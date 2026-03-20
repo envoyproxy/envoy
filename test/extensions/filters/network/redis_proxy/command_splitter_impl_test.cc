@@ -17,6 +17,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::_;
 using testing::DoAll;
@@ -1479,103 +1480,162 @@ INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithDelayFaultTest,
 class ScanHandlerTest : public FragmentedRequestCommandHandlerTest,
                         public testing::WithParamInterface<std::string> {
 public:
-  void setup(uint16_t shard_size, const std::list<uint64_t>& null_handle_indexes,
-             bool mirrored = false) {
-    std::vector<std::string> request_strings = {"scan", "0"};
-    makeRequestToShard(shard_size, request_strings, null_handle_indexes, mirrored);
+  void setupSingleShard(uint16_t shard_size, uint32_t target_shard, const std::string& cursor_str,
+                        bool null_handle = false) {
+    Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+    makeBulkStringArray(*request, {"scan", cursor_str});
+
+    pool_callbacks_.resize(1);
+    std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(1);
+    pool_requests_.swap(tmp_pool_requests);
+
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+    EXPECT_CALL(*conn_pool_, shardSize_()).WillRepeatedly(Return(shard_size));
+
+    Common::Redis::Client::PoolRequest* request_to_use = null_handle ? nullptr : &pool_requests_[0];
+    EXPECT_CALL(*conn_pool_, makeRequestToShard_(target_shard, _, _))
+        .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[0])), Return(request_to_use)));
+
+    handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   }
 
-  Common::Redis::RespValuePtr response() {
-    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
-    response->type(Common::Redis::RespType::Array);
-    return response;
+  Common::Redis::RespValuePtr scanResponse(const std::string& cursor,
+                                           const std::vector<std::string>& keys) {
+    auto resp = std::make_unique<Common::Redis::RespValue>();
+    resp->type(Common::Redis::RespType::Array);
+    std::vector<Common::Redis::RespValue> elements(2);
+
+    elements[0].type(Common::Redis::RespType::BulkString);
+    elements[0].asString() = cursor;
+
+    elements[1].type(Common::Redis::RespType::Array);
+    std::vector<Common::Redis::RespValue> key_values(keys.size());
+    for (uint64_t i = 0; i < keys.size(); i++) {
+      key_values[i].type(Common::Redis::RespType::BulkString);
+      key_values[i].asString() = keys[i];
+    }
+    elements[1].asArray().swap(key_values);
+    resp->asArray().swap(elements);
+    return resp;
+  }
+
+  Common::Redis::RespValue expectedScanResponse(const std::string& cursor,
+                                                const std::vector<std::string>& keys) {
+    Common::Redis::RespValue expected;
+    expected.type(Common::Redis::RespType::Array);
+    std::vector<Common::Redis::RespValue> elements(2);
+    elements[0].type(Common::Redis::RespType::BulkString);
+    elements[0].asString() = cursor;
+    elements[1].type(Common::Redis::RespType::Array);
+    std::vector<Common::Redis::RespValue> key_values(keys.size());
+    for (uint64_t i = 0; i < keys.size(); i++) {
+      key_values[i].type(Common::Redis::RespType::BulkString);
+      key_values[i].asString() = keys[i];
+    }
+    elements[1].asArray().swap(key_values);
+    expected.asArray().swap(elements);
+    return expected;
   }
 };
 
-TEST_P(ScanHandlerTest, Normal) {
+TEST_P(ScanHandlerTest, InitialScanRoutesToShardZero) {
   InSequence s;
 
-  setup(2, {});
+  setupSingleShard(3, 0, "0");
   EXPECT_NE(nullptr, handle_);
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Array);
-  pool_callbacks_[1]->onResponse(response());
+
+  Common::Redis::RespValue expected_response = expectedScanResponse("0:42", {"key1"});
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
   EXPECT_CALL(
       store_,
       deliverHistogramToSinks(
           Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  pool_callbacks_[0]->onResponse(response());
+  pool_callbacks_[0]->onResponse(scanResponse("42", {"key1"}));
+
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
 };
 
-TEST_P(ScanHandlerTest, Mirrored) {
+TEST_P(ScanHandlerTest, EncodedCursorRoutesToCorrectShard) {
   InSequence s;
 
-  setupMirrorPolicy();
-  setup(2, {}, true);
+  setupSingleShard(3, 1, "1:55");
   EXPECT_NE(nullptr, handle_);
 
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Array);
+  Common::Redis::RespValue expected_response = expectedScanResponse("1:99", {});
 
-  pool_callbacks_[1]->onResponse(response());
-  mirror_pool_callbacks_[1]->onResponse(response());
-
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  pool_callbacks_[0]->onResponse(response());
-  mirror_pool_callbacks_[0]->onResponse(response());
+  pool_callbacks_[0]->onResponse(scanResponse("99", {}));
+};
 
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+TEST_P(ScanHandlerTest, ShardDoneAdvancesToNextShard) {
+  InSequence s;
+
+  setupSingleShard(3, 0, "0");
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response = expectedScanResponse("1:0", {});
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(scanResponse("0", {}));
+};
+
+TEST_P(ScanHandlerTest, LastShardDoneReturnsZeroCursor) {
+  InSequence s;
+
+  setupSingleShard(3, 2, "2:10");
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response = expectedScanResponse("0", {});
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(scanResponse("0", {}));
+};
+
+TEST_F(ScanHandlerTest, InvalidCursorFormat) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"scan", "a:b:c"});
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "ERR invalid cursor";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillRepeatedly(Return(3));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+};
+
+TEST_F(ScanHandlerTest, ShardIndexOutOfBounds) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"scan", "5:0"});
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "ERR invalid cursor";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillRepeatedly(Return(3));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
 };
 
 TEST_F(ScanHandlerTest, Cancel) {
   InSequence s;
 
-  setup(2, {});
+  setupSingleShard(2, 0, "0");
   EXPECT_NE(nullptr, handle_);
 
   EXPECT_CALL(pool_requests_[0], cancel());
-  EXPECT_CALL(pool_requests_[1], cancel());
   handle_->cancel();
-};
-
-TEST_P(ScanHandlerTest, NormalOneZero) {
-  InSequence s;
-
-  setup(2, {});
-  EXPECT_NE(nullptr, handle_);
-
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Array);
-
-  pool_callbacks_[1]->onResponse(response());
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  pool_callbacks_[0]->onResponse(response());
-
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
-};
-
-TEST_P(ScanHandlerTest, UpstreamError) {
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Error);
-  expected_response.asString() = "finished with 2 error(s)";
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  setup(2, {0, 1});
-  EXPECT_EQ(nullptr, handle_);
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
 };
 
 TEST_P(ScanHandlerTest, NoUpstreamHostForAll) {
@@ -1583,8 +1643,25 @@ TEST_P(ScanHandlerTest, NoUpstreamHostForAll) {
   expected_response.type(Common::Redis::RespType::Error);
   expected_response.asString() = "no upstream host";
 
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  setup(0, {});
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"scan", "0"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+};
+
+TEST_P(ScanHandlerTest, UpstreamFailure) {
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "finished with 1 error(s)";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  setupSingleShard(2, 0, "0", true);
   EXPECT_EQ(nullptr, handle_);
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
   EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
@@ -1606,6 +1683,71 @@ TEST_F(ScanHandlerTest, ScanWrongNumberOfArgs) {
 };
 
 INSTANTIATE_TEST_SUITE_P(ScanHandlerTest, ScanHandlerTest, testing::Values("scan"));
+
+class ScanHandlerLegacyTest : public FragmentedRequestCommandHandlerTest {
+public:
+  ScanHandlerLegacyTest() {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.redis_scan_single_shard", "false"}});
+  }
+
+  void setup(uint16_t shard_size, const std::list<uint64_t>& null_handle_indexes) {
+    std::vector<std::string> request_strings = {"scan", "0"};
+    makeRequestToShard(shard_size, request_strings, null_handle_indexes, false);
+  }
+
+  Common::Redis::RespValuePtr response() {
+    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
+    response->type(Common::Redis::RespType::Array);
+    return response;
+  }
+
+  TestScopedRuntime scoped_runtime_;
+};
+
+TEST_F(ScanHandlerLegacyTest, FanOutToAllShards) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Array);
+
+  pool_callbacks_[1]->onResponse(response());
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.scan.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(response());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.scan.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.scan.success").value());
+};
+
+TEST_F(ScanHandlerLegacyTest, AllShardsUpstreamError) {
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "finished with 2 error(s)";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  setup(2, {0, 1});
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.scan.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.scan.error").value());
+};
+
+TEST_F(ScanHandlerLegacyTest, NoUpstreamHost) {
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "no upstream host";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  setup(0, {});
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.scan.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.scan.error").value());
+};
 
 // INFO.SHARD command handler tests - queries a single specific shard
 class InfoShardHandlerTest : public FragmentedRequestCommandHandlerTest,

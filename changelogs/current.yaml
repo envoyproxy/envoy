@@ -100,6 +100,12 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: redis_proxy
+  change: |
+    Fixed the SCAN command to return spec-compliant responses in sharded clusters. Previously, SCAN
+    fanned out to all shards and returned concatenated cursor/key pairs. The fix scans one shard at
+    a time using encoded cursors (``shard_index:upstream_cursor``). This behavior can be reverted by
+    setting ``envoy.reloadable_features.redis_scan_single_shard`` to ``false``.
 - area: hot_restart
   change: |
     Fixed hot restart for listeners with a network namespace in the address. Previously, socket

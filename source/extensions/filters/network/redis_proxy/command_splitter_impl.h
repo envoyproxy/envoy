@@ -304,10 +304,9 @@ private:
 };
 
 /**
- * ScanRequest is a specialized request for the SCAN command. It sends the command to all Redis
- * servers and merges the results. The SCAN command is used to incrementally iterate over keys in
- * the database, and it may return multiple pages of results. This request handles the pagination
- * by sending multiple requests to the Redis servers until all keys are retrieved.
+ * ScanRequest handles the SCAN command across a sharded Redis cluster. It routes each SCAN to a
+ * single shard using an encoded cursor format (shard_index:upstream_cursor) and advances through
+ * shards sequentially so the client sees a spec-compliant single-cursor response.
  */
 class ScanRequest : public FragmentedRequest {
 public:
@@ -318,10 +317,15 @@ public:
 
 private:
   ScanRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
-              bool delay_command_latency)
-      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+              bool delay_command_latency, uint32_t shard_size, uint32_t target_shard)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency),
+        shard_size_(shard_size), target_shard_(target_shard) {}
+
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
+
+  uint32_t shard_size_;
+  uint32_t target_shard_;
 };
 
 /**
