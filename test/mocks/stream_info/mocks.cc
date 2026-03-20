@@ -243,7 +243,8 @@ MockStreamInfo::MockStreamInfo()
         return makeOptRefFromPtr<const Upstream::ClusterInfo>(upstream_cluster_info_.get());
       }));
   ON_CALL(*this, upstreamClusterInfoSharedPtr())
-      .WillByDefault(ReturnPointee(&upstream_cluster_info_));
+      .WillByDefault(Invoke(
+          [this]() -> Upstream::ClusterInfoConstSharedPtr { return upstream_cluster_info_; }));
   ON_CALL(*this, addCustomFlag(_)).WillByDefault(Invoke([this](absl::string_view flag) {
     if (stream_flags_.empty()) {
       stream_flags_.append(flag);
