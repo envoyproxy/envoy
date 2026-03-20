@@ -75,7 +75,7 @@ message MethodParsingConfig {
   // If provided, this overrides any built-in classification for the method.
   // This will be emitted to dynamic metadata under the key specified by `group_metadata_key`.
   string group = 1;
-  // List of attributes to extract for this method, specified by their JSON paths(e.g., "params.name").
+  // List of attributes to extract for this method, specified by their JSON paths (e.g., "params.name").
   repeated string paths = 2;
 }
 
@@ -87,7 +87,7 @@ message ParserConfig {
   map<string, MethodParsingConfig> method_configs = 1;
 
   // Attributes that should always be extracted regardless of the method.
-  // Specified by their JSON paths(e.g., "params.id").
+  // Specified by their JSON paths (e.g., "params.id").
   repeated string always_extract_attributes = 2;
 
   // The dynamic metadata key under which the method's group name will be stored
