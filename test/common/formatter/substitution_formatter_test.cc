@@ -1129,9 +1129,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     const std::string observable_cluster_name = "observability_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Invoke([&cluster_info_mock]() {
-      return makeOptRefFromPtr<const Upstream::ClusterInfo>(cluster_info_mock.get());
-    }));
+    stream_info.upstream_cluster_info_ = cluster_info_mock;
     EXPECT_CALL(*cluster_info_mock, observabilityName())
         .WillRepeatedly(ReturnRef(observable_cluster_name));
     EXPECT_EQ("observability_name", upstream_format.format({}, stream_info));
@@ -1151,9 +1149,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
     const std::string raw_cluster_name = "raw_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Invoke([&cluster_info_mock]() {
-      return makeOptRefFromPtr<const Upstream::ClusterInfo>(cluster_info_mock.get());
-    }));
+    stream_info.upstream_cluster_info_ = cluster_info_mock;
     EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(raw_cluster_name));
     EXPECT_EQ("raw_name", upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info),
@@ -1162,8 +1158,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
-    EXPECT_CALL(stream_info, upstreamClusterInfo())
-        .WillRepeatedly(Return(OptRef<const Upstream::ClusterInfo>{}));
+    stream_info.upstream_cluster_info_ = nullptr;
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
@@ -4583,13 +4578,6 @@ TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataNoClusterInfoTest) {
   JsonFormatterImpl formatter(key_mapping, false);
 
   // No cluster info
-  {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo())
-        .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
-    EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format(formatter_context, stream_info),
-                                             expected_json_map));
-  }
-  // Empty cluster info (nullptr shared_ptr)
   {
     EXPECT_CALL(Const(stream_info), upstreamClusterInfo())
         .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));

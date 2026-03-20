@@ -352,10 +352,10 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
                      ->getDataReadOnly<TestIntAccessor>("test")
                      ->access());
 
-    EXPECT_FALSE(stream_info.upstreamClusterInfo());
+    EXPECT_FALSE(stream_info.upstreamClusterInfo().has_value());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
     stream_info.setUpstreamClusterInfo(cluster_info);
-    EXPECT_TRUE(stream_info.upstreamClusterInfo());
+    ASSERT_TRUE(stream_info.upstreamClusterInfo().has_value());
     EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo()->name());
 
     const std::string session_id =
@@ -506,7 +506,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
             s2.filterState()->getDataReadOnly<TestIntAccessor>("test")->access());
   EXPECT_EQ(*s1.getRequestHeaders(), headers1);
   EXPECT_EQ(*s2.getRequestHeaders(), headers2);
-  EXPECT_TRUE(s2.upstreamClusterInfo());
+  ASSERT_TRUE(s2.upstreamClusterInfo().has_value());
   EXPECT_EQ(s1.upstreamClusterInfo().ptr(), s2.upstreamClusterInfo().ptr());
   EXPECT_EQ(s1.getStreamIdProvider().value().get().toStringView().value(),
             s2.getStreamIdProvider().value().get().toStringView().value());

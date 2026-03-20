@@ -648,14 +648,6 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
         formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
         expected);
   }
-  // Empty cluster info (nullptr shared_ptr)
-  {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo())
-        .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
-    verifyOpenTelemetryOutput(
-        formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
-        expected);
-  }
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateTest) {
