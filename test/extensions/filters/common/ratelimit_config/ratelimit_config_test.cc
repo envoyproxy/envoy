@@ -82,7 +82,7 @@ public:
     config_ = std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::RateLimitConfig>(
         proto_config.rate_limits(), factory_context_, creation_status_);
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
-    ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
+    stream_info_.route_ = route_;
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;

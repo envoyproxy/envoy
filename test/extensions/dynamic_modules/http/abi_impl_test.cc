@@ -782,7 +782,7 @@ TEST(ABIImpl, metadata) {
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo())
       .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -905,7 +905,7 @@ TEST(ABIImpl, metadata_bool) {
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo())
       .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -980,7 +980,7 @@ TEST(ABIImpl, metadata_keys) {
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo())
       .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -1043,7 +1043,7 @@ TEST(ABIImpl, metadata_namespaces) {
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo())
       .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -1111,7 +1111,7 @@ TEST(ABIImpl, metadata_list) {
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
   EXPECT_CALL(callbacks, clusterInfo())
       .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
