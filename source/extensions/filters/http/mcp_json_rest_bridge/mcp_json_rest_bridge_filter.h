@@ -92,7 +92,7 @@ private:
     OperationFailed = 6,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
-  absl::optional<int> session_id_;
+  absl::optional<nlohmann::json> session_id_;
   std::string server_name_;
   Buffer::OwnedImpl request_body_;
   std::string request_body_str_;

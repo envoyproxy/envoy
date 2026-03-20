@@ -744,8 +744,5 @@ new_features:
   change: |
     Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
     This filter is currently a work-in-progress and not recommended for production use.
-- area: mcp_json_rest_bridge
-  change: |
-    Added support for MCP ``tools/list`` request and response transcoding.
 
 deprecated:

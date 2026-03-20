@@ -15,25 +15,18 @@ namespace {
 using ::nlohmann::json;
 namespace McpConstants = Envoy::Extensions::Filters::Common::Mcp::McpConstants;
 
-absl::StatusOr<int> getSessionId(const json& json_rpc) {
+absl::StatusOr<json> getSessionId(const json& json_rpc) {
   if (auto it = json_rpc.find(McpConstants::ID_FIELD); it != json_rpc.end()) {
-    if (it->is_number_integer()) {
-      return it->get<int>();
+    if (it->is_number_integer() || it->is_string()) {
+      return *it;
     }
-    if (it->is_string()) {
-      int int_id;
-      // TODO(guoyilin42): Support non-numeric string IDs as MCP is JSON-RPC compliant.
-      if (absl::SimpleAtoi(it->get<std::string>(), &int_id)) {
-        return int_id;
-      }
-    }
-    return absl::InvalidArgumentError("JSON-RPC request ID is not an integer or a numeric string.");
+    return absl::InvalidArgumentError("JSON-RPC request ID is not an integer or a string.");
   }
   return absl::InvalidArgumentError("JSON-RPC request (except notification) does not have an ID.");
 }
 
-json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response, int session_id,
-                                        bool is_error) {
+json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response,
+                                        const json& session_id, bool is_error) {
   return json{
       {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
       {McpConstants::ID_FIELD, session_id},
@@ -47,7 +40,7 @@ json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response, in
   };
 }
 
-json generateInitializeResponse(int session_id, absl::string_view server_name) {
+json generateInitializeResponse(const json& session_id, absl::string_view server_name) {
   json ret;
   ret[McpConstants::JSONRPC_FIELD] = McpConstants::JSONRPC_VERSION;
   ret[McpConstants::ID_FIELD] = session_id;
@@ -244,6 +237,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
   }
 
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
+  // TODO(guoyilin42): Consider supporting local response for tools/list in addition to the GET.
   if (method == McpConstants::Methods::TOOLS_LIST) {
     absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
         config_->getToolsListHttpRule();
@@ -252,10 +246,9 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
       // We don't support pagination for the tools/list request for now.
       auto request_headers = decoder_callbacks_->requestHeaders();
       if (request_headers.has_value()) {
-        // TODO(guoyilin42): Add config validation logic to ensure tool_list_http_rule is mapped to
-        // a GET request with an empty body.
         request_headers->setPath(http_rule->get());
         request_headers->setMethod(Http::Headers::get().MethodValues.Get);
+        request_headers->removeTransferEncoding();
         request_headers->removeContentLength();
         request_headers->removeContentType();
         // Set AcceptEncoding to "identity" to prevent server encoding the response.
@@ -367,11 +360,10 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
       ENVOY_STREAM_LOG(error, "Failed to parse error response.", *encoder_callbacks_);
       return;
     }
-    json ret = {
-        {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
-        // If the ID is missing in the request, the ID in the response should be null.
-        {McpConstants::ID_FIELD, session_id_.has_value() ? json(*session_id_) : json(nullptr)},
-        {McpConstants::ERROR_FIELD, error}};
+    json ret = {{McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+                // If the ID is missing in the request, the ID in the response should be null.
+                {McpConstants::ID_FIELD, session_id_.has_value() ? *session_id_ : json(nullptr)},
+                {McpConstants::ERROR_FIELD, error}};
     response_body_str_ = ret.dump();
     break;
   }
@@ -488,7 +480,7 @@ void McpJsonRestBridgeFilter::sendErrorResponse(Http::Code response_code,
 }
 
 absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc) {
-  absl::StatusOr<int> session_id = getSessionId(json_rpc);
+  absl::StatusOr<nlohmann::json> session_id = getSessionId(json_rpc);
   if (session_id.ok()) {
     session_id_ = *session_id;
   }
