@@ -164,15 +164,15 @@ Stats::StatNameTagVectorOptConstRef GaugeKey::tags() const {
 }
 
 bool GaugeKey::operator==(const GaugeKey& rhs) const {
+  if (stat_name_ != rhs.stat_name_ || import_mode_ != rhs.import_mode_) {
+    return false;
+  }
   auto lhs_tags = tags();
   auto rhs_tags = rhs.tags();
-  if (stat_name_ != rhs.stat_name_ || import_mode_ != rhs.import_mode_)
+  if (lhs_tags.has_value() != rhs_tags.has_value()) {
     return false;
-  if (lhs_tags.has_value() != rhs_tags.has_value())
-    return false;
-  if (!lhs_tags.has_value())
-    return true;
-  return lhs_tags.value().get() == rhs_tags.value().get();
+  }
+  return !lhs_tags.has_value() || lhs_tags.value().get() == rhs_tags.value().get();
 }
 
 StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v3::Config& config,
