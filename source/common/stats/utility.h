@@ -232,6 +232,21 @@ TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
 
+
+/**
+ * Returns vectors of stats held in the store. This must only be called
+ * from the main thread. The stats are returns as pointers, and the the
+ * pointers will remain valid only until the main thread is released --
+ * this is because stats are always deleted on the main thread.
+ *
+ * These functions handle de-duplication.
+ */
+std::vector<Stats::Counter*> collectCountersMainThread(Stats::Store& store);
+std::vector<Stats::Gauge*> collectGaugesMainThread(Stats::Store& store);
+std::vector<Stats::TextReadout*> collectTextreadoutsMainThread(Stats::Store& store);
+std::vector<Stats::ParentHistogram*> collectHistogramsMainThread(Stats::Store& store);
+
+
 } // namespace Utility
 
 /**

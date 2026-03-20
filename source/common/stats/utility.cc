@@ -7,6 +7,10 @@
 #include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
 
+#include "envoy/stats/store.h"
+
+#include "source/common/common/thread.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -123,6 +127,42 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
   return scope.textReadoutFromStatNameWithTags(StatName(joined.get()), tags);
+}
+
+std::vector<Stats::Counter*> collectCountersMainThread(Stats::Store& store) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  std::vector<Stats::Counter*> counters;
+  store.forEachCounter([&counters](size_t size) { counters.reserve(size); },
+                       [&counters](Counter& counter) { counters.push_back(&counter); });
+  return counters;
+}
+
+std::vector<Stats::Gauge*> collectGaugesMainThread(Stats::Store& store) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  std::vector<Stats::Gauge*> gauges;
+  store.forEachGauge([&gauges](size_t size) { gauges.reserve(size); },
+                     [&gauges](Gauge& gauge) { gauges.push_back(&gauge); });
+  return gauges;
+}
+
+std::vector<Stats::TextReadout*> collectTextReadoutsMainThread(Stats::Store& store) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  std::vector<Stats::TextReadout*> text_readouts;
+  store.forEachTextReadout([&text_readouts](size_t size) { text_readouts.reserve(size); },
+                           [&text_readouts](TextReadout& text_readout) {
+                             text_readouts.push_back(&text_readout); });
+
+  return text_readouts;
+}
+
+std::vector<Stats::ParentHistogram*> collectHistogramsMainThread(Stats::Store& store) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  std::vector<Stats::ParentHistogram*> histograms;
+  store.forEachHistogram([&histograms](size_t size) { histograms.reserve(size); },
+                         [&histograms](ParentHistogram& histogram) {
+                           histograms.push_back(&histogram);
+                         });
+  return histograms;
 }
 
 } // namespace Utility
