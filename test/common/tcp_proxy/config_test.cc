@@ -871,9 +871,9 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
             cluster_info = upstream_cluster_info;
           }));
   EXPECT_CALL(connection_.stream_info_, upstreamClusterInfo())
-      .WillOnce(Invoke([&cluster_info]() -> OptRef<const Upstream::ClusterInfo> {
+      .WillOnce([&cluster_info]() -> OptRef<const Upstream::ClusterInfo> {
         return makeOptRefFromPtr<const Upstream::ClusterInfo>(cluster_info.get());
-      }));
+      });
 
   filter_->onNewConnection();
 

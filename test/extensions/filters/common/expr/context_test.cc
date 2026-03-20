@@ -874,8 +874,7 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
-    EXPECT_CALL(info, upstreamClusterInfo())
-        .WillRepeatedly(Return(OptRef<const Upstream::ClusterInfo>{}));
+    info.upstream_cluster_info_ = nullptr;
     auto value = upstream[CelValue::CreateStringView(UpstreamNumEndpoints)];
     EXPECT_FALSE(value.has_value());
   }

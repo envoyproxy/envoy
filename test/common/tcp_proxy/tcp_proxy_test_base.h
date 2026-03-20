@@ -69,9 +69,9 @@ public:
           upstream_cluster_ = cluster_info;
         }));
     ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamClusterInfo())
-        .WillByDefault(Invoke([this]() -> OptRef<const Upstream::ClusterInfo> {
+        .WillByDefault([this]() -> OptRef<const Upstream::ClusterInfo> {
           return makeOptRefFromPtr<const Upstream::ClusterInfo>(upstream_cluster_.get());
-        }));
+        });
     factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"fake_cluster"});
   }
