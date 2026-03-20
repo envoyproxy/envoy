@@ -1399,7 +1399,7 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->clusterInfo());
 
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().route());
-        EXPECT_FALSE(decoder_filters_[2]->callbacks_->streamInfo().virtualHost());
+        EXPECT_FALSE(decoder_filters_[2]->callbacks_->streamInfo().virtualHost().has_value());
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -1454,7 +1454,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->clusterInfo());
 
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().route());
-        EXPECT_FALSE(decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
+        EXPECT_FALSE(decoder_filters_[1]->callbacks_->streamInfo().virtualHost().has_value());
 
         return FilterHeadersStatus::StopIteration;
       }));

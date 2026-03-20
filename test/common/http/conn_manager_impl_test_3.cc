@@ -1313,7 +1313,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
         EXPECT_EQ(nullptr, decoder_filters_[0]->callbacks_->route());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_FALSE(decoder_filters_[0]->callbacks_->streamInfo().virtualHost());
+        EXPECT_FALSE(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().has_value());
         EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), nullptr);
 
         // Clear route and next call on callbacks_->route() will trigger a re-snapping of the
@@ -2809,7 +2809,7 @@ TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteClusterWithoutRouteCache) 
         filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_FALSE(filter->callbacks_->streamInfo().virtualHost());
+        EXPECT_FALSE(filter->callbacks_->streamInfo().virtualHost().has_value());
         EXPECT_EQ(filter->callbacks_->streamInfo().route(), nullptr);
 
         return FilterHeadersStatus::StopIteration;
