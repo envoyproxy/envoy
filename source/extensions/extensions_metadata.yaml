@@ -285,6 +285,7 @@ envoy.filters.http.a2a:
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: stable
   type_urls:
