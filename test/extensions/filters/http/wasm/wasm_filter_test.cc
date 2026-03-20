@@ -1933,7 +1933,9 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
   EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(*cluster_metadata));
   EXPECT_CALL(request_stream_info_, requestComplete)
       .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-  EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
+  EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Invoke([&cluster]() {
+    return makeOptRefFromPtr<const Upstream::ClusterInfo>(cluster.get());
+  }));
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
   filter().log({&request_headers}, request_stream_info_);

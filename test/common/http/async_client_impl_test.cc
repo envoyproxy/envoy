@@ -103,9 +103,7 @@ public:
 class AsyncClientImplTracingTest : public AsyncClientImplTest {
 public:
   AsyncClientImplTracingTest() {
-    ON_CALL(stream_info_, upstreamClusterInfo())
-        .WillByDefault(Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(
-            cm_.thread_local_cluster_.cluster_.info_)));
+    stream_info_.upstream_cluster_info_ = cm_.thread_local_cluster_.cluster_.info_;
   }
 
   Tracing::MockSpan parent_span_;

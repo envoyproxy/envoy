@@ -1129,8 +1129,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     const std::string observable_cluster_name = "observability_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Invoke([&cluster_info_mock]() {
+      return makeOptRefFromPtr<const Upstream::ClusterInfo>(cluster_info_mock.get());
+    }));
     EXPECT_CALL(*cluster_info_mock, observabilityName())
         .WillRepeatedly(ReturnRef(observable_cluster_name));
     EXPECT_EQ("observability_name", upstream_format.format({}, stream_info));
@@ -1140,8 +1141,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_CALL(stream_info, upstreamClusterInfo())
+        .WillRepeatedly(Return(OptRef<const Upstream::ClusterInfo>{}));
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
@@ -1150,8 +1151,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
     const std::string raw_cluster_name = "raw_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Invoke([&cluster_info_mock]() {
+      return makeOptRefFromPtr<const Upstream::ClusterInfo>(cluster_info_mock.get());
+    }));
     EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(raw_cluster_name));
     EXPECT_EQ("raw_name", upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info),
@@ -1160,8 +1162,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    EXPECT_CALL(stream_info, upstreamClusterInfo())
+        .WillRepeatedly(Return(OptRef<const Upstream::ClusterInfo>{}));
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
@@ -4537,11 +4539,9 @@ TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataTest) {
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
-  absl::optional<std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>> cluster =
-      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(**cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
-  EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
-  EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
+  stream_info.upstream_cluster_info_ = cluster;
 
   const std::string expected_json_map = R"EOF({
     "test_key": "test_value",
@@ -4582,15 +4582,17 @@ TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataNoClusterInfoTest) {
                             key_mapping);
   JsonFormatterImpl formatter(key_mapping, false);
 
-  // Empty optional (absl::nullopt)
+  // No cluster info
   {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
+    EXPECT_CALL(Const(stream_info), upstreamClusterInfo())
+        .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
     EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format(formatter_context, stream_info),
                                              expected_json_map));
   }
-  // Empty cluster info (nullptr)
+  // Empty cluster info (nullptr shared_ptr)
   {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(nullptr));
+    EXPECT_CALL(Const(stream_info), upstreamClusterInfo())
+        .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
     EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format(formatter_context, stream_info),
                                              expected_json_map));
   }
