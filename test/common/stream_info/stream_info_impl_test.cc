@@ -496,7 +496,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.requestComplete(), s2.requestComplete());
   EXPECT_EQ(s1.responseFlags(), s2.responseFlags());
   EXPECT_EQ(s1.healthCheck(), s2.healthCheck());
-  EXPECT_TRUE(s1.route());
+  EXPECT_TRUE(s1.route().has_value());
   EXPECT_EQ(s1.route().ptr(), s2.route().ptr());
   EXPECT_EQ(
       Config::Metadata::metadataValue(&s1.dynamicMetadata(), "com.test", "test_key").string_value(),
