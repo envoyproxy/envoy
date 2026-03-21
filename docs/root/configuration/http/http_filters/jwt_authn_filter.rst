@@ -287,7 +287,7 @@ Extract-Only Mode Security Considerations
    **Configuration:**
 
    The header name is configurable via ``verification_status_header`` in
-   ``ExtractOnlyWithoutValidation``. Set to ``-`` to disable (not recommended).
+   ``ExtractOnlyWithoutValidation``. The header is always set and cannot be disabled.
 
    **Recommended alternative:** Use ``provider_name`` with ``remote_jwks``
    or ``local_jwks`` for full signature verification.

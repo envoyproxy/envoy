@@ -101,21 +101,16 @@ FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route) co
 
 void FilterConfigImpl::validateExtractOnlyWithoutValidationUsage(
     const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config) {
-  // Resolve verification status header and detect extract_only usage.
+  // Resolve verification status header name.
   std::string verification_header = "x-jwt-signature-verified";
   bool extract_only_used = false;
-  bool verification_disabled = false;
 
   for (const auto& rule : config.rules()) {
     if (rule.has_requires() && rule.requires().has_extract_only_without_validation()) {
       extract_only_used = true;
       const auto& econfig = rule.requires().extract_only_without_validation();
       if (!econfig.verification_status_header().empty()) {
-        if (econfig.verification_status_header() == "-") {
-          verification_disabled = true;
-        } else {
-          verification_header = econfig.verification_status_header();
-        }
+        verification_header = econfig.verification_status_header();
       }
       break;
     }
@@ -125,32 +120,15 @@ void FilterConfigImpl::validateExtractOnlyWithoutValidationUsage(
     return;
   }
 
-  if (verification_disabled) {
-    ENVOY_LOG(critical,
-              "jwt_authn: SECURITY WARNING - extract_only_without_validation is in use "
-              "with verification_status_header DISABLED. Downstream filters have NO way "
-              "to distinguish forged JWT claims from verified ones.");
-  }
-
-  // Warn per claim header with specific RBAC guidance.
+  // Warn per claim header with RBAC guidance.
   for (const auto& [provider_name, provider] : config.providers()) {
     for (const auto& claim_to_header : provider.claim_to_headers()) {
-      if (verification_disabled) {
-        ENVOY_LOG(critical,
-                  "jwt_authn: Claim header '{}' (claim: '{}') from provider '{}' "
-                  "will be set WITHOUT signature verification and WITHOUT a verification "
-                  "status header. Any RBAC or ext_authz policy matching on '{}' can be "
-                  "bypassed with a forged JWT.",
-                  claim_to_header.header_name(), claim_to_header.claim_name(),
-                  provider_name, claim_to_header.header_name());
-      } else {
-        ENVOY_LOG(warn,
-                  "jwt_authn: Claim header '{}' (claim: '{}') from provider '{}' will "
-                  "be set WITHOUT signature verification. Ensure RBAC policies check "
-                  "'{}' before trusting '{}' for authorization.",
-                  claim_to_header.header_name(), claim_to_header.claim_name(),
-                  provider_name, verification_header, claim_to_header.header_name());
-      }
+      ENVOY_LOG(warn,
+                "jwt_authn: Claim header '{}' (claim: '{}') from provider '{}' will "
+                "be set WITHOUT signature verification. Ensure RBAC policies check "
+                "'{}' before trusting '{}' for authorization.",
+                claim_to_header.header_name(), claim_to_header.claim_name(),
+                provider_name, verification_header, claim_to_header.header_name());
     }
 
     if (!provider.forward_payload_header().empty()) {

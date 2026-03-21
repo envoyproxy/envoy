@@ -533,14 +533,8 @@ namespace {
 
 std::string getVerificationStatusHeaderName(
     const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation& config) {
-  const auto& configured = config.verification_status_header();
-  if (configured == "-") {
-    ENVOY_LOG(warn, "jwt_authn: verification_status_header disabled. "
-              "Downstream filters cannot distinguish unverified claims.");
-    return "";
-  }
-  if (!configured.empty()) {
-    return configured;
+  if (!config.verification_status_header().empty()) {
+    return config.verification_status_header();
   }
   return "x-jwt-signature-verified";
 }

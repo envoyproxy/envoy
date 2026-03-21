@@ -619,10 +619,9 @@ message JwtRequirement {
 
 // Configuration for extract-only mode without JWT signature validation.
 //
-// When this mode is active, a verification status header is set on the request
-// to signal to downstream filters (RBAC, ext_authz) that the JWT claims were
-// NOT cryptographically verified. This header is set by default and requires
-// no configuration.
+// When this mode is active, a verification status header is always set on
+// the request to signal to downstream filters (RBAC, ext_authz) that the
+// JWT claims were NOT cryptographically verified.
 //
 message ExtractOnlyWithoutValidation {
   // Name of the HTTP header set to "false" on requests where JWT claims
@@ -633,7 +632,9 @@ message ExtractOnlyWithoutValidation {
   //
   // Default (unset or empty): "x-jwt-signature-verified"
   // Custom value: uses the specified header name
-  // Set to "-" to disable the header entirely (NOT RECOMMENDED)
+  //
+  // The header is always set and cannot be disabled. If removal is needed
+  // downstream, use header mutation in a subsequent filter.
   //
   // Example: with the default, all requests processed by this mode will have:
   //   x-jwt-signature-verified: false

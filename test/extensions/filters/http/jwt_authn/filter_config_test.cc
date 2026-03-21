@@ -377,17 +377,7 @@ providers:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
                              HasSubstr("Duration out-of-range"));
-}
-
-
-// Test: Config with disabled verification header loads with critical warning.
-TEST_F(FilterConfigTest, ExtractOnlyWithDisabledVerificationHeader) {
-  const char config_yaml[] = R"(
-providers:
-  test_provider:
-    issuer: "https://example.com"
-    local_jwks:
-      inline_string: "{}"
+}"
     claim_to_headers:
     - header_name: "x-jwt-claim-role"
       claim_name: "role"

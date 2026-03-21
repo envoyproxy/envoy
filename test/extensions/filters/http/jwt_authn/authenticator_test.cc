@@ -1224,10 +1224,13 @@ TEST_F(AuthenticatorTest, ExtractOnlyCustomVerificationHeader) {
 }
 
 // Test: allow_unprefixed_headers=true skips prefix (dangerous path).
-TEST_F(AuthenticatorTest, ExtractOnlyDisableVerificationHeader) {
+TEST_F(AuthenticatorTest, ExtractOnlyHeaderAlwaysSet) {
   envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation config;
-  config.set_verification_status_header("-");
-  EXPECT_EQ(config.verification_status_header(), "-");
+  // Header is always set — no disable option. Empty means default.
+  EXPECT_TRUE(config.verification_status_header().empty());
+  // Custom name works
+  config.set_verification_status_header("x-custom");
+  EXPECT_EQ(config.verification_status_header(), "x-custom");
 }
 
 // Test: Verification status header can be disabled.

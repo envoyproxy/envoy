@@ -40,9 +40,9 @@ minor_behavior_changes:
   change: |
     added configurable ``verification_status_header`` to ``extract_only_without_validation``
     JWT requirement type. When claims are extracted without signature verification, Envoy
-    now sets ``x-jwt-signature-verified: false`` by default so downstream filters (RBAC,
-    ext_authz) can distinguish unverified claims. Enhanced config validation warns per
-    claim header with specific RBAC guidance. Set header to ``-`` to disable (not recommended).
+    now always sets ``x-jwt-signature-verified: false`` so downstream filters (RBAC,
+    ext_authz) can distinguish unverified claims. The header name is configurable.
+    Enhanced config validation warns per claim header with specific RBAC guidance.
 
 - area: memory
   change: |
