@@ -390,7 +390,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
                                                // going to invoke check call.
-  cluster_ = decoder_callbacks_->clusterInfo();
+  cluster_ = decoder_callbacks_->clusterInfoSharedPtr();
   initiating_call_ = true;
   client_->check(*this, check_request_, decoder_callbacks_->activeSpan(),
                  decoder_callbacks_->streamInfo());

@@ -238,7 +238,9 @@ TEST_F(HttpRateLimitFilterTest, NoRoute) {
 TEST_F(HttpRateLimitFilterTest, NoCluster) {
   setUpTest(filter_config_);
 
-  ON_CALL(filter_callbacks_, clusterInfo()).WillByDefault(Return(nullptr));
+  ON_CALL(filter_callbacks_, clusterInfo())
+      .WillByDefault(Return(OptRef<const Upstream::ClusterInfo>{}));
+  ON_CALL(filter_callbacks_, clusterInfoSharedPtr()).WillByDefault(Return(nullptr));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));

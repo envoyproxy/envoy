@@ -4885,7 +4885,9 @@ TEST_P(HttpFilterTestParam, OnDestroyCancelsDefaultClient) {
 // (this could be the case when route is configured with redirect or direct response action).
 TEST_P(HttpFilterTestParam, NoCluster) {
 
-  ON_CALL(decoder_filter_callbacks_, clusterInfo()).WillByDefault(Return(nullptr));
+  ON_CALL(decoder_filter_callbacks_, clusterInfo())
+      .WillByDefault(Return(OptRef<const Upstream::ClusterInfo>{}));
+  ON_CALL(decoder_filter_callbacks_, clusterInfoSharedPtr()).WillByDefault(Return(nullptr));
 
   // Place something in the context extensions on the route.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settingsroute;

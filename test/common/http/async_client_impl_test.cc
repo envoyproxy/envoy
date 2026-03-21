@@ -2378,7 +2378,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   const auto& route_config = route->virtualHost()->routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
-  auto cluster_info = filter_callbacks->clusterInfo();
+  auto cluster_info = filter_callbacks->clusterInfoSharedPtr();
   ASSERT_NE(nullptr, cluster_info);
   EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_, cluster_info);
   EXPECT_CALL(stream_callbacks_, onReset());

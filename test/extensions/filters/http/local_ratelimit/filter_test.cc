@@ -613,7 +613,9 @@ TEST_F(DescriptorFilterTest, NoRouteEntry) {
 TEST_F(DescriptorFilterTest, NoCluster) {
   setUpTest(fmt::format(descriptor_config_yaml, "1", "\"OFF\"", "1", "0"));
 
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(decoder_callbacks_, clusterInfoSharedPtr()).WillRepeatedly(testing::Return(nullptr));
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));

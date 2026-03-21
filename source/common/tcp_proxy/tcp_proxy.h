@@ -554,9 +554,16 @@ public:
       IS_ENVOY_BUG("Not implemented. Unexpected call to resetStream()");
     };
     Router::RouteConstSharedPtr route() override { return route_; }
-    Upstream::ClusterInfoConstSharedPtr clusterInfo() override {
-      return parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())
-          ->info();
+    OptRef<const Upstream::ClusterInfo> clusterInfo() override {
+      // Keep the shared pointer to ensure the cluster info's lifetime covers the entire request.
+      cluster_info_ =
+          parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())->info();
+      return makeOptRefFromPtr<const Upstream::ClusterInfo>(cluster_info_.get());
+    }
+    Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() override {
+      cluster_info_ =
+          parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())->info();
+      return cluster_info_;
     }
     uint64_t streamId() const override {
       auto sip = parent_->getStreamInfo().getStreamIdProvider();
@@ -637,6 +644,7 @@ public:
       DUMP_DETAILS(parent_->getStreamInfo().upstreamInfo());
     }
     Filter* parent_{};
+    Upstream::ClusterInfoConstSharedPtr cluster_info_;
     Http::RequestTrailerMapPtr request_trailer_map_;
     std::shared_ptr<Http::NullRouteImpl> route_;
   };
