@@ -273,6 +273,14 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: ratelimit
+  change: |
+    Added ``hits_subtrahend`` support to the rate limit API. This allows rate limit requests to refill
+    previously consumed tokens in both the global rate limit service and the local rate limit token
+    bucket. The value can be configured per rate limit action via
+    :ref:`hits_subtrahend <envoy_v3_api_field_config.route.v3.RateLimit.hits_subtrahend>`,
+    per descriptor in :ref:`RateLimitDescriptor <envoy_v3_api_field_extensions.common.ratelimit.v3.RateLimitDescriptor.hits_subtrahend>`,
+    or dynamically via the ``envoy.ratelimit.hits_subtrahend`` filter state key.
 - area: dynamic_modules
   change: |
     Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform

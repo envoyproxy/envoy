@@ -87,6 +87,22 @@ bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume) {
   return token_bucket_.consume(cb) != 0.0;
 }
 
+void RateLimitTokenBucket::refill(uint64_t tokens) {
+  if (tokens == 0) {
+    return;
+  }
+  // Use a negative consumed value to add tokens back, capped so we never exceed max_tokens.
+  token_bucket_.consume([tokens_to_refill = static_cast<double>(tokens),
+                         max = token_bucket_.maxTokens()](double total) -> double {
+    const double headroom = max - total;
+    if (headroom <= 0) {
+      return 0.0; // Already at or above max, nothing to refill.
+    }
+    // Return negative consumed = tokens added back, capped at available headroom.
+    return -std::min(tokens_to_refill, headroom);
+  });
+}
+
 LocalRateLimiterImpl::LocalRateLimiterImpl(
     const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
     const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
@@ -196,6 +212,11 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
       // token bucket.
       return {false, std::shared_ptr<TokenBucketContext>(match_result.token_bucket),
               match_result.request_descriptor.get().x_ratelimit_option_};
+    }
+    // Refill tokens back if hits_subtrahend is set, capped at max bucket size.
+    if (match_result.request_descriptor.get().hits_subtrahend_.has_value()) {
+      match_result.token_bucket->refill(
+          match_result.request_descriptor.get().hits_subtrahend_.value());
     }
     ENVOY_LOG(trace,
               "request allowed by descriptor with fill rate: {}, maxToken: {}, remainingToken {}",

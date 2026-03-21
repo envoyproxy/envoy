@@ -435,6 +435,153 @@ TEST_F(RateLimitConfigTest, MultipleActionsAndStringHitsAddend) {
   }
 }
 
+TEST_F(RateLimitConfigTest, HasHitsSubtrahendButEmpty) {
+  const std::string yaml = R"EOF(
+    actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_subtrahend: {}
+  )EOF";
+
+  ProtoRateLimit rate_limit;
+  TestUtility::loadFromYaml(yaml, rate_limit);
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(rate_limit, factory_context_, creation_status);
+
+  EXPECT_TRUE(absl::StartsWith(creation_status.message(),
+                               "hits_subtrahend must contain either a format or a number"));
+}
+
+TEST_F(RateLimitConfigTest, HasHitsSubtrahendButBothAreSet) {
+  const std::string yaml = R"EOF(
+    actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_subtrahend:
+      number: 1
+      format: "%BYTES_RECEIVED%"
+  )EOF";
+
+  ProtoRateLimit rate_limit;
+  TestUtility::loadFromYaml(yaml, rate_limit);
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(rate_limit, factory_context_, creation_status);
+
+  EXPECT_TRUE(absl::StartsWith(creation_status.message(),
+                               "hits_subtrahend must contain either a format or a number"));
+}
+
+TEST_F(RateLimitConfigTest, HasHitsSubtrahendButFormatWrong) {
+  const std::string yaml = R"EOF(
+    actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_subtrahend:
+      format: "%BYTES_RECEIVED%%BYTES_RECEIVED%"
+  )EOF";
+
+  ProtoRateLimit rate_limit;
+  TestUtility::loadFromYaml(yaml, rate_limit);
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(rate_limit, factory_context_, creation_status);
+
+  EXPECT_EQ(creation_status.message(),
+            "hits_subtrahend format must contain exactly one substitution");
+}
+
+TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndHitsSubtrahend) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_subtrahend:
+      format: "%BYTES_RECEIVED%"
+  - actions:
+    - destination_cluster: {}
+    hits_subtrahend:
+      number: 3
+  )EOF";
+
+  setupTest(yaml);
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+  stream_info_.bytes_received_ = 321;
+  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+  std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
+      {{{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}},
+      {{{"destination_cluster", "fake_cluster"}}}};
+
+  EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
+  EXPECT_EQ(321, descriptors[0].hits_subtrahend_.value());
+  EXPECT_EQ(3, descriptors[1].hits_subtrahend_.value());
+}
+
+TEST_F(RateLimitConfigTest, MultipleActionsAndStringHitsSubtrahend) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_subtrahend:
+      format: "%REQ(x-test-hits-subtrahend)%"
+  )EOF";
+
+  setupTest(yaml);
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+    headers_.setCopy(Http::LowerCaseString("x-test-hits-subtrahend"), "321");
+    config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+    std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
+        {{{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}}};
+
+    EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
+    EXPECT_EQ(321, descriptors[0].hits_subtrahend_.value());
+  }
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+    headers_.setCopy(Http::LowerCaseString("x-test-hits-subtrahend"), "-1");
+    config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+    EXPECT_TRUE(descriptors.empty());
+  }
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+    headers_.setCopy(Http::LowerCaseString("x-test-hits-subtrahend"), "11000000000");
+    config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+    EXPECT_TRUE(descriptors.empty());
+  }
+}
+
+TEST_F(RateLimitConfigTest, BothHitsAddendAndSubtrahendIsRejected) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_addend:
+      number: 5
+    hits_subtrahend:
+      number: 2
+  )EOF";
+
+  setupTest(yaml);
+  EXPECT_EQ(creation_status_.message(),
+            "only one of hits_addend or hits_subtrahend can be specified");
+}
+
 class RateLimitPolicyTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
