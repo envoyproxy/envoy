@@ -49,10 +49,6 @@ class TcpGrpcAccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamT
 public:
   TcpGrpcAccessLogIntegrationTest()
       : BaseIntegrationTest(ipVersion(), ConfigHelper::tcpProxyConfig()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'grpc.accesslog.streams_closed_14' and stat_prefix
-    // 'accesslog'.
-    skip_tag_extraction_rule_check_ = true;
 
     enableHalfClose(true);
   }

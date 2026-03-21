@@ -24,10 +24,6 @@ class AccessLogIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'grpc.accesslog.streams_closed_11' and stat_prefix
-    // 'accesslog'.
-    skip_tag_extraction_rule_check_ = true;
   }
 
   void createUpstreams() override {

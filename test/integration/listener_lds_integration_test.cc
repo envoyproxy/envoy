@@ -38,10 +38,6 @@ public:
 
   ListenerIntegrationTestBase(Network::Address::IpVersion version, const std::string& config)
       : HttpIntegrationTest(Http::CodecType::HTTP1, version, config) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'listener_manager.lds.grpc.lds_cluster.streams_closed_1' and stat_prefix 'lds_cluster'.
-    skip_tag_extraction_rule_check_ = true;
   }
 
   ~ListenerIntegrationTestBase() override { resetConnections(); }
@@ -1193,10 +1189,6 @@ public:
           stat_prefix: tcp_stats
           cluster: cluster_0
 )EOF") {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'listener_manager.lds.grpc.lds_cluster.streams_closed_1' and stat_prefix 'lds_cluster'.
-    skip_tag_extraction_rule_check_ = true;
   }
 
   ~ListenerFilterIntegrationTest() override {
