@@ -22,11 +22,19 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
 
   Tracers::OpenTelemetry::ResourceProviderPtr resource_provider =
       std::make_unique<Tracers::OpenTelemetry::ResourceProviderImpl>();
-  auto otlp_options = std::make_shared<OtlpOptions>(
-      sink_config,
-      resource_provider->getResource(sink_config.resource_detectors(), server,
-                                     /*service_name=*/""),
-      server);
+  auto resource = resource_provider->getResource(sink_config.resource_detectors(), server,
+                                                  /*service_name=*/"");
+  // Inject Envoy node attributes into the resource so that downstream collectors
+  // can identify which Envoy instance emitted the metrics. Only populated when
+  // not already set by a configured resource detector.
+  const auto& local_info = server.localInfo();
+  if (!local_info.nodeName().empty()) {
+    resource.attributes_.try_emplace("node.id", local_info.nodeName());
+  }
+  if (!local_info.clusterName().empty()) {
+    resource.attributes_.try_emplace("node.cluster", local_info.clusterName());
+  }
+  auto otlp_options = std::make_shared<OtlpOptions>(sink_config, resource, server);
   std::shared_ptr<OtlpMetricsFlusher> otlp_metrics_flusher =
       std::make_shared<OtlpMetricsFlusherImpl>(otlp_options);
 
