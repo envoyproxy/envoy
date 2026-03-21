@@ -30,7 +30,7 @@ public:
             hcm.mutable_access_log_options()->set_flush_access_log_on_new_request(true);
           }
           for (const auto& config_yaml : config_yamls) {
-            auto* access_log = hcm.add_access_log();
+            envoy::config::accesslog::v3::AccessLog* access_log = hcm.add_access_log();
             TestUtility::loadFromYaml(config_yaml, *access_log);
           }
         });
@@ -80,7 +80,7 @@ TEST_P(StatsAccessLogIntegrationTest, Basic) {
   };
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 
@@ -89,7 +89,8 @@ TEST_P(StatsAccessLogIntegrationTest, Basic) {
   test_server_->waitForCounterEq("test_stat_prefix.formatcounter", 200);
   test_server_->waitUntilHistogramHasSamples("test_stat_prefix.testhistogram.tag.mytagvalue");
 
-  auto histogram = test_server_->histogram("test_stat_prefix.testhistogram.tag.mytagvalue");
+  Stats::ParentHistogramSharedPtr histogram =
+      test_server_->histogram("test_stat_prefix.testhistogram.tag.mytagvalue");
   EXPECT_EQ(1, TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram));
   EXPECT_EQ(2, static_cast<uint32_t>(
                    TestUtility::readSampleSum(test_server_->server().dispatcher(), *histogram)));
@@ -164,13 +165,14 @@ TEST_P(StatsAccessLogIntegrationTest, PercentHistogram) {
   };
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 
   test_server_->waitUntilHistogramHasSamples("test_stat_prefix.testhistogram");
 
-  auto histogram = test_server_->histogram("test_stat_prefix.testhistogram");
+  Stats::ParentHistogramSharedPtr histogram =
+      test_server_->histogram("test_stat_prefix.testhistogram");
   EXPECT_EQ(1, TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram));
 
   double p100 = histogram->cumulativeStatistics().computedQuantiles().back();
@@ -204,7 +206,7 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
   };
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   // Wait for upstream to receive request.
   waitForNextUpstreamRequest();
@@ -256,7 +258,7 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   };
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   // Wait for upstream to receive request.
   waitForNextUpstreamRequest();
@@ -310,8 +312,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
   };
 
   // Request 1: starts gauge at 1.
-  auto codec_client1 = makeHttpConnection(lookupPort("http"));
-  auto response1 = codec_client1->makeHeaderOnlyRequest(request_headers);
+  IntegrationCodecClientPtr codec_client1 = makeHttpConnection(lookupPort("http"));
+  IntegrationStreamDecoderPtr response1 = codec_client1->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
   test_server_->waitForGaugeEq(
       "test_stat_prefix.active_requests.request_header_tag.my-eviction-test-tag", 1);
@@ -319,6 +321,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
   // Simulate eviction from the store.
   absl::Notification evict_done;
   test_server_->server().dispatcher().post([this, &evict_done]() {
+    // Two calls are required: the first to mark the stat as unused, and the second to actually
+    // evict it from the store.
     test_server_->statStore().evictUnused();
     test_server_->statStore().evictUnused();
     evict_done.Notify();
@@ -326,8 +330,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
   evict_done.WaitForNotification();
 
   // Request 2: starts another concurrent request using the same tag.
-  auto codec_client2 = makeHttpConnection(lookupPort("http"));
-  auto response2 = codec_client2->makeHeaderOnlyRequest(request_headers);
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+  IntegrationStreamDecoderPtr response2 = codec_client2->makeHeaderOnlyRequest(request_headers);
 
   // Wait for the second request to reach upstream.
   // We need to keep track of the second upstream request.
@@ -353,6 +357,7 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
   // Transition the state from used to unused, but not evicted.
   absl::Notification evict_done3;
   test_server_->server().dispatcher().post([this, &evict_done3]() {
+    // Transition the state from used to unused, but not evicted yet.
     test_server_->statStore().evictUnused();
     evict_done3.Notify();
   });
@@ -406,8 +411,9 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
              /*flush_access_log_on_new_request=*/true);
 
         // Start request.
-        auto codec_client1 = makeHttpConnection(lookupPort("http"));
-        auto response1 = codec_client1->makeHeaderOnlyRequest(request_headers);
+        IntegrationCodecClientPtr codec_client1 = makeHttpConnection(lookupPort("http"));
+        IntegrationStreamDecoderPtr response1 =
+            codec_client1->makeHeaderOnlyRequest(request_headers);
         waitForNextUpstreamRequest();
         test_server_->waitForGaugeEq(
             "test_stat_prefix.active_requests.request_header_tag.my-evict-crash-tag", 1);
@@ -420,6 +426,8 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
         // Simulate eviction from the store.
         absl::Notification evict_done;
         test_server_->server().dispatcher().post([this, &evict_done]() {
+          // Two calls are required: the first to mark the stat as unused, and the second to
+          // actually evict it from the store.
           test_server_->statStore().evictUnused();
           test_server_->statStore().evictUnused();
           evict_done.Notify();
@@ -468,8 +476,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeCleanupOnDestructor) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
-  auto codec_client = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client->makeHeaderOnlyRequest(request_headers);
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort("http"));
+  IntegrationStreamDecoderPtr response = codec_client->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
   // DownstreamStart logged, gauge should be 1.

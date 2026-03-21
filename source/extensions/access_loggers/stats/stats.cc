@@ -29,6 +29,8 @@ public:
     }
   }
 
+  // Adds an incremental value to an existing gauge, or creates it if that gauge doesn't exist.
+  // Zero values are ignored.
   void addInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
                         Stats::Gauge::ImportMode import_mode, uint64_t value,
                         std::vector<Stats::StatNameDynamicStorage> tags_storage) {
@@ -49,6 +51,8 @@ public:
     parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
   }
 
+  // Removes an amount from an existing gauge, allowing the gauge to be evicted if the value reaches
+  // 0.
   void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
                            Stats::Gauge::ImportMode import_mode, uint64_t value) {
     if (value == 0) {
@@ -64,6 +68,7 @@ public:
 
     auto it = inflight_gauges_.find(key);
     if (it != inflight_gauges_.end()) {
+      ENVOY_BUG(it->second.value_ >= value, "Connection gauge underflow in removeInflightGauge");
       it->second.value_ -= value;
       gauge_stat.sub(value);
       if (it->second.value_ == 0) {
@@ -151,6 +156,8 @@ GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mo
     : stat_name_(stat_name), import_mode_(import_mode), borrowed_tags_(borrowed_tags) {}
 
 void GaugeKey::makeOwned() {
+  ENVOY_BUG(!(borrowed_tags_.has_value() && owned_tags_.has_value()),
+            "Both borrowed and owned tags are present in GaugeKey::makeOwned");
   if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
     owned_tags_ = borrowed_tags_.value().get();
     borrowed_tags_ = absl::nullopt;
