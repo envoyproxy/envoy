@@ -26,18 +26,17 @@ namespace StatsAccessLog {
 // zero-allocation "view" using `borrowed_tags_` during map lookups.
 // When the key actually needs to be safely persisted into the map, `makeOwned()`
 // is explicitly called to allocate and copy the tags into `owned_tags_`.
-struct GaugeKey {
-  Stats::StatName stat_name_;
-  Stats::Gauge::ImportMode import_mode_;
-  absl::optional<Stats::StatNameTagVector> owned_tags_;
-  Stats::StatNameTagVectorOptConstRef borrowed_tags_{absl::nullopt};
-
+class GaugeKey {
+public:
   GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mode,
            Stats::StatNameTagVectorOptConstRef borrowed_tags);
 
   void makeOwned();
 
   Stats::StatNameTagVectorOptConstRef tags() const;
+
+  Stats::StatName statName() const { return stat_name_; }
+  Stats::Gauge::ImportMode importMode() const { return import_mode_; }
 
   bool operator==(const GaugeKey& rhs) const;
 
@@ -55,6 +54,12 @@ struct GaugeKey {
     }
     return H::combine(std::move(h), key.stat_name_, key.import_mode_, false);
   }
+
+private:
+  Stats::StatName stat_name_;
+  Stats::Gauge::ImportMode import_mode_;
+  absl::optional<Stats::StatNameTagVector> owned_tags_;
+  Stats::StatNameTagVectorOptConstRef borrowed_tags_{absl::nullopt};
 };
 
 class StatsAccessLog : public AccessLoggers::Common::ImplBase,
