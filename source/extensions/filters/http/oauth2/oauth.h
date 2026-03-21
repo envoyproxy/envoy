@@ -29,7 +29,7 @@ public:
                                            const std::string& refresh_token,
                                            std::chrono::seconds expires_in) PURE;
 
-  virtual void onRefreshAccessTokenFailure() PURE;
+  virtual Http::FilterHeadersStatus onRefreshAccessTokenFailure() PURE;
 
   virtual void handleOAuthFailureAsync(const std::string& reason,
                                        const std::string& extra_details = "") PURE;

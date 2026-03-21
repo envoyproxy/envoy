@@ -354,7 +354,7 @@ public:
                                    const std::string& refresh_token,
                                    std::chrono::seconds expires_in) override;
 
-  void onRefreshAccessTokenFailure() override;
+  Http::FilterHeadersStatus onRefreshAccessTokenFailure() override;
 
   // Handles unauthorized requests from async contexts (OAuth client callbacks).
   // Calls handleOAuthFailure() and then continueDecoding() if needed.

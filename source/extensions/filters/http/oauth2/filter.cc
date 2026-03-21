@@ -745,12 +745,13 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                        *decoder_callbacks_);
 
       // try to update access token by refresh token
-      const auto status =
-          oauth_client_->asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
-                                                 config_->clientSecret(), config_->authType());
-      if (!status.ok()) {
-        // Async task failed to start - handle immediately
-        return handleOAuthFailure(std::string(status.message()));
+      oauth_client_->asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
+                                             config_->clientSecret(), config_->authType());
+      const auto state = oauth_client_->getState();
+      if (state == OAuth2Client::OAuthState::FailureContinue) {
+        return Http::FilterHeadersStatus::Continue;
+      } else if (state == OAuth2Client::OAuthState::FailureStop) {
+        return Http::FilterHeadersStatus::StopIteration;
       }
       // pause while we await the next step from the OAuth server
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
@@ -804,12 +805,12 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
   std::string code_verifier = decrypt_result.plaintext;
 
-  const auto status =
-      oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
-                                         redirect_uri, code_verifier, config_->authType());
-  if (!status.ok()) {
-    // Async task failed to start - handle immediately
-    sendUnauthorizedResponse(std::string(status.message()));
+  oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
+                                     redirect_uri, code_verifier, config_->authType());
+  const auto state = oauth_client_->getState();
+  if (state == OAuth2Client::OAuthState::FailureContinue) {
+    return Http::FilterHeadersStatus::Continue;
+  } else if (state == OAuth2Client::OAuthState::FailureStop) {
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -1290,24 +1291,25 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   decoder_callbacks_->continueDecoding();
 }
 
-void OAuth2Filter::onRefreshAccessTokenFailure() {
+Http::FilterHeadersStatus OAuth2Filter::onRefreshAccessTokenFailure() {
   config_->stats().oauth_refreshtoken_failure_.inc();
   // We failed to get an access token via the refresh token. Forward the request based on the
   // matcher configuration.
   if (shouldAllowFailed(*request_headers_)) {
     continueWithFailedOAuth("Failed to refresh the access token, and forwarding as unauthorized "
-                           "because OAuth failure is allowed");
-    decoder_callbacks_->continueDecoding();
+                            "because OAuth failure is allowed");
+    return Http::FilterHeadersStatus::Continue;
   } else if (shouldDenyRedirect(*request_headers_)) {
     sendUnauthorizedResponse(
         "Failed to refresh the access token, and redirecting to OAuth server is not allowed");
   } else {
     redirectToOAuthServer(*request_headers_);
   }
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 void OAuth2Filter::handleOAuthFailureAsync(const std::string& reason,
-                                       const std::string& extra_details) {
+                                           const std::string& extra_details) {
   // Handle unauthorized request in async context
   const auto status = handleOAuthFailure(reason, extra_details);
   if (status == Http::FilterHeadersStatus::Continue) {
@@ -1459,7 +1461,7 @@ bool OAuth2Filter::shouldDenyRedirect(const Http::RequestHeaderMap& headers) con
 }
 
 void OAuth2Filter::continueWithFailedOAuth(const std::string& reason,
-                                          const std::string& extra_details) {
+                                           const std::string& extra_details) {
   removeOAuthTokenCookies(*request_headers_);
   removeOAuthFlowCookies(*request_headers_);
   request_headers_->setCopy(OAuth2Headers::get().OAuthStatus, "failed");
@@ -1472,7 +1474,7 @@ void OAuth2Filter::continueWithFailedOAuth(const std::string& reason,
 }
 
 Http::FilterHeadersStatus OAuth2Filter::handleOAuthFailure(const std::string& reason,
-                                                       const std::string& extra_details) {
+                                                           const std::string& extra_details) {
   if (shouldAllowFailed(*request_headers_)) {
     continueWithFailedOAuth(reason, extra_details);
     return Http::FilterHeadersStatus::Continue;
