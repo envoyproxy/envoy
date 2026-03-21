@@ -1139,8 +1139,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
-    EXPECT_CALL(stream_info, upstreamClusterInfo())
-        .WillRepeatedly(Return(OptRef<const Upstream::ClusterInfo>{}));
+    stream_info.upstream_cluster_info_ = nullptr;
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
