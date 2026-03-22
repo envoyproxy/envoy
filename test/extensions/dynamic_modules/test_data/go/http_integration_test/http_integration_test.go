@@ -24,8 +24,6 @@ func init() {
 		"body_callbacks":               &BodyCallbacksConfigFactory{},
 		"http_callouts":                &HttpCalloutsConfigFactory{},
 		"send_response":                &SendResponseConfigFactory{},
-		"send_response_grpc":           &SendResponseGrpcConfigFactory{},
-		"grpc_status_attribute":        &GrpcStatusAttributeConfigFactory{},
 		"http_filter_scheduler":        &HttpFilterSchedulerConfigFactory{},
 		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
 		"stats_callbacks":              &StatsCallbacksConfigFactory{},
@@ -37,6 +35,7 @@ func init() {
 		"http_config_callout":          &HttpConfigCalloutConfigFactory{},
 		"http_config_stream":           &HttpConfigStreamConfigFactory{},
 		"http_struct_config":           &HttpStructConfigFactory{},
+		"list_metadata_callbacks":      &ListMetadataCallbacksConfigFactory{},
 	})
 }
 
@@ -516,7 +515,7 @@ func (p *SendResponseFilter) OnRequestHeaders(headers shared.HeaderMap,
 	if p.mode == "on_request_headers" {
 		p.handle.SendLocalResponse(200,
 			[][2]string{{"some_header", "some_value"}},
-			[]byte("local_response_body_from_on_request_headers"), -1, "test_details")
+			[]byte("local_response_body_from_on_request_headers"), "test_details")
 		return shared.HeadersStatusStop
 	}
 	return shared.HeadersStatusContinue
@@ -527,7 +526,7 @@ func (p *SendResponseFilter) OnRequestBody(body shared.BodyBuffer,
 	if p.mode == "on_request_body" {
 		p.handle.SendLocalResponse(200,
 			[][2]string{{"some_header", "some_value"}},
-			[]byte("local_response_body_from_on_request_body"), -1, "")
+			[]byte("local_response_body_from_on_request_body"), "")
 		return shared.BodyStatusStopAndBuffer
 	}
 	return shared.BodyStatusContinue
@@ -538,82 +537,8 @@ func (p *SendResponseFilter) OnResponseHeaders(headers shared.HeaderMap,
 	if p.mode == "on_response_headers" {
 		p.handle.SendLocalResponse(500,
 			[][2]string{{"some_header", "some_value"}},
-			[]byte("local_response_body_from_on_response_headers"), -1, "")
+			[]byte("local_response_body_from_on_response_headers"), "")
 		return shared.HeadersStatusStop
-	}
-	return shared.HeadersStatusContinue
-}
-
-// -----------------------------------------------------------------------------
-// SendResponseGrpc
-// -----------------------------------------------------------------------------
-
-type SendResponseGrpcConfigFactory struct {
-	shared.EmptyHttpFilterConfigFactory
-}
-
-func (f *SendResponseGrpcConfigFactory) Create(handle shared.HttpFilterConfigHandle,
-	config []byte) (shared.HttpFilterFactory, error) {
-	grpcStatus, err := strconv.ParseInt(string(config), 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("invalid grpc status config: %v", err)
-	}
-	return &SendResponseGrpcFilterFactory{grpcStatus: int32(grpcStatus)}, nil
-}
-
-type SendResponseGrpcFilterFactory struct {
-	shared.EmptyHttpFilterFactory
-	grpcStatus int32
-}
-
-func (f *SendResponseGrpcFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
-	return &SendResponseGrpcFilter{handle: handle, grpcStatus: f.grpcStatus}
-}
-
-type SendResponseGrpcFilter struct {
-	shared.EmptyHttpFilter
-	handle     shared.HttpFilterHandle
-	grpcStatus int32
-}
-
-func (p *SendResponseGrpcFilter) OnRequestHeaders(headers shared.HeaderMap,
-	endOfStream bool) shared.HeadersStatus {
-	p.handle.SendLocalResponse(200,
-		[][2]string{{"x-grpc-test", "true"}},
-		[]byte("grpc_response"), p.grpcStatus, "")
-	return shared.HeadersStatusStop
-}
-
-// -----------------------------------------------------------------------------
-// GrpcStatusAttribute
-// -----------------------------------------------------------------------------
-
-type GrpcStatusAttributeConfigFactory struct {
-	shared.EmptyHttpFilterConfigFactory
-}
-
-func (f *GrpcStatusAttributeConfigFactory) Create(handle shared.HttpFilterConfigHandle,
-	config []byte) (shared.HttpFilterFactory, error) {
-	return &GrpcStatusAttributeFilterFactory{}, nil
-}
-
-type GrpcStatusAttributeFilterFactory struct {
-	shared.EmptyHttpFilterFactory
-}
-
-func (f *GrpcStatusAttributeFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
-	return &GrpcStatusAttributeFilter{handle: handle}
-}
-
-type GrpcStatusAttributeFilter struct {
-	shared.EmptyHttpFilter
-	handle shared.HttpFilterHandle
-}
-
-func (p *GrpcStatusAttributeFilter) OnResponseHeaders(headers shared.HeaderMap,
-	endOfStream bool) shared.HeadersStatus {
-	if val, ok := p.handle.GetAttributeNumber(shared.AttributeIDResponseGrpcStatus); ok {
-		headers.Set("x-grpc-status-from-attr", strconv.FormatInt(int64(val), 10))
 	}
 	return shared.HeadersStatusContinue
 }
@@ -657,7 +582,7 @@ func (p *HttpCalloutsFilter) OnRequestHeaders(headers shared.HeaderMap,
 		p,
 	)
 	if res != shared.HttpCalloutInitSuccess {
-		p.handle.SendLocalResponse(500, [][2]string{{"foo", "bar"}}, nil, -1, "")
+		p.handle.SendLocalResponse(500, [][2]string{{"foo", "bar"}}, nil, "")
 	}
 	p.calloutHandle = id
 	return shared.HeadersStatusStop
@@ -688,7 +613,7 @@ func (p *HttpCalloutsFilter) OnHttpCalloutDone(calloutID uint64, result shared.H
 	assertEq(fullBody, "response_body_from_callout", "resp body")
 
 	p.handle.SendLocalResponse(200, [][2]string{{"some_header", "some_value"}},
-		[]byte("local_response_body"), -1, "callout_success")
+		[]byte("local_response_body"), "callout_success")
 }
 
 // -----------------------------------------------------------------------------
@@ -804,7 +729,7 @@ func (p *FakeExternalCacheFilter) OnRequestHeaders(headers shared.HeaderMap, end
 		if key.ToUnsafeString() == "existing" {
 			// Simulate hit
 			sched.Schedule(func() {
-				p.handle.SendLocalResponse(200, [][2]string{{"cached", "yes"}}, []byte("cached_response_body"), -1, "")
+				p.handle.SendLocalResponse(200, [][2]string{{"cached", "yes"}}, []byte("cached_response_body"), "")
 			})
 		} else {
 			// Simulate miss
@@ -1079,7 +1004,7 @@ func (p *HttpStreamBasicFilter) OnRequestHeaders(h shared.HeaderMap, end bool) s
 		nil, true, 5000, p)
 	if res != shared.HttpCalloutInitSuccess {
 		p.handle.SendLocalResponse(500,
-			[][2]string{{"x-error", "stream_init_failed"}}, nil, -1, "")
+			[][2]string{{"x-error", "stream_init_failed"}}, nil, "")
 		return shared.HeadersStatusStop
 	}
 	p.streamID = id
@@ -1110,7 +1035,7 @@ func (p *HttpStreamBasicFilter) OnHttpStreamComplete(id uint64) {
 	p.complete = true
 	p.handle.SendLocalResponse(200,
 		[][2]string{{"x-stream-test", "basic"}},
-		[]byte("stream_callout_success"), -1, "")
+		[]byte("stream_callout_success"), "")
 }
 func (p *HttpStreamBasicFilter) OnHttpStreamReset(id uint64, reason shared.HttpStreamResetReason) {}
 
@@ -1157,7 +1082,7 @@ func (p *HttpStreamBidiFilter) OnRequestHeaders(h shared.HeaderMap, end bool) sh
 		[][2]string{{":path", "/stream"}, {":method", "POST"}, {"host", "example.com"}},
 		nil, false, 10000, p)
 	if res != shared.HttpCalloutInitSuccess {
-		p.handle.SendLocalResponse(500, [][2]string{{"x-error", "stream_init_failed"}}, nil, -1, "")
+		p.handle.SendLocalResponse(500, [][2]string{{"x-error", "stream_init_failed"}}, nil, "")
 		return shared.HeadersStatusStop
 	}
 	p.streamID = id
@@ -1188,7 +1113,7 @@ func (p *HttpStreamBidiFilter) OnHttpStreamComplete(id uint64) {
 		{"x-stream-test", "bidirectional"},
 		{"x-chunks-sent", strconv.Itoa(p.sentChunks)},
 		{"x-chunks-received", strconv.Itoa(p.recvChunks)},
-	}, []byte("bidirectional_success"), -1, "")
+	}, []byte("bidirectional_success"), "")
 }
 func (p *HttpStreamBidiFilter) OnHttpStreamReset(id uint64, reason shared.HttpStreamResetReason) {}
 
@@ -1231,7 +1156,7 @@ func (p *UpstreamResetFilter) OnRequestHeaders(h shared.HeaderMap, end bool) sha
 		[][2]string{{":path", "/reset"}, {":method", "GET"}, {"host", "example.com"}},
 		nil, true, 5000, p)
 	if res != shared.HttpCalloutInitSuccess {
-		p.handle.SendLocalResponse(500, [][2]string{{"x-error", "stream_init_failed"}}, nil, -1, "")
+		p.handle.SendLocalResponse(500, [][2]string{{"x-error", "stream_init_failed"}}, nil, "")
 		return shared.HeadersStatusStop
 	}
 	p.streamID = id
@@ -1246,7 +1171,7 @@ func (p *UpstreamResetFilter) OnHttpStreamTrailers(id uint64, trailers [][2]shar
 func (p *UpstreamResetFilter) OnHttpStreamComplete(id uint64) {}
 func (p *UpstreamResetFilter) OnHttpStreamReset(id uint64, reason shared.HttpStreamResetReason) {
 	assertEq(id, p.streamID, "id")
-	p.handle.SendLocalResponse(200, [][2]string{{"x-reset", "true"}}, []byte("upstream_reset"), -1, "")
+	p.handle.SendLocalResponse(200, [][2]string{{"x-reset", "true"}}, []byte("upstream_reset"), "")
 }
 
 // -----------------------------------------------------------------------------
@@ -1301,9 +1226,9 @@ type HttpConfigCalloutFilter struct {
 func (p *HttpConfigCalloutFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	if p.calloutDone.Load() {
-		p.handle.SendLocalResponse(200, [][2]string{{"x-config-callout", "success"}}, nil, -1, "")
+		p.handle.SendLocalResponse(200, [][2]string{{"x-config-callout", "success"}}, nil, "")
 	} else {
-		p.handle.SendLocalResponse(503, [][2]string{{"x-config-callout", "pending"}}, nil, -1, "")
+		p.handle.SendLocalResponse(503, [][2]string{{"x-config-callout", "pending"}}, nil, "")
 	}
 	return shared.HeadersStatusStop
 }
@@ -1372,9 +1297,9 @@ type HttpConfigStreamFilter struct {
 func (p *HttpConfigStreamFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	if p.streamDone.Load() {
-		p.handle.SendLocalResponse(200, [][2]string{{"x-config-stream", "success"}}, nil, -1, "")
+		p.handle.SendLocalResponse(200, [][2]string{{"x-config-stream", "success"}}, nil, "")
 	} else {
-		p.handle.SendLocalResponse(503, [][2]string{{"x-config-stream", "pending"}}, nil, -1, "")
+		p.handle.SendLocalResponse(503, [][2]string{{"x-config-stream", "pending"}}, nil, "")
 	}
 	return shared.HeadersStatusStop
 }
@@ -1404,4 +1329,89 @@ func (f *HttpStructFilterFactory) Create(handle shared.HttpFilterHandle) shared.
 		handle.RequestHeaders().Set(k, v)
 	}
 	return &shared.EmptyHttpFilter{}
+}
+
+// -----------------------------------------------------------------------------
+// ListMetadataCallbacks
+// -----------------------------------------------------------------------------
+
+type ListMetadataCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *ListMetadataCallbacksConfigFactory) Create(_ shared.HttpFilterConfigHandle, _ []byte) (shared.HttpFilterFactory, error) {
+	return &ListMetadataCallbacksFilterFactory{}, nil
+}
+
+type ListMetadataCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *ListMetadataCallbacksFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &ListMetadataCallbacksFilter{handle: handle}
+}
+
+type ListMetadataCallbacksFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (f *ListMetadataCallbacksFilter) OnRequestHeaders(_ shared.HeaderMap, _ bool) shared.HeadersStatus {
+	// Build a number list: [10.0, 20.0, 30.0]
+	f.handle.AddMetadataListNumber("ns", "numbers", 10.0)
+	f.handle.AddMetadataListNumber("ns", "numbers", 20.0)
+	f.handle.AddMetadataListNumber("ns", "numbers", 30.0)
+	// Build a string list: ["hello", "world"]
+	f.handle.AddMetadataListString("ns", "strings", "hello")
+	f.handle.AddMetadataListString("ns", "strings", "world")
+	// Build a bool list: [true, false]
+	f.handle.AddMetadataListBool("ns", "bools", true)
+	f.handle.AddMetadataListBool("ns", "bools", false)
+	return shared.HeadersStatusContinue
+}
+
+func (f *ListMetadataCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap, _ bool) shared.HeadersStatus {
+	source := shared.MetadataSourceTypeDynamic
+
+	// Expose number list via response headers.
+	numSize, ok := f.handle.GetMetadataListSize(source, "ns", "numbers")
+	if ok {
+		headers.Set("x-list-num-size", strconv.Itoa(numSize))
+		for i := 0; i < numSize; i++ {
+			val, ok := f.handle.GetMetadataListNumber(source, "ns", "numbers", i)
+			if ok {
+				headers.Set(fmt.Sprintf("x-list-num-%d", i), strconv.Itoa(int(val)))
+			}
+		}
+	}
+
+	// Expose string list via response headers.
+	strSize, ok := f.handle.GetMetadataListSize(source, "ns", "strings")
+	if ok {
+		headers.Set("x-list-str-size", strconv.Itoa(strSize))
+		for i := 0; i < strSize; i++ {
+			val, ok := f.handle.GetMetadataListString(source, "ns", "strings", i)
+			if ok {
+				headers.Set(fmt.Sprintf("x-list-str-%d", i), string(val.ToBytes()))
+			}
+		}
+	}
+
+	// Expose bool list via response headers.
+	boolSize, ok := f.handle.GetMetadataListSize(source, "ns", "bools")
+	if ok {
+		headers.Set("x-list-bool-size", strconv.Itoa(boolSize))
+		for i := 0; i < boolSize; i++ {
+			val, ok := f.handle.GetMetadataListBool(source, "ns", "bools", i)
+			if ok {
+				if val {
+					headers.Set(fmt.Sprintf("x-list-bool-%d", i), "true")
+				} else {
+					headers.Set(fmt.Sprintf("x-list-bool-%d", i), "false")
+				}
+			}
+		}
+	}
+
+	return shared.HeadersStatusContinue
 }

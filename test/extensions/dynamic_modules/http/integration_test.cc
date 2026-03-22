@@ -418,43 +418,6 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnResponseHeaders) {
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
 }
 
-TEST_P(DynamicModulesIntegrationTest, SendResponseWithGrpcStatus) {
-  initializeFilter("send_response_grpc", "\"14\"");
-
-  // Use a gRPC request via makeSingleRequest which handles the full request-response lifecycle.
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "POST", "/test/long/url", "", downstream_protocol_, version_,
-      "sni.lyft.com", Http::Headers::get().ContentTypeValues.Grpc);
-  ASSERT_TRUE(response->complete());
-  // gRPC trailers-only response always has HTTP status 200.
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, response->headers().getContentTypeValue());
-  // Verify the gRPC status is set in the response headers (trailers-only response).
-  EXPECT_EQ("14", response->headers().getGrpcStatusValue());
-}
-
-TEST_P(DynamicModulesIntegrationTest, ResponseGrpcStatusAttribute) {
-  initializeFilter("grpc_status_attribute", "");
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
-  auto response = std::move(encoder_decoder.second);
-
-  waitForNextUpstreamRequest();
-  Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "200"}, {"grpc-status", "7"}, {"content-type", "application/grpc"}};
-  upstream_request_->encodeHeaders(response_headers, true);
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  // Verify the filter read the gRPC status from the response headers.
-  EXPECT_EQ("7", response->headers()
-                     .get(Http::LowerCaseString("x-grpc-status-from-attr"))[0]
-                     ->value()
-                     .getStringView());
-}
-
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
   initializeFilter("http_callouts", "missing");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -1054,6 +1017,53 @@ TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
   } else {
     EXPECT_EQ(current_limit, 65536);
   }
+}
+
+TEST_P(DynamicModulesIntegrationTest, ListMetadataCallbacks) {
+  initializeFilter("list_metadata_callbacks");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  // Verify number list (3 elements: 10, 20, 30).
+  auto num_size = response->headers().get(Http::LowerCaseString("x-list-num-size"));
+  ASSERT_FALSE(num_size.empty());
+  EXPECT_EQ("3", num_size[0]->value().getStringView());
+  auto num_0 = response->headers().get(Http::LowerCaseString("x-list-num-0"));
+  ASSERT_FALSE(num_0.empty());
+  EXPECT_EQ("10", num_0[0]->value().getStringView());
+  auto num_1 = response->headers().get(Http::LowerCaseString("x-list-num-1"));
+  ASSERT_FALSE(num_1.empty());
+  EXPECT_EQ("20", num_1[0]->value().getStringView());
+  auto num_2 = response->headers().get(Http::LowerCaseString("x-list-num-2"));
+  ASSERT_FALSE(num_2.empty());
+  EXPECT_EQ("30", num_2[0]->value().getStringView());
+
+  // Verify string list (2 elements: "hello", "world").
+  auto str_size = response->headers().get(Http::LowerCaseString("x-list-str-size"));
+  ASSERT_FALSE(str_size.empty());
+  EXPECT_EQ("2", str_size[0]->value().getStringView());
+  auto str_0 = response->headers().get(Http::LowerCaseString("x-list-str-0"));
+  ASSERT_FALSE(str_0.empty());
+  EXPECT_EQ("hello", str_0[0]->value().getStringView());
+  auto str_1 = response->headers().get(Http::LowerCaseString("x-list-str-1"));
+  ASSERT_FALSE(str_1.empty());
+  EXPECT_EQ("world", str_1[0]->value().getStringView());
+
+  // Verify bool list (2 elements: true, false).
+  auto bool_size = response->headers().get(Http::LowerCaseString("x-list-bool-size"));
+  ASSERT_FALSE(bool_size.empty());
+  EXPECT_EQ("2", bool_size[0]->value().getStringView());
+  auto bool_0 = response->headers().get(Http::LowerCaseString("x-list-bool-0"));
+  ASSERT_FALSE(bool_0.empty());
+  EXPECT_EQ("true", bool_0[0]->value().getStringView());
+  auto bool_1 = response->headers().get(Http::LowerCaseString("x-list-bool-1"));
+  ASSERT_FALSE(bool_1.empty());
+  EXPECT_EQ("false", bool_1[0]->value().getStringView());
 }
 
 } // namespace Envoy

@@ -8,6 +8,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
+#include "source/common/matcher/regex_replace.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/pass_through_filter.h"
 
 #include "absl/strings/string_view.h"
@@ -44,14 +45,12 @@ class Rule {
 public:
   Rule(const ProtoRule& rule, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
-  const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
-  const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
+  const absl::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
   std::shared_ptr<const HeaderValueSelector> selector_;
 
 private:
   const ProtoRule rule_;
-  Regex::CompiledMatcherPtr regex_rewrite_{};
-  std::string regex_rewrite_substitution_{};
+  absl::optional<Matcher::RegexReplace> regex_replace_;
 };
 
 using HeaderToMetadataRules = std::vector<Rule>;
