@@ -39,6 +39,7 @@ protected:
     create_xds_upstream_ = false;
     // LEDS is only supported by delta-xDS.
     sotw_or_delta_ = Grpc::SotwOrDelta::Delta;
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.delta_grpc_mux_sharing", "true");
   }
 
   ~LedsIntegrationTest() override {

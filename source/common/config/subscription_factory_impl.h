@@ -57,7 +57,10 @@ private:
   // Shared mux cache for delta-xDS collection subscriptions.
   // Key: StrCat(hash(ApiConfigSource), "/", type_url).
   // Enables multiple collection subscriptions targeting the same control plane
-  // and resource type to share a single gRPC stream.
+  // and resource type to share a single gRPC stream. Only used when the
+  // envoy.reloadable_features.delta_grpc_mux_sharing runtime flag is enabled;
+  // the flag is checked once per collectionSubscriptionFromUrl call and the
+  // cache pointer is only passed to the factory when the flag is true.
   absl::flat_hash_map<std::string, GrpcMuxSharedPtr> delta_grpc_collection_mux_cache_;
 };
 

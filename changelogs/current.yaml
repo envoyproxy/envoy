@@ -271,11 +271,12 @@ bug_fixes:
 
 - area: xds
   change: |
-    Fixed delta gRPC collection subscriptions (used by LEDS) to share a single gRPC mux and stream
-    when targeting the same control plane and resource type, instead of opening one stream per
-    subscription. This is particularly relevant in split control plane deployments where ADS and EDS
-    are served independently and LEDS must use ``DELTA_GRPC`` with an explicit ``ApiConfigSource``
-    pointing to the dedicated EDS control plane.
+    Added support for delta gRPC collection subscriptions (used by LEDS) to share a single gRPC mux
+    and stream when targeting the same control plane and resource type, instead of opening one stream
+    per subscription. This is guarded by the runtime flag
+    ``envoy.reloadable_features.delta_grpc_mux_sharing`` (default off). This is particularly relevant
+    in split control plane deployments where ADS and EDS are served independently and LEDS must use
+    ``DELTA_GRPC`` with an explicit ``ApiConfigSource`` pointing to the dedicated EDS control plane.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

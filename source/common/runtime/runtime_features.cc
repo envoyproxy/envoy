@@ -124,6 +124,7 @@ FALSE_RUNTIME_GUARD(
     envoy_reloadable_features_enable_formatter_for_ratelimit_action_descriptor_value);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_delta_grpc_mux_sharing);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(alyssawilk, renjietang) figure out what to do with this for optimal defaults

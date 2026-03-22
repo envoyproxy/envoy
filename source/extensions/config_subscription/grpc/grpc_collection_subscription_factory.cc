@@ -25,9 +25,10 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
   const envoy::config::core::v3::ApiConfigSource& api_config_source =
       data.config_.api_config_source();
 
-  // Check the mux cache: reuse an existing mux for the same ApiConfigSource
-  // and type_url to avoid opening redundant gRPC streams (e.g. one per LEDS
-  // locality instead of one shared stream).
+  // When mux sharing is enabled (delta_grpc_mux_sharing runtime flag checked in
+  // SubscriptionFactoryImpl::collectionSubscriptionFromUrl), reuse an existing
+  // mux for the same ApiConfigSource and type_url to avoid opening redundant
+  // gRPC streams (e.g. one per LEDS locality instead of one shared stream).
   if (data.delta_grpc_mux_cache_ != nullptr) {
     const std::string cache_key = deltaGrpcCollectionMuxCacheKey(api_config_source, data.type_url_);
     auto it = data.delta_grpc_mux_cache_->find(cache_key);

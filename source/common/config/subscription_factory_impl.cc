@@ -11,6 +11,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -211,7 +212,9 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionF
       case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
         std::string type_url = TypeUtil::descriptorFullNameToTypeUrl(resource_type);
         data.type_url_ = type_url;
-        data.delta_grpc_mux_cache_ = &delta_grpc_collection_mux_cache_;
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.delta_grpc_mux_sharing")) {
+          data.delta_grpc_mux_cache_ = &delta_grpc_collection_mux_cache_;
+        }
         auto ptr_or_error =
             createFromFactory(data, "envoy.config_subscription.delta_grpc_collection");
         RETURN_IF_NOT_OK(ptr_or_error.status());
