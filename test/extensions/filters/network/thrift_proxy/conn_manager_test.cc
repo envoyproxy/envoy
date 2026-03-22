@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 #include "source/extensions/filters/network/thrift_proxy/config.h"
@@ -178,7 +179,7 @@ stat_prefix: test
     // Destroy any existing filter first.
     filter_ = nullptr;
 
-    for (const auto& counter : store_.counters()) {
+    for (Stats::Counter* counter : Stats::Utility::collectCountersMainThread(store_)) {
       counter->reset();
     }
 

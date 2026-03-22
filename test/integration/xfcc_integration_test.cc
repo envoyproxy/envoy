@@ -923,7 +923,8 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
     }
   };
 
-  for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
+  for (Stats::Counter* counter : Stats::Utility::collectCountersMainThread(
+           test_server_->statStore())) {
     test_name_against_mapping(tag_extracted_counter_map, *counter);
   }
   EXPECT_EQ(tag_extracted_counter_map, MetricMap{});
