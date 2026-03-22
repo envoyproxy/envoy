@@ -127,18 +127,34 @@ def envoy_cmake(
         generate_args = ["-GNinja"],
         targets = ["", "install"],
         **kwargs):
+    # On clang builds, point cmake at the LLVM toolchain's lld instead of the
+    # system linker (/bin/ld).  rules_foreign_cc runs cmake with
+    # generate_crosstool_file=False by default, so it only exports CC/CXX and
+    # never passes -fuse-ld=lld to cmake's configure step.  Without this,
+    # cmake falls back to the host /bin/ld, which can be a wrong-glibc-version
+    # bfd linker or may not exist at all (e.g. Arch Linux).  The LLVM toolchain
+    # always ships ld.lld alongside clang, so -fuse-ld=lld is always safe here.
+    _lld_linker_entries = select({
+        "@envoy//bazel:clang_build": {
+            "CMAKE_EXE_LINKER_FLAGS": "-fuse-ld=lld",
+            "CMAKE_SHARED_LINKER_FLAGS": "-fuse-ld=lld",
+            "CMAKE_MODULE_LINKER_FLAGS": "-fuse-ld=lld",
+        },
+        "//conditions:default": {},
+    })
+
     # If cache_entries is a dict, merge defaults and wrap for debug builds.
     # If it's a select(), pass it through directly.
     if hasattr(cache_entries, "update"):
         cache_entries.update(default_cache_entries)
         cache_entries_debug = dict(cache_entries)
         cache_entries_debug.update(debug_cache_entries)
-        final_cache_entries = select({
+        final_cache_entries = _lld_linker_entries | select({
             "@envoy//bazel:dbg_build": cache_entries_debug,
             "//conditions:default": cache_entries,
         })
     else:
-        final_cache_entries = cache_entries
+        final_cache_entries = _lld_linker_entries | cache_entries
 
     pf = ""
     if copy_pdb:
