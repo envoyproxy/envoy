@@ -33,7 +33,7 @@ WriteFilterStatus HttpCapsuleFilter::onWrite(Network::UdpRecvData& data) {
   for (const Buffer::RawSlice& slice : data.buffer_->getRawSlices()) {
     absl::string_view mem_slice(reinterpret_cast<const char*>(slice.mem_), slice.len_);
     if (!capsule_parser_.IngestCapsuleFragment(mem_slice)) {
-      ENVOY_LOG(error, "Capsule ingestion error occured: slice length = {}", slice.len_);
+      ENVOY_LOG(error, "Capsule ingestion error occurred: slice length = {}", slice.len_);
       break;
     }
   }
