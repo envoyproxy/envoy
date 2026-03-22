@@ -408,8 +408,7 @@ private:
   absl::Status buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
                                        uint32_t concurrency);
   void buildListenSocketOptions(const envoy::config::listener::v3::Listener& config,
-                                std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
-                                    envoy::config::core::v3::SocketOption>>>& address_opts_list);
+                                std::vector<Network::Socket::OptionsSharedPtr>& address_opts_list);
   absl::Status createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
   absl::Status validateFilterChains(const envoy::config::listener::v3::Listener& config);
   absl::Status buildFilterChains(const envoy::config::listener::v3::Listener& config);

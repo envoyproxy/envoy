@@ -128,6 +128,73 @@ vhds:
                    .ok());
 }
 
+// verify that ADS with DELTA_GRPC in bootstrap passes validation
+TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithAdsAndDeltaGrpc) {
+  // Configure bootstrap with ADS using DELTA_GRPC
+  auto& bootstrap = factory_context_.bootstrap();
+  auto* dynamic_resources = bootstrap.mutable_dynamic_resources();
+  auto* ads_config = dynamic_resources->mutable_ads_config();
+  ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    ads: {}
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_TRUE(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                       context_, provider_)
+                  .status()
+                  .ok());
+}
+
+// verify that ADS without ADS configured in bootstrap fails validation
+TEST_F(VhdsTest, VhdsInstantiationShouldFailWithAdsButNoBootstrapConfig) {
+  // Don't configure ADS in bootstrap (it's empty by default)
+
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    ads: {}
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  auto result = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                         context_, provider_);
+  EXPECT_FALSE(result.status().ok());
+  EXPECT_EQ(result.status().message(),
+            "vhds: ADS config source specified but no ADS configured in bootstrap.");
+}
+
+// verify that ADS without DELTA_GRPC api_type in bootstrap fails validation
+TEST_F(VhdsTest, VhdsInstantiationShouldFailWithAdsButWrongApiType) {
+  // Configure bootstrap with ADS using GRPC (not DELTA_GRPC)
+  auto& bootstrap = factory_context_.bootstrap();
+  auto* dynamic_resources = bootstrap.mutable_dynamic_resources();
+  auto* ads_config = dynamic_resources->mutable_ads_config();
+  ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    ads: {}
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  auto result = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                         context_, provider_);
+  EXPECT_FALSE(result.status().ok());
+  EXPECT_EQ(result.status().message(),
+            "vhds: ADS must use DELTA_GRPC api_type when used as VHDS config source.");
+}
+
 // verify addition/updating of virtual hosts
 TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
   const auto route_config =

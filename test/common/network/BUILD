@@ -354,6 +354,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":socket_option_test",
+        "//envoy/network:address_interface",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -364,6 +365,7 @@ envoy_cc_test(
     srcs = ["socket_option_factory_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/network:address_interface",
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:socket_option_lib",

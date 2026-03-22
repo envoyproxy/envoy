@@ -107,7 +107,7 @@ envoy_cc_library(
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/network:network_types_lib",
         "//library/common/types:c_types_lib",
-        "@envoy//bazel:boringssl",
+        "@envoy//bazel:ssl",
     ],
 )
 

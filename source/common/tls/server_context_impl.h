@@ -42,6 +42,7 @@ namespace TransportSockets {
 namespace Tls {
 
 Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs);
+bool isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello);
 
 class ServerContextImpl : public ContextImpl,
                           public Envoy::Ssl::ServerContext,
@@ -49,7 +50,6 @@ class ServerContextImpl : public ContextImpl,
 public:
   static absl::StatusOr<std::unique_ptr<ServerContextImpl>>
   create(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-         const std::vector<std::string>& server_names,
          Server::Configuration::CommonFactoryContext& factory_context,
          Ssl::ContextAdditionalInitFunc additional_init);
 
@@ -69,13 +69,15 @@ public:
                  bool client_ocsp_capable, bool* cert_matched_sni);
 
   Ssl::CurveNIDVector getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const;
-  bool isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const;
+
+protected:
+  ServerContextImpl(
+      Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
+      const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
+      bool add_selector, Server::Configuration::CommonFactoryContext& factory_context,
+      Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
 
 private:
-  ServerContextImpl(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                    const std::vector<std::string>& server_names,
-                    Server::Configuration::CommonFactoryContext& factory_context,
-                    Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status);
   using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
 
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
@@ -88,6 +90,8 @@ private:
 
   Ssl::TlsCertificateSelectorPtr tls_certificate_selector_;
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
+
+protected:
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
 };
 
@@ -96,7 +100,6 @@ public:
   std::string name() const override { return "envoy.ssl.server_context_factory.default"; }
   absl::StatusOr<Ssl::ServerContextSharedPtr>
   createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                      const std::vector<std::string>& server_names,
                       Server::Configuration::CommonFactoryContext& factory_context,
                       Ssl::ContextAdditionalInitFunc additional_init) override;
 };

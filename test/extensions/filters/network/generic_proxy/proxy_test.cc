@@ -180,15 +180,16 @@ TEST_F(FilterConfigTest, CreateFilterChain) {
 
   initializeFilterConfig();
 
-  NiceMock<MockFilterChainManager> cb;
+  NiceMock<MockFilterChainFactoryCallbacks> callbacks_;
 
-  EXPECT_CALL(cb.callbacks_, addFilter(_))
+  EXPECT_CALL(callbacks_, setFilterConfigName(_)).Times(3);
+  EXPECT_CALL(callbacks_, addFilter(_))
       .Times(3)
       .WillRepeatedly(Invoke([&](StreamFilterSharedPtr filter) {
         EXPECT_EQ(filter.get(), mock_stream_filter.get());
       }));
 
-  filter_config_->createFilterChain(cb);
+  filter_config_->createFilterChain(callbacks_);
 }
 
 /**
@@ -578,7 +579,8 @@ TEST_F(FilterTest, ActiveStreamAddFilters) {
   EXPECT_EQ(1, active_stream->decoderFiltersForTest().size());
   EXPECT_EQ(0, active_stream->encoderFiltersForTest().size());
 
-  ActiveStream::FilterChainFactoryCallbacksHelper helper(*active_stream, {"fake_test"});
+  ActiveStream::FilterChainFactoryCallbacksHelper helper(*active_stream);
+  helper.setFilterConfigName("fake_test");
 
   auto new_filter_0 = std::make_shared<NiceMock<MockStreamFilter>>();
   auto new_filter_1 = std::make_shared<NiceMock<MockStreamFilter>>();

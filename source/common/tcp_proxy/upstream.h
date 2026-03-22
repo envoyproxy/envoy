@@ -178,6 +178,7 @@ public:
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
   bool startUpstreamSecureTransport() override;
   Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override;
+  StreamInfo::DetectedCloseType detectedCloseType() const override;
 
 private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
@@ -218,10 +219,10 @@ public:
     conn_pool_callbacks_ = std::move(callbacks);
   }
   Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
+  StreamInfo::DetectedCloseType detectedCloseType() const override;
 
 protected:
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
-
   // The encoder offered by the upstream http client.
   Http::RequestEncoder* request_encoder_{};
   // The config object that is owned by the downstream network filter chain factory.
@@ -304,6 +305,7 @@ public:
   // socket from non-secure to secure mode.
   bool startUpstreamSecureTransport() override { return false; }
   Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
+  StreamInfo::DetectedCloseType detectedCloseType() const override;
 
   // Router::RouterFilterInterface
   void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,

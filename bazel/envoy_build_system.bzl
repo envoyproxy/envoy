@@ -32,7 +32,6 @@ load(
     _envoy_select_admin_functionality = "envoy_select_admin_functionality",
     _envoy_select_admin_html = "envoy_select_admin_html",
     _envoy_select_admin_no_html = "envoy_select_admin_no_html",
-    _envoy_select_boringssl = "envoy_select_boringssl",
     _envoy_select_disable_exceptions = "envoy_select_disable_exceptions",
     _envoy_select_disable_logging = "envoy_select_disable_logging",
     _envoy_select_enable_exceptions = "envoy_select_enable_exceptions",
@@ -128,9 +127,18 @@ def envoy_cmake(
         generate_args = ["-GNinja"],
         targets = ["", "install"],
         **kwargs):
-    cache_entries.update(default_cache_entries)
-    cache_entries_debug = dict(cache_entries)
-    cache_entries_debug.update(debug_cache_entries)
+    # If cache_entries is a dict, merge defaults and wrap for debug builds.
+    # If it's a select(), pass it through directly.
+    if hasattr(cache_entries, "update"):
+        cache_entries.update(default_cache_entries)
+        cache_entries_debug = dict(cache_entries)
+        cache_entries_debug.update(debug_cache_entries)
+        final_cache_entries = select({
+            "@envoy//bazel:dbg_build": cache_entries_debug,
+            "//conditions:default": cache_entries,
+        })
+    else:
+        final_cache_entries = cache_entries
 
     pf = ""
     if copy_pdb:
@@ -152,10 +160,7 @@ def envoy_cmake(
 
     cmake(
         name = name,
-        cache_entries = select({
-            "@envoy//bazel:dbg_build": cache_entries_debug,
-            "//conditions:default": cache_entries,
-        }),
+        cache_entries = final_cache_entries,
         generate_args = generate_args,
         targets = targets,
         # TODO: Remove install target and make this work
@@ -238,7 +243,6 @@ envoy_select_admin_functionality = _envoy_select_admin_functionality
 envoy_select_static_extension_registration = _envoy_select_static_extension_registration
 envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
 envoy_select_envoy_mobile_xds = _envoy_select_envoy_mobile_xds
-envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_enable_http3 = _envoy_select_enable_http3

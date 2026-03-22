@@ -147,6 +147,28 @@ TEST_P(TlsInspectorTest, SniRegistered) {
   EXPECT_EQ(1, cfg_->stats().alpn_not_found_.value());
 }
 
+// Test that SNI stats are only incremented once even though both early extraction and
+// the server name callback processing extract the same SNI. This verifies the sni_found_
+// flag prevents duplicate stat incrementing.
+TEST_P(TlsInspectorTest, SniStatsNotDoubleCounted) {
+  init();
+  const std::string servername("example.com");
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
+      std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "");
+  mockSysCallForPeek(client_hello);
+  // setRequestedServerName should only be called once despite both callbacks processing SNI.
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+  // Verify stats are incremented exactly once.
+  EXPECT_EQ(1, cfg_->stats().sni_found_.value());
+  EXPECT_EQ(0, cfg_->stats().sni_not_found_.value());
+}
+
 // Test that a ClientHello with an ALPN value causes the correct name notification.
 TEST_P(TlsInspectorTest, AlpnRegistered) {
   init();
@@ -294,6 +316,9 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   const std::vector<uint64_t> bytes_processed =
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ("TLS_error|error:10000092:SSL "
+            "routines:OPENSSL_internal:ENCRYPTED_LENGTH_TOO_LONG:TLS_error_end",
+            cb_.streamInfo().downstreamTransportFailureReason());
 }
 
 TEST_P(TlsInspectorTest, ClientHelloTooBigTreatParsingErrorAsPlainText) {
@@ -458,6 +483,39 @@ TEST_P(TlsInspectorTest, NotSsl) {
 
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
+  EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+  const std::vector<uint64_t> bytes_processed =
+      store_.histogramValues("tls_inspector.bytes_processed", false);
+  ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ(5, bytes_processed[0]);
+  EXPECT_EQ(
+      "TLS_error|error:100000f7:SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER:TLS_error_end",
+      cb_.streamInfo().downstreamTransportFailureReason());
+}
+
+TEST_P(TlsInspectorTest, NotSslCloseConnection) {
+  std::vector<uint8_t> data;
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.set_close_connection_on_client_hello_parsing_errors(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+
+  init();
+
+  // Use 100 bytes of zeroes. This is not valid as a ClientHello.
+  data.resize(100);
+  mockSysCallForPeek(data);
+  // trigger the event to copy the client hello message into buffer:q
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+
+  Protobuf::Struct expected_metadata;
+  auto& fields = *expected_metadata.mutable_fields();
+  fields[Filter::failureReasonKey()].set_string_value(
+      Filter::failureReasonClientHelloNotDetected());
+  EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
+
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
   const std::vector<uint64_t> bytes_processed =
       store_.histogramValues("tls_inspector.bytes_processed", false);

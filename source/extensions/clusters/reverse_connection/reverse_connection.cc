@@ -74,7 +74,7 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_v
   ENVOY_LOG(debug, "reverse_connection: resolved key '{}' to node: '{}'", host_id, node_id);
 
   {
-    absl::ReaderMutexLock rlock(&host_map_lock_);
+    absl::ReaderMutexLock rlock(host_map_lock_);
     // Check if node_id is already present in host_map_ or not. This ensures,
     // that envoy reuses a conn_pool_container for an endpoint.
     auto host_itr = host_map_.find(node_id);
@@ -85,7 +85,7 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_v
     }
   }
 
-  absl::WriterMutexLock wlock(&host_map_lock_);
+  absl::WriterMutexLock wlock(host_map_lock_);
 
   // Re-check under writer lock to avoid duplicate creation under contention.
   auto host_itr2 = host_map_.find(node_id);
@@ -115,7 +115,7 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_v
 }
 
 void RevConCluster::cleanup() {
-  absl::WriterMutexLock wlock(&host_map_lock_);
+  absl::WriterMutexLock wlock(host_map_lock_);
 
   for (auto iter = host_map_.begin(); iter != host_map_.end();) {
     // Check if the host handle is acquired by any connection pool container or not. If not

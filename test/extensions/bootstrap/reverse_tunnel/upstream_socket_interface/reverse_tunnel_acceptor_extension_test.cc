@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 
 #include "source/common/network/utility.h"
@@ -7,10 +9,12 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -59,6 +63,17 @@ protected:
     thread_local_registry_.reset();
     extension_.reset();
     socket_interface_.reset();
+  }
+
+  auto getConfigWithReporter() {
+    envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+        UpstreamReverseConnectionSocketInterface custom_config;
+
+    auto* reporter_config = custom_config.mutable_reporter_config();
+    reporter_config->set_name(MOCK_REPORTER);
+    reporter_config->mutable_typed_config()->PackFrom(Protobuf::StringValue{});
+
+    return custom_config;
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -478,6 +493,93 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, PingFailureThresholdConfiguration) {
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, FactoryName) {
   EXPECT_EQ(socket_interface_->name(), "envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, InitializeWithReporterConfig) {
+  auto config = getConfigWithReporter();
+  NiceMock<MockReporterFactory> reporter_factory;
+
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+    EXPECT_CALL(*reporter, onServerInitialized());
+    return reporter;
+  }));
+
+  extension_ =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
+  extension_->onServerInitialized();
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, InvalidReverseTunnelReporter) {
+  auto config = getConfigWithReporter();
+  NiceMock<MockReporterFactory> reporter_factory;
+
+  EXPECT_THROW(ReverseTunnelAcceptorExtension(*socket_interface_, context_, config),
+               EnvoyException);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateConnectionReporting) {
+  auto config = getConfigWithReporter();
+
+  std::string node_id = "node";
+  std::string cluster_id = "cluster";
+  std::string tenant_id = "tenant";
+
+  NiceMock<MockReporterFactory> reporter_factory;
+
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  EXPECT_CALL(reporter_factory, createReporter())
+      .Times(1)
+      .WillOnce(Invoke([&node_id, &cluster_id, &tenant_id]() {
+        auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+
+        EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                                     testing::Eq(tenant_id)));
+
+        return reporter;
+      }));
+
+  extension_ =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
+  extension_->reportConnection(node_id, cluster_id, tenant_id);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
+  auto config = getConfigWithReporter();
+
+  std::string node_id = "node";
+  std::string cluster_id = "cluster";
+
+  NiceMock<MockReporterFactory> reporter_factory;
+
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  EXPECT_CALL(reporter_factory, createReporter())
+      .Times(1)
+      .WillOnce(Invoke([&node_id, &cluster_id]() {
+        auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+
+        EXPECT_CALL(*reporter,
+                    reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id)));
+
+        return reporter;
+      }));
+
+  extension_ =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
+  extension_->reportDisconnection(node_id, cluster_id);
 }
 
 } // namespace ReverseConnection

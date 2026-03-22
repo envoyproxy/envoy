@@ -82,9 +82,6 @@ private:
   ParserStatus status_ = ParserStatus::Ok;
   // An error message, often seemingly arbitrary to match http-parser behavior.
   absl::string_view error_message_;
-  // Latched value of `envoy.reloadable_features.http1_balsa_delay_reset`.
-  const bool delay_reset_ =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_balsa_delay_reset");
 };
 
 } // namespace Http1

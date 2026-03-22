@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
 
     engine = new AndroidEngineBuilder(getApplication())
                  .setUseV2NetworkMonitor(true)
+                 .setUseQuicPlatformPacketWriter(true)
                  .setLogLevel(LogLevel.DEBUG)
                  .setLogger((level, message) -> {
                    Log.d(TAG, message);

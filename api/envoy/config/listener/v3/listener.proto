@@ -45,6 +45,14 @@ message AdditionalAddress {
   // or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
   // it means no socket option will apply.
   core.v3.SocketOptionsOverride socket_options = 2;
+
+  // Configures TCP keepalive settings for the additional address.
+  // If not set, the listener :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.Listener.tcp_keepalive>`
+  // configuration is inherited. You can explicitly disable TCP keepalive for the additional address by setting any keepalive field
+  // (:ref:`keepalive_probes <envoy_v3_api_field_config.core.v3.TcpKeepalive.keepalive_probes>`,
+  // :ref:`keepalive_time <envoy_v3_api_field_config.core.v3.TcpKeepalive.keepalive_time>`, or
+  // :ref:`keepalive_interval <envoy_v3_api_field_config.core.v3.TcpKeepalive.keepalive_interval>`) to ``0``.
+  core.v3.TcpKeepalive tcp_keepalive = 3;
 }
 
 // Listener list collections. Entries are ``Listener`` resources or references.
@@ -53,7 +61,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -420,6 +428,12 @@ message Listener {
 
   // Whether the listener bypasses configured overload manager actions.
   bool bypass_overload_manager = 35;
+
+  // If set, TCP keepalive settings are configured for the listener address and inherited by
+  // additional addresses. If not set, TCP keepalive settings are not configured for the
+  // listener address and additional addresses by default. See :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive>`
+  // to explicitly configure TCP keepalive settings for individual additional addresses.
+  core.v3.TcpKeepalive tcp_keepalive = 37;
 }
 
 // A placeholder proto so that users can explicitly configure the standard

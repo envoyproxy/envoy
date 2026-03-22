@@ -147,13 +147,12 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
       auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-          tls_context, factory_context_, false);
+          tls_context, factory_context_, {}, false);
       // upstream_stats_store_ should have been initialized be prior call to
       // BaseIntegrationTest::createXdsUpstream().
       ASSERT(upstream_stats_store_ != nullptr);
       auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-          std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
-          std::vector<std::string>{});
+          std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
       addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
     }
     failover_xds_upstream_ = fake_upstreams_.back().get();

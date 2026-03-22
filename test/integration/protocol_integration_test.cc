@@ -1731,7 +1731,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1760,7 +1759,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitFor
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1770,31 +1768,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitFor
                                      {":scheme", "http"},
                                      {":authority", "sni.lyft.com"},
                                      {"expect", "100-contINUE"}});
-  waitForNextUpstreamRequest();
-  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}});
-  response->waitFor1xxHeaders();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-}
-
-TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102NoDelayBalsaReset) {
-  if (GetParam().upstream_protocol != Http::CodecType::HTTP1) {
-    GTEST_SKIP() << "This test is only relevant for HTTP1 upstream with BalsaParser";
-  }
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "false");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "HEAD"},
-                                     {":path", "/dynamo/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
-                                     {"expect", "100-contINUE"}});
-
   waitForNextUpstreamRequest();
   upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}});
   response->waitFor1xxHeaders();

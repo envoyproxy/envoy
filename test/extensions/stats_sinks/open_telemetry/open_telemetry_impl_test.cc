@@ -877,7 +877,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationHistogram
   auto data_point1 = metric.histogram().data_points()[0];
   EXPECT_EQ(20, data_point1.count()); // Each original hist has count 10
   // The sum should be double the sum of a single cumulative histogram.
-  EXPECT_NEAR(data_point1.sum(), 11661106.51, 0.1);
+  EXPECT_NEAR(data_point1.sum(), 11656376.283404071, 0.1);
   expectAttributes(data_point1.attributes(), "key", "hist1");
   // Check bucket counts are doubled.
   const int default_buckets_count = 19;
@@ -1216,9 +1216,9 @@ public:
               (const, override));
 };
 
-class OpenTelemetryGrpcSinkTests : public OpenTelemetryStatsSinkTests {
+class OpenTelemetrySinkTests : public OpenTelemetryStatsSinkTests {
 public:
-  OpenTelemetryGrpcSinkTests()
+  OpenTelemetrySinkTests()
       : flusher_(std::make_shared<MockOtlpMetricsFlusher>()),
         exporter_(std::make_shared<MockOpenTelemetryGrpcMetricsExporter>()) {}
 
@@ -1226,9 +1226,9 @@ public:
   std::shared_ptr<MockOpenTelemetryGrpcMetricsExporter> exporter_;
 };
 
-TEST_F(OpenTelemetryGrpcSinkTests, BasicFlow) {
+TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   // Initialize the sink with a created_at time of 1000.
-  OpenTelemetryGrpcSink sink(flusher_, exporter_, /*create_time_ns=*/1000);
+  OpenTelemetrySink sink(flusher_, exporter_, /*create_time_ns=*/1000);
 
   // First flush: last_flush_time_ns should be the created_at value (1000).
   MetricsExportRequestPtr request1 = std::make_unique<MetricsExportRequest>();

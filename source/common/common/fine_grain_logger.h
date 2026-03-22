@@ -129,7 +129,7 @@ public:
    */
   void removeFineGrainLogEntryForTest(absl::string_view key)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
-    absl::WriterMutexLock wl(&fine_grain_log_lock_);
+    absl::WriterMutexLock wl(fine_grain_log_lock_);
     fine_grain_log_map_->erase(key);
   }
 

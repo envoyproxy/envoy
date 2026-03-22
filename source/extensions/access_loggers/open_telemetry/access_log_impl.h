@@ -12,6 +12,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/grpc/typed_async_client.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
 #include "source/extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
 #include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
@@ -56,6 +57,8 @@ private:
   const GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::unique_ptr<OpenTelemetryFormatter> body_formatter_;
   std::unique_ptr<OpenTelemetryFormatter> attributes_formatter_;
+  const std::vector<std::string> filter_state_objects_to_log_;
+  const std::vector<Tracing::CustomTagConstSharedPtr> custom_tags_;
 };
 
 using AccessLogPtr = std::unique_ptr<AccessLog>;

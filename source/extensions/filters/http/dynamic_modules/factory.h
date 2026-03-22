@@ -20,8 +20,18 @@ class DynamicModuleConfigFactory
 public:
   DynamicModuleConfigFactory() : DualFactoryBase("envoy.extensions.filters.http.dynamic_modules") {}
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const FilterConfig& raw_config, const std::string&, DualInfo,
-                                    Server::Configuration::ServerFactoryContext& context) override;
+  createFilterFactoryFromProtoTyped(const FilterConfig& proto_config,
+                                    const std::string& stat_prefix, DualInfo dual_info,
+                                    Server::Configuration::ServerFactoryContext& context) override {
+    return createFilterFactory(proto_config, stat_prefix, context, dual_info.scope);
+  }
+  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const FilterConfig& proto_config, const std::string& stat_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactory(const FilterConfig& proto_config, const std::string& stat_prefix,
+                      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,

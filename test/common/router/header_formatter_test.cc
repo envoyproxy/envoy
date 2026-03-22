@@ -239,6 +239,44 @@ TEST(HeaderParserTest, TestParse) {
   }
 }
 
+TEST(HeaderParser, TestInternalAddressTranslator) {
+  struct TestCase {
+    std::string input_;
+    std::string expected_output_;
+  };
+
+  static const TestCase test_cases[] = {
+      {"%DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID%", "1234567890"},
+      {"%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_ENDPOINT_ID%", "1234567890"},
+      {"%UPSTREAM_REMOTE_ADDRESS_ENDPOINT_ID%", "1111111111"},
+  };
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  auto downstream_local_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::EnvoyInternalInstance("downstream", "1234567890")};
+  stream_info.downstream_connection_info_provider_->setLocalAddress(downstream_local_address);
+  stream_info.downstream_connection_info_provider_->setDirectLocalAddressForTest(
+      downstream_local_address);
+  auto upstream_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::EnvoyInternalInstance("upstream", "1111111111")};
+  stream_info.upstreamInfo()->setUpstreamRemoteAddress(upstream_address);
+
+  for (const auto& test_case : test_cases) {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
+    envoy::config::core::v3::HeaderValueOption* header = to_add.Add();
+    header->mutable_header()->set_key("x-header");
+    header->mutable_header()->set_value(test_case.input_);
+
+    HeaderParserPtr req_header_parser = HeaderParser::configure(to_add).value();
+    Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+    req_header_parser->evaluateHeaders(header_map, stream_info);
+
+    std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
+    EXPECT_TRUE(header_map.has("x-header")) << descriptor;
+    EXPECT_EQ(test_case.expected_output_, header_map.get_("x-header")) << descriptor;
+  }
+}
+
 TEST(HeaderParser, TestMetadataTranslator) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   ScopedThreadLocalServerContextSetter setter(context);

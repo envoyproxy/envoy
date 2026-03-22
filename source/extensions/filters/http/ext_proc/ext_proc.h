@@ -26,6 +26,7 @@
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
@@ -49,7 +50,9 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_ignored)                                                               \
   COUNTER(clear_route_cache_disabled)                                                              \
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
-  COUNTER(http_not_ok_resp_received)
+  COUNTER(http_not_ok_resp_received)                                                               \
+  COUNTER(immediate_responses_sent)                                                                \
+  COUNTER(server_half_closed)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -89,11 +92,18 @@ public:
     std::unique_ptr<GrpcCallBody> body_stats_;
   };
 
+  struct ProcessingEffects {
+    ProcessingEffect::Effect header_effect_;
+    ProcessingEffect::Effect body_effect_;
+    ProcessingEffect::Effect trailer_effect_;
+  };
+
   using GrpcCalls = struct GrpcCallStats;
 
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
+  void setFailedOpen() { failed_open_ = true; }
   void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status) {
     grpc_status_before_first_call_ = call_status;
   }
@@ -101,6 +111,9 @@ public:
     return grpc_status_before_first_call_;
   }
 
+  void recordProcessingEffect(ProcessorState::CallbackState callback_state,
+                              envoy::config::core::v3::TrafficDirection traffic_direction,
+                              ProcessingEffect::Effect processing_effect);
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
@@ -126,6 +139,8 @@ public:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
+  const ProcessingEffects&
+  processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
 
@@ -139,8 +154,11 @@ public:
 
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
+  ProcessingEffects& processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
+  ProcessingEffects encoding_processor_effects_{};
+  ProcessingEffects decoding_processor_effects_{};
   const Envoy::Protobuf::Struct filter_metadata_;
   // The following stats are populated for ext_proc filters using Envoy gRPC only.
   // The bytes sent and received are for the entire stream.
@@ -149,6 +167,8 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
   std::string http_response_code_details_;
+  // True if the stream failed open.
+  bool failed_open_{false};
   // The gRPC status when the openStream() operation fails.
   Grpc::Status::GrpcStatus grpc_status_before_first_call_ = Grpc::Status::Ok;
 };
@@ -553,12 +573,15 @@ public:
   void onProcessBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response,
                              absl::Status status,
                              envoy::config::core::v3::TrafficDirection traffic_direction);
+  void onProcessStreamingImmediateResponse(
+      const envoy::service::ext_proc::v3::StreamedImmediateResponse& response, absl::Status status);
 
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
   void closeStream();
   void halfCloseAndWaitForRemoteClose();
+  void logFailOpen();
 
   void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status);
   void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
@@ -607,6 +630,7 @@ private:
                    envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream);
 
   void encodeProtocolConfig(envoy::service::ext_proc::v3::ProcessingRequest& req);
+  void finishProcessing();
 
   // For FULL_DUPLEX_STREAMED body mode, once the data is received and sent to
   // the ext_proc server, Envoy only supports fail close.
@@ -624,7 +648,9 @@ private:
   // This stream closing optimization only applies to STREAMED or FULL_DUPLEX_STREAMED body modes.
   // For other body modes like BUFFERED or BUFFERED_PARTIAL, it is ignored.
   void closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
-                                         const bool is_last_body_resp);
+                                         const bool eos_seen_in_body);
+  absl::Status handleStreamingImmediateResponse(
+      const envoy::service::ext_proc::v3::StreamedImmediateResponse& response);
 
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;

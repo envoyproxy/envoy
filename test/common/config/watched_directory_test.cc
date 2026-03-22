@@ -33,5 +33,21 @@ TEST(WatchedDirectory, All) {
   EXPECT_TRUE(called);
 }
 
+// Verify that watch callback doesn't crash if setCallback() was never called.
+TEST(WatchedDirectory, CallbackNotSetDoesNotCrash) {
+  Event::MockDispatcher dispatcher;
+  envoy::config::core::v3::WatchedDirectory config;
+  config.set_path("foo/bar");
+  auto* watcher = new Filesystem::MockWatcher();
+  EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
+  Filesystem::Watcher::OnChangedCb cb;
+  EXPECT_CALL(*watcher, addWatch("foo/bar/", Filesystem::Watcher::Events::MovedTo, _))
+      .WillOnce(DoAll(SaveArg<2>(&cb), Return(absl::OkStatus())));
+  auto wd = *WatchedDirectory::create(config, dispatcher);
+  // We are not calling setCallback() to simulate the case where file loading fails
+  // before the callback can be set. The watch callback checks for null and returns OkStatus.
+  EXPECT_TRUE(cb(Filesystem::Watcher::Events::MovedTo).ok());
+}
+
 } // namespace Config
 } // namespace Envoy

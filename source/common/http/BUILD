@@ -284,6 +284,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "forward_client_cert_lib",
+    hdrs = ["forward_client_cert.h"],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/matcher:matcher_interface",
+        "//source/common/matcher:matcher_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "conn_manager_config_interface",
     hdrs = ["conn_manager_config.h"],
     deps = [
@@ -294,6 +304,7 @@ envoy_cc_library(
         "//envoy/http:header_validator_interface",
         "//envoy/http:original_ip_detection_interface",
         "//envoy/http:request_id_extension_interface",
+        "//envoy/matcher:matcher_interface",
         "//envoy/router:rds_interface",
         "//envoy/router:scopes_interface",
         "//source/common/local_reply:local_reply_lib",
@@ -359,6 +370,7 @@ envoy_cc_library(
         ":conn_manager_config_interface",
         ":exception_lib",
         ":filter_manager_lib",
+        ":forward_client_cert_lib",
         ":header_map_lib",
         ":header_utility_lib",
         ":headers_lib",
@@ -404,6 +416,8 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/matcher:matcher_lib",
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/quic:quic_server_factory_stub_lib",

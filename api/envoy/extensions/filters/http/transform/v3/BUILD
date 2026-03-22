@@ -8,6 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/config/common/mutation_rules/v3:pkg",
         "//envoy/config/core/v3:pkg",
-        "@com_github_cncf_xds//udpa/annotations:pkg",
+        "@xds//udpa/annotations:pkg",
     ],
 )

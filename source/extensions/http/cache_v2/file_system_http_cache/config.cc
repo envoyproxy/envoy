@@ -54,7 +54,7 @@ public:
     std::shared_ptr<CacheSessions> cache;
     ConfigProto config = normalizeConfig(non_normalized_config);
     auto key = config.cache_path();
-    absl::MutexLock lock(&mu_);
+    absl::MutexLock lock(mu_);
     auto it = caches_.find(key);
     if (it != caches_.end()) {
       cache = it->second.lock();

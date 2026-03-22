@@ -5,7 +5,8 @@ using testing::AssertionResult;
 namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsXdsTpConfigsIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsXdsTpConfigsIntegrationTest::protocolTestParamsToString);
 
 // Validate that clusters that are fetched using ADS and use EDS from a
 // different authority works.

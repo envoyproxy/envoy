@@ -1,10 +1,10 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
-load("//tools/base:envoy_python.bzl", "envoy_genjson")
 
 licenses(["notice"])  # Apache 2
 
@@ -12,7 +12,7 @@ licenses(["notice"])  # Apache 2
 # this is a workaround to just exclude it from checks for now
 # which is sub-optimal as it also excludes it from CVE scanning
 # https://github.com/envoyproxy/envoy/issues/31394
-envoy_genjson(
+json_merge(
     name = "filtered-dependencies",
     srcs = ["//bazel:all_repository_locations"],
     filter = """
@@ -22,7 +22,7 @@ envoy_genjson(
     visibility = ["//visibility:public"],
 )
 
-envoy_genjson(
+json_merge(
     name = "cpe-dependencies",
     srcs = [":filtered-dependencies"],
     args = [
@@ -87,7 +87,7 @@ py_binary(
     deps = [":validate"],
 )
 
-envoy_genjson(
+json_merge(
     name = "build-images",
     filter = """
     .[0]["build-image"]
@@ -109,7 +109,7 @@ sh_binary(
     toolchains = ["@jq_toolchains//:resolved_toolchain"],
 )
 
-envoy_genjson(
+json_merge(
     name = "start-year",
     filter = """
     .[0].start_year
@@ -142,7 +142,7 @@ sh_binary(
     },
 )
 
-envoy_genjson(
+json_merge(
     name = "ignored-cves",
     filter = """
     .[0].ignored_cves

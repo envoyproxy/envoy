@@ -446,7 +446,7 @@
               ]
             }
           },
-          "com_github_cncf_xds": {
+          "xds": {
             "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
             "ruleClassName": "http_archive",
             "attributes": {

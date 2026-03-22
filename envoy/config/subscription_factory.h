@@ -147,7 +147,7 @@ public:
          const LocalInfo::LocalInfo& local_info,
          std::unique_ptr<CustomConfigValidators>&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, OptRef<XdsConfigTracker> xds_config_tracker,
-         OptRef<XdsResourcesDelegate> xds_resources_delegate, bool use_eds_resources_cache) PURE;
+         OptRef<XdsResourcesDelegate> xds_resources_delegate) PURE;
 };
 
 } // namespace Config

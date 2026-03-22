@@ -25,23 +25,6 @@
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/tls/cert_validator/timed_cert_validator.h"
-#include "test/common/tls/ssl_certs_test.h"
-#include "test/common/tls/test_data/ca_cert_info.h"
-#include "test/common/tls/test_data/extensions_cert_info.h"
-#include "test/common/tls/test_data/no_san_cert_info.h"
-#include "test/common/tls/test_data/password_protected_cert_info.h"
-#include "test/common/tls/test_data/san_dns2_cert_info.h"
-#include "test/common/tls/test_data/san_dns3_cert_info.h"
-#include "test/common/tls/test_data/san_dns4_cert_info.h"
-#include "test/common/tls/test_data/san_dns_cert_info.h"
-#include "test/common/tls/test_data/san_dns_ecdsa_1_cert_info.h"
-#include "test/common/tls/test_data/san_dns_rsa_1_cert_info.h"
-#include "test/common/tls/test_data/san_dns_rsa_2_cert_info.h"
-#include "test/common/tls/test_data/san_multiple_dns_1_cert_info.h"
-#include "test/common/tls/test_data/san_multiple_dns_cert_info.h"
-#include "test/common/tls/test_data/san_uri_cert_info.h"
-#include "test/common/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
-#include "test/common/tls/test_private_key_method_provider.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -63,7 +46,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
-#include "xds/type/v3/typed_struct.pb.h"
 
 using testing::_;
 using testing::Invoke;
@@ -77,17 +59,33 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+namespace {
 
-class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
+class TestTlsCertificateSelector : public Ssl::TlsCertificateSelector,
+                                   public Ssl::UpstreamTlsCertificateSelector {
 public:
   TestTlsCertificateSelector(Ssl::TlsCertificateSelectorContext& selector_ctx,
-                             const Protobuf::Message&)
-      : selector_ctx_(selector_ctx) {}
+                             Ssl::SelectionResult::SelectionStatus mode)
+      : selector_ctx_(selector_ctx), mod_(mode) {
+    ENVOY_LOG_MISC(info, "debug: init provider");
+  }
+
   ~TestTlsCertificateSelector() override {
     ENVOY_LOG_MISC(info, "debug: ~TestTlsCertificateSelector");
   }
+
   Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO&,
                                         Ssl::CertificateSelectionCallbackPtr cb) override {
+    return selectTlsContext(std::move(cb));
+  }
+
+  Ssl::SelectionResult selectTlsContext(const SSL&,
+                                        const Network::TransportSocketOptionsConstSharedPtr&,
+                                        Ssl::CertificateSelectionCallbackPtr cb) override {
+    return selectTlsContext(std::move(cb));
+  }
+
+  Ssl::SelectionResult selectTlsContext(Ssl::CertificateSelectionCallbackPtr cb) {
     ENVOY_LOG_MISC(info, "debug: select context");
 
     switch (mod_) {
@@ -104,12 +102,12 @@ public:
       break;
     }
     return {mod_, nullptr, false};
-  };
+  }
 
   std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
   findTlsContext(absl::string_view, const Ssl::CurveNIDVector&, bool, bool*) override {
     PANIC("unreachable");
-  };
+  }
 
   void selectTlsContextAsync() {
     ENVOY_LOG_MISC(info, "debug: select cert async done");
@@ -118,47 +116,70 @@ public:
 
   const Ssl::TlsContext& getTlsContext() { return selector_ctx_.getTlsContexts()[0]; }
 
-  Ssl::SelectionResult::SelectionStatus mod_;
-
 private:
   Ssl::TlsCertificateSelectorContext& selector_ctx_;
+  const Ssl::SelectionResult::SelectionStatus mod_;
   Ssl::CertificateSelectionCallbackPtr cb_;
 };
 
-class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {
+class TestTlsCertificateSelectorFactory;
+
+class TestTlsSelectorFactory : public Ssl::TlsCertificateSelectorFactory,
+                               public Ssl::UpstreamTlsCertificateSelectorFactory {
+public:
+  TestTlsSelectorFactory(TestTlsCertificateSelectorFactory& parent) : parent_(parent) {}
+  Ssl::TlsCertificateSelectorPtr create(Ssl::TlsCertificateSelectorContext& selector_ctx) override;
+  Ssl::UpstreamTlsCertificateSelectorPtr
+  createUpstreamTlsCertificateSelector(Ssl::TlsCertificateSelectorContext& selector_ctx) override;
+  absl::Status onConfigUpdate() override { return absl::OkStatus(); }
+
+private:
+  TestTlsCertificateSelectorFactory& parent_;
+};
+
+class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory,
+                                          public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
 public:
   using CreateProviderHook =
-      std::function<void(const Protobuf::Message&, Server::Configuration::CommonFactoryContext&,
-                         ProtobufMessage::ValidationVisitor&)>;
+      std::function<void(const Protobuf::Message&, Server::Configuration::GenericFactoryContext&)>;
 
-  Ssl::TlsCertificateSelectorFactory
+  absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr>
   createTlsCertificateSelectorFactory(const Protobuf::Message& config,
-                                      Server::Configuration::CommonFactoryContext& factory_context,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                      absl::Status& creation_status, bool for_quic) override {
+                                      Server::Configuration::GenericFactoryContext& factory_context,
+                                      const Ssl::ServerContextConfig&, bool for_quic) override {
     if (selector_cb_) {
-      selector_cb_(config, factory_context, validation_visitor);
+      selector_cb_(config, factory_context);
     }
     if (for_quic) {
-      creation_status = absl::InvalidArgumentError("does not supported for quic");
-      return {};
+      return absl::InvalidArgumentError("does not supported for quic");
     }
-    return [&config, this](const Ssl::ServerContextConfig&,
-                           Ssl::TlsCertificateSelectorContext& selector_ctx) {
-      ENVOY_LOG_MISC(info, "debug: init provider");
-      auto provider = std::make_unique<TestTlsCertificateSelector>(selector_ctx, config);
-      provider->mod_ = mod_;
-      return provider;
-    };
+    return std::make_unique<TestTlsSelectorFactory>(*this);
   }
+  absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
+  createUpstreamTlsCertificateSelectorFactory(const Protobuf::Message&,
+                                              Server::Configuration::GenericFactoryContext&,
+                                              const Ssl::ClientContextConfig&) override {
+    return std::make_unique<TestTlsSelectorFactory>(*this);
+  }
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<xds::type::v3::TypedStruct>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "test-tls-context-provider"; };
 
   CreateProviderHook selector_cb_;
   Ssl::SelectionResult::SelectionStatus mod_;
 };
+
+Ssl::TlsCertificateSelectorPtr
+TestTlsSelectorFactory::create(Ssl::TlsCertificateSelectorContext& selector_ctx) {
+  return std::make_unique<TestTlsCertificateSelector>(selector_ctx, parent_.mod_);
+};
+
+Ssl::UpstreamTlsCertificateSelectorPtr TestTlsSelectorFactory::createUpstreamTlsCertificateSelector(
+    Ssl::TlsCertificateSelectorContext& selector_ctx) {
+  return std::make_unique<TestTlsCertificateSelector>(selector_ctx, parent_.mod_);
+}
 
 Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                     Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
@@ -171,18 +192,55 @@ Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
       listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
 }
 
-class TlsCertificateSelectorFactoryTest
-    : public testing::Test,
-      public testing::WithParamInterface<Network::Address::IpVersion> {
+using SelectionStatus = Ssl::SelectionResult::SelectionStatus;
+
+struct TestParams {
+  Network::Address::IpVersion ip_version;
+  SelectionStatus mode;
+  bool upstream;
+};
+
+std::string modeToString(SelectionStatus mode) {
+  switch (mode) {
+  case SelectionStatus::Success:
+    return "Sync";
+  case SelectionStatus::Pending:
+    return "Async";
+  default:
+    return "Fail";
+  }
+}
+
+std::string testParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
+  return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
+                     modeToString(p.param.mode), p.param.upstream ? "Upstream" : "Downstream");
+}
+
+std::vector<SelectionStatus> getSelectionStatuses() {
+  return {SelectionStatus::Success, SelectionStatus::Failed, SelectionStatus::Pending};
+}
+
+std::vector<TestParams> testParams() {
+  std::vector<TestParams> ret;
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    for (auto selection : getSelectionStatuses()) {
+      ret.push_back(TestParams{ip_version, selection, true});
+      ret.push_back(TestParams{ip_version, selection, false});
+    }
+  }
+  return ret;
+}
+
+class TlsCertificateSelectorFactoryTest : public testing::TestWithParam<TestParams> {
 protected:
   TlsCertificateSelectorFactoryTest()
-      : registered_factory_(provider_factory_), version_(GetParam()) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-  }
+      : registered_factory_(provider_factory_), upstream_registered_factory_(provider_factory_),
+        version_(GetParam().ip_version) {}
 
-  void testUtil(Ssl::SelectionResult::SelectionStatus mod) {
-    const std::string server_ctx_yaml = R"EOF(
+  void runTest() {
+    const auto mod = GetParam().mode;
+    const bool upstream = GetParam().upstream;
+    const std::string ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
       certificate_chain:
@@ -192,24 +250,17 @@ protected:
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+    const std::string selector_yaml = R"EOF(
     custom_tls_certificate_selector:
       name: test-tls-context-provider
       typed_config:
-        "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        value:
-          foo: bar
+        "@type": type.googleapis.com/google.protobuf.StringValue
 )EOF";
-    const std::string client_ctx_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-      certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
-)EOF";
+    const std::string server_ctx_yaml = upstream ? ctx_yaml : absl::StrCat(ctx_yaml, selector_yaml);
+    const std::string client_ctx_yaml = upstream ? absl::StrCat(ctx_yaml, selector_yaml) : ctx_yaml;
 
     Event::SimulatedTimeSystem time_system;
-
     Stats::TestUtil::TestStore server_stats_store;
     Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
     NiceMock<Runtime::MockLoader> runtime;
@@ -220,19 +271,20 @@ protected:
 
     MockFunction<TestTlsCertificateSelectorFactory::CreateProviderHook> mock_factory_cb;
     provider_factory_.selector_cb_ = mock_factory_cb.AsStdFunction();
-
-    EXPECT_CALL(mock_factory_cb, Call)
-        .WillOnce(WithArg<1>([&](Server::Configuration::CommonFactoryContext& context) {
-          // Check that the objects available via the context are the same ones
-          // provided to the parent context.
-          EXPECT_THAT(context.api(), Ref(*server_api));
-        }));
+    if (!upstream) {
+      EXPECT_CALL(mock_factory_cb, Call)
+          .WillOnce(WithArg<1>([&](Server::Configuration::GenericFactoryContext& context) {
+            // Check that the objects available via the context are the same ones
+            // provided to the parent context.
+            EXPECT_THAT(context.serverFactoryContext().api(), Ref(*server_api));
+          }));
+    }
 
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
     // provider factory callback will be Called here.
     auto server_cfg = *ServerContextConfigImpl::create(server_tls_context,
-                                                       transport_socket_factory_context, false);
+                                                       transport_socket_factory_context, {}, false);
 
     Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
     provider_factory_.mod_ = mod;
@@ -240,8 +292,7 @@ protected:
     NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
     Tls::ContextManagerImpl manager(server_factory_context);
     auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-        std::move(server_cfg), manager, *server_stats_store.rootScope(),
-        std::vector<std::string>{});
+        std::move(server_cfg), manager, *server_stats_store.rootScope());
 
     auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(version_));
@@ -308,32 +359,18 @@ protected:
       }
     };
 
-    if (false) {
-      EXPECT_CALL(client_connection_callbacks, onEvent)
-          .WillRepeatedly(Invoke([&](Network::ConnectionEvent e) -> void {
-            ENVOY_LOG_MISC(info, "client onEvent {}", static_cast<int>(e));
-            connect_second_time();
-          }));
-
-      EXPECT_CALL(server_connection_callbacks, onEvent)
-          .WillRepeatedly(Invoke([&](Network::ConnectionEvent e) -> void {
-            ENVOY_LOG_MISC(info, "server onEvent {}", static_cast<int>(e));
-            connect_second_time();
-          }));
+    if (mod == Ssl::SelectionResult::SelectionStatus::Failed) {
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
     } else {
-      if (mod == Ssl::SelectionResult::SelectionStatus::Failed) {
-        EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
-        EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
-      } else {
-        EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-        EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-        EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-        EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-      }
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     }
 
     dispatcher->run(Event::Dispatcher::RunType::Block);
@@ -341,24 +378,21 @@ protected:
 
   TestTlsCertificateSelectorFactory provider_factory_;
   Registry::InjectFactory<Ssl::TlsCertificateSelectorConfigFactory> registered_factory_;
-  TestScopedRuntime scoped_runtime_;
+  Registry::InjectFactory<Ssl::UpstreamTlsCertificateSelectorConfigFactory>
+      upstream_registered_factory_;
 
   Network::Address::IpVersion version_;
 };
 
-TEST_P(TlsCertificateSelectorFactoryTest, Success) {
-  testUtil(Ssl::SelectionResult::SelectionStatus::Success);
-}
+TEST_P(TlsCertificateSelectorFactoryTest, Run) { runTest(); }
 
-TEST_P(TlsCertificateSelectorFactoryTest, Failed) {
-  testUtil(Ssl::SelectionResult::SelectionStatus::Failed);
-}
+INSTANTIATE_TEST_SUITE_P(IpVersionsSelectorType, TlsCertificateSelectorFactoryTest,
+                         testing::ValuesIn(testParams()), testParamsToString);
 
-TEST_P(TlsCertificateSelectorFactoryTest, Pending) {
-  testUtil(Ssl::SelectionResult::SelectionStatus::Pending);
-}
-
-TEST_P(TlsCertificateSelectorFactoryTest, QUICFactory) {
+TEST(TlsCertificateSelectorFactoryQuicTest, QUICFactory) {
+  TestTlsCertificateSelectorFactory provider_factory;
+  Registry::InjectFactory<Ssl::TlsCertificateSelectorConfigFactory> registered_factory(
+      provider_factory);
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -372,9 +406,7 @@ TEST_P(TlsCertificateSelectorFactoryTest, QUICFactory) {
     custom_tls_certificate_selector:
       name: test-tls-context-provider
       typed_config:
-        "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        value:
-          foo: bar
+        "@type": type.googleapis.com/google.protobuf.StringValue
 )EOF";
 
   Event::SimulatedTimeSystem time_system;
@@ -388,16 +420,13 @@ TEST_P(TlsCertificateSelectorFactoryTest, QUICFactory) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   // provider factory callback will be Called here.
-  auto server_cfg =
-      ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context, true);
+  auto server_cfg = ServerContextConfigImpl::create(server_tls_context,
+                                                    transport_socket_factory_context, {}, true);
 
   EXPECT_FALSE(server_cfg.ok());
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, TlsCertificateSelectorFactoryTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
+} // namespace
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

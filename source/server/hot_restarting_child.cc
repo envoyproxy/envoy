@@ -84,7 +84,7 @@ bool HotRestartingChild::abortDueToFailedParentConnection() {
 void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
   if (abortDueToFailedParentConnection()) {
     ENVOY_LOG(warn, "hot restart sendmsg() connection refused, falling back to regular restart");
-    absl::MutexLock lock(&registry_mu_);
+    absl::MutexLock lock(registry_mu_);
     parent_terminated_ = parent_drained_ = true;
     return;
   }
@@ -180,7 +180,7 @@ void HotRestartingChild::registerUdpForwardingListener(
 
 void HotRestartingChild::registerParentDrainedCallback(
     const Network::Address::InstanceConstSharedPtr& address, absl::AnyInvocable<void()> callback) {
-  absl::MutexLock lock(&registry_mu_);
+  absl::MutexLock lock(registry_mu_);
   if (parent_drained_) {
     callback();
   } else {
@@ -189,7 +189,7 @@ void HotRestartingChild::registerParentDrainedCallback(
 }
 
 void HotRestartingChild::allDrainsImplicitlyComplete() {
-  absl::MutexLock lock(&registry_mu_);
+  absl::MutexLock lock(registry_mu_);
   for (auto& drain_action : on_drained_actions_) {
     // Call the callback.
     std::move(drain_action.second)();

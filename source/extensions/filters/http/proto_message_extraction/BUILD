@@ -15,8 +15,8 @@ envoy_cc_library(
     external_deps = ["grpc_transcoding"],
     deps = [
         "@com_google_absl//absl/status",
-        "@com_google_protofieldextraction//:all_libs",
         "@envoy_api//envoy/extensions/filters/http/proto_message_extraction/v3:pkg_cc_proto",
+        "@proto-field-extraction//:all_libs",
     ],
 )
 
@@ -36,11 +36,11 @@ envoy_cc_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:string_view",
-        "@com_google_protoconverter//:all",
-        "@com_google_protofieldextraction//:all_libs",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:field_mask_path_checker",
         "@envoy_api//envoy/extensions/filters/http/proto_message_extraction/v3:pkg_cc_proto",
+        "@proto-converter//:all",
+        "@proto-field-extraction//:all_libs",
+        "@proto-processing//proto_processing_lib/proto_scrubber",
+        "@proto-processing//proto_processing_lib/proto_scrubber:field_mask_path_checker",
     ],
 )
 
@@ -55,11 +55,11 @@ envoy_cc_extension(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/strings:string_view",
-        "@com_google_protoconverter//:all",
-        "@com_google_protofieldextraction//:all_libs",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:field_mask_path_checker",
         "@envoy_api//envoy/extensions/filters/http/proto_message_extraction/v3:pkg_cc_proto",
+        "@proto-converter//:all",
+        "@proto-field-extraction//:all_libs",
+        "@proto-processing//proto_processing_lib/proto_scrubber",
+        "@proto-processing//proto_processing_lib/proto_scrubber:field_mask_path_checker",
     ],
 )
 

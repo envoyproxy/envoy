@@ -115,9 +115,9 @@ void HttpFilterTest::initialize(std::string&& yaml, bool is_upstream_filter) {
                                            "", is_upstream_filter, builder_, factory_context_);
   filter_ = std::make_unique<Filter>(config_, std::move(client_));
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(Return(BufferSize));
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillRepeatedly(Return(BufferSize));
   HttpTestUtility::addDefaultHeaders(request_headers_);
   request_headers_.setMethod("POST");
 }

@@ -43,3 +43,9 @@ name = "http_integration_test"
 path = "http_integration_test.rs"
 crate-type = ["cdylib"]
 test = true
+
+[[example]]
+name = "network_no_op"
+path = "network_no_op.rs"
+crate-type = ["cdylib"]
+test = true

@@ -83,7 +83,7 @@ message Validation {
 // Configuration for the reverse tunnel network filter.
 // This filter handles reverse tunnel connection acceptance and rejection by processing
 // HTTP requests where required identification values are provided via HTTP headers.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
   // If not specified, defaults to ``2 seconds``.
@@ -113,4 +113,10 @@ message ReverseTunnel {
   // ``x-envoy-reverse-tunnel-cluster-id`` headers against expected values extracted
   // using format strings. Requests that fail validation are rejected with HTTP ``403 Forbidden``.
   Validation validation = 5;
+
+  // Required cluster name for validating reverse tunnel connection initiations.
+  // When set, the filter validates that the upstream cluster of the initiator envoy matches this name
+  // via ``x-envoy-reverse-tunnel-upstream-cluster-name`` header. Connections with mismatched or missing
+  // cluster names are rejected with HTTP ``400 Bad Request``. When empty, no cluster name validation is performed.
+  string required_cluster_name = 6 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
 }

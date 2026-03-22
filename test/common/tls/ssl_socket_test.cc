@@ -473,16 +473,17 @@ void testUtil(const TestUtilOptions& options) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.serverCtxYaml()),
                             server_tls_context);
-  auto server_cfg = THROW_OR_RETURN_VALUE(
-      ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context, false),
-      std::unique_ptr<ServerContextConfigImpl>);
+  auto server_cfg =
+      THROW_OR_RETURN_VALUE(ServerContextConfigImpl::create(
+                                server_tls_context, transport_socket_factory_context, {}, false),
+                            std::unique_ptr<ServerContextConfigImpl>);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
-  auto server_ssl_socket_factory = THROW_OR_RETURN_VALUE(
-      ServerSslSocketFactory::create(std::move(server_cfg), manager,
-                                     *server_stats_store.rootScope(), std::vector<std::string>{}),
-      std::unique_ptr<ServerSslSocketFactory>);
+  auto server_ssl_socket_factory =
+      THROW_OR_RETURN_VALUE(ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                           *server_stats_store.rootScope()),
+                            std::unique_ptr<ServerSslSocketFactory>);
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(options.version()));
@@ -950,11 +951,11 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   ASSERT(transport_socket.has_typed_config());
   transport_socket.typed_config().UnpackTo(&tls_context);
 
-  auto server_cfg =
-      *ServerContextConfigImpl::create(tls_context, transport_socket_factory_context, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, transport_socket_factory_context,
+                                                     server_names, false);
 
-  auto factory_or_error = ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), server_names);
+  auto factory_or_error = ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                         *server_stats_store.rootScope());
   THROW_IF_NOT_OK_REF(factory_or_error.status());
   auto server_ssl_socket_factory = std::move(*factory_or_error);
 
@@ -1257,13 +1258,12 @@ TEST_P(SslSocketTest, ServerTransportSocketOptions) {
   ;
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
-  auto server_ssl_socket_factory =
-      ServerSslSocketFactory::create(std::move(server_cfg), manager,
-                                     *server_stats_store.rootScope(), std::vector<std::string>{})
-          .value();
+  auto server_ssl_socket_factory = ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                  *server_stats_store.rootScope())
+                                       .value();
   auto ssl_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
   auto ssl_handshaker = dynamic_cast<const SslHandshakerImpl*>(ssl_socket->ssl().get());
   auto shared_ptr_ptr = static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(
@@ -3611,12 +3611,12 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -3671,12 +3671,13 @@ TEST_P(SslSocketTest, HalfClose) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -3757,12 +3758,13 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -3849,12 +3851,13 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -3957,12 +3960,13 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -4054,17 +4058,17 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml1), server_tls_context1);
-  auto server_cfg1 = *ServerContextConfigImpl::create(server_tls_context1,
-                                                      transport_socket_factory_context, false);
+  auto server_cfg1 = *ServerContextConfigImpl::create(
+      server_tls_context1, transport_socket_factory_context, server_names1, false);
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml2), server_tls_context2);
-  auto server_cfg2 = *ServerContextConfigImpl::create(server_tls_context2,
-                                                      transport_socket_factory_context, false);
+  auto server_cfg2 = *ServerContextConfigImpl::create(
+      server_tls_context2, transport_socket_factory_context, server_names2, false);
   auto server_ssl_socket_factory1 = *ServerSslSocketFactory::create(
-      std::move(server_cfg1), manager, *server_stats_store.rootScope(), server_names1);
+      std::move(server_cfg1), manager, *server_stats_store.rootScope());
   auto server_ssl_socket_factory2 = *ServerSslSocketFactory::create(
-      std::move(server_cfg2), manager, *server_stats_store.rootScope(), server_names2);
+      std::move(server_cfg2), manager, *server_stats_store.rootScope());
 
   auto socket1 = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(ip_version));
@@ -4215,11 +4219,11 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg =
-      *ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context, false);
+  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context,
+                                                     transport_socket_factory_context, {}, false);
 
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), {});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
   auto tcp_socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(ip_version));
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
@@ -4858,17 +4862,17 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context1);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context1, factory_context_, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context1, factory_context_, {}, false);
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
-  auto server2_cfg = *ServerContextConfigImpl::create(tls_context2, factory_context_, false);
+  auto server2_cfg = *ServerContextConfigImpl::create(tls_context2, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
   auto server2_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server2_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+      std::move(server2_cfg), manager, *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -4992,10 +4996,10 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_ctx_proto;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
-  auto server_cfg =
-      *ServerContextConfigImpl::create(server_ctx_proto, transport_socket_factory_context, false);
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_cfg = *ServerContextConfigImpl::create(server_ctx_proto,
+                                                     transport_socket_factory_context, {}, false);
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version));
@@ -5256,11 +5260,11 @@ TEST_P(SslSocketTest, SslError) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
   ContextManagerImpl manager(factory_context_.serverFactoryContext());
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -5826,11 +5830,12 @@ TEST_P(SslSocketTest, SetSignatureAlgorithms) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
   ContextManagerImpl manager(factory_context_.serverFactoryContext());
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -6438,14 +6443,13 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
   EXPECT_TRUE(server_cfg->tlsCertificates().empty());
   EXPECT_FALSE(server_cfg->isReady());
 
   ContextManagerImpl manager(factory_context_.serverFactoryContext());
   auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *factory_context_.store_.rootScope(),
-      std::vector<std::string>{});
+      std::move(server_cfg), manager, *factory_context_.store_.rootScope());
   auto transport_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
   EXPECT_FALSE(transport_socket->startSecureTransport());                                  // Noop
   transport_socket->configureInitialCongestionWindow(200, std::chrono::microseconds(223)); // Noop
@@ -6531,11 +6535,10 @@ protected:
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
                               downstream_tls_context_);
     auto server_cfg =
-        *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_, false);
+        *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_, {}, false);
     manager_ = std::make_unique<ContextManagerImpl>(factory_context_.serverFactoryContext());
     server_ssl_socket_factory_ = *ServerSslSocketFactory::create(std::move(server_cfg), *manager_,
-                                                                 *server_stats_store_.rootScope(),
-                                                                 std::vector<std::string>{});
+                                                                 *server_stats_store_.rootScope());
 
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(version_));

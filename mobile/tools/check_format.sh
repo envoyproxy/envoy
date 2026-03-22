@@ -19,7 +19,7 @@ echo "${BAZEL_BUILD_EXTRA_OPTIONS[*]}"
 _bazel () {
     local cmd="${1}"
     shift
-    ./bazelw "${cmd}" "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" "${@}"
+    bazel "${cmd}" "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" "${@}"
 }
 
 if [[ $(uname) == "Darwin" ]]; then

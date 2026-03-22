@@ -4,6 +4,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
@@ -126,6 +127,19 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, InitializeWithDefaultConfig) {
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, InitializeWithCustomStatPrefix) {
   EXPECT_EQ(extension_->statPrefix(), "reverse_connections");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeRequestPathDefaults) {
+  EXPECT_EQ(extension_->handshakeRequestPath(),
+            ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeRequestPathOverride) {
+  auto custom_config = config_;
+  custom_config.mutable_http_handshake()->set_request_path("/custom/handshake");
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  EXPECT_EQ(custom_extension->handshakeRequestPath(), "/custom/handshake");
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {

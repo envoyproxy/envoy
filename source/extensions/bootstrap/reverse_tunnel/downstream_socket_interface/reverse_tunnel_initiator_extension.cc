@@ -7,6 +7,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -279,6 +280,75 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelInitiatorExtension::getP
             dispatcher_name);
 
   return stats_map;
+}
+
+void ReverseTunnelInitiatorExtension::incrementHandshakeStats(const std::string& cluster_id,
+                                                              bool success,
+                                                              const std::string& failure_reason) {
+  // Check if detailed stats are enabled via configuration flag.
+  if (!enable_detailed_stats_) {
+    return;
+  }
+
+  auto& stats_store = context_.scope();
+
+  // Get dispatcher name (worker name).
+  std::string dispatcher_name = "main_thread"; // Default for main thread
+  auto* local_registry = getLocalRegistry();
+  if (local_registry) {
+    // Dispatcher name is of the form "worker_x" where x is the worker index.
+    dispatcher_name = local_registry->dispatcher().name();
+  }
+
+  // Base stat name: <stat_prefix>.handshake
+  // Labels: worker=<worker_name>, cluster=<cluster_id>, result=<success|failed>,
+  //         failure_reason=<failure_reason> (only for failures)
+  std::string base_stat_name = fmt::format("{}.handshake", stat_prefix_);
+  Stats::StatNameManagedStorage stat_storage(base_stat_name, stats_store.symbolTable());
+
+  // Create storage for all tag keys and values - must be kept alive for the entire function.
+  Stats::StatNameManagedStorage worker_key_storage("worker", stats_store.symbolTable());
+  Stats::StatNameManagedStorage worker_value_storage(dispatcher_name, stats_store.symbolTable());
+  Stats::StatNameManagedStorage cluster_key_storage("cluster", stats_store.symbolTable());
+  Stats::StatNameManagedStorage cluster_value_storage(cluster_id, stats_store.symbolTable());
+  std::string result_value = success ? "success" : "failed";
+  Stats::StatNameManagedStorage result_key_storage("result", stats_store.symbolTable());
+  Stats::StatNameManagedStorage result_value_storage(result_value, stats_store.symbolTable());
+  Stats::StatNameManagedStorage failure_reason_key_storage("failure_reason",
+                                                           stats_store.symbolTable());
+  Stats::StatNameManagedStorage failure_reason_value_storage(failure_reason,
+                                                             stats_store.symbolTable());
+
+  // Now create tags vector using the stored StatNames.
+  Stats::StatNameTagVector tags;
+
+  // Add worker tag.
+  tags.push_back({worker_key_storage.statName(), worker_value_storage.statName()});
+
+  // Add cluster tag.
+  if (!cluster_id.empty()) {
+    tags.push_back({cluster_key_storage.statName(), cluster_value_storage.statName()});
+  }
+
+  // Add result tag.
+  tags.push_back({result_key_storage.statName(), result_value_storage.statName()});
+
+  // Add failure_reason tag for failures.
+  if (!success && !failure_reason.empty()) {
+    tags.push_back(
+        {failure_reason_key_storage.statName(), failure_reason_value_storage.statName()});
+  }
+
+  // Get or create the counter with tags and increment it.
+  // The third parameter takes the tags vector (StatNameTagVectorOptConstRef).
+  auto& handshake_counter =
+      Stats::Utility::counterFromStatNames(stats_store, {stat_storage.statName()}, tags);
+  handshake_counter.inc();
+
+  ENVOY_LOG(trace,
+            "reverse_tunnel: incremented handshake stat {} with tags worker={}, cluster={}, "
+            "result={}, failure_reason={}",
+            base_stat_name, dispatcher_name, cluster_id, result_value, failure_reason);
 }
 
 } // namespace ReverseConnection

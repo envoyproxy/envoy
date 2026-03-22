@@ -291,10 +291,6 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
 }
 
 // Test Ext_Proc filter and WebSocket configuration combination.
-TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.router_filter_resetall_on_local_reply", "true"}});
-  websocketExtProcTest();
-}
+TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) { websocketExtProcTest(); }
 
 } // namespace Envoy

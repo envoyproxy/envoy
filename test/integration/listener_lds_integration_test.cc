@@ -1704,6 +1704,119 @@ TEST_P(ListenerFilterIntegrationTest,
       });
 }
 
+#ifdef __linux__
+TEST_P(ListenerFilterIntegrationTest, BasicSuccessWithMultiAddressesAndKeepalive) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    GTEST_SKIP() << "Keepalive is not supported on this platform.";
+  }
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add the static cluster to serve LDS.
+    auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    lds_cluster->set_name("lds_cluster");
+    ConfigHelper::setHttp2(*lds_cluster);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+    listener_config_.set_name("listener_foo");
+    listener_config_.mutable_tcp_keepalive();
+
+    auto* additional_addr = listener_config_.mutable_additional_addresses()->Add();
+    additional_addr->mutable_tcp_keepalive()->mutable_keepalive_probes()->set_value(3);
+
+    auto* address = additional_addr->mutable_address()->mutable_socket_address();
+    address->set_address("127.0.0.1");
+    address->set_port_value(0);
+
+    bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+    auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+    lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+    lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    envoy::config::core::v3::GrpcService* grpc_service = lds_api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "lds_cluster", fake_upstreams_[1]->localAddress());
+  });
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+  };
+  use_lds_ = false;
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Workers not started, the LDS added test_listener is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"test_listener_1"});
+  std::string data = "hello";
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener_1"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+
+  int opt_value = 0;
+  socklen_t opt_len = sizeof(opt_value);
+  // Keepalive must be enabled on the first address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(1, opt_value);
+
+  // Keepalive must be enabled on the second address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(1, opt_value);
+
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_TCP_KEEPCNT.level(),
+                              ENVOY_SOCKET_TCP_KEEPCNT.option(), &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(3, opt_value);
+
+  // Update the config where default keepalive time is changed and keepalive is explicitly disabled
+  // on the additional address.
+  listener_config_.mutable_tcp_keepalive()->mutable_keepalive_time()->set_value(74);
+  listener_config_.mutable_additional_addresses(0)
+      ->mutable_tcp_keepalive()
+      ->mutable_keepalive_time()
+      ->set_value(0);
+
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  registerTestServerPorts({"test_listener_1"});
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener_1"));
+  ASSERT_TRUE(tcp_client2->write(data));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+  tcp_client2->close();
+  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+
+  // Keepalive must be enabled on the first address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(1, opt_value);
+
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_TCP_KEEPIDLE.level(),
+                              ENVOY_SOCKET_TCP_KEEPIDLE.option(), &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(74, opt_value);
+
+  // Keepalive must be disabled on the second address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(0, opt_value);
+}
+#endif
+
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 

@@ -79,7 +79,7 @@ public:
         connection_id_(quic::test::TestConnectionId(1)),
         transport_socket_factory_(*QuicServerTransportSocketFactory::create(
             true, listener_config_.listenerScope(),
-            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_, {})) {
+            std::make_unique<NiceMock<Ssl::MockServerContextConfig>>(), ssl_context_manager_)) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
     EXPECT_CALL(*writer, WritePacket(_, _, _, _, _, _))

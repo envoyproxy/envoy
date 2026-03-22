@@ -63,9 +63,10 @@ public:
         /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/nullptr};
+        /*eds_resources_cache_=*/nullptr,
+        /*skip_subsequent_node_=*/false};
     if (should_use_unified_) {
-      xds_context_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(grpc_mux_context, false);
+      xds_context_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(grpc_mux_context);
     } else {
       xds_context_ = std::make_shared<NewGrpcMuxImpl>(grpc_mux_context);
     }

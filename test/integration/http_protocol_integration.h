@@ -77,6 +77,7 @@ public:
     setupHttp2ImplOverrides(GetParam().http2_implementation);
     config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
                                       GetParam().use_universal_header_validator ? "true" : "false");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "true");
   }
 
   void SetUp() override {
@@ -112,6 +113,7 @@ public:
     config_helper_.addRuntimeOverride(
         "envoy.reloadable_features.enable_universal_header_validator",
         std::get<0>(GetParam()).use_universal_header_validator ? "true" : "false");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "true");
   }
   static std::string testParamsToString(
       const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {

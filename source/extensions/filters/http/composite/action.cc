@@ -10,6 +10,20 @@ void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callb
     return;
   }
 
+  // Handle filter chain mode.
+  if (is_filter_chain_) {
+    for (const auto& factory_cb : filter_factories_) {
+      factory_cb(callbacks);
+    }
+    return;
+  }
+
+  // Named filter chain lookup is handled by the Filter at runtime.
+  if (is_named_filter_chain_lookup_) {
+    return;
+  }
+
+  // Handle single filter mode.
   if (auto config_value = config_provider_(); config_value.has_value()) {
     (*config_value)(callbacks);
     return;
@@ -34,9 +48,24 @@ ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
 
-  if (composite_action.has_dynamic_config() && composite_action.has_typed_config()) {
-    throw EnvoyException(
-        fmt::format("Error: Only one of `dynamic_config` or `typed_config` can be set."));
+  // Priority order: filter_chain > filter_chain_name > dynamic_config > typed_config
+  if (composite_action.has_filter_chain()) {
+    return createFilterChainAction(composite_action, context, validation_visitor);
+  }
+
+  if (!composite_action.filter_chain_name().empty()) {
+    // Create an action that just stores the name. The actual filter chain lookup
+    // will happen at runtime in the Composite filter.
+    ASSERT(context.server_factory_context_ != absl::nullopt);
+    Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
+
+    return std::make_shared<ExecuteFilterAction>(
+        composite_action.filter_chain_name(),
+        composite_action.has_sample_percent()
+            ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+                  composite_action.sample_percent())
+            : absl::nullopt,
+        runtime);
   }
 
   if (composite_action.has_dynamic_config()) {
@@ -47,6 +76,7 @@ ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
     }
   }
 
+  // Default to static action (typed_config).
   if (context.is_downstream_) {
     return createStaticActionDownstream(composite_action, context, validation_visitor);
   } else {
@@ -159,6 +189,83 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionUpst
   }
 
   return createActionCommon(composite_action, context, callback, false);
+}
+
+Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainAction(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Http::Matching::HttpFilterActionContext& context,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  const auto& filter_chain_config = composite_action.filter_chain();
+  if (filter_chain_config.typed_config().empty()) {
+    throw EnvoyException("filter_chain must contain at least one filter.");
+  }
+
+  FilterFactoryCbList filter_factories;
+  filter_factories.reserve(filter_chain_config.typed_config().size());
+
+  for (const auto& filter_config : filter_chain_config.typed_config()) {
+    Http::FilterFactoryCb callback = nullptr;
+
+    if (context.is_downstream_) {
+      // For downstream filters.
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+              filter_config);
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          filter_config.typed_config(), validation_visitor, factory);
+
+      // First, try to create from factory context.
+      if (context.factory_context_.has_value()) {
+        auto callback_or_status = factory.createFilterFactoryFromProto(
+            *message, context.stat_prefix_, context.factory_context_.value());
+        THROW_IF_NOT_OK_REF(callback_or_status.status());
+        callback = callback_or_status.value();
+      }
+
+      // If above failed, try server factory context.
+      if (callback == nullptr && context.server_factory_context_.has_value()) {
+        callback = factory.createFilterFactoryFromProtoWithServerContext(
+            *message, context.stat_prefix_, context.server_factory_context_.value());
+      }
+
+      if (callback == nullptr) {
+        throw EnvoyException(fmt::format(
+            "Failed to create downstream filter factory for filter '{}'", filter_config.name()));
+      }
+    } else {
+      // For upstream filters.
+      auto& factory = Config::Utility::getAndCheckFactory<
+          Server::Configuration::UpstreamHttpFilterConfigFactory>(filter_config);
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          filter_config.typed_config(), validation_visitor, factory);
+
+      if (context.upstream_factory_context_.has_value()) {
+        auto callback_or_status = factory.createFilterFactoryFromProto(
+            *message, context.stat_prefix_, context.upstream_factory_context_.value());
+        THROW_IF_NOT_OK_REF(callback_or_status.status());
+        callback = callback_or_status.value();
+      }
+
+      if (callback == nullptr) {
+        throw EnvoyException(fmt::format("Failed to create upstream filter factory for filter '{}'",
+                                         filter_config.name()));
+      }
+    }
+
+    filter_factories.push_back(std::move(callback));
+  }
+
+  ASSERT(context.server_factory_context_ != absl::nullopt);
+  Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
+
+  // Use "filter_chain" as the action name for filter chains.
+  return std::make_shared<ExecuteFilterAction>(
+      std::move(filter_factories), "filter_chain",
+      composite_action.has_sample_percent()
+          ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+                composite_action.sample_percent())
+          : absl::nullopt,
+      runtime);
 }
 
 REGISTER_FACTORY(ExecuteFilterActionFactory,

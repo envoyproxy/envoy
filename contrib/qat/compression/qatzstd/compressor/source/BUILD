@@ -17,7 +17,7 @@ envoy_contrib_package()
 COMMON_ENV = {
     "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd/lib",
     "QAT_INCLUDE_PATH": "$$EXT_BUILD_DEPS/qatlib/include/qat",
-    "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/numactl/lib",
+    "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
 }
 
 COMMON_CFLAGS = "-I$$EXT_BUILD_ROOT/external/numactl"
@@ -27,9 +27,7 @@ make(
     build_data = ["@com_github_qat_zstd//:all"],
     # Include the numa_archive genrule output so that libnuma.a is available
     # for the linker to find with -lnuma.
-    data = [
-        "@numactl//:numa_archive",
-    ],
+    data = ["//bazel/external:numa_archive"],
     env = select({
         "//bazel:clang_build": COMMON_ENV | {
             "CFLAGS": COMMON_CFLAGS + " -Wno-error=unused-parameter -Wno-error=unused-command-line-argument",

@@ -63,12 +63,14 @@ ConstScopeSharedPtr IsolatedStoreImpl::constRootScope() const {
 
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 
-ScopeSharedPtr IsolatedScopeImpl::createScope(const std::string& name, bool) {
+ScopeSharedPtr IsolatedScopeImpl::createScope(const std::string& name, bool,
+                                              const ScopeStatsLimitSettings& limits) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(stat_name_storage.statName(), false);
+  return scopeFromStatName(stat_name_storage.statName(), false, limits);
 }
 
-ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName name, bool) {
+ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName name, bool,
+                                                    const ScopeStatsLimitSettings&) {
   SymbolTable::StoragePtr prefix_name_storage = symbolTable().join({prefix(), name});
   ScopeSharedPtr scope = store_.makeScope(StatName(prefix_name_storage.get()));
   addScopeToStore(scope);

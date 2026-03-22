@@ -132,7 +132,7 @@ protected:
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
 
-private:
+protected:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context_;
 };
@@ -142,6 +142,42 @@ INSTANTIATE_TEST_SUITE_P(
     Envoy::Extensions::Common::Wasm::dual_filter_sandbox_runtime_and_cpp_values,
     Envoy::Extensions::Common::Wasm::wasmDualFilterTestParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmFilterConfigTest);
+
+TEST_P(WasmFilterConfigTest, CreateFilterFactoryFromProtoWithServerContext) {
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  WasmFilterConfig factory;
+  Http::FilterFactoryCb cb;
+  if (std::get<2>(GetParam())) {
+    cb = factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats",
+                                                               context_.server_factory_context_);
+  } else {
+    cb = factory.createFilterFactoryFromProtoWithServerContext(
+        proto_config, "stats", upstream_factory_context_.server_factory_context_);
+  }
+
+  EXPECT_CALL(init_watcher_, ready());
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  cb(filter_callback);
+}
 
 TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
   const std::string json =

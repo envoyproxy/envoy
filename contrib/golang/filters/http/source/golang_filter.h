@@ -313,6 +313,7 @@ public:
   CAPIStatus getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
                                GoInt32* rc);
   CAPIStatus getSecret(absl::string_view key, uint64_t* value_data, int* value_len);
+  CAPIStatus setDrainConnectionUponCompletion();
 
   bool isProcessingInGo() {
     return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();

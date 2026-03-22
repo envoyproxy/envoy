@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 
@@ -326,7 +327,7 @@ public:
       account_ = account;
       return *this;
     }
-    StreamOptions& setBufferLimit(uint32_t limit) {
+    StreamOptions& setBufferLimit(uint64_t limit) {
       buffer_limit_ = limit;
       return *this;
     }
@@ -435,7 +436,7 @@ public:
     // Buffer memory account for tracking bytes.
     Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
 
-    absl::optional<uint32_t> buffer_limit_;
+    absl::optional<uint64_t> buffer_limit_;
 
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
     Router::RetryPolicyConstSharedPtr parsed_retry_policy;

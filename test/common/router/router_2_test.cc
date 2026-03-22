@@ -322,7 +322,7 @@ TEST_F(WatermarkTest, DelayUpstreamReadDisableBeforeResponse2) {
 }
 
 TEST_F(WatermarkTest, FilterWatermarks) {
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(AtLeast(3)).WillRepeatedly(Return(10));
+  EXPECT_CALL(callbacks_, bufferLimit()).Times(AtLeast(3)).WillRepeatedly(Return(10));
   router_->setDecoderFilterCallbacks(callbacks_);
   // Send the headers sans-fin, and don't flag the pool as ready.
   sendRequest(false, false);
@@ -360,7 +360,7 @@ TEST_F(WatermarkTest, FilterWatermarks) {
 
 TEST_F(WatermarkTest, FilterWatermarksUnwound) {
   num_add_callbacks_ = 0;
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(AtLeast(3)).WillRepeatedly(Return(10));
+  EXPECT_CALL(callbacks_, bufferLimit()).Times(AtLeast(3)).WillRepeatedly(Return(10));
   router_->setDecoderFilterCallbacks(callbacks_);
   // Send the headers sans-fin, and don't flag the pool as ready.
   sendRequest(false, false);
@@ -383,7 +383,7 @@ TEST_F(WatermarkTest, FilterWatermarksUnwound) {
 // Same as RetryRequestNotComplete but with decodeData larger than the buffer
 // limit, no retry will occur.
 TEST_F(WatermarkTest, RetryRequestNotComplete) {
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(AtLeast(2)).WillRepeatedly(Return(10));
+  EXPECT_CALL(callbacks_, bufferLimit()).Times(AtLeast(2)).WillRepeatedly(Return(10));
   router_->setDecoderFilterCallbacks(callbacks_);
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -466,6 +466,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
   EXPECT_CALL(*child_span, finishSpan());
   ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
@@ -525,6 +526,8 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UR")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("remote reset")));
+  EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
+
   EXPECT_CALL(*child_span, finishSpan());
   encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 }
@@ -574,6 +577,8 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Canceled), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
+
   EXPECT_CALL(*child_span, finishSpan());
   router_->onDestroy();
 }
@@ -624,6 +629,8 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))
       .Times(2);
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("remote reset")));
+  EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
+
   EXPECT_CALL(*child_span_1, finishSpan());
 
   router_->retry_state_->expectResetRetry();
@@ -667,6 +674,8 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+  EXPECT_CALL(callbacks_.tracing_config_, modifySpan(_, true));
+
   EXPECT_CALL(*child_span_2, finishSpan());
   ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);

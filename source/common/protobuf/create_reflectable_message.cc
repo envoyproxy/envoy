@@ -123,6 +123,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator_descriptor.pb.h"
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream_descriptor.pb.h"
 #include "envoy/extensions/quic/proof_source/v3/proof_source_descriptor.pb.h"
+#include "envoy/extensions/quic/client_writer_factory/v3/default_client_writer_descriptor.pb.h"
 #include "envoy/extensions/regex_engines/v3/google_re2_descriptor.pb.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid_descriptor.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect_descriptor.pb.h"
@@ -350,6 +351,8 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
       protobuf::reflection::envoy_extensions_quic_crypto_stream_v3_crypto_stream::
           kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_quic_proof_source_v3_proof_source::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_quic_client_writer_factory_v3_default_client_writer::
+          kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_regex_engines_v3_google_re2::kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_request_id_uuid_v3_uuid::kFileDescriptorInfo,
       protobuf::reflection::

@@ -41,24 +41,26 @@ void initializeUpstreamTlsContextConfig(
       ->mutable_validation_context()
       ->mutable_trusted_ca()
       ->set_filename(rundir + "/test/config/integration/certs/cacert.pem");
-  auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
-  std::string chain;
-  std::string key;
-  if (options.client_ecdsa_cert_) {
-    chain = rundir + "/test/config/integration/certs/client_ecdsacert.pem";
-    key = rundir + "/test/config/integration/certs/client_ecdsakey.pem";
-  } else if (options.use_expired_spiffe_cert_) {
-    chain = rundir + "/test/common/tls/test_data/expired_spiffe_san_cert.pem";
-    key = rundir + "/test/common/tls/test_data/expired_spiffe_san_key.pem";
-  } else if (options.client_with_intermediate_cert_) {
-    chain = rundir + "/test/config/integration/certs/client2_chain.pem";
-    key = rundir + "/test/config/integration/certs/client2key.pem";
-  } else {
-    chain = rundir + "/test/config/integration/certs/clientcert.pem";
-    key = rundir + "/test/config/integration/certs/clientkey.pem";
+  if (!options.no_cert_) {
+    auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+    std::string chain;
+    std::string key;
+    if (options.client_ecdsa_cert_) {
+      chain = rundir + "/test/config/integration/certs/client_ecdsacert.pem";
+      key = rundir + "/test/config/integration/certs/client_ecdsakey.pem";
+    } else if (options.use_expired_spiffe_cert_) {
+      chain = rundir + "/test/common/tls/test_data/expired_spiffe_san_cert.pem";
+      key = rundir + "/test/common/tls/test_data/expired_spiffe_san_key.pem";
+    } else if (options.client_with_intermediate_cert_) {
+      chain = rundir + "/test/config/integration/certs/client2_chain.pem";
+      key = rundir + "/test/config/integration/certs/client2key.pem";
+    } else {
+      chain = rundir + "/test/config/integration/certs/clientcert.pem";
+      key = rundir + "/test/config/integration/certs/clientkey.pem";
+    }
+    certs->mutable_certificate_chain()->set_filename(chain);
+    certs->mutable_private_key()->set_filename(key);
   }
-  certs->mutable_certificate_chain()->set_filename(chain);
-  certs->mutable_private_key()->set_filename(key);
 
   auto* common_context = tls_context.mutable_common_tls_context();
 
@@ -131,14 +133,14 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
+  std::vector<std::string> server_names;
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-      tls_context, mock_factory_ctx, false);
+      tls_context, mock_factory_ctx, server_names, false);
 
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   if (!use_http3) {
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
-        std::vector<std::string>{});
+        std::move(cfg), context_manager, *upstream_stats_store->rootScope());
   }
   envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
   quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -147,7 +149,6 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   ON_CALL(mock_factory_ctx.server_context_, sslContextManager())
       .WillByDefault(ReturnRef(context_manager));
 
-  std::vector<std::string> server_names;
   auto& config_factory = Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       "envoy.transport_sockets.quic");
@@ -166,12 +167,11 @@ Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
       fmt::format("test/config/integration/certs/{}key.pem", upstream_cert_name)));
 
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-      tls_context, factory_context, false);
+      tls_context, factory_context, {}, false);
 
   static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-      std::move(cfg), context_manager, *upstream_stats_store->rootScope(),
-      std::vector<std::string>{});
+      std::move(cfg), context_manager, *upstream_stats_store->rootScope());
 }
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port) {

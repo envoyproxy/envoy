@@ -19,10 +19,10 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
         "@com_github_fmtlib_fmt//:fmt",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
 
@@ -35,10 +35,10 @@ envoy_cc_test(
         "//source/common/orca:orca_parser",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
         "@com_github_fmtlib_fmt//:fmt",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
 
@@ -63,9 +63,9 @@ envoy_cc_fuzz_test(
         "//test/fuzz:utility_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
         "@com_github_fmtlib_fmt//:fmt",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )

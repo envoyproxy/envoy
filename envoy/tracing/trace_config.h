@@ -32,8 +32,9 @@ public:
    * This method MUST be called at most ONLY once per span before the span is
    * finished.
    * @param span the span to modify.
+   * @param upstream_span true if the span is an upstream span that created for outgoing request.
    */
-  virtual void modifySpan(Span& span) const PURE;
+  virtual void modifySpan(Span& span, bool upstream_span) const PURE;
 
   /**
    * @return true if spans should be annotated with more detailed information.

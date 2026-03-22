@@ -42,7 +42,8 @@ public:
               (const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret));
   MOCK_METHOD(TlsCertificateConfigProviderSharedPtr, findOrCreateTlsCertificateProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
-               Server::Configuration::ServerFactoryContext&, Init::Manager& init_manager));
+               Server::Configuration::ServerFactoryContext&, OptRef<Init::Manager> init_manager,
+               bool warm));
   MOCK_METHOD(CertificateValidationContextConfigProviderSharedPtr,
               findOrCreateCertificateValidationContextProvider,
               (const envoy::config::core::v3::ConfigSource& config_source,
@@ -76,7 +77,9 @@ public:
   MOCK_METHOD(Common::CallbackHandlePtr, addValidationCallback,
               (std::function<absl::Status(const SecretType&)>));
   MOCK_METHOD(Common::CallbackHandlePtr, addUpdateCallback, (std::function<absl::Status()>));
+  MOCK_METHOD(Common::CallbackHandlePtr, addRemoveCallback, (std::function<absl::Status()>));
   MOCK_METHOD(const Init::Target*, initTarget, ());
+  void start() override {}
 };
 
 } // namespace Secret

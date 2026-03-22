@@ -6,9 +6,11 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -593,6 +595,44 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
   EXPECT_EQ(getAcceptedReverseConnectionsSize(), 0);
 }
 
+TEST_F(TestUpstreamSocketManager, PingConnectionStaleNodeCleanup) {
+  auto socket1 = createMockSocket(123);
+  auto socket2 = createMockSocket(456);
+
+  const std::string node1 = "node1";
+  const std::string node2 = "node2";
+
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node1, cluster_id, std::move(socket1), ping_interval);
+  socket_manager_->addConnectionSocket(node2, cluster_id, std::move(socket2), ping_interval);
+
+  auto& sockets_node1 = getSocketsForNode(node1);
+  auto& sockets_node2 = getSocketsForNode(node2);
+
+  auto* mock_io_handle1 =
+      dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets_node1.front()->ioHandle());
+  auto* mock_io_handle2 =
+      dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets_node2.front()->ioHandle());
+
+  EXPECT_CALL(*mock_io_handle1, write(_))
+      .Times(1)
+      .WillOnce(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        buffer.drain(buffer.length());
+        return Api::IoCallUint64Result{0, Network::IoSocketError::create(ECONNRESET)};
+      }));
+
+  EXPECT_CALL(*mock_io_handle2, write(_))
+      .Times(1)
+      .WillOnce(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        buffer.drain(buffer.length());
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      }));
+
+  socket_manager_->pingConnections();
+}
+
 TEST_F(TestUpstreamSocketManager, OnPingResponseValidResponse) {
   auto socket = createMockSocket(123);
   const std::string node_id = "test-node";
@@ -1027,6 +1067,51 @@ TEST_F(TestUpstreamSocketManager, GetNodeWithSocketComprehensiveMixedCalls) {
   // Call with node2 should still return node2 as-is.
   result = socket_manager_->getNodeWithSocket(node2);
   EXPECT_EQ(result, node2);
+}
+
+// Checks that the dead socket is reported to the extension.
+// Inject a mock reporter and expect that it receives the data about the dead socket.
+TEST_F(TestUpstreamSocketManager, MarkSocketDeadCallsReportDisconnection) {
+  socket_manager_.reset();
+
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface config_with_reporter;
+
+  // Add the mock reporter to the config.
+  auto* reporter_cfg = config_with_reporter.mutable_reporter_config();
+  reporter_cfg->set_name(MOCK_REPORTER);
+  Protobuf::StringValue noop_config;
+  reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
+
+  NiceMock<MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  NiceMock<MockReverseTunnelReporter>* reporter_ptr = nullptr;
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+    reporter_ptr = reporter.get();
+    return reporter;
+  }));
+
+  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_,
+                                                                config_with_reporter);
+  socket_manager_ = std::make_unique<UpstreamSocketManager>(dispatcher_, extension_.get());
+
+  const int fd = 200;
+  const std::string node_id = "node";
+  const std::string cluster_id = "cluster";
+
+  auto socket = createMockSocket(fd);
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket),
+                                       std::chrono::seconds(30), /*rebalanced=*/false);
+
+  ASSERT_NE(reporter_ptr, nullptr);
+  EXPECT_CALL(*reporter_ptr,
+              reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id)));
+  socket_manager_->markSocketDead(fd);
 }
 
 // Socket Rebalancing Tests.

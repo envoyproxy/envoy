@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/ratelimit:ratelimit_interface",
+        "//envoy/server:factory_context_interface",
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/config:subscription_base_interface",
@@ -33,8 +34,8 @@ envoy_cc_extension(
     hdrs = ["filter.h"],
     deps = [
         ":provider_singleton_lib",
-        "//envoy/access_log:access_log_interface",
         "//source/common/init:target_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/access_loggers/filters/process_ratelimit/v3:pkg_cc_proto",
     ],
 )

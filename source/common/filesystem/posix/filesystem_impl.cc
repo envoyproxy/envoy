@@ -55,7 +55,7 @@ Api::IoCallBoolResult FileImplPosix::open(FlagSet in) {
     return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
   }
   const auto flags_and_mode = translateFlag(in);
-  fd_ = ::open(path().c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
+  fd_ = ::open(filepath_and_type_.path_.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
   return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
 }
 
@@ -67,8 +67,8 @@ Api::IoCallBoolResult TmpFileImplPosix::open(FlagSet in) {
   const auto flags_and_mode = translateFlag(in);
 #ifdef O_TMPFILE
   // Try to create a temp file with no name. Only some file systems support this.
-  fd_ =
-      ::open(path().c_str(), (flags_and_mode.flags_ & ~O_CREAT) | O_TMPFILE, flags_and_mode.mode_);
+  fd_ = ::open(filepath_and_type_.path_.c_str(), (flags_and_mode.flags_ & ~O_CREAT) | O_TMPFILE,
+               flags_and_mode.mode_);
   if (fd_ != -1) {
     return resultSuccess(true);
   }

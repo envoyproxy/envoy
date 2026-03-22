@@ -16,7 +16,7 @@ Http::Code StatsParams::parse(absl::string_view url, Buffer::Instance& response)
     options.set_log_errors(false);
     re2_filter_ = std::make_shared<re2::RE2>(filter_string_, options);
     if (!re2_filter_->ok()) {
-      response.add("Invalid re2 regex");
+      response.add(absl::StrCat("Invalid re2 regex: ", re2_filter_->error()));
       return Http::Code::BadRequest;
     }
   }

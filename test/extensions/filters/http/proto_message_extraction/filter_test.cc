@@ -127,11 +127,9 @@ protected:
             .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
             .value();
 
-    ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
-        .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
 
-    ON_CALL(mock_encoder_callbacks_, encoderBufferLimit())
-        .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_encoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
 
     filter_config_ = std::make_unique<FilterConfig>(
         proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_);
@@ -2433,7 +2431,7 @@ using FilterTestExtractRejected = FilterTestBase;
 
 TEST_F(FilterTestExtractRejected, BufferLimitedExceeded) {
   setUp();
-  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -2452,7 +2450,7 @@ TEST_F(FilterTestExtractRejected, BufferLimitedExceeded) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(*request_data, true));
 
-  ON_CALL(mock_encoder_callbacks_, encoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_encoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
       {":status", "200"},
@@ -2508,7 +2506,7 @@ TEST_F(FilterTestExtractRejected, NotEnoughData) {
 
 TEST_F(FilterTestExtractRejected, RequestMisformedGrpcPath) {
   setUp();
-  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", "/misformatted"}, {"content-type", "application/grpc"}};

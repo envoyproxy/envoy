@@ -24,6 +24,20 @@ public:
                                          NetworkConnectivityTracker& network_tracker)
       : dispatcher_(dispatcher), network_tracker_(network_tracker) {}
 
+  quic::QuicNetworkHandle getDefaultNetwork() override {
+    return network_tracker_.getDefaultNetwork();
+  }
+
+  quic::QuicNetworkHandle getAlternativeNetwork(quic::QuicNetworkHandle network) override {
+    auto networks = network_tracker_.getAllConnectedNetworks();
+    for (const auto& [handle, type] : networks) {
+      if (handle != network) {
+        return handle;
+      }
+    }
+    return quic::kInvalidNetworkHandle;
+  }
+
   // Called when the default network has changed to notify each registered observer asynchronously.
   void onNetworkMadeDefault(NetworkHandle network);
 

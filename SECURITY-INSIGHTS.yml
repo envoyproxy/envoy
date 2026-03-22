@@ -33,6 +33,7 @@ project-lifecycle:
   - github:ravenblackx
   - github:tonya11en
   - github:tyxia
+  - github:yanjunxiang-google
 contribution-policy:
   accepts-pull-requests: true
   accepts-automated-pull-requests: true

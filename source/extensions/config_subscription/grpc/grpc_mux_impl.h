@@ -41,7 +41,7 @@ class GrpcMuxImpl : public GrpcMux,
                     public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>,
                     public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
+  explicit GrpcMuxImpl(GrpcMuxContext& grpc_mux_context);
 
   ~GrpcMuxImpl() override;
 

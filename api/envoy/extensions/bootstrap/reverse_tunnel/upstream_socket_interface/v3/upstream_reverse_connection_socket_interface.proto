@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3;
 
+import "envoy/config/core/v3/extension.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -29,4 +31,9 @@ message UpstreamReverseConnectionSocketInterface {
   // When enabled, emits hidden statistics for individual nodes and clusters.
   // Defaults to false.
   bool enable_detailed_stats = 3;
+
+  // Optional configuration for a tunnel reporting extension. When provided,
+  // the socket interface instantiates a reporter via the configured factory.
+  // If unset, no reporting is done.
+  config.core.v3.TypedExtensionConfig reporter_config = 4;
 }

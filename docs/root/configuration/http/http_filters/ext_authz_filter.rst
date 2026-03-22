@@ -134,6 +134,48 @@ Per-Route Configuration
 A sample virtual host and route filter configuration.
 In this example, we add additional context on the virtual host and disable the filter for ``/static``-prefixed routes.
 
+Conditional Filter Activation with Dynamic Metadata
+----------------------------------------------------
+
+When you need to conditionally invoke the ext_authz filter based on dynamic metadata set by a preceding
+filter (such as a Lua filter), it is recommended to use :ref:`ExtensionWithMatcher
+<envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` rather than the
+:ref:`filter_enabled_metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.filter_enabled_metadata>`
+field.
+
+The key differences are:
+
+* **ExtensionWithMatcher**: Evaluates matching conditions before filter instantiation. The filter is only
+  created and invoked when the matcher determines it should run. This is the recommended approach for
+  metadata-based conditional invocation.
+
+* **filter_enabled_metadata**: Only evaluated after the filter is instantiated. If the filter is marked with
+  ``disabled: true`` in the HttpFilter configuration, it will not be instantiated and ``filter_enabled_metadata``
+  will have no effect.
+
+The following example demonstrates using ExtensionWithMatcher to conditionally invoke ext_authz based on
+dynamic metadata set by a Lua filter:
+
+.. literalinclude:: _include/ext-authz-extension-with-matcher.yaml
+    :language: yaml
+    :lines: 26-83
+    :lineno-start: 26
+    :linenos:
+    :caption: :download:`ext-authz-extension-with-matcher.yaml <_include/ext-authz-extension-with-matcher.yaml>`
+
+In this configuration:
+
+* The Lua filter examines the request path and sets dynamic metadata (``envoy.filters.http.ext_authz.require_auth``)
+  to indicate whether authorization is required.
+* The ExtensionWithMatcher uses :ref:`DynamicMetadataInput
+  <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DynamicMetadataInput>` to read this metadata.
+* When ``require_auth`` is ``true``, the ext_authz filter is invoked.
+* When ``require_auth`` is ``false``, the :ref:`SkipFilter
+  <envoy_v3_api_msg_extensions.filters.common.matcher.action.v3.SkipFilter>` action causes the filter to be skipped.
+
+This pattern provides clean separation between the decision logic (in the Lua filter) and the authorization
+enforcement (in ext_authz), while ensuring the ext_authz filter is only instantiated and invoked when needed.
+
 Statistics
 ----------
 .. _config_http_filters_ext_authz_stats:

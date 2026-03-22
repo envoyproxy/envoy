@@ -147,14 +147,14 @@ envoy_cc_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//udpa/type/v1:pkg_cc_proto",
-        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/cors/v3:pkg_cc_proto",
+        "@xds//udpa/type/v1:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
     ],
 )
 

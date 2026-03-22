@@ -4,6 +4,7 @@
 
 #include "source/common/init/target_impl.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,13 +13,13 @@ namespace Filters {
 namespace ProcessRateLimit {
 
 ProcessRateLimitFilter::ProcessRateLimitFilter(
-    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::access_loggers::filters::process_ratelimit::v3::ProcessRateLimitFilter&
         config)
     : setter_key_(reinterpret_cast<intptr_t>(this)),
       cancel_cb_(std::make_shared<std::atomic<bool>>(false)), context_(context),
-      stats_({ALL_PROCESS_RATELIMIT_FILTER_STATS(
-          POOL_COUNTER_PREFIX(context.scope(), "access_log.process_ratelimit."))}) {
+      stats_({ALL_PROCESS_RATELIMIT_FILTER_STATS(POOL_COUNTER_PREFIX(
+          context.serverFactoryContext().scope(), "access_log.process_ratelimit."))}) {
   auto setter =
       [this, cancel_cb = cancel_cb_](
           Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter)
@@ -43,7 +44,7 @@ ProcessRateLimitFilter::~ProcessRateLimitFilter() {
   // The `cancel_cb_` is set to true to prevent the `limiter` from being set in
   // the `setter` from the main thread.
   cancel_cb_->store(true);
-  context_.mainThreadDispatcher().post(
+  context_.serverFactoryContext().mainThreadDispatcher().post(
       [limiter = std::move(rate_limiter_), setter_key = setter_key_] {
         // remove the setter for this filter.
         limiter->getSubscription()->removeSetter(setter_key);

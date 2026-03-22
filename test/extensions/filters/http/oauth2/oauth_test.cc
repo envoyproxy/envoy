@@ -48,7 +48,7 @@ public:
     uri.mutable_timeout()->set_seconds(1);
     cm_.initializeThreadLocalClusters({"auth"});
 
-    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, absl::nullopt, 0s);
+    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, nullptr, 0s);
   }
 
   ABSL_MUST_USE_RESULT
@@ -167,7 +167,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenDefaultExpiresIn) {
   uri.set_cluster("auth");
   uri.set_uri("auth.com/oauth/token");
   uri.mutable_timeout()->set_seconds(1);
-  client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, absl::nullopt, 2000s);
+  client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, nullptr, 2000s);
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_EQ(1, callbacks_.size());
@@ -495,30 +495,27 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenRetryPolicy) {
   retry_policy.mutable_retry_back_off()->mutable_max_interval()->set_seconds(10);
   retry_policy.mutable_num_retries()->set_value(5);
 
-  client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, retry_policy, 2000s);
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  auto parsed_retry_policy = Router::RetryPolicyImpl::create(
+      retry_policy, ProtobufMessage::getNullValidationVisitor(), server_factory_context);
+
+  client_ =
+      std::make_shared<OAuth2ClientImpl>(cm_, uri, std::move(parsed_retry_policy.value()), 2000s);
 
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(Invoke(
           [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
-            EXPECT_TRUE(options.retry_policy.has_value());
+            EXPECT_TRUE(options.parsed_retry_policy != nullptr);
             EXPECT_TRUE(options.buffer_body_for_retry);
-            EXPECT_TRUE(options.retry_policy.value().has_num_retries());
-            EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries), 5);
-            EXPECT_TRUE(options.retry_policy.value().has_retry_back_off());
-            EXPECT_TRUE(options.retry_policy.value().retry_back_off().has_base_interval());
-            EXPECT_EQ(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(),
-                                               base_interval),
-                      1 * 1000);
-            EXPECT_TRUE(options.retry_policy.value().retry_back_off().has_max_interval());
-            EXPECT_EQ(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(),
-                                               max_interval),
-                      10 * 1000);
-            const std::string& retry_on = options.retry_policy.value().retry_on();
-            std::set<std::string> retry_on_modes = absl::StrSplit(retry_on, ',');
-            EXPECT_EQ(retry_on_modes.count("5xx"), 1);
-            EXPECT_EQ(retry_on_modes.count("reset"), 1);
-
+            EXPECT_EQ(options.parsed_retry_policy->numRetries(), 5);
+            EXPECT_TRUE(options.parsed_retry_policy->baseInterval().has_value());
+            EXPECT_TRUE(options.parsed_retry_policy->maxInterval().has_value());
+            EXPECT_EQ(options.parsed_retry_policy->baseInterval().value().count(), 1 * 1000);
+            EXPECT_EQ(options.parsed_retry_policy->maxInterval().value().count(), 10 * 1000);
+            const auto retry_on = options.parsed_retry_policy->retryOn();
+            EXPECT_TRUE(retry_on & Router::RetryPolicy::RETRY_ON_5XX);
+            EXPECT_TRUE(retry_on & Router::RetryPolicy::RETRY_ON_RESET);
             return nullptr;
           }));
 

@@ -70,7 +70,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
 
   request->body().add(body);
   request->headers().setContentLength(body.length());
-  ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
+  ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for access token.", *decoder_callbacks_);
   dispatchRequest(std::move(request));
 }
 
@@ -103,7 +103,8 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
 
   request->body().add(body);
   request->headers().setContentLength(body.length());
-  ENVOY_LOG(debug, "Dispatching OAuth request for update access token by refresh token.");
+  ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for update access token by refresh token.",
+                   *decoder_callbacks_);
   dispatchRequest(std::move(request));
 }
 
@@ -113,8 +114,8 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
     auto options = Http::AsyncClient::RequestOptions().setTimeout(
         std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout)));
 
-    if (retry_policy_.has_value()) {
-      options.setRetryPolicy(retry_policy_.value());
+    if (retry_policy_ != nullptr) {
+      options.setRetryPolicy(retry_policy_);
       options.setBufferBodyForRetry(true);
     }
 
@@ -138,8 +139,9 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   const auto response_code = message->headers().Status()->value().getStringView();
 
   if (response_code != "200") {
-    ENVOY_LOG(debug, "Oauth response code: {}", response_code);
-    ENVOY_LOG(debug, "Oauth response body: {}", message->bodyAsString());
+    ENVOY_STREAM_LOG(debug, "Oauth response code: {}", *decoder_callbacks_, response_code);
+    ENVOY_STREAM_LOG(debug, "Oauth response body: {}", *decoder_callbacks_,
+                     message->bodyAsString());
     switch (oldState) {
     case OAuthState::PendingAccessToken:
       parent_->sendUnauthorizedResponse(
@@ -204,7 +206,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
                                  Http::AsyncClient::FailureReason) {
-  ENVOY_LOG(debug, "OAuth request failed.");
+  ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
   in_flight_request_ = nullptr;
   const OAuthState oldState = state_;
   state_ = OAuthState::Idle;

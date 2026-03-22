@@ -656,7 +656,7 @@ absl::Status LoaderImpl::loadNewSnapshot() {
   refreshReloadableFlags(ptr->values());
 
   {
-    absl::MutexLock lock(&snapshot_mutex_);
+    absl::MutexLock lock(snapshot_mutex_);
     thread_safe_snapshot_ = ptr;
   }
   return absl::OkStatus();
@@ -674,7 +674,7 @@ SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   }
 
   {
-    absl::ReaderMutexLock lock(&snapshot_mutex_);
+    absl::ReaderMutexLock lock(snapshot_mutex_);
     return thread_safe_snapshot_;
   }
 }

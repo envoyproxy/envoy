@@ -52,8 +52,8 @@ UdpTapSink::getUdpMaxSendMsgDataSize(envoy::config::tap::v3::OutputSink::Format 
 void UdpTapSink::UdpTapSinkHandle::setStreamedTraceDataAndSubmit(
     int32_t new_trace_cnt,
     const envoy::data::tap::v3::SocketStreamedTraceSegment& src_streamed_trace, bool is_read_event,
-    size_t copy_offset, size_t copy_total_bytes,
-    envoy::config::tap::v3::OutputSink::Format format) {
+    size_t copy_offset, size_t copy_total_bytes, envoy::config::tap::v3::OutputSink::Format format,
+    int64_t& seq_num) {
 
   TapCommon::TraceWrapperPtr dst_trace = std::make_unique<envoy::data::tap::v3::TraceWrapper>();
   envoy::data::tap::v3::SocketStreamedTraceSegment& dst_streamed_trace =
@@ -91,6 +91,9 @@ void UdpTapSink::UdpTapSinkHandle::setStreamedTraceDataAndSubmit(
     }
   }
 
+  dst_streamed_trace.mutable_event()->set_seq_num(seq_num);
+  seq_num = seq_num + copy_total_bytes;
+
   doSubmitTrace(std::move(dst_trace), format);
 }
 
@@ -119,11 +122,12 @@ void UdpTapSink::UdpTapSinkHandle::handleSocketStreamedTrace(
   size_t remaining_data_size = 0;
   size_t copy_offset = 0;
   int32_t new_trace_cnt = 0;
+  int64_t seq_num = src_streamed_trace.event().seq_num();
   while (true) {
     new_trace_cnt++;
 
     setStreamedTraceDataAndSubmit(new_trace_cnt, src_streamed_trace, is_read_event, copy_offset,
-                                  max_size_of_each_sub_data, format);
+                                  max_size_of_each_sub_data, format, seq_num);
 
     remaining_data_size = total_body_bytes - new_trace_cnt * max_size_of_each_sub_data;
     copy_offset = new_trace_cnt * max_size_of_each_sub_data;
@@ -136,7 +140,7 @@ void UdpTapSink::UdpTapSinkHandle::handleSocketStreamedTrace(
       // The last part data, set and send.
       new_trace_cnt++;
       setStreamedTraceDataAndSubmit(new_trace_cnt, src_streamed_trace, is_read_event, copy_offset,
-                                    remaining_data_size, format);
+                                    remaining_data_size, format, seq_num);
       break;
     }
   }

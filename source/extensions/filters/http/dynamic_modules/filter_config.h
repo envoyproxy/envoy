@@ -3,7 +3,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
@@ -11,9 +11,10 @@ namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
 
-// The custom stat namespace which prepends all the user-defined metrics.
-// Note that the prefix is removed from the final output of /stats endpoints.
-constexpr absl::string_view CustomStatNamespace = "dynamicmodulescustom";
+// The default custom stat namespace which prepends all user-defined metrics.
+// Note that the prefix is removed from the final output of ``/stats`` endpoints.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 using OnHttpConfigDestroyType = decltype(&envoy_dynamic_module_on_http_filter_config_destroy);
 using OnHttpFilterNewType = decltype(&envoy_dynamic_module_on_http_filter_new);
@@ -50,23 +51,29 @@ using OnHttpFilterDownstreamAboveWriteBufferHighWatermark =
     decltype(&envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark);
 using OnHttpFilterDownstreamBelowWriteBufferLowWatermark =
     decltype(&envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark);
+using OnHttpFilterLocalReplyType = decltype(&envoy_dynamic_module_on_http_filter_local_reply);
+using OnHttpFilterConfigScheduled = decltype(&envoy_dynamic_module_on_http_filter_config_scheduled);
 
 /**
  * A config to create http filters based on a dynamic module. This will be owned by multiple
  * filter instances. This resolves and holds the symbols used for the HTTP filters.
  * Each filter instance and the factory callback holds a shared pointer to this config.
  */
-class DynamicModuleHttpFilterConfig {
+class DynamicModuleHttpFilterConfig
+    : public std::enable_shared_from_this<DynamicModuleHttpFilterConfig> {
 public:
   /**
    * Constructor for the config.
    * @param filter_name the name of the filter.
    * @param filter_config the configuration for the module.
+   * @param metrics_namespace the namespace prefix for metrics.
    * @param dynamic_module the dynamic module to use.
+   * @param stats_scope the stats scope for metric creation.
    * @param context the server factory context.
    */
   DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
                                 const absl::string_view filter_config,
+                                const absl::string_view metrics_namespace,
                                 DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
                                 Server::Configuration::ServerFactoryContext& context);
 
@@ -99,8 +106,11 @@ public:
       on_http_filter_downstream_above_write_buffer_high_watermark_ = nullptr;
   OnHttpFilterDownstreamBelowWriteBufferLowWatermark
       on_http_filter_downstream_below_write_buffer_low_watermark_ = nullptr;
+  OnHttpFilterLocalReplyType on_http_filter_local_reply_ = nullptr;
+  OnHttpFilterConfigScheduled on_http_filter_config_scheduled_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
+  Event::Dispatcher& main_thread_dispatcher_;
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
   // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
@@ -292,6 +302,9 @@ private:
   // The configuration for the module.
   const std::string filter_config_;
 
+  // The namespace prefix for metrics.
+  const std::string metrics_namespace_;
+
   // The cached references to stats and their metadata.
   std::vector<ModuleCounterHandle> counters_;
   std::vector<ModuleCounterVecHandle> counter_vecs_;
@@ -302,6 +315,31 @@ private:
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
+
+public:
+  /**
+   * This is called when an event is scheduled via DynamicModuleHttpFilterConfigScheduler::commit.
+   */
+  void onScheduled(uint64_t event_id);
+};
+
+class DynamicModuleHttpFilterConfigScheduler {
+public:
+  DynamicModuleHttpFilterConfigScheduler(std::weak_ptr<DynamicModuleHttpFilterConfig> config,
+                                         Event::Dispatcher& dispatcher)
+      : config_(std::move(config)), dispatcher_(dispatcher) {}
+
+  void commit(uint64_t event_id) {
+    dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleHttpFilterConfig> config_shared = config.lock()) {
+        config_shared->onScheduled(event_id);
+      }
+    });
+  }
+
+private:
+  std::weak_ptr<DynamicModuleHttpFilterConfig> config_;
+  Event::Dispatcher& dispatcher_;
 };
 
 class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {
@@ -333,14 +371,18 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
  * Creates a new DynamicModuleHttpFilterConfig for given configuration.
  * @param filter_name the name of the filter.
  * @param filter_config the configuration for the module.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
+ * @param terminal_filter whether the filter is terminal.
  * @param dynamic_module the dynamic module to use.
+ * @param stats_scope the stats scope for metric creation.
  * @param context the server factory context.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
-    const bool terminal_filter, Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-    Stats::Scope& stats_scope, Server::Configuration::ServerFactoryContext& context);
+    const absl::string_view metrics_namespace, const bool terminal_filter,
+    Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+    Server::Configuration::ServerFactoryContext& context);
 
 } // namespace HttpFilters
 } // namespace DynamicModules

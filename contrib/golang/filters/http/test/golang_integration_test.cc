@@ -1940,4 +1940,28 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFoun
       false, "", true);
 }
 
+// Test DrainConnectionUponCompletion triggers connection draining for HTTP/1.1.
+TEST_P(GolangIntegrationTest, DrainConnectionUponCompletion) {
+  initializeBasicFilter(BASIC);
+  registerTestServerPorts({"http"});
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Make request with drainConnection query parameter.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test?drainConnection=1"}, {":authority", "test"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // For HTTP/1.1, we should see Connection: close header.
+  EXPECT_EQ("close", response->headers().getConnectionValue());
+
+  // Connection should be closed after request completes.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace Envoy

@@ -32,14 +32,55 @@ message FilterStateValue {
   oneof key {
     option (validate.required) = true;
 
-    // Filter state object key. The key is used to lookup the object factory, unless :ref:`factory_key
-    // <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>` is set. See
-    // :ref:`the well-known filter state keys <well_known_filter_state>` for a list of valid object keys.
+    // The name under which the filter state object will be stored and can be retrieved.
+    //
+    // When using :ref:`well-known filter state keys <well_known_filter_state>` (e.g.,
+    // ``envoy.network.upstream_server_name``, ``envoy.tcp_proxy.cluster``), the object key serves
+    // dual purpose where it identifies both where the data is stored and which factory creates the
+    // object. In this case, :ref:`factory_key
+    // <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`
+    // is not needed.
+    //
+    // When using a custom key name which is not from the well-known list, you must also specify
+    // :ref:`factory_key
+    // <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`
+    // to indicate which factory should create the object from your value.
+    //
+    // Example using a well-known key where ``factory_key`` is not needed:
+    //
+    // .. code-block:: yaml
+    //
+    //    object_key: envoy.tcp_proxy.cluster
+    //    format_string:
+    //      text_format_source:
+    //        inline_string: "my-cluster"
+    //
+    // Example using a custom key which requires a ``factory_key``:
+    //
+    // .. code-block:: yaml
+    //
+    //    object_key: my.custom.key
+    //    factory_key: envoy.string
+    //    format_string:
+    //      text_format_source:
+    //        inline_string: "my-value"
+    //
     string object_key = 1 [(validate.rules).string = {min_len: 1}];
   }
 
-  // Optional filter object factory lookup key. See :ref:`the well-known filter state keys <well_known_filter_state>`
-  // for a list of valid factory keys.
+  // Specifies which registered factory should be used to create the filter state object from the
+  // provided value. This field is required when :ref:`object_key
+  // <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.object_key>`
+  // is a custom name not found in the :ref:`well-known filter state keys <well_known_filter_state>`.
+  //
+  // Each well-known key has a factory registered with the same name (e.g., the key
+  // ``envoy.tcp_proxy.cluster`` has a factory also named ``envoy.tcp_proxy.cluster``). For custom keys,
+  // use one of the following generic factories:
+  //
+  // * ``envoy.string``: Creates a generic string object. Use this for arbitrary string values that
+  //   will be accessed via ``StringAccessor``.
+  //
+  // If not specified, defaults to the value of ``object_key``.
   string factory_key = 6;
 
   oneof value {

@@ -47,8 +47,8 @@ envoy_proto_library(
         "utility_test_message_field_wip.proto",
     ],
     deps = [
-        "@com_github_cncf_xds//udpa/annotations:pkg",
-        "@com_github_cncf_xds//xds/annotations/v3:pkg",
+        "@xds//udpa/annotations:pkg",
+        "@xds//xds/annotations/v3:pkg",
     ],
 )
 

@@ -67,6 +67,33 @@ TEST_P(IntegrationTest, RouteNoMatch) {
   EXPECT_THAT(log, HasSubstr("test_trunc,"));
 }
 
+TEST_P(IntegrationTest, ListenerMetadata) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* metadata = listener->mutable_metadata();
+    auto* filter_metadata = metadata->mutable_filter_metadata();
+
+    Protobuf::Struct struct_pb;
+    auto& fields = *struct_pb.mutable_fields();
+    fields["key"] = ValueUtil::stringValue("value");
+
+    (*filter_metadata)["com.test.metadata"] = struct_pb;
+  });
+
+  useAccessLog("%METADATA(LISTENER:com.test.metadata:key)%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setPath("/expect");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("value"));
+}
+
 } // namespace
 } // namespace Formatter
 } // namespace Extensions

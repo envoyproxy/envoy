@@ -154,6 +154,39 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "filter_local_reply_streaming_test",
+    size = "small",
+    srcs = ["filter_local_reply_streaming_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = ["envoy.filters.http.ext_proc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":filter_test_common_lib",
+        ":utils_lib",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_factory_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
+        "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "filter_observability_test",
     size = "small",
     srcs = ["filter_observability_test.cc"],
@@ -325,6 +358,7 @@ envoy_extension_cc_test(
         ":utils_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/ext_proc:mutation_utils_lib",
+        "//source/extensions/filters/http/ext_proc:processing_effect_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:status_utility_lib",
@@ -355,6 +389,7 @@ envoy_extension_cc_test_library(
         "@com_google_absl//absl/strings",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
@@ -416,7 +451,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
     ],
 )
 
@@ -466,7 +501,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
     ],
 )
 
@@ -516,7 +551,42 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ext_proc_local_reply_streaming_integration_test",
+    size = "large",  # This test can take a while under tsan.
+    srcs = ["ext_proc_local_reply_streaming_integration_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = [
+        "envoy.filters.http.ext_proc",
+        # TODO(jbohanon) use a test filter here instead of production filter
+        "envoy.filters.http.set_metadata",
+    ],
+    shard_count = 8,
+    tags = [
+        "cpu:3",
+        "skip_on_windows",
+    ],
+    deps = [
+        ":ext_proc_integration_common_lib",
+        "//envoy/http:header_map_interface",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/common/http:common_lib",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
 

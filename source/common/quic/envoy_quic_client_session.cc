@@ -322,6 +322,11 @@ std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
                                    : configured_alpns_;
 }
 
+void EnvoyQuicClientSession::OnConfigNegotiated() {
+  received_custom_transport_parameters_ = config()->received_custom_transport_parameters();
+  quic::QuicSpdyClientSession::OnConfigNegotiated();
+}
+
 void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry) {
   if (network_connectivity_observer_ == nullptr) {
     network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserverImpl>(*this);
@@ -331,6 +336,9 @@ void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverReg
 }
 
 void EnvoyQuicClientSession::StartDraining() {
+  ENVOY_CONN_LOG(
+      trace, "Failed to migrate to the default network {}. Drain the connection on network {}.",
+      *this, migration_manager().default_network(), migration_manager().current_network());
   quic::QuicSpdyClientSession::StartDraining();
   // Treat draining as receiving a GOAWAY.
   if (http_connection_callbacks_ != nullptr) {

@@ -59,7 +59,8 @@ protected:
     for (const CustomTagCase& cas : cases) {
       envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
-      custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
+      auto custom_tag_ptr = CustomTagUtility::createCustomTag(custom_tag);
+      custom_tags_.emplace(custom_tag_ptr->tag(), custom_tag_ptr);
       if (cas.set) {
         EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
       } else {
@@ -67,7 +68,7 @@ protected:
       }
     }
 
-    EXPECT_CALL(config, modifySpan(_)).WillOnce(Invoke([this](Span& span) {
+    EXPECT_CALL(config, modifySpan).WillOnce(Invoke([this](Span& span, bool) {
       HttpTraceContext trace_context{request_headers_};
       const CustomTagContext ctx{trace_context, stream_info, {&request_headers_}};
       for (const auto& [_, custom_tag] : custom_tags_) {

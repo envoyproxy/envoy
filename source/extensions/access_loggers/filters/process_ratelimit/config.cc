@@ -20,8 +20,7 @@ AccessLog::FilterPtr ProcessRateLimitFilterFactory::createFilter(
   const auto& process_ratelimit_config =
       dynamic_cast<const envoy::extensions::access_loggers::filters::process_ratelimit::v3::
                        ProcessRateLimitFilter&>(*factory_config);
-  auto filter = std::make_unique<ProcessRateLimitFilter>(context.serverFactoryContext(),
-                                                         process_ratelimit_config);
+  auto filter = std::make_unique<ProcessRateLimitFilter>(context, process_ratelimit_config);
   return filter;
 }
 

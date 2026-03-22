@@ -149,8 +149,8 @@ EXTERNAL_DEPS_MAP = {
     "grpc": "@com_github_grpc_grpc//:grpc++",
     "grpc_health_proto": "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_cc_proto",
     # SSL/Crypto (aliases defined in @envoy//bazel)
-    "ssl": "@envoy//bazel:boringssl",
-    "crypto": "@envoy//bazel:boringcrypto",
+    "ssl": "@envoy//bazel:ssl",
+    "crypto": "@envoy//bazel:crypto",
     # Bazel tools
     "bazel_runfiles": "@bazel_tools//tools/cpp/runfiles",
 }

@@ -20,6 +20,52 @@
 namespace Envoy {
 namespace Matchers {
 
+template <class RegexMatcherType>
+RegexStringMatcher::RegexStringMatcher(const RegexMatcherType& safe_regex,
+                                       Server::Configuration::CommonFactoryContext& context)
+    : regex_(THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(safe_regex, context.regexEngine()),
+                                   Regex::CompiledMatcherPtr)) {}
+
+// Explicit instantiation of the two possible types.
+template RegexStringMatcher::RegexStringMatcher(const ::envoy::type::matcher::v3::RegexMatcher&,
+                                                Server::Configuration::CommonFactoryContext&);
+template RegexStringMatcher::RegexStringMatcher(const ::xds::type::matcher::v3::RegexMatcher&,
+                                                Server::Configuration::CommonFactoryContext&);
+
+template <class StringMatcherType>
+/* static */ StringMatcherImpl::StringMatcherVariant
+StringMatcherImpl::createVariant(const StringMatcherType& matcher,
+                                 Server::Configuration::CommonFactoryContext& context) {
+  switch (matcher.match_pattern_case()) {
+  case StringMatcherType::MatchPatternCase::kExact:
+    return ExactStringMatcher(matcher.exact(), matcher.ignore_case());
+  case StringMatcherType::MatchPatternCase::kPrefix:
+    return PrefixStringMatcher(matcher.prefix(), matcher.ignore_case());
+  case StringMatcherType::MatchPatternCase::kSuffix:
+    return SuffixStringMatcher(matcher.suffix(), matcher.ignore_case());
+  case StringMatcherType::MatchPatternCase::kSafeRegex:
+    if (matcher.ignore_case()) {
+      ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
+    }
+    return RegexStringMatcher(matcher.safe_regex(), context);
+  case StringMatcherType::MatchPatternCase::kContains:
+    return ContainsStringMatcher(matcher.contains(), matcher.ignore_case());
+  case StringMatcherType::MatchPatternCase::kCustom:
+    return CustomStringMatcher(matcher.custom(), context);
+  default:
+    ExceptionUtil::throwEnvoyException(
+        fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
+  }
+}
+
+// Explicit instantiation of the two possible types.
+template StringMatcherImpl::StringMatcherVariant
+StringMatcherImpl::createVariant(const ::envoy::type::matcher::v3::StringMatcher&,
+                                 Server::Configuration::CommonFactoryContext&);
+template StringMatcherImpl::StringMatcherVariant
+StringMatcherImpl::createVariant(const ::xds::type::matcher::v3::StringMatcher&,
+                                 Server::Configuration::CommonFactoryContext&);
+
 ValueMatcherConstSharedPtr
 ValueMatcher::create(const envoy::type::matcher::v3::ValueMatcher& v,
                      Server::Configuration::CommonFactoryContext& context) {

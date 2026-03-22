@@ -152,12 +152,12 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
     return WasmResult::InvalidMemoryAccess;
   }
   // Verify set and verify token_ptr before initiating the async resolve.
-  uint32_t token = context->wasm()->nextDnsToken();
-  if (!context->wasm()->setDatatype(token_ptr, token)) {
+  uint32_t token = context->envoyWasm()->nextDnsToken();
+  if (!context->envoyWasm()->setDatatype(token_ptr, token)) {
     return WasmResult::InvalidMemoryAccess;
   }
-  auto callback = [weak_wasm = std::weak_ptr<Wasm>(context->wasm()->sharedThis()), root_context,
-                   context_id = context->id(),
+  auto callback = [weak_wasm = std::weak_ptr<Wasm>(context->envoyWasm()->sharedThis()),
+                   root_context, context_id = context->id(),
                    token](Envoy::Network::DnsResolver::ResolutionStatus status, absl::string_view,
                           std::list<Envoy::Network::DnsResponse>&& response) {
     auto wasm = weak_wasm.lock();
@@ -166,17 +166,18 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
     }
     root_context->onResolveDns(token, status, std::move(response));
   };
-  if (!context->wasm()->dnsResolver()) {
+  if (!context->envoyWasm()->dnsResolver()) {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-    context->wasm()->dnsResolver() = THROW_OR_RETURN_VALUE(
-        dns_resolver_factory.createDnsResolver(context->wasm()->dispatcher(),
-                                               context->wasm()->api(), typed_dns_resolver_config),
-        Network::DnsResolverSharedPtr);
+    context->envoyWasm()->dnsResolver() =
+        THROW_OR_RETURN_VALUE(dns_resolver_factory.createDnsResolver(
+                                  context->envoyWasm()->dispatcher(), context->envoyWasm()->api(),
+                                  typed_dns_resolver_config),
+                              Network::DnsResolverSharedPtr);
   }
-  context->wasm()->dnsResolver()->resolve(std::string(address.value()),
-                                          Network::DnsLookupFamily::Auto, callback);
+  context->envoyWasm()->dnsResolver()->resolve(std::string(address.value()),
+                                               Network::DnsLookupFamily::Auto, callback);
   return WasmResult::Ok;
 }
 

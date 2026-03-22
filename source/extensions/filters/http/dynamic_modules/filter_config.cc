@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -7,12 +9,15 @@ namespace HttpFilters {
 
 DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
     Server::Configuration::ServerFactoryContext& context)
     : cluster_manager_(context.clusterManager()),
-      stats_scope_(stats_scope.createScope(std::string(CustomStatNamespace) + ".")),
+      main_thread_dispatcher_(context.mainThreadDispatcher()),
+      stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
       stat_name_pool_(stats_scope_->symbolTable()), filter_name_(filter_name),
-      filter_config_(filter_config), dynamic_module_(std::move(dynamic_module)) {};
+      filter_config_(filter_config), metrics_namespace_(metrics_namespace),
+      dynamic_module_(std::move(dynamic_module)) {}
 
 DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
   // When the initialization of the dynamic module fails, the in_module_config_ is nullptr,
@@ -41,8 +46,8 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
   RETURN_IF_NOT_OK_REF(destroy.status());
 
   const void* filter_config_envoy_ptr =
-      (*constructor.value())(per_route_config_name.data(), per_route_config_name.size(),
-                             filter_config.data(), filter_config.size());
+      (*constructor.value())({per_route_config_name.data(), per_route_config_name.size()},
+                             {filter_config.data(), filter_config.size()});
   if (filter_config_envoy_ptr == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize per-route dynamic module");
   }
@@ -53,8 +58,9 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
 
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
-    const bool terminal_filter, Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-    Stats::Scope& stats_scope, Server::Configuration::ServerFactoryContext& context) {
+    const absl::string_view metrics_namespace, const bool terminal_filter,
+    Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+    Server::Configuration::ServerFactoryContext& context) {
   auto constructor =
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_config_new)>(
           "envoy_dynamic_module_on_http_filter_config_new");
@@ -132,6 +138,11 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
       "envoy_dynamic_module_on_http_filter_scheduled");
   RETURN_IF_NOT_OK_REF(on_scheduled.status());
 
+  // This is optional. Those modules that don't need config-level scheduling don't need to
+  // implement it.
+  auto on_config_scheduled = dynamic_module->getFunctionPointer<OnHttpFilterConfigScheduled>(
+      "envoy_dynamic_module_on_http_filter_config_scheduled");
+
   auto on_downstream_above_write_buffer_high_watermark =
       dynamic_module->getFunctionPointer<OnHttpFilterDownstreamAboveWriteBufferHighWatermark>(
           "envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark");
@@ -142,12 +153,17 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
           "envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark");
   RETURN_IF_NOT_OK_REF(on_downstream_below_write_buffer_low_watermark.status());
 
-  auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
-      filter_name, filter_config, std::move(dynamic_module), stats_scope, context);
+  auto on_local_reply = dynamic_module->getFunctionPointer<OnHttpFilterLocalReplyType>(
+      "envoy_dynamic_module_on_http_filter_local_reply");
+  RETURN_IF_NOT_OK_REF(on_local_reply.status());
 
-  const void* filter_config_envoy_ptr =
-      (*constructor.value())(static_cast<void*>(config.get()), filter_name.data(),
-                             filter_name.size(), filter_config.data(), filter_config.size());
+  auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      filter_name, filter_config, metrics_namespace, std::move(dynamic_module), stats_scope,
+      context);
+
+  const void* filter_config_envoy_ptr = (*constructor.value())(
+      static_cast<void*>(config.get()), {filter_name.data(), filter_name.size()},
+      {filter_config.data(), filter_config.size()});
   if (filter_config_envoy_ptr == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module");
   }
@@ -173,11 +189,21 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   config->on_http_filter_http_stream_complete_ = on_http_stream_complete.value();
   config->on_http_filter_http_stream_reset_ = on_http_stream_reset.value();
   config->on_http_filter_scheduled_ = on_scheduled.value();
+  if (on_config_scheduled.ok()) {
+    config->on_http_filter_config_scheduled_ = on_config_scheduled.value();
+  }
   config->on_http_filter_downstream_above_write_buffer_high_watermark_ =
       on_downstream_above_write_buffer_high_watermark.value();
   config->on_http_filter_downstream_below_write_buffer_low_watermark_ =
       on_downstream_below_write_buffer_low_watermark.value();
+  config->on_http_filter_local_reply_ = on_local_reply.value();
   return config;
+}
+
+void DynamicModuleHttpFilterConfig::onScheduled(uint64_t event_id) {
+  if (on_http_filter_config_scheduled_) {
+    (*on_http_filter_config_scheduled_)(this, in_module_config_, event_id);
+  }
 }
 
 } // namespace HttpFilters

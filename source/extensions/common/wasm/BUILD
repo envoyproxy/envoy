@@ -97,6 +97,7 @@ envoy_cc_extension(
     deps = [
         ":wasm_hdr",
         ":wasm_runtime_factory_interface",
+        "//bazel:zlib",
         "//envoy/server:lifecycle_notifier_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
@@ -126,7 +127,6 @@ envoy_cc_extension(
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
         "@proxy_wasm_cpp_host//:base_lib",
         "@proxy_wasm_cpp_host//:null_lib",
-        "@zlib",
     ] + select(
         {
             "//bazel:windows_x86_64": [],

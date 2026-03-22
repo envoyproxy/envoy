@@ -257,6 +257,15 @@ struct ResponseCodeDetailValues {
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
 
 /**
+ * Type of connection close which is detected from the socket.
+ */
+enum class DetectedCloseType {
+  Normal,      // The normal socket close from Envoy's connection perspective.
+  LocalReset,  // The local reset initiated from Envoy.
+  RemoteReset, // The peer reset detected by the connection.
+};
+
+/**
  * Constants for the locally closing a connection. This is used in response code
  * details field of StreamInfo for details sent by core (non-extension) code.
  * This is incomplete as some details may be
@@ -627,6 +636,16 @@ public:
    *         failed.
    */
   virtual const std::string& upstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param close_type the upstream detected close type.
+   */
+  virtual void setUpstreamDetectedCloseType(DetectedCloseType close_type) PURE;
+
+  /**
+   * @return StreamInfo::DetectedCloseType the upstream detected close type.
+   */
+  virtual DetectedCloseType upstreamDetectedCloseType() const PURE;
 
   /**
    * @param host the selected upstream host for the request.
@@ -1018,6 +1037,27 @@ public:
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 
   /**
+   * @param failure_reason the downstream local close reason.
+   */
+  virtual void setDownstreamLocalCloseReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * @return absl::string_view the downstream local close reason, if local close did not occur an
+   * empty string view is returned.
+   */
+  virtual absl::string_view downstreamLocalCloseReason() const PURE;
+
+  /**
+   * @param close_type the downstream detected close type.
+   */
+  virtual void setDownstreamDetectedCloseType(DetectedCloseType close_type) PURE;
+
+  /**
+   * @return DetectedCloseType the downstream detected close type.
+   */
+  virtual DetectedCloseType downstreamDetectedCloseType() const PURE;
+
+  /**
    * Checked by routing filters before forwarding a request upstream.
    * @return to override the scheme header to match the upstream transport
    * protocol at routing filters.
@@ -1061,6 +1101,18 @@ public:
    * finished sending and receiving.
    */
   virtual void setShouldDrainConnectionUponCompletion(bool should_drain) PURE;
+
+  /**
+   * @return the codec level stream ID for the associated stream.
+   * This should be implemented to call the codecStreamId() method on the
+   * associated Http::Stream object.
+   */
+  virtual absl::optional<uint32_t> codecStreamId() const PURE;
+
+  /**
+   * @param id the codec level stream ID for the associated stream.
+   */
+  virtual void setCodecStreamId(absl::optional<uint32_t> id) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

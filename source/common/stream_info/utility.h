@@ -240,10 +240,14 @@ class Utility {
 public:
   /**
    * @param address supplies the downstream address.
-   * @return a properly formatted address for logs, header expansion, etc.
+   * @param mask_prefix_len optional CIDR prefix length to mask the address. If not provided,
+   * returns the unmasked IP address (without port).
+   * @return the IP address without port, or masked IP address in CIDR notation if mask_prefix_len
+   * is specified (e.g., "10.1.0.0/16"), or empty string if masking fails.
    */
-  static const std::string&
-  formatDownstreamAddressNoPort(const Network::Address::Instance& address);
+  static const std::string
+  formatDownstreamAddressNoPort(const Network::Address::Instance& address,
+                                absl::optional<int> mask_prefix_len = absl::nullopt);
 
   /**
    * @param address supplies the downstream address.
@@ -258,6 +262,14 @@ public:
    */
   static absl::optional<uint32_t>
   extractDownstreamAddressJustPort(const Network::Address::Instance& address);
+
+  /**
+   * @param address supplies the downstream address.
+   * @return the endpoint id of an EnvoyInternalAddress, extracted from the provided downstream
+   * address for logs, header expansion, etc.
+   */
+  static const std::string
+  formatDownstreamAddressJustEndpointId(const Network::Address::Instance& address);
 };
 
 // Static utils for creating, consuming, and producing strings from the

@@ -165,6 +165,24 @@ message ExtAuthz {
 
   // Specifies if the filter is enabled with metadata matcher.
   // If this field is not specified, the filter will be enabled for all requests.
+  //
+  // .. note::
+  //
+  //   This field is only evaluated if the filter is instantiated. If the filter is marked with
+  //   ``disabled: true`` in the :ref:`HttpFilter
+  //   <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpFilter>`
+  //   configuration or in per-route configuration via :ref:`ExtAuthzPerRoute
+  //   <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute>`,
+  //   the filter will not be instantiated and this field will have no effect.
+  //
+  // .. tip::
+  //
+  //   For dynamic filter activation based on metadata (such as metadata set by a preceding
+  //   filter), consider using :ref:`ExtensionWithMatcher
+  //   <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` instead. This
+  //   provides a more flexible matching framework that can evaluate conditions before filter
+  //   instantiation. See the :ref:`ext_authz filter documentation
+  //   <config_http_filters_ext_authz>` for examples.
   type.matcher.v3.MetadataMatcher filter_enabled_metadata = 14;
 
   // Specifies whether to deny the requests when the filter is disabled.

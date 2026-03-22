@@ -11,7 +11,8 @@ namespace Server {
 
 ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
                                  Network::ConnectionSocketPtr&& socket,
-                                 bool hand_off_restored_destination_connections)
+                                 bool hand_off_restored_destination_connections,
+                                 const absl::optional<std::string>& network_namespace)
     : listener_(listener), socket_(std::move(socket)),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       iter_(accept_filters_.end()),
@@ -21,14 +22,12 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
   listener_.stats_.downstream_pre_cx_active_.inc();
 
   // Automatically populate network namespace from listener address if present.
-  const auto& local_address = socket_->connectionInfoProvider().localAddress();
-  if (local_address && local_address->networkNamespace().has_value() &&
-      !local_address->networkNamespace()->empty()) {
-    stream_info_->filterState()->setData(Network::DownstreamNetworkNamespace::key(),
-                                         std::make_unique<Network::DownstreamNetworkNamespace>(
-                                             local_address->networkNamespace().value()),
-                                         StreamInfo::FilterState::StateType::ReadOnly,
-                                         StreamInfo::FilterState::LifeSpan::Connection);
+  if (network_namespace && !network_namespace->empty()) {
+    stream_info_->filterState()->setData(
+        Network::DownstreamNetworkNamespace::key(),
+        std::make_unique<Network::DownstreamNetworkNamespace>(*network_namespace),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 }
 
@@ -220,7 +219,13 @@ void ActiveTcpSocket::newConnection() {
     // Note also that we must account for the number of connections properly across both listeners.
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
     listener_.decNumConnections();
-    new_listener.value().get().onAcceptWorker(std::move(socket_), false, false);
+    absl::optional<std::string> network_namespace;
+    if (const auto* obj = stream_info_->filterState()->getDataReadOnlyGeneric(
+            Network::DownstreamNetworkNamespace::key());
+        obj) {
+      network_namespace = obj->serializeAsString();
+    }
+    new_listener.value().get().onAcceptWorker(std::move(socket_), false, false, network_namespace);
   } else {
     // Set default transport protocol if none of the listener filters did it.
     if (socket_->detectedTransportProtocol().empty()) {

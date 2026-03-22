@@ -18,7 +18,7 @@ public:
   ~MockConfig() override;
 
   MOCK_METHOD(OperationName, operationName, (), (const));
-  MOCK_METHOD(void, modifySpan, (Span&), (const));
+  MOCK_METHOD(void, modifySpan, (Span&, bool), (const));
   MOCK_METHOD(bool, verbose, (), (const));
   MOCK_METHOD(uint32_t, maxPathTagLength, (), (const));
   MOCK_METHOD(bool, spawnUpstreamSpan, (), (const));

@@ -16,6 +16,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_load_balancer_context.h"
@@ -80,6 +81,8 @@ struct ReverseConnectionSocketConfig {
   std::string src_cluster_id; // Cluster identifier of local envoy instance.
   std::string src_node_id;    // Node identifier of local envoy instance.
   std::string src_tenant_id;  // Tenant identifier of local envoy instance.
+  std::string request_path{
+      std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)};
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -288,6 +291,11 @@ public:
    * @return pointer to the extension, nullptr if not available
    */
   ReverseTunnelInitiatorExtension* getDownstreamExtension() const;
+
+  /**
+   * @return reference to the configured HTTP handshake request path.
+   */
+  const std::string& requestPath() const { return config_.request_path; }
 
 private:
   /**

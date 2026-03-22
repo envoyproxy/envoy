@@ -72,6 +72,32 @@ TEST(ConfigTest, FlushAccessLogOnConnected) {
   }
 }
 
+TEST(ConfigTest, FlushAccessLogOnStart) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(yaml, factory_context));
+    EXPECT_FALSE(config_obj.sharedConfig()->flushAccessLogOnStart());
+  }
+
+  {
+    const std::string yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      access_log_options:
+        flush_access_log_on_start: true
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(yaml, factory_context));
+    EXPECT_TRUE(config_obj.sharedConfig()->flushAccessLogOnStart());
+  }
+}
+
 TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedFlushAccessLogOnConnected)) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 

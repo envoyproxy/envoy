@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "@rules_fuzzing//fuzzing:cc_defs.bzl",
     "cc_fuzzing_engine",
@@ -23,6 +24,14 @@ envoy_proto_library(
 
 exports_files(["headers.dict"])
 
+cc_library(
+    name = "fuzzed_data_provider",
+    hdrs = ["@llvm_toolchain_llvm//:lib/clang/18/include/fuzzer/FuzzedDataProvider.h"],
+    include_prefix = "",
+    strip_include_prefix = "/lib/clang/18/include",
+    visibility = ["//visibility:public"],
+)
+
 envoy_cc_test_library(
     name = "main",
     srcs = ["main.cc"],
@@ -43,6 +52,7 @@ envoy_cc_test_library(
     srcs = ["fuzz_runner.cc"],
     hdrs = ["fuzz_runner.h"],
     deps = [
+        ":fuzzed_data_provider",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
@@ -51,7 +61,6 @@ envoy_cc_test_library(
         "//source/exe:process_wide_lib",
         "//test/test_common:environment_lib",
         "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
-        "@org_llvm_releases_compiler_rt//:fuzzed_data_provider",
     ],
 )
 
@@ -85,9 +94,9 @@ envoy_cc_test_library(
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib_header",
         "//source/common/protobuf:visitor_lib",
-        "@com_github_cncf_xds//udpa/type/v1:pkg_cc_proto",
-        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
         "@com_google_absl//absl/cleanup",
+        "@xds//udpa/type/v1:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -99,9 +108,9 @@ envoy_cc_test_library(
         "//test/fuzz:mutable_visitor_lib",
         "//test/fuzz:random_lib",
         "@com_envoyproxy_protoc_gen_validate//validate:cc_validate",
-        "@com_github_cncf_xds//udpa/type/v1:pkg_cc_proto",
-        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
         "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
+        "@xds//udpa/type/v1:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
     ],
 )
 

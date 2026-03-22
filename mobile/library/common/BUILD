@@ -57,6 +57,7 @@ envoy_cc_library(
         "//library/common/extensions/filters/http/platform_bridge:filter_cc_proto_descriptor",
         "//library/common/extensions/filters/http/socket_tag:filter_cc_proto_descriptor",
         "//library/common/extensions/key_value/platform:platform_cc_proto_descriptor",
+        "//library/common/extensions/quic_packet_writer/platform:platform_packet_writer_proto_cc_proto_descriptor",
         "//library/common/extensions/retry/options/network_configuration:predicate_cc_proto_descriptor",
         "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/common/common:random_generator_lib",

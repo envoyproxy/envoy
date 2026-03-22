@@ -29,7 +29,7 @@ using testing::AssertionResult;
 namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS, AdsIntegrationTest::protocolTestParamsToString);
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
@@ -275,13 +275,14 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster}, {}, "1");
 
   // The cluster needs this secret, so it's going to request it.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}));
+  EXPECT_TRUE(
+      compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}, {}, {}, false));
 
   // Cluster should start off warming as the secret is being requested.
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
 
   // Ack the original CDS sub.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}, {}, {}, false));
 
   // Before we send the secret, we'll send a delta removal to make sure we don't get a NACK.
   sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
@@ -292,10 +293,10 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
 
   // Ack the original LDS subscription.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}, {}, {}, false));
 
   // Ack the removal itself.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {}, false));
 
   envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -313,7 +314,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
       sds_type_url, {validation_context}, {}, "2");
 
   // Ack the secret we just sent.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {}, false));
 
   // Remove the cluster that owns the secret.
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {"cluster_0"},
@@ -323,9 +324,9 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
       sds_type_url, {}, {"validation_context"}, "3");
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
   // Ack the CDS removal.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}, {}, {}, false));
   // Should be an ACK, not a NACK since the SDS removal is ignored.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {}, false));
 }
 
 // Make sure two clusters sharing same secret are both kept warming before secret
@@ -744,9 +745,6 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
 // Validate that an update to a Cluster that doesn't receive updated ClusterLoadAssignment
 // uses the previous (cached) cluster load assignment.
 TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
-  // TODO(adisuissa): this test should be kept after the runtime guard is deprecated
-  // (only the runtime guard should be removed).
-  config_helper_.addRuntimeOverride("envoy.restart_features.use_eds_cache_for_ads", "true");
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   envoy::config::cluster::v3::Cluster cluster = buildCluster("cluster_0");
@@ -814,13 +812,60 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
   makeSingleRequest();
 }
 
+TEST_P(AdsIntegrationTest, CdsKeepEdsDropOverloadAfterWarmingFailure) {
+  // This test should be kept after the runtime guard is deprecated
+  config_helper_.addRuntimeOverride("envoy.restart_features.use_eds_cache_for_ads", "true");
+  initialize();
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  envoy::config::cluster::v3::Cluster cluster = buildCluster("cluster_0");
+  // Set a small EDS subscription expiration.
+  cluster.mutable_eds_cluster_config()
+      ->mutable_eds_config()
+      ->mutable_initial_fetch_timeout()
+      ->set_nanos(100 * 1000 * 1000);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                             {cluster}, {cluster}, {}, "1");
+
+  auto cluster_load_assignment = buildClusterLoadAssignment("cluster_0");
+  auto* policy = cluster_load_assignment.mutable_policy();
+  auto* drop_overload = policy->add_drop_overloads();
+  drop_overload->set_category("lb_drop_overload");
+  // Set drop_overload to drop everything.
+  drop_overload->mutable_drop_percentage()->set_numerator(100);
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {cluster_load_assignment},
+      {cluster_load_assignment}, {}, "1");
+
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+      {buildListener("listener_0", "route_config_0")}, {}, "1");
+
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TestTypeUrl::get().RouteConfiguration,
+      {buildRouteConfig("route_config_0", "cluster_0")},
+      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Send a HTTP request and verify it is dropped with unconditional_drop_overload.
+  makeSingleRequestWithDropOverload();
+
+  // Update a cluster's field (connect_timeout) so the cluster in Envoy will be explicitly updated.
+  cluster.mutable_connect_timeout()->set_seconds(7);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                             {cluster}, {cluster}, {}, "2");
+  // Avoid sending an EDS update, and wait for EDS update timeout (that results in
+  // a cluster update without resources).
+  test_server_->waitForCounterGe("cluster.cluster_0.init_fetch_timeout", 1);
+  // Envoy uses the cached resource.
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.assignment_use_cached")->value());
+  // Send a HTTP request again and verify it is dropped with unconditional_drop_overload.
+  makeSingleRequestWithDropOverload();
+}
+
 // Validate that an update to 2 Clusters that have the same ClusterLoadAssignment, and
 // that don't receive updated ClusterLoadAssignment use the previous (cached) cluster
 // load assignment.
 TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
-  // TODO(adisuissa): this test should be kept after the runtime guard is deprecated
-  // (only the runtime guard should be removed).
-  config_helper_.addRuntimeOverride("envoy.restart_features.use_eds_cache_for_ads", "true");
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   envoy::config::cluster::v3::Cluster cluster0 = buildCluster("cluster_0");
@@ -1529,7 +1574,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsFailIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsFailIntegrationTest::protocolTestParamsToString);
 
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
@@ -1586,7 +1632,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsConfigIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsConfigIntegrationTest::protocolTestParamsToString);
 
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
@@ -1809,7 +1856,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsClusterFromFileIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsClusterFromFileIntegrationTest::protocolTestParamsToString);
 
 // Validate if ADS cluster defined as EDS will be loaded from file and connection with ADS cluster
 // will be established.
@@ -1873,7 +1921,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsIntegrationTestWithRtds,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsIntegrationTestWithRtds::protocolTestParamsToString);
 
 TEST_P(AdsIntegrationTestWithRtds, Basic) {
   initialize();
@@ -1927,15 +1976,17 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard,
-                         AdsIntegrationTestWithRtdsAndSecondaryClusters, ADS_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeltaWildcard, AdsIntegrationTestWithRtdsAndSecondaryClusters,
+    ADS_INTEGRATION_PARAMS,
+    AdsIntegrationTestWithRtdsAndSecondaryClusters::protocolTestParamsToString);
 
 TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   initialize();
   testBasicFlow();
 }
 
-// Node is resent on a dynamic context parameter update.
+// Node is present on a dynamic context parameter update.
 TEST_P(AdsIntegrationTest, ContextParameterUpdate) {
   initialize();
 
@@ -2024,11 +2075,6 @@ public:
     });
     AdsIntegrationTest::initialize();
   }
-
-  bool isSotw() const {
-    return sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
-           sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw;
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -2037,7 +2083,8 @@ INSTANTIATE_TEST_SUITE_P(
                      // There should be no variation across clients.
                      testing::Values(Grpc::ClientType::EnvoyGrpc),
                      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw,
-                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
+                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)),
+    XdsTpAdsIntegrationTest::protocolTestParamsToString);
 
 TEST_P(XdsTpAdsIntegrationTest, Basic) {
   initialize();
@@ -2795,13 +2842,12 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
       auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-          tls_context, factory_context_, false);
+          tls_context, factory_context_, {}, false);
 
       // upstream_stats_store_ was initialized by AdsIntegrationTest::createXdsUpstream().
       ASSERT(upstream_stats_store_ != nullptr);
       auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-          std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
-          std::vector<std::string>{});
+          std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
       addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
     }
     second_xds_upstream_ = fake_upstreams_.back().get();
@@ -2879,7 +2925,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsReplacementIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsReplacementIntegrationTest::protocolTestParamsToString);
 
 TEST_P(AdsReplacementIntegrationTest, ReplaceAdsConfig) {
   initializeTwoAds();

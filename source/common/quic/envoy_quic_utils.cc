@@ -217,10 +217,11 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
   }
 }
 
-Network::ConnectionSocketPtr
-createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
-                       Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+Network::ConnectionSocketPtr createConnectionSocket(
+    const Network::Address::InstanceConstSharedPtr& peer_addr,
+    Network::Address::InstanceConstSharedPtr& local_addr,
+    const Network::ConnectionSocket::OptionsSharedPtr& options, quic::QuicNetworkHandle network,
+    std::function<void(Network::ConnectionSocket&, quic::QuicNetworkHandle)> custom_bind_func) {
   ASSERT(peer_addr != nullptr);
   // NOTE: If changing the default cache size from 4 entries, make sure to profile it using
   // the benchmark test: //test/common/network:io_socket_handle_impl_benchmark
@@ -244,8 +245,14 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
     ENVOY_LOG_MISC(error, "Failed to create quic socket");
     return connection_socket;
   }
-  connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
-  connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.disable_quic_ip_packet_info_socket_options")) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
+  }
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.disable_quic_rx_queue_overflow_socket_options")) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
@@ -282,7 +289,14 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   if (local_addr != nullptr) {
     connection_socket->bind(local_addr);
     ASSERT(local_addr->ip());
+  } else if (network != quic::kInvalidNetworkHandle && custom_bind_func != nullptr) {
+    custom_bind_func(*connection_socket, network);
+    if (!connection_socket->isOpen()) {
+      ENVOY_LOG_MISC(error, "Custom bind function failed");
+      return connection_socket;
+    }
   }
+
   if (auto result = connection_socket->connect(peer_addr); result.return_value_ == -1) {
     connection_socket->close();
     ENVOY_LOG_MISC(error, "Fail to connect socket: ({}) {}", result.errno_,

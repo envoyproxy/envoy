@@ -21,7 +21,7 @@ class QuicServerTransportSocketFactory : public Network::DownstreamTransportSock
 public:
   static absl::StatusOr<std::unique_ptr<QuicServerTransportSocketFactory>>
   create(bool enable_early_data, Stats::Scope& store, Ssl::ServerContextConfigPtr config,
-         Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names);
+         Envoy::Ssl::ContextManager& manager);
   ~QuicServerTransportSocketFactory() override;
 
   // Network::DownstreamTransportSocketFactory
@@ -42,7 +42,6 @@ protected:
   QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
                                    Ssl::ServerContextConfigPtr config,
                                    Envoy::Ssl::ContextManager& manager,
-                                   const std::vector<std::string>& server_names,
                                    absl::Status& creation_status);
 
   absl::Status onSecretUpdated() override;
@@ -53,7 +52,6 @@ private:
   Envoy::Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   Ssl::ServerContextConfigPtr config_;
-  const std::vector<std::string> server_names_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
   bool enable_early_data_;

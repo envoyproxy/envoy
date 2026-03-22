@@ -19,8 +19,8 @@ py_binary(
     deps = [
         ":types_py_proto",
         "//tools/api_proto_plugin",
-        "@com_github_cncf_xds//udpa/annotations:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
+        "@xds//udpa/annotations:pkg_py_proto",
     ],
 )
 
@@ -41,8 +41,8 @@ py_binary(
     srcs = ["file_descriptor_set_text_gen.py"],
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_cncf_xds//udpa/annotations:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
+        "@xds//udpa/annotations:pkg_py_proto",
     ],
 )
 
@@ -101,8 +101,8 @@ envoy_cc_library(
     deps = [
         "//source/common/protobuf",
         "//tools/type_whisperer:api_type_db_proto_cc_proto",
-        "@com_github_cncf_xds//udpa/annotations:pkg_cc_proto",
         "@com_google_absl//absl/container:node_hash_map",
+        "@xds//udpa/annotations:pkg_cc_proto",
     ],
 )
 

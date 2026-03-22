@@ -103,6 +103,7 @@ HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations,
                                  Server::Configuration::CommonFactoryContext& context,
                                  const Formatter::CommandParserPtrVector& command_parsers,
                                  absl::Status& creation_status) {
+  header_mutations_.reserve(header_mutations.size());
   for (const auto& mutation : header_mutations) {
     switch (mutation.action_case()) {
     case envoy::config::common::mutation_rules::v3::HeaderMutation::ActionCase::kAppend:

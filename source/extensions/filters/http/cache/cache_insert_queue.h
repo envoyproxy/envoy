@@ -25,11 +25,11 @@ class CacheInsertFragment;
 // potentially at a slower rate, without having to implement its own buffer.
 //
 // If the queue contains more than the "high watermark" for the buffer
-// (encoder_callbacks.encoderBufferLimit()), then a high watermark event is
+// (encoder_callbacks.bufferLimit()), then a high watermark event is
 // sent to the encoder, which may cause the filter to slow down, to allow the
 // cache implementation time to catch up and avoid buffering significantly
 // more data in memory than the configuration intends to allow. When this happens,
-// the queue must drain to half the encoderBufferLimit before a low watermark
+// the queue must drain to half the bufferLimit before a low watermark
 // event is sent to resume normal flow.
 //
 // From the cache implementation's perspective, the queue ensures that the cache

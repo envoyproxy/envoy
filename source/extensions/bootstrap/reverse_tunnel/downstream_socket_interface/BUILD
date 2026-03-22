@@ -44,6 +44,7 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:logger_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg_cc_proto",
     ],
 )

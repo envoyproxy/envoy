@@ -1355,6 +1355,20 @@ Connection object API
 ``ssl()``
 ^^^^^^^^^
 
+.. warning::
+
+  **DEPRECATED**: This method is deprecated and will be removed in a future release.
+  Use ``streamInfo():downstreamSslConnection()`` instead:
+
+  .. code-block:: lua
+
+    -- Preferred approach:
+    if handle:streamInfo():downstreamSslConnection() == nil then
+      print("plain")
+    else
+      print("secure")
+    end
+
 .. code-block:: lua
 
   if connection:ssl() == nil then

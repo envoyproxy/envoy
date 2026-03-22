@@ -97,7 +97,8 @@ yanavlasov:
   opsgenie: Yan
   slack: UJHLR5KFS
 yanjunxiang-google:
-  first-pass: true
+  maintainer: true
+  opsgenie: Yanjun
   slack: U0210Q3SUKX
 zuercher:
   maintainer: true
