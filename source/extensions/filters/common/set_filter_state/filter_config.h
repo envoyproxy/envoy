@@ -33,14 +33,20 @@ class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
 public:
   Config(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values, LifeSpan life_span,
          Server::Configuration::GenericFactoryContext& context)
-      : life_span_(life_span), values_(parse(proto_values, context)) {}
+      : Config(proto_values, life_span, context, false) {}
+  Config(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values, LifeSpan life_span,
+         Server::Configuration::GenericFactoryContext& context, bool clear_route_cache)
+      : life_span_(life_span), values_(parse(proto_values, context)),
+        clear_route_cache_(clear_route_cache) {}
   void updateFilterState(const Formatter::Context& context, StreamInfo::StreamInfo& info) const;
+  bool clearRouteCache() { return clear_route_cache_; };
 
 private:
   std::vector<Value> parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,
                            Server::Configuration::GenericFactoryContext& context) const;
   const LifeSpan life_span_;
   const std::vector<Value> values_;
+  const bool clear_route_cache_{false};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

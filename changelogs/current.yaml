@@ -376,6 +376,12 @@ new_features:
     endpoint now supports `native histograms <https://prometheus.io/docs/specs/native_histograms>`_
     when using the prometheus protobuf exposition format, using query
     ``/stats/prometheus?histogram_buckets=prometheusnative``.
+- area: stats
+  change: |
+    Added support for cluster-level stats matcher, allowing more granular control over which stats
+    are enabled and reported at the cluster level. This the stats matcher could be configured via
+    the xDS API dynamically on a per-cluster basis.
+    See :ref:`envoy.stats_matcher <well_known_metadata_envoy_stats_matcher>` for more details.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
@@ -753,5 +759,10 @@ new_features:
   change: |
     Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
     This filter is currently a work-in-progress and not recommended for production use.
+- area: http_filter
+  change: |
+    Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
+    ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
+    This is necessary if the route configuration may depend on the filter state values set.
 
 deprecated:
