@@ -3465,6 +3465,47 @@ TEST(SubstitutionFormatterTest, TraceIDFormatter) {
   }
 }
 
+TEST(SubstitutionFormatterTest, SpanIDFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+
+  {
+    // Span present with valid span ID.
+    Tracing::MockSpan active_span;
+    EXPECT_CALL(active_span, getSpanId()).WillRepeatedly(Return("4041424344454647"));
+
+    Context formatter_context;
+    formatter_context.setActiveSpan(active_span);
+
+    SpanIDFormatter formatter{};
+    EXPECT_EQ("4041424344454647", formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("4041424344454647")));
+  }
+
+  {
+    // No active span.
+    Context formatter_context;
+    SpanIDFormatter formatter{};
+    EXPECT_EQ(absl::nullopt, formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    // Span present but getSpanId() returns empty (e.g., Zipkin, Datadog, SkyWalking).
+    Tracing::MockSpan active_span;
+    EXPECT_CALL(active_span, getSpanId()).WillRepeatedly(Return(""));
+
+    Context formatter_context;
+    formatter_context.setActiveSpan(active_span);
+
+    SpanIDFormatter formatter{};
+    EXPECT_EQ(absl::nullopt, formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+}
+
 /**
  * Populate a metadata object with the following test data:
  * "com.test":
