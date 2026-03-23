@@ -145,9 +145,7 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().disable_on_etag_header()
               : proto_config.disable_on_etag_header()),
-      weaken_etag_on_compress_(proto_config.has_response_direction_config()
-                                   ? proto_config.response_direction_config().weaken_etag_on_compress()
-                                   : false),
+      weaken_etag_on_compress_(proto_config.response_direction_config().weaken_etag_on_compress()),
       remove_accept_encoding_header_(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().remove_accept_encoding_header()
