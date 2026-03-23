@@ -18,7 +18,6 @@ envoy_cc_library(
     deps = [
         "//envoy/common:time_interface",
         "//source/common/common:thread_lib",
-        "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/common:utility_lib",
     ],
