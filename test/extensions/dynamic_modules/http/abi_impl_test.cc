@@ -2718,7 +2718,6 @@ TEST_F(DynamicModuleHttpFilterTest, GetClusterNameNoCluster) {
   // When clusterInfo returns nullptr.
   EXPECT_CALL(decoder_callbacks_, clusterInfo())
       .WillOnce(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(decoder_callbacks_, clusterInfoSharedPtr()).WillOnce(testing::Return(nullptr));
 
   envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_name(filter_.get(), &result));
@@ -2750,7 +2749,6 @@ TEST_F(DynamicModuleHttpFilterTest, GetClusterHostCountNoCluster) {
   // When clusterInfo returns nullptr.
   EXPECT_CALL(decoder_callbacks_, clusterInfo())
       .WillOnce(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
-  EXPECT_CALL(decoder_callbacks_, clusterInfoSharedPtr()).WillOnce(testing::Return(nullptr));
 
   size_t total = 0, healthy = 0, degraded = 0;
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 0, &total,
