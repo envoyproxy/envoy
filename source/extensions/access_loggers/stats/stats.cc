@@ -156,8 +156,8 @@ GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mo
     : stat_name_(stat_name), import_mode_(import_mode), borrowed_tags_(borrowed_tags) {}
 
 void GaugeKey::makeOwned() {
-  ENVOY_BUG(!(borrowed_tags_.has_value() && owned_tags_.has_value()),
-            "Both borrowed and owned tags are present in GaugeKey::makeOwned");
+  ASSERT(!(borrowed_tags_.has_value() && owned_tags_.has_value()),
+         "Both borrowed and owned tags are present in GaugeKey::makeOwned");
   if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
     owned_tags_ = borrowed_tags_.value().get();
     borrowed_tags_ = absl::nullopt;
