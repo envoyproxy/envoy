@@ -136,6 +136,7 @@ public:
   MOCK_METHOD(void, continueRequest, (), (override));
   MOCK_METHOD(void, continueResponse, (), (override));
   MOCK_METHOD(void, clearRouteCache, (), (override));
+  MOCK_METHOD(void, clearRouteClusterCache, (), (override));
   MOCK_METHOD(HeaderMap&, requestHeaders, (), (override));
   MOCK_METHOD(BodyBuffer&, bufferedRequestBody, (), (override));
   MOCK_METHOD(BodyBuffer&, receivedRequestBody, (), (override));

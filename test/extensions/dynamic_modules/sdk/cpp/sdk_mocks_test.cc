@@ -29,5 +29,11 @@ TEST(SdkMocksTest, MocksAreInstantiable) {
   MockHttpFilter filter;
 }
 
+TEST(SdkMocksTest, ClearRouteClusterCacheIsMockable) {
+  MockHttpFilterHandle handle;
+  EXPECT_CALL(handle, clearRouteClusterCache()).Times(1);
+  handle.clearRouteClusterCache();
+}
+
 } // namespace DynamicModules
 } // namespace Envoy
