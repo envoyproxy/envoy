@@ -14,7 +14,6 @@ protected:
   SymbolTable symbol_table_;
   StatNamePool symbolic_pool_{symbol_table_};
   StatNameDynamicPool dynamic_pool_{symbol_table_};
-  ;
 };
 
 TEST_F(TagUtilityTest, Symbolic) {
