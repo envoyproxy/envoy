@@ -7,6 +7,7 @@
 
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/stats/tag_utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,9 +23,8 @@ public:
   AccessLogState(std::shared_ptr<const StatsAccessLog> parent) : parent_(std::move(parent)) {}
 
   ~AccessLogState() override {
-    for (const std::pair<const GaugeKey, InflightGauge>& p : inflight_gauges_) {
-      Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
-          p.first.statName(), p.first.tags(), p.first.importMode());
+    for (const auto& p : inflight_gauges_) {
+      Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatName(p.first, p.second.import_mode_);
       gauge_stat.sub(p.second.value_);
     }
   }
@@ -38,17 +38,19 @@ public:
       return;
     }
 
-    GaugeKey key{stat_name, import_mode, tags};
+    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags, parent_->scope().symbolTable());
+    Stats::StatName joined_name = joiner.nameWithTags();
 
-    auto it = inflight_gauges_.find(key);
+    auto it = inflight_gauges_.find(joined_name);
     if (it == inflight_gauges_.end()) {
-      key.makeOwned();
-      auto [new_it, inserted] =
-          inflight_gauges_.emplace(std::move(key), InflightGauge{std::move(tags_storage), 0});
+      Stats::StatName persistent_joined_name = joiner.nameWithTags();
+      auto [new_it, inserted] = inflight_gauges_.emplace(
+          persistent_joined_name, InflightGauge{std::move(tags_storage), 0, import_mode,
+                                                std::move(joiner)});
       it = new_it;
     }
     it->second.value_ += value;
-    parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
+    parent_->scope().gaugeFromStatName(joined_name, import_mode).add(value);
   }
 
   // Removes an amount from an existing gauge, allowing the gauge to be evicted if the value reaches
@@ -59,14 +61,15 @@ public:
       return;
     }
 
-    GaugeKey key{stat_name, import_mode, tags};
+    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags, parent_->scope().symbolTable());
+    Stats::StatName joined_name = joiner.nameWithTags();
 
     // Create the gauge so it gets registered in the stat store (expected by some tests and stats
     // logic)
     Stats::Gauge& gauge_stat =
-        parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+        parent_->scope().gaugeFromStatName(joined_name, import_mode);
 
-    auto it = inflight_gauges_.find(key);
+    auto it = inflight_gauges_.find(joined_name);
     if (it != inflight_gauges_.end()) {
       ENVOY_BUG(it->second.value_ >= value, "Connection gauge underflow in removeInflightGauge");
       it->second.value_ -= value;
@@ -87,9 +90,11 @@ private:
   struct InflightGauge {
     std::vector<Stats::StatNameDynamicStorage> tags_storage_;
     uint64_t value_;
+    Stats::Gauge::ImportMode import_mode_;
+    Stats::TagUtility::TagStatNameJoiner joiner_;
   };
 
-  absl::flat_hash_map<GaugeKey, InflightGauge> inflight_gauges_;
+  absl::flat_hash_map<Stats::StatName, InflightGauge> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -151,37 +156,6 @@ public:
 
 } // namespace
 
-GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mode,
-                   Stats::StatNameTagVectorOptConstRef borrowed_tags)
-    : stat_name_(stat_name), import_mode_(import_mode), borrowed_tags_(borrowed_tags) {}
-
-void GaugeKey::makeOwned() {
-  ASSERT(!(borrowed_tags_.has_value() && owned_tags_.has_value()),
-         "Both borrowed and owned tags are present in GaugeKey::makeOwned");
-  if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
-    owned_tags_ = borrowed_tags_.value().get();
-    borrowed_tags_ = absl::nullopt;
-  }
-}
-
-Stats::StatNameTagVectorOptConstRef GaugeKey::tags() const {
-  if (owned_tags_.has_value()) {
-    return std::cref(owned_tags_.value());
-  }
-  return borrowed_tags_;
-}
-
-bool GaugeKey::operator==(const GaugeKey& rhs) const {
-  if (stat_name_ != rhs.stat_name_ || import_mode_ != rhs.import_mode_) {
-    return false;
-  }
-  Stats::StatNameTagVectorOptConstRef lhs_tags = tags();
-  Stats::StatNameTagVectorOptConstRef rhs_tags = rhs.tags();
-  if (lhs_tags.has_value() != rhs_tags.has_value()) {
-    return false;
-  }
-  return !lhs_tags.has_value() || lhs_tags.value().get() == rhs_tags.value().get();
-}
 
 StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v3::Config& config,
                                Server::Configuration::GenericFactoryContext& context,
