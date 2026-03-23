@@ -605,7 +605,7 @@ public:
    * cluster selection but not the route itself. This is more efficient than clearing the entire
    * route cache.
    */
-  virtual void clearRouteClusterCache() = 0;
+  virtual void refreshRouteCluster() = 0;
 
   /**
    * Returns reference to request headers.

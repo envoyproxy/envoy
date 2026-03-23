@@ -29,10 +29,10 @@ TEST(SdkMocksTest, MocksAreInstantiable) {
   MockHttpFilter filter;
 }
 
-TEST(SdkMocksTest, ClearRouteClusterCacheIsMockable) {
+TEST(SdkMocksTest, RefreshRouteClusterIsMockable) {
   MockHttpFilterHandle handle;
-  EXPECT_CALL(handle, clearRouteClusterCache()).Times(1);
-  handle.clearRouteClusterCache();
+  EXPECT_CALL(handle, refreshRouteCluster()).Times(1);
+  handle.refreshRouteCluster();
 }
 
 } // namespace DynamicModules

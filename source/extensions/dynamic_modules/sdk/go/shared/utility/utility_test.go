@@ -123,13 +123,13 @@ func TestReadWholeResponseBody_EmptyBuffered(t *testing.T) {
 	}
 }
 
-func TestClearRouteClusterCache_MockIsCalled(t *testing.T) {
+func TestRefreshRouteCluster_MockIsCalled(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	handle := mocks.NewMockHttpFilterHandle(ctrl)
-	handle.EXPECT().ClearRouteClusterCache().Times(1)
-	handle.ClearRouteClusterCache()
+	handle.EXPECT().RefreshRouteCluster().Times(1)
+	handle.RefreshRouteCluster()
 }
 
 func TestClearRouteCache_MockIsCalled(t *testing.T) {

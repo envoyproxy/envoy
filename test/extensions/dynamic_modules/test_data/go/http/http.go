@@ -122,7 +122,7 @@ func (f *headerCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.H
 func (p *headerCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	p.handle.ClearRouteCache()
-	p.handle.ClearRouteClusterCache()
+	p.handle.RefreshRouteCluster()
 
 	testHeaders(headers)
 

@@ -503,7 +503,7 @@ public:
     envoy_dynamic_module_callback_http_clear_route_cache(host_plugin_ptr_);
   }
 
-  void clearRouteClusterCache() override {
+  void refreshRouteCluster() override {
     envoy_dynamic_module_callback_http_clear_route_cluster_cache(host_plugin_ptr_);
   }
 

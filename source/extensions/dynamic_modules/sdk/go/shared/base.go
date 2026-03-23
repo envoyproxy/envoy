@@ -495,11 +495,11 @@ type HttpFilterHandle interface {
 	// ClearRouteCache clears the cached route for the stream.
 	ClearRouteCache()
 
-	// ClearRouteClusterCache clears only the cluster selection for the current route without
+	// RefreshRouteCluster clears only the cluster selection for the current route without
 	// clearing the entire route cache.
 	// This is a subset of ClearRouteCache. Use this when a filter modifies headers that affect
 	// cluster selection but not the route itself.
-	ClearRouteClusterCache()
+	RefreshRouteCluster()
 
 	// RequestHeaders retrieves the request headers.
 	// @Return the request headers.
