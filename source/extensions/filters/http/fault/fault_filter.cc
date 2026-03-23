@@ -484,7 +484,7 @@ bool FaultFilter::matchesTargetUpstreamCluster() {
   bool matches = true;
 
   if (!fault_settings_->upstreamCluster().empty()) {
-    Router::RouteConstSharedPtr route = decoder_callbacks_->route();
+    const auto route = decoder_callbacks_->route();
     matches = route && route->routeEntry() &&
               (route->routeEntry()->clusterName() == fault_settings_->upstreamCluster());
   }

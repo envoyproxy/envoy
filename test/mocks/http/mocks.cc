@@ -58,7 +58,12 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
   callbacks.route_.reset(new NiceMock<Router::MockRoute>());
   ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(callbacks.dispatcher_));
   ON_CALL(callbacks, streamInfo()).WillByDefault(ReturnRef(callbacks.stream_info_));
-  ON_CALL(callbacks, route()).WillByDefault(Return(callbacks.route_));
+  ON_CALL(callbacks, route()).WillByDefault(Invoke([&callbacks]() -> OptRef<const Router::Route> {
+    return makeOptRefFromPtr<const Router::Route>(callbacks.route_.get());
+  }));
+  ON_CALL(callbacks, routeSharedPtr())
+      .WillByDefault(
+          Invoke([&callbacks]() -> Router::RouteConstSharedPtr { return callbacks.route_; }));
   ON_CALL(callbacks, clusterInfo())
       .WillByDefault(Invoke([&callbacks]() -> OptRef<const Upstream::ClusterInfo> {
         return makeOptRefFromPtr<const Upstream::ClusterInfo>(callbacks.cluster_info_.get());
@@ -106,7 +111,7 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, mostSpecificPerFilterConfig())
       .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {
         auto route = this->route();
-        if (route == nullptr) {
+        if (!route) {
           return nullptr;
         }
         return route->mostSpecificPerFilterConfig("envoy.filter");
@@ -114,7 +119,7 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, perFilterConfigs())
       .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
         auto route = this->route();
-        if (route == nullptr) {
+        if (!route) {
           return {};
         }
         return route->perFilterConfigs("envoy.filter");
@@ -154,7 +159,7 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   ON_CALL(*this, mostSpecificPerFilterConfig())
       .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {
         auto route = this->route();
-        if (route == nullptr) {
+        if (!route) {
           return nullptr;
         }
         return route->mostSpecificPerFilterConfig("envoy.filter");
@@ -162,7 +167,7 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   ON_CALL(*this, perFilterConfigs())
       .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
         auto route = this->route();
-        if (route == nullptr) {
+        if (!route) {
           return {};
         }
         return route->perFilterConfigs("envoy.filter");

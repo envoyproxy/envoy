@@ -299,11 +299,20 @@ Upstream::ClusterInfoConstSharedPtr ActiveStreamFilterBase::clusterInfoSharedPtr
   return parent_.filter_manager_callbacks_.clusterInfoSharedPtr();
 }
 
-Router::RouteConstSharedPtr ActiveStreamFilterBase::route() { return getRoute(); }
+OptRef<const Router::Route> ActiveStreamFilterBase::route() { return getRoute(); }
 
-Router::RouteConstSharedPtr ActiveStreamFilterBase::getRoute() const {
+OptRef<const Router::Route> ActiveStreamFilterBase::getRoute() const {
   if (parent_.filter_manager_callbacks_.downstreamCallbacks()) {
     return parent_.filter_manager_callbacks_.downstreamCallbacks()->route(nullptr);
+  }
+  return parent_.streamInfo().route();
+}
+
+Router::RouteConstSharedPtr ActiveStreamFilterBase::routeSharedPtr() { return getRouteSharedPtr(); }
+
+Router::RouteConstSharedPtr ActiveStreamFilterBase::getRouteSharedPtr() const {
+  if (parent_.filter_manager_callbacks_.downstreamCallbacks()) {
+    return parent_.filter_manager_callbacks_.downstreamCallbacks()->routeSharedPtr(nullptr);
   }
   return parent_.streamInfo().routeSharedPtr();
 }
@@ -314,16 +323,16 @@ void ActiveStreamFilterBase::resetIdleTimer() {
 
 const Router::RouteSpecificFilterConfig*
 ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
-  auto current_route = getRoute();
-  if (current_route == nullptr) {
+  const auto current_route = getRoute();
+  if (!current_route) {
     return nullptr;
   }
   return current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
 }
 
 Router::RouteSpecificFilterConfigs ActiveStreamFilterBase::perFilterConfigs() const {
-  Router::RouteConstSharedPtr current_route = getRoute();
-  if (current_route == nullptr) {
+  const auto current_route = getRoute();
+  if (!current_route) {
     return {};
   }
 
