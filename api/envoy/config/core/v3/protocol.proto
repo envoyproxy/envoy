@@ -775,8 +775,12 @@ message Http2ProtocolOptions {
   google.protobuf.UInt32Value max_header_field_size_kb = 19
       [(validate.rules).uint32 = {lte: 256 gte: 64}];
 
-  // Whether to disallow obsolete text in header field values.
+  // Whether to disallow obsolete text for oghttp2 in header field values.
   // If not set, it defaults to false.
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
+  // obs-text = %x80-FF
+  // [#comment: TODO Unify this knob and default value for H1/H2/H3 and move
+  // this configuration to HttpProtocolOptions.]
   bool disallow_obs_text = 20;
 }
 
@@ -834,7 +838,10 @@ message Http3ProtocolOptions {
 
   // Whether to disallow obsolete text in header field values.
   // If not set, it defaults to true for alignment with current behavior.
-  // Note that HTTP/2 defaults to false, we should unify it in the future.
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
+  // obs-text = %x80-FF
+  // [#comment: TODO Unify this knob and default value for H1/H2/H3 and move
+  // this configuration to HttpProtocolOptions]
   google.protobuf.BoolValue disallow_obs_text = 9;
 }
 
