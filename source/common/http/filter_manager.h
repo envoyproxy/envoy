@@ -1038,6 +1038,8 @@ private:
   private:
     FilterManager& manager_;
     absl::string_view filter_config_name_;
+    // Reference here is safe because the callbacks are only used during filter chain creation,
+    // at which point the route cannot change.
     OptRef<const Router::Route> route_;
   };
 
