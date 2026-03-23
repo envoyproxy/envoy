@@ -113,17 +113,16 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
         auto it = background_fetches_.find(sha256);
         if (it != background_fetches_.end() && it->second->completed_) {
           background_fetches_.erase(it);
+          it = background_fetches_.end();
         }
-        if (background_fetches_.find(sha256) == background_fetches_.end()) {
-          background_fetches_.emplace(std::string(sha256),
-                                      std::make_unique<BackgroundFetchState>(
-                                          context.clusterManager(), module_config.module().remote(),
-                                          module_config.do_not_close(),
-                                          module_config.load_globally()));
+        if (it == background_fetches_.end()) {
+          background_fetches_.emplace(
+              sha256, std::make_unique<BackgroundFetchState>(
+                          context.clusterManager(), module_config.module().remote(),
+                          module_config.do_not_close(), module_config.load_globally()));
         }
         return absl::InvalidArgumentError(
-            "Remote module not cached; background fetch in progress. SHA256: " +
-            std::string(sha256));
+            "Remote module not cached; background fetch in progress. SHA256: " + sha256);
       }
 
       // No cached file — need async fetch, which requires init_manager.
