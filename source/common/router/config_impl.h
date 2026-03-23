@@ -703,7 +703,7 @@ public:
   }
 
   const VirtualHost& virtualHost() const override { return *vhost_; }
-  VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return vhost_copy_; }
+  VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool appendXfh() const override { return append_xfh_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -874,9 +874,6 @@ private:
   // Keep an copy of the shared pointer to the shared part of the virtual host. This is needed
   // to keep the shared part alive while the route is alive.
   const CommonVirtualHostSharedPtr vhost_;
-  // Same with vhost_ but this could be returned as reference. vhost_ is kept to access the
-  // methods that not exposed in the VirtualHost.
-  const VirtualHostConstSharedPtr vhost_copy_;
   const std::string cluster_name_;
   RouteStatsContextPtr route_stats_context_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;

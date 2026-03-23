@@ -1324,8 +1324,6 @@ public:
 
   /**
    * @return const VirtualHost& the virtual host that owns the route.
-   *
-   * NOTE: This MUST not be null.
    */
   virtual const VirtualHost& virtualHost() const PURE;
 
