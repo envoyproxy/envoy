@@ -80,7 +80,7 @@ enum ProxyProtocolTlvMergePolicy {
   APPEND_IF_EXISTS_OR_ADD = 2;
 }
 
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -390,4 +390,10 @@ message TcpProxy {
   //   Use this carefully with server-first protocols. The upstream may send data before
   //   receiving anything from downstream, which could fill the early data buffer.
   google.protobuf.UInt32Value max_early_data_bytes = 22 [(validate.rules).uint32 = {lte: 1048576}];
+
+  // Delays when to pick the upstream route.
+  //
+  // If set to true, the route will picked just before the upstream connection is established.
+  // This field has no effect when ``upstream_connect_mode`` is ``IMMEDIATE``.
+  bool delay_route_selection = 24;
 }

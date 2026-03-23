@@ -2748,6 +2748,37 @@ TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamDataConfig) {
   EXPECT_EQ(config.maxEarlyDataBytes().value(), 1024);
 }
 
+TEST(TcpProxyConfigTest, DelayRouteSelectionConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    delay_route_selection: true
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_TRUE(config.delayRouteSelection());
+}
+
+TEST(TcpProxyConfigTest, DelayRouteSelectionDefaultConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  Config config(tcp_proxy, factory_context);
+
+  EXPECT_FALSE(config.delayRouteSelection());
+}
+
 TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamTlsHandshakeConfig) {
   const std::string yaml = R"EOF(
     stat_prefix: name
@@ -2931,6 +2962,57 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithTlsConnection_WaitsForHand
   // Call onNewConnection() to initialize the filter.
   // With max_early_data_bytes: 0, receive_before_connect=true, so it returns Continue.
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Set up connection pool expectations for when TLS handshake completes.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // Simulate TLS handshake completion.
+  filter_->onDownstreamTlsHandshakeComplete();
+
+  // Verify connection establishment was triggered.
+  EXPECT_FALSE(conn_pool_callbacks_.empty());
+}
+
+TEST_P(TcpProxyTlsHandshakeTest,
+       TlsHandshakeMode_WithTlsConnectionAndDelayedSelection_SelectsOnHandshake) {
+  // Setup SSL connection before initializing the filter.
+  auto ssl_connection = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(ssl_connection));
+
+  setupFilter(R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
+    max_early_data_bytes: 0
+    delay_route_selection: true
+  )EOF",
+              true, false);
+
+  // Call onNewConnection() to initialize the filter.
+  // With max_early_data_bytes: 0, receive_before_connect=true, so it returns Continue.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Simulate setting the filter state after the onNewConnection
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::TcpProxy::PerConnectionCluster::key(),
+      std::make_shared<Envoy::TcpProxy::PerConnectionCluster>("state_fake_cluster"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Expect the cluster selected via filter statte
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("state_fake_cluster"))
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
   // Set up connection pool expectations for when TLS handshake completes.
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
@@ -3182,6 +3264,53 @@ TEST_P(TcpProxyTest, MultipleTinyChunksSetInitialDataReceivedOnce) {
   // Use setupOnDownstreamDataMode to avoid conflicting expectations from base setup.
   setupOnDownstreamDataMode(config, false /* receive_before_connect */);
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
+  EXPECT_CALL(conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            conn_pool_callbacks_.push_back(&cb);
+            return conn_pool_handles_
+                .emplace_back(std::make_unique<NiceMock<Envoy::ConnectionPool::MockCancellable>>())
+                .get();
+          }));
+
+  // First tiny chunk. It should trigger connection but NOT readDisable.
+  Buffer::OwnedImpl chunk1("h");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(chunk1, false));
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1);
+
+  // Second tiny chunk. It should NOT trigger connection again.
+  Buffer::OwnedImpl chunk2("e");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(chunk2, false));
+  EXPECT_EQ(conn_pool_callbacks_.size(), 1); // Still only one connection attempt.
+}
+
+// Test that delay route selection picks the correct cluster when filter state is set
+TEST_P(TcpProxyTest, DelayRouteSelectionAllowsFilterStateChanges) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.set_upstream_connect_mode(
+      envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA);
+  config.mutable_max_early_data_bytes()->set_value(1024);
+  config.set_delay_route_selection(true);
+
+  // Use setupOnDownstreamDataMode to avoid conflicting expectations from base setup.
+  setupOnDownstreamDataMode(config, false /* receive_before_connect */);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Simulate setting the filter state after the onNewConnection
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      Envoy::TcpProxy::PerConnectionCluster::key(),
+      std::make_shared<Envoy::TcpProxy::PerConnectionCluster>("state_fake_cluster"),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Expect the cluster selected via filter statte
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("state_fake_cluster"))
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _, _))
