@@ -265,8 +265,10 @@ TEST_P(DynamicModuleHttpLanguageTests, HeaderCallbacks) {
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
   EXPECT_CALL(downstream_callbacks, clearRouteCache());
+  EXPECT_CALL(downstream_callbacks, refreshRouteCluster());
   EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
-      .WillOnce(testing::Return(OptRef(downstream_callbacks)));
+      .WillRepeatedly(
+          testing::Return(OptRef<DownstreamStreamFilterCallbacks>(downstream_callbacks)));
   filter->setDecoderFilterCallbacks(decoder_callbacks);
 
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
