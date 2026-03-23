@@ -14,6 +14,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 
+inline constexpr absl::string_view kSupportedPrivateKeyJwtAlgorithms[] = {
+    "RS256", "RS384", "RS512", "ES256", "ES384", "ES512"};
+
 /**
  * Creates signed JWT client assertions for private_key_jwt authentication (RFC 7523).
  */

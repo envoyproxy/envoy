@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/oauth2/config.h"
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <string>
@@ -15,8 +16,11 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/oauth2/client_assertion.h"
 #include "source/extensions/filters/http/oauth2/filter.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
+
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -89,11 +93,12 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
     if (proto_config.has_private_key_jwt() &&
         !proto_config.private_key_jwt().signing_algorithm().empty()) {
       const std::string alg = proto_config.private_key_jwt().signing_algorithm();
-      if (alg != "RS256" && alg != "RS384" && alg != "RS512" && alg != "ES256" && alg != "ES384" &&
-          alg != "ES512") {
+      if (std::find(std::begin(kSupportedPrivateKeyJwtAlgorithms),
+                    std::end(kSupportedPrivateKeyJwtAlgorithms),
+                    alg) == std::end(kSupportedPrivateKeyJwtAlgorithms)) {
         return absl::InvalidArgumentError(
             absl::StrCat("unsupported private_key_jwt signing algorithm: ", alg,
-                         ". Supported: RS256, RS384, RS512, ES256, ES384, ES512"));
+                         ". Supported: ", absl::StrJoin(kSupportedPrivateKeyJwtAlgorithms, ", ")));
       }
     }
   }

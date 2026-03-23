@@ -25,6 +25,7 @@
 #include "source/extensions/filters/http/oauth2/oauth.h"
 #include "source/extensions/filters/http/oauth2/oauth_client.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
@@ -408,6 +409,7 @@ private:
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;
   void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
+  absl::StatusOr<std::string> getClientCredential();
 };
 
 } // namespace Oauth2
