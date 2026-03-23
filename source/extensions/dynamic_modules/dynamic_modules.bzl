@@ -31,11 +31,11 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
     # required by llvm-objcopy --redefine-syms.
     native.genrule(
         name = redefine_syms_name,
-        srcs = ["//source/extensions/dynamic_modules/abi:abi.h"],
+        srcs = ["@envoy//source/extensions/dynamic_modules/abi:abi.h"],
         outs = [name + "_redefine_syms.txt"],
         cmd = (
             "grep -Eo 'envoy_dynamic_module_on_[a-z_]+' " +
-            "$(location //source/extensions/dynamic_modules/abi:abi.h) | " +
+            "$(location @envoy//source/extensions/dynamic_modules/abi:abi.h) | " +
             "sort -u | " +
             "sed 's/.*/& " + module_name + "_&/' > $@"
         ),
