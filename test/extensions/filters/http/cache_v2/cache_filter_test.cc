@@ -158,7 +158,7 @@ TEST_F(CacheFilterTest, PassThroughIfCacheabilityIsNo) {
 
 TEST_F(CacheFilterTest, NoRouteShouldLocalReply) {
   CacheFilterSharedPtr filter = makeFilter(mock_cache_);
-  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::NotFound, _, _, _, "cache_no_route"));
   EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
               Eq(Http::FilterHeadersStatus::StopIteration));
