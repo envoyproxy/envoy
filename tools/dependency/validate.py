@@ -230,6 +230,9 @@ class Validator(object):
         # test_only.
         marginal_test_deps = await self._build_graph.query_external_deps(
             '//test/...', exclude=['//source/...'])
+        # Disregard openssl since it's conditional on --config=openssl. Without
+        # this exclusion, it is falsely flagged as a test_only dependency.
+        marginal_test_deps = marginal_test_deps.difference(['openssl'])
         bad_test_deps = marginal_test_deps.difference(expected_test_only_deps)
         unknown_bad_test_deps = [dep for dep in bad_test_deps if not test_only_ignore(dep)]
         print(f'Validating {len(expected_test_only_deps)} test-only dependencies...')
