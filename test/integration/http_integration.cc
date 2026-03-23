@@ -385,6 +385,7 @@ HttpIntegrationTest::~HttpIntegrationTest() {
         << "test requires explicit cleanupUpstreamAndDownstream";
   }
   cleanupUpstreamAndDownstream();
+  sleep(5);
 }
 
 void HttpIntegrationTest::initialize() {

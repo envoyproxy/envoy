@@ -61,7 +61,9 @@ ConstScopeSharedPtr IsolatedStoreImpl::constRootScope() const {
   return const_cast<IsolatedStoreImpl*>(this)->rootScope();
 }
 
-IsolatedStoreImpl::~IsolatedStoreImpl() = default;
+IsolatedStoreImpl::~IsolatedStoreImpl() {
+  alloc_.setShuttingDown();
+}
 
 ScopeSharedPtr IsolatedScopeImpl::createScope(const std::string& name, bool,
                                               const ScopeStatsLimitSettings& limits,

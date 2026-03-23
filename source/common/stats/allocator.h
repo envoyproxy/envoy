@@ -107,6 +107,9 @@ public:
   void markGaugeForDeletion(const GaugeSharedPtr& gauge);
   void markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout);
 
+  void setShuttingDown() { shutting_down_ = true; }
+  bool shuttingDown() const { return shutting_down_; }
+
 protected:
   virtual Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
                                        const StatNameTagVector& stat_name_tags);
@@ -150,7 +153,10 @@ private:
   std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(mutex_);
   std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(mutex_);
   std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(mutex_);
+
+  std::atomic<bool> shutting_down_{false};
 };
+
 
 } // namespace Stats
 } // namespace Envoy

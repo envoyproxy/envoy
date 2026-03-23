@@ -1,10 +1,12 @@
+#include "source/common/stats/allocator.h"
+
 #include <cmath>
 #include <memory>
 #include <string>
 
 #include "envoy/stats/sink.h"
 
-#include "source/common/stats/allocator.h"
+#include "source/common/common/thread.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
@@ -99,6 +101,12 @@ TEST_F(AllocatorTest, RefCountDecAllocRaceOrganic) {
   absl::Notification go;
   for (uint32_t i = 0; i < num_threads; ++i) {
     threads.push_back(thread_factory.createThread([&]() {
+      // The behavior being tested in this test is harmful in the context
+      // of Envoy serving, because we need main-threads to be able to run
+      // without stats spontaneously disappearing, so we can finish stats
+      // sinks. See https://github.com/envoyproxy/envoy/pull/43958 and
+      // https://github.com/envoyproxy/envoy/issues/43836 for context.
+      Thread::MainThread main_thread;
       go.WaitForNotification();
       for (uint32_t i = 0; i < iters; ++i) {
         alloc_.makeCounter(counter_name, StatName(), {});
@@ -125,6 +133,16 @@ TEST_F(AllocatorTest, RefCountDecAllocRaceSynchronized) {
   alloc_.sync().enable();
   alloc_.sync().waitOn(Allocator::DecrementToZeroSyncPoint);
   Thread::ThreadPtr thread = thread_factory.createThread([&]() {
+    // The behavior being tested in this test is harmful in the context
+    // of Envoy serving, because we need main-threads to be able to run
+    // without stats spontaneously disappearing, so we can finish stats
+    // sinks. See https://github.com/envoyproxy/envoy/pull/43958 and
+    // https://github.com/envoyproxy/envoy/issues/43836 for context.
+    //
+    // Because of this, we have an assert in the stat destructors that
+    // we are on the main thread. We want to defeat that for this
+    // particular test by asserting we are on the main thread.
+    Thread::MainThread main_thread;
     CounterSharedPtr counter = alloc_.makeCounter(counter_name, StatName(), {});
     counter->inc();
     counter->reset(); // Blocks in thread synchronizer waiting on DecrementToZeroSyncPoint

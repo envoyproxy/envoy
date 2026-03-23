@@ -485,7 +485,7 @@ private:
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     TlsCacheEntry& insertScope(uint64_t scope_id);
-    void eraseScopes(const std::vector<uint64_t>& scope_ids);
+    void eraseScopes(const std::vector<uint64_t>& scope_ids, std::vector<TlsCacheEntry>& tls_cache_entries);
     void eraseHistograms(const std::vector<uint64_t>& histograms);
 
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references

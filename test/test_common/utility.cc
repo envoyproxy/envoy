@@ -182,49 +182,56 @@ AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::st
                                               std::chrono::milliseconds timeout,
                                               Event::Dispatcher* dispatcher) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      std::string current_value;
-      if (findCounter(store, name)) {
-        current_value = absl::StrCat(findCounter(store, name)->value());
-      } else {
-        current_value = "nil";
-      }
-      return AssertionFailure() << fmt::format(
-                 "timed out waiting for {} to be {}, current value {}", name, value, current_value);
+  Stats::CounterSharedPtr counter;
+  do {
+    if (counter == nullptr) {
+      counter = findCounter(store, name);
     }
+    if (counter != nullptr && counter->value() >= value) {
+      return AssertionSuccess();
+    }
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (dispatcher != nullptr) {
       dispatcher->run(Event::Dispatcher::RunType::NonBlock);
     }
-  }
-  return AssertionSuccess();
+  } while (timeout == std::chrono::milliseconds::zero() || bound.withinBound());
+  return AssertionFailure() << fmt::format(
+      "timed out waiting for {} to be {}, current value {}", name, value,
+      (counter == nullptr) ? absl::StrCat(counter->value()) : "nil");
 }
 
 AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name,
                                               uint64_t value, Event::TestTimeSystem& time_system,
                                               std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to be >= {}", name, value);
+  Stats::CounterSharedPtr counter;
+  do {
+    if (counter == nullptr) {
+      counter = findCounter(store, name);
     }
-  }
-  return AssertionSuccess();
+    if (counter != nullptr && counter->value() >= value) {
+      return AssertionSuccess();
+    }
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+  } while (timeout == std::chrono::milliseconds::zero() || bound.withinBound());
+  return AssertionFailure() << fmt::format("timed out waiting for {} to be >= {}", name, value);
 }
 
 AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name,
                                             uint64_t value, Event::TestTimeSystem& time_system,
                                             std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+  Stats::GaugeSharedPtr gauge;
+  do {
+    if (gauge == nullptr) {
+      gauge = findGauge(store, name);
     }
-  }
-  return AssertionSuccess();
+    if (gauge != nullptr && gauge->value() >= value) {
+      return AssertionSuccess();
+    }
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+  } while (timeout == std::chrono::milliseconds::zero() || bound.withinBound());
+  return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
 }
 
 AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name,
