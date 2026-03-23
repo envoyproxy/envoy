@@ -25,6 +25,10 @@ public:
                                Server::Configuration::ServerFactoryContext& server_context,
                                absl::Status& creation_status);
 
+  static std::unique_ptr<HttpServiceHeadersApplicator>
+  createOrThrow(const envoy::config::core::v3::HttpService& http_service,
+                Server::Configuration::ServerFactoryContext& server_context);
+
   /**
    * Apply all parsed headers to the outgoing request message.
    */

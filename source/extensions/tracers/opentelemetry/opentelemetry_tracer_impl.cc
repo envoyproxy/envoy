@@ -94,10 +94,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
   // Create the headers applicator on the main thread if HTTP export is configured.
   std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator;
   if (opentelemetry_config.has_http_service()) {
-    absl::Status creation_status = absl::OkStatus();
-    headers_applicator = std::make_shared<Http::HttpServiceHeadersApplicator>(
-        opentelemetry_config.http_service(), factory_context, creation_status);
-    THROW_IF_NOT_OK_REF(creation_status);
+    headers_applicator = Http::HttpServiceHeadersApplicator::createOrThrow(
+        opentelemetry_config.http_service(), factory_context);
   }
 
   // Create the tracer in Thread Local Storage.

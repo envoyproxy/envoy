@@ -126,6 +126,7 @@ paths:
     - source/common/secret/sds_api.cc
     - source/exe/stripped_main_base.cc
     - source/common/http/header_utility.cc
+    - source/common/http/http_service_headers.cc
     - source/common/common/matchers.cc
     - source/server/options_impl.cc
     - source/server/config_validation/server.cc

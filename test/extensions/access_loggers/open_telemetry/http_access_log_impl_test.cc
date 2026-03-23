@@ -379,6 +379,30 @@ TEST(HttpAccessLoggerCacheTest, CacheHitReturnsSameLogger) {
   EXPECT_EQ(logger1.get(), logger2.get());
 }
 
+// Verifies that failure in creation of the applicator is handled correctly through
+// the cache.
+TEST(HttpAccessLoggerCacheTest, CreateApplicatorFailure) {
+  std::string yaml_string = R"EOF(
+  http_uri:
+    uri: "https://some-o11y.com/otlp/v1/logs"
+    cluster: "my_o11y_backend"
+    timeout: 0.250s
+  request_headers_to_add:
+    - header:
+        key: "x-bad-formatter"
+        value: "%UNCLOSED_FORMATTER"
+  )EOF";
+
+  envoy::config::core::v3::HttpService http_service;
+  TestUtility::loadFromYaml(yaml_string, http_service);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  auto cache = std::make_shared<HttpAccessLoggerCacheImpl>(server_context);
+
+  EXPECT_THROW(cache->getOrCreateApplicator(http_service, server_context), EnvoyException);
+}
+
 } // namespace OpenTelemetry
 } // namespace AccessLoggers
 } // namespace Extensions

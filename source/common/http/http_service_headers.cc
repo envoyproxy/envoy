@@ -37,6 +37,16 @@ HttpServiceHeadersApplicator::HttpServiceHeadersApplicator(
   }
 }
 
+std::unique_ptr<HttpServiceHeadersApplicator> HttpServiceHeadersApplicator::createOrThrow(
+    const envoy::config::core::v3::HttpService& http_service,
+    Server::Configuration::ServerFactoryContext& server_context) {
+  absl::Status creation_status;
+  auto applicator =
+      std::make_unique<HttpServiceHeadersApplicator>(http_service, server_context, creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
+  return applicator;
+}
+
 void HttpServiceHeadersApplicator::apply(RequestHeaderMap& headers) const {
   for (const auto& header_pair : static_headers_) {
     headers.setReference(header_pair.first, header_pair.second);

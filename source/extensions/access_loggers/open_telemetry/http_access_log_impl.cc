@@ -185,11 +185,10 @@ HttpAccessLoggerCacheImpl::getOrCreateApplicator(
     }
   }
 
-  absl::Status creation_status = absl::OkStatus();
   // Capture shared_from_this() in the deleter so the mutex and map remain alive.
   std::shared_ptr<HttpAccessLoggerCacheImpl> self = shared_from_this();
   std::shared_ptr<const Http::HttpServiceHeadersApplicator> applicator(
-      new Http::HttpServiceHeadersApplicator(http_service, server_context, creation_status),
+      Http::HttpServiceHeadersApplicator::createOrThrow(http_service, server_context).release(),
       [self, config_hash](const Http::HttpServiceHeadersApplicator* ptr) {
         {
           absl::MutexLock lock(&self->applicator_mutex_);
@@ -202,7 +201,6 @@ HttpAccessLoggerCacheImpl::getOrCreateApplicator(
         }
         delete ptr;
       });
-  THROW_IF_NOT_OK_REF(creation_status);
   applicators_.insert_or_assign(config_hash, applicator);
   return applicator;
 }
