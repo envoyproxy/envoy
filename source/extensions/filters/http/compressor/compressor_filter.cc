@@ -37,6 +37,11 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     response_content_encoding_handle(Http::CustomHeaders::get().ContentEncoding);
 
+// True when the ETag uses the weak form (RFC 7232): ``W/`` prefix, case-insensitive on ``W``.
+bool isWeakEtag(absl::string_view value) {
+  return value.length() >= 2 && (value[0] == 'w' || value[0] == 'W') && value[1] == '/';
+}
+
 // Default minimum length of an upstream response that allows compression.
 const uint64_t DefaultMinimumContentLength = 30;
 
@@ -837,7 +842,7 @@ void CompressorFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* etag = headers.getInline(etag_handle.handle());
   if (etag != nullptr) {
     absl::string_view value(etag->value().getStringView());
-    if (value.length() > 2 && !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
+    if (value.length() > 2 && !isWeakEtag(value)) {
       headers.removeInline(etag_handle.handle());
     }
   }
@@ -847,8 +852,7 @@ void CompressorFilter::weakenEtagHeader(Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* etag = headers.getInline(etag_handle.handle());
   if (etag != nullptr) {
     absl::string_view value(etag->value().getStringView());
-    // Only weaken strong ETags (those not already weak).
-    if (value.length() < 2 || !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
+    if (!isWeakEtag(value)) {
       headers.setInline(etag_handle.handle(), absl::StrCat("W/", value));
     }
   }
