@@ -459,7 +459,7 @@ void Client::DirectStreamCallbacks::latchError() {
       !resp_code_details.empty()) {
     error_msg_details.push_back(absl::StrCat("det: ", std::move(resp_code_details)));
   }
-  // The format of the error message propogated to callbacks is:
+  // The format of the error message propagated to callbacks is:
   // rc: {value}|ec: {value}|rsp_flags: {value}|http: {value}|det: {value}
   //
   // Where envoy_rc is the HTTP response code from StreamInfo::responseCode().
