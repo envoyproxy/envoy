@@ -181,6 +181,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.clear_route_cache();
+    envoy_filter.clear_route_cluster_cache();
 
     // Test single getter API.
     let single_value = envoy_filter
