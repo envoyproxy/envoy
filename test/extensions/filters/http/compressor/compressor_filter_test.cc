@@ -1308,6 +1308,17 @@ TEST_P(CompressWithEtagTest, CompressionIsDisabledOnEtagStatusHeaderEnabled) {
   }
 }
 
+// Two-character values that are not valid weak ETags (``W/``) are removed when compressing, same as
+// longer strong ETags.
+TEST_F(CompressorFilterTest, StrongEtagLengthTwoRemovedWhenCompressing) {
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test, deflate"}});
+  Http::TestResponseHeaderMapImpl headers{
+      {":method", "get"}, {"content-length", "256"}, {"etag", "ab"}};
+  doResponseCompression(headers, false);
+  EXPECT_EQ("test", headers.get_("content-encoding"));
+  EXPECT_FALSE(headers.has("etag"));
+}
+
 // Tests for weaken_etag_on_compress: when true, strong ETags are weakened (W/ prefix) instead of removed.
 TEST_F(CompressorFilterTest, WeakenEtagOnCompressStrongEtag) {
   setUpFilter(R"EOF(

@@ -840,7 +840,7 @@ void CompressorFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* etag = headers.getInline(etag_handle.handle());
   if (etag != nullptr) {
     absl::string_view value(etag->value().getStringView());
-    if (value.length() > 2 && !isWeakEtag(value)) {
+    if (!isWeakEtag(value)) {
       headers.removeInline(etag_handle.handle());
     }
   }

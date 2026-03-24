@@ -130,9 +130,9 @@ When a response has an ``ETag`` header, the filter's behavior depends on
 - **``disable_on_etag_header: false``** (default) — Compression is allowed. When compression
   is applied:
 
-  - **``weaken_etag_on_compress: false``** (default) — Weak ``ETag`` values (those starting
-    with ``W/``) are preserved. Strong ``ETag`` values are *removed* from the response,
-    since they would no longer match the compressed body.
+  - **``weaken_etag_on_compress: false``** (default) — Weak ``ETag`` values (RFC 7232: ``W/`` prefix,
+    case-insensitive ``W``) are preserved. Any other value is treated as strong and is *removed*
+    from the response when compressing, since it would no longer match the compressed body.
 
   - **``weaken_etag_on_compress: true``** — Weak ``ETag`` values are preserved. Strong
     ``ETag`` values are *weakened* by prepending ``W/`` to the value (e.g. ``"abc123"``
