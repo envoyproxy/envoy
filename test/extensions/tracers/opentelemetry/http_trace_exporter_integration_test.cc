@@ -84,6 +84,7 @@ public:
 
   FakeUpstream* trace_receiver_upstream_{};
   FakeHttpConnectionPtr connection_;
+  FakeStreamPtr stream_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, OpenTelemetryHttpTraceExporterIntegrationTest,
@@ -100,21 +101,20 @@ TEST_P(OpenTelemetryHttpTraceExporterIntegrationTest, HttpExportWithFormatterHea
 
   // Wait for the trace export HTTP request.
   ASSERT_TRUE(trace_receiver_upstream_->waitForHttpConnection(*dispatcher_, connection_));
-  FakeStreamPtr stream;
-  ASSERT_TRUE(connection_->waitForNewStream(*dispatcher_, stream));
-  ASSERT_TRUE(stream->waitForEndStream(*dispatcher_));
+  ASSERT_TRUE(connection_->waitForNewStream(*dispatcher_, stream_));
+  ASSERT_TRUE(stream_->waitForEndStream(*dispatcher_));
 
   // Verify standard OTLP HTTP headers.
-  EXPECT_EQ("POST", stream->headers().getMethodValue());
-  EXPECT_EQ("/v1/traces", stream->headers().getPathValue());
+  EXPECT_EQ("POST", stream_->headers().getMethodValue());
+  EXPECT_EQ("/v1/traces", stream_->headers().getPathValue());
 
   // Verify the custom formatter header was applied.
-  auto values = stream->headers().get(Http::LowerCaseString("x-custom-formatter"));
+  auto values = stream_->headers().get(Http::LowerCaseString("x-custom-formatter"));
   ASSERT_FALSE(values.empty());
   EXPECT_FALSE(values[0]->value().empty());
   EXPECT_NE(values[0]->value(), "%HOSTNAME%");
 
-  stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 }
 
 } // namespace Envoy
