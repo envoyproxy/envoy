@@ -259,3 +259,8 @@ def crates_repositories():
         # lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
         manifests = ["@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
     )
+    crates_repository(
+        name = "hickory_dns_crate_index",
+        cargo_lockfile = "@envoy//:Cargo.lock",
+        manifests = ["@envoy//source/extensions/network/dns_resolver/hickory/rust:Cargo.toml"],
+    )
