@@ -202,7 +202,6 @@ private:
   const std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry_;
   LcTrieSharedPtr trie_;
   std::shared_ptr<IpTagsProvider> provider_;
-  ::Envoy::Common::CallbackHandlePtr tags_reload_callback_handle_;
 };
 
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;
