@@ -104,7 +104,7 @@ public:
   /**
    * @return true if this host data wants router ORCA callbacks.
    */
-  virtual bool receivesOrcaLoadReport() const { return true; }
+  virtual bool receivesOrcaLoadReport() const PURE;
 
   /**
    * Invoked when a new orca report is received for this upstream host to

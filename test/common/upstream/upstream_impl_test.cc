@@ -1875,10 +1875,12 @@ TEST_F(HostImplTest, HostLbPolicyData) {
 
   class TestLbPolicyData : public Upstream::HostLbPolicyData {
   public:
+    bool receivesOrcaLoadReport() const override { return false; }
     int foo = 42;
   };
   class AnotherTestLbPolicyData : public Upstream::HostLbPolicyData {
   public:
+    bool receivesOrcaLoadReport() const override { return false; }
     int bar = 7;
   };
 
