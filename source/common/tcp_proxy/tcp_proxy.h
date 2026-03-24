@@ -555,7 +555,9 @@ public:
     };
     Router::RouteConstSharedPtr route() override { return route_; }
     OptRef<const Upstream::ClusterInfo> clusterInfo() override {
-      return makeOptRefFromPtr<const Upstream::ClusterInfo>(clusterInfoSharedPtr().get());
+      const auto info =
+          parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())->info();
+      return makeOptRefFromPtr<const Upstream::ClusterInfo>(info.get());
     }
     Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() override {
       return parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())
