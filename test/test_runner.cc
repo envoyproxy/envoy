@@ -58,7 +58,6 @@ static OpenSSLConf openssl_conf(R"(
 
   [system_default_sect]
   CipherString = DEFAULT:@SECLEVEL=0
-  Options = IgnoreUnexpectedEof
 )");
 #endif
 
