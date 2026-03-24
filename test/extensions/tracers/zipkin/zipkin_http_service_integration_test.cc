@@ -72,6 +72,7 @@ public:
 
   FakeUpstream* zipkin_upstream_{};
   FakeHttpConnectionPtr connection_;
+  FakeStreamPtr stream_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ZipkinHttpServiceIntegrationTest,
@@ -91,24 +92,20 @@ TEST_P(ZipkinHttpServiceIntegrationTest, CollectorServiceWithFormatterHeader) {
   // The runtime default is 5 spans, so we wait for the timer flush.
   ASSERT_TRUE(
       zipkin_upstream_->waitForHttpConnection(*dispatcher_, connection_, std::chrono::seconds(10)));
-  FakeStreamPtr stream;
-  ASSERT_TRUE(connection_->waitForNewStream(*dispatcher_, stream, std::chrono::seconds(10)));
-  ASSERT_TRUE(stream->waitForEndStream(*dispatcher_, std::chrono::seconds(10)));
+  ASSERT_TRUE(connection_->waitForNewStream(*dispatcher_, stream_, std::chrono::seconds(10)));
+  ASSERT_TRUE(stream_->waitForEndStream(*dispatcher_, std::chrono::seconds(10)));
 
   // Verify the request was sent to the correct path.
-  EXPECT_EQ("POST", stream->headers().getMethodValue());
-  EXPECT_EQ("/api/v2/spans", stream->headers().getPathValue());
+  EXPECT_EQ("POST", stream_->headers().getMethodValue());
+  EXPECT_EQ("/api/v2/spans", stream_->headers().getPathValue());
 
   // Verify the custom formatter header was applied.
-  auto values = stream->headers().get(Http::LowerCaseString("x-custom-formatter"));
+  auto values = stream_->headers().get(Http::LowerCaseString("x-custom-formatter"));
   EXPECT_FALSE(values.empty());
   EXPECT_FALSE(values[0]->value().empty());
   EXPECT_NE(values[0]->value(), "%HOSTNAME%");
-  if (!values.empty()) {
-    EXPECT_FALSE(values[0]->value().empty());
-  }
 
-  stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
+  stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
 }
 
 } // namespace Envoy
