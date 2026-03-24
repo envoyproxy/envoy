@@ -132,7 +132,7 @@ int EnvoyQuicProofSource::ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t
 
   auto& transport_socket_factory =
       dynamic_cast<const QuicServerTransportSocketFactory&>(filter_chain->transportSocketFactory());
-  return transport_socket_factory.sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
+  return transport_socket_factory.processSessionTicket(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
 }
 
 void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {

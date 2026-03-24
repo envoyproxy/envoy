@@ -32,7 +32,7 @@ public:
 
   // Session ticket key callback installed on SSL_CTX by OnNewSslCtx.
   // Looks up the filter chain from SSL ex_data and delegates to the
-  // transport socket factory's sessionTicketProcess.
+  // transport socket factory's processSessionTicket.
   static int ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                                HMAC_CTX* hmac_ctx, int encrypt);
 

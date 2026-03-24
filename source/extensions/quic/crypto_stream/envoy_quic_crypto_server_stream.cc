@@ -1,8 +1,12 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 
+#include <openssl/ssl.h>
+
 #include "source/common/quic/envoy_quic_proof_source.h"
-#include "source/common/quic/envoy_tls_server_handshaker.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/runtime/runtime_features.h"
+
+#include "quiche/quic/core/tls_server_handshaker.h"
 
 namespace Envoy {
 namespace Quic {
@@ -15,16 +19,32 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
     // Though this extension doesn't use the parameters below, they might be used by
     // downstreams. Do not remove them.
     OptRef<const Network::DownstreamTransportSocketFactory> /*transport_socket_factory*/,
-    Envoy::Event::Dispatcher& /*dispatcher*/) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support")) {
-    // Use default QUICHE TLS server handshaker when session ticket support is disabled.
-    return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
+    Envoy::Event::Dispatcher& /*dispatcher*/, const Network::FilterChain* filter_chain) {
+  auto stream =
+      quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support") &&
+      filter_chain != nullptr && stream->GetSsl() != nullptr) {
+    // Store filter chain in SSL ex_data for the per-connection ticket key callback
+    // installed by EnvoyQuicProofSource::OnNewSslCtx.
+    SSL_set_ex_data(stream->GetSsl(), EnvoyQuicProofSource::filterChainExDataIndex(),
+                    const_cast<Network::FilterChain*>(filter_chain));
+
+    // QUIC listeners always use QuicServerTransportSocketFactory.
+    auto& factory = static_cast<const QuicServerTransportSocketFactory&>(
+        filter_chain->transportSocketFactory());
+    auto ticket_config = factory.getSessionTicketConfig();
+    if (ticket_config.disable_stateless_resumption || !ticket_config.has_keys ||
+        ticket_config.handles_session_resumption) {
+      // GetSsl() returning non-null guarantees this is a TlsServerHandshaker (not the
+      // legacy QuicCryptoServerStream which returns nullptr from GetSsl()).
+      // DisableResumption() works here: can_disable_resumption_ is true at construction,
+      // only set false in EarlySelectCertCallback which hasn't fired yet.
+      static_cast<quic::TlsServerHandshaker*>(stream.get())->DisableResumption();
+    }
   }
 
-  auto* proof_source = dynamic_cast<EnvoyQuicProofSource*>(crypto_config->proof_source());
-  ASSERT(proof_source != nullptr, "Expected EnvoyQuicProofSource in crypto config");
-
-  return std::make_unique<EnvoyTlsServerHandshaker>(session, crypto_config, proof_source);
+  return stream;
 }
 
 REGISTER_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl,

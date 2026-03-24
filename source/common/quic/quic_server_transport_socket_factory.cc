@@ -175,7 +175,7 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
   return {tls_context.quic_cert_, tls_context.quic_private_key_};
 }
 
-int QuicServerTransportSocketFactory::sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv,
+int QuicServerTransportSocketFactory::processSessionTicket(SSL* ssl, uint8_t* key_name, uint8_t* iv,
                                                            EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
                                                            int encrypt) const {
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx;

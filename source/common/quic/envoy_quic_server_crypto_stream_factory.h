@@ -2,6 +2,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/network/filter.h"
 #include "envoy/network/transport_socket.h"
 
 #include "quiche/quic/core/crypto/quic_crypto_server_config.h"
@@ -22,7 +23,7 @@ public:
       quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
       quic::QuicCryptoServerStreamBase::Helper* helper,
       OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
-      Event::Dispatcher& dispatcher) PURE;
+      Event::Dispatcher& dispatcher, const Network::FilterChain* filter_chain = nullptr) PURE;
 };
 
 } // namespace Quic

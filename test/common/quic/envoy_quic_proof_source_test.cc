@@ -416,7 +416,7 @@ TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackNullFilterChain) {
 }
 
 // Verify that ticketKeyCallback delegates to the transport socket factory's
-// sessionTicketProcess when a filter chain is present in SSL ex_data.
+// processSessionTicket when a filter chain is present in SSL ex_data.
 TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackWithFilterChain) {
   loadCertsIntoFactory(expected_certs_, true);
 

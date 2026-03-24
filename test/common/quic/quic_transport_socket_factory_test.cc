@@ -182,8 +182,8 @@ downstream_tls_context:
       config_factory_.createTransportSocketFactory(proto_config, context_, {}),
       Network::DownstreamTransportSocketFactoryPtr);
   auto& quic_factory = static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory);
-  // Before initialization, ssl_ctx_ is null, so sessionTicketProcess returns 0.
-  EXPECT_EQ(0, quic_factory.sessionTicketProcess(nullptr, nullptr, nullptr, nullptr, nullptr, 0));
+  // Before initialization, ssl_ctx_ is null, so processSessionTicket returns 0.
+  EXPECT_EQ(0, quic_factory.processSessionTicket(nullptr, nullptr, nullptr, nullptr, nullptr, 0));
 }
 
 class QuicClientTransportSocketFactoryTest : public testing::Test {

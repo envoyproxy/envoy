@@ -28,8 +28,9 @@ envoy_cc_library(
         "//envoy/registry",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_server_crypto_stream_factory_lib",
-        "//source/common/quic:envoy_tls_server_handshaker_lib",
+        "//source/common/quic:quic_server_transport_socket_factory_lib",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
+        "@quiche//:quic_server_session_lib",
     ]),
     alwayslink = LEGACY_ALWAYSLINK,
 )

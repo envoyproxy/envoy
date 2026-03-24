@@ -131,19 +131,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_tls_server_handshaker_lib",
-    srcs = envoy_select_enable_http3(["envoy_tls_server_handshaker.cc"]),
-    hdrs = envoy_select_enable_http3(["envoy_tls_server_handshaker.h"]),
-    external_deps = ["ssl"],
-    deps = envoy_select_enable_http3([
-        ":envoy_quic_proof_source_lib",
-        "//source/common/common:assert_lib",
-        "@quiche//:quic_core_crypto_proof_source_lib",
-        "@quiche//:quic_server_session_lib",
-    ]),
-)
-
-envoy_cc_library(
     name = "envoy_quic_proof_verifier_base_lib",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_verifier_base.cc"]),
     hdrs = envoy_select_enable_http3(["envoy_quic_proof_verifier_base.h"]),

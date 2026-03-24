@@ -58,7 +58,10 @@ public:
             config_->capabilities().handles_session_resumption};
   }
 
-  int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
+  // Processes a session ticket encrypt or decrypt operation by delegating to the
+  // underlying ServerContextImpl. Returns 0 on failure, 1 on success, 2 on
+  // success with key renewal (decrypt only).
+  int processSessionTicket(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt) const;
 
 protected:

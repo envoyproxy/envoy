@@ -584,7 +584,7 @@ TEST_P(EnvoyQuicDispatcherTest, TerminateIdleSessionsScaling) {
 }
 
 // Test with EnvoyQuicProofSource, real ContextManagerImpl, and runtime guard enabled
-// to exercise full TLS handshake through EnvoyTlsServerHandshaker.
+// to exercise full TLS handshake with session ticket support.
 class EnvoyQuicDispatcherWithSessionTicketTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       protected Logger::Loggable<Logger::Id::main> {
@@ -784,7 +784,7 @@ TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithSessionTicketSuppo
   EXPECT_CALL(network_connection_callbacks, onEvent(_)).Times(testing::AnyNumber());
   EXPECT_CALL(write_total, add(_)).Times(AnyNumber());
 
-  // Process CHLO — triggers full TLS handshake through EnvoyTlsServerHandshaker.
+  // Process CHLO — triggers full TLS handshake with session ticket support.
   envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
   quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
                                         ? quic::QuicIpAddress::Loopback4()
@@ -804,7 +804,7 @@ TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithSessionTicketSuppo
       envoyIpAddressToQuicSocketAddress(
           listen_socket_->connectionInfoProvider().localAddress()->ip()),
       peer_addr, *received_packet);
-  // Verify session was created and handshake completed through EnvoyTlsServerHandshaker.
+  // Verify session was created and handshake completed with session ticket support.
   EXPECT_EQ(1u, envoy_quic_dispatcher_.NumSessions());
   const quic::QuicSession* session =
       quic::test::QuicDispatcherPeer::FindSession(&envoy_quic_dispatcher_, connection_id_);
@@ -817,8 +817,8 @@ TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithSessionTicketSuppo
 }
 
 // Same handshake test with the GetCertChains QUICHE flag disabled to exercise the
-// old GetCertChain code path in SelectCertificate (envoy_tls_server_handshaker.cc
-// L124-138). The default flag value is true, so the existing test covers L104-121.
+// old GetCertChain code path in QUICHE's DefaultProofSourceHandle::SelectCertificate.
+// The default flag value is true, so the existing test covers the GetCertChains path.
 TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithOldCertChainAPI) {
   SetQuicReloadableFlag(quic_use_proof_source_get_cert_chains, false);
 
