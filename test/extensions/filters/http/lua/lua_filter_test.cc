@@ -2900,10 +2900,12 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   EXPECT_CALL(*connection_info, issuerPeerCertificate()).WillOnce(ReturnRef(peer_cert_issuer));
 
   const std::string peer_cert_issuer_serial = "peer-cert-issuer-serial";
-  EXPECT_CALL(*connection_info, serialNumberPeerCertificateIssuer()).WillOnce(ReturnRef(peer_cert_issuer_serial));
+  EXPECT_CALL(*connection_info, serialNumberPeerCertificateIssuer())
+      .WillOnce(ReturnRef(peer_cert_issuer_serial));
 
   const std::string peer_cert_issuer_hash = "peer-cert-issuer-hash";
-  EXPECT_CALL(*connection_info, sha256PeerCertificateIssuerDigest()).WillOnce(ReturnRef(peer_cert_issuer_hash));
+  EXPECT_CALL(*connection_info, sha256PeerCertificateIssuerDigest())
+      .WillOnce(ReturnRef(peer_cert_issuer_hash));
 
   const std::string peer_cert_subject = "peer-cert-subject";
   EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillOnce(ReturnRef(peer_cert_subject));

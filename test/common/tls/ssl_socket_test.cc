@@ -267,7 +267,8 @@ public:
 
   const std::string& expectedPeerIssuer() const { return expected_peer_issuer_; }
 
-  TestUtilOptions& setExpectedSha256PeerCertificateIssuerDigest(const std::string& expected_issuer_hash) {
+  TestUtilOptions&
+  setExpectedSha256PeerCertificateIssuerDigest(const std::string& expected_issuer_hash) {
     expected_issuer_peer_certificate_hash_ = expected_issuer_hash;
     return *this;
   }
@@ -276,7 +277,8 @@ public:
     return expected_issuer_peer_certificate_hash_;
   }
 
-  TestUtilOptions& setExpectedSerialNumberPeerCertificateIssuer(const std::string& expected_issuer_serial) {
+  TestUtilOptions&
+  setExpectedSerialNumberPeerCertificateIssuer(const std::string& expected_issuer_serial) {
     expected_issuer_peer_certificate_serial_ = expected_issuer_serial;
     return *this;
   }
@@ -1417,8 +1419,7 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options
-               .setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
+  testUtil(test_options.setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
                .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
                .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
 }
@@ -1451,8 +1452,7 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestLeafOnly) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options
-               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+  testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedSha256PeerCertificateIssuerDigest(TEST_CA_CERT_256_HASH)
                .setExpectedSerialNumberPeerCertificateIssuer(TEST_CA_CERT_SERIAL));
 }
@@ -1488,8 +1488,7 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestDecoyInChain) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options
-               .setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
+  testUtil(test_options.setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
                .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
                .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
 }

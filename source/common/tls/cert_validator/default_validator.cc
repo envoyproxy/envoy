@@ -379,11 +379,11 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   const bool succeeded =
       verifyCertAndUpdateStatus(leaf_cert, host_name, transport_socket_options.get(), context,
                                 detailed_status, &error_details, &tls_alert);
-  return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
-                                       detailed_status, absl::nullopt, absl::nullopt,
-                                       std::move(validated_chain)}
-                   : ValidationResults{ValidationResults::ValidationStatus::Failed, detailed_status,
-                                       tls_alert, error_details};
+  return succeeded
+             ? ValidationResults{ValidationResults::ValidationStatus::Successful, detailed_status,
+                                 absl::nullopt, absl::nullopt, std::move(validated_chain)}
+             : ValidationResults{ValidationResults::ValidationStatus::Failed, detailed_status,
+                                 tls_alert, error_details};
 }
 
 bool DefaultCertValidator::verifySubjectAltName(X509* cert,
