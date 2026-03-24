@@ -32,7 +32,7 @@ using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
 class IpTagsLoader : public Logger::Loggable<Logger::Id::ip_tagging>,
                      public std::enable_shared_from_this<IpTagsLoader> {
 public:
-  IpTagsLoader(const std::string& stat_prefix, Stats::Scope& scope);
+  IpTagsLoader(const std::string& stat_prefix, Stats::ScopeSharedPtr scope);
 
   void incIpTagsReloadSuccess() { incCounter(reload_success_); }
 
@@ -51,7 +51,7 @@ public:
                      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 
 private:
-  Stats::Scope& scope_;
+  Stats::ScopeSharedPtr scope_;
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
   const Stats::StatName unknown_tag_;
@@ -70,8 +70,9 @@ public:
   IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                  Event::Dispatcher& main_dispatcher, Api::Api& api,
                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                 ThreadLocal::SlotAllocator& tls, const std::string& stat_prefix, Stats::Scope& scope,
-                 Singleton::InstanceSharedPtr owner, absl::Status& creation_status);
+                 ThreadLocal::SlotAllocator& tls, const std::string& stat_prefix,
+                 Stats::ScopeSharedPtr scope, Singleton::InstanceSharedPtr owner,
+                 absl::Status& creation_status);
 
   ~IpTagsProvider();
 
@@ -82,7 +83,7 @@ public:
   void incTotal();
 
 private:
-Api::Api& api_;
+  Api::Api& api_;
   Envoy::Config::DataSource::DataSourceProviderPtr<Network::LcTrie::LcTrie<std::string>>
       data_source_provider_;
   // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
@@ -105,7 +106,8 @@ public:
   getOrCreateProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource, Api::Api& api,
                       ProtobufMessage::ValidationVisitor& validation_visitor,
                       ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_dispatcher,
-                      const std::string& stat_prefix, Stats::Scope& scope, std::shared_ptr<IpTagsRegistrySingleton> singleton);
+                      const std::string& stat_prefix, Stats::Scope& scope,
+                      std::shared_ptr<IpTagsRegistrySingleton> singleton);
 
 private:
   // Each provider stores shared_ptrs to this singleton, which keeps the singleton
@@ -113,6 +115,7 @@ private:
   // Each entry in this map consists of a key (hash of an absolute file path to ip tags file)
   // and and value (instance of `IpTagsProvider` that owns ip tags data).
   absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_;
+  Stats::ScopeSharedPtr scope_;
 };
 
 /**

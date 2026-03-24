@@ -81,8 +81,6 @@ struct ProviderOptions {
   bool hash_content{false};
 };
 
-static const ProviderOptions DEFAULT_PROVIDER_OPTIONS{ProviderOptions{}};
-
 // DynamicData registers the file watches and a thread local slot. This class
 // must be created and deleted on the dispatcher thread.
 template <class DataType> class DynamicData {
@@ -99,7 +97,8 @@ public:
               absl::AnyInvocable<void()> cleanup, absl::Status& creation_status,
               absl::optional<std::function<void()>> data_update_cb = absl::nullopt)
       : dispatcher_(main_dispatcher), api_(api), options_(options), filename_(source.filename()),
-        data_transform_cb_(data_transform_cb), data_update_cb_(data_update_cb), hash_(initial_hash), cleanup_(std::move(cleanup)) {
+        data_transform_cb_(data_transform_cb), data_update_cb_(data_update_cb), hash_(initial_hash),
+        cleanup_(std::move(cleanup)) {
     slot_ =
         ThreadLocal::TypedSlot<typename DynamicData<DataType>::ThreadLocalData>::makeUnique(tls);
     slot_->set([initial_data = std::move(initial_data)](Event::Dispatcher&) {
@@ -164,8 +163,8 @@ private:
       hash_ = new_hash;
     }
 
-    slot_->runOnAllThreads([new_data = std::move(transformed_new_data_or_error.value()), this](
-                               OptRef<typename DynamicData<DataType>::ThreadLocalData> obj) {
+    slot_->runOnAllThreads([new_data = std::move(transformed_new_data_or_error.value()),
+                            this](OptRef<typename DynamicData<DataType>::ThreadLocalData> obj) {
       if (obj.has_value()) {
         obj->data_ = new_data;
       }
@@ -220,6 +219,15 @@ public:
    */
   static absl::StatusOr<DataSourceProviderPtr<DataType>>
   create(const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
+         ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty,
+         DataTransform<DataType> data_transform_cb, uint64_t max_size,
+         absl::optional<DataUpdateCb> data_update_cb = absl::nullopt) {
+    return create(source, main_dispatcher, tls, api, data_transform_cb,
+                  {.allow_empty = allow_empty, .max_size = max_size}, {}, data_update_cb);
+  }
+
+  static absl::StatusOr<DataSourceProviderPtr<DataType>>
+  create(const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
          ThreadLocal::SlotAllocator& tls, Api::Api& api, DataTransform<DataType> data_transform_cb,
          const ProviderOptions& options, absl::AnyInvocable<void()> cleanup = {},
          absl::optional<DataUpdateCb> data_update_cb = absl::nullopt) {
@@ -236,22 +244,20 @@ public:
                                                     max_size));
     }
     auto transformed_data_or_error = data_transform_cb(initial_data_or_error.value());
-    std::cerr << "***DataSourceProviderPtr transformed data"<< std::endl;
     RETURN_IF_NOT_OK_REF(transformed_data_or_error.status());
 
     if (!usesFileWatching(source, options)) {
       return std::unique_ptr<DataSourceProvider<DataType>>(
           new DataSourceProvider<DataType>(std::move(*transformed_data_or_error.value())));
     }
-    std::cerr << "***DataSourceProviderPtr transformed data 2"<< std::endl;
 
     absl::Status creation_status = absl::OkStatus();
     const uint64_t hash = options.hash_content ? HashUtil::xxHash64(*initial_data_or_error) : 0;
-    auto ret = std::unique_ptr<DataSourceProvider>(new DataSourceProvider<DataType>(
-        std::make_unique<DynamicData<DataType>>(source, main_dispatcher, tls, api,
-                                                data_transform_cb, options,
-                                                std::move(transformed_data_or_error).value(), hash,
-                                                std::move(cleanup), creation_status, data_update_cb)));
+    auto ret = std::unique_ptr<DataSourceProvider>(
+        new DataSourceProvider<DataType>(std::make_unique<DynamicData<DataType>>(
+            source, main_dispatcher, tls, api, data_transform_cb, options,
+            std::move(transformed_data_or_error).value(), hash, std::move(cleanup), creation_status,
+            data_update_cb)));
     RETURN_IF_NOT_OK(creation_status);
     return std::move(ret);
   }
@@ -295,16 +301,16 @@ class ProviderSingleton : public Singleton::Instance,
 public:
   ProviderSingleton(Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls,
                     Api::Api& api, DataTransform<DataType> data_transform_cb,
-                    const ProviderOptions& options, absl::optional<DataUpdateCb> data_update_cb = absl::nullopt)
+                    const ProviderOptions& options,
+                    absl::optional<DataUpdateCb> data_update_cb = absl::nullopt)
       : dispatcher_(main_dispatcher), tls_(tls), api_(api), data_transform_cb_(data_transform_cb),
-        data_update_cb_(data_update_cb),
-        options_(options) {}
+        data_update_cb_(data_update_cb), options_(options) {}
 
   absl::StatusOr<DataSourceProviderSharedPtr<DataType>> getOrCreate(const ProtoDataSource& source) {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (!usesFileWatching(source, options_)) {
-      return DataSourceProvider<DataType>::create(source, dispatcher_, tls_, api_, data_transform_cb_,
-                                                  options_, data_update_cb_);
+      return DataSourceProvider<DataType>::create(source, dispatcher_, tls_, api_,
+                                                  data_transform_cb_, options_, data_update_cb_);
     }
     const size_t config_hash = MessageUtil::hash(source);
     auto it = dynamic_providers_.find(config_hash);

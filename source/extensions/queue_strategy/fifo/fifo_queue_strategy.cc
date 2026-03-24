@@ -7,8 +7,10 @@ namespace QueueStrategy {
 /**
  * Static registration for the FifoQueueFactory.
  */
-template <class ItemType> static auto REGISTER_FACTORY =                                                 \
-        new Envoy::Registry::RegisterFactory<FifoQueueFactory<ItemType>, QueueStrategy::QueueStrategyFactory<ItemType>>();
+template <class ItemType>
+static auto REGISTER_FACTORY =
+    new Envoy::Registry::RegisterFactory<FifoQueueFactory<ItemType>,
+                                         QueueStrategy::QueueStrategyFactory<ItemType>>();
 
 } // namespace QueueStrategy
 } // namespace Extensions
