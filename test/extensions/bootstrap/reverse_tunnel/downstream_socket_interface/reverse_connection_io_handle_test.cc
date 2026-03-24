@@ -1497,7 +1497,7 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateMultipleConnectionsMixedResults) {
             auto override_host = reverse_context->overrideHostToSelect();
             EXPECT_TRUE(override_host.has_value());
 
-            std::string host_address = std::string(override_host->first);
+            std::string host_address = std::string(override_host->host);
 
             Upstream::MockHost::MockCreateConnectionData result;
             if (host_address == "192.168.1.1") {
@@ -1624,7 +1624,7 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
         auto override_host = reverse_context->overrideHostToSelect();
         EXPECT_TRUE(override_host.has_value());
 
-        std::string host_address = std::string(override_host->first);
+        std::string host_address = std::string(override_host->host);
 
         if (host_address == "192.168.1.1") {
           return success_conn_data1; // First host: success

@@ -7770,10 +7770,10 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   // called to get address of upstream host that should be selected first.
   EXPECT_CALL(callbacks_, upstreamOverrideHost())
       .WillOnce(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("1.2.3.4", false))));
+          Upstream::LoadBalancerContext::OverrideHost{"1.2.3.4", false})));
 
   auto override_host = router_->overrideHostToSelect();
-  EXPECT_EQ("1.2.3.4", override_host.value().first);
+  EXPECT_EQ("1.2.3.4", override_host.value().host);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);

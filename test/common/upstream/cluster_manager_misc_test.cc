@@ -1108,7 +1108,7 @@ TEST_F(PreconnectTest, PreconnectOnWithOverrideHost) {
   NiceMock<MockLoadBalancerContext> context;
   EXPECT_CALL(context, overrideHostToSelect())
       .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("127.0.0.1:80", false))));
+          Upstream::LoadBalancerContext::OverrideHost{"127.0.0.1:80", false})));
 
   // Only allocate connection pool once.
   EXPECT_CALL(factory_, allocateTcpConnPool_)

@@ -1139,7 +1139,31 @@ private:
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
       std::make_shared<Network::Socket::Options>();
-  std::pair<std::string, bool> upstream_override_host_;
+  struct UpstreamOverrideHostStorage {
+    std::string host;
+    bool strict{false};
+
+    // Default constructor
+    UpstreamOverrideHostStorage() = default;
+
+    // Constructor from OverrideHost
+    UpstreamOverrideHostStorage(const Upstream::LoadBalancerContext::OverrideHost& override_host)
+        : host(override_host.host), strict(override_host.strict) {}
+
+    // Assignment from OverrideHost
+    UpstreamOverrideHostStorage&
+    operator=(const Upstream::LoadBalancerContext::OverrideHost& override_host) {
+      host.assign(override_host.host);
+      strict = override_host.strict;
+      return *this;
+    }
+
+    // Conversion to OverrideHost
+    Upstream::LoadBalancerContext::OverrideHost toOverrideHost() const {
+      return Upstream::LoadBalancerContext::OverrideHost{absl::string_view(host), strict};
+    }
+  };
+  UpstreamOverrideHostStorage upstream_override_host_;
 
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.

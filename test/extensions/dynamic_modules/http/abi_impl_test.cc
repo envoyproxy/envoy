@@ -2783,8 +2783,8 @@ TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostSuccess) {
   std::string host = "10.0.0.1:8080";
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(testing::_))
       .WillOnce(testing::Invoke([&host](Upstream::LoadBalancerContext::OverrideHost override_host) {
-        EXPECT_EQ(override_host.first, host);
-        EXPECT_TRUE(override_host.second);
+        EXPECT_EQ(override_host.host, host);
+        EXPECT_TRUE(override_host.strict);
       }));
 
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_upstream_override_host(
@@ -2795,8 +2795,8 @@ TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostNonStrict) {
   std::string host = "192.168.1.1:9000";
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(testing::_))
       .WillOnce(testing::Invoke([&host](Upstream::LoadBalancerContext::OverrideHost override_host) {
-        EXPECT_EQ(override_host.first, host);
-        EXPECT_FALSE(override_host.second);
+        EXPECT_EQ(override_host.host, host);
+        EXPECT_FALSE(override_host.strict);
       }));
 
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_upstream_override_host(
