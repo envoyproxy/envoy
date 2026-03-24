@@ -76,7 +76,7 @@ x-envoy-build-base: &envoy-build-base
     set -e
 
     if [[ -n "${USER_GID:-}" ]]; then
-        groupmod -g "$USER_GID" envoybuild 2>/dev/null || true
+        groupmod -g "$USER_GID" envoybuild >/dev/null
     fi
     if [[ -n "${USER_UID:-}" ]]; then
         usermod -u "$USER_UID" envoybuild >/dev/null
@@ -87,7 +87,6 @@ x-envoy-build-base: &envoy-build-base
         echo "Envoy build image: $${build_id}"
     fi
     chown envoybuild:envoybuild /build
-    [[ -e /var/run/docker.sock ]] && chmod 777 /var/run/docker.sock
     chown envoybuild /proc/self/fd/2 2>/dev/null || true
     [[ -e /entrypoint-extra.sh ]] && /entrypoint-extra.sh
     sudo -EHs -u envoybuild bash -c 'cd ${ENVOY_DOCKER_SOURCE_DIR:-/source} && exec ${DOCKER_COMMAND:-bash}'
