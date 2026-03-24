@@ -110,6 +110,7 @@ TEST_P(OpenTelemetryHttpTraceExporterIntegrationTest, HttpExportWithFormatterHea
 
   // Verify the custom formatter header was applied.
   auto values = stream->headers().get(Http::LowerCaseString("x-custom-formatter"));
+  ASSERT_FALSE(values.empty());
   EXPECT_FALSE(values[0]->value().empty());
   EXPECT_NE(values[0]->value(), "%HOSTNAME%");
 
