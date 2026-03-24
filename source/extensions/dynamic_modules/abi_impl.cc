@@ -1880,6 +1880,31 @@ __attribute__((weak)) uint32_t envoy_dynamic_module_callback_access_logger_get_a
   return 0;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+    envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_access_logger_get_attribute_bool: not implemented in "
+               "this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_access_logger_get_attribute_int(
+    envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_access_logger_get_attribute_int: not implemented in "
+               "this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_access_logger_get_attribute_string(
+    envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_access_logger_get_attribute_string: not implemented in "
+      "this context");
+  return false;
+}
+
 __attribute__((weak)) void envoy_dynamic_module_callback_access_logger_get_bytes_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_bytes_info*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_access_logger_get_bytes_info: not implemented in "

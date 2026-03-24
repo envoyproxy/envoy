@@ -51,9 +51,9 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
         srcs = [archive, ":" + redefine_syms_name],
         outs = [name + "_renamed.a"],
         cmd = (
-            "ARCH=$$(for f in $(SRCS); do case $$f in *.pic.a);; *.a) echo $$f; break;; esac; done); " +
+            "ARCH=$$(for f in $(SRCS); do case $$f in (*.pic.a) :;; (*.a) echo $$f; break;; esac; done); " +
             "[ -z \"$$ARCH\" ] && " +
-            "ARCH=$$(for f in $(SRCS); do case $$f in *.a) echo $$f; break;; esac; done); " +
+            "ARCH=$$(for f in $(SRCS); do case $$f in (*.a) echo $$f; break;; esac; done); " +
             "$(location @llvm_toolchain_llvm//:objcopy) " +
             "--redefine-syms=$(location :" + redefine_syms_name + ") $$ARCH $@"
         ),
