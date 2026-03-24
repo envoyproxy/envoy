@@ -4,6 +4,7 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/extensions/access_loggers/stats/stats.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -1270,6 +1271,118 @@ TEST(GaugeKeyTest, VerifyAbslHashCorrectness) {
       key_owned,
       key_tags2,
   }));
+}
+
+TEST(GaugeKeyTest, ExactMemoryFootprint) {
+  Stats::SymbolTableImpl symbol_table;
+  Stats::StatNamePool pool(symbol_table);
+
+  using GaugeKey = AccessLoggers::StatsAccessLog::GaugeKey;
+
+  // Static size check
+  EXPECT_LE(sizeof(GaugeKey), 64);
+
+  Stats::StatName name = pool.add("test_gauge");
+  Stats::StatName tag_n1 = pool.add("tag_n1");
+  Stats::StatName tag_v1 = pool.add("tag_v1");
+
+  Stats::StatNameTagVector tags = {{tag_n1, tag_v1}};
+
+  // 1. Check memory usage of empty GaugeKey (no heap should be used by GaugeKey itself).
+  {
+    Memory::TestUtil::MemoryTest memory_test;
+    GaugeKey key(name, absl::nullopt);
+    // GaugeKey on stack, no heap should be allocated.
+    EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
+  }
+
+  // 2. Check memory usage of Borrowed tags GaugeKey.
+  {
+    Memory::TestUtil::MemoryTest memory_test;
+    GaugeKey key(name, std::cref(tags));
+    // Borrowed tags should NOT cause heap allocation by GaugeKey itself.
+    EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
+  }
+
+  // 3. Check memory usage after making it owned.
+  {
+    GaugeKey key(name, std::cref(tags));
+
+    Memory::TestUtil::MemoryTest memory_test;
+    key.makeOwned();
+
+    // We expect some non-zero heap allocation for owned tags.
+    // The exact match depends on platform calibration (canonical release build).
+    // We use LE to check if it's within bounds. For exactly 1 tag, it should be small.
+    // Let's verify it exceeds 0 but is less than some reasonable limit (e.g., 64 bytes).
+    EXPECT_MEMORY_LE(memory_test.consumedBytes(), 64);
+  }
+}
+
+TEST_F(StatsAccessLoggerTest, AccessLogStateMemoryFootprint) {
+  initialize();
+  auto access_log_state = std::make_shared<AccessLogState>(logger_);
+
+  // Static size check
+  EXPECT_LE(sizeof(AccessLogState), 128);
+
+  Stats::StatNamePool pool(store_.symbolTable());
+
+  Stats::StatName tag_n = pool.add("tag_n");
+  Stats::StatName tag_v = pool.add("tag_v");
+
+  Stats::StatNameTagVector tags = {{tag_n, tag_v}};
+
+  const int NUM_ITEMS = 10000;
+
+  // Pre-intern names to isolate map insertion overhead from SymbolTable allocation.
+  std::vector<Stats::StatName> names;
+  names.reserve(NUM_ITEMS);
+  for (int i = 0; i < NUM_ITEMS; ++i) {
+    names.push_back(pool.add("test_gauge_" + std::to_string(i)));
+  }
+
+  // Use single MemoryTest scope to measure net difference from creation to destruction (Check for
+  // absolute zero leaks).
+  {
+    Memory::TestUtil::MemoryTest memory_test;
+    auto access_log_state = std::make_shared<AccessLogState>(logger_);
+
+    // 1. Add multiple items
+    for (int i = 0; i < NUM_ITEMS; ++i) {
+      access_log_state->addInflightGauge(names[i], std::cref(tags),
+                                         Stats::Gauge::ImportMode::Accumulate, 1, {});
+    }
+
+    // Verify it is within bounds (e.g., less than 384 bytes per entry including map overhead).
+    // Why 384 bytes?
+    // - Base slot size (GaugeKey 56B + InflightGauge 40B) = 96B.
+    // - absl::flat_hash_map load factor overhead can push average to about 110B.
+    // - Just after table doubling, it can peak to about 220B per item.
+    // - Tag view making owned adds around 16 to 32B per item.
+    // - Total peak estimate about 252B. 384 gives a generous 1.5x buffer for allocator page
+    // alignment.
+    EXPECT_MEMORY_LE(memory_test.consumedBytes(), NUM_ITEMS * 384);
+
+    // 2. Remove all items
+    for (int i = 0; i < NUM_ITEMS; ++i) {
+      access_log_state->removeInflightGauge(names[i], std::cref(tags),
+                                            Stats::Gauge::ImportMode::Accumulate, 1);
+    }
+
+    // absl::flat_hash_map is designed to not release its slots after removing entries,
+    // which is why we check for such a big memory usage here (approximately 1.6 Megabytes for
+    // 10,000 items). We set a threshold of 2 Megabytes here to account for this capacity and
+    // allocator page alignment.
+    EXPECT_LE(static_cast<int64_t>(memory_test.consumedBytes()), 2097152);
+
+    // Destroy the object! This must release the map capacity.
+    access_log_state.reset();
+
+    // After destruction, there should be no leaks. We allow 4096 bytes for allocator caches.
+    // We use EXPECT_LE directly here to bypass the strict EXPECT_GT constraint of EXPECT_MEMORY_LE.
+    EXPECT_LE(memory_test.consumedBytes(), 4096);
+  }
 }
 
 } // namespace StatsAccessLog

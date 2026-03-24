@@ -30,7 +30,7 @@ public:
 } // namespace
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_StatsAccessLogAddSubtractGauge(benchmark::State& state) {
+static void BM_StatsAccessLogAddSubtractGaugeWithTags(benchmark::State& state) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   NiceMock<Stats::MockStore> store;
   Stats::StatNamePool pool(store.symbolTable());
@@ -51,6 +51,9 @@ static void BM_StatsAccessLogAddSubtractGauge(benchmark::State& state) {
 
   Stats::StatName stat_name = pool.add("test_gauge");
   Stats::StatNameTagVector tags;
+  tags.emplace_back(pool.add("tag_key_1"), pool.add("tag_value_1"));
+  tags.emplace_back(pool.add("tag_key_2"), pool.add("tag_value_2"));
+  tags.emplace_back(pool.add("tag_key_3"), pool.add("tag_value_3"));
 
   for (auto _ : state) { // NOLINT
     access_log_state->addInflightGauge(stat_name, tags, Stats::Gauge::ImportMode::Accumulate, 1,
@@ -58,7 +61,7 @@ static void BM_StatsAccessLogAddSubtractGauge(benchmark::State& state) {
     access_log_state->removeInflightGauge(stat_name, tags, Stats::Gauge::ImportMode::Accumulate, 1);
   }
 }
-BENCHMARK(BM_StatsAccessLogAddSubtractGauge);
+BENCHMARK(BM_StatsAccessLogAddSubtractGaugeWithTags);
 
 } // namespace StatsAccessLog
 } // namespace AccessLoggers
