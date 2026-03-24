@@ -6165,6 +6165,32 @@ bool envoy_dynamic_module_callback_access_logger_get_header_value(
 // ------------------ Access Logger Callbacks - Stream Info Basic --------------
 
 /**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_int with
+ * envoy_dynamic_module_type_attribute_id_ResponseCode instead.
+ *
+ * Get the HTTP response code.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the HTTP response code, or 0 if not available.
+ */
+uint32_t envoy_dynamic_module_callback_access_logger_get_response_code(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ResponseCodeDetails instead.
+ *
+ * Get the response code details string.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if details are available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_response_code_details(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
  * Check if a specific response flag is set.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
@@ -6183,6 +6209,20 @@ bool envoy_dynamic_module_callback_access_logger_has_response_flag(
  */
 uint64_t envoy_dynamic_module_callback_access_logger_get_response_flags(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_RequestProtocol instead.
+ *
+ * Get the protocol (HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/3).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer for the protocol string.
+ * @return true if protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_protocol(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
  * Get timing information from StreamInfo.
@@ -6216,6 +6256,60 @@ void envoy_dynamic_module_callback_access_logger_get_bytes_info(
  */
 bool envoy_dynamic_module_callback_access_logger_is_health_check(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_XdsRouteName instead.
+ *
+ * Get the route name.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if route name is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_route_name(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_XdsVirtualHostName instead.
+ *
+ * Get the virtual cluster name.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if virtual cluster name is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_int with
+ * envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount instead.
+ *
+ * Get the upstream request attempt count.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the attempt count, or 0 if not available.
+ */
+uint32_t envoy_dynamic_module_callback_access_logger_get_attempt_count(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionTerminationDetails instead.
+ *
+ * Get the connection termination details.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if termination details are available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_connection_termination_details(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
 
 // -----------------Access Logger Callbacks - Address Information---------------
 
@@ -6316,6 +6410,20 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_host(
     envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_UpstreamTransportFailureReason instead.
+ *
+ * Get the upstream transport failure reason.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if failure reason is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
  * Get the upstream connection ID.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
@@ -6348,6 +6456,34 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_session_id(
     envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_UpstreamTlsVersion instead.
+ *
+ * Get the upstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if TLS version is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_version(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_UpstreamSubjectPeerCertificate instead.
+ *
+ * Get the upstream peer certificate subject.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
  * Get the upstream peer certificate issuer.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
@@ -6355,6 +6491,34 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_session_id(
  * @return true if issuer is available, false otherwise.
  */
 bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_issuer(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_UpstreamSubjectLocalCertificate instead.
+ *
+ * Get the upstream local certificate subject (Envoy's own certificate for the upstream connection).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateDigest instead.
+ *
+ * Get the upstream peer certificate SHA256 fingerprint.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if fingerprint is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_digest(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
 
@@ -6463,6 +6627,86 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san(
 // ------------------ Access Logger Callbacks - Connection/TLS Info ------------
 
 /**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_int with
+ * envoy_dynamic_module_type_attribute_id_ConnectionId instead.
+ *
+ * Get the connection ID.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the connection ID, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_connection_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_bool with
+ * envoy_dynamic_module_type_attribute_id_ConnectionMtls instead.
+ *
+ * Check if mTLS was used.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if mTLS was used, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_is_mtls(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName instead.
+ *
+ * Get the requested server name (SNI).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if SNI is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_requested_server_name(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion instead.
+ *
+ * Get the downstream TLS version.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if TLS version is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificate instead.
+ *
+ * Get the downstream peer certificate subject.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest instead.
+ *
+ * Get the downstream peer certificate SHA256 fingerprint.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if fingerprint is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
  * Get the downstream TLS cipher suite. The buffer uses thread-local storage and is valid until the
  * next call to this function or `get_upstream_tls_cipher` on the same thread.
  *
@@ -6515,6 +6759,20 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_serial(
  * @return true if fingerprint is available, false otherwise.
  */
 bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_fingerprint_1(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate instead.
+ *
+ * Get the downstream local certificate subject (Envoy's own certificate).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_subject(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
 
@@ -6667,6 +6925,20 @@ bool envoy_dynamic_module_callback_access_logger_get_filter_state(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_RequestId instead.
+ *
+ * Get the request ID (x-request-id header value or generated).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if request ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_request_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
  * Get the local reply body (if this was a local response).
  *
  * @param logger_envoy_ptr is the pointer to the log context.
@@ -6733,6 +7005,20 @@ bool envoy_dynamic_module_callback_access_logger_get_ja3_hash(
  * @return true if the `JA4` hash is available, false otherwise.
  */
 bool envoy_dynamic_module_callback_access_logger_get_ja4_hash(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReason instead.
+ *
+ * Get the downstream transport failure reason.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer where the failure reason string will be stored.
+ * @return true if the failure reason is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_transport_failure_reason(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
 
