@@ -12,6 +12,11 @@ bug_fixes:
   change: |
     Fixed segfault from timer thread-safety violation, a ring buffer overflow and alpha calculation in
     peak_ewma loadbalancer.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module filter may result in a incomplete body being sent to upstream
+    or downstream when some filters before or after the dynamic module filter in the chain
+    buffered the body and the dynamic module filter did not.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
