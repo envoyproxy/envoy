@@ -193,7 +193,6 @@ private:
   const Stats::StatName no_hit_;
   const Stats::StatName total_;
   const Stats::StatName unknown_tag_;
-  absl::flat_hash_map<std::string, Stats::StatName> tag_hit_counters_;
   const Http::LowerCaseString
       ip_tag_header_; // An empty string indicates that no ip_tag_header is set.
   const HeaderAction ip_tag_header_action_;
