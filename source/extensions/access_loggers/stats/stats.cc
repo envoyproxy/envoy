@@ -17,81 +17,6 @@ namespace {
 
 using Extensions::Matching::Actions::TransformStat::ActionContext;
 
-class AccessLogState : public StreamInfo::FilterState::Object {
-public:
-  AccessLogState(std::shared_ptr<const StatsAccessLog> parent) : parent_(std::move(parent)) {}
-
-  ~AccessLogState() override {
-    for (const std::pair<const GaugeKey, InflightGauge>& p : inflight_gauges_) {
-      Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
-          p.first.statName(), p.first.tags(), p.first.importMode());
-      gauge_stat.sub(p.second.value_);
-    }
-  }
-
-  // Adds an incremental value to an existing gauge, or creates it if that gauge doesn't exist.
-  // Zero values are ignored.
-  void addInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
-                        Stats::Gauge::ImportMode import_mode, uint64_t value,
-                        std::vector<Stats::StatNameDynamicStorage> tags_storage) {
-    if (value == 0) {
-      return;
-    }
-
-    GaugeKey key{stat_name, import_mode, tags};
-
-    auto it = inflight_gauges_.find(key);
-    if (it == inflight_gauges_.end()) {
-      key.makeOwned();
-      auto [new_it, inserted] =
-          inflight_gauges_.emplace(std::move(key), InflightGauge{std::move(tags_storage), 0});
-      it = new_it;
-    }
-    it->second.value_ += value;
-    parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
-  }
-
-  // Removes an amount from an existing gauge, allowing the gauge to be evicted if the value reaches
-  // 0.
-  void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
-                           Stats::Gauge::ImportMode import_mode, uint64_t value) {
-    if (value == 0) {
-      return;
-    }
-
-    GaugeKey key{stat_name, import_mode, tags};
-
-    // Create the gauge so it gets registered in the stat store (expected by some tests and stats
-    // logic)
-    Stats::Gauge& gauge_stat =
-        parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
-
-    auto it = inflight_gauges_.find(key);
-    if (it != inflight_gauges_.end()) {
-      ENVOY_BUG(it->second.value_ >= value, "Connection gauge underflow in removeInflightGauge");
-      it->second.value_ -= value;
-      gauge_stat.sub(value);
-      if (it->second.value_ == 0) {
-        inflight_gauges_.erase(it);
-      }
-    }
-  }
-
-  static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
-
-private:
-  // Hold a shared_ptr to the parent to ensure the parent and its members exist for the lifetime of
-  // AccessLogState.
-  std::shared_ptr<const StatsAccessLog> parent_;
-
-  struct InflightGauge {
-    std::vector<Stats::StatNameDynamicStorage> tags_storage_;
-    uint64_t value_;
-  };
-
-  absl::flat_hash_map<GaugeKey, InflightGauge> inflight_gauges_;
-};
-
 Formatter::FormatterProviderPtr
 parseValueFormat(absl::string_view format,
                  const std::vector<Formatter::CommandParserPtr>& commands) {
@@ -151,9 +76,60 @@ public:
 
 } // namespace
 
-GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mode,
-                   Stats::StatNameTagVectorOptConstRef borrowed_tags)
-    : stat_name_(stat_name), import_mode_(import_mode), borrowed_tags_(borrowed_tags) {}
+AccessLogState::~AccessLogState() {
+  for (const auto& p : inflight_gauges_) {
+    Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
+        p.first.statName(), p.first.tags(), p.second.import_mode_);
+    gauge_stat.sub(p.second.value_);
+  }
+}
+
+void AccessLogState::addInflightGauge(Stats::StatName stat_name,
+                                      Stats::StatNameTagVectorOptConstRef tags,
+                                      Stats::Gauge::ImportMode import_mode, uint64_t value,
+                                      std::vector<Stats::StatNameDynamicStorage> tags_storage) {
+  if (value == 0) {
+    return;
+  }
+
+  GaugeKey key{stat_name, tags};
+
+  auto it = inflight_gauges_.find(key);
+  if (it == inflight_gauges_.end()) {
+    key.makeOwned();
+    auto [new_it, inserted] = inflight_gauges_.emplace(
+        std::move(key), InflightGauge{std::move(tags_storage), 0, import_mode});
+    it = new_it;
+  }
+  it->second.value_ += value;
+  parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
+}
+
+void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
+                                         Stats::StatNameTagVectorOptConstRef tags,
+                                         Stats::Gauge::ImportMode import_mode, uint64_t value) {
+  if (value == 0) {
+    return;
+  }
+
+  GaugeKey key{stat_name, tags};
+
+  Stats::Gauge& gauge_stat =
+      parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+
+  auto it = inflight_gauges_.find(key);
+  if (it != inflight_gauges_.end()) {
+    ENVOY_BUG(it->second.value_ >= value, "Connection gauge underflow in removeInflightGauge");
+    it->second.value_ -= value;
+    gauge_stat.sub(value);
+    if (it->second.value_ == 0) {
+      inflight_gauges_.erase(it);
+    }
+  }
+}
+
+GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef borrowed_tags)
+    : stat_name_(stat_name), borrowed_tags_(borrowed_tags) {}
 
 void GaugeKey::makeOwned() {
   ASSERT(!(borrowed_tags_.has_value() && owned_tags_.has_value()),
@@ -172,7 +148,7 @@ Stats::StatNameTagVectorOptConstRef GaugeKey::tags() const {
 }
 
 bool GaugeKey::operator==(const GaugeKey& rhs) const {
-  if (stat_name_ != rhs.stat_name_ || import_mode_ != rhs.import_mode_) {
+  if (stat_name_ != rhs.stat_name_) {
     return false;
   }
   Stats::StatNameTagVectorOptConstRef lhs_tags = tags();

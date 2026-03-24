@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_package",
 )
 load(
@@ -42,4 +44,23 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "stats_speed_test",
+    srcs = ["stats_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "//source/extensions/access_loggers/stats:stats_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "stats_speed_test_benchmark_test",
+    benchmark_binary = "stats_speed_test",
 )

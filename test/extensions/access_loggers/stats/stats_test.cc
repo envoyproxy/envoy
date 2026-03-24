@@ -1200,20 +1200,17 @@ TEST(GaugeKeyTest, EqualityAndHashing) {
   Stats::StatName name1 = pool.add("name1");
   Stats::StatName name2 = pool.add("name2");
 
-  GaugeKey key1(name1, Stats::Gauge::ImportMode::Accumulate, absl::nullopt);
-  GaugeKey key2(name1, Stats::Gauge::ImportMode::Accumulate, absl::nullopt);
-  GaugeKey key3(name2, Stats::Gauge::ImportMode::Accumulate, absl::nullopt);
-  GaugeKey key4(name1, Stats::Gauge::ImportMode::NeverImport, absl::nullopt);
+  GaugeKey key1(name1, absl::nullopt);
+  GaugeKey key2(name1, absl::nullopt);
+  GaugeKey key3(name2, absl::nullopt);
 
   // Basic equality
   EXPECT_EQ(key1, key2);
   EXPECT_NE(key1, key3);
-  EXPECT_NE(key1, key4);
 
   // Hash equality
   EXPECT_EQ(absl::Hash<GaugeKey>{}(key1), absl::Hash<GaugeKey>{}(key2));
   EXPECT_NE(absl::Hash<GaugeKey>{}(key1), absl::Hash<GaugeKey>{}(key3));
-  EXPECT_NE(absl::Hash<GaugeKey>{}(key1), absl::Hash<GaugeKey>{}(key4));
 
   // Tags
   Stats::StatName tag_n1 = pool.add("tag_n1");
@@ -1223,9 +1220,9 @@ TEST(GaugeKeyTest, EqualityAndHashing) {
   Stats::StatNameTagVector tags1 = {{tag_n1, tag_v1}};
   Stats::StatNameTagVector tags2 = {{tag_n1, tag_v2}};
 
-  GaugeKey key_tags1(name1, Stats::Gauge::ImportMode::Accumulate, std::cref(tags1));
-  GaugeKey key_tags2(name1, Stats::Gauge::ImportMode::Accumulate, std::cref(tags1));
-  GaugeKey key_tags3(name1, Stats::Gauge::ImportMode::Accumulate, std::cref(tags2));
+  GaugeKey key_tags1(name1, std::cref(tags1));
+  GaugeKey key_tags2(name1, std::cref(tags1));
+  GaugeKey key_tags3(name1, std::cref(tags2));
 
   EXPECT_EQ(key_tags1, key_tags2);
   EXPECT_NE(key_tags1, key_tags3);
@@ -1235,10 +1232,11 @@ TEST(GaugeKeyTest, EqualityAndHashing) {
   EXPECT_NE(absl::Hash<GaugeKey>{}(key_tags1), absl::Hash<GaugeKey>{}(key_tags3));
 
   // Borrowed vs Owned
-  GaugeKey key_owned(name1, Stats::Gauge::ImportMode::Accumulate, std::cref(tags1));
+  GaugeKey key_owned(name1, std::cref(tags1));
   key_owned.makeOwned();
 
-  EXPECT_EQ(key_tags1, key_owned); // Borrowed vs Owned should be equal if content is same
+  EXPECT_EQ(key_tags1, key_owned); // Borrowed vs Owned should be equal if content is same //
+                                   // Borrowed vs Owned should be equal if content is same
 }
 
 TEST(GaugeKeyTest, VerifyAbslHashCorrectness) {
@@ -1256,20 +1254,18 @@ TEST(GaugeKeyTest, VerifyAbslHashCorrectness) {
   Stats::StatNameTagVector tags1 = {{tag_n1, tag_v1}};
   Stats::StatNameTagVector tags2 = {{tag_n1, tag_v2}};
 
-  GaugeKey key_empty1(name1, Stats::Gauge::ImportMode::Accumulate, absl::nullopt);
-  GaugeKey key_empty2(name2, Stats::Gauge::ImportMode::Accumulate, absl::nullopt);
-  GaugeKey key_empty3(name1, Stats::Gauge::ImportMode::NeverImport, absl::nullopt);
+  GaugeKey key_empty1(name1, absl::nullopt);
+  GaugeKey key_empty2(name2, absl::nullopt);
 
-  GaugeKey key_borrowed(name1, Stats::Gauge::ImportMode::Accumulate, std::cref(tags1));
-  GaugeKey key_owned(name1, Stats::Gauge::ImportMode::Accumulate, std::cref(tags1));
+  GaugeKey key_borrowed(name1, std::cref(tags1));
+  GaugeKey key_owned(name1, std::cref(tags1));
   key_owned.makeOwned();
 
-  GaugeKey key_tags2(name1, Stats::Gauge::ImportMode::Accumulate, std::cref(tags2));
+  GaugeKey key_tags2(name1, std::cref(tags2));
 
   EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
       key_empty1,
       key_empty2,
-      key_empty3,
       key_borrowed,
       key_owned,
       key_tags2,

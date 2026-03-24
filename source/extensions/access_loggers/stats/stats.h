@@ -4,11 +4,14 @@
 #include "envoy/extensions/access_loggers/stats/v3/stats.pb.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/tag.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/matcher/matcher.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
 #include "source/extensions/matching/actions/transform_stat/transform_stat.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,15 +31,13 @@ namespace StatsAccessLog {
 // is explicitly called to allocate and copy the tags into `owned_tags_`.
 class GaugeKey {
 public:
-  GaugeKey(Stats::StatName stat_name, Stats::Gauge::ImportMode import_mode,
-           Stats::StatNameTagVectorOptConstRef borrowed_tags);
+  GaugeKey(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef borrowed_tags);
 
   void makeOwned();
 
   Stats::StatNameTagVectorOptConstRef tags() const;
 
   Stats::StatName statName() const { return stat_name_; }
-  Stats::Gauge::ImportMode importMode() const { return import_mode_; }
 
   bool operator==(const GaugeKey& rhs) const;
 
@@ -46,18 +47,17 @@ public:
     // that two equal keys produce the same hash regardless of their storage representation.
     Stats::StatNameTagVectorOptConstRef tags = key.tags();
     if (tags.has_value()) {
-      h = H::combine(std::move(h), key.stat_name_, key.import_mode_, true);
+      h = H::combine(std::move(h), key.stat_name_, true);
       for (const auto& tag : tags.value().get()) {
         h = H::combine(std::move(h), tag.first, tag.second);
       }
       return h;
     }
-    return H::combine(std::move(h), key.stat_name_, key.import_mode_, false);
+    return H::combine(std::move(h), key.stat_name_, false);
   }
 
 private:
   Stats::StatName stat_name_;
-  Stats::Gauge::ImportMode import_mode_;
   absl::optional<Stats::StatNameTagVector> owned_tags_;
   Stats::StatNameTagVectorOptConstRef borrowed_tags_{absl::nullopt};
 };
@@ -150,6 +150,39 @@ private:
   const std::vector<Histogram> histograms_;
   const std::vector<Counter> counters_;
   const std::vector<Gauge> gauges_;
+};
+
+class AccessLogState : public StreamInfo::FilterState::Object {
+public:
+  AccessLogState(std::shared_ptr<const StatsAccessLog> parent) : parent_(std::move(parent)) {}
+
+  ~AccessLogState() override;
+
+  // Adds an incremental value to an existing gauge, or creates it if that gauge doesn't exist.
+  // Zero values are ignored.
+  void addInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
+                        Stats::Gauge::ImportMode import_mode, uint64_t value,
+                        std::vector<Stats::StatNameDynamicStorage> tags_storage);
+
+  // Removes an amount from an existing gauge, allowing the gauge to be evicted if the value reaches
+  // 0.
+  void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
+                           Stats::Gauge::ImportMode import_mode, uint64_t value);
+
+  static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
+
+private:
+  // Hold a shared_ptr to the parent to ensure the parent and its members exist for the lifetime of
+  // AccessLogState.
+  std::shared_ptr<const StatsAccessLog> parent_;
+
+  struct InflightGauge {
+    std::vector<Stats::StatNameDynamicStorage> tags_storage_;
+    uint64_t value_;
+    Stats::Gauge::ImportMode import_mode_;
+  };
+
+  absl::flat_hash_map<GaugeKey, InflightGauge> inflight_gauges_;
 };
 
 } // namespace StatsAccessLog
