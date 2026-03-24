@@ -331,7 +331,10 @@ struct StreamInfoImpl : public StreamInfo {
     return *downstream_connection_info_provider_;
   }
 
-  const Router::VirtualHostConstSharedPtr& virtualHost() const override { return vhost_; }
+  OptRef<const Router::VirtualHost> virtualHost() const override {
+    return makeOptRefFromPtr<const Router::VirtualHost>(vhost_.get());
+  }
+  Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return vhost_; }
 
   Router::RouteConstSharedPtr route() const override { return route_; }
 
@@ -454,7 +457,7 @@ struct StreamInfoImpl : public StreamInfo {
                            other_response_flags.end());
     health_check_request_ = info.healthCheck();
     route_ = info.route();
-    vhost_ = info.virtualHost();
+    vhost_ = info.virtualHostSharedPtr();
     metadata_ = info.dynamicMetadata();
     filter_state_ = info.filterState();
     request_headers_ = request_headers;

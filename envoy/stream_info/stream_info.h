@@ -929,10 +929,15 @@ public:
   virtual Router::RouteConstSharedPtr route() const PURE;
 
   /**
-   * @return const Router::VirtualHostConstSharedPtr& Get the virtual host selected for this
-   * request.
+   * @return OptRef<const Router::VirtualHost> Get the virtual host selected for this request.
    */
-  virtual const Router::VirtualHostConstSharedPtr& virtualHost() const PURE;
+  virtual OptRef<const Router::VirtualHost> virtualHost() const PURE;
+
+  /**
+   * @return Router::VirtualHostConstSharedPtr Get the virtual host selected for this request,
+   * extended to allow a caller to extend or transfer ownership.
+   */
+  virtual Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this

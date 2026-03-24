@@ -151,7 +151,8 @@ public:
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
   MOCK_METHOD(const Network::ConnectionInfoProvider&, downstreamAddressProvider, (), (const));
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (), (const));
-  MOCK_METHOD(const Router::VirtualHostConstSharedPtr&, virtualHost, (), (const));
+  MOCK_METHOD(OptRef<const Router::VirtualHost>, virtualHost, (), (const));
+  MOCK_METHOD(Router::VirtualHostConstSharedPtr, virtualHostSharedPtr, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const Protobuf::Struct&));
