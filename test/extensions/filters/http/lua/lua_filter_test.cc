@@ -123,8 +123,8 @@ public:
 
     ON_CALL(*virtual_host, metadata()).WillByDefault(ReturnRef(virtual_host_metadata_));
 
-    ON_CALL(decoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
-    ON_CALL(encoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
+    decoder_callbacks_.stream_info_.virtual_host_ = virtual_host;
+    encoder_callbacks_.stream_info_.virtual_host_ = virtual_host;
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
     EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));

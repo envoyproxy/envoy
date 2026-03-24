@@ -2296,7 +2296,7 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
 void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
   Router::VirtualHostRoute vhost_route;
   if (route != nullptr) {
-    vhost_route.vhost = route->virtualHost();
+    vhost_route.vhost = route->virtualHostSharedPtr();
     vhost_route.route = std::move(route);
   }
   setVirtualHostRoute(std::move(vhost_route));

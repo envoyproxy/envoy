@@ -1,7 +1,7 @@
 #![allow(clippy::unnecessary_cast)]
 use crate::*;
 #[cfg(test)]
-use std::sync::atomic::{AtomicBool, AtomicUsize}; // These are used for testing, not for actual concurrency.
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize};
 
 #[test]
 fn test_loggers() {
@@ -3509,6 +3509,299 @@ fn test_lb_config_vec_metric_invalid_id() {
   assert!(mock_config
     .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
     .is_err());
+}
+
+// =============================================================================
+// CatchUnwind Tests
+// =============================================================================
+
+static SEND_RESPONSE_STATUS_CODE: AtomicU32 = AtomicU32::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_send_response(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  status_code: u32,
+  _headers_vector: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_vector_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  SEND_RESPONSE_STATUS_CODE.store(status_code, std::sync::atomic::Ordering::SeqCst);
+}
+
+static RESET_STREAM_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _reason: abi::envoy_dynamic_module_type_http_filter_stream_reset_reason,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_close(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  _close_type: abi::envoy_dynamic_module_type_network_connection_close_type,
+) {
+  NETWORK_CLOSE_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+static LISTENER_CLOSE_SOCKET_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_close_socket(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  LISTENER_CLOSE_SOCKET_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_catch_unwind_http_filter_panic() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  SEND_RESPONSE_STATUS_CODE.store(0, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+  assert_eq!(
+    SEND_RESPONSE_STATUS_CODE.load(std::sync::atomic::Ordering::SeqCst),
+    500,
+  );
+}
+
+#[test]
+fn test_catch_unwind_network_filter_panic() {
+  struct PanicFilter;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for PanicFilter {
+    fn on_read(
+      &mut self,
+      _envoy_filter: &mut ENF,
+      _data_length: usize,
+      _end_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      panic!("intentional panic in on_read");
+    }
+  }
+
+  NETWORK_CLOSE_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = network::EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = NetworkFilter::on_read(&mut wrapper, &mut envoy_filter, 0, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration,
+  );
+  assert!(NETWORK_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_listener_filter_panic() {
+  struct PanicFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for PanicFilter {
+    fn on_accept(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      panic!("intentional panic in on_accept");
+    }
+  }
+
+  LISTENER_CLOSE_SOCKET_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = listener::EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = ListenerFilter::on_accept(&mut wrapper, &mut envoy_filter);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration,
+  );
+  assert!(LISTENER_CLOSE_SOCKET_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_http_response_headers_panic() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_response_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+      panic!("intentional panic in on_response_headers");
+    }
+  }
+
+  RESET_STREAM_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_response_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration,
+  );
+  assert!(RESET_STREAM_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_network_on_write_panic() {
+  struct PanicFilter;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for PanicFilter {
+    fn on_write(
+      &mut self,
+      _envoy_filter: &mut ENF,
+      _data_length: usize,
+      _end_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      panic!("intentional panic in on_write");
+    }
+  }
+
+  NETWORK_CLOSE_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = network::EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = NetworkFilter::on_write(&mut wrapper, &mut envoy_filter, 0, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration,
+  );
+  assert!(NETWORK_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_listener_on_data_panic() {
+  struct PanicFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for PanicFilter {
+    fn on_data(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      panic!("intentional panic in on_data");
+    }
+  }
+
+  LISTENER_CLOSE_SOCKET_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = listener::EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = ListenerFilter::on_data(&mut wrapper, &mut envoy_filter);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration,
+  );
+  assert!(LISTENER_CLOSE_SOCKET_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_http_callout_done_after_poison_is_skipped() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    HttpFilter::on_http_callout_done(
+      &mut wrapper,
+      &mut envoy_filter,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      None,
+      None,
+    );
+  }));
+  assert!(
+    result.is_ok(),
+    "late on_http_callout_done should be skipped after CatchUnwind is poisoned",
+  );
+}
+
+#[test]
+fn test_catch_unwind_http_scheduled_after_poison_is_skipped() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
+  }));
+  assert!(
+    result.is_ok(),
+    "late on_scheduled should be skipped after CatchUnwind is poisoned",
+  );
 }
 
 // =============================================================================
