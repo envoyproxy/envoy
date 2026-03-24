@@ -60,8 +60,9 @@ struct CollectorInfo {
 
   bool shared_span_context_{DEFAULT_SHARED_SPAN_CONTEXT};
 
-  // Applicator for custom headers from HttpService request_headers_to_add.
-  // Only set when using HttpService configuration.
+  // Additional custom headers to include in requests to the Zipkin collector.
+  // Only available when using HttpService configuration via request_headers_to_add.
+  // Legacy configuration does not support custom headers.
   std::unique_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator_;
 };
 
