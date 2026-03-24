@@ -268,6 +268,11 @@ bug_fixes:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module filter may result in a incomplete body being sent to upstream
+    or downstream when some filters before or after the dynamic module filter in the chain
+    buffered the body and the dynamic module filter did not.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -384,6 +389,12 @@ new_features:
     endpoint now supports `native histograms <https://prometheus.io/docs/specs/native_histograms>`_
     when using the prometheus protobuf exposition format, using query
     ``/stats/prometheus?histogram_buckets=prometheusnative``.
+- area: stats
+  change: |
+    Added support for cluster-level stats matcher, allowing more granular control over which stats
+    are enabled and reported at the cluster level. This the stats matcher could be configured via
+    the xDS API dynamically on a per-cluster basis.
+    See :ref:`envoy.stats_matcher <well_known_metadata_envoy_stats_matcher>` for more details.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
@@ -630,6 +641,10 @@ new_features:
   change: |
     Added admin handler API to the bootstrap extension dynamic modules ABI, enabling modules to
     register custom admin HTTP endpoints.
+- area: formatter
+  change: |
+    Added ``SPAN_ID`` :ref:`access log formatter <config_access_log_format>` to log the span ID of
+    the active (downstream) span for a request, complementing the existing ``TRACE_ID`` formatter.
 - area: formatter
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
