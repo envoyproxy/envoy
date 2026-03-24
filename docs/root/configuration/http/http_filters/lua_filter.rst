@@ -1510,7 +1510,7 @@ Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``"
 peer certificate, or no issuer.
 
 ``sha256PeerCertificateIssuerDigest()``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1524,7 +1524,7 @@ been successfully validated (e.g., mTLS with ``require_client_certificate: true`
 issuer certificate can be found.
 
 ``serialNumberPeerCertificateIssuer()``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
