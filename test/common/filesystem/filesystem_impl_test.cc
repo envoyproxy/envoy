@@ -230,6 +230,23 @@ TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_TRUE(file_system_.illegalPath("/dev/"));
   // Exception to allow opening from file descriptors. See #7258.
   EXPECT_FALSE(file_system_.illegalPath("/dev/fd/0"));
+
+  if (file_system_.directoryExists("/dev/shm")) {
+    // Exception for /dev/shm/*
+    EXPECT_FALSE(file_system_.illegalPath("/dev/shm/"));
+    EXPECT_FALSE(file_system_.illegalPath("/dev/shm"));
+    EXPECT_TRUE(file_system_.illegalPath("/dev/shm/_some_non_existent_file"));
+    // This is not the same special case as /dev/fd; paths will actually need to exist here to be
+    // considered valid.
+    std::string shmTempFile = "/dev/shm/envoy_test_XXXXXX";
+    auto fd = mkstemp(shmTempFile.data());
+    ASSERT_NE(fd, -1);
+    auto res = file_system_.illegalPath(shmTempFile);
+    close(fd);
+    unlink(shmTempFile.c_str());
+    EXPECT_FALSE(res);
+  }
+
   EXPECT_TRUE(file_system_.illegalPath("/proc"));
   EXPECT_TRUE(file_system_.illegalPath("/proc/"));
   EXPECT_TRUE(file_system_.illegalPath("/sys"));
