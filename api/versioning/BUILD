@@ -123,6 +123,7 @@ proto_library(
         "//envoy/extensions/filters/http/admission_control/v3:pkg",
         "//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg",
         "//envoy/extensions/filters/http/api_key_auth/v3:pkg",
+        "//envoy/extensions/filters/http/aws_eventstream_to_metadata/v3:pkg",
         "//envoy/extensions/filters/http/aws_lambda/v3:pkg",
         "//envoy/extensions/filters/http/aws_request_signing/v3:pkg",
         "//envoy/extensions/filters/http/bandwidth_limit/v3:pkg",
