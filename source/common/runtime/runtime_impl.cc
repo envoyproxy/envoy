@@ -564,7 +564,7 @@ absl::Status RtdsSubscription::createSubscription() {
   const auto resource_name = resource_type_helper_.getResourceName();
   auto subscription_or_error = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this,
-      resource_type_helper_.resource_decoder_, {});
+      resource_type_helper_.resourceDecoder(), {});
   RETURN_IF_NOT_OK(subscription_or_error.status());
   subscription_ = std::move(*subscription_or_error);
   return absl::OkStatus();

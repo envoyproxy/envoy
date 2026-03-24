@@ -68,7 +68,7 @@ private:
   Stats::ScopeSharedPtr scope_;
   StartStatus status_{StartStatus::NotStarted};
   absl::flat_hash_set<std::string> awaiting_names_;
-  Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
+  const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
   Config::SubscriptionPtr subscription_;
 };
 

@@ -80,7 +80,9 @@ private:
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;
-  Envoy::Config::ResourceTypeHelper<envoy::config::route::v3::VirtualHost> resource_type_helper_;
+  const Envoy::Config::ResourceTypeHelper<envoy::config::route::v3::VirtualHost>
+      resource_type_helper_;
+
   Rds::RouteConfigProvider* route_config_provider_;
 };
 

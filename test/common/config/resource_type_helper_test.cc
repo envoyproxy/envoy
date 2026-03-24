@@ -15,7 +15,7 @@ TEST(ResourceTypeHelperTest, GetResourceName) {
   ProtobufMessage::NullValidationVisitorImpl validation_visitor;
   ResourceTypeHelper<envoy::config::cluster::v3::Cluster> helper(validation_visitor, "name");
   EXPECT_EQ("envoy.config.cluster.v3.Cluster", helper.getResourceName());
-  EXPECT_NE(nullptr, helper.resource_decoder_);
+  EXPECT_NE(nullptr, helper.resourceDecoder());
 }
 
 } // namespace

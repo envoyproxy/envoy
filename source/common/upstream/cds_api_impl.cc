@@ -38,11 +38,11 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
   if (cds_resources_locator == nullptr) {
     subscription_or_error = cm_.subscriptionFactory().subscriptionFromConfigSource(
         cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
-        resource_type_helper_.resource_decoder_, {});
+        resource_type_helper_.resourceDecoder(), {});
   } else {
     subscription_or_error = cm.subscriptionFactory().collectionSubscriptionFromUrl(
         *cds_resources_locator, cds_config, resource_name, *scope_, *this,
-        resource_type_helper_.resource_decoder_);
+        resource_type_helper_.resourceDecoder());
   }
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);

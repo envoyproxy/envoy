@@ -49,7 +49,7 @@ private:
   std::string system_version_info_;
   ListenerManager& listener_manager_;
   Stats::ScopeSharedPtr scope_;
-  Config::ResourceTypeHelper<envoy::config::listener::v3::Listener> resource_type_helper_;
+  const Config::ResourceTypeHelper<envoy::config::listener::v3::Listener> resource_type_helper_;
   Config::XdsManager& xds_manager_;
   Init::TargetImpl init_target_;
 };

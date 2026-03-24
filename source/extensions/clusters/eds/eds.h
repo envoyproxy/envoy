@@ -103,7 +103,7 @@ private:
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment_;
   };
 
-  Config::ResourceTypeHelper<envoy::config::endpoint::v3::ClusterLoadAssignment>
+  const Config::ResourceTypeHelper<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_type_helper_;
   Config::SubscriptionPtr subscription_;
   const LocalInfo::LocalInfo& local_info_;

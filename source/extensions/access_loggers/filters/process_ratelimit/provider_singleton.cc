@@ -122,7 +122,7 @@ RateLimiterProviderSingleton::TokenBucketSubscription::TokenBucketSubscription(
       THROW_OR_RETURN_VALUE(parent.factory_context_.xdsManager().subscribeToSingletonResource(
                                 resource_name, parent.config_source_,
                                 Grpc::Common::typeUrl(resource_type_helper_.getResourceName()),
-                                *parent.scope_, *this, resource_type_helper_.resource_decoder_, {}),
+                                *parent.scope_, *this, resource_type_helper_.resourceDecoder(), {}),
                             Config::SubscriptionPtr);
   subscription_->start({resource_name_});
 }

@@ -150,7 +150,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     subscription_ = THROW_OR_RETURN_VALUE(
         factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
             scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
-            *this, resource_type_helper_.resource_decoder_, {}),
+            *this, resource_type_helper_.resourceDecoder(), {}),
         Envoy::Config::SubscriptionPtr);
   } else {
     const auto srds_resources_locator = THROW_OR_RETURN_VALUE(
@@ -159,7 +159,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     subscription_ = THROW_OR_RETURN_VALUE(
         factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
             srds_resources_locator, scoped_rds.scoped_rds_config_source(), resource_name, *scope_,
-            *this, resource_type_helper_.resource_decoder_),
+            *this, resource_type_helper_.resourceDecoder()),
         Envoy::Config::SubscriptionPtr);
   }
 

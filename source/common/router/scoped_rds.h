@@ -231,7 +231,7 @@ private:
   Stats::ScopeSharedPtr scope_;
   ScopedRdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
-  Envoy::Config::ResourceTypeHelper<envoy::config::route::v3::ScopedRouteConfiguration>
+  const Envoy::Config::ResourceTypeHelper<envoy::config::route::v3::ScopedRouteConfiguration>
       resource_type_helper_;
   const envoy::config::core::v3::ConfigSource rds_config_source_;
   const std::string stat_prefix_;

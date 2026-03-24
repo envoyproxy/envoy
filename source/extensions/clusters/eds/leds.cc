@@ -30,7 +30,7 @@ LedsSubscription::LedsSubscription(
                                 .subscriptionFactory()
                                 .collectionSubscriptionFromUrl(
                                     leds_resource_locator, leds_config.leds_config(), resource_name,
-                                    *stats_scope_, *this, resource_type_helper_.resource_decoder_),
+                                    *stats_scope_, *this, resource_type_helper_.resourceDecoder()),
                             Config::SubscriptionPtr);
   subscription_->start({});
 }

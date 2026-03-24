@@ -39,11 +39,11 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
   if (!odcds_resources_locator.has_value()) {
     subscription_or_error = cm.subscriptionFactory().subscriptionFromConfigSource(
         odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
-        resource_type_helper_.resource_decoder_, {});
+        resource_type_helper_.resourceDecoder(), {});
   } else {
     subscription_or_error = cm.subscriptionFactory().collectionSubscriptionFromUrl(
         *odcds_resources_locator, odcds_config, resource_name, *scope_, *this,
-        resource_type_helper_.resource_decoder_);
+        resource_type_helper_.resourceDecoder());
   }
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
@@ -215,7 +215,7 @@ private:
                   ? makeOptRef<const envoy::config::core::v3::ConfigSource>(staticAdsConfigSource())
                   : absl::nullopt,
               Grpc::Common::typeUrl(resource_type), *parent_.scope_, *this,
-              resource_type_helper_.resource_decoder_, {});
+              resource_type_helper_.resourceDecoder(), {});
       RETURN_IF_NOT_OK_REF(subscription_or_error.status());
       subscription_ = std::move(subscription_or_error.value());
       subscription_->start({resource_name_});
@@ -280,7 +280,7 @@ private:
     // TODO(adisuissa): this can be converted to an absl::string_view and point to the
     // subscriptions_ map key.
     const std::string resource_name_;
-    Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
+    const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
     Config::SubscriptionPtr subscription_;
     bool resource_was_updated_{false};
   };

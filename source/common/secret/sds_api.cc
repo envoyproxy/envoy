@@ -34,7 +34,7 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
   subscription_ =
       THROW_OR_RETURN_VALUE(subscription_factory_.subscriptionFromConfigSource(
                                 sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this,
-                                resource_type_helper_.resource_decoder_, {}),
+                                resource_type_helper_.resourceDecoder(), {}),
                             Config::SubscriptionPtr);
 }
 

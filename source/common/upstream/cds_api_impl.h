@@ -65,7 +65,7 @@ private:
   void runInitializeCallbackIfAny();
 
   CdsApiHelper helper_;
-  Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
+  const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
   ClusterManager& cm_;
   Stats::ScopeSharedPtr scope_;
   Server::Configuration::ServerFactoryContext& factory_context_;

@@ -482,7 +482,9 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;
-  Config::ResourceTypeHelper<envoy::config::core::v3::TypedExtensionConfig> resource_type_helper_;
+  const Config::ResourceTypeHelper<envoy::config::core::v3::TypedExtensionConfig>
+      resource_type_helper_;
+
   bool started_{false};
 
   Stats::ScopeSharedPtr scope_;

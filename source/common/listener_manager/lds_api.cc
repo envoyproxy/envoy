@@ -34,13 +34,13 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
     subscription_ =
         THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
                                   lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
-                                  resource_type_helper_.resource_decoder_, {}),
+                                  resource_type_helper_.resourceDecoder(), {}),
                               Config::SubscriptionPtr);
   } else {
     subscription_ =
         THROW_OR_RETURN_VALUE(cm.subscriptionFactory().collectionSubscriptionFromUrl(
                                   *lds_resources_locator, lds_config, resource_name, *scope_, *this,
-                                  resource_type_helper_.resource_decoder_),
+                                  resource_type_helper_.resourceDecoder()),
                               Config::SubscriptionPtr);
   }
   init_manager.add(init_target_);

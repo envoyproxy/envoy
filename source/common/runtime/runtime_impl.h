@@ -200,7 +200,7 @@ struct RtdsSubscription : public Config::SubscriptionCallbacks,
   Config::SubscriptionPtr subscription_;
   std::string resource_name_;
   Init::TargetImpl init_target_;
-  Config::ResourceTypeHelper<envoy::service::runtime::v3::Runtime> resource_type_helper_;
+  const Config::ResourceTypeHelper<envoy::service::runtime::v3::Runtime> resource_type_helper_;
   Protobuf::Struct proto_;
 };
 

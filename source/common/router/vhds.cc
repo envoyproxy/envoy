@@ -86,7 +86,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->protobufConfigurationCast().vhds().config_source(),
           Grpc::Common::typeUrl(resource_name), *scope_, *this,
-          resource_type_helper_.resource_decoder_, options);
+          resource_type_helper_.resourceDecoder(), options);
   SET_AND_RETURN_IF_NOT_OK(status_or.status(), status);
   subscription_ = std::move(status_or.value());
 }

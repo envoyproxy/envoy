@@ -75,7 +75,7 @@ private:
   const UpdateCb callback_;
   // Once the endpoints of the locality are updated, it is considered active.
   bool initial_update_attempt_complete_{false};
-  Config::ResourceTypeHelper<envoy::config::endpoint::v3::LbEndpoint> resource_type_helper_;
+  const Config::ResourceTypeHelper<envoy::config::endpoint::v3::LbEndpoint> resource_type_helper_;
   Config::SubscriptionPtr subscription_;
 };
 

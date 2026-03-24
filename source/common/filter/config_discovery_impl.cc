@@ -94,7 +94,7 @@ FilterConfigSubscription::FilterConfigSubscription(
   const auto resource_name = resource_type_helper_.getResourceName();
   auto subscription_or_error = cluster_manager.subscriptionFactory().subscriptionFromConfigSource(
       config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this,
-      resource_type_helper_.resource_decoder_, {});
+      resource_type_helper_.resourceDecoder(), {});
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
 }

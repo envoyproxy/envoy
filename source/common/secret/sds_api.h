@@ -107,7 +107,7 @@ private:
 
   Stats::ScopeSharedPtr scope_;
   SdsApiStats sds_api_stats_;
-  Config::ResourceTypeHelper<envoy::extensions::transport_sockets::tls::v3::Secret>
+  const Config::ResourceTypeHelper<envoy::extensions::transport_sockets::tls::v3::Secret>
       resource_type_helper_;
 
   const envoy::config::core::v3::ConfigSource sds_config_;

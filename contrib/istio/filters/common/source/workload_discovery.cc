@@ -147,7 +147,7 @@ private:
               .subscriptionFromConfigSource(
                   parent.config_source_,
                   Grpc::Common::typeUrl(resource_type_helper_.getResourceName()), *parent.scope_,
-                  *this, resource_type_helper_.resource_decoder_, {}),
+                  *this, resource_type_helper_.resourceDecoder(), {}),
           Config::SubscriptionPtr);
     }
     void start() { subscription_->start({}); }
@@ -196,7 +196,7 @@ private:
       // TODO: Potential issue with the expiration of the metadata.
     }
     WorkloadMetadataProviderImpl& parent_;
-    Config::ResourceTypeHelper<istio::workload::Workload> resource_type_helper_;
+    const Config::ResourceTypeHelper<istio::workload::Workload> resource_type_helper_;
     Config::SubscriptionPtr subscription_;
   };
 

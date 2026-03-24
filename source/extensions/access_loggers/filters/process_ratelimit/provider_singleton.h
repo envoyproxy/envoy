@@ -159,7 +159,7 @@ public:
     absl::flat_hash_map<intptr_t, SetRateLimiterCb> setters_;
     absl::optional<envoy::type::v3::TokenBucket> config_;
     std::weak_ptr<LocalRateLimiterImpl> limiter_;
-    Config::ResourceTypeHelper<envoy::type::v3::TokenBucket> resource_type_helper_;
+    const Config::ResourceTypeHelper<envoy::type::v3::TokenBucket> resource_type_helper_;
     size_t token_bucket_config_hash_;
   };
 
