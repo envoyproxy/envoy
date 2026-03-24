@@ -816,10 +816,10 @@ TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithSessionTicketSuppo
   envoy_quic_dispatcher_.Shutdown();
 }
 
-// Same handshake test with the GetCertChains QUICHE flag disabled to exercise the
-// old GetCertChain code path in QUICHE's DefaultProofSourceHandle::SelectCertificate.
-// The default flag value is true, so the existing test covers the GetCertChains path.
-TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithOldCertChainAPI) {
+// Exercises the GetCertChain (singular) cert selection path by disabling the
+// quic_use_proof_source_get_cert_chains flag. The other test covers the
+// GetCertChains (plural) path which is the default.
+TEST_P(EnvoyQuicDispatcherWithSessionTicketTest, HandshakeWithGetCertChainPath) {
   SetQuicReloadableFlag(quic_use_proof_source_get_cert_chains, false);
 
   loadCerts();
