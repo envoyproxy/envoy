@@ -2241,6 +2241,254 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateSerializeMethods) {
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
+// --- HEX_STRING value_format tests ---
+
+TEST_P(ProxyProtocolTest, V2TlvBinaryValuePreservedWithHexString) {
+  // Simulates GCP PSC pscConnectionId: 8-byte big-endian uint64 in TLV type 0xE0.
+  // pscConnectionId = 49477946121388034 = 0x00afc7ee0ac80002
+  // Bytes 0xaf, 0xc7, 0xee, 0xc8 are all > 0x7F and would be corrupted by UTF-8 sanitization.
+  // PP2 header: ipv4/tcp, 12 bytes addr + 11 bytes TLV extension = 23 bytes payload
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x17, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // TLV type 0xE0, length 8, value = 0x00afc7ee0ac80002
+  constexpr uint8_t tlv_gcp[] = {0xe0, 0x00, 0x08, 0x00, 0xaf, 0xc7,
+                                 0xee, 0x0a, 0xc8, 0x00, 0x02};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0xE0);
+  rule->mutable_on_tlv_present()->set_key("psc_conn_id");
+  rule->mutable_on_tlv_present()->set_value_format(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::HEX_STRING);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv_gcp, sizeof(tlv_gcp));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  // Verify dynamic metadata contains hex-encoded value, not corrupted bytes.
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.count("envoy.filters.listener.proxy_protocol"));
+  auto fields = metadata.at("envoy.filters.listener.proxy_protocol").fields();
+  EXPECT_EQ(1, fields.size());
+  EXPECT_EQ("00afc7ee0ac80002", fields.at("psc_conn_id").string_value());
+
+  // Typed metadata should still contain the raw bytes (unchanged behavior).
+  auto typed_metadata = server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata();
+  EXPECT_EQ(1, typed_metadata.count("envoy.filters.listener.proxy_protocol"));
+  envoy::data::core::v3::TlvsMetadata tlvs_metadata;
+  auto status = MessageUtil::unpackTo(
+      typed_metadata["envoy.filters.listener.proxy_protocol"], tlvs_metadata);
+  EXPECT_EQ(absl::OkStatus(), status);
+  auto raw_bytes = (tlvs_metadata.typed_metadata()).at("psc_conn_id");
+  ASSERT_THAT(raw_bytes, ElementsAre(0x00, 0xaf, 0xc7, 0xee, 0x0a, 0xc8, 0x00, 0x02));
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2TlvAsciiValueBothFormats) {
+  // TLV value = "foo.com" (all bytes < 0x80) — test that both RAW_STRING and HEX_STRING
+  // produce expected output for pure ASCII values.
+  // PP2 header: ipv4/tcp, 12 bytes addr + 14+10 = 24 bytes TLV extensions = 36 bytes payload
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x24, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // TLV type 0x02, length 7, value = "foo.com"
+  constexpr uint8_t tlv_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                       0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  // TLV type 0x0f, length 7, value = "foo.com" (same bytes, different type)
+  constexpr uint8_t tlv_other[] = {0x0f, 0x00, 0x07, 0x66, 0x6f,
+                                   0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  // Padding TLV of type 0x00, length 1 to fill extension space
+  constexpr uint8_t tlv_pad[] = {0x00, 0x00, 0x01, 0xff};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  // Rule 1: RAW_STRING (default)
+  auto rule1 = proto_config.add_rules();
+  rule1->set_tlv_type(0x02);
+  rule1->mutable_on_tlv_present()->set_key("authority_raw");
+  // value_format defaults to RAW_STRING
+
+  // Rule 2: HEX_STRING
+  auto rule2 = proto_config.add_rules();
+  rule2->set_tlv_type(0x0f);
+  rule2->mutable_on_tlv_present()->set_key("authority_hex");
+  rule2->mutable_on_tlv_present()->set_value_format(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::HEX_STRING);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv_pad, sizeof(tlv_pad));
+  write(tlv_authority, sizeof(tlv_authority));
+  write(tlv_other, sizeof(tlv_other));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  auto fields = metadata.at("envoy.filters.listener.proxy_protocol").fields();
+  EXPECT_EQ(2, fields.size());
+  // RAW_STRING: ASCII value is stored as-is.
+  EXPECT_EQ("foo.com", fields.at("authority_raw").string_value());
+  // HEX_STRING: ASCII value is hex-encoded.
+  EXPECT_EQ("666f6f2e636f6d", fields.at("authority_hex").string_value());
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2TlvDefaultFormatIsRawStringBackwardsCompat) {
+  // Ensure that when value_format is not set, behavior is identical to the legacy RAW_STRING.
+  // Uses non-UTF-8 bytes to verify sanitization still happens.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x17, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // TLV type 0xE0, length 8, value = 0x00afc7ee0ac80002 (contains bytes > 0x7F)
+  constexpr uint8_t tlv_gcp[] = {0xe0, 0x00, 0x08, 0x00, 0xaf, 0xc7,
+                                 0xee, 0x0a, 0xc8, 0x00, 0x02};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0xE0);
+  rule->mutable_on_tlv_present()->set_key("psc_conn_id");
+  // Do NOT set value_format — should default to RAW_STRING
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv_gcp, sizeof(tlv_gcp));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  // Verify that with default RAW_STRING, non-UTF-8 bytes are still sanitized (replaced with 0x21).
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  auto fields = metadata.at("envoy.filters.listener.proxy_protocol").fields();
+  auto value = fields.at("psc_conn_id").string_value();
+  const char replacement = 0x21;
+  // 0x00 stays, 0xaf->!, 0xc7+0xee forms invalid UTF-8 sequence->!, 0x0a stays,
+  // 0xc8+0x00 forms invalid->!, 0x02 stays.
+  // The exact sanitization depends on MessageUtil::sanitizeUtf8String logic.
+  // Key assertion: the value should NOT be the correct hex "00afc7ee0ac80002".
+  EXPECT_NE("00afc7ee0ac80002", value);
+  // Verify at least one byte was replaced (the value contains '!' from sanitization).
+  EXPECT_TRUE(value.find(replacement) != std::string::npos);
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2TlvHexStringInFilterState) {
+  // Verify HEX_STRING works correctly when tlv_location = FILTER_STATE.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x17, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // TLV type 0xE0, length 8, value = 0x00afc7ee0ac80002
+  constexpr uint8_t tlv_gcp[] = {0xe0, 0x00, 0x08, 0x00, 0xaf, 0xc7,
+                                 0xee, 0x0a, 0xc8, 0x00, 0x02};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_tlv_location(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE);
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0xE0);
+  rule->mutable_on_tlv_present()->set_key("psc_conn_id");
+  rule->mutable_on_tlv_present()->set_value_format(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::HEX_STRING);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv_gcp, sizeof(tlv_gcp));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  // Verify filter state contains hex-encoded value.
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";
+  EXPECT_TRUE(filter_state->hasDataWithName(kFilterStateKey));
+  const auto* tlv_obj = filter_state->getDataReadOnlyGeneric(kFilterStateKey);
+  ASSERT_NE(nullptr, tlv_obj);
+
+  auto field = tlv_obj->getField("psc_conn_id");
+  ASSERT_TRUE(absl::holds_alternative<absl::string_view>(field));
+  EXPECT_EQ("00afc7ee0ac80002", absl::get<absl::string_view>(field));
+
+  // Verify dynamic metadata is NOT populated when FILTER_STATE is used.
+  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2TlvHexStringEdgeCases) {
+  // Edge cases: all-zero bytes, all-0xFF bytes, and empty TLV.
+  // PP2 header: ipv4/tcp, 12 bytes addr + (11+11+3) = 37 bytes TLV extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x25, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // TLV type 0xE0, length 8, value = all zeros
+  constexpr uint8_t tlv_zeros[] = {0xe0, 0x00, 0x08, 0x00, 0x00, 0x00,
+                                   0x00, 0x00, 0x00, 0x00, 0x00};
+  // TLV type 0xE1, length 8, value = all 0xFF
+  constexpr uint8_t tlv_ffs[] = {0xe1, 0x00, 0x08, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff};
+  // TLV type 0xE2, length 0, value = empty
+  constexpr uint8_t tlv_empty[] = {0xe2, 0x00, 0x00};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule1 = proto_config.add_rules();
+  rule1->set_tlv_type(0xE0);
+  rule1->mutable_on_tlv_present()->set_key("all_zeros");
+  rule1->mutable_on_tlv_present()->set_value_format(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::HEX_STRING);
+
+  auto rule2 = proto_config.add_rules();
+  rule2->set_tlv_type(0xE1);
+  rule2->mutable_on_tlv_present()->set_key("all_ffs");
+  rule2->mutable_on_tlv_present()->set_value_format(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::HEX_STRING);
+
+  auto rule3 = proto_config.add_rules();
+  rule3->set_tlv_type(0xE2);
+  rule3->mutable_on_tlv_present()->set_key("empty_val");
+  rule3->mutable_on_tlv_present()->set_value_format(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::HEX_STRING);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv_zeros, sizeof(tlv_zeros));
+  write(tlv_ffs, sizeof(tlv_ffs));
+  write(tlv_empty, sizeof(tlv_empty));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  auto fields = metadata.at("envoy.filters.listener.proxy_protocol").fields();
+  EXPECT_EQ(3, fields.size());
+  EXPECT_EQ("0000000000000000", fields.at("all_zeros").string_value());
+  EXPECT_EQ("ffffffffffffffff", fields.at("all_ffs").string_value());
+  EXPECT_EQ("", fields.at("empty_val").string_value());
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
   connect(false);
 

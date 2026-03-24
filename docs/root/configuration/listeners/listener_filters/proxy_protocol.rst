@@ -66,6 +66,44 @@ The filter supports two storage locations for TLV values, controlled by the
               action:
                 name: allow
 
+TLV Value Format
+----------------
+
+TLV payloads in PROXY Protocol v2 are arbitrary binary data, not UTF-8 text. By default (``RAW_STRING``),
+the filter sanitizes non-UTF-8 bytes by replacing them with ``0x21`` (``!``), which can silently corrupt
+binary payloads. For binary TLV values, use the ``HEX_STRING`` format to get a lossless hex-encoded
+representation.
+
+The format is controlled per-rule via the
+:ref:`value_format <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.value_format>` field:
+
+**RAW_STRING** (default)
+  The TLV value is stored as a sanitized UTF-8 string. Non-UTF-8 bytes are replaced with ``0x21`` (``!``).
+  This is the legacy behavior and is appropriate for TLV values known to contain only ASCII/UTF-8 text
+  (e.g., authority TLV ``0x02``).
+
+**HEX_STRING**
+  The TLV value is stored as a lowercase hex-encoded string (e.g., ``00afc7ee0ac80002``). This is safe
+  for all binary payloads and preserves the original bytes without any corruption.
+
+  Example: Google Cloud PSC sends ``pscConnectionId`` as an 8-byte big-endian uint64 in TLV type ``0xE0``.
+  With ``HEX_STRING``, a ``pscConnectionId`` of ``49477946121388034`` is stored as ``"00afc7ee0ac80002"``.
+
+.. code-block:: yaml
+
+  listener_filters:
+    - name: envoy.filters.listener.proxy_protocol
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+        rules:
+          - tlv_type: 0xE0
+            on_tlv_present:
+              key: "psc_conn_id"
+              value_format: HEX_STRING
+          - tlv_type: 0x02
+            on_tlv_present:
+              key: "authority"
+
 This implementation supports both version 1 and version 2, it
 automatically determines on a per-connection basis which of the two
 versions is present.

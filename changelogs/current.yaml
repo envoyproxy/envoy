@@ -278,6 +278,13 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: proxy_protocol
+  change: |
+    Added :ref:`value_format <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.value_format>`
+    option to the proxy protocol listener filter's ``on_tlv_present`` rule configuration. When set to ``HEX_STRING``,
+    TLV values are stored as hex-encoded strings instead of sanitized UTF-8, preventing silent data corruption for
+    binary TLV payloads (e.g., Google Cloud PSC ``pscConnectionId``). Defaults to ``RAW_STRING`` for full
+    backwards compatibility.
 - area: dynamic_modules
   change: |
     Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform
