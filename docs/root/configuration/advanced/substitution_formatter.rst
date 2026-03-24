@@ -1756,3 +1756,41 @@ Current supported substitution commands include:
 
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%FILE_CONTENT(X:Y):Z%``
+  Evaluates to the content of the file at path ``X``. The file is reloaded whenever it changes.
+
+  Optionally specify a directory ``Y`` to watch, and reload the file when changes occur. See
+  :ref:`watched_directory <envoy_v3_api_field_config.core.v3.DataSource.watched_directory>`
+  for more detailed semantics.
+
+  Takes an optional parameter ``Z`` to denote the maximum string length after which the
+  string is truncated.
+
+  This formatter is an extension, which must be explictly configured with:
+
+  .. validated-code-block:: yaml
+    :type-name: envoy.config.core.v3.TypedExtensionConfig
+
+    name: envoy.formatter.file_content
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent
+
+``%SECRET(X):Z%``
+  Evaluates to a secret value ``X`` in the configuration for this formatter, with an optional
+  maximum length ``Z`` after which the data is truncated. The format string ``%SECRET(my-api-token)%``
+  could we used with the following formatter extension configuration:
+
+  .. validated-code-block:: yaml
+    :type-name: envoy.config.core.v3.TypedExtensionConfig
+
+    name: envoy.formatter.generic_secret
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.generic_secret.v3.GenericSecret
+      secret_configs:
+        my-api-token:
+          name: bearer-token
+          sds_config:
+            ads: {}
+
+  This formatter is an extension and must be explicitly configured.
