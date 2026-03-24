@@ -21,7 +21,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
-#include "source/common/common/hex.h"
+#include "source/common/common/hex.h" // IWYU pragma: keep (used for Hex::encode in HEX_STRING path)
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
@@ -606,9 +606,18 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     absl::string_view tlv_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
-      // Sanitize any non utf8 characters.
-      auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
-      std::string sanitised_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
+      // Compute the formatted string value based on the configured value_format.
+      std::string formatted_value;
+      if (key_value_pair->value_format() ==
+          envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::HEX_STRING) {
+        // Hex-encode the raw TLV bytes — lossless for all binary payloads.
+        formatted_value =
+            Hex::encode(reinterpret_cast<const uint8_t*>(tlv_value.data()), tlv_value.size());
+      } else {
+        // Default RAW_STRING: sanitize non-UTF-8 characters (legacy behavior).
+        auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
+        formatted_value.assign(sanitised_tlv_value.data(), sanitised_tlv_value.size());
+      }
 
       if (config_->tlvLocation() ==
           envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE) {
@@ -628,7 +637,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
                                      StreamInfo::FilterState::LifeSpan::Connection);
           ENVOY_LOG(trace, "proxy_protocol: Created TLV FilterState object");
         }
-        tlv_filter_state_obj->addTlvValue(key_value_pair->key(), sanitised_value);
+        tlv_filter_state_obj->addTlvValue(key_value_pair->key(), formatted_value);
         ENVOY_LOG(trace, "proxy_protocol: Stored TLV type {} value in FilterState with key {}",
                   tlv_type, key_value_pair->key());
       } else {
@@ -656,7 +665,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
         }
         // Always populate untyped metadata for backwards compatibility.
         Protobuf::Value metadata_value;
-        metadata_value.set_string_value(sanitised_value.data(), sanitised_value.size());
+        metadata_value.set_string_value(formatted_value.data(), formatted_value.size());
         Protobuf::Struct metadata(
             (*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
         metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});

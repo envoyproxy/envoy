@@ -32,12 +32,36 @@ message ProxyProtocol {
     FILTER_STATE = 1;
   }
 
+  // Controls how TLV values are formatted when stored as strings (in dynamic metadata or filter state).
+  //
+  // TLV payloads are arbitrary binary data and may contain bytes > 0x7F that are not valid UTF-8.
+  // Since protobuf ``string`` fields require valid UTF-8, the default ``RAW_STRING`` format sanitizes
+  // non-UTF-8 bytes (replacing them with ``0x21`` / ``!``), which silently corrupts binary payloads.
+  //
+  // Use ``HEX_STRING`` for binary TLV values (e.g., Google Cloud PSC ``pscConnectionId``) to get a
+  // lossless hex-encoded representation.
+  enum TlvValueFormat {
+    // Store the TLV value as a sanitized UTF-8 string. Bytes that are not valid UTF-8 are replaced
+    // with ``0x21`` (``!``). This is the legacy behavior and is appropriate for TLV values that are
+    // known to contain only ASCII/UTF-8 text.
+    RAW_STRING = 0;
+
+    // Store the TLV value as a hex-encoded string (e.g., ``00afc7ee0ac80002``). This is safe for
+    // all binary payloads and preserves the original bytes without any corruption.
+    HEX_STRING = 1;
+  }
+
   message KeyValuePair {
     // The namespace — if this is empty, the filter's namespace will be used.
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
     string key = 2 [(validate.rules).string = {min_len: 1}];
+
+    // Controls how the TLV value is formatted when stored as a string.
+    // Defaults to ``RAW_STRING`` (legacy behavior). Use ``HEX_STRING`` for binary TLV payloads
+    // to avoid data corruption from UTF-8 sanitization.
+    TlvValueFormat value_format = 3;
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.
