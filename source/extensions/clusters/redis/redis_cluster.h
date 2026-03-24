@@ -274,9 +274,9 @@ private:
 
     // Zone discovery methods
     void startZoneDiscovery(ClusterSlotsSharedPtr slots);
-    void onZoneResponse(const std::string& address, bool is_primary,
+    void onZoneResponse(std::string address, bool is_primary,
                         NetworkFilters::Common::Redis::RespValuePtr&& value);
-    void onZoneDiscoveryFailure(const std::string& address, bool is_primary);
+    void onZoneDiscoveryFailure(std::string address, bool is_primary);
     void finishZoneDiscovery();
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config

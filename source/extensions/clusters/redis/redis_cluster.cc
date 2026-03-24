@@ -766,12 +766,11 @@ void RedisCluster::RedisDiscoverySession::startZoneDiscovery(ClusterSlotsSharedP
 }
 
 void RedisCluster::RedisDiscoverySession::onZoneResponse(
-    const std::string& address, bool /*is_primary*/,
+    std::string address, bool /*is_primary*/,
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
   ENVOY_LOG(debug, "received zone discovery response from {}", address);
 
-  // Remove request tracking (but keep zone_callbacks_ alive — address references callback's
-  // address_ member, so erasing the callback would create a dangling reference).
+  // Remove request tracking.
   zone_requests_.erase(address);
 
   if (value->type() == NetworkFilters::Common::Redis::RespType::BulkString) {
@@ -785,7 +784,6 @@ void RedisCluster::RedisDiscoverySession::onZoneResponse(
               static_cast<int>(value->type()));
   }
 
-  // Now safe to erase callback — address is no longer needed after this point.
   zone_callbacks_.erase(address);
 
   if (pending_zone_requests_.fetch_sub(1) == 1) {
@@ -793,7 +791,7 @@ void RedisCluster::RedisDiscoverySession::onZoneResponse(
   }
 }
 
-void RedisCluster::RedisDiscoverySession::onZoneDiscoveryFailure(const std::string& address,
+void RedisCluster::RedisDiscoverySession::onZoneDiscoveryFailure(std::string address,
                                                                  bool /*is_primary*/) {
   ENVOY_LOG(warn, "zone discovery failed for node {}", address);
 
