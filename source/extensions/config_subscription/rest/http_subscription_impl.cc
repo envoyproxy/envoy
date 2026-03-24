@@ -129,8 +129,7 @@ void HttpSubscriptionImpl::handleFailure(Config::ConfigUpdateFailureReason reaso
     break;
   case Config::ConfigUpdateFailureReason::UpdateRejected:
     ASSERT(e != nullptr);
-    ENVOY_LOG(warn, "REST config for {} rejected: {}", path_,
-              e == nullptr ? "exception not provided" : e->what());
+    ENVOY_LOG(warn, "REST config for {} rejected: {}", path_, e->what());
     stats_.update_rejected_.inc();
     disableInitFetchTimeoutTimer();
     break;
