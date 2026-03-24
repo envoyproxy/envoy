@@ -1132,8 +1132,9 @@ void ThreadLocalStoreImpl::evictUnused() {
         auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
           return [&unused_metrics](const std::pair<const StatName, T>& kv) {
             const auto& [name, metric] = kv;
-            // We assume the gauge is used as an `updown` counter here and if the value is 0, it is
-            // unused.
+            // evictable scopes can contain counters, gauges, text-readouts, and histograms. For all
+            // the gauges we find in one, we treat them as up/down counters that become evictable
+            // when they hit zero.
             if constexpr (std::is_same_v<T, GaugeSharedPtr>) {
               if (metric->value() != 0) {
                 return false;
