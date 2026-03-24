@@ -457,7 +457,7 @@ TEST_P(DynamicModuleTestLanguages, WillNotMoveDataAutomatically) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_store.symbolTable(), 0);
+                                                          stats_store.symbolTable());
   filter->initializeInModuleFilter();
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
