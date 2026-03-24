@@ -40,7 +40,9 @@ pub enum DnsResolutionStatus {
 /// A single resolved DNS address with its TTL.
 #[derive(Debug, Clone)]
 pub struct DnsAddress {
-  /// The resolved address in "ip:port" format (e.g., "1.2.3.4:0").
+  /// The resolved address in "ip:port" format (e.g., "1.2.3.4:0"). The port must always be 0
+  /// because DNS resolution only produces IP addresses; the actual port comes from the
+  /// cluster/endpoint configuration.
   pub address: String,
   /// The time-to-live in seconds for this record.
   pub ttl_seconds: u32,

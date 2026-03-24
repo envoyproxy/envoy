@@ -10847,8 +10847,10 @@ typedef enum envoy_dynamic_module_type_dns_resolution_status {
 
 /**
  * envoy_dynamic_module_type_dns_address represents a single resolved DNS address with its TTL.
- * The address_ptr/address_length must contain an "ip:port" string (e.g., "1.2.3.4:0").
- * The ttl_seconds is the time-to-live in seconds for this record.
+ * The address_ptr/address_length must contain an "ip:port" string (e.g., "1.2.3.4:0"). The port
+ * must always be 0 because DNS resolution only produces IP addresses; the actual port comes from
+ * the cluster/endpoint configuration. The ttl_seconds is the time-to-live in seconds for this
+ * record.
  */
 typedef struct envoy_dynamic_module_type_dns_address {
   envoy_dynamic_module_type_buffer_module_ptr address_ptr;
