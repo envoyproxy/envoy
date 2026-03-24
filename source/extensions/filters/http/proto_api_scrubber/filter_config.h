@@ -231,7 +231,6 @@ protected:
 private:
   friend class MockProtoApiScrubberFilterConfig;
 
-
   // Helper method to look up or create a MatchTree.
   // This allows deduplication of identical matchers in the configuration, ensuring that
   // if multiple fields share the same matcher config, they share the same MatchTree pointer.
