@@ -329,7 +329,7 @@ public:
    * Used by HDS to report richer health state to the control plane.
    * 0 means no response has been recorded yet.
    */
-  virtual void setLastHealthCheckHttpStatus(uint32_t) PURE;
+  virtual void setLastHealthCheckHttpStatus(uint64_t) PURE;
 
   /**
    * @return the HTTP status code from the last active health check response, or

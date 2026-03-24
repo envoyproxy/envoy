@@ -383,7 +383,7 @@ public:
   uint32_t healthFlagsGetAll() const override { return health_flags_; }
   void healthFlagsSetAll(uint32_t bits) override { health_flags_ |= bits; }
 
-  void setLastHealthCheckHttpStatus(uint32_t status) override { last_hc_http_status_ = status; }
+  void setLastHealthCheckHttpStatus(uint64_t status) override { last_hc_http_status_ = status; }
   absl::optional<uint64_t> lastHealthCheckHttpStatus() const override {
     return last_hc_http_status_;
   }
