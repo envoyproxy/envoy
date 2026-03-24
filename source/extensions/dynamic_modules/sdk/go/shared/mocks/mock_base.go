@@ -434,6 +434,48 @@ func (mr *MockHttpFilterHandleMockRecorder) AddCustomFlag(flag any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddCustomFlag", reflect.TypeOf((*MockHttpFilterHandle)(nil).AddCustomFlag), flag)
 }
 
+// AddMetadataListBool mocks base method.
+func (m *MockHttpFilterHandle) AddMetadataListBool(metadataNamespace, key string, value bool) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddMetadataListBool", metadataNamespace, key, value)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// AddMetadataListBool indicates an expected call of AddMetadataListBool.
+func (mr *MockHttpFilterHandleMockRecorder) AddMetadataListBool(metadataNamespace, key, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddMetadataListBool", reflect.TypeOf((*MockHttpFilterHandle)(nil).AddMetadataListBool), metadataNamespace, key, value)
+}
+
+// AddMetadataListNumber mocks base method.
+func (m *MockHttpFilterHandle) AddMetadataListNumber(metadataNamespace, key string, value float64) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddMetadataListNumber", metadataNamespace, key, value)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// AddMetadataListNumber indicates an expected call of AddMetadataListNumber.
+func (mr *MockHttpFilterHandleMockRecorder) AddMetadataListNumber(metadataNamespace, key, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddMetadataListNumber", reflect.TypeOf((*MockHttpFilterHandle)(nil).AddMetadataListNumber), metadataNamespace, key, value)
+}
+
+// AddMetadataListString mocks base method.
+func (m *MockHttpFilterHandle) AddMetadataListString(metadataNamespace, key, value string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddMetadataListString", metadataNamespace, key, value)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// AddMetadataListString indicates an expected call of AddMetadataListString.
+func (mr *MockHttpFilterHandleMockRecorder) AddMetadataListString(metadataNamespace, key, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddMetadataListString", reflect.TypeOf((*MockHttpFilterHandle)(nil).AddMetadataListString), metadataNamespace, key, value)
+}
+
 // BufferedRequestBody mocks base method.
 func (m *MockHttpFilterHandle) BufferedRequestBody() shared.BodyBuffer {
 	m.ctrl.T.Helper()
@@ -484,6 +526,18 @@ func (m *MockHttpFilterHandle) ClearRouteCache() {
 func (mr *MockHttpFilterHandleMockRecorder) ClearRouteCache() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearRouteCache", reflect.TypeOf((*MockHttpFilterHandle)(nil).ClearRouteCache))
+}
+
+// RefreshRouteCluster mocks base method.
+func (m *MockHttpFilterHandle) RefreshRouteCluster() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RefreshRouteCluster")
+}
+
+// RefreshRouteCluster indicates an expected call of RefreshRouteCluster.
+func (mr *MockHttpFilterHandleMockRecorder) RefreshRouteCluster() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshRouteCluster", reflect.TypeOf((*MockHttpFilterHandle)(nil).RefreshRouteCluster))
 }
 
 // ContinueRequest mocks base method.
@@ -632,6 +686,66 @@ func (mr *MockHttpFilterHandleMockRecorder) GetMetadataKeys(source, metadataName
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataKeys", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataKeys), source, metadataNamespace)
 }
 
+// GetMetadataListBool mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataListBool(source shared.MetadataSourceType, metadataNamespace, key string, index int) (bool, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataListBool", source, metadataNamespace, key, index)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMetadataListBool indicates an expected call of GetMetadataListBool.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataListBool(source, metadataNamespace, key, index any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataListBool", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataListBool), source, metadataNamespace, key, index)
+}
+
+// GetMetadataListNumber mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataListNumber(source shared.MetadataSourceType, metadataNamespace, key string, index int) (float64, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataListNumber", source, metadataNamespace, key, index)
+	ret0, _ := ret[0].(float64)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMetadataListNumber indicates an expected call of GetMetadataListNumber.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataListNumber(source, metadataNamespace, key, index any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataListNumber", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataListNumber), source, metadataNamespace, key, index)
+}
+
+// GetMetadataListSize mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataListSize(source shared.MetadataSourceType, metadataNamespace, key string) (int, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataListSize", source, metadataNamespace, key)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMetadataListSize indicates an expected call of GetMetadataListSize.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataListSize(source, metadataNamespace, key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataListSize", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataListSize), source, metadataNamespace, key)
+}
+
+// GetMetadataListString mocks base method.
+func (m *MockHttpFilterHandle) GetMetadataListString(source shared.MetadataSourceType, metadataNamespace, key string, index int) (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetadataListString", source, metadataNamespace, key, index)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMetadataListString indicates an expected call of GetMetadataListString.
+func (mr *MockHttpFilterHandleMockRecorder) GetMetadataListString(source, metadataNamespace, key, index any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataListString", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataListString), source, metadataNamespace, key, index)
+}
+
 // GetMetadataNamespaces mocks base method.
 func (m *MockHttpFilterHandle) GetMetadataNamespaces(source shared.MetadataSourceType) []shared.UnsafeEnvoyBuffer {
 	m.ctrl.T.Helper()
@@ -772,6 +886,34 @@ func (mr *MockHttpFilterHandleMockRecorder) Log(level, format any, args ...any) 
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{level, format}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockHttpFilterHandle)(nil).Log), varargs...)
+}
+
+// ReceivedBufferedRequestBody mocks base method.
+func (m *MockHttpFilterHandle) ReceivedBufferedRequestBody() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReceivedBufferedRequestBody")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// ReceivedBufferedRequestBody indicates an expected call of ReceivedBufferedRequestBody.
+func (mr *MockHttpFilterHandleMockRecorder) ReceivedBufferedRequestBody() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReceivedBufferedRequestBody", reflect.TypeOf((*MockHttpFilterHandle)(nil).ReceivedBufferedRequestBody))
+}
+
+// ReceivedBufferedResponseBody mocks base method.
+func (m *MockHttpFilterHandle) ReceivedBufferedResponseBody() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReceivedBufferedResponseBody")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// ReceivedBufferedResponseBody indicates an expected call of ReceivedBufferedResponseBody.
+func (mr *MockHttpFilterHandleMockRecorder) ReceivedBufferedResponseBody() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReceivedBufferedResponseBody", reflect.TypeOf((*MockHttpFilterHandle)(nil).ReceivedBufferedResponseBody))
 }
 
 // ReceivedRequestBody mocks base method.
@@ -1131,6 +1273,35 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) DefineHistogram(name any, tagK
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefineHistogram", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).DefineHistogram), varargs...)
 }
 
+// GetScheduler mocks base method.
+func (m *MockHttpFilterConfigHandle) GetScheduler() shared.Scheduler {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetScheduler")
+	ret0, _ := ret[0].(shared.Scheduler)
+	return ret0
+}
+
+// GetScheduler indicates an expected call of GetScheduler.
+func (mr *MockHttpFilterConfigHandleMockRecorder) GetScheduler() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetScheduler", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).GetScheduler))
+}
+
+// HttpCallout mocks base method.
+func (m *MockHttpFilterConfigHandle) HttpCallout(cluster string, headers [][2]string, body []byte, timeoutMs uint64, cb shared.HttpCalloutCallback) (shared.HttpCalloutInitResult, uint64) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HttpCallout", cluster, headers, body, timeoutMs, cb)
+	ret0, _ := ret[0].(shared.HttpCalloutInitResult)
+	ret1, _ := ret[1].(uint64)
+	return ret0, ret1
+}
+
+// HttpCallout indicates an expected call of HttpCallout.
+func (mr *MockHttpFilterConfigHandleMockRecorder) HttpCallout(cluster, headers, body, timeoutMs, cb any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HttpCallout", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).HttpCallout), cluster, headers, body, timeoutMs, cb)
+}
+
 // Log mocks base method.
 func (m *MockHttpFilterConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
 	m.ctrl.T.Helper()
@@ -1146,4 +1317,59 @@ func (mr *MockHttpFilterConfigHandleMockRecorder) Log(level, format any, args ..
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{level, format}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).Log), varargs...)
+}
+
+// ResetHttpStream mocks base method.
+func (m *MockHttpFilterConfigHandle) ResetHttpStream(streamID uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ResetHttpStream", streamID)
+}
+
+// ResetHttpStream indicates an expected call of ResetHttpStream.
+func (mr *MockHttpFilterConfigHandleMockRecorder) ResetHttpStream(streamID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetHttpStream", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).ResetHttpStream), streamID)
+}
+
+// SendHttpStreamData mocks base method.
+func (m *MockHttpFilterConfigHandle) SendHttpStreamData(streamID uint64, body []byte, endOfStream bool) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendHttpStreamData", streamID, body, endOfStream)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SendHttpStreamData indicates an expected call of SendHttpStreamData.
+func (mr *MockHttpFilterConfigHandleMockRecorder) SendHttpStreamData(streamID, body, endOfStream any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendHttpStreamData", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).SendHttpStreamData), streamID, body, endOfStream)
+}
+
+// SendHttpStreamTrailers mocks base method.
+func (m *MockHttpFilterConfigHandle) SendHttpStreamTrailers(streamID uint64, trailers [][2]string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendHttpStreamTrailers", streamID, trailers)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SendHttpStreamTrailers indicates an expected call of SendHttpStreamTrailers.
+func (mr *MockHttpFilterConfigHandleMockRecorder) SendHttpStreamTrailers(streamID, trailers any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendHttpStreamTrailers", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).SendHttpStreamTrailers), streamID, trailers)
+}
+
+// StartHttpStream mocks base method.
+func (m *MockHttpFilterConfigHandle) StartHttpStream(cluster string, headers [][2]string, body []byte, endOfStream bool, timeoutMs uint64, cb shared.HttpStreamCallback) (shared.HttpCalloutInitResult, uint64) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartHttpStream", cluster, headers, body, endOfStream, timeoutMs, cb)
+	ret0, _ := ret[0].(shared.HttpCalloutInitResult)
+	ret1, _ := ret[1].(uint64)
+	return ret0, ret1
+}
+
+// StartHttpStream indicates an expected call of StartHttpStream.
+func (mr *MockHttpFilterConfigHandleMockRecorder) StartHttpStream(cluster, headers, body, endOfStream, timeoutMs, cb any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartHttpStream", reflect.TypeOf((*MockHttpFilterConfigHandle)(nil).StartHttpStream), cluster, headers, body, endOfStream, timeoutMs, cb)
 }

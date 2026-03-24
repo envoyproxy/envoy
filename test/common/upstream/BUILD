@@ -407,7 +407,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "load_stats_reporter_test",
-    srcs = ["load_stats_reporter_test.cc"],
+    srcs = ["load_stats_reporter_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/network:address_lib",
@@ -559,6 +559,22 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@xds//xds/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "prod_cluster_info_factory_test",
+    srcs = ["prod_cluster_info_factory_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":utility_lib",
+        "//source/common/upstream:prod_cluster_info_factory_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 

@@ -39,11 +39,13 @@ envoy_cc_test(
         ":util",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
     ],
 )
 
 envoy_cc_test(
     name = "abi_impl_test",
+    size = "large",
     srcs = ["abi_impl_test.cc"],
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",

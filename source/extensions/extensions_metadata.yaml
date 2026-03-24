@@ -275,6 +275,13 @@ envoy.content_parsers.json:
   status: alpha
   type_urls:
   - envoy.extensions.content_parsers.json.v3.JsonContentParser
+envoy.filters.http.a2a:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.a2a.v3.A2a
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
@@ -482,6 +489,13 @@ envoy.filters.http.fault:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.fault.v3.HTTPFault
+envoy.filters.http.file_server:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.file_server.v3.FileServerConfig
 envoy.filters.http.file_system_buffer:
   categories:
   - envoy.filters.http
@@ -793,6 +807,13 @@ envoy.filters.listener.proxy_protocol:
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+envoy.filters.listener.set_filter_state:
+  categories:
+  - envoy.filters.listener
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.listener.set_filter_state.v3.Config
 envoy.filters.listener.tls_inspector:
   categories:
   - envoy.filters.listener
@@ -1629,6 +1650,11 @@ envoy.upstreams.http.http_protocol_options:
   - envoy.upstream_options
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.upstreams.http.dynamic_modules:
+  categories:
+  - envoy.upstreams
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.upstreams.http.tcp:
   categories:
   - envoy.upstreams
@@ -1799,6 +1825,13 @@ envoy.matching.inputs.query_params:
   status: stable
   type_urls:
   - envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
+envoy.matching.inputs.local_reply:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.type.matcher.v3.HttpResponseLocalReplyMatchInput
 envoy.matching.inputs.cel_data_input:
   categories:
   - envoy.matching.http.input
@@ -2072,6 +2105,13 @@ envoy.matching.actions.format_string:
   status: stable
   type_urls:
   - envoy.config.core.v3.SubstitutionFormatString
+envoy.matching.actions.transform_stat:
+  categories:
+  - envoy.matching.action
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.actions.transform_stat.v3.TransformStat
 envoy.matching.action.transport_socket.name:
   categories:
   - envoy.matching.action

@@ -67,7 +67,9 @@ void CodecClient::connect() {
   }
 }
 
-void CodecClient::close(Network::ConnectionCloseType type) { connection_->close(type); }
+void CodecClient::close(Network::ConnectionCloseType type, absl::string_view details) {
+  connection_->close(type, details);
+}
 
 void CodecClient::deleteRequest(ActiveRequest& request) {
   connection_->dispatcher().deferredDelete(request.removeFromList(active_requests_));

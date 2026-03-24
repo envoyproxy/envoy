@@ -495,7 +495,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           route.route().has_host_rewrite_path_regex()
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
-      vhost_(vhost), vhost_copy_(vhost), cluster_name_(route.route().cluster()),
+      vhost_(vhost), cluster_name_(route.route().cluster()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
       runtime_(loadRuntimeData(route.match())),
@@ -569,6 +569,17 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         route.direct_response().body_format(), generic_context);
     SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
     direct_response_body_formatter_ = std::move(formatter_or_error.value());
+    // Capture the content_type from body_format, using the same defaulting logic as
+    // local_reply.cc BodyFormatter: explicit content_type > JSON format default > empty
+    // (text/plain).
+    const auto& body_format = route.direct_response().body_format();
+    if (!body_format.content_type().empty()) {
+      direct_response_content_type_ = body_format.content_type();
+    } else if (body_format.format_case() ==
+               envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat) {
+      direct_response_content_type_ = Http::Headers::get().ContentTypeValues.Json;
+    }
+    // else: leave empty; sendLocalReply will use its default "text/plain"
   }
 
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {

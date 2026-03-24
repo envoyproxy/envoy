@@ -1077,6 +1077,66 @@ CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
     }
     *value = streamInfo().attemptCount().value();
     break;
+  // SSL Integer/Boolean values
+  case EnvoyValue::SslConnectionExists: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    *value = (ssl != nullptr) ? 1 : 0;
+    break;
+  }
+  case EnvoyValue::SslPeerCertificatePresented: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = ssl->peerCertificatePresented() ? 1 : 0;
+    break;
+  }
+  case EnvoyValue::SslPeerCertificateValidated: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = ssl->peerCertificateValidated() ? 1 : 0;
+    break;
+  }
+  case EnvoyValue::SslCiphersuiteId: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto cipher_id = ssl->ciphersuiteId();
+    if (cipher_id == SSL_INVALID_CIPHERSUITE_ID) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = cipher_id;
+    break;
+  }
+  case EnvoyValue::SslValidFromPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto time_val = ssl->validFromPeerCertificate();
+    if (!time_val.has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = std::chrono::duration_cast<std::chrono::seconds>(time_val.value().time_since_epoch())
+                 .count();
+    break;
+  }
+  case EnvoyValue::SslExpirationPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto time_val = ssl->expirationPeerCertificate();
+    if (!time_val.has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = std::chrono::duration_cast<std::chrono::seconds>(time_val.value().time_since_epoch())
+                 .count();
+    break;
+  }
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid integer value id: ", id));
   }
@@ -1143,6 +1203,127 @@ CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) 
     }
     req_->strValue = streamInfo().virtualClusterName().value();
     break;
+  // SSL String values
+  case EnvoyValue::SslSha256PeerCertificateDigest: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->sha256PeerCertificateDigest();
+    break;
+  }
+  case EnvoyValue::SslSerialNumberPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->serialNumberPeerCertificate();
+    break;
+  }
+  case EnvoyValue::SslSubjectPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->subjectPeerCertificate();
+    break;
+  }
+  case EnvoyValue::SslIssuerPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->issuerPeerCertificate();
+    break;
+  }
+  case EnvoyValue::SslSubjectLocalCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->subjectLocalCertificate();
+    break;
+  }
+  case EnvoyValue::SslTlsVersion: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->tlsVersion();
+    break;
+  }
+  case EnvoyValue::SslCiphersuiteString: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto cipher_val = ssl->ciphersuiteString();
+    if (cipher_val.empty()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = std::string(cipher_val);
+    break;
+  }
+  case EnvoyValue::SslSessionId: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->sessionId();
+    break;
+  }
+  case EnvoyValue::SslUrlEncodedPemEncodedPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->urlEncodedPemEncodedPeerCertificate();
+    break;
+  }
+  case EnvoyValue::SslUrlEncodedPemEncodedPeerCertificateChain: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->urlEncodedPemEncodedPeerCertificateChain();
+    break;
+  }
+  // SSL String array values (serialized as null-separated strings)
+  case EnvoyValue::SslUriSanPeerCertificate:
+  case EnvoyValue::SslUriSanLocalCertificate:
+  case EnvoyValue::SslDnsSansPeerCertificate:
+  case EnvoyValue::SslDnsSansLocalCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    absl::Span<const std::string> strings;
+    switch (static_cast<EnvoyValue>(id)) {
+    case EnvoyValue::SslUriSanPeerCertificate:
+      strings = ssl->uriSanPeerCertificate();
+      break;
+    case EnvoyValue::SslUriSanLocalCertificate:
+      strings = ssl->uriSanLocalCertificate();
+      break;
+    case EnvoyValue::SslDnsSansPeerCertificate:
+      strings = ssl->dnsSansPeerCertificate();
+      break;
+    case EnvoyValue::SslDnsSansLocalCertificate:
+      strings = ssl->dnsSansLocalCertificate();
+      break;
+    default:
+      PANIC("unreachable");
+    }
+    // Serialize to null-separated string
+    req_->strValue.clear();
+    for (size_t i = 0; i < strings.size(); ++i) {
+      if (i > 0) {
+        req_->strValue.push_back('\0');
+      }
+      req_->strValue.append(strings[i]);
+    }
+    break;
+  }
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
   }
