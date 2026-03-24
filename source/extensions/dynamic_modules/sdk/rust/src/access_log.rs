@@ -517,7 +517,9 @@ impl LogContext {
 
   /// Check if this is a health check request.
   pub fn is_health_check(&self) -> bool {
-    unsafe { abi::envoy_dynamic_module_callback_access_logger_is_health_check(self.envoy_ptr) }
+    self
+      .get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::HealthCheck)
+      .unwrap_or(false)
   }
 
   /// Get the upstream cluster name.

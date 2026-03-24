@@ -2190,6 +2190,28 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolUnsupported) {
       env_ptr, envoy_dynamic_module_type_attribute_id_RequestPath, &result));
 }
 
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolHealthCheck) {
+  ON_CALL(stream_info_, healthCheck()).WillByDefault(testing::Return(true));
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  bool result = false;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_HealthCheck, &result));
+  EXPECT_TRUE(result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolHealthCheckFalse) {
+  ON_CALL(stream_info_, healthCheck()).WillByDefault(testing::Return(false));
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  bool result = true;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_HealthCheck, &result));
+  EXPECT_FALSE(result);
+}
+
 // =============================================================================
 // Generic Attribute Accessor Coverage Tests
 // =============================================================================

@@ -207,12 +207,6 @@ void envoy_dynamic_module_callback_access_logger_get_bytes_info(
   }
 }
 
-bool envoy_dynamic_module_callback_access_logger_is_health_check(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
-  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  return logger->stream_info_->healthCheck();
-}
-
 // -----------------------------------------------------------------------------
 // Access Logger Callbacks - Address Information
 // -----------------------------------------------------------------------------
@@ -1345,6 +1339,10 @@ bool envoy_dynamic_module_callback_access_logger_get_attribute_bool(
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_HealthCheck:
+    *result = logger->stream_info_->healthCheck();
+    ok = true;
+    break;
   default:
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
                         "Unsupported attribute ID {} as bool for access logger.",
@@ -1525,6 +1523,14 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_transport_failur
   return envoy_dynamic_module_callback_access_logger_get_attribute_string(
       logger_envoy_ptr, envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReason,
       result);
+}
+
+bool envoy_dynamic_module_callback_access_logger_is_health_check(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  bool result = false;
+  envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      logger_envoy_ptr, envoy_dynamic_module_type_attribute_id_HealthCheck, &result);
+  return result;
 }
 
 // -----------------------------------------------------------------------------

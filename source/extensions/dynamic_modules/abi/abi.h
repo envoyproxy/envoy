@@ -373,6 +373,8 @@ typedef enum envoy_dynamic_module_type_attribute_id {
   envoy_dynamic_module_type_attribute_id_XdsUpstreamHostMetadata,
   // xds.filter_chain_name
   envoy_dynamic_module_type_attribute_id_XdsFilterChainName,
+  // health_check
+  envoy_dynamic_module_type_attribute_id_HealthCheck,
 } envoy_dynamic_module_type_attribute_id;
 
 /**
@@ -6249,6 +6251,9 @@ void envoy_dynamic_module_callback_access_logger_get_bytes_info(
     envoy_dynamic_module_type_bytes_info* bytes_out);
 
 /**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_bool with
+ * envoy_dynamic_module_type_attribute_id_HealthCheck instead.
+ *
  * Check if this is a health check request.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
