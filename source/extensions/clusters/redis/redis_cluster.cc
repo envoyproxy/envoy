@@ -766,8 +766,7 @@ void RedisCluster::RedisDiscoverySession::startZoneDiscovery(ClusterSlotsSharedP
 }
 
 void RedisCluster::RedisDiscoverySession::onZoneResponse(
-    std::string address, bool /*is_primary*/,
-    NetworkFilters::Common::Redis::RespValuePtr&& value) {
+    std::string address, bool /*is_primary*/, NetworkFilters::Common::Redis::RespValuePtr&& value) {
   ENVOY_LOG(debug, "received zone discovery response from {}", address);
 
   // Remove request tracking.
