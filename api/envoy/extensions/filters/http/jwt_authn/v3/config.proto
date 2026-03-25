@@ -601,8 +601,8 @@ message JwtRequirement {
     //    can forge a JWT with arbitrary claims, and those claims will be extracted
     //    and forwarded as HTTP headers. Headers set by this mode are
     //    INDISTINGUISHABLE from headers set by fully validated JWTs unless the
-    //    ``unverified_header_prefix`` is configured (which is now REQUIRED by
-    //    default).
+    //    ``verification_status_header`` is checked by downstream filters
+    //    (set to "false" by default on all extract-only requests).
     //
     //    DO NOT use this mode if:
     //      - RBAC policies match on JWT-derived headers
