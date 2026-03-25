@@ -46,10 +46,8 @@ public:
 
     cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
 
-    absl::Status creation_status = absl::OkStatus();
-    auto headers_applicator = std::make_shared<Http::HttpServiceHeadersApplicator>(
-        http_service, context_.server_factory_context_, creation_status);
-    THROW_IF_NOT_OK_REF(creation_status);
+    auto headers_applicator = Http::HttpServiceHeadersApplicator::createOrThrow(
+        http_service, context_.server_factory_context_);
     trace_exporter_ = std::make_unique<OpenTelemetryHttpTraceExporter>(
         cluster_manager_, http_service, std::move(headers_applicator));
   }
