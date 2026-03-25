@@ -21,6 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.a2a]
 
 // This filter will inspect and get attributes from A2A traffic.
+// [#next-free-field: 6]
 message A2a {
   // Traffic handling mode for non-A2A traffic.
   enum TrafficMode {
@@ -75,6 +76,7 @@ message MethodParsingConfig {
   // If provided, this overrides any built-in classification for the method.
   // This will be emitted to dynamic metadata under the key specified by `group_metadata_key`.
   string group = 1;
+
   // List of attributes to extract for this method, specified by their JSON paths (e.g., "params.name").
   repeated string paths = 2;
 }
