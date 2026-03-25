@@ -1,8 +1,9 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
+load("@python_abi//:abi.bzl", "abi_tag", "python_tag")
 load("@rules_python//python:defs.bzl", "py_library")
 load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
-load("@python_abi//:abi.bzl", "abi_tag", "python_tag")
+
 
 licenses(["notice"])  # Apache 2
 
@@ -105,6 +106,7 @@ py_package(
 # 3. Explicitly pass the rules into the wheel's deps
 py_wheel(
     name = "envoy_mobile_wheel",
+    abi = abi_tag(),
     distribution = "envoy-mobile-client",
     platform = select({
         ":is_linux_x86_64": "manylinux2014_x86_64",
@@ -112,6 +114,7 @@ py_wheel(
         ":is_macos_arm64": "macosx_11_0_arm64",
         "//conditions:default": "any",
     }),
+    python_tag = python_tag(),
     strip_path_prefixes = [
         "mobile/library/python",
         "library/python",
@@ -119,6 +122,4 @@ py_wheel(
     version = "0.5.0",
     visibility = ["//visibility:public"],
     deps = [":envoy_mobile_package"],
-    abi = abi_tag(),
-    python_tag = python_tag(),
 )
