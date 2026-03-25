@@ -633,8 +633,9 @@ message ExtractOnlyWithoutValidation {
   // Default (unset or empty): "x-jwt-signature-verified"
   // Custom value: uses the specified header name
   //
-  // The header is always set and cannot be disabled. If removal is needed
-  // downstream, use header mutation in a subsequent filter.
+  // The header is always set, but this behavior is guarded by the
+  // ``envoy.reloadable_features.jwt_authn_add_verification_status_header`` runtime flag.
+  // If removal is needed downstream, use header mutation in a subsequent filter.
   //
   // Example: with the default, all requests processed by this mode will have:
   //   x-jwt-signature-verified: false
