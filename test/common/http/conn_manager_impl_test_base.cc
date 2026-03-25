@@ -53,6 +53,9 @@ public:
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return parent_.maxConnectionDuration();
   }
+  absl::optional<double> maxConnectionDurationJitterPercent() const override {
+    return parent_.maxConnectionDurationJitterPercent();
+  }
   bool http1SafeMaxConnectionDuration() const override {
     return parent_.http1SafeMaxConnectionDuration();
   }
