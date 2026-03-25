@@ -29,6 +29,9 @@ Http::FilterHeadersStatus SetFilterState::decodeHeaders(Http::RequestHeaderMap& 
   for (auto policy : policies) {
     policy.get().updateFilterState({&headers}, decoder_callbacks_->streamInfo());
   }
+  if (config_->clearRouteCache() && decoder_callbacks_->downstreamCallbacks()) {
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -37,7 +40,8 @@ Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoTyped(
     const std::string&, Server::Configuration::FactoryContext& context) {
 
   const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
-      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain, context);
+      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain, context,
+      proto_config.clear_route_cache());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});
@@ -53,7 +57,7 @@ SetFilterStateConfig::createRouteSpecificFilterConfigTyped(
 
   return std::make_shared<const Filters::Common::SetFilterState::Config>(
       proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-      generic_context);
+      generic_context, proto_config.clear_route_cache());
 }
 
 Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoWithServerContextTyped(
@@ -67,7 +71,7 @@ Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoWithServ
 
   const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
       proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-      generic_context);
+      generic_context, proto_config.clear_route_cache());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});

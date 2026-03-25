@@ -896,7 +896,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   ProcessingRequest req =
       buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/false);
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             ProcessorState::CallbackState::HeadersCallback);
+                             ProcessorState::CallbackState::HeadersCallback, false);
   ENVOY_STREAM_LOG(debug, "Sending headers message", *decoder_callbacks_);
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -1425,7 +1425,7 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
 void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             new_state);
+                             new_state, true);
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
@@ -1453,7 +1453,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
       callback_state = ProcessorState::CallbackState::TrailersCallback;
     }
     state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-                               config_->messageTimeout(), callback_state);
+                               config_->messageTimeout(), callback_state, false);
     ENVOY_STREAM_LOG(debug, "Sending trailers message", *decoder_callbacks_);
   }
   encodeProtocolConfig(req);
@@ -1479,7 +1479,7 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
 
   // Only set cluster info in logging info once.
   if (logging_info_->clusterInfo() == nullptr) {
-    logging_info_->setClusterInfo(stream_info->upstreamClusterInfo());
+    logging_info_->setClusterInfo(stream_info->upstreamClusterInfoSharedPtr());
   }
 
   // Response code details should actually be set as many times as possible, since it's
@@ -1540,10 +1540,9 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
   envoy::config::core::v3::Metadata forwarding_metadata;
 
   // Forward cluster metadata if so configured.
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      cb->streamInfo().upstreamClusterInfo();
-  if (cluster_info.has_value() && cluster_info.value() != nullptr) {
-    const auto& cluster_metadata = cluster_info.value()->metadata().filter_metadata();
+  const auto cluster_info = cb->streamInfo().upstreamClusterInfo();
+  if (cluster_info) {
+    const auto& cluster_metadata = cluster_info->metadata().filter_metadata();
     for (const auto& context_key : state.untypedClusterMetadataForwardingNamespaces()) {
       if (const auto metadata_it = cluster_metadata.find(context_key);
           metadata_it != cluster_metadata.end()) {
@@ -1551,7 +1550,7 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
       }
     }
 
-    const auto& cluster_typed_metadata = cluster_info.value()->metadata().typed_filter_metadata();
+    const auto& cluster_typed_metadata = cluster_info->metadata().typed_filter_metadata();
     for (const auto& context_key : state.typedClusterMetadataForwardingNamespaces()) {
       if (const auto metadata_it = cluster_typed_metadata.find(context_key);
           metadata_it != cluster_typed_metadata.end()) {

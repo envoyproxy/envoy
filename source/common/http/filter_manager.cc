@@ -291,8 +291,12 @@ OptRef<const Tracing::Config> ActiveStreamFilterBase::tracingConfig() const {
   return parent_.filter_manager_callbacks_.tracingConfig();
 }
 
-Upstream::ClusterInfoConstSharedPtr ActiveStreamFilterBase::clusterInfo() {
+OptRef<const Upstream::ClusterInfo> ActiveStreamFilterBase::clusterInfo() {
   return parent_.filter_manager_callbacks_.clusterInfo();
+}
+
+Upstream::ClusterInfoConstSharedPtr ActiveStreamFilterBase::clusterInfoSharedPtr() {
+  return parent_.filter_manager_callbacks_.clusterInfoSharedPtr();
 }
 
 Router::RouteConstSharedPtr ActiveStreamFilterBase::route() { return getRoute(); }

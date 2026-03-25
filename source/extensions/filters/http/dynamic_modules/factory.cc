@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
+#include <filesystem>
+
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
@@ -85,6 +87,26 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   absl::StatusOr<Extensions::DynamicModules::DynamicModulePtr> dynamic_module;
   if (module_config.has_module()) {
     if (module_config.module().has_remote()) {
+      const auto& sha256 = module_config.module().remote().sha256();
+
+      // Check if a previously fetched module with the same SHA256 already exists on disk.
+      // newDynamicModuleFromBytes writes to a deterministic path based on SHA256, so the
+      // filesystem itself acts as the cache.
+      auto cached_path = Extensions::DynamicModules::moduleTempPath(sha256);
+      if (std::filesystem::exists(cached_path)) {
+        dynamic_module = Extensions::DynamicModules::newDynamicModule(
+            cached_path, module_config.do_not_close(), module_config.load_globally());
+        if (dynamic_module.ok()) {
+          return buildFilterFactoryCallback(std::move(dynamic_module.value()), proto_config,
+                                            module_config, context, scope);
+        }
+        // File exists but failed to load — re-fetching the same SHA256 would produce
+        // identical bytes, so there is no point in falling through to the remote path.
+        return absl::InvalidArgumentError("Cached remote module failed to load: " +
+                                          std::string(dynamic_module.status().message()));
+      }
+
+      // No cached file — need async fetch, which requires init_manager.
       if (init_manager == nullptr) {
         return absl::InvalidArgumentError("Remote module sources require an init manager");
       }
@@ -164,6 +186,7 @@ DynamicModuleConfigFactory::createFilterFactoryFromRemoteSource(
                               module_or_error.status().message());
           return;
         }
+
         auto cb_or_error =
             buildFilterFactoryCallback(std::move(module_or_error.value()), proto_config_copy,
                                        module_config_copy, context, scope);

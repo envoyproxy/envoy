@@ -1190,9 +1190,8 @@ CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) 
     }
     break;
   case EnvoyValue::UpstreamClusterName:
-    if (streamInfo().upstreamClusterInfo().has_value() &&
-        streamInfo().upstreamClusterInfo().value()) {
-      req_->strValue = streamInfo().upstreamClusterInfo().value()->name();
+    if (const auto cluster_info = streamInfo().upstreamClusterInfo()) {
+      req_->strValue = cluster_info->name();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
