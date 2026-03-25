@@ -1758,31 +1758,31 @@ TEST_F(MetricAggregatorTests, NoLimits) {
   EXPECT_EQ(getGaugeValue(metrics, "metric999", attr1), 999);
 }
 
-class RequestBuilderTests : public testing::Test {
+class OtlpRequestStreamerTests : public testing::Test {
 public:
   void SetUp() override { resource_attributes_.Add()->set_key("resource_key"); }
 
-  void setupBuilder(bool enable_metric_aggregation, uint32_t max_dp) {
-    builder_ =
-        std::make_unique<RequestBuilder>(enable_metric_aggregation, max_dp, resource_attributes_);
+  void setupStreamer(bool enable_metric_aggregation, uint32_t max_dp) {
+    streamer_ = std::make_unique<OtlpRequestStreamer>(enable_metric_aggregation, max_dp,
+                                                      resource_attributes_);
   }
 
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
   std::vector<MetricsExportRequestPtr> requests_;
-  std::unique_ptr<RequestBuilder> builder_;
+  std::unique_ptr<OtlpRequestStreamer> streamer_;
 };
 
-TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestEmptyMetrics) {
-  setupBuilder(/*enable_metric_aggregation=*/true, 1);
+TEST_F(OtlpRequestStreamerTests, TestMaxDatapointsPerRequestEmptyMetrics) {
+  setupStreamer(/*enable_metric_aggregation=*/true, 1);
   MetricAggregator::AggregationResult empty_metrics;
-  builder_->buildRequests(empty_metrics, [this](MetricsExportRequestPtr request) {
+  streamer_->streamRequests(empty_metrics, [this](MetricsExportRequestPtr request) {
     requests_.push_back(std::move(request));
   });
   EXPECT_EQ(requests_.size(), 0);
 }
 
-TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestNoLimits) {
-  setupBuilder(/*enable_metric_aggregation=*/true, 0);
+TEST_F(OtlpRequestStreamerTests, TestMaxDatapointsPerRequestNoLimits) {
+  setupStreamer(/*enable_metric_aggregation=*/true, 0);
   MetricAggregator::AggregationResult metrics;
 
   for (int i = 0; i < 1000; i++) {
@@ -1791,15 +1791,15 @@ TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestNoLimits) {
     metrics.gauge_data_[key] = i;
   }
 
-  builder_->buildRequests(metrics, [this](MetricsExportRequestPtr request) {
+  streamer_->streamRequests(metrics, [this](MetricsExportRequestPtr request) {
     requests_.push_back(std::move(request));
   });
   EXPECT_EQ(requests_.size(), 1);
   EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 1000);
 }
 
-TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestWithLimits) {
-  setupBuilder(/*enable_metric_aggregation=*/true, 2);
+TEST_F(OtlpRequestStreamerTests, TestMaxDatapointsPerRequestWithLimits) {
+  setupStreamer(/*enable_metric_aggregation=*/true, 2);
   MetricAggregator::AggregationResult metrics;
 
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
@@ -1811,7 +1811,7 @@ TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestWithLimits) {
   MetricAggregator::MetricKey key3{"metric2", MetricAggregator::AttributesMap{}};
   metrics.gauge_data_[key3] = 3;
 
-  builder_->buildRequests(metrics, [this](MetricsExportRequestPtr request) {
+  streamer_->streamRequests(metrics, [this](MetricsExportRequestPtr request) {
     requests_.push_back(std::move(request));
   });
   EXPECT_EQ(requests_.size(), 2);
@@ -1828,8 +1828,8 @@ TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestWithLimits) {
   EXPECT_EQ(count_dp(requests_[1]), 1);
 }
 
-TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestNoAggregation) {
-  setupBuilder(/*enable_metric_aggregation=*/false, 0);
+TEST_F(OtlpRequestStreamerTests, TestMaxDatapointsPerRequestNoAggregation) {
+  setupStreamer(/*enable_metric_aggregation=*/false, 0);
   MetricAggregator::AggregationResult metrics;
 
   for (int i = 0; i < 1000; i++) {
@@ -1838,7 +1838,7 @@ TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestNoAggregation) {
     metrics.gauge_data_[key] = i;
   }
 
-  builder_->buildRequests(metrics, [this](MetricsExportRequestPtr request) {
+  streamer_->streamRequests(metrics, [this](MetricsExportRequestPtr request) {
     requests_.push_back(std::move(request));
   });
   EXPECT_EQ(requests_.size(), 1);

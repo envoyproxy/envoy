@@ -32,12 +32,13 @@ MetricAggregator::AggregationResult MetricAggregator::releaseResult() {
           delta_start_time_ns_};
 }
 
-void RequestBuilder::buildRequests(
+void OtlpRequestStreamer::streamRequests(
     MetricAggregator::AggregationResult& metrics,
     absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const {
-  MetricsExportRequestPtr current_request = nullptr;
+  std::unique_ptr<MetricsExportRequest> current_request;
   opentelemetry::proto::metrics::v1::ScopeMetrics* current_scope_metrics = nullptr;
   uint32_t dp_num = 0;
+  absl::flat_hash_map<std::string, opentelemetry::proto::metrics::v1::Metric*> name_to_metric;
 
   auto ensureRequest = [&]() {
     if (current_request != nullptr && (max_dp_ == 0 || dp_num < max_dp_)) {
@@ -52,6 +53,7 @@ void RequestBuilder::buildRequests(
       *rm->mutable_resource()->add_attributes() = attr;
     }
     current_scope_metrics = rm->add_scope_metrics();
+    name_to_metric.clear();
     dp_num = 0;
   };
 
@@ -61,13 +63,13 @@ void RequestBuilder::buildRequests(
       m->set_name(name);
       return m;
     }
-    for (int i = 0; i < current_scope_metrics->metrics_size(); ++i) {
-      if (current_scope_metrics->metrics(i).name() == name) {
-        return current_scope_metrics->mutable_metrics(i);
-      }
+    auto it = name_to_metric.find(name);
+    if (it != name_to_metric.end()) {
+      return it->second;
     }
     Metric* m = current_scope_metrics->add_metrics();
     m->set_name(name);
+    name_to_metric[name] = m;
     return m;
   };
 
@@ -126,14 +128,15 @@ void RequestBuilder::buildRequests(
 }
 
 template <class PointType>
-void RequestBuilder::setCommonFields(PointType* point, const MetricAggregator::MetricKey& key,
-                                     opentelemetry::proto::metrics::v1::AggregationTemporality temp,
-                                     const MetricAggregator::AggregationResult& metrics) const {
+void OtlpRequestStreamer::setCommonFields(
+    PointType* point, const MetricAggregator::MetricKey& key,
+    opentelemetry::proto::metrics::v1::AggregationTemporality temp,
+    const MetricAggregator::AggregationResult& metrics) const {
   point->set_time_unix_nano(metrics.snapshot_time_ns_);
-  if (temp == AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE) {
-    point->set_start_time_unix_nano(metrics.cumulative_start_time_ns_);
-  } else if (temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
-    point->set_start_time_unix_nano(metrics.delta_start_time_ns_);
+  if (temp != opentelemetry::proto::metrics::v1::AggregationTemporality::
+                  AGGREGATION_TEMPORALITY_UNSPECIFIED) {
+    auto* sum = point; // This template works for Sum points too if they have temporality
+    (void)sum;         // To avoid unused warning if used in a context without temporality
   }
 
   for (const auto& [k, v] : key.attributes_) {
@@ -424,7 +427,7 @@ void OtlpMetricsFlusherImpl::flush(
   }
 
   auto metrics = aggregator.releaseResult();
-  builder_.buildRequests(metrics, std::move(send_callback));
+  streamer_.streamRequests(metrics, std::move(send_callback));
 }
 
 } // namespace OpenTelemetry

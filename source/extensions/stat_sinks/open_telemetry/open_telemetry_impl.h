@@ -40,16 +40,6 @@ using SinkConfig = envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig
 /**
  * This class helps to group data points by metric name and attributes,
  * which is necessary for creating a valid OTLP request.
- *
- * If `enable_metric_aggregation_` is true:
- * - Gauge metrics: We overwrite the existing data point for the same attributes.
- * - Counter metrics: We sum the data points if the temporality is delta. Otherwise, we overwrite
- * the existing data point.
- * - Histogram metrics: We aggregate the counts and sums if bounds are compatible.
- *
- * Data points are also split into multiple OTLP requests if the number of
- * data points exceeds `max_data_points_per_request_`. A new request is spawned
- * when the limit is reached.
  */
 class MetricAggregator : public Logger::Loggable<Logger::Id::stats> {
 public:
@@ -155,16 +145,16 @@ public:
  * Once a request reaches its data point limit, it is seamlessly dispatched to the provided
  * send_callback_.
  */
-class RequestBuilder {
+class OtlpRequestStreamer {
 public:
-  RequestBuilder(bool enable_metric_aggregation, uint32_t max_dp,
-                 const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
-                     resource_attributes)
+  OtlpRequestStreamer(bool enable_metric_aggregation, uint32_t max_dp,
+                      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
+                          resource_attributes)
       : enable_metric_aggregation_(enable_metric_aggregation), max_dp_(max_dp),
         resource_attributes_(resource_attributes) {}
 
-  void buildRequests(MetricAggregator::AggregationResult& metrics,
-                     absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const;
+  void streamRequests(MetricAggregator::AggregationResult& metrics,
+                      absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const;
 
 private:
   template <class PointType>
@@ -242,8 +232,8 @@ public:
       const OtlpOptionsSharedPtr config, std::function<bool(const Stats::Metric&)> predicate =
                                              [](const auto& metric) { return metric.used(); })
       : config_(config), predicate_(predicate),
-        builder_(config->enableMetricAggregation(), config->maxDataPointsPerRequest(),
-                 config->resource_attributes()) {}
+        streamer_(config->enableMetricAggregation(), config->maxDataPointsPerRequest(),
+                  config->resource_attributes()) {}
 
   void flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
              int64_t cumulative_start_time_ns,
@@ -288,7 +278,7 @@ private:
 
   const OtlpOptionsSharedPtr config_;
   const std::function<bool(const Stats::Metric&)> predicate_;
-  const RequestBuilder builder_;
+  const OtlpRequestStreamer streamer_;
 };
 
 /**
