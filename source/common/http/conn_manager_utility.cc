@@ -328,6 +328,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
 void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_headers) {
   absl::string_view te_header = request_headers.getTEValue();
   if (te_header.empty()) {
+    request_headers.removeTE();
     return;
   }
 
