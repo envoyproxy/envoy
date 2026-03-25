@@ -274,8 +274,6 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     throw EnvoyException(
         "max_early_data_bytes must be set when upstream_connect_mode is not IMMEDIATE");
   }
-
-  delay_route_selection_ = config.delay_route_selection();
 }
 
 RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& connection) {
@@ -434,7 +432,11 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 
   // Initialize connection establishment mode.
   connect_mode_ = config_->upstreamConnectMode();
-  delay_route_selection_ = config_->delayRouteSelection();
+
+  // Delay route selection needs to set on initialization since mid execution changes
+  // could lead to inconsistent behavior
+  delay_route_selection_ =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tcp_proxy_delay_route_selection");
 
   // Check if early data buffering is enabled.
   if (config_->maxEarlyDataBytes().has_value()) {

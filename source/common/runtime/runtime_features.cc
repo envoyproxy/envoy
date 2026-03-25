@@ -221,6 +221,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_strip_custom_stat_
 // TODO(haoyuewang): Flip true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_data_read_immediately);
 
+// Delay route selection in tcp_proxy until just before the upstream connection is established
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_delay_route_selection);
+
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT

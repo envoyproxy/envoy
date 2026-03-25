@@ -377,7 +377,6 @@ public:
   }
 
   const absl::optional<uint32_t>& maxEarlyDataBytes() const { return max_early_data_bytes_; }
-  bool delayRouteSelection() const { return delay_route_selection_; }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -434,7 +433,6 @@ private:
   envoy::extensions::filters::network::tcp_proxy::v3::UpstreamConnectMode upstream_connect_mode_{
       envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE};
   absl::optional<uint32_t> max_early_data_bytes_;
-  bool delay_route_selection_{false};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

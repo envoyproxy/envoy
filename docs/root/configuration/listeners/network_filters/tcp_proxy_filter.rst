@@ -104,19 +104,20 @@ Example configuration:
   The ``ON_DOWNSTREAM_DATA`` mode is not suitable for server-first protocols where the server sends the initial
   greeting (e.g., SMTP, MySQL, POP3). For such protocols, use ``IMMEDIATE`` mode.
 
-**Delay Route Selection**
+Delay Route Selection
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The ``delay_route_selection`` field controls whether we delay the route selection until the filter needs to establish the
-upstream connection. When unset, the filter will select a route on new connection.
+The ``envoy.reloadable_features.tcp_proxy_delay_route_selection`` runtime guard controls whether we delay the
+route selection until the filter needs to establish the upstream connection. When unset, the filter will select a 
+route on new connection.
 
-This field is **independent** of ``upstream_connect_mode``, but the momemt the selection occurs depends on the connection
-mode:
+The momemt the selection occurs depends on the connection mode:
 
 * ``IMMEDIATE`` with route selection delay: It has no effect. Route selection still happens on new connection
-* ``ON_DOWNSTREAM_DATA`` with route selection delay: Route selection will happen when the filter first receives data from
-downstream
-* ``ON_DOWNSTREAM_TLS_HANDSHAKE`` with route selection delay: Route selection will happen when the downstream TLS handshake
-  completes
+* ``ON_DOWNSTREAM_DATA`` with route selection delay: Route selection will happen when the filter first receives
+  data from downstream
+* ``ON_DOWNSTREAM_TLS_HANDSHAKE`` with route selection delay: Route selection will happen when the downstream TLS
+  handshake completes
 
 Filter state configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
