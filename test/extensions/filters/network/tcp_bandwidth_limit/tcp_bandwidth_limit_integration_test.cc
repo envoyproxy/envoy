@@ -20,13 +20,13 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TcpBandwidthLimitIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(TcpBandwidthLimitIntegrationTest, DownloadLimiting) {
+TEST_P(TcpBandwidthLimitIntegrationTest, ReadLimiting) {
   setup(R"EOF(
 name: envoy.filters.network.tcp_bandwidth_limit
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_bandwidth_limit.v3.TcpBandwidthLimit
   stat_prefix: tcp_bw
-  download_limit_kbps: 1
+  read_limit_kbps: 1
 )EOF");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -39,20 +39,20 @@ typed_config:
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
 
-  EXPECT_EQ(test_server_->counter("tcp_bw.tcp_bandwidth_limit.download_enabled")->value(), 1);
-  EXPECT_EQ(test_server_->counter("tcp_bw.tcp_bandwidth_limit.download_throttled")->value(), 0);
+  EXPECT_EQ(test_server_->counter("tcp_bw.tcp_bandwidth_limit.read_enabled")->value(), 1);
+  EXPECT_EQ(test_server_->counter("tcp_bw.tcp_bandwidth_limit.read_throttled")->value(), 0);
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
-TEST_P(TcpBandwidthLimitIntegrationTest, UploadLimiting) {
+TEST_P(TcpBandwidthLimitIntegrationTest, WriteLimiting) {
   setup(R"EOF(
 name: envoy.filters.network.tcp_bandwidth_limit
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_bandwidth_limit.v3.TcpBandwidthLimit
   stat_prefix: tcp_bw
-  upload_limit_kbps: 1
+  write_limit_kbps: 1
 )EOF");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -62,20 +62,20 @@ typed_config:
   ASSERT_TRUE(fake_upstream_connection->write("hello"));
   tcp_client->waitForData("hello");
 
-  EXPECT_EQ(test_server_->counter("tcp_bw.tcp_bandwidth_limit.upload_enabled")->value(), 1);
-  EXPECT_EQ(test_server_->counter("tcp_bw.tcp_bandwidth_limit.upload_throttled")->value(), 0);
+  EXPECT_EQ(test_server_->counter("tcp_bw.tcp_bandwidth_limit.write_enabled")->value(), 1);
+  EXPECT_EQ(test_server_->counter("tcp_bw.tcp_bandwidth_limit.write_throttled")->value(), 0);
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
-TEST_P(TcpBandwidthLimitIntegrationTest, DownloadThrottled) {
+TEST_P(TcpBandwidthLimitIntegrationTest, ReadThrottled) {
   setup(R"EOF(
 name: envoy.filters.network.tcp_bandwidth_limit
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_bandwidth_limit.v3.TcpBandwidthLimit
   stat_prefix: tcp_bw
-  download_limit_kbps: 1
+  read_limit_kbps: 1
 )EOF");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -85,23 +85,23 @@ typed_config:
   const std::string large_data(2048, 'a');
   ASSERT_TRUE(tcp_client->write(large_data));
 
-  test_server_->waitForCounterGe("tcp_bw.tcp_bandwidth_limit.download_throttled", 1);
-  test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.download_bytes_buffered", 1024);
+  test_server_->waitForCounterGe("tcp_bw.tcp_bandwidth_limit.read_throttled", 1);
+  test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.read_bytes_buffered", 1024);
 
   timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
-  test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.download_bytes_buffered", 0);
+  test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.read_bytes_buffered", 0);
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
-TEST_P(TcpBandwidthLimitIntegrationTest, UploadThrottled) {
+TEST_P(TcpBandwidthLimitIntegrationTest, WriteThrottled) {
   setup(R"EOF(
 name: envoy.filters.network.tcp_bandwidth_limit
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_bandwidth_limit.v3.TcpBandwidthLimit
   stat_prefix: tcp_bw
-  upload_limit_kbps: 1
+  write_limit_kbps: 1
 )EOF");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -111,8 +111,8 @@ typed_config:
   const std::string large_data(2048, 'b');
   ASSERT_TRUE(fake_upstream_connection->write(large_data));
 
-  test_server_->waitForCounterGe("tcp_bw.tcp_bandwidth_limit.upload_throttled", 1);
-  test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.upload_bytes_buffered", 1024);
+  test_server_->waitForCounterGe("tcp_bw.tcp_bandwidth_limit.write_throttled", 1);
+  test_server_->waitForGaugeEq("tcp_bw.tcp_bandwidth_limit.write_bytes_buffered", 1024);
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());

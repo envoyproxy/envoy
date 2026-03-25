@@ -22,10 +22,10 @@ namespace TcpBandwidthLimit {
 
 class TcpBandwidthLimitFilterTest : public ::testing::Test {
 public:
-  Buffer::WatermarkBuffer& getDownloadBuffer() { return filter_->download_buffer_; }
-  Buffer::WatermarkBuffer& getUploadBuffer() { return filter_->upload_buffer_; }
-  Event::TimerPtr& getDownloadTimer() { return filter_->download_timer_; }
-  Event::TimerPtr& getUploadTimer() { return filter_->upload_timer_; }
+  Buffer::WatermarkBuffer& getReadBuffer() { return filter_->read_buffer_; }
+  Buffer::WatermarkBuffer& getWriteBuffer() { return filter_->write_buffer_; }
+  Event::TimerPtr& getReadTimer() { return filter_->read_timer_; }
+  Event::TimerPtr& getWriteTimer() { return filter_->write_timer_; }
 
   void setup(const std::string& yaml) {
     envoy::extensions::filters::network::tcp_bandwidth_limit::v3::TcpBandwidthLimit proto_config;
@@ -51,10 +51,10 @@ public:
   std::unique_ptr<TcpBandwidthLimitFilter> filter_;
 };
 
-TEST_F(TcpBandwidthLimitFilterTest, DownloadLimit) {
+TEST_F(TcpBandwidthLimitFilterTest, ReadLimit) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -74,10 +74,10 @@ TEST_F(TcpBandwidthLimitFilterTest, DownloadLimit) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(upload_data, false));
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, UploadLimit) {
+TEST_F(TcpBandwidthLimitFilterTest, WriteLimit) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 1
+    write_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -102,7 +102,7 @@ TEST_F(TcpBandwidthLimitFilterTest, RuntimeDisabled) {
 
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
     runtime_enabled:
       default_value: false
       runtime_key: test_key
@@ -117,8 +117,8 @@ TEST_F(TcpBandwidthLimitFilterTest, RuntimeDisabled) {
 TEST_F(TcpBandwidthLimitFilterTest, BothLimitsConfigured) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
-    upload_limit_kbps: 2
+    read_limit_kbps: 1
+    write_limit_kbps: 2
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -144,7 +144,7 @@ TEST_F(TcpBandwidthLimitFilterTest, BothLimitsConfigured) {
 TEST_F(TcpBandwidthLimitFilterTest, PartialConsumption) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
   )EOF";
 
   setup(yaml);
@@ -165,10 +165,10 @@ TEST_F(TcpBandwidthLimitFilterTest, PartialConsumption) {
   EXPECT_EQ(0, large_data.length());
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, PartialConsumptionUpload) {
+TEST_F(TcpBandwidthLimitFilterTest, PartialConsumptionWrite) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 1
+    write_limit_kbps: 1
   )EOF";
 
   setup(yaml);
@@ -204,10 +204,10 @@ TEST_F(TcpBandwidthLimitFilterTest, NoLimitPassThrough) {
   EXPECT_EQ(10000, large_upload.length());
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, ZeroLimitBlocksAllDownload) {
+TEST_F(TcpBandwidthLimitFilterTest, ZeroLimitBlocksAllRead) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 0
+    read_limit_kbps: 0
   )EOF";
 
   setup(yaml);
@@ -220,10 +220,10 @@ TEST_F(TcpBandwidthLimitFilterTest, ZeroLimitBlocksAllDownload) {
   EXPECT_CALL(read_filter_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, ZeroLimitBlocksAllUpload) {
+TEST_F(TcpBandwidthLimitFilterTest, ZeroLimitBlocksAllWrite) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 0
+    write_limit_kbps: 0
   )EOF";
 
   setup(yaml);
@@ -239,8 +239,8 @@ TEST_F(TcpBandwidthLimitFilterTest, ZeroLimitBlocksAllUpload) {
 TEST_F(TcpBandwidthLimitFilterTest, ConnectionClosed) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
-    upload_limit_kbps: 1
+    read_limit_kbps: 1
+    write_limit_kbps: 1
   )EOF";
 
   setup(yaml);
@@ -255,7 +255,7 @@ TEST_F(TcpBandwidthLimitFilterTest, FillIntervalValidation) {
   // Test minimum fill interval (20ms)
   const std::string yaml1 = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 20000000
@@ -267,7 +267,7 @@ TEST_F(TcpBandwidthLimitFilterTest, FillIntervalValidation) {
   // Test maximum fill interval (1s)
   const std::string yaml2 = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
     fill_interval:
       seconds: 1
       nanos: 0
@@ -283,7 +283,7 @@ TEST_F(TcpBandwidthLimitFilterTest, FillIntervalValidation) {
 TEST_F(TcpBandwidthLimitFilterTest, DefaultFillInterval) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 100
+    read_limit_kbps: 100
   )EOF";
 
   setup(yaml);
@@ -293,8 +293,8 @@ TEST_F(TcpBandwidthLimitFilterTest, DefaultFillInterval) {
 TEST_F(TcpBandwidthLimitFilterTest, EmptyDataWithLimits) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 100
-    upload_limit_kbps: 100
+    read_limit_kbps: 100
+    write_limit_kbps: 100
   )EOF";
 
   setup(yaml);
@@ -307,8 +307,8 @@ TEST_F(TcpBandwidthLimitFilterTest, EmptyDataWithLimits) {
 TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedDataScenarios) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
-    upload_limit_kbps: 1
+    read_limit_kbps: 1
+    write_limit_kbps: 1
   )EOF";
 
   setup(yaml);
@@ -338,8 +338,8 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedDataScenarios) {
 TEST_F(TcpBandwidthLimitFilterTest, DestructorCleanup) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
-    upload_limit_kbps: 1
+    read_limit_kbps: 1
+    write_limit_kbps: 1
   )EOF";
 
   setup(yaml);
@@ -354,8 +354,8 @@ TEST_F(TcpBandwidthLimitFilterTest, DestructorCleanup) {
 TEST_F(TcpBandwidthLimitFilterTest, ConfigAccessors) {
   const std::string yaml_with_limits = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 100
-    upload_limit_kbps: 50
+    read_limit_kbps: 100
+    write_limit_kbps: 50
     fill_interval:
       seconds: 0
       nanos: 100000000
@@ -363,10 +363,10 @@ TEST_F(TcpBandwidthLimitFilterTest, ConfigAccessors) {
 
   setup(yaml_with_limits);
 
-  EXPECT_TRUE(config_->hasDownloadLimit());
-  EXPECT_TRUE(config_->hasUploadLimit());
-  EXPECT_EQ(100, config_->downloadLimit());
-  EXPECT_EQ(50, config_->uploadLimit());
+  EXPECT_TRUE(config_->hasReadLimit());
+  EXPECT_TRUE(config_->hasWriteLimit());
+  EXPECT_EQ(100, config_->readLimit());
+  EXPECT_EQ(50, config_->writeLimit());
   EXPECT_EQ(std::chrono::milliseconds(100), config_->fillInterval());
   EXPECT_TRUE(config_->enabled());
 
@@ -379,15 +379,15 @@ TEST_F(TcpBandwidthLimitFilterTest, ConfigAccessors) {
 
   setup(yaml_no_limits);
 
-  EXPECT_FALSE(config_->hasDownloadLimit());
-  EXPECT_FALSE(config_->hasUploadLimit());
+  EXPECT_FALSE(config_->hasReadLimit());
+  EXPECT_FALSE(config_->hasWriteLimit());
   EXPECT_EQ(std::chrono::milliseconds(50), config_->fillInterval()); // Default 50ms
 }
 
 TEST_F(TcpBandwidthLimitFilterTest, OnNewConnectionTest) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 100
+    read_limit_kbps: 100
   )EOF";
 
   setup(yaml);
@@ -403,10 +403,10 @@ TEST_F(TcpBandwidthLimitFilterTest, OnNewConnectionTest) {
   EXPECT_EQ(Network::FilterStatus::Continue, new_filter->onData(data, false));
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerBufferDraining) {
+TEST_F(TcpBandwidthLimitFilterTest, ReadTimerBufferDraining) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -435,15 +435,15 @@ TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerBufferDraining) {
   ON_CALL(read_filter_callbacks_.connection_, readDisable(false))
       .WillByDefault(testing::Return(Network::Connection::ReadDisableStatus::NoTransition));
 
-  filter_->onDownloadTokenTimer();
-  filter_->onDownloadTokenTimer();
-  filter_->onDownloadTokenTimer();
+  filter_->onReadTokenTimer();
+  filter_->onReadTokenTimer();
+  filter_->onReadTokenTimer();
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, UploadTimerBufferDraining) {
+TEST_F(TcpBandwidthLimitFilterTest, WriteTimerBufferDraining) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 1
+    write_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -470,16 +470,16 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerBufferDraining) {
   ON_CALL(write_filter_callbacks_, onBelowWriteBufferLowWatermark())
       .WillByDefault(testing::Return());
 
-  filter_->onUploadTokenTimer();
-  filter_->onUploadTokenTimer();
-  filter_->onUploadTokenTimer();
+  filter_->onWriteTokenTimer();
+  filter_->onWriteTokenTimer();
+  filter_->onWriteTokenTimer();
 }
 
 TEST_F(TcpBandwidthLimitFilterTest, SimultaneousTimers) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
-    upload_limit_kbps: 1
+    read_limit_kbps: 1
+    write_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -521,20 +521,20 @@ TEST_F(TcpBandwidthLimitFilterTest, SimultaneousTimers) {
   ON_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, _))
       .WillByDefault(testing::Return());
 
-  filter_->onDownloadTokenTimer();
+  filter_->onReadTokenTimer();
 
-  filter_->onUploadTokenTimer();
+  filter_->onWriteTokenTimer();
 
   // Verify both can be called again without issues
-  filter_->onDownloadTokenTimer();
-  filter_->onUploadTokenTimer();
+  filter_->onReadTokenTimer();
+  filter_->onWriteTokenTimer();
 }
 
 // Test edge case: throttling with small amounts of data
 TEST_F(TcpBandwidthLimitFilterTest, TimerWithEmptyBuffer) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
   )EOF";
 
   setup(yaml);
@@ -559,58 +559,56 @@ TEST_F(TcpBandwidthLimitFilterTest, TimerWithEmptyBuffer) {
 
   // First timer fire: processes the 100 bytes of buffered data
   // This should inject the buffered data and may re-enable the timer
-  filter_->onDownloadTokenTimer();
+  filter_->onReadTokenTimer();
 
   // Subsequent fires: handle the empty buffer case
   // When buffer is empty, timer should be reset and read re-enabled
-  filter_->onDownloadTokenTimer();
+  filter_->onReadTokenTimer();
 
   // One more call to ensure empty buffer handling is robust
-  filter_->onDownloadTokenTimer();
+  filter_->onReadTokenTimer();
 }
 
 // Test stats increment for throttling
 TEST_F(TcpBandwidthLimitFilterTest, StatsIncrement) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
-    upload_limit_kbps: 1
+    read_limit_kbps: 1
+    write_limit_kbps: 1
   )EOF";
 
   setup(yaml);
 
-  EXPECT_EQ(0, stats_store_.counterFromString("test.tcp_bandwidth_limit.download_enabled").value());
-  EXPECT_EQ(0, stats_store_.counterFromString("test.tcp_bandwidth_limit.upload_enabled").value());
-  EXPECT_EQ(0,
-            stats_store_.counterFromString("test.tcp_bandwidth_limit.download_throttled").value());
-  EXPECT_EQ(0, stats_store_.counterFromString("test.tcp_bandwidth_limit.upload_throttled").value());
+  EXPECT_EQ(0, stats_store_.counterFromString("test.tcp_bandwidth_limit.read_enabled").value());
+  EXPECT_EQ(0, stats_store_.counterFromString("test.tcp_bandwidth_limit.write_enabled").value());
+  EXPECT_EQ(0, stats_store_.counterFromString("test.tcp_bandwidth_limit.read_throttled").value());
+  EXPECT_EQ(0, stats_store_.counterFromString("test.tcp_bandwidth_limit.write_throttled").value());
 
   Buffer::OwnedImpl data1(std::string(512, 'a'));
   filter_->onData(data1, false);
-  EXPECT_EQ(1, stats_store_.counterFromString("test.tcp_bandwidth_limit.download_enabled").value());
+  EXPECT_EQ(1, stats_store_.counterFromString("test.tcp_bandwidth_limit.read_enabled").value());
 
   Buffer::OwnedImpl data2(std::string(512, 'b'));
   filter_->onWrite(data2, false);
-  EXPECT_EQ(1, stats_store_.counterFromString("test.tcp_bandwidth_limit.upload_enabled").value());
+  EXPECT_EQ(1, stats_store_.counterFromString("test.tcp_bandwidth_limit.write_enabled").value());
 
   Buffer::OwnedImpl large_data(std::string(2048, 'c'));
   EXPECT_CALL(read_filter_callbacks_.connection_, readDisable(true));
   filter_->onData(large_data, false);
-  EXPECT_EQ(2, stats_store_.counterFromString("test.tcp_bandwidth_limit.download_enabled").value());
-  EXPECT_EQ(1,
-            stats_store_.counterFromString("test.tcp_bandwidth_limit.download_throttled").value());
+  EXPECT_EQ(2, stats_store_.counterFromString("test.tcp_bandwidth_limit.read_enabled").value());
+  EXPECT_EQ(1, stats_store_.counterFromString("test.tcp_bandwidth_limit.read_throttled").value());
   EXPECT_EQ(1536, stats_store_
-                      .gaugeFromString("test.tcp_bandwidth_limit.download_bytes_buffered",
+                      .gaugeFromString("test.tcp_bandwidth_limit.read_bytes_buffered",
                                        Stats::Gauge::ImportMode::Accumulate)
                       .value());
 
   Buffer::OwnedImpl large_upload(std::string(2048, 'd'));
   EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   filter_->onWrite(large_upload, false);
-  EXPECT_EQ(2, stats_store_.counterFromString("test.tcp_bandwidth_limit.upload_enabled").value());
-  EXPECT_EQ(1, stats_store_.counterFromString("test.tcp_bandwidth_limit.upload_throttled").value());
+  EXPECT_EQ(2, stats_store_.counterFromString("test.tcp_bandwidth_limit.write_enabled").value());
+  EXPECT_EQ(1, stats_store_.counterFromString("test.tcp_bandwidth_limit.write_throttled").value());
   EXPECT_EQ(1536, stats_store_
-                      .gaugeFromString("test.tcp_bandwidth_limit.upload_bytes_buffered",
+                      .gaugeFromString("test.tcp_bandwidth_limit.write_bytes_buffered",
                                        Stats::Gauge::ImportMode::Accumulate)
                       .value());
 }
@@ -618,7 +616,7 @@ TEST_F(TcpBandwidthLimitFilterTest, StatsIncrement) {
 TEST_F(TcpBandwidthLimitFilterTest, TimerReEnableReadAlreadyEnabled) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -641,10 +639,10 @@ TEST_F(TcpBandwidthLimitFilterTest, TimerReEnableReadAlreadyEnabled) {
 }
 
 // Test timer callback when buffer becomes empty
-TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerEmptyBufferPath) {
+TEST_F(TcpBandwidthLimitFilterTest, ReadTimerEmptyBufferPath) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 10
+    read_limit_kbps: 10
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -655,14 +653,14 @@ TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerEmptyBufferPath) {
   Buffer::OwnedImpl data(std::string(100, 'a'));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  filter_->onDownloadTokenTimer();
+  filter_->onReadTokenTimer();
 }
 
 // Test upload timer callback when buffer becomes empty
-TEST_F(TcpBandwidthLimitFilterTest, UploadTimerEmptyBufferPath) {
+TEST_F(TcpBandwidthLimitFilterTest, WriteTimerEmptyBufferPath) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 10
+    write_limit_kbps: 10
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -673,13 +671,13 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerEmptyBufferPath) {
   Buffer::OwnedImpl data(std::string(100, 'a'));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data, false));
 
-  filter_->onUploadTokenTimer();
+  filter_->onWriteTokenTimer();
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, PartialTokenConsumptionDownload) {
+TEST_F(TcpBandwidthLimitFilterTest, PartialTokenConsumptionRead) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -703,10 +701,10 @@ TEST_F(TcpBandwidthLimitFilterTest, PartialTokenConsumptionDownload) {
   EXPECT_LT(injected_data.length(), 500);
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, PartialTokenConsumptionUpload) {
+TEST_F(TcpBandwidthLimitFilterTest, PartialTokenConsumptionWrite) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 1
+    write_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -733,7 +731,7 @@ TEST_F(TcpBandwidthLimitFilterTest, PartialTokenConsumptionUpload) {
 TEST_F(TcpBandwidthLimitFilterTest, ConnectionClosingWithBufferedData) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -749,42 +747,19 @@ TEST_F(TcpBandwidthLimitFilterTest, ConnectionClosingWithBufferedData) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedDownloadDataEmptyBuffer) {
+TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedReadDataEmptyBuffer) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
   )EOF";
 
   setup(yaml);
 
   // Directly call with empty buffer should return early
-  filter_->onDownloadTokenTimer();
+  filter_->onReadTokenTimer();
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedDownloadDataNoTokenBucket) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test
-  )EOF";
-
-  setup(yaml);
-
-  // Directly call with empty buffer should return early
-  filter_->onDownloadTokenTimer();
-}
-
-TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadDataEmptyBuffer) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test
-    upload_limit_kbps: 1
-  )EOF";
-
-  setup(yaml);
-
-  // Directly call with empty buffer should return early
-  filter_->onUploadTokenTimer();
-}
-
-TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadDataNoTokenBucket) {
+TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedReadDataNoTokenBucket) {
   const std::string yaml = R"EOF(
     stat_prefix: test
   )EOF";
@@ -792,13 +767,36 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadDataNoTokenBucket) {
   setup(yaml);
 
   // Directly call with empty buffer should return early
-  filter_->onUploadTokenTimer();
+  filter_->onReadTokenTimer();
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerDrainsBufferAndReEnablesRead) {
+TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedWriteDataEmptyBuffer) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    write_limit_kbps: 1
+  )EOF";
+
+  setup(yaml);
+
+  // Directly call with empty buffer should return early
+  filter_->onWriteTokenTimer();
+}
+
+TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedWriteDataNoTokenBucket) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test
+  )EOF";
+
+  setup(yaml);
+
+  // Directly call with empty buffer should return early
+  filter_->onWriteTokenTimer();
+}
+
+TEST_F(TcpBandwidthLimitFilterTest, ReadTimerDrainsBuffer) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test
+    read_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -816,16 +814,16 @@ TEST_F(TcpBandwidthLimitFilterTest, DownloadTimerDrainsBufferAndReEnablesRead) {
 
   EXPECT_CALL(read_filter_callbacks_, injectReadDataToFilterChain(_, true));
   EXPECT_CALL(read_filter_callbacks_.connection_, readDisable(false));
-  filter_->onDownloadTokenTimer();
+  filter_->onReadTokenTimer();
 
-  EXPECT_EQ(0, getDownloadBuffer().length());
-  EXPECT_EQ(nullptr, getDownloadTimer());
+  EXPECT_EQ(0, getReadBuffer().length());
+  EXPECT_EQ(nullptr, getReadTimer());
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, UploadTimerDrainsBufferAndSignalsLowWatermark) {
+TEST_F(TcpBandwidthLimitFilterTest, WriteTimerDrainsBuffer) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 1
+    write_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -843,16 +841,16 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerDrainsBufferAndSignalsLowWatermar
 
   EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, true));
   EXPECT_CALL(write_filter_callbacks_, onBelowWriteBufferLowWatermark());
-  filter_->onUploadTokenTimer();
+  filter_->onWriteTokenTimer();
 
-  EXPECT_EQ(0, getUploadBuffer().length());
-  EXPECT_EQ(nullptr, getUploadTimer());
+  EXPECT_EQ(0, getWriteBuffer().length());
+  EXPECT_EQ(nullptr, getWriteTimer());
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, UploadTimerResetPath) {
+TEST_F(TcpBandwidthLimitFilterTest, WriteTimerResetPath) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 1
+    write_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -868,17 +866,17 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadTimerResetPath) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
 
   // Clear the buffer completely to test the empty buffer path
-  getUploadBuffer().drain(getUploadBuffer().length());
-  filter_->onUploadTokenTimer();
+  getWriteBuffer().drain(getWriteBuffer().length());
+  filter_->onWriteTokenTimer();
 
   // Verify timer was reset
-  EXPECT_EQ(nullptr, getUploadTimer());
+  EXPECT_EQ(nullptr, getWriteTimer());
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedDownloadWithTokens) {
+TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedReadWithTokens) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -886,24 +884,24 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedDownloadWithTokens) {
 
   setup(yaml);
 
-  getDownloadBuffer().add("test data");
-  getDownloadTimer().reset(new Event::MockTimer());
+  getReadBuffer().add("test data");
+  getReadTimer().reset(new Event::MockTimer());
 
   time_source_.advanceTimeWait(std::chrono::milliseconds(100));
   EXPECT_CALL(read_filter_callbacks_,
               injectReadDataToFilterChain(BufferStringEqual("test data"), false));
 
-  filter_->onDownloadTokenTimer();
+  filter_->onReadTokenTimer();
 
   // Verify buffer is now empty and timer is reset
-  EXPECT_EQ(0, getDownloadBuffer().length());
-  EXPECT_EQ(nullptr, getDownloadTimer());
+  EXPECT_EQ(0, getReadBuffer().length());
+  EXPECT_EQ(nullptr, getReadTimer());
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadWithTokens) {
+TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedWriteWithTokens) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 1
+    write_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -912,8 +910,8 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadWithTokens) {
   setup(yaml);
 
   EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
-  getUploadBuffer().add("test data");
-  getUploadTimer().reset(new Event::MockTimer());
+  getWriteBuffer().add("test data");
+  getWriteTimer().reset(new Event::MockTimer());
 
   time_source_.advanceTimeWait(std::chrono::milliseconds(100));
 
@@ -921,18 +919,18 @@ TEST_F(TcpBandwidthLimitFilterTest, ProcessBufferedUploadWithTokens) {
               injectWriteDataToFilterChain(BufferStringEqual("test data"), false));
   EXPECT_CALL(write_filter_callbacks_, onBelowWriteBufferLowWatermark());
 
-  filter_->onUploadTokenTimer();
+  filter_->onWriteTokenTimer();
 
   // Verify buffer is now empty and timer is reset
-  EXPECT_EQ(0, getUploadBuffer().length());
-  EXPECT_EQ(nullptr, getUploadTimer());
+  EXPECT_EQ(0, getWriteBuffer().length());
+  EXPECT_EQ(nullptr, getWriteTimer());
 }
 
 // Test that new data is buffered when there's already pending data, to preserve byte ordering.
-TEST_F(TcpBandwidthLimitFilterTest, DownloadOrderingWithPendingBuffer) {
+TEST_F(TcpBandwidthLimitFilterTest, ReadOrderingWithPendingBuffer) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1
+    read_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -948,19 +946,19 @@ TEST_F(TcpBandwidthLimitFilterTest, DownloadOrderingWithPendingBuffer) {
   Buffer::OwnedImpl data2(std::string(512, 'b'));
   EXPECT_CALL(read_filter_callbacks_.connection_, readDisable(true));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
-  EXPECT_EQ(512, getDownloadBuffer().length());
+  EXPECT_EQ(512, getReadBuffer().length());
 
   // Third call: buffer has pending data. New data must be appended without consuming tokens.
   EXPECT_CALL(read_filter_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
   Buffer::OwnedImpl data3(std::string(256, 'c'));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data3, false));
-  EXPECT_EQ(512 + 256, getDownloadBuffer().length());
+  EXPECT_EQ(512 + 256, getReadBuffer().length());
 }
 
-TEST_F(TcpBandwidthLimitFilterTest, UploadOrderingWithPendingBuffer) {
+TEST_F(TcpBandwidthLimitFilterTest, WriteOrderingWithPendingBuffer) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 1
+    write_limit_kbps: 1
     fill_interval:
       seconds: 0
       nanos: 50000000
@@ -976,13 +974,13 @@ TEST_F(TcpBandwidthLimitFilterTest, UploadOrderingWithPendingBuffer) {
   Buffer::OwnedImpl data2(std::string(512, 'b'));
   EXPECT_CALL(write_filter_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data2, false));
-  EXPECT_EQ(512, getUploadBuffer().length());
+  EXPECT_EQ(512, getWriteBuffer().length());
 
   // Third call: buffer has pending data. New data must be appended without consuming tokens.
   EXPECT_CALL(write_filter_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
   Buffer::OwnedImpl data3(std::string(256, 'c'));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data3, false));
-  EXPECT_EQ(512 + 256, getUploadBuffer().length());
+  EXPECT_EQ(512 + 256, getWriteBuffer().length());
 }
 
 } // namespace TcpBandwidthLimit

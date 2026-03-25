@@ -13,6 +13,8 @@ namespace TcpBandwidthLimit {
 namespace {
 
 constexpr uint64_t kiloBytesToBytes(uint64_t val) { return val * 1024; }
+constexpr int64_t RateUpdateIntervalMs = 1000;
+constexpr uint64_t MillisecondsPerSecond = 1000;
 
 } // namespace
 
@@ -20,8 +22,8 @@ FilterConfig::FilterConfig(
     const envoy::extensions::filters::network::tcp_bandwidth_limit::v3::TcpBandwidthLimit& config,
     Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source)
     : runtime_(runtime), time_source_(time_source),
-      download_limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, download_limit_kbps, 0)),
-      upload_limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, upload_limit_kbps, 0)),
+      read_limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, read_limit_kbps, 0)),
+      write_limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, write_limit_kbps, 0)),
       fill_interval_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(config, fill_interval, 50))), // Default 50ms
       enabled_(config.runtime_enabled(), runtime),
@@ -29,16 +31,16 @@ FilterConfig::FilterConfig(
       // The token bucket is configured with a max token count of the number of
       // bytes per second, and refills at the same rate, so that we have a per
       // second limit which refills gradually over the fill interval.
-      download_token_bucket_(config.has_download_limit_kbps()
-                                 ? std::make_shared<SharedTokenBucketImpl>(
-                                       kiloBytesToBytes(download_limit_kbps_), time_source_,
-                                       static_cast<double>(kiloBytesToBytes(download_limit_kbps_)))
-                                 : nullptr),
-      upload_token_bucket_(config.has_upload_limit_kbps()
-                               ? std::make_shared<SharedTokenBucketImpl>(
-                                     kiloBytesToBytes(upload_limit_kbps_), time_source_,
-                                     static_cast<double>(kiloBytesToBytes(upload_limit_kbps_)))
-                               : nullptr) {}
+      read_token_bucket_(config.has_read_limit_kbps()
+                             ? std::make_shared<SharedTokenBucketImpl>(
+                                   kiloBytesToBytes(read_limit_kbps_), time_source_,
+                                   static_cast<double>(kiloBytesToBytes(read_limit_kbps_)))
+                             : nullptr),
+      write_token_bucket_(config.has_write_limit_kbps()
+                              ? std::make_shared<SharedTokenBucketImpl>(
+                                    kiloBytesToBytes(write_limit_kbps_), time_source_,
+                                    static_cast<double>(kiloBytesToBytes(write_limit_kbps_)))
+                              : nullptr) {}
 
 TcpBandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + ".tcp_bandwidth_limit";
@@ -47,178 +49,213 @@ TcpBandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, St
 }
 
 TcpBandwidthLimitFilter::TcpBandwidthLimitFilter(FilterConfigSharedPtr config)
-    : config_(config),
-      download_buffer_([this]() { onDownloadBufferLowWatermark(); },
-                       [this]() { onDownloadBufferHighWatermark(); }, []() -> void {}),
-      upload_buffer_([this]() { onUploadBufferLowWatermark(); },
-                     [this]() { onUploadBufferHighWatermark(); }, []() -> void {}) {}
+    : config_(config), read_buffer_([this]() { onReadBufferLowWatermark(); },
+                                    [this]() { onReadBufferHighWatermark(); }, []() -> void {}),
+      write_buffer_([this]() { onWriteBufferLowWatermark(); },
+                    [this]() { onWriteBufferHighWatermark(); }, []() -> void {}),
+      last_read_rate_update_(config->timeSource().monotonicTime()),
+      last_write_rate_update_(config->timeSource().monotonicTime()) {}
 
 TcpBandwidthLimitFilter::~TcpBandwidthLimitFilter() {
-  if (download_timer_) {
-    download_timer_->disableTimer();
-    download_timer_.reset();
+  if (read_timer_) {
+    read_timer_->disableTimer();
+    read_timer_.reset();
   }
-  if (upload_timer_) {
-    upload_timer_->disableTimer();
-    upload_timer_.reset();
+  if (write_timer_) {
+    write_timer_->disableTimer();
+    write_timer_.reset();
   }
 }
 
 Network::FilterStatus TcpBandwidthLimitFilter::onData(Buffer::Instance& data, bool end_stream) {
-  if (!config_->enabled() || !config_->hasDownloadLimit()) {
+  if (!config_->enabled() || !config_->hasReadLimit()) {
     return Network::FilterStatus::Continue;
   }
 
-  config_->stats().download_enabled_.inc();
+  config_->stats().read_enabled_.inc();
 
   // If there's already buffered data, we must buffer new data too to preserve byte ordering.
-  if (download_buffer_.length() > 0) {
-    config_->stats().download_throttled_.inc();
-    download_end_stream_ = end_stream;
-    download_buffer_.move(data);
-    config_->stats().download_bytes_buffered_.set(download_buffer_.length());
+  if (read_buffer_.length() > 0) {
+    config_->stats().read_throttled_.inc();
+    read_end_stream_ = end_stream;
+    read_buffer_.move(data);
+    config_->stats().read_bytes_buffered_.set(read_buffer_.length());
     return Network::FilterStatus::StopIteration;
   }
 
   uint64_t data_size = data.length();
-  uint64_t consumed = config_->downloadTokenBucket()->consume(data_size, true);
+  uint64_t consumed = config_->readTokenBucket()->consume(data_size, true);
 
   if (consumed < data_size) {
-    config_->stats().download_throttled_.inc();
+    config_->stats().read_throttled_.inc();
 
     if (consumed > 0) {
       Buffer::OwnedImpl passthrough;
       passthrough.move(data, consumed);
       read_callbacks_->injectReadDataToFilterChain(passthrough, false);
+      updateReadRate(consumed);
     }
 
-    download_end_stream_ = end_stream;
-    download_buffer_.move(data);
-    config_->stats().download_bytes_buffered_.set(download_buffer_.length());
+    read_end_stream_ = end_stream;
+    read_buffer_.move(data);
+    config_->stats().read_bytes_buffered_.set(read_buffer_.length());
 
-    if (!download_timer_) {
-      download_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-          [this]() { onDownloadTokenTimer(); });
-      download_timer_->enableTimer(config_->fillInterval());
+    if (!read_timer_) {
+      read_timer_ =
+          read_callbacks_->connection().dispatcher().createTimer([this]() { onReadTokenTimer(); });
+      read_timer_->enableTimer(config_->fillInterval());
     }
 
     return Network::FilterStatus::StopIteration;
   }
 
+  updateReadRate(data_size);
   return Network::FilterStatus::Continue;
 }
 
 Network::FilterStatus TcpBandwidthLimitFilter::onWrite(Buffer::Instance& data, bool end_stream) {
-  if (!config_->enabled() || !config_->hasUploadLimit()) {
+  if (!config_->enabled() || !config_->hasWriteLimit()) {
     return Network::FilterStatus::Continue;
   }
 
-  config_->stats().upload_enabled_.inc();
+  config_->stats().write_enabled_.inc();
 
   // If there's already buffered data, we must buffer new data too to preserve byte ordering.
-  if (upload_buffer_.length() > 0) {
-    config_->stats().upload_throttled_.inc();
-    upload_end_stream_ = end_stream;
-    upload_buffer_.move(data);
-    config_->stats().upload_bytes_buffered_.set(upload_buffer_.length());
+  if (write_buffer_.length() > 0) {
+    config_->stats().write_throttled_.inc();
+    write_end_stream_ = end_stream;
+    write_buffer_.move(data);
+    config_->stats().write_bytes_buffered_.set(write_buffer_.length());
     return Network::FilterStatus::StopIteration;
   }
 
   uint64_t data_size = data.length();
-  uint64_t consumed = config_->uploadTokenBucket()->consume(data_size, true);
+  uint64_t consumed = config_->writeTokenBucket()->consume(data_size, true);
 
   if (consumed < data_size) {
-    config_->stats().upload_throttled_.inc();
+    config_->stats().write_throttled_.inc();
 
     if (consumed > 0) {
       Buffer::OwnedImpl to_send;
       to_send.move(data, consumed);
       write_callbacks_->injectWriteDataToFilterChain(to_send, false);
+      updateWriteRate(consumed);
     }
 
-    upload_end_stream_ = end_stream;
-    upload_buffer_.move(data);
-    config_->stats().upload_bytes_buffered_.set(upload_buffer_.length());
+    write_end_stream_ = end_stream;
+    write_buffer_.move(data);
+    config_->stats().write_bytes_buffered_.set(write_buffer_.length());
 
-    if (!upload_timer_) {
-      upload_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-          [this]() { onUploadTokenTimer(); });
-      upload_timer_->enableTimer(config_->fillInterval());
+    if (!write_timer_) {
+      write_timer_ =
+          read_callbacks_->connection().dispatcher().createTimer([this]() { onWriteTokenTimer(); });
+      write_timer_->enableTimer(config_->fillInterval());
     }
 
     return Network::FilterStatus::StopIteration;
   }
 
+  updateWriteRate(data_size);
   return Network::FilterStatus::Continue;
 }
 
-void TcpBandwidthLimitFilter::onDownloadTokenTimer() {
-  processBufferedDownloadData();
+void TcpBandwidthLimitFilter::onReadTokenTimer() {
+  processBufferedReadData();
 
-  if (download_buffer_.length() > 0) {
-    download_timer_->enableTimer(config_->fillInterval());
+  if (read_buffer_.length() > 0) {
+    read_timer_->enableTimer(config_->fillInterval());
   } else {
-    download_timer_.reset();
+    read_timer_.reset();
   }
 }
 
-void TcpBandwidthLimitFilter::onUploadTokenTimer() {
-  processBufferedUploadData();
+void TcpBandwidthLimitFilter::onWriteTokenTimer() {
+  processBufferedWriteData();
 
-  if (upload_buffer_.length() > 0) {
-    upload_timer_->enableTimer(config_->fillInterval());
+  if (write_buffer_.length() > 0) {
+    write_timer_->enableTimer(config_->fillInterval());
   } else {
-    upload_timer_.reset();
+    write_timer_.reset();
   }
 }
 
-void TcpBandwidthLimitFilter::onDownloadBufferHighWatermark() {
+void TcpBandwidthLimitFilter::onReadBufferHighWatermark() {
   read_callbacks_->connection().readDisable(true);
 }
 
-void TcpBandwidthLimitFilter::onDownloadBufferLowWatermark() {
+void TcpBandwidthLimitFilter::onReadBufferLowWatermark() {
   read_callbacks_->connection().readDisable(false);
 }
 
-void TcpBandwidthLimitFilter::onUploadBufferHighWatermark() {
+void TcpBandwidthLimitFilter::onWriteBufferHighWatermark() {
   write_callbacks_->onAboveWriteBufferHighWatermark();
 }
 
-void TcpBandwidthLimitFilter::onUploadBufferLowWatermark() {
+void TcpBandwidthLimitFilter::onWriteBufferLowWatermark() {
   write_callbacks_->onBelowWriteBufferLowWatermark();
 }
 
-void TcpBandwidthLimitFilter::processBufferedDownloadData() {
-  if (download_buffer_.length() == 0 || !config_->downloadTokenBucket()) {
+void TcpBandwidthLimitFilter::processBufferedReadData() {
+  if (read_buffer_.length() == 0 || !config_->readTokenBucket()) {
     return;
   }
 
-  uint64_t buffer_size = download_buffer_.length();
-  uint64_t consumed = config_->downloadTokenBucket()->consume(buffer_size, true);
+  uint64_t buffer_size = read_buffer_.length();
+  uint64_t consumed = config_->readTokenBucket()->consume(buffer_size, true);
 
   if (consumed > 0) {
     Buffer::OwnedImpl data_to_send;
-    data_to_send.move(download_buffer_, consumed);
-    const bool end_stream = download_end_stream_ && download_buffer_.length() == 0;
+    data_to_send.move(read_buffer_, consumed);
+    const bool end_stream = read_end_stream_ && read_buffer_.length() == 0;
     read_callbacks_->injectReadDataToFilterChain(data_to_send, end_stream);
-    config_->stats().download_bytes_buffered_.set(download_buffer_.length());
+    updateReadRate(consumed);
+    config_->stats().read_bytes_buffered_.set(read_buffer_.length());
   }
 }
 
-void TcpBandwidthLimitFilter::processBufferedUploadData() {
-  if (upload_buffer_.length() == 0 || !config_->uploadTokenBucket()) {
+void TcpBandwidthLimitFilter::processBufferedWriteData() {
+  if (write_buffer_.length() == 0 || !config_->writeTokenBucket()) {
     return;
   }
 
-  uint64_t buffer_size = upload_buffer_.length();
-  uint64_t consumed = config_->uploadTokenBucket()->consume(buffer_size, true);
+  uint64_t buffer_size = write_buffer_.length();
+  uint64_t consumed = config_->writeTokenBucket()->consume(buffer_size, true);
 
   if (consumed > 0) {
     Buffer::OwnedImpl data_to_send;
-    data_to_send.move(upload_buffer_, consumed);
-    const bool end_stream = upload_end_stream_ && upload_buffer_.length() == 0;
+    data_to_send.move(write_buffer_, consumed);
+    const bool end_stream = write_end_stream_ && write_buffer_.length() == 0;
     write_callbacks_->injectWriteDataToFilterChain(data_to_send, end_stream);
-    config_->stats().upload_bytes_buffered_.set(upload_buffer_.length());
+    updateWriteRate(consumed);
+    config_->stats().write_bytes_buffered_.set(write_buffer_.length());
+  }
+}
+
+void TcpBandwidthLimitFilter::updateReadRate(uint64_t bytes) {
+  config_->stats().read_total_bytes_.add(bytes);
+  read_bytes_since_last_rate_ += bytes;
+  const auto now = config_->timeSource().monotonicTime();
+  const auto elapsed =
+      std::chrono::duration_cast<std::chrono::milliseconds>(now - last_read_rate_update_);
+  if (elapsed.count() >= RateUpdateIntervalMs) {
+    const uint64_t rate = (read_bytes_since_last_rate_ * MillisecondsPerSecond) / elapsed.count();
+    config_->stats().read_rate_bps_.set(rate);
+    read_bytes_since_last_rate_ = 0;
+    last_read_rate_update_ = now;
+  }
+}
+
+void TcpBandwidthLimitFilter::updateWriteRate(uint64_t bytes) {
+  config_->stats().write_total_bytes_.add(bytes);
+  write_bytes_since_last_rate_ += bytes;
+  const auto now = config_->timeSource().monotonicTime();
+  const auto elapsed =
+      std::chrono::duration_cast<std::chrono::milliseconds>(now - last_write_rate_update_);
+  if (elapsed.count() >= RateUpdateIntervalMs) {
+    const uint64_t rate = (write_bytes_since_last_rate_ * MillisecondsPerSecond) / elapsed.count();
+    config_->stats().write_rate_bps_.set(rate);
+    write_bytes_since_last_rate_ = 0;
+    last_write_rate_update_ = now;
   }
 }
 

@@ -25,12 +25,16 @@ namespace TcpBandwidthLimit {
  * All TCP bandwidth limit stats. @see stats_macros.h
  */
 #define ALL_TCP_BANDWIDTH_LIMIT_STATS(COUNTER, GAUGE)                                              \
-  COUNTER(download_enabled)                                                                        \
-  COUNTER(upload_enabled)                                                                          \
-  COUNTER(download_throttled)                                                                      \
-  COUNTER(upload_throttled)                                                                        \
-  GAUGE(download_bytes_buffered, Accumulate)                                                       \
-  GAUGE(upload_bytes_buffered, Accumulate)
+  COUNTER(read_enabled)                                                                            \
+  COUNTER(write_enabled)                                                                           \
+  COUNTER(read_throttled)                                                                          \
+  COUNTER(write_throttled)                                                                         \
+  COUNTER(read_total_bytes)                                                                        \
+  COUNTER(write_total_bytes)                                                                       \
+  GAUGE(read_bytes_buffered, Accumulate)                                                           \
+  GAUGE(write_bytes_buffered, Accumulate)                                                          \
+  GAUGE(read_rate_bps, NeverImport)                                                                \
+  GAUGE(write_rate_bps, NeverImport)
 
 /**
  * Struct definition for all TCP bandwidth limit stats. @see stats_macros.h
@@ -52,16 +56,16 @@ public:
   TcpBandwidthLimitStats& stats() { return stats_; }
   TimeSource& timeSource() { return time_source_; }
 
-  bool hasDownloadLimit() const { return download_token_bucket_ != nullptr; }
-  bool hasUploadLimit() const { return upload_token_bucket_ != nullptr; }
-  uint64_t downloadLimit() const { return download_limit_kbps_; }
-  uint64_t uploadLimit() const { return upload_limit_kbps_; }
+  bool hasReadLimit() const { return read_token_bucket_ != nullptr; }
+  bool hasWriteLimit() const { return write_token_bucket_ != nullptr; }
+  uint64_t readLimit() const { return read_limit_kbps_; }
+  uint64_t writeLimit() const { return write_limit_kbps_; }
   bool enabled() const { return enabled_.enabled(); }
-  const std::shared_ptr<SharedTokenBucketImpl>& downloadTokenBucket() const {
-    return download_token_bucket_;
+  const std::shared_ptr<SharedTokenBucketImpl>& readTokenBucket() const {
+    return read_token_bucket_;
   }
-  const std::shared_ptr<SharedTokenBucketImpl>& uploadTokenBucket() const {
-    return upload_token_bucket_;
+  const std::shared_ptr<SharedTokenBucketImpl>& writeTokenBucket() const {
+    return write_token_bucket_;
   }
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 
@@ -70,13 +74,13 @@ private:
 
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
-  const uint64_t download_limit_kbps_;
-  const uint64_t upload_limit_kbps_;
+  const uint64_t read_limit_kbps_;
+  const uint64_t write_limit_kbps_;
   const std::chrono::milliseconds fill_interval_;
   const Runtime::FeatureFlag enabled_;
   TcpBandwidthLimitStats stats_;
-  std::shared_ptr<SharedTokenBucketImpl> download_token_bucket_;
-  std::shared_ptr<SharedTokenBucketImpl> upload_token_bucket_;
+  std::shared_ptr<SharedTokenBucketImpl> read_token_bucket_;
+  std::shared_ptr<SharedTokenBucketImpl> write_token_bucket_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -94,28 +98,30 @@ public:
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
-    download_buffer_.setWatermarks(callbacks.connection().bufferLimit());
+    write_buffer_.setWatermarks(callbacks.connection().bufferLimit());
   }
 
   // Network::WriteFilter
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
   void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& callbacks) override {
     write_callbacks_ = &callbacks;
-    upload_buffer_.setWatermarks(callbacks.connection().bufferLimit());
+    read_buffer_.setWatermarks(callbacks.connection().bufferLimit());
   }
 
-  void onDownloadTokenTimer();
-  void onUploadTokenTimer();
+  void onReadTokenTimer();
+  void onWriteTokenTimer();
 
 private:
   friend class TcpBandwidthLimitFilterTest;
 
-  void processBufferedDownloadData();
-  void processBufferedUploadData();
-  void onDownloadBufferLowWatermark();
-  void onDownloadBufferHighWatermark();
-  void onUploadBufferLowWatermark();
-  void onUploadBufferHighWatermark();
+  void processBufferedReadData();
+  void processBufferedWriteData();
+  void onReadBufferLowWatermark();
+  void onReadBufferHighWatermark();
+  void onWriteBufferLowWatermark();
+  void onWriteBufferHighWatermark();
+  void updateReadRate(uint64_t bytes);
+  void updateWriteRate(uint64_t bytes);
 
   FilterConfigSharedPtr config_;
 
@@ -123,16 +129,22 @@ private:
   Network::WriteFilterCallbacks* write_callbacks_{};
 
   // Buffered data waiting for tokens
-  Buffer::WatermarkBuffer download_buffer_;
-  Buffer::WatermarkBuffer upload_buffer_;
+  Buffer::WatermarkBuffer read_buffer_;
+  Buffer::WatermarkBuffer write_buffer_;
 
   // Whether end_stream was observed while buffering data
-  bool download_end_stream_{false};
-  bool upload_end_stream_{false};
+  bool read_end_stream_{false};
+  bool write_end_stream_{false};
+
+  // Bytes sent since last rate update
+  uint64_t read_bytes_since_last_rate_{0};
+  uint64_t write_bytes_since_last_rate_{0};
+  MonotonicTime last_read_rate_update_;
+  MonotonicTime last_write_rate_update_;
 
   // Timers for processing buffered data
-  Event::TimerPtr download_timer_;
-  Event::TimerPtr upload_timer_;
+  Event::TimerPtr read_timer_;
+  Event::TimerPtr write_timer_;
 };
 
 } // namespace TcpBandwidthLimit

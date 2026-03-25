@@ -47,8 +47,8 @@ public:
 TEST_F(TcpBandwidthLimitConfigTest, BasicConfig) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 1024
-    upload_limit_kbps: 512
+    read_limit_kbps: 1024
+    write_limit_kbps: 512
   )EOF";
 
   setup(yaml);
@@ -77,7 +77,7 @@ TEST_F(TcpBandwidthLimitConfigTest, MinimalConfig) {
 TEST_F(TcpBandwidthLimitConfigTest, ConfigWithFillInterval) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 100
+    read_limit_kbps: 100
     fill_interval:
       seconds: 0
       nanos: 100000000
@@ -95,7 +95,7 @@ TEST_F(TcpBandwidthLimitConfigTest, ConfigWithFillInterval) {
 TEST_F(TcpBandwidthLimitConfigTest, ConfigWithRuntimeFlag) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    upload_limit_kbps: 256
+    write_limit_kbps: 256
     runtime_enabled:
       default_value: false
       runtime_key: bandwidth_limit_enabled
@@ -113,8 +113,8 @@ TEST_F(TcpBandwidthLimitConfigTest, ConfigWithRuntimeFlag) {
 TEST_F(TcpBandwidthLimitConfigTest, ConfigWithZeroLimits) {
   const std::string yaml = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 0
-    upload_limit_kbps: 0
+    read_limit_kbps: 0
+    write_limit_kbps: 0
   )EOF";
 
   setup(yaml);
@@ -148,7 +148,7 @@ TEST_F(TcpBandwidthLimitConfigTest, InvalidFillInterval) {
   // Test fill interval too small (< 20ms)
   const std::string yaml1 = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 100
+    read_limit_kbps: 100
     fill_interval:
       seconds: 0
       nanos: 10000000
@@ -169,7 +169,7 @@ TEST_F(TcpBandwidthLimitConfigTest, InvalidFillInterval) {
   // Test fill interval too large (> 1s)
   const std::string yaml2 = R"EOF(
     stat_prefix: test
-    download_limit_kbps: 100
+    read_limit_kbps: 100
     fill_interval:
       seconds: 2
       nanos: 0

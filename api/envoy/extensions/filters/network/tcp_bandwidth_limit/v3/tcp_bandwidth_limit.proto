@@ -25,15 +25,15 @@ message TcpBandwidthLimit {
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The limit for download bandwidth in KiB/s.
+  // The limit for read (onData) bandwidth in KiB/s.
   // If not set, no limit is applied (unlimited bandwidth).
-  // If set to 0, all download traffic is blocked.
-  google.protobuf.UInt64Value download_limit_kbps = 2;
+  // If set to 0, all reads are blocked.
+  google.protobuf.UInt64Value read_limit_kbps = 2;
 
-  // The limit for upload bandwidth in KiB/s.
+  // The limit for write (onWrite) bandwidth in KiB/s.
   // If not set, no limit is applied (unlimited bandwidth).
-  // If set to 0, all upload traffic is blocked.
-  google.protobuf.UInt64Value upload_limit_kbps = 3;
+  // If set to 0, all writes are is blocked.
+  google.protobuf.UInt64Value write_limit_kbps = 3;
 
   // The interval at which to process buffered data and check for available bandwidth.
   // Defaults to 50ms. It must be at least 20ms to avoid too frequent processing.

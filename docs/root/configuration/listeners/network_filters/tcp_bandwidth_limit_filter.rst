@@ -9,9 +9,12 @@ TCP bandwidth limit
 Overview
 --------
 
-The TCP bandwidth limit filter is a network filter that limits the bandwidth of TCP connections.
-It can be configured to limit download (ingress) and upload (egress) bandwidth independently,
-using a token bucket algorithm similar to the HTTP bandwidth limit filter.
+The TCP bandwidth limit filter is a network filter that limits the bandwidth on the downstream
+connection. It can be configured to limit read and write bandwidth independently, using a token
+bucket algorithm similar to the HTTP bandwidth limit filter.
+
+- ``read_limit_kbps`` limits data read from the downstream connection.
+- ``write_limit_kbps`` limits data written to the downstream connection.
 
 The filter works by:
 
@@ -22,7 +25,7 @@ The filter works by:
 Example configuration
 ---------------------
 
-The following example configuration limits download bandwidth to 1 MiB/s and upload bandwidth to 512 KiB/s:
+The following example configuration limits read bandwidth to 1 MiB/s and write bandwidth to 512 KiB/s:
 
 .. code-block:: yaml
 
@@ -30,10 +33,10 @@ The following example configuration limits download bandwidth to 1 MiB/s and upl
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_bandwidth_limit.v3.TcpBandwidthLimit
     stat_prefix: bandwidth_limiter
-    download_limit_kbps: 1024  # 1 MiB/s
-    upload_limit_kbps: 512     # 512 KiB/s
+    read_limit_kbps: 1024   # 1 MiB/s
+    write_limit_kbps: 512   # 512 KiB/s
     fill_interval:
-      nanos: 50000000          # 50ms
+      nanos: 50000000       # 50ms
 
 Statistics
 ----------
@@ -44,12 +47,16 @@ The TCP bandwidth limit filter outputs statistics in the ``<stat_prefix>.`` name
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  download_enabled, Counter, Total number of times the download limit was applied to incoming data
-  upload_enabled, Counter, Total number of times the upload limit was applied to outgoing data
-  download_throttled, Counter, Total number of times download data was throttled
-  upload_throttled, Counter, Total number of times upload data was throttled
-  download_bytes_buffered, Gauge, Current number of bytes buffered for download
-  upload_bytes_buffered, Gauge, Current number of bytes buffered for upload
+  read_enabled, Counter, Total number of times the read limit was applied to incoming data
+  write_enabled, Counter, Total number of times the write limit was applied to outgoing data
+  read_throttled, Counter, Total number of times read data was throttled
+  write_throttled, Counter, Total number of times write data was throttled
+  read_total_bytes, Counter, Total bytes read
+  write_total_bytes, Counter, Total bytes written
+  read_bytes_buffered, Gauge, Current number of bytes buffered for read
+  write_bytes_buffered, Gauge, Current number of bytes buffered for write
+  read_rate_bps, Gauge, Current read rate in bytes per second
+  write_rate_bps, Gauge, Current write rate in bytes per second
 
 Runtime
 -------
