@@ -12,6 +12,8 @@ namespace Network {
 MockConnectionCallbacks::MockConnectionCallbacks() = default;
 MockConnectionCallbacks::~MockConnectionCallbacks() = default;
 
+std::atomic<uint64_t> MockConnectionBase::next_id_;
+
 void MockConnectionBase::raiseEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {

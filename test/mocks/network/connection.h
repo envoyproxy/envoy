@@ -34,7 +34,7 @@ public:
   void runHighWatermarkCallbacks();
   void runLowWatermarkCallbacks();
 
-  static inline std::atomic_uint64_t next_id_;
+  static std::atomic<uint64_t> next_id_;
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::list<Network::ConnectionCallbacks*> callbacks_;
