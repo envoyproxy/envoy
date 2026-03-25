@@ -40,6 +40,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/stats:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/matching/actions/transform_stat:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",

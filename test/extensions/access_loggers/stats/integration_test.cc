@@ -497,4 +497,70 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeCleanupOnDestructor) {
 }
 
 } // namespace
+
+class StatsAccessLogTcpIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                         public BaseIntegrationTest {
+public:
+  StatsAccessLogTcpIntegrationTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
+};
+
+TEST_P(StatsAccessLogTcpIntegrationTest, ActiveTcpConnectionsGauge) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* filter = filter_chain->mutable_filters(0);
+
+    const std::string tcp_proxy_config_with_access_log = R"EOF(
+name: envoy.filters.network.tcp_proxy
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+  stat_prefix: tcp_stats
+  cluster: cluster_0
+  access_log_options:
+    flush_access_log_on_start: true
+  access_log:
+    - name: envoy.access_loggers.stats
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+        stat_prefix: test_stat_prefix
+        gauges:
+          - stat:
+              name: active_connections
+            value_fixed: 1
+            add_subtract:
+              add_log_type: TcpConnectionStart
+              sub_log_type: TcpConnectionEnd
+)EOF";
+
+    TestUtility::loadFromYaml(tcp_proxy_config_with_access_log, *filter);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr client1 = makeTcpConnection(lookupPort("listener_0"));
+  FakeRawConnectionPtr raw_conn1;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conn1));
+  ASSERT_TRUE(client1->connected());
+
+  test_server_->waitForGaugeEq("test_stat_prefix.active_connections", 1);
+
+  IntegrationTcpClientPtr client2 = makeTcpConnection(lookupPort("listener_0"));
+  FakeRawConnectionPtr raw_conn2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conn2));
+  ASSERT_TRUE(client2->connected());
+
+  test_server_->waitForGaugeEq("test_stat_prefix.active_connections", 2);
+
+  client1->close();
+  test_server_->waitForGaugeEq("test_stat_prefix.active_connections", 1);
+
+  client2->close();
+  test_server_->waitForGaugeEq("test_stat_prefix.active_connections", 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsAccessLogTcpIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 } // namespace Envoy
