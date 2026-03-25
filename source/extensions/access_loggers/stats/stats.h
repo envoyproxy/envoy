@@ -159,7 +159,8 @@ public:
   ~AccessLogState() override;
 
   // Adds an incremental value to an existing gauge, or creates it if that gauge doesn't exist.
-  // Zero values are ignored.
+  // Zero values are ignored. If the same value isn't removed with `removeInflightGauge`, the
+  // value is removed when the object is destroyed.
   void addInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
                         Stats::Gauge::ImportMode import_mode, uint64_t value,
                         std::vector<Stats::StatNameDynamicStorage> tags_storage);
