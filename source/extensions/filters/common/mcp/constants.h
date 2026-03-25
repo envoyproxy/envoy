@@ -35,6 +35,10 @@ constexpr absl::string_view ERROR_FIELD = "error";
 
 // MCP Initialize constants
 constexpr absl::string_view LATEST_SUPPORTED_MCP_VERSION = "2025-11-25";
+// Based on the 2025-11-25 spec, if the MCP-Protocol-Version header is not
+// provided, the default protocol version is 2025-03-26.
+// https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#protocol-version-header
+constexpr absl::string_view DEFAULT_PROTOCOL_VERSION = "2025-03-26";
 constexpr absl::string_view PROTOCOL_VERSION_FIELD = "protocolVersion";
 constexpr absl::string_view CAPABILITIES_FIELD = "capabilities";
 constexpr absl::string_view TOOLS_FIELD = "tools";
@@ -48,6 +52,7 @@ constexpr absl::string_view IS_MCP_REQUEST = "is_mcp_request";
 
 // HTTP header names
 constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
+constexpr absl::string_view MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version";
 
 // Method names
 namespace Methods {
