@@ -122,10 +122,9 @@ TEST_F(MetadataFormatterTest, DynamicMetadataWithLegacyConfigurationAndLength) {
 // cluster's metadata object.
 TEST_F(MetadataFormatterTest, ClusterMetadata) {
   // Make sure that formatter accesses cluster metadata.
-  absl::optional<std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>> cluster =
-      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(**cluster, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
-  EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::ReturnPointee(cluster));
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(*cluster, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
+  stream_info_.upstream_cluster_info_ = cluster;
 
   EXPECT_EQ("test_value",
             getTestMetadataFormatter("CLUSTER")->format(formatter_context_, stream_info_));

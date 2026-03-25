@@ -164,8 +164,8 @@ public:
   MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
   MOCK_METHOD(const Http::RequestHeaderMap*, getRequestHeaders, (), (const));
   MOCK_METHOD(void, setUpstreamClusterInfo, (const Upstream::ClusterInfoConstSharedPtr&));
-  MOCK_METHOD(absl::optional<Upstream::ClusterInfoConstSharedPtr>, upstreamClusterInfo, (),
-              (const));
+  MOCK_METHOD(OptRef<const Upstream::ClusterInfo>, upstreamClusterInfo, (), (const));
+  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, upstreamClusterInfoSharedPtr, (), (const));
   MOCK_METHOD(OptRef<const StreamIdProvider>, getStreamIdProvider, (), (const));
   MOCK_METHOD(void, setStreamIdProvider, (StreamIdProviderSharedPtr provider));
   MOCK_METHOD(void, setTraceReason, (Tracing::Reason reason));
@@ -206,7 +206,7 @@ public:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
+  Upstream::ClusterInfoConstSharedPtr upstream_cluster_info_;
   std::shared_ptr<UpstreamInfo> upstream_info_;
   absl::InlinedVector<ResponseFlag, 4> response_flags_;
   envoy::config::core::v3::Metadata metadata_;

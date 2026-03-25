@@ -987,11 +987,15 @@ public:
   setUpstreamClusterInfo(const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) PURE;
 
   /**
-   * @return Upstream Connection's ClusterInfo.
-   * This returns an optional to differentiate between unset(absl::nullopt),
-   * no route or cluster does not exist(nullptr), and set to a valid cluster(not nullptr).
+   * @return OptRef<const Upstream::ClusterInfo> Get the cluster info for this request.
    */
-  virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
+  virtual OptRef<const Upstream::ClusterInfo> upstreamClusterInfo() const PURE;
+
+  /**
+   * @return Upstream::ClusterInfoConstSharedPtr Get the cluster info for this request, extended to
+   * allow a caller to extend or transfer ownership.
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr upstreamClusterInfoSharedPtr() const PURE;
 
   /**
    * @param provider The unique id implementation this stream uses.
