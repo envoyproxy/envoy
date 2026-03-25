@@ -15,10 +15,10 @@
 namespace Envoy {
 namespace Quic {
 
-int EnvoyQuicProofSource::filterChainExDataIndex() {
+int EnvoyQuicProofSource::transportSocketFactoryExDataIndex() {
   CONSTRUCT_ON_FIRST_USE(int, []() -> int {
     int index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
-    RELEASE_ASSERT(index >= 0, "Failed to allocate SSL ex_data index for filter chain");
+    RELEASE_ASSERT(index >= 0, "Failed to allocate SSL ex_data index for transport socket factory");
     return index;
   }());
 }
@@ -124,25 +124,19 @@ void EnvoyQuicProofSource::updateFilterChainManager(
 
 int EnvoyQuicProofSource::ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv,
                                             EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx, int encrypt) {
-  auto* filter_chain =
-      static_cast<const Network::FilterChain*>(SSL_get_ex_data(ssl, filterChainExDataIndex()));
-  if (filter_chain == nullptr) {
+  auto* factory = static_cast<const QuicServerTransportSocketFactory*>(
+      SSL_get_ex_data(ssl, transportSocketFactoryExDataIndex()));
+  if (factory == nullptr) {
     return 0;
   }
-
-  auto& transport_socket_factory =
-      dynamic_cast<const QuicServerTransportSocketFactory&>(filter_chain->transportSocketFactory());
-  return transport_socket_factory.processSessionTicket(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
+  return factory->processSessionTicket(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
 }
 
 void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
   registerCertCompression(ssl_ctx);
-
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support")) {
-    return;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support")) {
+    SSL_CTX_set_tlsext_ticket_key_cb(ssl_ctx, ticketKeyCallback);
   }
-
-  SSL_CTX_set_tlsext_ticket_key_cb(ssl_ctx, ticketKeyCallback);
 }
 
 } // namespace Quic

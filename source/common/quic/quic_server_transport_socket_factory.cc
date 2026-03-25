@@ -187,12 +187,9 @@ int QuicServerTransportSocketFactory::processSessionTicket(SSL* ssl, uint8_t* ke
     return 0;
   }
 
+  // QuicServerTransportSocketFactory always creates ServerContextImpl.
   auto server_ctx =
-      std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
-  if (!server_ctx) {
-    return 0;
-  }
-
+      std::static_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
   return server_ctx->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
 }
 

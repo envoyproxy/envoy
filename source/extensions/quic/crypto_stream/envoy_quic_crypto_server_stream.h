@@ -19,7 +19,7 @@ public:
       quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
       quic::QuicCryptoServerStreamBase::Helper* helper,
       OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
-      Envoy::Event::Dispatcher& dispatcher, const Network::FilterChain* filter_chain) override;
+      Envoy::Event::Dispatcher& dispatcher) override;
 };
 
 DECLARE_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl);

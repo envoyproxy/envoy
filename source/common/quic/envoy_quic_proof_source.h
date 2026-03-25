@@ -27,12 +27,13 @@ public:
 
   void updateFilterChainManager(Network::FilterChainManager& filter_chain_manager);
 
-  // Returns the SSL ex_data index used to store filter chain pointer during QUIC handshakes.
-  static int filterChainExDataIndex();
+  // Returns the SSL ex_data index used to store transport socket factory pointer during QUIC
+  // handshakes.
+  static int transportSocketFactoryExDataIndex();
 
   // Session ticket key callback installed on SSL_CTX by OnNewSslCtx.
-  // Looks up the filter chain from SSL ex_data and delegates to the
-  // transport socket factory's processSessionTicket.
+  // Retrieves the QuicServerTransportSocketFactory from SSL ex_data and
+  // delegates to processSessionTicket.
   static int ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                                HMAC_CTX* hmac_ctx, int encrypt);
 

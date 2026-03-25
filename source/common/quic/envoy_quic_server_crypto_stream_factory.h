@@ -2,13 +2,11 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/config/typed_config.h"
-#include "envoy/network/filter.h"
 #include "envoy/network/transport_socket.h"
 
 #include "quiche/quic/core/crypto/quic_crypto_server_config.h"
 #include "quiche/quic/core/quic_crypto_server_stream_base.h"
 #include "quiche/quic/core/quic_session.h"
-#include "quiche/quic/core/tls_server_handshaker.h"
 
 namespace Envoy {
 namespace Quic {
@@ -23,7 +21,7 @@ public:
       quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
       quic::QuicCryptoServerStreamBase::Helper* helper,
       OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
-      Event::Dispatcher& dispatcher, const Network::FilterChain* filter_chain = nullptr) PURE;
+      Event::Dispatcher& dispatcher) PURE;
 };
 
 } // namespace Quic

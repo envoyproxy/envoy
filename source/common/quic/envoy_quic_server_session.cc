@@ -94,7 +94,7 @@ EnvoyQuicServerSession::CreateQuicCryptoServerStream(
       crypto_config, compressed_certs_cache, this, stream_helper(),
       makeOptRefFromPtr(position_.has_value() ? &position_->filter_chain_.transportSocketFactory()
                                               : nullptr),
-      dispatcher(), position_.has_value() ? &position_->filter_chain_ : nullptr);
+      dispatcher());
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStreamId id) {

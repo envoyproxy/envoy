@@ -375,10 +375,10 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailAlgorithmMismatch) {
 }
 
 TEST_F(EnvoyQuicProofSourceTest, FilterChainExDataIndex) {
-  // filterChainExDataIndex() should return a valid (non-negative) index and be stable.
-  int index = EnvoyQuicProofSource::filterChainExDataIndex();
+  // transportSocketFactoryExDataIndex() should return a valid (non-negative) index and be stable.
+  int index = EnvoyQuicProofSource::transportSocketFactoryExDataIndex();
   EXPECT_GE(index, 0);
-  EXPECT_EQ(index, EnvoyQuicProofSource::filterChainExDataIndex());
+  EXPECT_EQ(index, EnvoyQuicProofSource::transportSocketFactoryExDataIndex());
 }
 
 // Smoke test: verify OnNewSslCtx installs the ticket key callback when the
@@ -410,14 +410,14 @@ TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackNullFilterChain) {
   ASSERT_NE(ssl_ctx, nullptr);
   bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
   ASSERT_NE(ssl, nullptr);
-  // No ex_data set → SSL_get_ex_data returns nullptr for the filter chain index.
+  // No ex_data set → SSL_get_ex_data returns nullptr for the transport socket factory index.
   EXPECT_EQ(
       0, EnvoyQuicProofSource::ticketKeyCallback(ssl.get(), nullptr, nullptr, nullptr, nullptr, 0));
 }
 
 // Verify that ticketKeyCallback delegates to the transport socket factory's
-// processSessionTicket when a filter chain is present in SSL ex_data.
-TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackWithFilterChain) {
+// processSessionTicket when a transport socket factory is present in SSL ex_data.
+TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackWithTransportSocketFactory) {
   loadCertsIntoFactory(expected_certs_, true);
 
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
@@ -425,11 +425,9 @@ TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackWithFilterChain) {
   bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
   ASSERT_NE(ssl, nullptr);
 
-  // Store filter chain pointer in SSL ex_data at the well-known index.
-  SSL_set_ex_data(ssl.get(), EnvoyQuicProofSource::filterChainExDataIndex(), &filter_chain_);
-
-  EXPECT_CALL(filter_chain_, transportSocketFactory())
-      .WillOnce(ReturnRef(*transport_socket_factory_));
+  // Store transport socket factory pointer in SSL ex_data at the well-known index.
+  SSL_set_ex_data(ssl.get(), EnvoyQuicProofSource::transportSocketFactoryExDataIndex(),
+                  transport_socket_factory_.get());
 
   // With decrypt mode (encrypt=0) and no session ticket keys configured, the
   // ServerContextImpl returns 0 (no matching key).

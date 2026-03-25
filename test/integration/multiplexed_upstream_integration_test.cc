@@ -913,8 +913,7 @@ public:
       quic::QuicCryptoServerStreamBase::Helper* /*helper*/,
       Envoy::OptRef<const Envoy::Network::DownstreamTransportSocketFactory>
       /*transport_socket_factory*/,
-      Envoy::Event::Dispatcher& /*dispatcher*/,
-      const Envoy::Network::FilterChain* /*filter_chain*/) override {
+      Envoy::Event::Dispatcher& /*dispatcher*/) override {
     ASSERT(session->connection()->version().transport_version > quic::QUIC_VERSION_46);
     return std::make_unique<QuicCustomTlsServerHandshaker>(session, crypto_config, fail_handshake_);
   }

@@ -81,7 +81,7 @@ public:
       const quic::QuicCryptoServerConfig* crypto_config, quic::QuicCompressedCertsCache*,
       quic::QuicSession* session, quic::QuicCryptoServerStreamBase::Helper*,
       OptRef<const Network::DownstreamTransportSocketFactory> /*transport_socket_factory*/,
-      Event::Dispatcher& /*dispatcher*/, const Network::FilterChain* /*filter_chain*/) override {
+      Event::Dispatcher& /*dispatcher*/) override {
     if (session->connection()->version().transport_version > quic::QUIC_VERSION_46) {
       return std::make_unique<TestEnvoyQuicTlsServerHandshaker>(session, *crypto_config);
     }
