@@ -446,6 +446,20 @@ envoy_cc_library(
     }),
 )
 
+configure_make(
+    name = "jemalloc",
+    configure_options = [
+        "--with-jemalloc-prefix=",
+        "--disable-shared",
+        "--enable-static",
+        "--disable-doc",
+    ],
+    lib_source = "@jemalloc//:all",
+    out_static_libs = ["libjemalloc.a"],
+    tags = ["skip_on_windows"],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "libcxx_msan_wrapper",
     visibility = ["//visibility:public"],
