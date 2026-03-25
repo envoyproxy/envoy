@@ -309,8 +309,8 @@ public:
   absl::StatusOr<DataSourceProviderSharedPtr<DataType>> getOrCreate(const ProtoDataSource& source) {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (!usesFileWatching(source, options_)) {
-      return DataSourceProvider<DataType>::create(source, dispatcher_, tls_, api_,
-                                                  data_transform_cb_, options_, data_update_cb_);
+      return DataSourceProvider<DataType>::create(
+          source, dispatcher_, tls_, api_, data_transform_cb_, options_, {}, data_update_cb_);
     }
     const size_t config_hash = MessageUtil::hash(source);
     auto it = dynamic_providers_.find(config_hash);
@@ -347,7 +347,7 @@ private:
   ThreadLocal::SlotAllocator& tls_;
   Api::Api& api_;
   DataTransform<DataType> data_transform_cb_;
-  DataTransform<DataType> data_update_cb_;
+  absl::optional<DataUpdateCb> data_update_cb_;
   const ProviderOptions options_;
   absl::flat_hash_map<size_t, std::weak_ptr<DataSourceProvider<DataType>>> dynamic_providers_;
 };
