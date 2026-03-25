@@ -341,6 +341,14 @@ public:
   virtual ClusterInfoMaps clusters() const PURE;
 
   /**
+   * Iterates over all active clusters and invokes the callback for each.
+   * @param cb the callback to invoke for each active cluster.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual void forEachActiveCluster(std::function<void(const Cluster&)> cb) const PURE;
+
+  /**
    * Receives a cluster name and returns an active cluster (if found).
    * @param cluster_name the name of the cluster.
    * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.

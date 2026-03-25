@@ -1,8 +1,8 @@
 # This should match the schema defined in external_deps.bzl.
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_skylib = dict(
-        version = "1.8.2",
-        sha256 = "6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446",
+        version = "1.9.0",
+        sha256 = "3b5b49006181f5f8ff626ef8ddceaa95e9bb8ad294f7b5d7b11ea9f7ddaf8c59",
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
     ),
     com_envoyproxy_protoc_gen_validate = dict(
@@ -74,8 +74,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.30",
-        sha256 = "c8851783f5296b5325070bfdc0bf4c1c8187c20ffaf00ec6585e9f7c1b9ce4ad",
+        version = "0.3.31",
+        sha256 = "e6878f21ab2c7e80d6600a4c597fe5a95f196f534a8a4b9588e35c0e8d901717",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),

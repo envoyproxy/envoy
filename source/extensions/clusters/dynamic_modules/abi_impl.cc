@@ -3,6 +3,7 @@
 // This file provides host-side implementations for the cluster dynamic module ABI callbacks.
 
 #include "source/common/common/assert.h"
+#include "source/common/http/message_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
@@ -83,18 +84,50 @@ Envoy::Stats::StatNameTagVector buildTagsForClusterMetric(
 extern "C" {
 
 bool envoy_dynamic_module_callback_cluster_add_hosts(
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
-    const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights, size_t count,
-    envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs) {
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+    const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights,
+    const envoy_dynamic_module_type_module_buffer* regions,
+    const envoy_dynamic_module_type_module_buffer* zones,
+    const envoy_dynamic_module_type_module_buffer* sub_zones,
+    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
+    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs) {
   auto* cluster = getCluster(cluster_envoy_ptr);
   std::vector<std::string> address_strings;
   address_strings.reserve(count);
   std::vector<uint32_t> weight_vec(weights, weights + count);
+  std::vector<std::string> region_strings;
+  region_strings.reserve(count);
+  std::vector<std::string> zone_strings;
+  zone_strings.reserve(count);
+  std::vector<std::string> sub_zone_strings;
+  sub_zone_strings.reserve(count);
   for (size_t i = 0; i < count; ++i) {
     address_strings.emplace_back(addresses[i].ptr, addresses[i].length);
+    region_strings.emplace_back(regions[i].ptr, regions[i].length);
+    zone_strings.emplace_back(zones[i].ptr, zones[i].length);
+    sub_zone_strings.emplace_back(sub_zones[i].ptr, sub_zones[i].length);
   }
+
+  // Parse metadata triples: each host has metadata_pairs_per_host triples of
+  // (filter_name, key, value), laid out contiguously.
+  std::vector<std::vector<std::tuple<std::string, std::string, std::string>>> metadata_vec;
+  if (metadata_pairs != nullptr && metadata_pairs_per_host > 0) {
+    metadata_vec.resize(count);
+    for (size_t i = 0; i < count; ++i) {
+      metadata_vec[i].reserve(metadata_pairs_per_host);
+      for (size_t j = 0; j < metadata_pairs_per_host; ++j) {
+        size_t base = (i * metadata_pairs_per_host + j) * 3;
+        std::string filter_name(metadata_pairs[base].ptr, metadata_pairs[base].length);
+        std::string key(metadata_pairs[base + 1].ptr, metadata_pairs[base + 1].length);
+        std::string value(metadata_pairs[base + 2].ptr, metadata_pairs[base + 2].length);
+        metadata_vec[i].emplace_back(std::move(filter_name), std::move(key), std::move(value));
+      }
+    }
+  }
+
   std::vector<Envoy::Upstream::HostSharedPtr> result_hosts;
-  if (!cluster->addHosts(address_strings, weight_vec, result_hosts)) {
+  if (!cluster->addHosts(address_strings, weight_vec, region_strings, zone_strings,
+                         sub_zone_strings, metadata_vec, result_hosts, priority)) {
     return false;
   }
   for (size_t i = 0; i < result_hosts.size(); ++i) {
@@ -113,6 +146,28 @@ size_t envoy_dynamic_module_callback_cluster_remove_hosts(
     hosts.emplace_back(cluster->findHost(host_envoy_ptrs[i]));
   }
   return cluster->removeHosts(hosts);
+}
+
+bool envoy_dynamic_module_callback_cluster_update_host_health(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
+    envoy_dynamic_module_type_host_health health_status) {
+  auto* cluster = getCluster(cluster_envoy_ptr);
+  auto host = cluster->findHost(host_envoy_ptr);
+  return cluster->updateHostHealth(std::move(host), health_status);
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_find_host_by_address(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address) {
+  auto* cluster = getCluster(cluster_envoy_ptr);
+  std::string address_str(address.ptr, address.length);
+  auto host = cluster->findHostByAddress(address_str);
+  if (host == nullptr) {
+    return nullptr;
+  }
+  return const_cast<Envoy::Upstream::Host*>(host.get());
 }
 
 void envoy_dynamic_module_callback_cluster_pre_init_complete(
@@ -301,6 +356,41 @@ bool envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
     break;
   }
   return true;
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_find_host_by_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address) {
+  if (lb_envoy_ptr == nullptr || address.ptr == nullptr) {
+    return nullptr;
+  }
+  const auto host_map = getLb(lb_envoy_ptr)->prioritySet().crossPriorityHostMap();
+  if (host_map == nullptr) {
+    return nullptr;
+  }
+  std::string address_str(address.ptr, address.length);
+  const auto it = host_map->find(address_str);
+  if (it == host_map->end()) {
+    return nullptr;
+  }
+  return const_cast<Envoy::Upstream::Host*>(it->second.get());
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_callback_cluster_lb_get_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
+  if (lb_envoy_ptr == nullptr) {
+    return nullptr;
+  }
+  const auto& host_sets = getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority();
+  if (priority >= host_sets.size()) {
+    return nullptr;
+  }
+  const auto& hosts = host_sets[priority]->hosts();
+  if (index >= hosts.size()) {
+    return nullptr;
+  }
+  return const_cast<Envoy::Upstream::Host*>(hosts[index].get());
 }
 
 bool envoy_dynamic_module_callback_cluster_lb_get_host_address(
@@ -988,19 +1078,101 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
     envoy_dynamic_module_type_cluster_host_envoy_ptr host,
     envoy_dynamic_module_type_module_buffer details) {
   auto* lb = getLb(lb_envoy_ptr);
-  auto* context = getContext(context_envoy_ptr);
 
-  Envoy::Upstream::HostConstSharedPtr host_shared;
-  if (host != nullptr) {
-    host_shared = lb->handle()->cluster()->findHost(host);
-  }
-
+  // Copy the details string on the calling thread. The pointer is not valid after we return.
   std::string details_str;
   if (details.ptr != nullptr && details.length > 0) {
     details_str.assign(details.ptr, details.length);
   }
 
-  context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
+  auto cancelled = lb->activeAsyncCancelled();
+  auto* dispatcher = lb->activeAsyncDispatcher();
+
+  if (dispatcher != nullptr) {
+    // Post all work to the worker thread. The host lookup and context access must happen
+    // on the worker thread because the module may call this from a background thread.
+    // Keep the cluster alive via the handle's shared_ptr until the callback fires.
+    auto handle = lb->handle();
+    dispatcher->post([context_envoy_ptr, host, details_str = std::move(details_str),
+                      cancelled = std::move(cancelled), handle = std::move(handle)]() {
+      if (cancelled != nullptr && cancelled->load(std::memory_order_acquire)) {
+        return;
+      }
+      auto* context = getContext(context_envoy_ptr);
+      Envoy::Upstream::HostConstSharedPtr host_shared;
+      if (host != nullptr) {
+        host_shared = handle->cluster()->findHost(host);
+      }
+      context->onAsyncHostSelection(std::move(host_shared), std::string(details_str));
+    });
+  } else {
+    // No worker dispatcher. Complete inline on the calling thread.
+    auto* context = getContext(context_envoy_ptr);
+    Envoy::Upstream::HostConstSharedPtr host_shared;
+    if (host != nullptr) {
+      host_shared = lb->handle()->cluster()->findHost(host);
+    }
+    context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
+  }
+}
+
+// =============================================================================
+// HTTP Callout Callback
+// =============================================================================
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_cluster_http_callout(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  auto* cluster = getCluster(cluster_envoy_ptr);
+
+  Envoy::Http::RequestHeaderMapPtr header_map = Envoy::Http::RequestHeaderMapImpl::create();
+  for (size_t i = 0; i < headers_size; ++i) {
+    header_map->addCopy(
+        Envoy::Http::LowerCaseString(std::string(headers[i].key_ptr, headers[i].key_length)),
+        std::string(headers[i].value_ptr, headers[i].value_length));
+  }
+
+  if (header_map->Path() == nullptr || header_map->Method() == nullptr ||
+      header_map->Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+
+  Envoy::Http::RequestMessagePtr message =
+      std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(header_map));
+
+  if (body.length > 0 && body.ptr != nullptr) {
+    message->body().add(absl::string_view(body.ptr, body.length));
+  }
+
+  return cluster->sendHttpCallout(callout_id_out,
+                                  absl::string_view(cluster_name.ptr, cluster_name.length),
+                                  std::move(message), timeout_milliseconds);
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    if (result != nullptr) {
+      result->ptr = nullptr;
+      result->length = 0;
+    }
+    return false;
+  }
+  const auto* hosts =
+      is_added ? getLb(lb_envoy_ptr)->hostsAdded() : getLb(lb_envoy_ptr)->hostsRemoved();
+  if (hosts == nullptr || index >= hosts->size()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  const auto& address_str = (*hosts)[index]->address()->asStringView();
+  result->ptr = address_str.data();
+  result->length = address_str.size();
+  return true;
 }
 
 } // extern "C"

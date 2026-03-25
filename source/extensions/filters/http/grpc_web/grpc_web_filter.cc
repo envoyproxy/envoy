@@ -369,7 +369,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
 }
 
 void GrpcWebFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
-  cluster_ = decoder_callbacks_->clusterInfo();
+  cluster_ = decoder_callbacks_->clusterInfoSharedPtr();
   if (!cluster_) {
     return;
   }

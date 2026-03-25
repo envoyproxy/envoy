@@ -433,7 +433,13 @@ public:
    * view of clusterInfo after a route is picked/repicked.
    * NOTE: Cached clusterInfo and route will be updated the same time.
    */
-  virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
+  virtual OptRef<const Upstream::ClusterInfo> clusterInfo() PURE;
+
+  /**
+   * @return ClusterInfoConstSharedPtr the cluster info for the cached route, extended to allow a
+   * caller to extend or transfer ownership.
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() PURE;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
