@@ -105,10 +105,10 @@ Example configuration:
   greeting (e.g., SMTP, MySQL, POP3). For such protocols, use ``IMMEDIATE`` mode.
 
 Delay Route Selection
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
 
 The ``envoy.reloadable_features.tcp_proxy_delay_route_selection`` runtime guard controls whether we delay the
-route selection until the filter needs to establish the upstream connection. When unset, the filter will select a 
+route selection until the filter needs to establish the upstream connection. When unset, the filter will select a
 route on new connection.
 
 The momemt the selection occurs depends on the connection mode:
