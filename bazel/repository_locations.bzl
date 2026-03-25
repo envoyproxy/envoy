@@ -74,9 +74,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     aspect_bazel_lib = dict(
         version = "2.21.2",
-        sha256 = "079e47b2fd357396a376dec6ad7907a51028cb2b98233b45e5269cd5ce2fea51",
+        sha256 = "53cadea9109e646a93ed4dc90c9bbcaa8073c7c3df745b92f6a5000daf7aa3da",
         strip_prefix = "bazel-lib-{version}",
-        urls = ["https://github.com/aspect-build/bazel-lib/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/aspect-build/bazel-lib/releases/download/v{version}/bazel-lib-v{version}.tar.gz"],
     ),
     abseil_cpp = dict(
         version = "20260107.0",
@@ -542,8 +542,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "3a1960c518a0201b1b34384bcc89ea81add484cf",
-        sha256 = "edc92981797fddf5ff355cba9b83e00b1e0ce180812c5ca0fd139a2120482e0c",
+        version = "603f7ea475700dcdac7b58f5a05d6ccec70396f4",
+        sha256 = "4b3cd50cef5034eb0b5d49fa7345ec3414fbd1d4430af44a59a7645acfd12029",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),

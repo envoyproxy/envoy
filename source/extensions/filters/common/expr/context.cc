@@ -482,8 +482,8 @@ const XDSLookupValues& XDSLookupValues::get() {
              if (wrapper.info_ == nullptr) {
                return {};
              }
-             const auto& vhost = wrapper.info_->virtualHost();
-             if (vhost == nullptr) {
+             const auto vhost = wrapper.info_->virtualHost();
+             if (!vhost) {
                return {};
              }
              return CelValue::CreateString(&vhost->name());
@@ -493,8 +493,8 @@ const XDSLookupValues& XDSLookupValues::get() {
              if (wrapper.info_ == nullptr) {
                return {};
              }
-             const auto& vhost = wrapper.info_->virtualHost();
-             if (vhost == nullptr) {
+             const auto vhost = wrapper.info_->virtualHost();
+             if (!vhost) {
                return {};
              }
              return CelProtoWrapper::CreateMessage(&vhost->metadata(), &wrapper.arena_);

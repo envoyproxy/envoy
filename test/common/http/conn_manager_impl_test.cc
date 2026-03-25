@@ -926,8 +926,8 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
-          EXPECT_EQ(default_route->virtual_host_,
-                    decoder_filters_[0]->callbacks_->streamInfo().virtualHost());
+          EXPECT_EQ(default_route->virtual_host_.get(),
+                    decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr());
 
           // Not clearing cached route returns cached route and doesn't invoke cb.
           Router::RouteConstSharedPtr route =
@@ -982,8 +982,8 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
-          EXPECT_EQ(default_route->virtual_host_,
-                    decoder_filters_[0]->callbacks_->streamInfo().virtualHost());
+          EXPECT_EQ(default_route->virtual_host_.get(),
+                    decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr());
 
           return FilterHeadersStatus::Continue;
         }));
@@ -1013,8 +1013,8 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           EXPECT_EQ(default_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
           EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->streamInfo().route());
-          EXPECT_EQ(default_route->virtual_host_,
-                    decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
+          EXPECT_EQ(default_route->virtual_host_.get(),
+                    decoder_filters_[1]->callbacks_->streamInfo().virtualHost().ptr());
 
           int ctr = 0;
           const Router::RouteCallback& cb =
@@ -1044,8 +1044,8 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           EXPECT_EQ(foo_bar_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
           EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
-          EXPECT_EQ(foo_bar_route->virtual_host_,
-                    decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
+          EXPECT_EQ(foo_bar_route->virtual_host_.get(),
+                    decoder_filters_[1]->callbacks_->streamInfo().virtualHost().ptr());
 
           return FilterHeadersStatus::Continue;
         }));
@@ -1301,13 +1301,13 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                   delegating_route_foo->routeEntry()->maxGrpcTimeout());
         EXPECT_EQ(default_route->routeEntry()->grpcTimeoutOffset(),
                   delegating_route_foo->routeEntry()->grpcTimeoutOffset());
-        EXPECT_EQ(default_route->virtualHost()->virtualCluster(test_req_headers),
-                  delegating_route_foo->virtualHost()->virtualCluster(test_req_headers));
+        EXPECT_EQ(default_route->virtualHost().virtualCluster(test_req_headers),
+                  delegating_route_foo->virtualHost().virtualCluster(test_req_headers));
 
-        EXPECT_EQ(default_route->virtualHost()->corsPolicy(),
-                  delegating_route_foo->virtualHost()->corsPolicy());
-        EXPECT_EQ(default_route->virtualHost()->rateLimitPolicy().empty(),
-                  delegating_route_foo->virtualHost()->rateLimitPolicy().empty());
+        EXPECT_EQ(default_route->virtualHost().corsPolicy(),
+                  delegating_route_foo->virtualHost().corsPolicy());
+        EXPECT_EQ(default_route->virtualHost().rateLimitPolicy().empty(),
+                  delegating_route_foo->virtualHost().rateLimitPolicy().empty());
 
         EXPECT_EQ(default_route->routeEntry()->autoHostRewrite(),
                   delegating_route_foo->routeEntry()->autoHostRewrite());

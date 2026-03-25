@@ -438,6 +438,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_service_headers_test",
+    srcs = ["http_service_headers_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/http:http_service_headers_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "user_agent_test",
     srcs = ["user_agent_test.cc"],
     rbe_pool = "6gig",

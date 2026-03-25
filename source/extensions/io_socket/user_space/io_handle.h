@@ -42,48 +42,50 @@ public:
   virtual ~IoHandle() = default;
 
   /**
-   * Set the flag to indicate no further write from peer.
+   * Called by the peer to indicate that it will not send any more data.
    */
-  virtual void setWriteEnd() PURE;
+  virtual void setEof() PURE;
 
   /**
-   * @return true if the peer promise no more write.
+   * @return true if the peer has indicated that it will not send any more data.
    */
-  virtual bool isPeerShutDownWrite() const PURE;
+  virtual bool hasReceivedEof() const PURE;
 
   /**
-   * Raised when peer is destroyed. No further write to peer is allowed.
+   * Raised when peer is destroyed. Sending any more data to the peer will fail.
    */
   virtual void onPeerDestroy() PURE;
 
   /**
-   * Notify that consumable data arrived. The consumable data can be either data to read, or the end
-   * of stream event.
+   * Notify that consumable data arrived. The consumable data can be data in the receive buffer, or
+   * the end of stream event.
    */
   virtual void setNewDataAvailable() PURE;
 
   /**
-   * @return the buffer to be written.
+   * @return the buffer holding data received from the peer.
    */
-  virtual Buffer::Instance* getWriteBuffer() PURE;
+  virtual Buffer::Instance* getReceiveBuffer() PURE;
 
   /**
-   * @return true if more data is acceptable at the destination buffer.
+   * @return true if the receive buffer can accept more data from the peer.
+   */
+  virtual bool canReceiveData() const PURE;
+
+  /**
+   * @return true if the peer is valid and its receive buffer can accept more data. This means that
+   * write() calls to this handle will not block.
    */
   virtual bool isWritable() const PURE;
 
   /**
-   * @return true if peer is valid and writable.
-   */
-  virtual bool isPeerWritable() const PURE;
-
-  /**
-   * Raised by the peer when the peer switch from high water mark to low.
+   * Raised by the peer when its receive buffer switches from high watermark to low watermark.
    */
   virtual void onPeerBufferLowWatermark() PURE;
 
   /**
-   * @return true if the pending receive buffer is not empty or read_end is set.
+   * @return true if the receive buffer is not empty or read_end is set. This means that read()
+   * calls to this handle will not block.
    */
   virtual bool isReadable() const PURE;
 
