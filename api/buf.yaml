@@ -27,3 +27,11 @@ lint:
     - envoy/api/v2/listener.proto
     - envoy/config/bootstrap/v2/bootstrap.proto
   disallow_comment_ignores: true
+modules:
+- path: .
+  excludes:
+  # temporarily ignore proto linting errors as grpc health check import not handled by buf
+  # it requires grpc import to follow https://github.com/grpc/grpc-proto/blob/master/grpc/health/v1/health.proto
+  # but envoy uses https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto
+  # which has src/proto prefix
+  - envoy/config/core/v3/health_check.proto
