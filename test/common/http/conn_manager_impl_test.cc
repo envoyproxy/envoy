@@ -980,7 +980,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           route = decoder_filters_[0]->callbacks_->downstreamCallbacks()->routeSharedPtr(cb);
 
           EXPECT_EQ(default_route, route);
-          EXPECT_EQ(default_route.get(), decoder_filters_[0]->callbacks_->route().get());
+          EXPECT_EQ(default_route.get(), decoder_filters_[0]->callbacks_->route().ptr());
           EXPECT_EQ(default_cluster->info().get(),
                     decoder_filters_[0]->callbacks_->clusterInfo().ptr());
 
@@ -1013,7 +1013,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     // This filter chooses second route
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-          EXPECT_EQ(default_route.get(), decoder_filters_[1]->callbacks_->route().get());
+          EXPECT_EQ(default_route.get(), decoder_filters_[1]->callbacks_->route().ptr());
           EXPECT_EQ(default_cluster->info().get(),
                     decoder_filters_[1]->callbacks_->clusterInfo().ptr());
 
@@ -1046,7 +1046,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
           decoder_filters_[1]->callbacks_->downstreamCallbacks()->route(cb);
 
-          EXPECT_EQ(foo_bar_route.get(), decoder_filters_[1]->callbacks_->route().get());
+          EXPECT_EQ(foo_bar_route.get(), decoder_filters_[1]->callbacks_->route().ptr());
           EXPECT_EQ(foo_bar_cluster->info().get(),
                     decoder_filters_[1]->callbacks_->clusterInfo().ptr());
 
