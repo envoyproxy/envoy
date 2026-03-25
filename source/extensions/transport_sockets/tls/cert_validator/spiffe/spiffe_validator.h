@@ -34,7 +34,10 @@ namespace Tls {
 using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
 
 struct SpiffeData {
-  absl::flat_hash_map<std::string, CSmartPtr<X509_STORE, X509_STORE_free>> trust_bundle_stores_;
+  // Mapping for "peer trust domain" -> "local trust domain" -> certificate.
+  absl::flat_hash_map<std::string,
+                      absl::flat_hash_map<std::string, CSmartPtr<X509_STORE, X509_STORE_free>>>
+      trust_bundle_stores_;
   std::vector<bssl::UniquePtr<X509>> ca_certs_;
 };
 
@@ -70,7 +73,7 @@ public:
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 
   // Utility functions
-  X509_STORE* getTrustBundleStore(X509* leaf_cert);
+  X509_STORE* getTrustBundleStore(X509* leaf_cert, absl::string_view workload_trust_domain);
   static std::string extractTrustDomain(const std::string& san);
   static bool certificatePrecheck(X509* leaf_cert);
   OptRef<SpiffeData> getSpiffeData() const {
@@ -84,6 +87,7 @@ public:
 private:
   bool verifyCertChainUsingTrustBundleStore(X509& leaf_cert, STACK_OF(X509)* cert_chain,
                                             X509_VERIFY_PARAM* verify_param,
+                                            absl::string_view workload_trust_domain,
                                             std::string& error_details);
 
   void initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name);

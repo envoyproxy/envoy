@@ -28,13 +28,13 @@ class TestObject : public StreamInfo::FilterState::Object {};
 
 class MockUserSpaceIoHandle : public Network::MockIoHandle, public IoHandle {
 public:
-  MOCK_METHOD(void, setWriteEnd, ());
-  MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
+  MOCK_METHOD(void, setEof, ());
+  MOCK_METHOD(bool, hasReceivedEof, (), (const));
   MOCK_METHOD(void, onPeerDestroy, ());
   MOCK_METHOD(void, setNewDataAvailable, ());
-  MOCK_METHOD(Buffer::Instance*, getWriteBuffer, ());
+  MOCK_METHOD(Buffer::Instance*, getReceiveBuffer, ());
+  MOCK_METHOD(bool, canReceiveData, (), (const));
   MOCK_METHOD(bool, isWritable, (), (const));
-  MOCK_METHOD(bool, isPeerWritable, (), (const));
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
   MOCK_METHOD(std::shared_ptr<PassthroughState>, passthroughState, ());
