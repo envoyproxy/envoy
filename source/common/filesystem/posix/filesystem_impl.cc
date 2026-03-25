@@ -368,7 +368,7 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
       canonical_path.return_value_ == "/dev" || canonical_path.return_value_ == "/sys" ||
       canonical_path.return_value_ == "/proc") {
 
-#ifndef __APPLE__
+#ifdef __linux__
     // Allow /dev/shm/*, which is a de-facto standard tmpfs location on linux. A common use case is
     // to set the bazel sandbox_base to /dev/shm, since /tmp is not always backed by memory. Some
     // tests may then need to access files in bazel sandboxes under this directory.
