@@ -287,7 +287,9 @@ Extract-Only Mode Security Considerations
    **Configuration:**
 
    The header name is configurable via ``verification_status_header`` in
-   ``ExtractOnlyWithoutValidation``. The header is always set and cannot be disabled.
+   ``ExtractOnlyWithoutValidation``. The header is always set, but this behavior can be
+   disabled via the ``envoy.reloadable_features.jwt_authn_add_verification_status_header``
+   runtime flag.
 
    **Recommended alternative:** Use ``provider_name`` with ``remote_jwks``
    or ``local_jwks`` for full signature verification.
