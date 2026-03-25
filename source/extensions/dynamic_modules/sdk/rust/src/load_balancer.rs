@@ -2,6 +2,7 @@ use crate::{
   abi,
   drop_wrapped_c_void_ptr,
   str_to_module_buffer,
+  strs_to_module_buffers,
   wrap_into_c_void_ptr,
   EnvoyCounterId,
   EnvoyCounterVecId,
@@ -65,21 +66,13 @@ pub trait EnvoyLoadBalancer {
   /// Returns the weight of a host by index within all hosts at a given priority.
   fn get_host_weight(&self, priority: u32, index: usize) -> u32;
 
-  /// Returns the number of active requests for a host by index within all hosts at a given
-  /// priority. This is essential for implementing least-request, peak EWMA, and similar algorithms.
-  fn get_host_active_requests(&self, priority: u32, index: usize) -> u64;
-
-  /// Returns the number of active connections for a host by index within all hosts at a given
-  /// priority. This is useful for connection-aware load balancing decisions.
-  fn get_host_active_connections(&self, priority: u32, index: usize) -> u64;
-
-  /// Returns the value of a per-host counter stat. This provides access to host-level counters
-  /// such as total connections, request errors, and request totals.
-  fn get_host_counter_stat(
+  /// Returns the value of a per-host stat. This provides access to host-level counters and gauges
+  /// such as total connections, request errors, active requests, and active connections.
+  fn get_host_stat(
     &self,
     priority: u32,
     index: usize,
-    stat: abi::envoy_dynamic_module_type_host_counter_stat,
+    stat: abi::envoy_dynamic_module_type_host_stat,
   ) -> u64;
 
   /// Returns the locality information (region, zone, sub_zone) for a host by index within all
@@ -354,35 +347,14 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     unsafe { abi::envoy_dynamic_module_callback_lb_get_host_weight(self.lb_ptr, priority, index) }
   }
 
-  fn get_host_active_requests(&self, priority: u32, index: usize) -> u64 {
-    unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_host_active_requests(self.lb_ptr, priority, index)
-    }
-  }
-
-  fn get_host_active_connections(&self, priority: u32, index: usize) -> u64 {
-    unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_host_active_connections(
-        self.lb_ptr,
-        priority,
-        index,
-      )
-    }
-  }
-
-  fn get_host_counter_stat(
+  fn get_host_stat(
     &self,
     priority: u32,
     index: usize,
-    stat: abi::envoy_dynamic_module_type_host_counter_stat,
+    stat: abi::envoy_dynamic_module_type_host_stat,
   ) -> u64 {
     unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_host_counter_stat(
-        self.lb_ptr,
-        priority,
-        index,
-        stat,
-      )
+      abi::envoy_dynamic_module_callback_lb_get_host_stat(self.lb_ptr, priority, index, stat)
     }
   }
 
@@ -967,12 +939,7 @@ pub struct EnvoyLbConfigImpl {
 unsafe impl Send for EnvoyLbConfigImpl {}
 unsafe impl Sync for EnvoyLbConfigImpl {}
 
-/// Helper to convert a slice of string references into a vector of module buffers.
-fn strs_to_module_buffers(strs: &[&str]) -> Vec<abi::envoy_dynamic_module_type_module_buffer> {
-  strs.iter().map(|s| str_to_module_buffer(s)).collect()
-}
-
-/// Helper to call a metric recording ABI function and convert the result.
+/// Converts an ABI metrics result to a Rust Result for recording operations.
 fn metric_result_to_rust(
   res: abi::envoy_dynamic_module_type_metrics_result,
 ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {

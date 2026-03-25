@@ -137,6 +137,7 @@ public:
 
   HeadersStatus onRequestHeaders(HeaderMap& headers, bool) override {
     handle_.clearRouteCache();
+    handle_.refreshRouteCluster();
 
     testHeaders(headers);
 
@@ -247,7 +248,7 @@ public:
     std::vector<HeaderView> headers;
     headers.push_back(HeaderView("header1", "value1"));
     headers.push_back(HeaderView("header2", "value2"));
-    handle_.sendLocalResponse(200, headers, "Hello, World!", -1, "");
+    handle_.sendLocalResponse(200, headers, "Hello, World!", "");
     return HeadersStatus::Stop;
   }
 
@@ -278,47 +279,6 @@ public:
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(SendResponseConfigFactory, "send_response");
-
-// --- send_response_grpc ---
-
-class SendResponseGrpcFilter : public HttpFilter {
-public:
-  SendResponseGrpcFilter(HttpFilterHandle& handle) : handle_(handle) {}
-
-  HeadersStatus onRequestHeaders(HeaderMap&, bool) override {
-    std::vector<HeaderView> h;
-    h.push_back(HeaderView("grpc-message", "service unavailable"));
-    handle_.sendLocalResponse(503, h, "", 14, "");
-    return HeadersStatus::Stop;
-  }
-
-  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
-  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
-  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
-  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
-  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
-  void onStreamComplete() override {}
-  void onDestroy() override {}
-
-private:
-  HttpFilterHandle& handle_;
-};
-
-class SendResponseGrpcFactory : public HttpFilterFactory {
-public:
-  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
-    return std::make_unique<SendResponseGrpcFilter>(handle);
-  }
-};
-
-class SendResponseGrpcConfigFactory : public HttpFilterConfigFactory {
-public:
-  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
-    return std::make_unique<SendResponseGrpcFactory>();
-  }
-};
-
-REGISTER_HTTP_FILTER_CONFIG_FACTORY(SendResponseGrpcConfigFactory, "send_response_grpc");
 
 // --- dynamic_metadata_callbacks ---
 
@@ -459,6 +419,15 @@ public:
     std::set<std::string> ns_set(namespaces.begin(), namespaces.end());
     assert(ns_set.count("ns_keys_test") && "missing ns_keys_test in namespaces");
     assert(ns_set.count("ns_res_body_bool") && "missing ns_res_body_bool in namespaces");
+
+    // Test list metadata.
+    handle_.addMetadataList("ns_list", "list_key", 1.0);
+    handle_.addMetadataList("ns_list", "list_key", 2.0);
+    handle_.addMetadataList("ns_list", "list_key", 3.0);
+    handle_.addMetadataList("ns_list", "str_list_key", "hello");
+    handle_.addMetadataList("ns_list", "str_list_key", "world");
+    handle_.addMetadataList("ns_list", "bool_list_key", true);
+    handle_.addMetadataList("ns_list", "bool_list_key", false);
 
     return BodyStatus::Continue;
   }

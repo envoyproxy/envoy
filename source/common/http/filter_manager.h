@@ -149,7 +149,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Router::RouteConstSharedPtr route() override;
   void resetStream(Http::StreamResetReason reset_reason,
                    absl::string_view transport_failure_reason) override;
-  Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
+  OptRef<const Upstream::ClusterInfo> clusterInfo() override;
+  Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() override;
   uint64_t streamId() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   Tracing::Span& activeSpan() override;
@@ -529,7 +530,13 @@ public:
   /**
    * Returns the cluster info for the current route entry.
    */
-  virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
+  virtual OptRef<const Upstream::ClusterInfo> clusterInfo() PURE;
+
+  /**
+   * @return ClusterInfoConstSharedPtr the cluster info for the current route entry, extended to
+   * allow a caller to extend or transfer ownership.
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() PURE;
 
   /**
    * Returns the current active span.
@@ -1094,7 +1101,12 @@ private:
     return request_metadata_map_vector_.get();
   }
 
-  bool stopDecoderFilterChain() { return state_.decoder_filter_chain_aborted_; }
+  // Returns true if the decoder filter chain should not process any more frames.
+  // This includes cases where the chain was explicitly aborted (e.g., local reply)
+  // or where the downstream connection has been reset.
+  bool stopDecoderFilterChain() {
+    return state_.decoder_filter_chain_aborted_ || state_.saw_downstream_reset_;
+  }
 
   bool stopEncoderFilterChain() { return state_.encoder_filter_chain_aborted_; }
 

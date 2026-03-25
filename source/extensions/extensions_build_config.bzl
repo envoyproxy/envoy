@@ -238,6 +238,7 @@ EXTENSIONS = {
     # NOTE: The proxy_protocol filter is implicitly loaded if proxy_protocol functionality is
     #       configured on the listener. Do not remove it in that case or configs will fail to load.
     "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
+    "envoy.filters.listener.set_filter_state":          "//source/extensions/filters/listener/set_filter_state:config",
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
     "envoy.filters.listener.dynamic_modules":           "//source/extensions/filters/listener/dynamic_modules:config",
     "envoy.filters.udp_listener.dynamic_modules":       "//source/extensions/filters/udp/dynamic_modules:config",
@@ -392,6 +393,7 @@ EXTENSIONS = {
     # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
     #
 
+    "envoy.upstreams.http.dynamic_modules":              "//source/extensions/upstreams/http/dynamic_modules:config",
     "envoy.upstreams.http.http":                        "//source/extensions/upstreams/http/http:config",
     "envoy.upstreams.http.tcp":                         "//source/extensions/upstreams/http/tcp:config",
     "envoy.upstreams.http.udp":                         "//source/extensions/upstreams/http/udp:config",
@@ -501,6 +503,8 @@ EXTENSIONS = {
     #
 
     "envoy.formatter.cel":                              "//source/extensions/formatter/cel:config",
+    "envoy.formatter.file_content":                     "//source/extensions/formatter/file_content:config",
+    "envoy.formatter.generic_secret":                   "//source/extensions/formatter/generic_secret:config",
     "envoy.formatter.metadata":                         "//source/extensions/formatter/metadata:config",
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
     "envoy.built_in_formatters.xfcc_value":             "//source/extensions/formatter/xfcc_value:config",

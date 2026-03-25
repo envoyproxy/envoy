@@ -94,11 +94,7 @@ struct NopHttpFilter {
 impl Drop for NopHttpFilter {
   fn drop(&mut self) {
     assert!(self.on_request_headers_called);
-    assert!(self.on_request_body_called);
-    assert!(self.on_request_trailers_called);
     assert!(self.on_response_headers_called);
-    assert!(self.on_response_body_called);
-    assert!(self.on_response_trailers_called);
     assert!(self.on_stream_complete_called);
   }
 }

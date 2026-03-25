@@ -13,7 +13,6 @@ func init() {
 		"stats_callbacks":            &statsCallbacksConfigFactory{},
 		"header_callbacks":           &headerCallbacksConfigFactory{},
 		"send_response":              &sendResponseConfigFactory{},
-		"send_response_grpc":         &sendResponseGrpcConfigFactory{},
 		"dynamic_metadata_callbacks": &dynamicMetadataCallbacksConfigFactory{},
 		"filter_state_callbacks":     &filterStateCallbacksConfigFactory{},
 		"body_callbacks":             &bodyCallbacksConfigFactory{},
@@ -123,6 +122,7 @@ func (f *headerCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.H
 func (p *headerCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	p.handle.ClearRouteCache()
+	p.handle.RefreshRouteCluster()
 
 	testHeaders(headers)
 
@@ -224,35 +224,7 @@ func (f *sendResponseFactory) Create(handle shared.HttpFilterHandle) shared.Http
 func (p *sendResponseFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	p.handle.SendLocalResponse(200, [][2]string{{"header1", "value1"}, {"header2", "value2"}},
-		[]byte("Hello, World!"), -1, "")
-	return shared.HeadersStatusStop
-}
-
-// --- send_response_grpc ---
-type sendResponseGrpcConfigFactory struct {
-	shared.EmptyHttpFilterConfigFactory
-}
-type sendResponseGrpcFactory struct {
-	shared.EmptyHttpFilterFactory
-}
-
-func (f *sendResponseGrpcConfigFactory) Create(handle shared.HttpFilterConfigHandle,
-	config []byte) (shared.HttpFilterFactory, error) {
-	return &sendResponseGrpcFactory{}, nil
-}
-
-type sendResponseGrpcFilter struct {
-	handle shared.HttpFilterHandle
-	shared.EmptyHttpFilter
-}
-
-func (f *sendResponseGrpcFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
-	return &sendResponseGrpcFilter{handle: handle}
-}
-
-func (p *sendResponseGrpcFilter) OnRequestHeaders(headers shared.HeaderMap,
-	endOfStream bool) shared.HeadersStatus {
-	p.handle.SendLocalResponse(503, [][2]string{{"grpc-message", "service unavailable"}}, nil, 14, "")
+		[]byte("Hello, World!"), "")
 	return shared.HeadersStatusStop
 }
 
@@ -420,6 +392,15 @@ func (p *dynamicMetadataCallbacksFilter) OnResponseBody(body shared.BodyBuffer, 
 	if !nsSet["ns_res_body_bool"] {
 		panic(fmt.Sprintf("missing ns_res_body_bool in namespaces: %v", namespaces))
 	}
+
+	// Test list metadata.
+	p.handle.AddMetadataListNumber("ns_list", "list_key", 1.0)
+	p.handle.AddMetadataListNumber("ns_list", "list_key", 2.0)
+	p.handle.AddMetadataListNumber("ns_list", "list_key", 3.0)
+	p.handle.AddMetadataListString("ns_list", "str_list_key", "hello")
+	p.handle.AddMetadataListString("ns_list", "str_list_key", "world")
+	p.handle.AddMetadataListBool("ns_list", "bool_list_key", true)
+	p.handle.AddMetadataListBool("ns_list", "bool_list_key", false)
 
 	return shared.BodyStatusContinue
 }

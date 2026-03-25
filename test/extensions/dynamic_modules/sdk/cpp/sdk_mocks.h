@@ -105,6 +105,20 @@ public:
               (override));
   MOCK_METHOD(void, setMetadata, (std::string_view ns, std::string_view key, bool value),
               (override));
+  MOCK_METHOD(bool, addMetadataList, (std::string_view ns, std::string_view key, double value),
+              (override));
+  MOCK_METHOD(bool, addMetadataList,
+              (std::string_view ns, std::string_view key, std::string_view value), (override));
+  MOCK_METHOD(bool, addMetadataList, (std::string_view ns, std::string_view key, bool value),
+              (override));
+  MOCK_METHOD(std::optional<size_t>, getMetadataListSize,
+              (std::string_view ns, std::string_view key), (override));
+  MOCK_METHOD(std::optional<double>, getMetadataListNumber,
+              (std::string_view ns, std::string_view key, size_t index), (override));
+  MOCK_METHOD(std::optional<std::string_view>, getMetadataListString,
+              (std::string_view ns, std::string_view key, size_t index), (override));
+  MOCK_METHOD(std::optional<bool>, getMetadataListBool,
+              (std::string_view ns, std::string_view key, size_t index), (override));
   MOCK_METHOD(std::optional<std::string_view>, getAttributeString, (AttributeID id), (override));
   MOCK_METHOD(std::optional<uint64_t>, getAttributeNumber, (AttributeID id), (override));
   MOCK_METHOD(std::optional<bool>, getAttributeBool, (AttributeID id), (override));
@@ -112,7 +126,7 @@ public:
   MOCK_METHOD(void, setFilterState, (std::string_view key, std::string_view value), (override));
   MOCK_METHOD(void, sendLocalResponse,
               (uint32_t status, std::span<const HeaderView> headers, std::string_view body,
-               int32_t grpc_status, std::string_view detail),
+               std::string_view detail),
               (override));
   MOCK_METHOD(void, sendResponseHeaders, (std::span<const HeaderView> headers, bool end_stream),
               (override));
@@ -122,6 +136,7 @@ public:
   MOCK_METHOD(void, continueRequest, (), (override));
   MOCK_METHOD(void, continueResponse, (), (override));
   MOCK_METHOD(void, clearRouteCache, (), (override));
+  MOCK_METHOD(void, refreshRouteCluster, (), (override));
   MOCK_METHOD(HeaderMap&, requestHeaders, (), (override));
   MOCK_METHOD(BodyBuffer&, bufferedRequestBody, (), (override));
   MOCK_METHOD(BodyBuffer&, receivedRequestBody, (), (override));

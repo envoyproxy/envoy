@@ -433,6 +433,87 @@ public:
   }
 
   /**
+   * Appends a numeric value to the dynamic metadata list stored under the given namespace and key.
+   * If the key does not exist, a new list is created. Returns false if the key exists but is not a
+   * list, or if the metadata is not accessible.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The number to append.
+   * @return true if the operation is successful, false otherwise.
+   */
+  virtual bool addMetadataList(std::string_view ns, std::string_view key, double value) = 0;
+
+  /**
+   * Appends a string value to the dynamic metadata list stored under the given namespace and key.
+   * If the key does not exist, a new list is created. Returns false if the key exists but is not a
+   * list, or if the metadata is not accessible.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The string to append.
+   * @return true if the operation is successful, false otherwise.
+   */
+  virtual bool addMetadataList(std::string_view ns, std::string_view key,
+                               std::string_view value) = 0;
+
+  // Prevent const char* from implicitly converting to bool instead of string_view.
+  bool addMetadataList(std::string_view ns, std::string_view key, const char* value) {
+    return addMetadataList(ns, key, std::string_view(value));
+  }
+
+  /**
+   * Appends a bool value to the dynamic metadata list stored under the given namespace and key.
+   * If the key does not exist, a new list is created. Returns false if the key exists but is not a
+   * list, or if the metadata is not accessible.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The bool to append.
+   * @return true if the operation is successful, false otherwise.
+   */
+  virtual bool addMetadataList(std::string_view ns, std::string_view key, bool value) = 0;
+
+  /**
+   * Returns the number of elements in the metadata list stored under the given namespace and key.
+   * Returns nullopt if the metadata is not accessible, the namespace or key does not exist, or the
+   * value is not a list.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   */
+  virtual std::optional<size_t> getMetadataListSize(std::string_view ns, std::string_view key) = 0;
+
+  /**
+   * Returns the number element at the given index in the metadata list stored under the given
+   * namespace and key. Returns nullopt if the metadata is not accessible, the namespace or key does
+   * not exist, the value is not a list, the index is out of range, or the element is not a number.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param index The zero-based index.
+   */
+  virtual std::optional<double> getMetadataListNumber(std::string_view ns, std::string_view key,
+                                                      size_t index) = 0;
+
+  /**
+   * Returns the string element at the given index in the metadata list stored under the given
+   * namespace and key. Returns nullopt if the metadata is not accessible, the namespace or key does
+   * not exist, the value is not a list, the index is out of range, or the element is not a string.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param index The zero-based index.
+   */
+  virtual std::optional<std::string_view>
+  getMetadataListString(std::string_view ns, std::string_view key, size_t index) = 0;
+
+  /**
+   * Returns the bool element at the given index in the metadata list stored under the given
+   * namespace and key. Returns nullopt if the metadata is not accessible, the namespace or key does
+   * not exist, the value is not a list, the index is out of range, or the element is not a bool.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param index The zero-based index.
+   */
+  virtual std::optional<bool> getMetadataListBool(std::string_view ns, std::string_view key,
+                                                  size_t index) = 0;
+
+  /**
    * Retrieves the serialized filter state value of the stream.
    * @param key The filter state key.
    * @return The filter state value if found, otherwise empty.
@@ -470,15 +551,11 @@ public:
   /**
    * Sends a local response with status code, body, and detail.
    * @param status The HTTP status code.
-   * @param headers The response headers.
    * @param body The response body.
-   * @param grpc_status The gRPC status code for gRPC requests. Use -1 to indicate no gRPC status
-   * (Envoy will infer from the HTTP status code). Values 0-16 are standard gRPC status codes.
    * @param detail The response detail.
    */
   virtual void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
-                                 std::string_view body, int32_t grpc_status,
-                                 std::string_view detail) = 0;
+                                 std::string_view body, std::string_view detail) = 0;
 
   /**
    * Sends response headers. This is used for streaming local replies.
@@ -520,6 +597,15 @@ public:
    * Clear route cache to force re-evaluation of route.
    */
   virtual void clearRouteCache() = 0;
+
+  /**
+   * Clear only the cluster selection for the current route without clearing the entire route cache.
+   *
+   * This is a subset of clearRouteCache(). Use this when a filter modifies headers that affect
+   * cluster selection but not the route itself. This is more efficient than clearing the entire
+   * route cache.
+   */
+  virtual void refreshRouteCluster() = 0;
 
   /**
    * Returns reference to request headers.

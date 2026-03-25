@@ -103,9 +103,7 @@ public:
 class AsyncClientImplTracingTest : public AsyncClientImplTest {
 public:
   AsyncClientImplTracingTest() {
-    ON_CALL(stream_info_, upstreamClusterInfo())
-        .WillByDefault(Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(
-            cm_.thread_local_cluster_.cluster_.info_)));
+    stream_info_.upstream_cluster_info_ = cm_.thread_local_cluster_.cluster_.info_;
   }
 
   Tracing::MockSpan parent_span_;
@@ -2375,12 +2373,12 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   auto& path_match_criterion = route_entry->pathMatchCriterion();
   EXPECT_EQ("", path_match_criterion.matcher());
   EXPECT_EQ(Router::PathMatchType::None, path_match_criterion.matchType());
-  const auto& route_config = route->virtualHost()->routeConfig();
+  const auto& route_config = route->virtualHost().routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
   auto cluster_info = filter_callbacks->clusterInfo();
-  ASSERT_NE(nullptr, cluster_info);
-  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_, cluster_info);
+  ASSERT_TRUE(cluster_info.has_value());
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_.get(), cluster_info.ptr());
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
@@ -2556,11 +2554,11 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_TRUE(route_entry.upgradeMap().empty());
   EXPECT_EQ(false, route_entry.internalRedirectPolicy().enabled());
   EXPECT_TRUE(route_entry.shadowPolicies().empty());
-  EXPECT_TRUE(route_impl_->virtualHost()->rateLimitPolicy().empty());
-  EXPECT_EQ(nullptr, route_impl_->virtualHost()->corsPolicy());
-  EXPECT_FALSE(route_impl_->virtualHost()->includeAttemptCountInRequest());
-  EXPECT_FALSE(route_impl_->virtualHost()->includeAttemptCountInResponse());
-  EXPECT_FALSE(route_impl_->virtualHost()->routeConfig().usesVhds());
+  EXPECT_TRUE(route_impl_->virtualHost().rateLimitPolicy().empty());
+  EXPECT_EQ(nullptr, route_impl_->virtualHost().corsPolicy());
+  EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInRequest());
+  EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInResponse());
+  EXPECT_FALSE(route_impl_->virtualHost().routeConfig().usesVhds());
   EXPECT_EQ(nullptr, route_entry.tlsContextMatchCriteria());
 }
 

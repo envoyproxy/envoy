@@ -329,6 +329,77 @@ public:
         envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
   }
 
+  bool addMetadataList(std::string_view ns, std::string_view key, double value) override {
+    return envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
+  }
+
+  bool addMetadataList(std::string_view ns, std::string_view key, std::string_view value) override {
+    return envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
+  bool addMetadataList(std::string_view ns, std::string_view key, bool value) override {
+    return envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, value);
+  }
+
+  std::optional<size_t> getMetadataListSize(std::string_view ns, std::string_view key) override {
+    size_t result = 0;
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_list_size(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, &result);
+    if (!ret) {
+      return {};
+    }
+    return result;
+  }
+
+  std::optional<double> getMetadataListNumber(std::string_view ns, std::string_view key,
+                                              size_t index) override {
+    double value = 0.0;
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_list_number(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, index, &value);
+    if (!ret) {
+      return {};
+    }
+    return value;
+  }
+
+  std::optional<std::string_view> getMetadataListString(std::string_view ns, std::string_view key,
+                                                        size_t index) override {
+    BufferView value{nullptr, 0};
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_list_string(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, index,
+        reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    if (!ret || value.data() == nullptr) {
+      return {};
+    }
+    return value.toStringView();
+  }
+
+  std::optional<bool> getMetadataListBool(std::string_view ns, std::string_view key,
+                                          size_t index) override {
+    bool value = false;
+    const bool ret = envoy_dynamic_module_callback_http_get_metadata_list_bool(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        envoy_dynamic_module_type_module_buffer{key.data(), key.size()}, index, &value);
+    if (!ret) {
+      return {};
+    }
+    return value;
+  }
+
   std::optional<std::string_view> getFilterState(std::string_view key) override {
     BufferView value{nullptr, 0};
 
@@ -384,26 +455,12 @@ public:
   }
 
   void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
-                         std::string_view body, int32_t grpc_status,
-                         std::string_view detail) override {
-    // When gRPC status is specified, include it as a grpc-status header so Envoy's sendLocalReply
-    // picks it up via modify_headers without requiring an ABI change.
-    std::string grpc_status_str;
-    std::vector<HeaderView> merged_headers;
-    const HeaderView* headers_ptr = headers.data();
-    size_t headers_size = headers.size();
-    if (grpc_status >= 0) {
-      grpc_status_str = std::to_string(grpc_status);
-      merged_headers.assign(headers.begin(), headers.end());
-      merged_headers.emplace_back("grpc-status", grpc_status_str);
-      headers_ptr = merged_headers.data();
-      headers_size = merged_headers.size();
-    }
+                         std::string_view body, std::string_view detail) override {
     envoy_dynamic_module_callback_http_send_response(
         host_plugin_ptr_, status,
         const_cast<envoy_dynamic_module_type_module_http_header*>(
-            reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(headers_ptr)),
-        headers_size, envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
+            reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(headers.data())),
+        headers.size(), envoy_dynamic_module_type_module_buffer{body.data(), body.size()},
         envoy_dynamic_module_type_module_buffer{detail.data(), detail.size()});
   }
 
@@ -444,6 +501,10 @@ public:
 
   void clearRouteCache() override {
     envoy_dynamic_module_callback_http_clear_route_cache(host_plugin_ptr_);
+  }
+
+  void refreshRouteCluster() override {
+    envoy_dynamic_module_callback_http_clear_route_cluster_cache(host_plugin_ptr_);
   }
 
   HeaderMap& requestHeaders() override { return request_headers_; }

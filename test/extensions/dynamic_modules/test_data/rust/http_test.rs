@@ -12,6 +12,11 @@ fn test_header_callbacks_filter_on_request_headers() {
     .once();
 
   envoy_filter
+    .expect_clear_route_cluster_cache()
+    .return_const(())
+    .once();
+
+  envoy_filter
     .expect_get_request_header_value()
     .withf(|name| name == "single")
     .returning(|_| Some(EnvoyBuffer::new("value")))
@@ -122,7 +127,7 @@ fn test_send_response_filter() {
 
   envoy_filter
     .expect_send_response()
-    .withf(|status_code, headers, body, grpc_status, details| {
+    .withf(|status_code, headers, body, details| {
       *status_code == 200
         && *headers
           == vec![
@@ -130,7 +135,6 @@ fn test_send_response_filter() {
             ("header2", "value2".as_bytes()),
           ]
         && *body == Some(b"Hello, World!")
-        && grpc_status.is_none()
         && details.is_none()
     })
     .once()
@@ -476,6 +480,105 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
         EnvoyBuffer::new("ns_res_body"),
       ])
     })
+    .once();
+
+  // List metadata expectations: number list.
+  envoy_filter
+    .expect_add_dynamic_metadata_list_number()
+    .withf(|ns, key, val| ns == "ns_list" && key == "list_key" && *val == 1.0)
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_add_dynamic_metadata_list_number()
+    .withf(|ns, key, val| ns == "ns_list" && key == "list_key" && *val == 2.0)
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_add_dynamic_metadata_list_number()
+    .withf(|ns, key, val| ns == "ns_list" && key == "list_key" && *val == 3.0)
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_get_metadata_list_size()
+    .withf(|_, ns, key| ns == "ns_list" && key == "list_key")
+    .returning(|_, _, _| Some(3))
+    .once();
+  envoy_filter
+    .expect_get_metadata_list_number()
+    .withf(|_, ns, key, idx| ns == "ns_list" && key == "list_key" && *idx == 0)
+    .returning(|_, _, _, _| Some(1.0))
+    .once();
+  envoy_filter
+    .expect_get_metadata_list_number()
+    .withf(|_, ns, key, idx| ns == "ns_list" && key == "list_key" && *idx == 2)
+    .returning(|_, _, _, _| Some(3.0))
+    .once();
+  // Out-of-range index.
+  envoy_filter
+    .expect_get_metadata_list_number()
+    .withf(|_, ns, key, idx| ns == "ns_list" && key == "list_key" && *idx == 3)
+    .returning(|_, _, _, _| None)
+    .once();
+
+  // List metadata expectations: string list.
+  envoy_filter
+    .expect_add_dynamic_metadata_list_string()
+    .withf(|ns, key, val| ns == "ns_list" && key == "str_list_key" && val == "hello")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_add_dynamic_metadata_list_string()
+    .withf(|ns, key, val| ns == "ns_list" && key == "str_list_key" && val == "world")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_get_metadata_list_string()
+    .withf(|_, ns, key, idx| ns == "ns_list" && key == "str_list_key" && *idx == 0)
+    .returning(|_, _, _, _| Some(EnvoyBuffer::new("hello")))
+    .once();
+  envoy_filter
+    .expect_get_metadata_list_string()
+    .withf(|_, ns, key, idx| ns == "ns_list" && key == "str_list_key" && *idx == 1)
+    .returning(|_, _, _, _| Some(EnvoyBuffer::new("world")))
+    .once();
+
+  // List metadata expectations: bool list.
+  envoy_filter
+    .expect_add_dynamic_metadata_list_bool()
+    .withf(|ns, key, val| ns == "ns_list" && key == "bool_list_key" && *val == true)
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_add_dynamic_metadata_list_bool()
+    .withf(|ns, key, val| ns == "ns_list" && key == "bool_list_key" && *val == false)
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_get_metadata_list_bool()
+    .withf(|_, ns, key, idx| ns == "ns_list" && key == "bool_list_key" && *idx == 0)
+    .returning(|_, _, _, _| Some(true))
+    .once();
+  envoy_filter
+    .expect_get_metadata_list_bool()
+    .withf(|_, ns, key, idx| ns == "ns_list" && key == "bool_list_key" && *idx == 1)
+    .returning(|_, _, _, _| Some(false))
+    .once();
+
+  // Non-list key conflict: set_dynamic_metadata_number then add_dynamic_metadata_list_number fails.
+  envoy_filter
+    .expect_set_dynamic_metadata_number()
+    .withf(|ns, key, val| ns == "ns_list" && key == "not_a_list" && *val == 42.0)
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_add_dynamic_metadata_list_number()
+    .withf(|ns, key, val| ns == "ns_list" && key == "not_a_list" && *val == 1.0)
+    .return_const(false)
+    .once();
+  envoy_filter
+    .expect_get_metadata_list_size()
+    .withf(|_, ns, key| ns == "ns_list" && key == "not_a_list")
+    .returning(|_, _, _| None)
     .once();
 
   assert_eq!(
