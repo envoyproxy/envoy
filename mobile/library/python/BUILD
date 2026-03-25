@@ -4,7 +4,6 @@ load("@python_abi//:abi.bzl", "abi_tag", "python_tag")
 load("@rules_python//python:defs.bzl", "py_library")
 load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
 
-
 licenses(["notice"])  # Apache 2
 
 package(default_visibility = ["//visibility:public"])

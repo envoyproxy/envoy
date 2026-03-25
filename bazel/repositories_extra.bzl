@@ -42,7 +42,7 @@ def envoy_dependencies_extra(
     python_register_toolchains(
         name = "python_3_13",
         python_version = "3.13.1",
-        ignore_root_user_error = ignore_root_user_error
+        ignore_root_user_error = ignore_root_user_error,
     )
 
     aspect_bazel_lib_dependencies()
