@@ -181,6 +181,18 @@ impl AccessLogger for TestAccessLogger {
     let _response_trailers =
       ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer);
 
+    // Test generic attribute accessors.
+    let _attr_protocol =
+      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestProtocol);
+    let _attr_route =
+      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsRouteName);
+    let _attr_resp_code =
+      ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseCode);
+    let _attr_conn_id =
+      ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId);
+    let _attr_mtls =
+      ctx.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
+
     // Test access log type.
     let log_type = ctx.log_type();
     assert_eq!(log_type.as_str(), "DownstreamEnd");
