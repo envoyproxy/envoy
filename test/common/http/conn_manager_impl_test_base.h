@@ -119,7 +119,7 @@ public:
     return max_connection_duration_;
   }
   absl::optional<double> maxConnectionDurationJitterPercent() const override {
-    return absl::nullopt;
+    return max_connection_duration_jitter_percent_;
   }
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
@@ -299,6 +299,7 @@ public:
   uint32_t max_requests_per_connection_{};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  absl::optional<double> max_connection_duration_jitter_percent_;
   bool http1_safe_max_connection_duration_{false};
   std::chrono::milliseconds stream_idle_timeout_{};
   absl::optional<std::chrono::milliseconds> stream_flush_timeout_;
