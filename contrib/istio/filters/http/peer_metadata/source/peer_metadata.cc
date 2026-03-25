@@ -299,14 +299,14 @@ bool MXPropagationMethod::skipMXHeaders(const bool skip_external_clusters,
                                         const StreamInfo::StreamInfo& info) const {
   // We skip metadata in two cases.
   // 1. skip_external_clusters is enabled, and we detect the upstream as external.
-  const auto& cluster_info = info.upstreamClusterInfo();
-  if (cluster_info && cluster_info.value()) {
-    const auto& cluster_name = cluster_info.value()->name();
+  const auto cluster_info = info.upstreamClusterInfo();
+  if (cluster_info) {
+    const auto& cluster_name = cluster_info->name();
     // PassthroughCluster is always considered external
     if (skip_external_clusters && cluster_name == "PassthroughCluster") {
       return true;
     }
-    const auto& filter_metadata = cluster_info.value()->metadata().filter_metadata();
+    const auto& filter_metadata = cluster_info->metadata().filter_metadata();
     const auto& it = filter_metadata.find("istio");
     // Otherwise, cluster must be tagged as external
     if (it != filter_metadata.end()) {

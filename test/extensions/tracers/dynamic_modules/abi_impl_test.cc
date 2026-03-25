@@ -340,54 +340,150 @@ TEST_F(AbiImplTest, GetTraceContextMethod) {
   EXPECT_EQ(std::string(value_out.ptr, value_out.length), "POST");
 }
 
+// =============================================================================
+// Metrics Tests
+// =============================================================================
+
 TEST_F(AbiImplTest, DefineAndIncrementCounter) {
   envoy_dynamic_module_type_module_buffer name = {.ptr = "test_counter", .length = 12};
-  size_t counter_id =
-      envoy_dynamic_module_callback_tracer_define_counter(static_cast<void*>(config_.get()), name);
+  size_t counter_id = 0;
+  auto define_result = envoy_dynamic_module_callback_tracer_define_counter(
+      static_cast<void*>(config_.get()), name, nullptr, 0, &counter_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_GT(counter_id, 0u);
 
   auto result = envoy_dynamic_module_callback_tracer_increment_counter(
-      static_cast<void*>(config_.get()), counter_id, 5);
+      static_cast<void*>(config_.get()), counter_id, nullptr, 0, 5);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 }
 
 TEST_F(AbiImplTest, IncrementCounterInvalidId) {
   auto result = envoy_dynamic_module_callback_tracer_increment_counter(
-      static_cast<void*>(config_.get()), 999, 1);
+      static_cast<void*>(config_.get()), 999, nullptr, 0, 1);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
 }
 
 TEST_F(AbiImplTest, DefineAndSetGauge) {
   envoy_dynamic_module_type_module_buffer name = {.ptr = "test_gauge", .length = 10};
-  size_t gauge_id =
-      envoy_dynamic_module_callback_tracer_define_gauge(static_cast<void*>(config_.get()), name);
+  size_t gauge_id = 0;
+  auto define_result = envoy_dynamic_module_callback_tracer_define_gauge(
+      static_cast<void*>(config_.get()), name, nullptr, 0, &gauge_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_GT(gauge_id, 0u);
 
   auto result = envoy_dynamic_module_callback_tracer_set_gauge(static_cast<void*>(config_.get()),
-                                                               gauge_id, 42);
+                                                               gauge_id, nullptr, 0, 42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 }
 
 TEST_F(AbiImplTest, SetGaugeInvalidId) {
-  auto result =
-      envoy_dynamic_module_callback_tracer_set_gauge(static_cast<void*>(config_.get()), 999, 1);
+  auto result = envoy_dynamic_module_callback_tracer_set_gauge(static_cast<void*>(config_.get()),
+                                                               999, nullptr, 0, 1);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
 }
 
 TEST_F(AbiImplTest, DefineAndRecordHistogram) {
   envoy_dynamic_module_type_module_buffer name = {.ptr = "test_histogram", .length = 14};
-  size_t histogram_id = envoy_dynamic_module_callback_tracer_define_histogram(
-      static_cast<void*>(config_.get()), name);
+  size_t histogram_id = 0;
+  auto define_result = envoy_dynamic_module_callback_tracer_define_histogram(
+      static_cast<void*>(config_.get()), name, nullptr, 0, &histogram_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_GT(histogram_id, 0u);
 
   auto result = envoy_dynamic_module_callback_tracer_record_histogram_value(
-      static_cast<void*>(config_.get()), histogram_id, 100);
+      static_cast<void*>(config_.get()), histogram_id, nullptr, 0, 100);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 }
 
 TEST_F(AbiImplTest, RecordHistogramInvalidId) {
   auto result = envoy_dynamic_module_callback_tracer_record_histogram_value(
-      static_cast<void*>(config_.get()), 999, 1);
+      static_cast<void*>(config_.get()), 999, nullptr, 0, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+TEST_F(AbiImplTest, DefineAndIncrementCounterVec) {
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_counter_vec", .length = 16};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{.ptr = "method", .length = 6},
+                                                           {.ptr = "status", .length = 6}};
+  size_t counter_id = 0;
+  auto define_result = envoy_dynamic_module_callback_tracer_define_counter(
+      static_cast<void*>(config_.get()), name, label_names, 2, &counter_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_GT(counter_id, 0u);
+
+  envoy_dynamic_module_type_module_buffer label_values[] = {{.ptr = "GET", .length = 3},
+                                                            {.ptr = "200", .length = 3}};
+  auto result = envoy_dynamic_module_callback_tracer_increment_counter(
+      static_cast<void*>(config_.get()), counter_id, label_values, 2, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+}
+
+TEST_F(AbiImplTest, IncrementCounterVecInvalidLabels) {
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_counter_vec2", .length = 17};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{.ptr = "method", .length = 6}};
+  size_t counter_id = 0;
+  auto define_result = envoy_dynamic_module_callback_tracer_define_counter(
+      static_cast<void*>(config_.get()), name, label_names, 1, &counter_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Wrong number of label values.
+  envoy_dynamic_module_type_module_buffer label_values[] = {{.ptr = "GET", .length = 3},
+                                                            {.ptr = "200", .length = 3}};
+  auto result = envoy_dynamic_module_callback_tracer_increment_counter(
+      static_cast<void*>(config_.get()), counter_id, label_values, 2, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_InvalidLabels);
+}
+
+TEST_F(AbiImplTest, DefineAndSetGaugeVec) {
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_gauge_vec", .length = 14};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{.ptr = "host", .length = 4}};
+  size_t gauge_id = 0;
+  auto define_result = envoy_dynamic_module_callback_tracer_define_gauge(
+      static_cast<void*>(config_.get()), name, label_names, 1, &gauge_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_GT(gauge_id, 0u);
+
+  envoy_dynamic_module_type_module_buffer label_values[] = {
+      {.ptr = "example.com", .length = 11}};
+  auto result = envoy_dynamic_module_callback_tracer_set_gauge(static_cast<void*>(config_.get()),
+                                                               gauge_id, label_values, 1, 99);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+}
+
+TEST_F(AbiImplTest, DefineAndRecordHistogramVec) {
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_hist_vec", .length = 13};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{.ptr = "path", .length = 4}};
+  size_t histogram_id = 0;
+  auto define_result = envoy_dynamic_module_callback_tracer_define_histogram(
+      static_cast<void*>(config_.get()), name, label_names, 1, &histogram_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_GT(histogram_id, 0u);
+
+  envoy_dynamic_module_type_module_buffer label_values[] = {{.ptr = "/api", .length = 4}};
+  auto result = envoy_dynamic_module_callback_tracer_record_histogram_value(
+      static_cast<void*>(config_.get()), histogram_id, label_values, 1, 250);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+}
+
+TEST_F(AbiImplTest, IncrementCounterVecNotFound) {
+  // Try to use a non-existent vec ID.
+  envoy_dynamic_module_type_module_buffer label_values[] = {{.ptr = "v", .length = 1}};
+  auto result = envoy_dynamic_module_callback_tracer_increment_counter(
+      static_cast<void*>(config_.get()), 999, label_values, 1, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+TEST_F(AbiImplTest, SetGaugeVecNotFound) {
+  envoy_dynamic_module_type_module_buffer label_values[] = {{.ptr = "v", .length = 1}};
+  auto result = envoy_dynamic_module_callback_tracer_set_gauge(static_cast<void*>(config_.get()),
+                                                               999, label_values, 1, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+TEST_F(AbiImplTest, RecordHistogramVecNotFound) {
+  envoy_dynamic_module_type_module_buffer label_values[] = {{.ptr = "v", .length = 1}};
+  auto result = envoy_dynamic_module_callback_tracer_record_histogram_value(
+      static_cast<void*>(config_.get()), 999, label_values, 1, 1);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
 }
 

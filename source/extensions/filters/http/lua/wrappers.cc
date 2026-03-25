@@ -479,8 +479,8 @@ int FilterStateWrapper::luaSet(lua_State* state) {
 }
 
 const Protobuf::Struct& VirtualHostWrapper::getMetadata() const {
-  const auto& virtual_host = stream_info_.virtualHost();
-  if (virtual_host == nullptr) {
+  const auto virtual_host = stream_info_.virtualHost();
+  if (!virtual_host) {
     return Protobuf::Struct::default_instance();
   }
 

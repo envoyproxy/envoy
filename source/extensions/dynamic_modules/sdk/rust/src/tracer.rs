@@ -11,21 +11,39 @@ use std::ffi::c_void;
 // Metrics Support
 // -----------------------------------------------------------------------------
 
-/// Handle for a counter metric defined by the tracer module.
+/// Handle for a counter metric without labels defined by the tracer module.
 #[derive(Debug, Clone, Copy)]
 pub struct TracerCounterHandle {
   id: usize,
 }
 
-/// Handle for a gauge metric defined by the tracer module.
+/// Handle for a labeled counter metric defined by the tracer module.
+#[derive(Debug, Clone, Copy)]
+pub struct TracerCounterVecHandle {
+  id: usize,
+}
+
+/// Handle for a gauge metric without labels defined by the tracer module.
 #[derive(Debug, Clone, Copy)]
 pub struct TracerGaugeHandle {
   id: usize,
 }
 
-/// Handle for a histogram metric defined by the tracer module.
+/// Handle for a labeled gauge metric defined by the tracer module.
+#[derive(Debug, Clone, Copy)]
+pub struct TracerGaugeVecHandle {
+  id: usize,
+}
+
+/// Handle for a histogram metric without labels defined by the tracer module.
 #[derive(Debug, Clone, Copy)]
 pub struct TracerHistogramHandle {
+  id: usize,
+}
+
+/// Handle for a labeled histogram metric defined by the tracer module.
+#[derive(Debug, Clone, Copy)]
+pub struct TracerHistogramVecHandle {
   id: usize,
 }
 
@@ -47,75 +65,235 @@ impl TracerConfigContext {
   /// Define a counter metric.
   ///
   /// Returns a handle that can be used to increment the counter later.
-  /// Returns `None` if the counter could not be defined.
-  pub fn define_counter(&self, name: &str) -> Option<TracerCounterHandle> {
-    let name_buf = str_to_module_buffer(name);
-    let id =
-      unsafe { abi::envoy_dynamic_module_callback_tracer_define_counter(self.envoy_ptr, name_buf) };
-    if id > 0 {
-      Some(TracerCounterHandle { id })
-    } else {
-      None
-    }
+  pub fn define_counter(
+    &self,
+    name: &str,
+  ) -> Result<TracerCounterHandle, abi::envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_define_counter(
+        self.envoy_ptr,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(TracerCounterHandle { id })
+  }
+
+  /// Define a labeled counter metric.
+  ///
+  /// Returns a handle that can be used with `increment_counter_vec` together with label values.
+  pub fn define_counter_vec(
+    &self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<TracerCounterVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
+    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_define_counter(
+        self.envoy_ptr,
+        str_to_module_buffer(name),
+        label_bufs.as_ptr() as *mut _,
+        label_bufs.len(),
+        &mut id,
+      )
+    })?;
+    Ok(TracerCounterVecHandle { id })
   }
 
   /// Define a gauge metric.
   ///
   /// Returns a handle that can be used to set the gauge later.
-  /// Returns `None` if the gauge could not be defined.
-  pub fn define_gauge(&self, name: &str) -> Option<TracerGaugeHandle> {
-    let name_buf = str_to_module_buffer(name);
-    let id =
-      unsafe { abi::envoy_dynamic_module_callback_tracer_define_gauge(self.envoy_ptr, name_buf) };
-    if id > 0 {
-      Some(TracerGaugeHandle { id })
-    } else {
-      None
-    }
+  pub fn define_gauge(
+    &self,
+    name: &str,
+  ) -> Result<TracerGaugeHandle, abi::envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_define_gauge(
+        self.envoy_ptr,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(TracerGaugeHandle { id })
+  }
+
+  /// Define a labeled gauge metric.
+  ///
+  /// Returns a handle that can be used with `set_gauge_vec` together with label values.
+  pub fn define_gauge_vec(
+    &self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<TracerGaugeVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
+    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_define_gauge(
+        self.envoy_ptr,
+        str_to_module_buffer(name),
+        label_bufs.as_ptr() as *mut _,
+        label_bufs.len(),
+        &mut id,
+      )
+    })?;
+    Ok(TracerGaugeVecHandle { id })
   }
 
   /// Define a histogram metric.
   ///
   /// Returns a handle that can be used to record histogram values later.
-  /// Returns `None` if the histogram could not be defined.
-  pub fn define_histogram(&self, name: &str) -> Option<TracerHistogramHandle> {
-    let name_buf = str_to_module_buffer(name);
-    let id = unsafe {
-      abi::envoy_dynamic_module_callback_tracer_define_histogram(self.envoy_ptr, name_buf)
-    };
-    if id > 0 {
-      Some(TracerHistogramHandle { id })
-    } else {
-      None
-    }
+  pub fn define_histogram(
+    &self,
+    name: &str,
+  ) -> Result<TracerHistogramHandle, abi::envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_define_histogram(
+        self.envoy_ptr,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(TracerHistogramHandle { id })
+  }
+
+  /// Define a labeled histogram metric.
+  ///
+  /// Returns a handle that can be used with `record_histogram_vec` together with label values.
+  pub fn define_histogram_vec(
+    &self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<TracerHistogramVecHandle, abi::envoy_dynamic_module_type_metrics_result> {
+    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_define_histogram(
+        self.envoy_ptr,
+        str_to_module_buffer(name),
+        label_bufs.as_ptr() as *mut _,
+        label_bufs.len(),
+        &mut id,
+      )
+    })?;
+    Ok(TracerHistogramVecHandle { id })
   }
 
   /// Increment a counter by the given value.
-  pub fn increment_counter(&self, handle: TracerCounterHandle, value: u64) -> bool {
-    let result = unsafe {
-      abi::envoy_dynamic_module_callback_tracer_increment_counter(self.envoy_ptr, handle.id, value)
-    };
-    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  pub fn increment_counter(
+    &self,
+    handle: TracerCounterHandle,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_increment_counter(
+        self.envoy_ptr,
+        handle.id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })
+  }
+
+  /// Increment a labeled counter by the given value.
+  pub fn increment_counter_vec(
+    &self,
+    handle: TracerCounterVecHandle,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_increment_counter(
+        self.envoy_ptr,
+        handle.id,
+        label_bufs.as_ptr() as *mut _,
+        label_bufs.len(),
+        value,
+      )
+    })
   }
 
   /// Set a gauge to the given value.
-  pub fn set_gauge(&self, handle: TracerGaugeHandle, value: u64) -> bool {
-    let result = unsafe {
-      abi::envoy_dynamic_module_callback_tracer_set_gauge(self.envoy_ptr, handle.id, value)
-    };
-    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  pub fn set_gauge(
+    &self,
+    handle: TracerGaugeHandle,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_set_gauge(
+        self.envoy_ptr,
+        handle.id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })
+  }
+
+  /// Set a labeled gauge to the given value.
+  pub fn set_gauge_vec(
+    &self,
+    handle: TracerGaugeVecHandle,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_set_gauge(
+        self.envoy_ptr,
+        handle.id,
+        label_bufs.as_ptr() as *mut _,
+        label_bufs.len(),
+        value,
+      )
+    })
   }
 
   /// Record a value in a histogram.
-  pub fn record_histogram(&self, handle: TracerHistogramHandle, value: u64) -> bool {
-    let result = unsafe {
+  pub fn record_histogram(
+    &self,
+    handle: TracerHistogramHandle,
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    Result::from(unsafe {
       abi::envoy_dynamic_module_callback_tracer_record_histogram_value(
         self.envoy_ptr,
         handle.id,
+        std::ptr::null_mut(),
+        0,
         value,
       )
-    };
-    result == abi::envoy_dynamic_module_type_metrics_result::Success
+    })
+  }
+
+  /// Record a value in a labeled histogram.
+  pub fn record_histogram_vec(
+    &self,
+    handle: TracerHistogramVecHandle,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result> {
+    let label_bufs: Vec<_> = labels.iter().map(|l| str_to_module_buffer(l)).collect();
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_tracer_record_histogram_value(
+        self.envoy_ptr,
+        handle.id,
+        label_bufs.as_ptr() as *mut _,
+        label_bufs.len(),
+        value,
+      )
+    })
   }
 }
 
