@@ -578,16 +578,7 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   testing::Mock::VerifyAndClearExpectations(&store_);
   testing::Mock::VerifyAndClearExpectations(&*gauge_);
 
-  // Case 2: AccessLogType matches subtract_at but no prior add -> no change
-  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AtLeast(1));
-  EXPECT_CALL(*gauge_, add(_)).Times(0);
-  EXPECT_CALL(*gauge_, sub(_)).Times(0);
-  logger_->log(formatter_context_, stream_info_);
-  testing::Mock::VerifyAndClearExpectations(&store_);
-  testing::Mock::VerifyAndClearExpectations(&*gauge_);
-
-  // Case 3: AccessLogType matches add_at -> add
+  // Case 2: AccessLogType matches add_at -> add
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AtLeast(1));
   EXPECT_CALL(*gauge_, add(1));
@@ -595,19 +586,13 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   testing::Mock::VerifyAndClearExpectations(&store_);
   testing::Mock::VerifyAndClearExpectations(&*gauge_);
 
-  // Case 4: AccessLogType matches subtract_at after add -> subtract
+  // Case 3: AccessLogType matches subtract_at after add -> subtract
   formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AtLeast(1));
   EXPECT_CALL(*gauge_, sub(1));
   logger_->log(formatter_context_, stream_info_);
   testing::Mock::VerifyAndClearExpectations(&store_);
   testing::Mock::VerifyAndClearExpectations(&*gauge_);
-
-  // Case 5: AccessLogType matches subtract_at again -> no change (already removed from inflight)
-  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AtLeast(1));
-  EXPECT_CALL(*gauge_, sub(1)).Times(0);
-  logger_->log(formatter_context_, stream_info_);
 }
 
 TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
@@ -638,6 +623,47 @@ TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
   // We expect no `sub(0)` interaction here because it wasn't added to inflight_gauges_.
   EXPECT_CALL(*gauge_, sub(_)).Times(0);
   logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, GaugeSubtractBeforeAdd) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 1
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
+)EOF";
+  initialize(yaml);
+
+  // Subtract without add -> crashes in debug mode due to missing inflight gauge, but passes in
+  // production since it's the last step
+  EXPECT_DEBUG_DEATH(
+      {
+        formatter_context_.setAccessLogType(
+            envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+        EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate))
+            .Times(testing::AtLeast(1));
+        EXPECT_CALL(*gauge_, add(_)).Times(0);
+        EXPECT_CALL(*gauge_, sub(_)).Times(0);
+        logger_->log(formatter_context_, stream_info_);
+      },
+      "assert failure: was_found");
+
+  // Case 4: Subtracting a gauge that was already removed -> crashes in debug mode due to missing
+  // inflight gauge, but passes in production
+  EXPECT_DEBUG_DEATH(
+      {
+        formatter_context_.setAccessLogType(
+            envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+        EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate))
+            .Times(testing::AtLeast(1));
+        EXPECT_CALL(*gauge_, sub(_)).Times(0);
+        logger_->log(formatter_context_, stream_info_);
+      },
+      "assert failure: was_found");
 }
 
 TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
@@ -1264,13 +1290,9 @@ TEST(GaugeKeyTest, VerifyAbslHashCorrectness) {
 
   GaugeKey key_tags2(name1, std::cref(tags2));
 
-  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
-      key_empty1,
-      key_empty2,
-      key_borrowed,
-      key_owned,
-      key_tags2,
-  }));
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly(
+      std::make_tuple(std::move(key_empty1), std::move(key_empty2), std::move(key_borrowed),
+                      std::move(key_owned), std::move(key_tags2))));
 }
 
 TEST(GaugeKeyTest, ExactMemoryFootprint) {

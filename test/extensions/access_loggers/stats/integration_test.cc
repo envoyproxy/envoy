@@ -249,40 +249,44 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
                       sub_log_type: DownstreamEnd
 )EOF";
 
-  init(config_yaml, /*autonomous_upstream=*/false,
-       /*flush_access_log_on_new_request=*/true);
-
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},  {":authority", "envoyproxy.io"}, {":path", "/"},
       {":scheme", "http"}, {"tag-value", "my-tag"},
   };
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-
-  // Wait for upstream to receive request.
-  waitForNextUpstreamRequest();
-
-  // Since DownstreamStart is filtered out, gauge should be 0.
-  // Note: waitForGaugeEq waits for the gauge to exist and equal the value.
-  // If no stats are emitted yet, it might timeout or fail depending on implementation.
-  // However, in this case, we expect NO stats to be emitted at start.
-  // We can't verify "stat doesn't exist" easily with waitForGaugeEq.
-  // But we proceed.
-
-  // Send response from upstream.
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, true);
 
-  // Wait for client to receive response.
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ(response->headers().getStatusValue(), "200");
+  // In debug mode, this should assert because the subtraction is attempted for a gauge that wasn't
+  // added and DownstreamEnd evaluates access logs upon stream destruction. We wrap the entire
+  // connection flow in the death test so the parent process doesn't create a mock connection that
+  // would crash during test teardown.
+  EXPECT_DEBUG_DEATH(
+      {
+        init(config_yaml, /*autonomous_upstream=*/false,
+             /*flush_access_log_on_new_request=*/true);
 
-  // After DownstreamEnd is logged, subtract should be skipped because Add didn't happen.
-  // Gauge should still be 0.
-  test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
+        codec_client_ = makeHttpConnection(lookupPort("http"));
+        IntegrationStreamDecoderPtr response =
+            codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  codec_client_->close();
+        waitForNextUpstreamRequest();
+
+        // Note: waitForGaugeEq waits for the gauge to exist and equal the value.
+        // If no stats are emitted yet, it might timeout or fail depending on implementation.
+        // However, in this case, we expect NO stats to be emitted at start.
+        // We can't verify "stat doesn't exist" easily with waitForGaugeEq.
+        // But we proceed.
+
+        upstream_request_->encodeHeaders(response_headers, true);
+        ASSERT_TRUE(response->waitForEndStream());
+        EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+        test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag",
+                                     0);
+        codec_client_->close();
+        test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+      },
+      "assert failure: was_found");
 }
 
 TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
@@ -439,12 +443,10 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
 
         codec_client1->close();
       },
-      // This text check ensures the crash is from the local tracking assert because
-      // the StatName pointer of the dynamic tags changed after eviction (they were deleted
-      // and re-created in the pool), so map lookup failed.
-      // Note that in release builds (where ASSERT is disabled), this will fall through
-      // and skip the subtraction gracefully.
-      "it != inflight_gauges_.end()");
+      // This text check ensures the crash is from the underflow assert, not due to
+      // crashing because of bad stat access in the StatsAccessLog. This text check is the entire
+      // point of the test.
+      "child_value_ >= amount");
 }
 
 TEST_P(StatsAccessLogIntegrationTest, GaugeCleanupOnDestructor) {

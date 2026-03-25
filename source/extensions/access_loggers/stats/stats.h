@@ -11,7 +11,7 @@
 #include "source/extensions/access_loggers/common/access_log_base.h"
 #include "source/extensions/matching/actions/transform_stat/transform_stat.h"
 
-#include "absl/container/flat_hash_map.h"
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,6 +32,11 @@ namespace StatsAccessLog {
 class GaugeKey {
 public:
   GaugeKey(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef borrowed_tags);
+
+  GaugeKey(const GaugeKey&) = delete;
+  GaugeKey& operator=(const GaugeKey&) = delete;
+  GaugeKey(GaugeKey&&) = default;
+  GaugeKey& operator=(GaugeKey&&) = default;
 
   void makeOwned();
 
@@ -57,8 +62,17 @@ public:
   }
 
 private:
+  // The backing store for `stat_name_` is the StatNamePool owned by the StatsAccessLog::Config,
+  // which has the same lifetime as the logger itself.
   Stats::StatName stat_name_;
+
+  // The `StatName`s in `owned_tags_` (when present) represent dynamically generated tags.
+  // Their memory is backed by the Envoy stats store's SymbolTable. To ensure these dynamic tags
+  // are not freed prematurely and do not leak, their reference counts are kept alive by
+  // `StatNameDynamicStorage` instances stored alongside the gauge value in `InflightGauge`
+  // within the `AccessLogState`.
   absl::optional<Stats::StatNameTagVector> owned_tags_;
+
   Stats::StatNameTagVectorOptConstRef borrowed_tags_{absl::nullopt};
 };
 
@@ -183,7 +197,7 @@ private:
     Stats::Gauge::ImportMode import_mode_;
   };
 
-  absl::flat_hash_map<GaugeKey, InflightGauge> inflight_gauges_;
+  absl::node_hash_map<GaugeKey, InflightGauge> inflight_gauges_;
 };
 
 } // namespace StatsAccessLog

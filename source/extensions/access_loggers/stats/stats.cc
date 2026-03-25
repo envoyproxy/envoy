@@ -118,8 +118,8 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
       parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
 
   auto it = inflight_gauges_.find(key);
-  ASSERT(it != inflight_gauges_.end());
-  if (it != inflight_gauges_.end()) {
+  const bool was_found = (it != inflight_gauges_.end());
+  if (was_found) {
     ENVOY_BUG(it->second.value_ >= value, "Connection gauge underflow in removeInflightGauge");
     it->second.value_ -= value;
     gauge_stat.sub(value);
@@ -127,6 +127,7 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
       inflight_gauges_.erase(it);
     }
   }
+  ASSERT(was_found);
 }
 
 GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef borrowed_tags)
