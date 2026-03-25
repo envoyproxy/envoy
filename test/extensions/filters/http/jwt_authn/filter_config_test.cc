@@ -403,14 +403,7 @@ rules:
 // Tests for extract_only_without_validation config validation warnings
 // ==========================================================================
 
-// Test: Config with claim_to_headers + extract_only emits critical warning.
-TEST_F(FilterConfigTest, ExtractOnlyWithClaimToHeadersWarning) {
-  const char config_yaml[] = R"(
-providers:
-  test_provider:
-    issuer: "https://example.com"
-    local_jwks:
-      inline_string: "{}"
+// Test: Config with claim_to_headers + extract_only emits critical warning."
     claim_to_headers:
     - header_name: "x-jwt-claim-role"
       claim_name: "role"
@@ -426,14 +419,7 @@ rules:
       FilterConfigImpl(proto_config, "", mock_factory_ctx_));
 }
 
-// Test: Config with allow_unprefixed_headers=true emits critical warning.
-TEST_F(FilterConfigTest, ExtractOnlyWithCustomVerificationHeader) {
-  const char config_yaml[] = R"(
-providers:
-  test_provider:
-    issuer: "https://example.com"
-    local_jwks:
-      inline_string: "{}"
+// Test: Config with allow_unprefixed_headers=true emits critical warning."
     claim_to_headers:
     - header_name: "x-jwt-claim-role"
       claim_name: "role"
@@ -465,14 +451,7 @@ rules:
       FilterConfigImpl(proto_config, "", mock_factory_ctx_));
 }
 
-// Test: Config without claim_to_headers does not emit warning.
-TEST_F(FilterConfigTest, ExtractOnlyWithoutClaimToHeadersNoWarning) {
-  const char config_yaml[] = R"(
-providers:
-  test_provider:
-    issuer: "https://example.com"
-    local_jwks:
-      inline_string: "{}"
+// Test: Config without claim_to_headers does not emit warning."
     payload_in_metadata: "jwt_payload"
 rules:
 - match:

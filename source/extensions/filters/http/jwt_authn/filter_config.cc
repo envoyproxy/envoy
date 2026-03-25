@@ -98,48 +98,6 @@ FilterConfigImpl::findPerRouteVerifier(const PerRouteFilterConfig& per_route) co
                             ". It should be one of [", all_requirement_names_, "]"));
 }
 
-
-void FilterConfigImpl::validateExtractOnlyWithoutValidationUsage(
-    const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config) {
-  // Resolve verification status header name.
-  std::string verification_header = "x-jwt-signature-verified";
-  bool extract_only_used = false;
-
-  for (const auto& rule : config.rules()) {
-    if (rule.has_requires() && rule.requires().has_extract_only_without_validation()) {
-      extract_only_used = true;
-      const auto& econfig = rule.requires().extract_only_without_validation();
-      if (!econfig.verification_status_header().empty()) {
-        verification_header = econfig.verification_status_header();
-      }
-      break;
-    }
-  }
-
-  if (!extract_only_used) {
-    return;
-  }
-
-  // Warn per claim header with RBAC guidance.
-  for (const auto& [provider_name, provider] : config.providers()) {
-    for (const auto& claim_to_header : provider.claim_to_headers()) {
-      ENVOY_LOG(warn,
-                "jwt_authn: Claim header '{}' (claim: '{}') from provider '{}' will "
-                "be set WITHOUT signature verification. Ensure RBAC policies check "
-                "'{}' before trusting '{}' for authorization.",
-                claim_to_header.header_name(), claim_to_header.claim_name(),
-                provider_name, verification_header, claim_to_header.header_name());
-    }
-
-    if (!provider.forward_payload_header().empty()) {
-      ENVOY_LOG(warn,
-                "jwt_authn: Payload header '{}' from provider '{}' will contain an "
-                "UNVERIFIED JWT payload. Check '{}' before trusting it.",
-                provider.forward_payload_header(), provider_name, verification_header);
-    }
-  }
-}
-
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

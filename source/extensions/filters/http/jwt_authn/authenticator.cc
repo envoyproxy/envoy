@@ -519,28 +519,6 @@ AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
                                              time_source);
 }
 
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Security hardening for extract_only_without_validation
-// ═══════════════════════════════════════════════════════════════════════════
-
-namespace {
-
-// Header indicating whether the JWT signature was verified.
-// Verification status header name resolved by getVerificationStatusHeaderName().
-
-} // namespace
-
-std::string getVerificationStatusHeaderName(
-    const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation& config) {
-  if (!config.verification_status_header().empty()) {
-    return config.verification_status_header();
-  }
-  return "x-jwt-signature-verified";
-}
-
-
-
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions
