@@ -391,7 +391,12 @@ message HttpProtocolOptions {
   //
   // This field is ignored if ``max_connection_duration`` is not set. If not set, no jitter
   // is applied.
-  type.v3.Percent max_connection_duration_jitter_percent = 8;
+  //
+  // .. note::
+  //   This field is only effective for HTTP/1.1 and HTTP/2 connections. Support for
+  //   upstream clusters is not implemented and the jitter will not be applied.
+  type.v3.Percent max_connection_duration_jitter_percent = 8
+      [(validate.rules).message = {required: true}];
 }
 
 // [#next-free-field: 12]
