@@ -966,6 +966,10 @@ FilterDataStatus Filter::handleDataBufferedMode(ProcessorState& state, Buffer::I
 
 FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
                                                     bool end_stream) {
+  // For empty data chunk with end_stream false, do not send it to the ext_proc server.
+  if (data.length() == 0 && end_stream == false) {
+    return state.getBodyCallbackResultInStreamedMode(end_stream);
+  }
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterDataStatus::StopIterationNoBuffer;
