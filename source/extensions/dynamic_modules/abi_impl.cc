@@ -3101,9 +3101,10 @@ envoy_dynamic_module_callback_tracer_define_counter(
 }
 
 __attribute__((weak)) envoy_dynamic_module_type_metrics_result
-envoy_dynamic_module_callback_tracer_define_gauge(
-    envoy_dynamic_module_type_tracer_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,
-    envoy_dynamic_module_type_module_buffer*, size_t, size_t*) {
+envoy_dynamic_module_callback_tracer_define_gauge(envoy_dynamic_module_type_tracer_config_envoy_ptr,
+                                                  envoy_dynamic_module_type_module_buffer,
+                                                  envoy_dynamic_module_type_module_buffer*, size_t,
+                                                  size_t*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_define_gauge: "
                "not implemented in this context");
   return envoy_dynamic_module_type_metrics_result_MetricNotFound;

@@ -443,8 +443,7 @@ TEST_F(AbiImplTest, DefineAndSetGaugeVec) {
   EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_GT(gauge_id, 0u);
 
-  envoy_dynamic_module_type_module_buffer label_values[] = {
-      {.ptr = "example.com", .length = 11}};
+  envoy_dynamic_module_type_module_buffer label_values[] = {{.ptr = "example.com", .length = 11}};
   auto result = envoy_dynamic_module_callback_tracer_set_gauge(static_cast<void*>(config_.get()),
                                                                gauge_id, label_values, 1, 99);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
@@ -463,6 +462,38 @@ TEST_F(AbiImplTest, DefineAndRecordHistogramVec) {
   auto result = envoy_dynamic_module_callback_tracer_record_histogram_value(
       static_cast<void*>(config_.get()), histogram_id, label_values, 1, 250);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+}
+
+TEST_F(AbiImplTest, SetGaugeVecInvalidLabels) {
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_gauge_vec2", .length = 15};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{.ptr = "host", .length = 4}};
+  size_t gauge_id = 0;
+  auto define_result = envoy_dynamic_module_callback_tracer_define_gauge(
+      static_cast<void*>(config_.get()), name, label_names, 1, &gauge_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Wrong number of label values.
+  envoy_dynamic_module_type_module_buffer label_values[] = {{.ptr = "a", .length = 1},
+                                                            {.ptr = "b", .length = 1}};
+  auto result = envoy_dynamic_module_callback_tracer_set_gauge(static_cast<void*>(config_.get()),
+                                                               gauge_id, label_values, 2, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_InvalidLabels);
+}
+
+TEST_F(AbiImplTest, RecordHistogramVecInvalidLabels) {
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_hist_vec2", .length = 14};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{.ptr = "path", .length = 4}};
+  size_t histogram_id = 0;
+  auto define_result = envoy_dynamic_module_callback_tracer_define_histogram(
+      static_cast<void*>(config_.get()), name, label_names, 1, &histogram_id);
+  EXPECT_EQ(define_result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Wrong number of label values.
+  envoy_dynamic_module_type_module_buffer label_values[] = {{.ptr = "a", .length = 1},
+                                                            {.ptr = "b", .length = 1}};
+  auto result = envoy_dynamic_module_callback_tracer_record_histogram_value(
+      static_cast<void*>(config_.get()), histogram_id, label_values, 2, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_InvalidLabels);
 }
 
 TEST_F(AbiImplTest, IncrementCounterVecNotFound) {

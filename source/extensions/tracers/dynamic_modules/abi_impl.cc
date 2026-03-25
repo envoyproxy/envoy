@@ -177,8 +177,8 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_tracer_de
     label_names_vec.push_back(config->stat_name_pool_.add(label_name_view));
   }
   *counter_id_ptr = config->addCounterVec(
-      Envoy::Extensions::Tracers::DynamicModules::DynamicModuleTracerConfig::
-          ModuleCounterVecHandle(stat_name, label_names_vec));
+      Envoy::Extensions::Tracers::DynamicModules::DynamicModuleTracerConfig::ModuleCounterVecHandle(
+          stat_name, label_names_vec));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -223,9 +223,9 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_tracer_de
 
   if (label_names_length == 0) {
     auto& histogram = config->stats_scope_->histogramFromStatName(stat_name, unit);
-    *histogram_id_ptr = config->addHistogram(
-        Envoy::Extensions::Tracers::DynamicModules::DynamicModuleTracerConfig::
-            ModuleHistogramHandle(histogram));
+    *histogram_id_ptr =
+        config->addHistogram(Envoy::Extensions::Tracers::DynamicModules::DynamicModuleTracerConfig::
+                                 ModuleHistogramHandle(histogram));
     return envoy_dynamic_module_type_metrics_result_Success;
   }
 
@@ -319,8 +319,8 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_tracer_se
   if (label_values_length != gauge->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags = buildTagsForTracerMetric(*config, gauge->getLabelNames(), label_values,
-                                       label_values_length);
+  auto tags =
+      buildTagsForTracerMetric(*config, gauge->getLabelNames(), label_values, label_values_length);
   gauge->set(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }

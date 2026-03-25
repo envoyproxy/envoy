@@ -1146,8 +1146,7 @@ WEAK_STUB(TracerIncrementCounter,
           envoy_dynamic_module_callback_tracer_increment_counter(nullptr, 0, nullptr, 0, 0))
 WEAK_STUB(TracerRecordHistogramValue,
           envoy_dynamic_module_callback_tracer_record_histogram_value(nullptr, 0, nullptr, 0, 0))
-WEAK_STUB(TracerSetGauge,
-          envoy_dynamic_module_callback_tracer_set_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(TracerSetGauge, envoy_dynamic_module_callback_tracer_set_gauge(nullptr, 0, nullptr, 0, 0))
 
 WEAK_STUB(DnsResolveComplete,
           envoy_dynamic_module_callback_dns_resolve_complete(
