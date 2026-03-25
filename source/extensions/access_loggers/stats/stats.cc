@@ -118,6 +118,7 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
       parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
 
   auto it = inflight_gauges_.find(key);
+  ASSERT(it != inflight_gauges_.end());
   if (it != inflight_gauges_.end()) {
     ENVOY_BUG(it->second.value_ >= value, "Connection gauge underflow in removeInflightGauge");
     it->second.value_ -= value;
