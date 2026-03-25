@@ -2,6 +2,7 @@ load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 load("@rules_python//python:defs.bzl", "py_library")
 load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
+load("@python_abi//:abi.bzl", "abi_tag", "python_tag")
 
 licenses(["notice"])  # Apache 2
 
@@ -118,4 +119,6 @@ py_wheel(
     version = "0.5.0",
     visibility = ["//visibility:public"],
     deps = [":envoy_mobile_package"],
+    abi = abi_tag(),
+    python_tag = python_tag(),
 )
