@@ -413,6 +413,19 @@ case $CI_TARGET in
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
         fi
+        if [[ -z "$ENVOY_SKIP_CTO_JEMALLOC" ]]; then
+            echo "Building and testing with jemalloc: ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" \
+                --@envoy//bazel:jemalloc=True \
+                -c fastbuild \
+                @envoy//test/common/memory/...
+            echo "Building binary with jemalloc..."
+            bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+                --@envoy//bazel:jemalloc=True \
+                -c fastbuild \
+                @envoy//source/exe:envoy-static
+        fi
         if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
             exit 0
         fi
