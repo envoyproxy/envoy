@@ -1880,6 +1880,31 @@ __attribute__((weak)) uint32_t envoy_dynamic_module_callback_access_logger_get_a
   return 0;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+    envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    bool*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_access_logger_get_attribute_bool: not implemented in "
+               "this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_access_logger_get_attribute_int(
+    envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_access_logger_get_attribute_int: not implemented in "
+               "this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_access_logger_get_attribute_string(
+    envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG(
+      "envoy_dynamic_module_callback_access_logger_get_attribute_string: not implemented in "
+      "this context");
+  return false;
+}
+
 __attribute__((weak)) void envoy_dynamic_module_callback_access_logger_get_bytes_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr, envoy_dynamic_module_type_bytes_info*) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_access_logger_get_bytes_info: not implemented in "
@@ -3070,6 +3095,90 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_http_get_metadata_list_
   IS_ENVOY_BUG("envoy_dynamic_module_callback_http_get_metadata_list_bool: "
                "not implemented in this context");
   return false;
+}
+
+// DNS resolver callbacks.
+__attribute__((weak)) void envoy_dynamic_module_callback_dns_resolve_complete(
+    envoy_dynamic_module_type_dns_resolver_envoy_ptr, uint64_t,
+    envoy_dynamic_module_type_dns_resolution_status, envoy_dynamic_module_type_module_buffer,
+    const envoy_dynamic_module_type_dns_address*, size_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_dns_resolve_complete: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_define_counter(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_dns_resolver_config_define_counter: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_increment_counter(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_dns_resolver_config_increment_counter: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_define_gauge(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_dns_resolver_config_define_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_set_gauge(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_dns_resolver_config_set_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_increment_gauge(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_dns_resolver_config_increment_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_decrement_gauge(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_dns_resolver_config_decrement_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_define_histogram(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer*, size_t,
+    size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_dns_resolver_config_define_histogram: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_record_histogram_value(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_dns_resolver_config_record_histogram_value: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
 }
 
 } // extern "C"

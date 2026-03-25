@@ -1643,7 +1643,7 @@ TEST_F(LuaVirtualHostWrapperTest, GetFilterMetadataBasic) {
 
   // Set up the mock stream info to return the mock virtual host.
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(stream_info, virtualHost()).WillByDefault(ReturnRef(virtual_host_ptr));
+  stream_info.virtual_host_ = virtual_host_ptr;
 
   // Set up wrapper with the mock stream info.
   Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
@@ -1680,7 +1680,7 @@ TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataUnderFilterName) {
 
   // Set up the mock stream info to return the mock virtual host.
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(stream_info, virtualHost()).WillByDefault(ReturnRef(virtual_host_ptr));
+  stream_info.virtual_host_ = virtual_host_ptr;
 
   // Set up wrapper with the mock stream info.
   Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
@@ -1706,7 +1706,7 @@ TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataAtAll) {
 
   // Set up the mock stream info to return the mock virtual host.
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(stream_info, virtualHost()).WillByDefault(ReturnRef(virtual_host_ptr));
+  stream_info.virtual_host_ = virtual_host_ptr;
 
   // Set up wrapper with the mock stream info.
   Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(

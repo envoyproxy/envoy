@@ -33,6 +33,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
+        "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
         "//test/extensions/load_balancing_policies/common:load_balancer_base_test_lib",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
