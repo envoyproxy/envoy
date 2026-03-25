@@ -62,8 +62,8 @@ private:
   const UserMap users_;
   const std::string forward_username_header_;
   const Http::LowerCaseString authentication_header_;
-  const bool allow_missing_;
-  const bool emit_dynamic_metadata_;
+  const bool allow_missing_{};
+  const bool emit_dynamic_metadata_{};
   BasicAuthStats stats_;
 };
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
