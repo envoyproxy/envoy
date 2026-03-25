@@ -22,6 +22,12 @@ class FastMockClusterManager : public testing::StrictMock<Upstream::MockClusterM
 public:
   ClusterInfoMaps clusters() const override { return clusters_; }
 
+  void forEachActiveCluster(std::function<void(const Upstream::Cluster&)> cb) const override {
+    for (const auto& [unused_name, cluster_ref] : clusters_.active_clusters_) {
+      cb(cluster_ref.get());
+    }
+  }
+
   ClusterInfoMaps clusters_;
   std::vector<std::unique_ptr<FastMockCluster>> clusters_storage_;
   Stats::TestUtil::TestStore store_;

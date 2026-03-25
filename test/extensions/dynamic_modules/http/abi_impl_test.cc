@@ -780,7 +780,8 @@ TEST(ABIImpl, metadata) {
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
   EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
@@ -902,7 +903,8 @@ TEST(ABIImpl, metadata_bool) {
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
   EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
@@ -976,7 +978,8 @@ TEST(ABIImpl, metadata_keys) {
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
   EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
@@ -1038,7 +1041,8 @@ TEST(ABIImpl, metadata_namespaces) {
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
   EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
@@ -1105,7 +1109,8 @@ TEST(ABIImpl, metadata_list) {
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
   EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
@@ -2711,7 +2716,8 @@ TEST_F(DynamicModuleHttpFilterTest, GetClusterNameNoCallbacks) {
 
 TEST_F(DynamicModuleHttpFilterTest, GetClusterNameNoCluster) {
   // When clusterInfo returns nullptr.
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(testing::Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
 
   envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_name(filter_.get(), &result));
@@ -2741,7 +2747,8 @@ TEST_F(DynamicModuleHttpFilterTest, GetClusterHostCountNoCallbacks) {
 
 TEST_F(DynamicModuleHttpFilterTest, GetClusterHostCountNoCluster) {
   // When clusterInfo returns nullptr.
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(testing::Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
 
   size_t total = 0, healthy = 0, degraded = 0;
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 0, &total,
