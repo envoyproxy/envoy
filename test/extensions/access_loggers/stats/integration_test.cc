@@ -439,10 +439,14 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
 
         codec_client1->close();
       },
-      // This text check ensures the crash is from the underflow assert, not due to
-      // crashing because of bad stat access in the StatsAccessLog. This text check is the entire
-      // point of the test.
-      "child_value_ >= amount");
+      // This text check ensures the crash is from the local tracking assert because
+      // the StatName pointer of the dynamic tags changed after eviction (they were deleted
+      // and re-created in the pool), so map lookup failed.
+      // Note that in release builds (where ASSERT is disabled), this will fall through
+      // and skip the subtraction gracefully.
+      // We rely on the destructor of AccessLogState (retained per HTTP request or TCP connection)
+      // to do any final cleanups and sweeps of the map.
+      "it != inflight_gauges_.end()");
 }
 
 TEST_P(StatsAccessLogIntegrationTest, GaugeCleanupOnDestructor) {
