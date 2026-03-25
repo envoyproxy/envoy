@@ -75,7 +75,7 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
     // To use the exact same context for both request and on_stream_done rate limiting descriptors,
     // we save the route and per-route configuration here and use them later.
     route_ = callbacks_->route();
-    cluster_ = callbacks_->clusterInfo();
+    cluster_ = callbacks_->clusterInfoSharedPtr();
   }
   if (!route_ || !cluster_) {
     return;

@@ -385,7 +385,10 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_cluster_info_ = upstream_cluster_info;
   }
 
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const override {
+  OptRef<const Upstream::ClusterInfo> upstreamClusterInfo() const override {
+    return makeOptRefFromPtr<const Upstream::ClusterInfo>(upstream_cluster_info_.get());
+  }
+  Upstream::ClusterInfoConstSharedPtr upstreamClusterInfoSharedPtr() const override {
     return upstream_cluster_info_;
   }
 
@@ -461,7 +464,7 @@ struct StreamInfoImpl : public StreamInfo {
     metadata_ = info.dynamicMetadata();
     filter_state_ = info.filterState();
     request_headers_ = request_headers;
-    upstream_cluster_info_ = info.upstreamClusterInfo();
+    upstream_cluster_info_ = info.upstreamClusterInfoSharedPtr();
     auto stream_id_provider = info.getStreamIdProvider();
     if (stream_id_provider.has_value() && stream_id_provider->toStringView().has_value()) {
       std::string id{stream_id_provider->toStringView().value()};
@@ -563,7 +566,7 @@ private:
   const Http::RequestHeaderMap* request_headers_{};
   StreamIdProviderSharedPtr stream_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
+  Upstream::ClusterInfoConstSharedPtr upstream_cluster_info_;
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;

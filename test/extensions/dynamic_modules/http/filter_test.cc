@@ -334,7 +334,9 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
 
   EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(route));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(callbacks.cluster_info_));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(
+          makeOptRefFromPtr<const Upstream::ClusterInfo>(callbacks.cluster_info_.get())));
 
   Envoy::Config::Metadata::mutableMetadataValue(callbacks.cluster_info_->metadata_, "metadata",
                                                 "cluster_key")

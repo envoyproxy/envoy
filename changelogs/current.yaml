@@ -238,6 +238,12 @@ bug_fixes:
   change: |
     Fixed MCP router to support session-less backends that do not return ``mcp-session-id``
     headers. Previously, this caused a spurious 500 error.
+- area: health_check
+  change: |
+    Fixed a race condition where active health checks could start before required upstream TLS SDS secrets
+    were fetched, causing intermittent health check failures `#43116 <https://github.com/envoyproxy/envoy/issues/43116>`_.
+    This fix can be disabled by setting runtime guard ``envoy.reloadable_features.health_check_after_cluster_warming``
+    to ``false``.
 - area: upstream
   change: |
     Fixed an out-of-bounds issue in ThreadAwareLoadBalancerBase that could occur during mid-batch EDS host updates
@@ -276,8 +282,19 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: tcp_proxy
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection``
+    and legacy code path.
 
 new_features:
+- area: overload_manager
+  change: |
+    Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed
+    configuration for the ``envoy.overload_actions.shrink_heap`` overload action. This allows
+    operators to configure the timer interval (``timer_interval``, minimum 1s, default 10s) and
+    the memory release threshold (``max_unfreed_memory_bytes``, default 100MB) passed to
+    ``tcmalloc::MallocExtension::ReleaseMemoryToSystem()``.
 - area: dynamic_modules
   change: |
     Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform
@@ -528,10 +545,11 @@ new_features:
   change: |
     Added extensions for :ref:`%FILE_CONTENT(/path/to/file)% <envoy_v3_api_msg_extensions.formatter.file_content.v3.FileContent>`
     and :ref:`%SECRET(name)% <envoy_v3_api_msg_extensions.formatter.generic_secret.v3.GenericSecret>`.
-- area: open_telemetry
+- area: http_service
   change: |
     Added the ability for :ref:`request_headers_to_add <envoy_v3_api_field_config.core.v3.HttpService.request_headers_to_add>`
-    to use a formatter extension that can retrieve secrets, for including authentication tokens.
+    to use a formatter extension that can retrieve secrets, for including authentication tokens. This support is added for
+    all uses of this message, including the open telemetry, ``ext_proc``, and ``zipkin`` tracers.
 - area: reverse_tunnel
   change: |
     Added optional tenant isolation support to the reverse tunnel network filter. When
