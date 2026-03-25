@@ -321,6 +321,64 @@ providers:
                              HasSubstr("Duration out-of-range"));
 }
 
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksInvalidUri) {
+  // Invalid URI should fail config validation.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.not\nvalid.com
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
+                             HasSubstr("invalid URI"));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksValidUri) {
+  // Valid URI should not fail config validation.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.valid.com/resource
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  FilterConfigImpl(proto_config, "", context);
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksAsyncFetchRefetchDurationVeryBig) {
+  // failed_refetch_duration.duration.seconds should be less than:
+  // 9223372036 = max_int64 / 1e9, which is about 300 years.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      async_fetch:
+        failed_refetch_duration:
+          seconds: 9223372136
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
+                             HasSubstr("Duration out-of-range"));
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

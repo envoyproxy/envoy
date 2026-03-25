@@ -36,14 +36,15 @@ behavior_changes:
     codebase have been updated.
 
 minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: jwt_authn
   change: |
     added configurable ``verification_status_header`` to ``extract_only_without_validation``
     JWT requirement type. When claims are extracted without signature verification, Envoy
-    now always sets ``x-jwt-signature-verified: false`` so downstream filters (RBAC,
-    ext_authz) can distinguish unverified claims. The header name is configurable.
-    Enhanced config validation warns per claim header with specific RBAC guidance.
-
+    now sets ``x-jwt-signature-verified: false`` by default so downstream filters (RBAC,
+    ext_authz) can distinguish unverified claims. The header name is configurable via the
+    ``verification_status_header`` field. This behavior is runtime-guarded by
+    ``envoy.reloadable_features.jwt_authn_add_verification_status_header``.
 - area: memory
   change: |
     Replaced the custom timer-based tcmalloc memory release with tcmalloc's native
@@ -122,6 +123,9 @@ bug_fixes:
     properly as the API definition requires.
     The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
     to the dynamic module side as the configuration.
+- area: http_11_proxy
+  change: |
+    Fixed bug where providing an empty inner socket config would cause Envoy to crash.
 - area: tls
   change: |
     Fixed on-demand TLS selector to enforce session resumption settings.
@@ -158,6 +162,12 @@ bug_fixes:
     added after server initialization completed. The ``SrdsFactory`` interface
     was incorrectly using the server-level init manager instead of the listener-level init manager,
     causing the SRDS init target to be silently discarded.
+- area: xds
+  change: |
+    Fixed a bug where in delta-xDS when xDS-Failover is configured (gated by the experimental
+    ``envoy.restart_features.xds_failover_support`` runtime guard), in some cases the
+    :ref:`initial_resource_versions <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.initial_resource_versions>`
+    field was not updated correctly when attempting to reconnect to the xDS server.
 - area: odcds
   change: |
     Fixed a bug where using OD-CDS in tcp_proxy over ADS would not work in some
@@ -236,6 +246,12 @@ bug_fixes:
   change: |
     Fixed MCP router to support session-less backends that do not return ``mcp-session-id``
     headers. Previously, this caused a spurious 500 error.
+- area: health_check
+  change: |
+    Fixed a race condition where active health checks could start before required upstream TLS SDS secrets
+    were fetched, causing intermittent health check failures `#43116 <https://github.com/envoyproxy/envoy/issues/43116>`_.
+    This fix can be disabled by setting runtime guard ``envoy.reloadable_features.health_check_after_cluster_warming``
+    to ``false``.
 - area: upstream
   change: |
     Fixed an out-of-bounds issue in ThreadAwareLoadBalancerBase that could occur during mid-batch EDS host updates
@@ -266,11 +282,33 @@ bug_fixes:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module filter may result in a incomplete body being sent to upstream
+    or downstream when some filters before or after the dynamic module filter in the chain
+    buffered the body and the dynamic module filter did not.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: tcp_proxy
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection``
+    and legacy code path.
 
 new_features:
+- area: overload_manager
+  change: |
+    Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed
+    configuration for the ``envoy.overload_actions.shrink_heap`` overload action. This allows
+    operators to configure the timer interval (``timer_interval``, minimum 1s, default 10s) and
+    the memory release threshold (``max_unfreed_memory_bytes``, default 100MB) passed to
+    ``tcmalloc::MallocExtension::ReleaseMemoryToSystem()``.
+- area: dynamic_modules
+  change: |
+    Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform
+    HTTP requests into raw TCP data for upstream connections and convert TCP responses back into HTTP
+    responses via explicit send callbacks. See :ref:`envoy.upstreams.http.dynamic_modules
+    <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.Config>`.
 - area: filters
   change: |
     Added filters to update the filter state in :ref:`a listener filter <config_listener_filters_set_filter_state>`.
@@ -288,6 +326,11 @@ new_features:
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
     Modules can now define metrics during configuration and record them during host selection.
+- area: dynamic_modules
+  change: |
+    Rust SDK now provides an opt-in ``CatchUnwind`` wrapper for filter callbacks. When a
+    wrapped callback panics, Envoy logs the panic and returns a fail-closed error (e.g.
+    HTTP 500, stream reset, connection close) instead of aborting the process.
 - area: http_11_proxy
   change: |
     Added ability to configure a default proxy address that is used when the proxy address is not
@@ -316,6 +359,11 @@ new_features:
   change: |
     Added dynamic module input matcher extension that allows implementing custom matching logic
     in external languages (Rust, Go, C) via dynamic modules.
+- area: dynamic_modules
+  change: |
+    Added listener lifecycle event callbacks to the bootstrap dynamic module extension. Modules can
+    opt in via ``enable_listener_lifecycle`` to receive ``on_listener_add_or_update`` and
+    ``on_listener_removal`` notifications when listeners change in the ``ListenerManager``.
 - area: memory
   change: |
     Added ``soft_memory_limit_bytes``, ``max_per_cpu_cache_size_bytes``, and ``max_unfreed_memory_bytes``
@@ -358,6 +406,12 @@ new_features:
     endpoint now supports `native histograms <https://prometheus.io/docs/specs/native_histograms>`_
     when using the prometheus protobuf exposition format, using query
     ``/stats/prometheus?histogram_buckets=prometheusnative``.
+- area: stats
+  change: |
+    Added support for cluster-level stats matcher, allowing more granular control over which stats
+    are enabled and reported at the cluster level. This the stats matcher could be configured via
+    the xDS API dynamically on a per-cluster basis.
+    See :ref:`envoy.stats_matcher <well_known_metadata_envoy_stats_matcher>` for more details.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
@@ -495,6 +549,15 @@ new_features:
     Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected
     close type of downstream and upstream connections. The possible values are ``Normal``, ``LocalReset``,
     and ``RemoteReset``.
+- area: formatter
+  change: |
+    Added extensions for :ref:`%FILE_CONTENT(/path/to/file)% <envoy_v3_api_msg_extensions.formatter.file_content.v3.FileContent>`
+    and :ref:`%SECRET(name)% <envoy_v3_api_msg_extensions.formatter.generic_secret.v3.GenericSecret>`.
+- area: http_service
+  change: |
+    Added the ability for :ref:`request_headers_to_add <envoy_v3_api_field_config.core.v3.HttpService.request_headers_to_add>`
+    to use a formatter extension that can retrieve secrets, for including authentication tokens. This support is added for
+    all uses of this message, including the open telemetry, ``ext_proc``, and ``zipkin`` tracers.
 - area: reverse_tunnel
   change: |
     Added optional tenant isolation support to the reverse tunnel network filter. When
@@ -539,6 +602,14 @@ new_features:
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
     environments without configuration changes.
+- area: connection
+  change: |
+    Add support for closing connections when they stay above the buffer high watermark for a configured time.
+    This can be enabled by setting the :ref:`per_connection_buffer_high_watermark_timeout
+    <envoy_v3_api_field_config.listener.v3.Listener.per_connection_buffer_high_watermark_timeout>`
+    field on the listener and :ref:`per_connection_buffer_high_watermark_timeout
+    <envoy_v3_api_field_config.cluster.v3.Cluster.per_connection_buffer_high_watermark_timeout>`
+    field on the cluster. By default, the timeout is disabled.
 - area: dynamic_modules
   change: |
     Added configurable :ref:`metrics_namespace
@@ -561,6 +632,9 @@ new_features:
     cross-module interactions analogous to ``dlsym``.
 - area: dynamic_modules
   change: |
+    Added a process-wide shared data registry to the dynamic modules ABI.
+- area: dynamic_modules
+  change: |
     Added support for loading dynamic module binaries from local file paths via the new
     :ref:`module <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>`
     field in ``DynamicModuleConfig``. This allows specifying an absolute path to a ``.so`` file
@@ -572,6 +646,11 @@ new_features:
     listener initialization with SHA256 verification, written to a temporary file, and loaded
     via ``dlopen``. If the remote fetch fails, the filter is not installed and requests pass
     through (fail-open).
+- area: dynamic_modules
+  change: |
+    Added caching for remotely fetched dynamic modules. Since ``newDynamicModuleFromBytes``
+    writes modules to a deterministic path based on SHA256, subsequent config updates
+    referencing the same SHA256 load from the existing file, avoiding redundant HTTP fetches.
 - area: dynamic_modules
   change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
@@ -588,6 +667,10 @@ new_features:
   change: |
     Added admin handler API to the bootstrap extension dynamic modules ABI, enabling modules to
     register custom admin HTTP endpoints.
+- area: formatter
+  change: |
+    Added ``SPAN_ID`` :ref:`access log formatter <config_access_log_format>` to log the span ID of
+    the active (downstream) span for a request, complementing the existing ``TRACE_ID`` formatter.
 - area: formatter
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
@@ -708,6 +791,9 @@ new_features:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: redis
+  change: |
+    Added support for ``BITFIELD_RO`` in ``redis_proxy``.
 - area: network_filter
   change: |
     Added support for
@@ -715,5 +801,14 @@ new_features:
     :ref:`envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_data`)
     to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
     connection filter state to be populated after first receiving data from the downstream connection.
+- area: mcp_json_rest_bridge
+  change: |
+    Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
+    This filter is currently a work-in-progress and not recommended for production use.
+- area: http_filter
+  change: |
+    Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
+    ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
+    This is necessary if the route configuration may depend on the filter state values set.
 
 deprecated:

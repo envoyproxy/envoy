@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "source/common/jwt/check_audience.h"
+#include "source/common/runtime/runtime_features.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirement;
@@ -393,8 +394,11 @@ public:
 
     // Set verification status header so downstream filters (RBAC, ext_authz)
     // can distinguish unverified claims from cryptographically validated ones.
-    ctximpl.headers().setCopy(
-        Http::LowerCaseString(verification_status_header_), "false");
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.jwt_authn_add_verification_status_header")) {
+      ctximpl.headers().setCopy(
+          Http::LowerCaseString(verification_status_header_), "false");
+    }
 
     auto auth = auth_factory_.create(nullptr, absl::nullopt,
                                      /*=allow failed*/ true,
