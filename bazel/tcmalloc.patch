@@ -1,7 +1,8 @@
 diff --git a/tcmalloc/BUILD b/tcmalloc/BUILD
---- a/tcmalloc/BUILD	2025-01-28 16:41:20.424424728 +0000
-+++ b/tcmalloc/BUILD	2025-01-28 16:41:09.408433981 +0000
-@@ -24,7 +24,7 @@
+index 60bf5418..23279af2 100644
+--- a/tcmalloc/BUILD
++++ b/tcmalloc/BUILD
+@@ -24,7 +24,7 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
  load("//tcmalloc:copts.bzl", "TCMALLOC_DEFAULT_COPTS", "TCMALLOC_DEFAULT_CXXOPTS")
  load("//tcmalloc:variants.bzl", "create_tcmalloc_benchmark", "create_tcmalloc_libraries", "create_tcmalloc_testsuite")
  
@@ -10,3 +11,78 @@ diff --git a/tcmalloc/BUILD b/tcmalloc/BUILD
  
  licenses(["notice"])
  
+diff --git a/tcmalloc/internal_malloc_extension.h b/tcmalloc/internal_malloc_extension.h
+index a399b986..f5f34e11 100644
+--- a/tcmalloc/internal_malloc_extension.h
++++ b/tcmalloc/internal_malloc_extension.h
+@@ -106,6 +106,9 @@ ABSL_ATTRIBUTE_WEAK void MallocExtension_Internal_GetStats(std::string* ret);
+ ABSL_ATTRIBUTE_WEAK void MallocExtension_Internal_SetMaxPerCpuCacheSize(
+     int32_t value);
+ ABSL_ATTRIBUTE_WEAK void
++MallocExtension_Internal_SetUsermodeHugepageCollapse(bool value);
++ABSL_ATTRIBUTE_WEAK bool MallocExtension_Internal_GetUsermodeHugepageCollapse();
++ABSL_ATTRIBUTE_WEAK void
+ MallocExtension_Internal_SetBackgroundProcessActionsEnabled(bool value);
+ ABSL_ATTRIBUTE_WEAK void
+ MallocExtension_Internal_SetBackgroundProcessSleepInterval(
+diff --git a/tcmalloc/malloc_extension.cc b/tcmalloc/malloc_extension.cc
+index 468e67a2..d388305b 100644
+--- a/tcmalloc/malloc_extension.cc
++++ b/tcmalloc/malloc_extension.cc
+@@ -435,6 +435,23 @@ void MallocExtension::SetMaxPerCpuCacheSize(int32_t value) {
+ #endif
+ }
+ 
++bool MallocExtension::GetUsermodeHugepageCollapse() {
++#if ABSL_INTERNAL_HAVE_WEAK_MALLOCEXTENSION_STUBS
++  if (MallocExtension_Internal_GetUsermodeHugepageCollapse != nullptr) {
++    return MallocExtension_Internal_GetUsermodeHugepageCollapse();
++  }
++#endif
++  return false;
++}
++
++void MallocExtension::SetUsermodeHugepageCollapse(bool value) {
++#if ABSL_INTERNAL_HAVE_WEAK_MALLOCEXTENSION_STUBS
++  if (MallocExtension_Internal_SetUsermodeHugepageCollapse != nullptr) {
++    MallocExtension_Internal_SetUsermodeHugepageCollapse(value);
++  }
++#endif
++}
++
+ int64_t MallocExtension::GetMaxTotalThreadCacheBytes() {
+ #if ABSL_INTERNAL_HAVE_WEAK_MALLOCEXTENSION_STUBS
+   if (MallocExtension_Internal_GetMaxTotalThreadCacheBytes == nullptr) {
+diff --git a/tcmalloc/malloc_extension.h b/tcmalloc/malloc_extension.h
+index 14035c9e..6cb79f32 100644
+--- a/tcmalloc/malloc_extension.h
++++ b/tcmalloc/malloc_extension.h
+@@ -536,6 +536,11 @@ class MallocExtension final {
+   static void SetMaxPerCpuCacheSize(int32_t value);
+ 
+   // Gets the current maximum thread cache.
++
++  // Controls whether tcmalloc's userspace hugepage collapse is enabled.
++  static bool GetUsermodeHugepageCollapse();
++  static void SetUsermodeHugepageCollapse(bool value);
++
+   static int64_t GetMaxTotalThreadCacheBytes();
+   // Sets the maximum thread cache size.  This is a whole-process limit.
+   static void SetMaxTotalThreadCacheBytes(int64_t value);
+diff --git a/tcmalloc/parameters.cc b/tcmalloc/parameters.cc
+index e6f254b4..c475b215 100644
+--- a/tcmalloc/parameters.cc
++++ b/tcmalloc/parameters.cc
+@@ -679,4 +679,12 @@ void TCMalloc_Internal_SetUseUserspaceCollapseHeuristics(bool v) {
+ 
+ }  // extern "C"
+ 
++bool MallocExtension_Internal_GetUsermodeHugepageCollapse() {
++  return tcmalloc::tcmalloc_internal::Parameters::usermode_hugepage_collapse();
++}
++
++void MallocExtension_Internal_SetUsermodeHugepageCollapse(bool v) {
++  TCMalloc_Internal_SetUsermodeHugepageCollapse(v);
++}
++
+ GOOGLE_MALLOC_SECTION_END

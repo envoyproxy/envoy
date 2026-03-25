@@ -937,6 +937,7 @@ hostset
 hotrestart
 hrefs
 htpasswd
+hugepage
 huffman
 hystrix
 idempotency
@@ -1560,6 +1561,7 @@ useragent
 userdata
 userinfo
 username
+userspace
 usr
 util
 utils

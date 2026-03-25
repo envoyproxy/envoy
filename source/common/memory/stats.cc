@@ -197,6 +197,10 @@ void AllocatorManager::configureTcmallocOptions(
     ENVOY_LOG_MISC(info, "Set tcmalloc max per-CPU cache size to {} bytes.",
                    config.max_per_cpu_cache_size_bytes().value());
   }
+  if (config.disable_usermode_hugepage_collapse()) {
+    tcmalloc::MallocExtension::SetUsermodeHugepageCollapse(false);
+    ENVOY_LOG_MISC(info, "Disabled tcmalloc usermode hugepage collapse.");
+  }
 #else
   if (config.has_soft_memory_limit_bytes()) {
     ENVOY_LOG_MISC(warn, "Soft memory limit is only supported with Google's tcmalloc, ignoring.");
@@ -204,6 +208,10 @@ void AllocatorManager::configureTcmallocOptions(
   if (config.has_max_per_cpu_cache_size_bytes()) {
     ENVOY_LOG_MISC(warn,
                    "Max per-CPU cache size is only supported with Google's tcmalloc, ignoring.");
+  }
+  if (config.disable_usermode_hugepage_collapse()) {
+    ENVOY_LOG_MISC(
+        warn, "Usermode hugepage collapse is only supported with Google's tcmalloc, ignoring.");
   }
 #endif
 }

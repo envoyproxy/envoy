@@ -777,7 +777,7 @@ message CustomInlineHeader {
   InlineHeaderType inline_header_type = 2 [(validate.rules).enum = {defined_only: true}];
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message MemoryAllocatorManager {
   // Configures tcmalloc to perform background release of free memory in amount of bytes per ``memory_release_interval`` interval.
   // If equals to ``0``, no memory release will occur. Defaults to ``0``.
@@ -812,4 +812,13 @@ message MemoryAllocatorManager {
   //
   // Defaults to ``104857600`` (100 MB).
   uint64 max_unfreed_memory_bytes = 5;
+
+  // Controls whether tcmalloc's userspace hugepage collapse is disabled. When set to ``true``,
+  // tcmalloc will not call ``MADV_COLLAPSE`` to consolidate regular pages into huge pages.
+  // Defaults to ``false`` (hugepage collapse is enabled).
+  //
+  // .. note::
+  //     This is currently only supported with tcmalloc and not with ``gperftools``.
+  //
+  bool disable_usermode_hugepage_collapse = 6;
 }

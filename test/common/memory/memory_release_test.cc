@@ -203,6 +203,23 @@ TEST_F(MemoryReleaseTest, MaxPerCpuCacheSizeConfigured) {
 #endif
 }
 
+TEST_F(MemoryReleaseTest, UsermodeHugepageCollapseDisabled) {
+  const std::string yaml_config = R"EOF(
+  disable_usermode_hugepage_collapse: true
+)EOF";
+  const auto proto_config =
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::MemoryAllocatorManager>(yaml_config);
+#if defined(TCMALLOC)
+  EXPECT_LOG_CONTAINS("info", "Disabled tcmalloc usermode hugepage collapse.",
+                      allocator_manager_ =
+                          std::make_unique<Memory::AllocatorManager>(*api_, proto_config));
+#else
+  EXPECT_LOG_CONTAINS(
+      "warn", "Usermode hugepage collapse is only supported with Google's tcmalloc, ignoring.",
+      allocator_manager_ = std::make_unique<Memory::AllocatorManager>(*api_, proto_config));
+#endif
+}
+
 } // namespace
 } // namespace Memory
 } // namespace Envoy
