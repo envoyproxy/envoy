@@ -444,8 +444,6 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
       // and re-created in the pool), so map lookup failed.
       // Note that in release builds (where ASSERT is disabled), this will fall through
       // and skip the subtraction gracefully.
-      // We rely on the destructor of AccessLogState (retained per HTTP request or TCP connection)
-      // to do any final cleanups and sweeps of the map.
       "it != inflight_gauges_.end()");
 }
 
