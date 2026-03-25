@@ -55,6 +55,8 @@ envoy_extension_cc_test(
         "envoy.transport_sockets.tls",
     ],
     rbe_pool = "6gig",
+    # TODO(agrawroh): Temporarily disabled due to flakiness. Re-enable after stabilizing.
+    tags = ["manual"],
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",

@@ -408,11 +408,11 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_cluster(
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
   // upstreamClusterInfo is on StreamInfo, not UpstreamInfo.
   const auto cluster_info = logger->stream_info_->upstreamClusterInfo();
-  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+  if (!cluster_info) {
     return false;
   }
 
-  const auto& name = cluster_info.value()->name();
+  const auto& name = cluster_info->name();
   *result = {const_cast<char*>(name.data()), name.size()};
   return true;
 }

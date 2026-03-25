@@ -7,8 +7,10 @@
 pub mod access_log;
 pub mod bootstrap;
 pub mod buffer;
+pub mod catch_unwind;
 pub mod cert_validator;
 pub mod cluster;
+pub mod dns_resolver;
 pub mod http;
 pub mod listener;
 pub mod load_balancer;
@@ -19,8 +21,10 @@ pub mod upstream_http_tcp_bridge;
 pub mod utility;
 pub use bootstrap::*;
 pub use buffer::*;
+pub use catch_unwind::*;
 pub use cert_validator::*;
 pub use cluster::*;
+pub use dns_resolver::*;
 pub use http::*;
 pub use listener::*;
 pub use load_balancer::*;
@@ -36,6 +40,16 @@ mod mod_test;
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use std::any::Any;
 use std::sync::OnceLock;
+
+pub(crate) fn panic_payload_to_string(payload: Box<dyn Any + Send>) -> String {
+  match payload.downcast::<String>() {
+    Ok(s) => *s,
+    Err(payload) => match payload.downcast::<&str>() {
+      Ok(s) => s.to_string(),
+      Err(_) => "<non-string panic payload>".to_string(),
+    },
+  }
+}
 
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
@@ -164,9 +178,9 @@ pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
 
 /// Register an opaque data pointer under a name in the process-wide shared data registry.
 ///
-/// This allows modules loaded in the same process to share arbitrary state — such as runtime
-/// handles, configuration snapshots, or shared caches — without requiring direct access to
-/// each other's globals. For example, a bootstrap extension can register a Tokio runtime handle
+/// This allows modules loaded in the same process to share arbitrary state, such as runtime
+/// handles, configuration snapshots, or shared caches without requiring direct access to
+/// each other's globals. For example, a bootstrap extension can register a `Tokio` runtime handle
 /// and HTTP filters or cluster extensions can retrieve and use it for async operations.
 ///
 /// Unlike [`register_function`], the shared data registry allows overwriting an existing entry.
@@ -291,18 +305,23 @@ macro_rules! envoy_log {
   ($level:expr, $($arg:tt)*) => {
     {
       #[cfg(not(test))]
-      unsafe {
-        // Avoid allocating the message if the log level is not enabled.
-        if $crate::abi::envoy_dynamic_module_callback_log_enabled($level) {
+      {
+        let level = $level;
+        // SAFETY: envoy_dynamic_module_callback_log_enabled and envoy_dynamic_module_callback_log
+        // are FFI calls provided by the Envoy host.
+        let enabled = unsafe { $crate::abi::envoy_dynamic_module_callback_log_enabled(level) };
+        if enabled {
           let message = format!($($arg)*);
           let message_bytes = message.as_bytes();
-          $crate::abi::envoy_dynamic_module_callback_log(
-            $level,
-            $crate::abi::envoy_dynamic_module_type_module_buffer {
-              ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
-              length: message_bytes.len(),
-            },
-          );
+          unsafe {
+            $crate::abi::envoy_dynamic_module_callback_log(
+              level,
+              $crate::abi::envoy_dynamic_module_type_module_buffer {
+                ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
+                length: message_bytes.len(),
+              },
+            );
+          }
         }
       }
       // In unit tests, just print to stderr since the Envoy symbols are not available.
@@ -519,6 +538,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
 /// - `upstream_http_tcp_bridge:` — [`NewUpstreamHttpTcpBridgeConfigFunction`] for upstream HTTP TCP
 ///   bridges
+/// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
 ///
 /// # Examples
 ///
@@ -579,6 +599,10 @@ macro_rules! declare_all_init_functions {
   };
   (@register upstream_http_tcp_bridge : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register dns_resolver : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_DNS_RESOLVER_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
 }
@@ -1085,3 +1109,90 @@ pub type NewUpstreamHttpTcpBridgeConfigFunction =
 pub static NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION: OnceLock<
   NewUpstreamHttpTcpBridgeConfigFunction,
 > = OnceLock::new();
+
+// =================================================================================================
+// DNS Resolver Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new DNS resolver configuration.
+///
+/// The `envoy_dns_resolver_config` parameter provides access to the Envoy-side DNS resolver
+/// configuration. The caller receives an `Arc` so it can be stored and used at runtime
+/// (e.g., during resolution) for recording metrics.
+pub type NewDnsResolverConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_dns_resolver_config: std::sync::Arc<dyn dns_resolver::EnvoyDnsResolverConfig>,
+) -> Option<Box<dyn dns_resolver::DnsResolverConfig>>;
+
+/// Global storage for the DNS resolver config factory function.
+pub static NEW_DNS_RESOLVER_CONFIG_FUNCTION: OnceLock<NewDnsResolverConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a DNS resolver dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewDnsResolverConfigFunction`] type.
+///
+/// # Example
+///
+/// ```ignore
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use std::sync::Arc;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_dns_resolver_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _envoy_dns_resolver_config: Arc<dyn EnvoyDnsResolverConfig>,
+/// ) -> Option<Box<dyn DnsResolverConfig>> {
+///   Some(Box::new(MyDnsResolverConfig {}))
+/// }
+///
+/// declare_dns_resolver_init_functions!(program_init, new_dns_resolver_config);
+///
+/// struct MyDnsResolverConfig {}
+///
+/// impl DnsResolverConfig for MyDnsResolverConfig {
+///   fn new_resolver(
+///     &self,
+///     envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
+///   ) -> Box<dyn DnsResolverInstance> {
+///     Box::new(MyDnsResolver { envoy_callback })
+///   }
+/// }
+///
+/// struct MyDnsResolver {
+///   envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
+/// }
+///
+/// impl DnsResolverInstance for MyDnsResolver {
+///   fn resolve(
+///     &self,
+///     _dns_name: &str,
+///     _lookup_family: DnsLookupFamily,
+///     _query_id: u64,
+///   ) -> Option<Box<dyn DnsActiveQuery>> {
+///     None
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_dns_resolver_init_functions {
+  ($f:ident, $new_dns_resolver_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_DNS_RESOLVER_CONFIG_FUNCTION
+        .get_or_init(|| $new_dns_resolver_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
