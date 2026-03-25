@@ -275,6 +275,19 @@ index 1b1c16e23d..22e54259f0 100644
  #include "absl/strings/string_view.h"
  
  namespace grpc_core {
+diff --git a/src/cpp/server/health/default_health_check_service.cc b/src/cpp/server/health/default_health_check_service.cc
+index 492ba694c1..1cd2ee17fd 100644
+--- a/src/cpp/server/health/default_health_check_service.cc
++++ b/src/cpp/server/health/default_health_check_service.cc
+@@ -30,7 +30,7 @@
+ 
+ #include "absl/log/log.h"
+ #include "src/core/util/grpc_check.h"
+-#include "src/proto/grpc/health/v1/health.upb.h"
++#include "grpc/health/v1/health.upb.h"
+ #include "upb/base/string_view.h"
+ #include "upb/mem/arena.hpp"
+ 
 diff --git a/src/proto/grpc/health/v1/BUILD b/src/proto/grpc/health/v1/BUILD
 index f6165e0392..90e86a5c50 100644
 --- a/src/proto/grpc/health/v1/BUILD
