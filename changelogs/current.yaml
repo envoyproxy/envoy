@@ -97,6 +97,17 @@ minor_behavior_changes:
     Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
     serialize the ``google.protobuf.Struct`` configuration message to JSON string and pass it to the
     dynamic module side as the configuration.
+- area: proto_api_scrubber
+  change: |
+    If :ref:`scrub_unknown_fields
+    <envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.scrub_unknown_fields>`
+    is set to ``true`` in the :ref:`ProtoApiScrubberConfig
+    <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig>`,
+    unknown fields will now be scrubbed. This is disabled by default.
+- area: stat_sinks
+  change: |
+    OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
+    stopped reporting empty delta counters and histograms.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
