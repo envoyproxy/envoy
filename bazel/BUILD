@@ -238,6 +238,27 @@ config_setting(
 )
 
 config_setting(
+    name = "jemalloc_disabled",
+    flag_values = {":jemalloc": "False"},
+)
+
+selects.config_setting_group(
+    name = "tcmalloc_x86_64",
+    match_all = [
+        ":jemalloc_disabled",
+        ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "tcmalloc_aarch64",
+    match_all = [
+        ":jemalloc_disabled",
+        ":linux_aarch64",
+    ],
+)
+
+config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
 )
