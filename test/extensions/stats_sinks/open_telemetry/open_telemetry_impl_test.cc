@@ -63,6 +63,19 @@ public:
     return std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
   }
 
+  int64_t getGaugeValueByName(const MetricsExportRequestSharedPtr& request,
+                              const std::string& name) {
+    for (const auto& metric : request->resource_metrics()[0].scope_metrics()[0].metrics()) {
+      if (metric.name() == name) {
+        if (!metric.has_gauge() || metric.gauge().data_points().empty()) {
+          return -1;
+        }
+        return metric.gauge().data_points()[0].as_int();
+      }
+    }
+    return -1;
+  }
+
   std::string getTagExtractedName(const std::string name) { return name + "-tagged"; }
 
   void addCounterToSnapshot(const std::string& name, uint64_t delta, uint64_t value,
@@ -1156,10 +1169,13 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
     EXPECT_EQ(1, metric.sum().data_points()[0].as_int());
     const auto& attrs = metric.sum().data_points()[0].attributes();
     EXPECT_EQ(2, attrs.size());
-    EXPECT_EQ("key", attrs[0].key());
-    EXPECT_EQ("val1", attrs[0].value().string_value());
-    EXPECT_EQ("static_key_c", attrs[1].key());
-    EXPECT_EQ("static_val_c", attrs[1].value().string_value());
+    std::vector<KeyValue> sorted_attrs(attrs.begin(), attrs.end());
+    std::sort(sorted_attrs.begin(), sorted_attrs.end(),
+              [](const KeyValue& a, const KeyValue& b) { return a.key() < b.key(); });
+    EXPECT_EQ("key", sorted_attrs[0].key());
+    EXPECT_EQ("val1", sorted_attrs[0].value().string_value());
+    EXPECT_EQ("static_key_c", sorted_attrs[1].key());
+    EXPECT_EQ("static_val_c", sorted_attrs[1].value().string_value());
   }
 
   // Gauge: static_gauge
@@ -1171,10 +1187,13 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
     EXPECT_EQ(1, metric.gauge().data_points()[0].as_int());
     const auto& attrs = metric.gauge().data_points()[0].attributes();
     EXPECT_EQ(2, attrs.size());
-    EXPECT_EQ("key", attrs[0].key());
-    EXPECT_EQ("valA", attrs[0].value().string_value());
-    EXPECT_EQ("static_key_g", attrs[1].key());
-    EXPECT_EQ("static_val_g", attrs[1].value().string_value());
+    std::vector<KeyValue> sorted_attrs(attrs.begin(), attrs.end());
+    std::sort(sorted_attrs.begin(), sorted_attrs.end(),
+              [](const KeyValue& a, const KeyValue& b) { return a.key() < b.key(); });
+    EXPECT_EQ("key", sorted_attrs[0].key());
+    EXPECT_EQ("valA", sorted_attrs[0].value().string_value());
+    EXPECT_EQ("static_key_g", sorted_attrs[1].key());
+    EXPECT_EQ("static_val_g", sorted_attrs[1].value().string_value());
   }
 
   // Histogram: static_histogram
@@ -1185,10 +1204,13 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
     EXPECT_EQ(1, metric.histogram().data_points().size());
     const auto& attrs = metric.histogram().data_points()[0].attributes();
     EXPECT_EQ(2, attrs.size());
-    EXPECT_EQ("key", attrs[0].key());
-    EXPECT_EQ("hist1", attrs[0].value().string_value());
-    EXPECT_EQ("static_key_h", attrs[1].key());
-    EXPECT_EQ("static_val_h", attrs[1].value().string_value());
+    std::vector<KeyValue> sorted_attrs(attrs.begin(), attrs.end());
+    std::sort(sorted_attrs.begin(), sorted_attrs.end(),
+              [](const KeyValue& a, const KeyValue& b) { return a.key() < b.key(); });
+    EXPECT_EQ("key", sorted_attrs[0].key());
+    EXPECT_EQ("hist1", sorted_attrs[0].value().string_value());
+    EXPECT_EQ("static_key_h", sorted_attrs[1].key());
+    EXPECT_EQ("static_val_h", sorted_attrs[1].value().string_value());
   }
 }
 
@@ -1434,151 +1456,175 @@ public:
     custom_stats_.sample_count_ = sample_count;
     custom_stats_.sample_sum_ = sample_sum;
   }
+
+  uint64_t getGaugeValue(
+      const MetricAggregator::AggregationResult& metrics, const std::string& name,
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attrs) {
+    MetricAggregator::MetricKey key{name, attrs};
+    auto it = metrics.gauge_data_.find(key);
+    if (it != metrics.gauge_data_.end()) {
+      return it->second;
+    }
+    return 0;
+  }
+
+  uint64_t getCounterValue(
+      const MetricAggregator::AggregationResult& metrics, const std::string& name,
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attrs) {
+    MetricAggregator::MetricKey key{name, attrs};
+    auto it = metrics.counter_data_.find(key);
+    if (it != metrics.counter_data_.end()) {
+      return it->second;
+    }
+    return 0;
+  }
+
+  const MetricAggregator::CustomHistogram* getHistogramPoint(
+      const MetricAggregator::AggregationResult& metrics, const std::string& name,
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attrs) {
+    MetricAggregator::MetricKey key{name, attrs};
+    auto it = metrics.histogram_data_.find(key);
+    if (it != metrics.histogram_data_.end()) {
+      return &it->second;
+    }
+    return nullptr;
+  }
 };
 
 TEST_F(MetricAggregatorTests, GaugeNoAggregation) {
-  setupAggregatorWithMaxDatapoints(2, false);
+  setupAggregatorWithMaxDatapoints(2, /*enable_metric_aggregation=*/false);
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
   attr1.Add()->set_key("key1");
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr2;
   attr2.Add()->set_key("key2");
 
-  metric_aggregator_->addGauge("metric1", 10, attr1);
-  metric_aggregator_->addGauge("metric2", 20, attr1);
-  metric_aggregator_->addGauge("metric1", 30, attr1);
-  metric_aggregator_->addGauge("metric3", 40, attr1);
-  metric_aggregator_->addGauge("metric1", 50, attr2);
-  metric_aggregator_->addGauge("metric4", 60, attr1);
+  metric_aggregator_->addGauge("metric1", /*value=*/10, attr1);
+  metric_aggregator_->addGauge("metric1", /*value=*/30, attr1);
+  metric_aggregator_->addGauge("metric2", /*value=*/20, attr1);
+  metric_aggregator_->addGauge("metric3", /*value=*/40, attr1);
+  metric_aggregator_->addGauge("metric1", /*value=*/50, attr2);
+  metric_aggregator_->addGauge("metric4", /*value=*/60, attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.gauge_data_points.size(), 4);
-  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data.size(), 3);
-  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data[0].as_int(), 10);
-  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data[1].as_int(), 30);
-  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data[2].as_int(), 50);
+  EXPECT_EQ(metrics.gauge_data_.size(), 5);
 
-  EXPECT_EQ(metrics.gauge_data_points["metric2"].points_data.size(), 1);
-  EXPECT_EQ(metrics.gauge_data_points["metric3"].points_data.size(), 1);
-  EXPECT_EQ(metrics.gauge_data_points["metric4"].points_data.size(), 1);
+  EXPECT_EQ(getGaugeValue(metrics, "metric1", attr1), 30); // Overwritten
+  EXPECT_EQ(getGaugeValue(metrics, "metric2", attr1), 20);
+  EXPECT_EQ(getGaugeValue(metrics, "metric1", attr2), 50);
+  EXPECT_EQ(getGaugeValue(metrics, "metric3", attr1), 40);
+  EXPECT_EQ(getGaugeValue(metrics, "metric4", attr1), 60);
 }
 
 TEST_F(MetricAggregatorTests, GaugeAggregation) {
-  setupAggregatorWithMaxDatapoints(2, true);
+  setupAggregatorWithMaxDatapoints(2, /*enable_metric_aggregation=*/true);
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
   attr1.Add()->set_key("key1");
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr2;
   attr2.Add()->set_key("key2");
 
-  metric_aggregator_->addGauge("metric1", 10, attr1);
-  metric_aggregator_->addGauge("metric2", 20, attr1);
-  metric_aggregator_->addGauge("metric1", 30, attr1); // Aggregated with 10 (10+30=40)
-  metric_aggregator_->addGauge("metric3", 40, attr1);
-  metric_aggregator_->addGauge("metric1", 50, attr2); // New point for attr2
-  metric_aggregator_->addGauge("metric4", 60, attr1);
+  metric_aggregator_->addGauge("metric1", /*value=*/10, attr1);
+  metric_aggregator_->addGauge("metric2", /*value=*/20, attr1);
+  metric_aggregator_->addGauge("metric1", /*value=*/30, attr1); // Aggregated with 10 (10+30=40)
+  metric_aggregator_->addGauge("metric3", /*value=*/40, attr1);
+  metric_aggregator_->addGauge("metric1", /*value=*/50, attr2); // New point for attr2
+  metric_aggregator_->addGauge("metric4", /*value=*/60, attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.gauge_data_points.size(), 4);
-  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data.size(), 2);
+  EXPECT_EQ(metrics.gauge_data_.size(), 5);
 
-  // metric1 with attr1 should have value 10 + 30 = 40
-  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data[0].as_int(), 40);
-  // metric1 with attr2 should have value 50
-  EXPECT_EQ(metrics.gauge_data_points["metric1"].points_data[1].as_int(), 50);
-
-  EXPECT_EQ(metrics.gauge_data_points["metric2"].points_data.size(), 1);
-  EXPECT_EQ(metrics.gauge_data_points["metric3"].points_data.size(), 1);
-  EXPECT_EQ(metrics.gauge_data_points["metric4"].points_data.size(), 1);
+  EXPECT_EQ(getGaugeValue(metrics, "metric1", attr1), 40); // Aggregated
+  EXPECT_EQ(getGaugeValue(metrics, "metric2", attr1), 20);
+  EXPECT_EQ(getGaugeValue(metrics, "metric1", attr2), 50);
+  EXPECT_EQ(getGaugeValue(metrics, "metric3", attr1), 40);
+  EXPECT_EQ(getGaugeValue(metrics, "metric4", attr1), 60);
 }
 
 TEST_F(MetricAggregatorTests, CounterNoAggregation) {
-  setupAggregatorWithMaxDatapoints(2, false);
+  setupAggregatorWithMaxDatapoints(2, /*enable_metric_aggregation=*/false);
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
   attr1.Add()->set_key("key1");
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr2;
   attr2.Add()->set_key("key2");
 
   metric_aggregator_->addCounter(
-      "metric1", 10, 5,
+      "metric1", /*value=*/10, /*delta=*/5,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr1);
   metric_aggregator_->addCounter(
-      "metric2", 20, 15,
+      "metric2", /*value=*/20, /*delta=*/15,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr1);
   metric_aggregator_->addCounter(
-      "metric1", 15, 15,
+      "metric1", /*value=*/15, /*delta=*/15,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr1);
   metric_aggregator_->addCounter(
-      "metric3", 30, 25,
+      "metric3", /*value=*/30, /*delta=*/25,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr1);
   metric_aggregator_->addCounter(
-      "metric1", 15, 15,
+      "metric1", /*value=*/15, /*delta=*/15,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr2);
   metric_aggregator_->addCounter(
-      "metric4", 40, 35,
+      "metric4", /*value=*/40, /*delta=*/35,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.counter_data_points.size(), 4);
-  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data.size(), 3);
-  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data[0].as_int(), 5);
-  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data[1].as_int(), 15);
-  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data[2].as_int(), 15);
+  EXPECT_EQ(metrics.counter_data_.size(), 5);
 
-  EXPECT_EQ(metrics.counter_data_points["metric2"].points_data.size(), 1);
-  EXPECT_EQ(metrics.counter_data_points["metric3"].points_data.size(), 1);
-  EXPECT_EQ(metrics.counter_data_points["metric4"].points_data.size(), 1);
+  EXPECT_EQ(getCounterValue(metrics, "metric1", attr1), 15); // Overwritten
+  EXPECT_EQ(getCounterValue(metrics, "metric2", attr1), 15);
+  EXPECT_EQ(getCounterValue(metrics, "metric1", attr2), 15);
+  EXPECT_EQ(getCounterValue(metrics, "metric3", attr1), 25);
+  EXPECT_EQ(getCounterValue(metrics, "metric4", attr1), 35);
 }
 
 TEST_F(MetricAggregatorTests, CounterAggregation) {
-  setupAggregatorWithMaxDatapoints(2, true);
+  setupAggregatorWithMaxDatapoints(2, /*enable_metric_aggregation=*/true);
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
   attr1.Add()->set_key("key1");
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr2;
   attr2.Add()->set_key("key2");
 
   metric_aggregator_->addCounter(
-      "metric1", 10, 5,
+      "metric1", /*value=*/10, /*delta=*/5,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr1);
   metric_aggregator_->addCounter(
-      "metric2", 20, 15,
+      "metric2", /*value=*/20, /*delta=*/15,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr1);
   metric_aggregator_->addCounter(
-      "metric1", 15, 15,
+      "metric1", /*value=*/15, /*delta=*/15,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr1); // Aggregated -> delta sum is 5 + 15 = 20
   metric_aggregator_->addCounter(
-      "metric3", 30, 25,
+      "metric3", /*value=*/30, /*delta=*/25,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr1);
   metric_aggregator_->addCounter(
-      "metric1", 15, 15,
+      "metric1", /*value=*/15, /*delta=*/15,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr2); // Different attribute
   metric_aggregator_->addCounter(
-      "metric4", 40, 35,
+      "metric4", /*value=*/40, /*delta=*/35,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
       attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.counter_data_points.size(), 4);
-  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data.size(), 2);
-  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data[0].as_int(), 20); // 5 + 15
-  EXPECT_EQ(metrics.counter_data_points["metric1"].points_data[1].as_int(), 15);
+  EXPECT_EQ(metrics.counter_data_.size(), 5);
 
-  EXPECT_EQ(metrics.counter_data_points["metric2"].points_data.size(), 1);
-  EXPECT_EQ(metrics.counter_data_points["metric3"].points_data.size(), 1);
-  EXPECT_EQ(metrics.counter_data_points["metric4"].points_data.size(), 1);
+  EXPECT_EQ(getCounterValue(metrics, "metric1", attr1), 20); // 5 + 15
+  EXPECT_EQ(getCounterValue(metrics, "metric2", attr1), 15);
+  EXPECT_EQ(getCounterValue(metrics, "metric1", attr2), 15);
+  EXPECT_EQ(getCounterValue(metrics, "metric3", attr1), 25);
+  EXPECT_EQ(getCounterValue(metrics, "metric4", attr1), 35);
 }
 
 TEST_F(MetricAggregatorTests, HistogramNoAggregation) {
-  setupAggregatorWithMaxDatapoints(2, false);
+  setupAggregatorWithMaxDatapoints(2, /*enable_metric_aggregation=*/false);
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
   attr1.Add()->set_key("key1");
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr2;
@@ -1617,22 +1663,32 @@ TEST_F(MetricAggregatorTests, HistogramNoAggregation) {
       attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.histogram_data_points.size(), 4);
-  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data.size(), 3);
-  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[0].count(), 6);
-  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[0].sum(), 60);
-  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[1].count(), 15);
-  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[1].sum(), 150);
-  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[2].count(), 15);
-  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data[2].sum(), 150);
+  EXPECT_EQ(metrics.histogram_data_.size(), 5);
 
-  EXPECT_EQ(metrics.histogram_data_points["metric2"].points_data.size(), 1);
-  EXPECT_EQ(metrics.histogram_data_points["metric3"].points_data.size(), 1);
-  EXPECT_EQ(metrics.histogram_data_points["metric4"].points_data.size(), 1);
+  auto* dp1 = getHistogramPoint(metrics, "metric1", attr1);
+  ASSERT_NE(dp1, nullptr);
+  EXPECT_EQ(dp1->count_, 15); // Overwritten by second call
+  EXPECT_EQ(dp1->sum_, 150);
+
+  auto* dp2 = getHistogramPoint(metrics, "metric2", attr1);
+  ASSERT_NE(dp2, nullptr);
+  EXPECT_EQ(dp2->count_, 6);
+
+  auto* dp3 = getHistogramPoint(metrics, "metric1", attr2);
+  ASSERT_NE(dp3, nullptr);
+  EXPECT_EQ(dp3->count_, 15);
+
+  auto* dp4 = getHistogramPoint(metrics, "metric3", attr1);
+  ASSERT_NE(dp4, nullptr);
+  EXPECT_EQ(dp4->count_, 15);
+
+  auto* dp5 = getHistogramPoint(metrics, "metric4", attr1);
+  ASSERT_NE(dp5, nullptr);
+  EXPECT_EQ(dp5->count_, 15);
 }
 
 TEST_F(MetricAggregatorTests, HistogramAggregation) {
-  setupAggregatorWithMaxDatapoints(2, true);
+  setupAggregatorWithMaxDatapoints(2, /*enable_metric_aggregation=*/true);
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
   attr1.Add()->set_key("key1");
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr2;
@@ -1646,49 +1702,49 @@ TEST_F(MetricAggregatorTests, HistogramAggregation) {
   metric_aggregator_->addHistogram(
       "metric1", custom_stats_,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1); // Datapoint 1
+      attr1);
   metric_aggregator_->addHistogram(
       "metric2", custom_stats_,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1); // Datapoint 2 (Request 1 full)
+      attr1);
 
   mockHistogram(supported_buckets, computed_buckets2, 15, 150);
   metric_aggregator_->addHistogram(
       "metric1", custom_stats_,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1); // Aggregated, doesn't add to count
+      attr1); // Aggregated
   metric_aggregator_->addHistogram(
       "metric3", custom_stats_,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1); // Datapoint 3 (New request)
+      attr1);
   metric_aggregator_->addHistogram(
       "metric1", custom_stats_,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr2); // Datapoint 4 (Different attribute)
+      attr2);
   metric_aggregator_->addHistogram(
       "metric4", custom_stats_,
       opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1); // Datapoint 5 (New request)
+      attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.histogram_data_points.size(), 4);
-  EXPECT_EQ(metrics.histogram_data_points["metric1"].points_data.size(), 2);
+  EXPECT_EQ(metrics.histogram_data_.size(), 5);
 
-  auto& dp = metrics.histogram_data_points["metric1"].points_data[0];
-  EXPECT_EQ(dp.count(), 21); // Sum of counts
-  EXPECT_EQ(dp.sum(), 210);
+  auto* dp1 = getHistogramPoint(metrics, "metric1", attr1);
+  ASSERT_NE(dp1, nullptr);
+  EXPECT_EQ(dp1->count_, 21); // 6 + 15
+  EXPECT_EQ(dp1->sum_, 210);
 
-  auto& dp2 = metrics.histogram_data_points["metric1"].points_data[1];
-  EXPECT_EQ(dp2.count(), 15);
-  EXPECT_EQ(dp2.sum(), 150);
+  auto* dp2 = getHistogramPoint(metrics, "metric2", attr1);
+  ASSERT_NE(dp2, nullptr);
+  EXPECT_EQ(dp2->count_, 6);
 
-  EXPECT_EQ(metrics.histogram_data_points["metric2"].points_data.size(), 1);
-  EXPECT_EQ(metrics.histogram_data_points["metric3"].points_data.size(), 1);
-  EXPECT_EQ(metrics.histogram_data_points["metric4"].points_data.size(), 1);
+  auto* dp3 = getHistogramPoint(metrics, "metric1", attr2);
+  ASSERT_NE(dp3, nullptr);
+  EXPECT_EQ(dp3->count_, 15);
 }
 
 TEST_F(MetricAggregatorTests, NoLimits) {
-  setupAggregatorWithMaxDatapoints(0, false); // 0 means unlimited
+  setupAggregatorWithMaxDatapoints(0, /*enable_metric_aggregation=*/false); // 0 means unlimited
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
   attr1.Add()->set_key("key1");
 
@@ -1697,8 +1753,9 @@ TEST_F(MetricAggregatorTests, NoLimits) {
   }
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.gauge_data_points.size(), 1000);
-  EXPECT_EQ(metrics.gauge_data_points["metric999"].points_data.size(), 1);
+  EXPECT_EQ(metrics.gauge_data_.size(), 1000);
+
+  EXPECT_EQ(getGaugeValue(metrics, "metric999", attr1), 999);
 }
 
 class RequestBuilderTests : public testing::Test {
@@ -1706,9 +1763,8 @@ public:
   void SetUp() override { resource_attributes_.Add()->set_key("resource_key"); }
 
   void setupBuilder(bool enable_metric_aggregation, uint32_t max_dp) {
-    builder_ = std::make_unique<RequestBuilder>(
-        enable_metric_aggregation, max_dp, resource_attributes_,
-        [this](MetricsExportRequestPtr request) { requests_.push_back(std::move(request)); });
+    builder_ =
+        std::make_unique<RequestBuilder>(enable_metric_aggregation, max_dp, resource_attributes_);
   }
 
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
@@ -1717,44 +1773,47 @@ public:
 };
 
 TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestEmptyMetrics) {
-  setupBuilder(true, 1);
+  setupBuilder(/*enable_metric_aggregation=*/true, 1);
   MetricAggregator::AggregationResult empty_metrics;
-  builder_->buildRequests(empty_metrics);
+  builder_->buildRequests(empty_metrics, [this](MetricsExportRequestPtr request) {
+    requests_.push_back(std::move(request));
+  });
   EXPECT_EQ(requests_.size(), 0);
 }
 
 TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestNoLimits) {
-  setupBuilder(true, 0);
+  setupBuilder(/*enable_metric_aggregation=*/true, 0);
   MetricAggregator::AggregationResult metrics;
 
   for (int i = 0; i < 1000; i++) {
-    opentelemetry::proto::metrics::v1::NumberDataPoint data_point;
-    data_point.set_as_int(i);
-    metrics.gauge_data_points["metric" + std::to_string(i)].points_data.push_back(
-        std::move(data_point));
+    MetricAggregator::MetricKey key{"metric" + std::to_string(i),
+                                    MetricAggregator::AttributesMap{}};
+    metrics.gauge_data_[key] = i;
   }
 
-  builder_->buildRequests(metrics);
+  builder_->buildRequests(metrics, [this](MetricsExportRequestPtr request) {
+    requests_.push_back(std::move(request));
+  });
   EXPECT_EQ(requests_.size(), 1);
   EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 1000);
 }
 
 TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestWithLimits) {
-  setupBuilder(true, 2);
+  setupBuilder(/*enable_metric_aggregation=*/true, 2);
   MetricAggregator::AggregationResult metrics;
 
-  opentelemetry::proto::metrics::v1::NumberDataPoint data_point1;
-  data_point1.set_as_int(1);
-  metrics.gauge_data_points["metric1"].points_data.push_back(std::move(data_point1));
-  opentelemetry::proto::metrics::v1::NumberDataPoint data_point2;
-  data_point2.set_as_int(2);
-  metrics.gauge_data_points["metric1"].points_data.push_back(std::move(data_point2));
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
+  attr1.Add()->set_key("key1");
+  MetricAggregator::MetricKey key1{"metric1", MetricAggregator::AttributesMap{}};
+  metrics.gauge_data_[key1] = 1;
+  MetricAggregator::MetricKey key2{"metric1", attr1};
+  metrics.gauge_data_[key2] = 2;
+  MetricAggregator::MetricKey key3{"metric2", MetricAggregator::AttributesMap{}};
+  metrics.gauge_data_[key3] = 3;
 
-  opentelemetry::proto::metrics::v1::NumberDataPoint data_point3;
-  data_point3.set_as_int(3);
-  metrics.gauge_data_points["metric2"].points_data.push_back(std::move(data_point3));
-
-  builder_->buildRequests(metrics);
+  builder_->buildRequests(metrics, [this](MetricsExportRequestPtr request) {
+    requests_.push_back(std::move(request));
+  });
   EXPECT_EQ(requests_.size(), 2);
 
   auto count_dp = [](const MetricsExportRequestPtr& req) {
@@ -1770,17 +1829,18 @@ TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestWithLimits) {
 }
 
 TEST_F(RequestBuilderTests, TestMaxDatapointsPerRequestNoAggregation) {
-  setupBuilder(false, 0);
+  setupBuilder(/*enable_metric_aggregation=*/false, 0);
   MetricAggregator::AggregationResult metrics;
 
   for (int i = 0; i < 1000; i++) {
-    opentelemetry::proto::metrics::v1::NumberDataPoint data_point;
-    data_point.set_as_int(i);
-    metrics.gauge_data_points["metric" + std::to_string(i)].points_data.push_back(
-        std::move(data_point));
+    MetricAggregator::MetricKey key{"metric" + std::to_string(i),
+                                    MetricAggregator::AttributesMap{}};
+    metrics.gauge_data_[key] = i;
   }
 
-  builder_->buildRequests(metrics);
+  builder_->buildRequests(metrics, [this](MetricsExportRequestPtr request) {
+    requests_.push_back(std::move(request));
+  });
   EXPECT_EQ(requests_.size(), 1);
   EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 1000);
 }
