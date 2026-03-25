@@ -30,8 +30,7 @@ message HttpService {
   HttpUri http_uri = 1;
 
   // Specifies a list of HTTP headers that should be added to each request
-  // handled by this virtual host.
-  // Substitution formatters are supported for some uses of this field.
+  // handled by this virtual host. Substitution formatters are supported.
   repeated HeaderValueOption request_headers_to_add = 2
       [(validate.rules).repeated = {max_items: 1000}];
 

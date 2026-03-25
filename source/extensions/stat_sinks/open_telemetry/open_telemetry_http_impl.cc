@@ -14,14 +14,11 @@ namespace OpenTelemetry {
 
 OpenTelemetryHttpMetricsExporter::OpenTelemetryHttpMetricsExporter(
     Upstream::ClusterManager& cluster_manager,
-    const envoy::config::core::v3::HttpService& http_service)
-    : cluster_manager_(cluster_manager), http_service_(http_service) {
-  // Parse headers at construction time to avoid copies per request.
-  for (const auto& header_value_option : http_service_.request_headers_to_add()) {
-    parsed_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
-                                      header_value_option.header().value()});
-  }
-}
+    const envoy::config::core::v3::HttpService& http_service,
+    Server::Configuration::ServerFactoryContext& server_context)
+    : cluster_manager_(cluster_manager), http_service_(http_service),
+      headers_applicator_(
+          Http::HttpServiceHeadersApplicator::createOrThrow(http_service, server_context)) {}
 
 void OpenTelemetryHttpMetricsExporter::send(MetricsExportRequestPtr&& metrics) {
   std::string request_body;
@@ -50,9 +47,7 @@ void OpenTelemetryHttpMetricsExporter::send(MetricsExportRequestPtr&& metrics) {
   message->headers().setReferenceUserAgent(AccessLoggers::OpenTelemetry::getOtlpUserAgentHeader());
 
   // Add custom headers from config.
-  for (const auto& header_pair : parsed_headers_to_add_) {
-    message->headers().setReference(header_pair.first, header_pair.second);
-  }
+  headers_applicator_->apply(message->headers());
   message->body().add(request_body);
 
   const auto options =

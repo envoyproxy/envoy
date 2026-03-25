@@ -293,5 +293,100 @@ TEST_P(AccessLogIntegrationTest, AccessLoggerStatsAreIndependentOfListener) {
   test_server_->waitForCounterEq("access_logs.open_telemetry_access_log.logs_written", 2);
 }
 
+class AccessLogFormatterHeaderTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                     public HttpIntegrationTest {
+public:
+  AccessLogFormatterHeaderTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    skip_tag_extraction_rule_check_ = true;
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      accesslog_cluster->set_name("accesslog");
+      ConfigHelper::setHttp2(*accesslog_cluster);
+    });
+
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          auto* access_log = hcm.add_access_log();
+          access_log->set_name("otel_accesslog");
+
+          envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig
+              config;
+          config.set_log_name("foo");
+
+          auto* http = config.mutable_http_service();
+          http->mutable_http_uri()->set_uri(fmt::format(
+              "http://{}:{}/v1/logs", Network::Test::getLoopbackAddressUrlString(GetParam()),
+              fake_upstreams_.back()->localAddress()->ip()->port()));
+          http->mutable_http_uri()->set_cluster("accesslog");
+          http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
+
+          auto* header = http->add_request_headers_to_add();
+          header->mutable_header()->set_key("x-custom-formatter");
+          header->mutable_header()->set_value("%HOSTNAME%");
+
+          auto* body_config = config.mutable_body();
+          body_config->set_string_value("%REQ(:METHOD)% %PROTOCOL% %RESPONSE_CODE%");
+          access_log->mutable_typed_config()->PackFrom(config);
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void cleanup() {
+    if (access_log_connection_) {
+      AssertionResult result = access_log_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = access_log_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+  }
+
+  FakeHttpConnectionPtr access_log_connection_;
+  FakeStreamPtr access_log_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, AccessLogFormatterHeaderTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that request_headers_to_add with a substitution formatter is applied to HTTP exports.
+TEST_P(AccessLogFormatterHeaderTest, HttpExportWithFormatterHeader) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  codec_client_->close();
+
+  // Wait for the access log export HTTP request.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, access_log_connection_));
+  ASSERT_TRUE(access_log_connection_->waitForNewStream(*dispatcher_, access_log_stream_));
+  ASSERT_TRUE(access_log_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ("POST", access_log_stream_->headers().getMethodValue());
+  EXPECT_EQ("/v1/logs", access_log_stream_->headers().getPathValue());
+
+  // Verify the custom formatter header was applied.
+  auto values = access_log_stream_->headers().get(Http::LowerCaseString("x-custom-formatter"));
+  ASSERT_FALSE(values.empty());
+  EXPECT_FALSE(values[0]->value().empty());
+  EXPECT_NE(values[0]->value(), "%HOSTNAME%");
+
+  access_log_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy
