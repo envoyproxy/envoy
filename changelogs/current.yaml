@@ -288,6 +288,13 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: overload_manager
+  change: |
+    Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed
+    configuration for the ``envoy.overload_actions.shrink_heap`` overload action. This allows
+    operators to configure the timer interval (``timer_interval``, minimum 1s, default 10s) and
+    the memory release threshold (``max_unfreed_memory_bytes``, default 100MB) passed to
+    ``tcmalloc::MallocExtension::ReleaseMemoryToSystem()``.
 - area: dynamic_modules
   change: |
     Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform
