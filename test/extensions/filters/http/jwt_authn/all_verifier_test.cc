@@ -662,6 +662,37 @@ TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, TwoGoodJwts) {
   EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
 
+
+// Test: Verification status header is set with default name.
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderDefaultName) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // The verification status header should be set to "false" indicating
+  // claims were extracted without signature verification.
+  EXPECT_EQ(headers.get_("x-jwt-signature-verified"), "false");
+}
+
+// Test: Verification status header uses custom name when configured.
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderCustomName) {
+  // Reconfigure with a custom verification_status_header.
+  proto_config_.mutable_rules(0)
+      ->mutable_requires_()
+      ->mutable_extract_only_without_validation()
+      ->set_verification_status_header("x-custom-verified");
+  createVerifier();
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Custom header should be set.
+  EXPECT_EQ(headers.get_("x-custom-verified"), "false");
+  // Default header should NOT be set.
+  EXPECT_TRUE(headers.get_("x-jwt-signature-verified").empty());
+}
+
 TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, GoodAndBadJwts) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers =
