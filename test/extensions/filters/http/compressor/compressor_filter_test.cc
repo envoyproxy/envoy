@@ -1319,7 +1319,8 @@ TEST_F(CompressorFilterTest, StrongEtagLengthTwoRemovedWhenCompressing) {
   EXPECT_FALSE(headers.has("etag"));
 }
 
-// Tests for weaken_etag_on_compress: when true, strong ETags are weakened (W/ prefix) instead of removed.
+// Tests for weaken_etag_on_compress: when true, strong ETags are weakened (W/ prefix) instead of
+// removed.
 TEST_F(CompressorFilterTest, WeakenEtagOnCompressStrongEtag) {
   setUpFilter(R"EOF(
 {
