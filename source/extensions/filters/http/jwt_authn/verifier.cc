@@ -380,11 +380,12 @@ public:
         extractor_(Extractor::create(providers)) {
     // Resolve verification status header name from config or use default.
     const auto& configured = extract_config.verification_status_header();
-    verification_status_header_ = configured.empty() ? "x-jwt-signature-verified" : configured;
+    verification_status_header_ = Http::LowerCaseString(
+        configured.empty() ? "x-jwt-signature-verified" : configured);
     ENVOY_LOG(info,
               "JWT filter configured for claim extraction only - signature validation disabled. "
               "Setting '{}' to 'false' on all extract-only requests.",
-              verification_status_header_);
+              verification_status_header_.get());
   }
 
   void verify(ContextSharedPtr context) const override {
@@ -396,8 +397,7 @@ public:
     // can distinguish unverified claims from cryptographically validated ones.
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.jwt_authn_add_verification_status_header")) {
-      ctximpl.headers().setCopy(
-          Http::LowerCaseString(verification_status_header_), "false");
+      ctximpl.headers().setCopy(verification_status_header_, "false");
     }
 
     auto auth = auth_factory_.create(nullptr, absl::nullopt,
@@ -427,7 +427,7 @@ public:
 private:
   const AuthFactory& auth_factory_;
   const ExtractorConstPtr extractor_;
-  std::string verification_status_header_;
+  Http::LowerCaseString verification_status_header_;
 };
 
 VerifierConstPtr innerCreate(const JwtRequirement& requirement,
