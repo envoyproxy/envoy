@@ -85,6 +85,8 @@ public:
   // before they are flushed to OpenTelemetry requests.
   struct GaugeDataPoints {
     std::vector<::opentelemetry::proto::metrics::v1::NumberDataPoint> points_data;
+    // The map is wrapped in unique_ptr for lazy allocation (only if aggregation is enabled)
+    // and early deallocation (to free memory after accumulation is done).
     std::unique_ptr<absl::flat_hash_map<DataPointKey, size_t>> points_indices;
   };
 
@@ -92,6 +94,8 @@ public:
   // before they are flushed to OpenTelemetry requests.
   struct CounterDataPoints {
     std::vector<::opentelemetry::proto::metrics::v1::NumberDataPoint> points_data;
+    // The map is wrapped in unique_ptr for lazy allocation (only if aggregation is enabled)
+    // and early deallocation (to free memory after accumulation is done).
     std::unique_ptr<absl::flat_hash_map<DataPointKey, size_t>> points_indices;
     AggregationTemporality temporality{AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED};
   };
@@ -100,6 +104,8 @@ public:
   // before they are flushed to OpenTelemetry requests.
   struct HistogramDataPoints {
     std::vector<::opentelemetry::proto::metrics::v1::HistogramDataPoint> points_data;
+    // The map is wrapped in unique_ptr for lazy allocation (only if aggregation is enabled)
+    // and early deallocation (to free memory after accumulation is done).
     std::unique_ptr<absl::flat_hash_map<DataPointKey, size_t>> points_indices;
     AggregationTemporality temporality{AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED};
   };
