@@ -120,8 +120,8 @@ private:
    */
   void dispatchRequest(Http::RequestMessagePtr&& request);
 
-  // Calls handleOAuthFailureAsync (async path) or handleOAuthFailure + sets state_ (sync path)
-  // depending on whether the request was already dispatched.
+  // Calls handleOAuthFailure and either calls continueDecoding() (async path) or sets state_
+  // (sync path) depending on whether the request was already dispatched.
   void handleOAuthFailure(bool is_request_dispatched, const std::string& reason,
                           const std::string& extra_details = "");
 

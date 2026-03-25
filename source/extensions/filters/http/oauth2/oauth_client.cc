@@ -144,18 +144,18 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
     in_flight_request_ =
         thread_local_cluster->httpAsyncClient().send(std::move(msg), *this, options);
   } else {
-    const auto result = parent_->handleOAuthFailure("Token endpoint cluster not found");
-    state_ = (result == Http::FilterHeadersStatus::Continue) ? OAuthState::FailureContinue
-                                                             : OAuthState::FailureStop;
+    handleOAuthFailure(false, "Token endpoint cluster not found");
   }
 }
 
 void OAuth2ClientImpl::handleOAuthFailure(bool is_request_dispatched, const std::string& reason,
                                           const std::string& extra_details) {
+  const auto result = parent_->handleOAuthFailure(reason, extra_details);
   if (is_request_dispatched) {
-    parent_->handleOAuthFailureAsync(reason, extra_details);
+    if (result == Http::FilterHeadersStatus::Continue) {
+      decoder_callbacks_->continueDecoding();
+    }
   } else {
-    const auto result = parent_->handleOAuthFailure(reason, extra_details);
     state_ = (result == Http::FilterHeadersStatus::Continue) ? OAuthState::FailureContinue
                                                              : OAuthState::FailureStop;
   }

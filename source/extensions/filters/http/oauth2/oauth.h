@@ -31,9 +31,6 @@ public:
 
   virtual Http::FilterHeadersStatus onRefreshAccessTokenFailure() PURE;
 
-  virtual void handleOAuthFailureAsync(const std::string& reason,
-                                       const std::string& extra_details = "") PURE;
-
   virtual Http::FilterHeadersStatus handleOAuthFailure(const std::string& reason,
                                                        const std::string& extra_details = "") PURE;
 };

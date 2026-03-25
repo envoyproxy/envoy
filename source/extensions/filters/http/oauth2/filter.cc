@@ -1308,15 +1308,6 @@ Http::FilterHeadersStatus OAuth2Filter::onRefreshAccessTokenFailure() {
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-void OAuth2Filter::handleOAuthFailureAsync(const std::string& reason,
-                                           const std::string& extra_details) {
-  // Handle unauthorized request in async context
-  const auto status = handleOAuthFailure(reason, extra_details);
-  if (status == Http::FilterHeadersStatus::Continue) {
-    decoder_callbacks_->continueDecoding();
-  }
-}
-
 void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
                                            const std::string& encoded_token) const {
   // We use HTTP Only cookies.

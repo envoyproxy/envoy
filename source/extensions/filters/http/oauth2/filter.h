@@ -356,11 +356,6 @@ public:
 
   Http::FilterHeadersStatus onRefreshAccessTokenFailure() override;
 
-  // Handles unauthorized requests from async contexts (OAuth client callbacks).
-  // Calls handleOAuthFailure() and then continueDecoding() if needed.
-  void handleOAuthFailureAsync(const std::string& reason,
-                               const std::string& extra_details = "") override;
-
   // Handles unauthorized requests by checking allow_failed_matcher and either continuing
   // the request as unauthorized (if matcher matches) or sending an unauthorized response.
   // This is a catch-all function for request failures. We don't retry, as a user can simply
