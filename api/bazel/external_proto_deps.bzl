@@ -13,7 +13,7 @@ EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP = {
     "google/api/expr/v1alpha1/syntax.proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
     "io/prometheus/client/metrics.proto": "@prometheus_metrics_model//:client_model",
     "opentelemetry/proto/common/v1/common.proto": "@opentelemetry-proto//:common_proto",
-    "src/proto/grpc/health/v1/health.proto": "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_proto",
+    "grpc/health/v1/health.proto": "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_proto",
 }
 
 # This maps from the Bazel proto_library target to the Go language binding target for external dependencies.
