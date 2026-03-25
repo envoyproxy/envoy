@@ -4,6 +4,7 @@
 #include <iterator>
 #include <memory>
 
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/server/health_checker_config.h"
@@ -41,15 +42,6 @@ const std::string& getHostname(const HostSharedPtr& host,
   return HealthCheckerFactory::getHostname(host, EMPTY_STRING, cluster);
 }
 
-absl::flat_hash_set<grpc::health::v1::HealthCheckResponse::ServingStatus>
-buildRetriableStatuses(const envoy::config::core::v3::HealthCheck::GrpcHealthCheck& config) {
-  absl::flat_hash_set<grpc::health::v1::HealthCheckResponse::ServingStatus> statuses;
-  statuses.reserve(config.retriable_serving_statuses_size());
-  for (const auto status : config.retriable_serving_statuses()) {
-    statuses.insert(static_cast<grpc::health::v1::HealthCheckResponse::ServingStatus>(status));
-  }
-  return statuses;
-}
 } // namespace
 
 Upstream::HealthCheckerSharedPtr GrpcHealthCheckerFactory::createCustomHealthChecker(
@@ -75,7 +67,8 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(config.grpc_health_check().initial_metadata()),
           Router::HeaderParserPtr)),
-      retriable_statuses_(buildRetriableStatuses(config.grpc_health_check())) {
+      retriable_statuses_(buildAndValidateRetriableStatuses(
+          config.grpc_health_check().retriable_serving_statuses())) {
   if (!config.grpc_health_check().service_name().empty()) {
     service_name_ = config.grpc_health_check().service_name();
   }
@@ -83,6 +76,33 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
   if (!config.grpc_health_check().authority().empty()) {
     authority_value_ = config.grpc_health_check().authority();
   }
+}
+
+absl::flat_hash_set<grpc::health::v1::HealthCheckResponse::ServingStatus>
+GrpcHealthCheckerImpl::buildAndValidateRetriableStatuses(
+    const Protobuf::RepeatedField<int>& retriable_serving_statuses) {
+  absl::flat_hash_set<grpc::health::v1::HealthCheckResponse::ServingStatus> statuses;
+  statuses.reserve(retriable_serving_statuses.size());
+  for (const auto status : retriable_serving_statuses) {
+    // Validation occurs inside envoy due to issues validating repeated enums with
+    // protoc-gen-validate, see https://github.com/bufbuild/protoc-gen-validate/pull/1360
+    if (!grpc::health::v1::HealthCheckResponse::ServingStatus_IsValid(status)) {
+      throw EnvoyException(
+          absl::StrCat("unknown gRPC health check retriable serving status: ", status));
+    }
+    const auto typed_status =
+        static_cast<grpc::health::v1::HealthCheckResponse::ServingStatus>(status);
+    if (typed_status == grpc::health::v1::HealthCheckResponse::SERVING) {
+      throw EnvoyException("gRPC health check retriable serving statuses must not include SERVING");
+    }
+    const auto [_, inserted] = statuses.insert(typed_status);
+    if (!inserted) {
+      throw EnvoyException(
+          absl::StrCat("duplicate gRPC health check retriable serving status: ",
+                       grpc::health::v1::HealthCheckResponse::ServingStatus_Name(typed_status)));
+    }
+  }
+  return statuses;
 }
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSession(

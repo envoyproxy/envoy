@@ -5267,6 +5267,33 @@ void PrintTo(const GrpcHealthCheckerImplTestBase::ResponseSpec& spec, std::ostre
 
 class GrpcHealthCheckerImplTest : public testing::Test, public GrpcHealthCheckerImplTestBase {};
 
+TEST_F(GrpcHealthCheckerImplTest, RetriableServingStatusUnknownRejected) {
+  auto config = createGrpcHealthCheckConfig();
+  config.mutable_grpc_health_check()->add_retriable_serving_statuses(
+      static_cast<grpc::health::v1::HealthCheckResponse::ServingStatus>(999));
+  EXPECT_THROW_WITH_MESSAGE(allocHealthChecker(config), EnvoyException,
+                            "unknown gRPC health check retriable serving status: 999");
+}
+
+TEST_F(GrpcHealthCheckerImplTest, RetriableServingStatusServingRejected) {
+  auto config = createGrpcHealthCheckConfig();
+  config.mutable_grpc_health_check()->add_retriable_serving_statuses(
+      grpc::health::v1::HealthCheckResponse::SERVING);
+  EXPECT_THROW_WITH_MESSAGE(
+      allocHealthChecker(config), EnvoyException,
+      "gRPC health check retriable serving statuses must not include SERVING");
+}
+
+TEST_F(GrpcHealthCheckerImplTest, RetriableServingStatusDuplicateRejected) {
+  auto config = createGrpcHealthCheckConfig();
+  config.mutable_grpc_health_check()->add_retriable_serving_statuses(
+      grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+  config.mutable_grpc_health_check()->add_retriable_serving_statuses(
+      grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+  EXPECT_THROW_WITH_MESSAGE(allocHealthChecker(config), EnvoyException,
+                            "duplicate gRPC health check retriable serving status: NOT_SERVING");
+}
+
 // Test single host check success.
 TEST_F(GrpcHealthCheckerImplTest, Success) { testSingleHostSuccess(absl::nullopt); }
 

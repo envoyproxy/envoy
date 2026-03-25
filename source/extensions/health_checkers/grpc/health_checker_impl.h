@@ -53,6 +53,9 @@ public:
                         Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
 private:
+  static absl::flat_hash_set<grpc::health::v1::HealthCheckResponse::ServingStatus>
+  buildAndValidateRetriableStatuses(const Protobuf::RepeatedField<int>& retriable_serving_statuses);
+
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::ResponseDecoderImplBase,
                                         public Http::StreamCallbacks {
