@@ -41,7 +41,6 @@ const std::string& getHostname(const HostSharedPtr& host,
   }
   return HealthCheckerFactory::getHostname(host, EMPTY_STRING, cluster);
 }
-
 } // namespace
 
 Upstream::HealthCheckerSharedPtr GrpcHealthCheckerFactory::createCustomHealthChecker(
