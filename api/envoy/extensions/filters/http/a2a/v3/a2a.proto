@@ -74,7 +74,7 @@ message A2a {
 message MethodParsingConfig {
   // The group/category name to assign to this method (e.g., "tasks", "message").
   // If provided, this overrides any built-in classification for the method.
-  // This will be emitted to dynamic metadata under the key specified by `group_metadata_key`.
+  // This will be emitted to dynamic metadata under the key specified by ``group_metadata_key``.
   string group = 1;
 
   // List of attributes to extract for this method, specified by their JSON paths (e.g., "params.name").
