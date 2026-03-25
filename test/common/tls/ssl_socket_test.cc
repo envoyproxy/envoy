@@ -1424,9 +1424,9 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
                .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
 }
 
-// Verify that getIssuerFromValidatedChain falls back to the trust store (Path 2) when the
-// client sends only a leaf certificate with no intermediate chain. The issuer should be found
-// directly in the trusted CA store configured on the server.
+// Verify that validatedPeerIssuer() returns the correct issuer when the client sends only a
+// leaf certificate with no intermediate chain. OpenSSL's X509_verify_cert builds the validated
+// chain using the trust store, so validated_chain_[1] is the CA that signed the leaf.
 TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestLeafOnly) {
   // no_san_cert.pem contains a single leaf cert signed directly by ca_cert.pem (Root CA).
   const std::string client_ctx_yaml = R"EOF(
@@ -1457,13 +1457,13 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestLeafOnly) {
                .setExpectedSerialNumberPeerCertificateIssuer(TEST_CA_CERT_SERIAL));
 }
 
-// Verify that getIssuerFromValidatedChain correctly skips a decoy CA via AKI/SKI pre-filter
-// (Path 1) when the client sends: leaf + incorrect CA (AKI mismatch) + correct CA (AKI match).
+// Verify that validatedPeerIssuer() returns the correct issuer even when the client sends a
+// chain containing a decoy CA that did not sign the leaf. OpenSSL's X509_verify_cert re-orders
+// the chain correctly, so validated_chain_[1] is the actual issuer (Intermediate CA), not the
+// decoy (Root CA).
 //
-// Chain layout:
-//   [0] leaf (san_dns3)         — AKI = Intermediate CA's SKI
-//   [1] Root CA  (incorrect)    — SKI ≠ leaf AKI  → skipped by ASN1_OCTET_STRING_cmp()
-//   [2] Intermediate CA (correct) — SKI == leaf AKI  → X509_verify() confirms → returned
+// Client sends: leaf (san_dns3) + Root CA (decoy) + Intermediate CA (actual issuer).
+// After validation: validated_chain_ = [leaf, Intermediate CA, Root CA].
 TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestDecoyInChain) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
