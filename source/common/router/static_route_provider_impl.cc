@@ -95,18 +95,18 @@ StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
 }
 
 absl::Status StaticRouteConfigProviderImpl::VhdsContext::onConfigUpdate() {
-  const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
-  // Regular (non-VHDS) updates don't populate aliases fields in resources.
-  if (aliases.empty()) {
-    return absl::OkStatus();
-  }
-
   // Update the worker-thread local view of the config (similar to the result of
   // RdsRouteConfigProviderImpl::onConfigUpdate()).
   Rds::ConfigConstSharedPtr parsed_config = config_update_info_->parsedConfiguration();
   tls_.set([parsed_config](Event::Dispatcher&) {
     return std::make_unique<ThreadLocalConfig>(parsed_config);
   });
+
+  const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
+  // Regular (non-VHDS) updates don't populate aliases fields in resources.
+  if (aliases.empty()) {
+    return absl::OkStatus();
+  }
 
   const auto config = std::static_pointer_cast<const ConfigImpl>(parsed_config);
   // Notifies connections that RouteConfiguration update has been propagated.

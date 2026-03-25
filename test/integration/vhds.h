@@ -312,20 +312,11 @@ public:
 // VHDS Integration tests are similar to other xDS-dynamic config tests, but
 // also validate a dynamic-route config update (RDS) and a static-route config
 // settings.
-// TODO(adisuissa): enable the 'RouteConfigType::Static' testing option once its
-// support is added.
-/*
 #define VHDS_INTEGRATION_PARAMS                                                                    \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
                    testing::Values(Grpc::LegacyOrUnified::Legacy, Grpc::LegacyOrUnified::Unified), \
                    testing::Values(RouteConfigType::Rds, RouteConfigType::Static))
-*/
-#define VHDS_INTEGRATION_PARAMS                                                                    \
-  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
-                   testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
-                   testing::Values(Grpc::LegacyOrUnified::Legacy, Grpc::LegacyOrUnified::Unified), \
-                   testing::Values(RouteConfigType::Rds))
 
 inline std::string
 vhdsTestParamsToString(const testing::TestParamInfo<VhdsIntegrationTestParam>& info) {
