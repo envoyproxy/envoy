@@ -667,5 +667,14 @@ new_features:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: basic_auth
+  change: |
+    Added ``allow_missing`` field to the BasicAuth HTTP filter. When set to ``true``, requests
+    with no Basic credentials (missing or non-Basic ``Authorization`` header) are passed through
+    instead of rejected, enabling OR-semantics when combining BasicAuth with other auth filters
+    (e.g. JWT). Invalid credentials are still rejected.
+    Added dynamic metadata emission on successful authentication under the
+    ``envoy.filters.http.basic_auth`` namespace with key ``username``, allowing downstream
+    filters (e.g. RBAC) to act on BasicAuth success.
 
 deprecated:
