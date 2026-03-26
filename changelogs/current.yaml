@@ -37,6 +37,13 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: compressor
+  change: |
+    Strong ``ETag`` removal when compressing now uses the same weak ``W/`` check as
+    :ref:`weaken_etag_on_compress
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.weaken_etag_on_compress>`.
+    Previously removal applied only when ``ETag`` length was greater than 2; two-character strong
+    values are now removed as well (the only two-character weak form is ``W/``).
 - area: memory
   change: |
     Replaced the custom timer-based tcmalloc memory release with tcmalloc's native
@@ -101,6 +108,17 @@ minor_behavior_changes:
   change: |
     The oauth2 filter now removes the OauthExpires cookie from a user's browser upon logging out.
     Previously this cookie persisted beyond the logout despite the session no longer existing.
+- area: proto_api_scrubber
+  change: |
+    If :ref:`scrub_unknown_fields
+    <envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.scrub_unknown_fields>`
+    is set to ``true`` in the :ref:`ProtoApiScrubberConfig
+    <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig>`,
+    unknown fields will now be scrubbed. This is disabled by default.
+- area: stat_sinks
+  change: |
+    OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
+    stopped reporting empty delta counters and histograms.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -331,6 +349,15 @@ new_features:
   change: |
     Added ability to configure a default proxy address that is used when the proxy address is not
     configured via metadata.
+- area: compressor
+  change: |
+    Added :ref:`weaken_etag_on_compress
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.weaken_etag_on_compress>`
+    to the :ref:`compressor filter <config_http_filters_compressor>`. When enabled in
+    ``response_direction_config``, strong ``ETag`` response headers are weakened (``W/`` prefix)
+    instead of removed when compression is applied, allowing caches and conditional requests to
+    work while indicating the body was modified by compression. When both ``weaken_etag_on_compress``
+    and ``disable_on_etag_header`` are true, the new field takes precedence.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
