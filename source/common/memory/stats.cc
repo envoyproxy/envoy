@@ -161,9 +161,7 @@ void Stats::dumpStatsToLog() {
 #elif defined(JEMALLOC)
   std::string output;
   malloc_stats_print(
-      [](void* opaque, const char* msg) {
-        reinterpret_cast<std::string*>(opaque)->append(msg);
-      },
+      [](void* opaque, const char* msg) { reinterpret_cast<std::string*>(opaque)->append(msg); },
       &output, nullptr);
   ENVOY_LOG_MISC(debug, "jemalloc stats:\n{}", output);
 #else
@@ -183,9 +181,7 @@ absl::optional<std::string> Stats::dumpStats() {
 #elif defined(JEMALLOC)
   std::string output;
   malloc_stats_print(
-      [](void* opaque, const char* msg) {
-        reinterpret_cast<std::string*>(opaque)->append(msg);
-      },
+      [](void* opaque, const char* msg) { reinterpret_cast<std::string*>(opaque)->append(msg); },
       &output, nullptr);
   return output;
 #else
