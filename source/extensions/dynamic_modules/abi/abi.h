@@ -7327,6 +7327,25 @@ typedef void* envoy_dynamic_module_type_bootstrap_extension_config_scheduler_mod
  */
 typedef void* envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr;
 
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr is a raw pointer to the
+ * DynamicModuleBootstrapExtensionFileWatcher class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when the watcher is no longer needed. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new and the destruction is done by
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr;
+
+/**
+ * File watcher event constants. These correspond to Envoy's Filesystem::Watcher::Events.
+ */
+static const uint32_t envoy_dynamic_module_type_file_watcher_event_moved_to = 0x1;
+static const uint32_t envoy_dynamic_module_type_file_watcher_event_modified = 0x2;
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
@@ -7484,6 +7503,27 @@ void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_file_changed is called when a file watched by
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch changes on the main
+ * thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param watcher_ptr is the pointer to the file watcher that detected the change.
+ * @param path is the path that was registered via
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch that triggered the
+ * change. This is owned by the callback closure and valid only for the duration of this call.
+ * @param events is the bitmask of events that occurred (MovedTo = 0x1, Modified = 0x2).
+ */
+void envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr watcher_ptr,
+    envoy_dynamic_module_type_envoy_buffer path, uint32_t events);
 
 /**
  * envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update is called when a cluster is
@@ -8044,6 +8084,69 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
  */
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - File Watcher --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new is called by the module to
+ * create a new file watcher on the main thread dispatcher. The watcher is initially empty; use
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch to register paths.
+ *
+ * A single watcher can monitor multiple paths. When any watched file changes,
+ * envoy_dynamic_module_on_bootstrap_extension_file_changed is called on the main thread with the
+ * path that triggered the change.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr is the pointer to
+ * the created file watcher.
+ *
+ * NOTE: it is the caller's responsibility to delete the watcher using
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete when it is no longer
+ * needed.
+ */
+envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch is called by the module
+ * to add a watch for a file or directory to an existing file watcher. Multiple watches can be added
+ * to the same watcher.
+ *
+ * When the watched path changes, envoy_dynamic_module_on_bootstrap_extension_file_changed is called
+ * on the main thread with the path and events.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param watcher_ptr is the pointer to the file watcher created by
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new.
+ * @param path is the path to the file or directory to watch.
+ * @param events is the bitmask of events to watch for (MovedTo = 0x1, Modified = 0x2).
+ * @return true if the watch was successfully added, false otherwise (e.g. file does not exist).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr watcher_ptr,
+    envoy_dynamic_module_type_module_buffer path, uint32_t events);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete is called by the module to
+ * delete a file watcher created by
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new. All watches are automatically
+ * stopped before deletion.
+ *
+ * This must be called on the main thread.
+ *
+ * @param watcher_ptr is the pointer to the file watcher created by
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete(
+    envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr watcher_ptr);
 
 // -------------------- Bootstrap Extension Callbacks - Admin Handler --------------------
 

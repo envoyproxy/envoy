@@ -110,6 +110,28 @@ void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string&
   }
 }
 
+absl::Status DynamicModuleBootstrapExtensionFileWatcher::addWatch(absl::string_view path,
+                                                                  uint32_t events) {
+  // Capture the path as a string so the on_file_changed callback can identify which file changed.
+  // The watcher_wrapper raw pointer (this) is captured by value and is stable since it is
+  // heap-allocated and its lifetime is managed by the module via file_watcher_new/file_watcher_delete.
+  auto* self = this;
+  const std::string path_str(path);
+  return watcher_->addWatch(
+      path_str, events,
+      [weak_config = config_, self, path_str](uint32_t events) -> absl::Status {
+        if (auto config_shared = weak_config.lock()) {
+          if (config_shared->in_module_config_ != nullptr &&
+              config_shared->on_bootstrap_extension_file_changed_ != nullptr) {
+            config_shared->on_bootstrap_extension_file_changed_(
+                config_shared->thisAsVoidPtr(), config_shared->in_module_config_,
+                static_cast<void*>(self), {path_str.data(), path_str.size()}, events);
+          }
+        }
+        return absl::OkStatus();
+      });
+}
+
 void DynamicModuleBootstrapExtensionConfig::onScheduled(uint64_t event_id) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_config_scheduled_ != nullptr) {
     on_bootstrap_extension_config_scheduled_(thisAsVoidPtr(), in_module_config_, event_id);
@@ -303,6 +325,12 @@ newDynamicModuleBootstrapExtensionConfig(
     return on_timer_fired.status();
   }
 
+  auto on_file_changed = dynamic_module->getFunctionPointer<OnBootstrapExtensionFileChangedType>(
+      "envoy_dynamic_module_on_bootstrap_extension_file_changed");
+  if (!on_file_changed.ok()) {
+    return on_file_changed.status();
+  }
+
   auto on_admin_request = dynamic_module->getFunctionPointer<OnBootstrapExtensionAdminRequestType>(
       "envoy_dynamic_module_on_bootstrap_extension_admin_request");
   if (!on_admin_request.ok()) {
@@ -365,6 +393,7 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_config_scheduled_ = on_config_scheduled.value();
   config->on_bootstrap_extension_http_callout_done_ = on_http_callout_done.value();
   config->on_bootstrap_extension_timer_fired_ = on_timer_fired.value();
+  config->on_bootstrap_extension_file_changed_ = on_file_changed.value();
   config->on_bootstrap_extension_admin_request_ = on_admin_request.value();
   config->on_bootstrap_extension_cluster_add_or_update_ = on_cluster_add_or_update.value();
   config->on_bootstrap_extension_cluster_removal_ = on_cluster_removal.value();

@@ -4,6 +4,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
@@ -49,6 +50,8 @@ using OnBootstrapExtensionHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_http_callout_done);
 using OnBootstrapExtensionTimerFiredType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_timer_fired);
+using OnBootstrapExtensionFileChangedType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_file_changed);
 using OnBootstrapExtensionAdminRequestType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_admin_request);
 using OnBootstrapExtensionClusterAddOrUpdateType =
@@ -183,6 +186,7 @@ public:
   OnBootstrapExtensionConfigScheduledType on_bootstrap_extension_config_scheduled_ = nullptr;
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
   OnBootstrapExtensionTimerFiredType on_bootstrap_extension_timer_fired_ = nullptr;
+  OnBootstrapExtensionFileChangedType on_bootstrap_extension_file_changed_ = nullptr;
   OnBootstrapExtensionAdminRequestType on_bootstrap_extension_admin_request_ = nullptr;
   OnBootstrapExtensionClusterAddOrUpdateType on_bootstrap_extension_cluster_add_or_update_ =
       nullptr;
@@ -515,6 +519,34 @@ private:
   std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config_;
   // The underlying Envoy timer.
   Event::TimerPtr timer_;
+};
+
+/**
+ * This class wraps an Envoy filesystem watcher for use by bootstrap extension dynamic modules.
+ * It is created via envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new and deleted
+ * via envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete.
+ *
+ * When a watched file changes, it invokes the on_bootstrap_extension_file_changed event hook on
+ * the main thread if the config is still alive.
+ */
+class DynamicModuleBootstrapExtensionFileWatcher {
+public:
+  DynamicModuleBootstrapExtensionFileWatcher(
+      std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config, Filesystem::WatcherPtr watcher)
+      : config_(std::move(config)), watcher_(std::move(watcher)) {}
+
+  /**
+   * Add a watch for the given path and events. The callback captures a weak_ptr to the config
+   * and the path string so that on_file_changed receives the triggering path.
+   */
+  absl::Status addWatch(absl::string_view path, uint32_t events);
+
+private:
+  // The config that this file watcher is associated with. Using a weak pointer to avoid
+  // unnecessarily extending the lifetime of the config.
+  std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config_;
+  // The underlying Envoy filesystem watcher.
+  Filesystem::WatcherPtr watcher_;
 };
 
 /**

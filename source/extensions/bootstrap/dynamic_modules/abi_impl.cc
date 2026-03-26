@@ -14,6 +14,7 @@
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtension;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfig;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfigScheduler;
+using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionFileWatcher;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionTimer;
 
 extern "C" {
@@ -492,6 +493,34 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
   delete static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
+}
+
+// -------------------- File Watcher Callbacks --------------------
+
+envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+
+  // Create the filesystem watcher on the main thread dispatcher and wrap it.
+  auto envoy_watcher = config->main_thread_dispatcher_.createFilesystemWatcher();
+  auto* watcher_wrapper = new DynamicModuleBootstrapExtensionFileWatcher(
+      config->weak_from_this(), std::move(envoy_watcher));
+  return static_cast<void*>(watcher_wrapper);
+}
+
+bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr watcher_ptr,
+    envoy_dynamic_module_type_module_buffer path, uint32_t events) {
+  auto* watcher = static_cast<DynamicModuleBootstrapExtensionFileWatcher*>(watcher_ptr);
+  const absl::string_view path_view(path.ptr, path.length);
+  return watcher->addWatch(path_view, events).ok();
+}
+
+void envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete(
+    envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr watcher_ptr) {
+  delete static_cast<DynamicModuleBootstrapExtensionFileWatcher*>(watcher_ptr);
 }
 
 // -------------------- Admin Handler Callbacks --------------------

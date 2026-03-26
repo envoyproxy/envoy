@@ -118,6 +118,21 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, TimerRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_timer_test"));
 }
 
+// This test verifies that the Rust bootstrap extension file watcher API works correctly.
+// A file watcher is created during config_new for a temporary file. A short timer triggers a write
+// to that file, which causes on_file_changed to fire. The watcher identity API (id()) is used to
+// verify the correct watcher fired. Init completes after the file change is detected.
+TEST_P(DynamicModulesBootstrapIntegrationTest, FileWatcherRust) {
+  // Create a temporary file for the watcher to monitor.
+  const std::string watch_path =
+      TestEnvironment::writeStringToFileForTest("file_watcher_test_target", "initial content");
+
+  EXPECT_LOG_CONTAINS(
+      "info", "Bootstrap file watcher test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_file_watcher_test", "test",
+                                       watch_path));
+}
+
 // This test verifies that the Rust bootstrap extension can register a custom admin HTTP endpoint
 // and respond to admin requests.
 TEST_P(DynamicModulesBootstrapIntegrationTest, AdminHandlerRust) {
