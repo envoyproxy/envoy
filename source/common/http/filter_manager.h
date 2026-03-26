@@ -1023,10 +1023,10 @@ private:
 
     void setFilterConfigName(absl::string_view name) override { filter_config_name_ = name; }
 
-    OptRef<const Router::Route> route() const override { return makeOptRefFromPtr(route_.get()); }
+    OptRef<const Router::Route> route() const override { return route_; }
 
     absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
-      return route_ != nullptr ? route_->filterDisabled(config_name) : absl::nullopt;
+      return route_ ? route_->filterDisabled(config_name) : absl::nullopt;
     }
 
     const StreamInfo::StreamInfo& streamInfo() const override { return manager_.streamInfo(); }
@@ -1038,7 +1038,9 @@ private:
   private:
     FilterManager& manager_;
     absl::string_view filter_config_name_;
-    Router::RouteConstSharedPtr route_;
+    // Reference here is safe because the callbacks are only used during filter chain creation,
+    // at which point the route cannot change.
+    OptRef<const Router::Route> route_;
   };
 
   // Indicates which filter to start the iteration with.

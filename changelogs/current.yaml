@@ -37,6 +37,13 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: compressor
+  change: |
+    Strong ``ETag`` removal when compressing now uses the same weak ``W/`` check as
+    :ref:`weaken_etag_on_compress
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.weaken_etag_on_compress>`.
+    Previously removal applied only when ``ETag`` length was greater than 2; two-character strong
+    values are now removed as well (the only two-character weak form is ``W/``).
 - area: memory
   change: |
     Replaced the custom timer-based tcmalloc memory release with tcmalloc's native
@@ -338,6 +345,15 @@ new_features:
   change: |
     Added ability to configure a default proxy address that is used when the proxy address is not
     configured via metadata.
+- area: compressor
+  change: |
+    Added :ref:`weaken_etag_on_compress
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.weaken_etag_on_compress>`
+    to the :ref:`compressor filter <config_http_filters_compressor>`. When enabled in
+    ``response_direction_config``, strong ``ETag`` response headers are weakened (``W/`` prefix)
+    instead of removed when compression is applied, allowing caches and conditional requests to
+    work while indicating the body was modified by compression. When both ``weaken_etag_on_compress``
+    and ``disable_on_etag_header`` are true, the new field takes precedence.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
