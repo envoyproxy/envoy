@@ -407,7 +407,8 @@ TEST(ConfigTest, CreateFilterFromServerContextDual) {
   };
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor())
+          .IgnoreError(),
       EnvoyException,
       "DualFactoryBase: creating filter factory from server factory context is not supported");
 }
@@ -489,7 +490,8 @@ TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
   };
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor())
+          .IgnoreError(),
       EnvoyException, "Creating filter factory from server factory context is not supported");
 }
 
