@@ -1136,7 +1136,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.serverFactoryContext()
                              .clusterManager()
-                             .clusterCircuitBreakersStatNames()),
+                             .clusterCircuitBreakersStatNames(),
+                         factory_context.serverFactoryContext().timeSource()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           THROW_OR_RETURN_VALUE(createUpstreamLocalAddressSelector(config, bind_config),
@@ -1937,8 +1938,9 @@ ClusterInfoImpl::OptionalClusterStats::OptionalClusterStats(
 ClusterInfoImpl::ResourceManagers::ResourceManagers(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     const std::string& cluster_name, Stats::Scope& stats_scope,
-    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names)
-    : circuit_breakers_stat_names_(circuit_breakers_stat_names) {
+    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names,
+    TimeSource& time_source)
+    : circuit_breakers_stat_names_(circuit_breakers_stat_names), time_source_(time_source) {
   managers_[enumToInt(ResourcePriority::Default)] = THROW_OR_RETURN_VALUE(
       load(config, runtime, cluster_name, stats_scope, envoy::config::core::v3::DEFAULT),
       ResourceManagerImplPtr);
@@ -2016,22 +2018,28 @@ ClusterInfoImpl::makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) c
 #endif
 }
 
-std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(
+std::tuple<absl::optional<double>, absl::optional<std::chrono::milliseconds>,
+           absl::optional<uint32_t>>
+ClusterInfoImpl::getRetryBudgetParams(
     const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
   constexpr double default_budget_percent = 20.0;
+  constexpr uint64_t default_budget_interval_ms = 100;
   constexpr uint32_t default_retry_concurrency = 3;
 
   absl::optional<double> budget_percent;
+  absl::optional<std::chrono::milliseconds> budget_interval;
   absl::optional<uint32_t> min_retry_concurrency;
   if (thresholds.has_retry_budget()) {
-    // The budget_percent and min_retry_concurrency values are only set if there is a retry budget
-    // message set in the cluster config.
+    // The budget_percent, budget_interval, and min_retry_concurrency values are only set if
+    // there is a retry budget message set in the cluster config.
     budget_percent = PROTOBUF_GET_WRAPPED_OR_DEFAULT(thresholds.retry_budget(), budget_percent,
                                                      default_budget_percent);
+    budget_interval = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+        thresholds.retry_budget(), budget_interval, default_budget_interval_ms));
     min_retry_concurrency = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
         thresholds.retry_budget(), min_retry_concurrency, default_retry_concurrency);
   }
-  return std::make_pair(budget_percent, min_retry_concurrency);
+  return std::make_tuple(budget_percent, budget_interval, min_retry_concurrency);
 }
 
 SINGLETON_MANAGER_REGISTRATION(upstream_network_filter_config_provider_manager);
@@ -2089,6 +2097,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
       });
 
   absl::optional<double> budget_percent;
+  absl::optional<std::chrono::milliseconds> budget_interval;
   absl::optional<uint32_t> min_retry_concurrency;
   if (it != thresholds.cend()) {
     max_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connections, max_connections);
@@ -2099,7 +2108,8 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
     track_remaining = it->track_remaining();
     max_connection_pools =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connection_pools, max_connection_pools);
-    std::tie(budget_percent, min_retry_concurrency) = ClusterInfoImpl::getRetryBudgetParams(*it);
+    std::tie(budget_percent, budget_interval, min_retry_concurrency) =
+        ClusterInfoImpl::getRetryBudgetParams(*it);
   }
   if (per_host_it != per_host_thresholds.cend()) {
     if (per_host_it->has_max_pending_requests() || per_host_it->has_max_requests() ||
@@ -2116,7 +2126,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
       max_connection_pools, max_connections_per_host,
       ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_stat_name,
                                                     track_remaining, circuit_breakers_stat_names_),
-      budget_percent, min_retry_concurrency);
+      budget_percent, budget_interval, min_retry_concurrency, time_source_);
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,

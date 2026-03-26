@@ -1005,7 +1005,8 @@ protected:
 
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
   // budget message is specified, defaults will be filled in if either params are unspecified.
-  static std::pair<absl::optional<double>, absl::optional<uint32_t>>
+  static std::tuple<absl::optional<double>, absl::optional<std::chrono::milliseconds>,
+                    absl::optional<uint32_t>>
   getRetryBudgetParams(const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds);
 
 private:
@@ -1016,7 +1017,8 @@ private:
   struct ResourceManagers {
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name, Stats::Scope& stats_scope,
-                     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names);
+                     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names,
+                     TimeSource& time_source);
     absl::StatusOr<ResourceManagerImplPtr>
     load(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
          const std::string& cluster_name, Stats::Scope& stats_scope,
@@ -1026,6 +1028,7 @@ private:
 
     Managers managers_;
     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names_;
+    TimeSource& time_source_;
   };
 
   struct OptionalClusterStats {

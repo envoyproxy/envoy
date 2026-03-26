@@ -23,6 +23,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/transport_socket_match.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -88,7 +89,7 @@ public:
                             uint64_t conn_pool, uint64_t conn_per_host = 100) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
         runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, conn_per_host,
-        circuit_breakers_stats_, absl::nullopt, absl::nullopt);
+        circuit_breakers_stats_, absl::nullopt, absl::nullopt, absl::nullopt, time_system_);
   }
 
   void resetResourceManagerWithRetryBudget(uint64_t cx, uint64_t rq_pending, uint64_t rq,
@@ -97,7 +98,8 @@ public:
                                            uint64_t conn_per_host = 100) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
         runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, conn_per_host,
-        circuit_breakers_stats_, budget_percent, min_retry_concurrency);
+        circuit_breakers_stats_, budget_percent, absl::nullopt, min_retry_concurrency,
+        time_system_);
   }
 
   // Upstream::ClusterInfo
@@ -240,6 +242,7 @@ public:
   ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
   ClusterCircuitBreakersStats circuit_breakers_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
+  Event::SimulatedTimeSystem time_system_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   std::shared_ptr<MockUpstreamLocalAddressSelector> upstream_local_address_selector_;
