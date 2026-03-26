@@ -231,8 +231,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
   uint64_t total_clusters_value = 0;
   uint64_t total_nodes_value = 0;
   Stats::IterateFn<Stats::Gauge> gauge_callback =
-      [&total_clusters_value,
-       &total_nodes_value](Stats::Gauge& gauge) -> bool {
+      [&total_clusters_value, &total_nodes_value](Stats::Gauge& gauge) -> bool {
     const std::string& gauge_name = gauge.name();
     if (gauge_name.find(".total_clusters") != std::string::npos && gauge.used()) {
       total_clusters_value = gauge.value();
@@ -250,7 +249,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
   bool found_detailed_stats = false;
   Stats::IterateFn<Stats::Gauge> detailed_stats_callback =
       [&found_detailed_stats](Stats::Gauge& gauge) -> bool {
-    const std::string& gauge_name = gauge.name();  // note: takes a symbol table lock.
+    const std::string& gauge_name = gauge.name(); // note: takes a symbol table lock.
     // Check if any detailed stats were created (nodes. or clusters. or worker_.node. or
     // worker_.cluster.).
     //

@@ -40,7 +40,7 @@ public:
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   ScopeSharedPtr rootScope() override;
   ConstScopeSharedPtr constRootScope() const override;
-  //std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
+  // std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
   std::vector<GaugeSharedPtr> gauges() const override {
     // TODO(jmarantz): should we filter out gauges where
     // gauge.importMode() != Gauge::ImportMode::Uninitialized ?

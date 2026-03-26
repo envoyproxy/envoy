@@ -154,12 +154,11 @@ void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint6
 Stats::Counter* TestUtility::findCounter(Stats::Store& store, const std::string& name) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   Stats::Counter* found = nullptr;
-  store.forEachCounter(nullptr,
-                       [&found, &name](Stats::Counter& counter) {
-                         if (found == nullptr && counter.name() == name) {
-                           found = &counter;
-                         }
-                       });
+  store.forEachCounter(nullptr, [&found, &name](Stats::Counter& counter) {
+    if (found == nullptr && counter.name() == name) {
+      found = &counter;
+    }
+  });
   return found;
 
   /*
@@ -206,8 +205,8 @@ AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::st
     }
   } while (timeout == std::chrono::milliseconds::zero() || bound.withinBound());
   return AssertionFailure() << fmt::format(
-      "timed out waiting for {} to be {}, current value {}", name, value,
-      (counter == nullptr) ? absl::StrCat(counter->value()) : "nil");
+             "timed out waiting for {} to be {}, current value {}", name, value,
+             (counter == nullptr) ? absl::StrCat(counter->value()) : "nil");
 }
 
 AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name,

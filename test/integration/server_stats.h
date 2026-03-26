@@ -109,7 +109,7 @@ public:
   /**
    * @return std::vector<Stats::CounterSharedPtr> snapshot of server counters.
    */
-  //virtual std::vector<Stats::CounterSharedPtr> counters() PURE;
+  // virtual std::vector<Stats::CounterSharedPtr> counters() PURE;
 
   /**
    * @return std::vector<Stats::GaugeSharedPtr> snapshot of server counters.

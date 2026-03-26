@@ -1,5 +1,3 @@
-#include "source/common/stats/allocator.h"
-
 #include <cmath>
 #include <memory>
 #include <string>
@@ -7,6 +5,7 @@
 #include "envoy/stats/sink.h"
 
 #include "source/common/common/thread.h"
+#include "source/common/stats/allocator.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"

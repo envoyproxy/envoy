@@ -84,34 +84,31 @@ public:
                                     Buffer::Instance& response, const StatsParams& params,
                                     const Stats::CustomStatNamespaces& custom_namespaces);
 
-  static uint64_t
-  statsAsPrometheusText(const std::vector<Stats::Counter*>& counters,
-                        const std::vector<Stats::Gauge*>& gauges,
-                        const std::vector<Stats::ParentHistogram*>& histograms,
-                        const std::vector<Stats::TextReadout*>& text_readouts,
-                        const Upstream::ClusterManager& cluster_manager, Buffer::Instance& response,
-                        const StatsParams& params,
-                        const Stats::CustomStatNamespaces& custom_namespaces);
+  static uint64_t statsAsPrometheusText(const std::vector<Stats::Counter*>& counters,
+                                        const std::vector<Stats::Gauge*>& gauges,
+                                        const std::vector<Stats::ParentHistogram*>& histograms,
+                                        const std::vector<Stats::TextReadout*>& text_readouts,
+                                        const Upstream::ClusterManager& cluster_manager,
+                                        Buffer::Instance& response, const StatsParams& params,
+                                        const Stats::CustomStatNamespaces& custom_namespaces);
 
-  static uint64_t
-  statsAsPrometheusProtobuf(const std::vector<Stats::Counter*>& counters,
-                            const std::vector<Stats::Gauge*>& gauges,
-                            const std::vector<Stats::ParentHistogram*>& histograms,
-                            const std::vector<Stats::TextReadout*>& text_readouts,
-                            const Upstream::ClusterManager& cluster_manager,
-                            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                            const StatsParams& params,
-                            const Stats::CustomStatNamespaces& custom_namespaces);
+  static uint64_t statsAsPrometheusProtobuf(const std::vector<Stats::Counter*>& counters,
+                                            const std::vector<Stats::Gauge*>& gauges,
+                                            const std::vector<Stats::ParentHistogram*>& histograms,
+                                            const std::vector<Stats::TextReadout*>& text_readouts,
+                                            const Upstream::ClusterManager& cluster_manager,
+                                            Http::ResponseHeaderMap& response_headers,
+                                            Buffer::Instance& response, const StatsParams& params,
+                                            const Stats::CustomStatNamespaces& custom_namespaces);
 
-  static uint64_t
-  generateWithOutputFormat(const std::vector<Stats::Counter*>& counters,
-                           const std::vector<Stats::Gauge*>& gauges,
-                           const std::vector<Stats::ParentHistogram*>& histograms,
-                           const std::vector<Stats::TextReadout*>& text_readouts,
-                           const Upstream::ClusterManager& cluster_manager,
-                           Buffer::Instance& response, const StatsParams& params,
-                           const Stats::CustomStatNamespaces& custom_namespaces,
-                           OutputFormat& output_format);
+  static uint64_t generateWithOutputFormat(const std::vector<Stats::Counter*>& counters,
+                                           const std::vector<Stats::Gauge*>& gauges,
+                                           const std::vector<Stats::ParentHistogram*>& histograms,
+                                           const std::vector<Stats::TextReadout*>& text_readouts,
+                                           const Upstream::ClusterManager& cluster_manager,
+                                           Buffer::Instance& response, const StatsParams& params,
+                                           const Stats::CustomStatNamespaces& custom_namespaces,
+                                           OutputFormat& output_format);
 
   /**
    * Format the given tags, returning a string as a comma-separated list

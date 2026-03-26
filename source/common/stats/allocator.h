@@ -14,7 +14,7 @@
 namespace Envoy {
 namespace Stats {
 
-//using CounterSharedPtr = RefcountPtr<Counter>;
+// using CounterSharedPtr = RefcountPtr<Counter>;
 
 /**
  * Helper class for Store to manage memory for statistics.
@@ -164,7 +164,6 @@ private:
   std::atomic<bool> isolated_store_{false};
   std::atomic<bool> thread_local_store_{false};
 };
-
 
 } // namespace Stats
 } // namespace Envoy

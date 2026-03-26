@@ -880,8 +880,7 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
 }
 
 uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
-    const std::vector<Stats::Counter*>& counters,
-    const std::vector<Stats::Gauge*>& gauges,
+    const std::vector<Stats::Counter*>& counters, const std::vector<Stats::Gauge*>& gauges,
     const std::vector<Stats::ParentHistogram*>& histograms,
     const std::vector<Stats::TextReadout*>& text_readouts,
     const Upstream::ClusterManager& cluster_manager, Buffer::Instance& response,
@@ -947,8 +946,7 @@ uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
 }
 
 uint64_t PrometheusStatsFormatter::statsAsPrometheusText(
-    const std::vector<Stats::Counter*>& counters,
-    const std::vector<Stats::Gauge*>& gauges,
+    const std::vector<Stats::Counter*>& counters, const std::vector<Stats::Gauge*>& gauges,
     const std::vector<Stats::ParentHistogram*>& histograms,
     const std::vector<Stats::TextReadout*>& text_readouts,
     const Upstream::ClusterManager& cluster_manager, Buffer::Instance& response,
@@ -960,8 +958,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheusText(
 }
 
 uint64_t PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-    const std::vector<Stats::Counter*>& counters,
-    const std::vector<Stats::Gauge*>& gauges,
+    const std::vector<Stats::Counter*>& counters, const std::vector<Stats::Gauge*>& gauges,
     const std::vector<Stats::ParentHistogram*>& histograms,
     const std::vector<Stats::TextReadout*>& text_readouts,
     const Upstream::ClusterManager& cluster_manager, Http::ResponseHeaderMap& response_headers,
@@ -978,8 +975,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheusProtobuf(
 }
 
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(
-    const std::vector<Stats::Counter*>& counters,
-    const std::vector<Stats::Gauge*>& gauges,
+    const std::vector<Stats::Counter*>& counters, const std::vector<Stats::Gauge*>& gauges,
     const std::vector<Stats::ParentHistogram*>& histograms,
     const std::vector<Stats::TextReadout*>& text_readouts,
     const Upstream::ClusterManager& cluster_manager, const Http::RequestHeaderMap& request_headers,

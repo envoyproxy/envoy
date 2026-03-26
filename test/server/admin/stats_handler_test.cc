@@ -1348,7 +1348,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
 TEST_P(AdminInstanceTest, TracingStatsDisabled) {
   const std::string& name = admin_.tracingStats().service_forced_.name();
   for (const Stats::CounterSharedPtr& counter :
-           Stats::Utility::countersMainThread(server_.stats())) {
+       Stats::Utility::countersMainThread(server_.stats())) {
     EXPECT_NE(counter->name(), name) << "Unexpected tracing stat found in server stats: " << name;
   }
 }

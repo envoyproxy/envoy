@@ -61,24 +61,24 @@ protected:
 
   void addCounter(const std::string& name, Stats::StatNameTagVector cluster_tags) {
     Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
-    //Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    counters_.push_back(&store_.rootScope()->counterFromStatNameWithTags(
-        name_storage.statName(), cluster_tags));
+    // Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
+    counters_.push_back(
+        &store_.rootScope()->counterFromStatNameWithTags(name_storage.statName(), cluster_tags));
   }
 
   void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags,
                 Stats::Gauge::ImportMode import_mode = Stats::Gauge::ImportMode::Accumulate) {
     Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
-    //Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    gauges_.push_back(&store_.rootScope()->gaugeFromStatNameWithTags(
-        name_storage.statName(), cluster_tags, import_mode));
+    // Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
+    gauges_.push_back(&store_.rootScope()->gaugeFromStatNameWithTags(name_storage.statName(),
+                                                                     cluster_tags, import_mode));
   }
 
   void addTextReadout(const std::string& name, const std::string& value,
                       Stats::StatNameTagVector cluster_tags) {
     Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
-    Stats::TextReadout* text_readout = &store_.rootScope()->textReadoutFromStatNameWithTags(
-        name_storage.statName(), cluster_tags);
+    Stats::TextReadout* text_readout =
+        &store_.rootScope()->textReadoutFromStatNameWithTags(name_storage.statName(), cluster_tags);
     text_readout->set(value);
     text_readouts_.push_back(text_readout);
   }
@@ -132,7 +132,7 @@ protected:
   }
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  //Stats::Allocator alloc_;
+  // Stats::Allocator alloc_;
   Stats::StatNamePool pool_;
   Stats::IsolatedStoreImpl store_;
   std::vector<Stats::Counter*> counters_;
@@ -372,8 +372,7 @@ envoy_cluster_default_total_match_count{envoy_cluster_name="x"} 0
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, text_readouts_
-, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1, size);
   EXPECT_EQ(expected_output, response.toString());
@@ -394,8 +393,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, text_readouts_
-, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -435,8 +433,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, text_readouts_
-, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -471,8 +468,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, text_readouts_
-, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 

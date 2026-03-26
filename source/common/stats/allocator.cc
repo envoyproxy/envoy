@@ -48,21 +48,11 @@ Allocator::~Allocator() {
 #endif
 }
 
-void Allocator::setShuttingDown() {
-  /*  Thread::LockGuard lock(mutex_);
-  if (!shutting_down_) {
-    ENVOY_LOG_MISC(error, "Allocator::setSHuttingDown called on {}", static_cast<void*>(this));
-    }*/
-  shutting_down_ = true;
-}
+void Allocator::setShuttingDown() { shutting_down_ = true; }
 
-void Allocator::setIsolatedStore() {
-  ASSERT(!thread_local_store_);
-}
+void Allocator::setIsolatedStore() { ASSERT(!thread_local_store_); }
 
-void Allocator::setThreadLocalStore() {
-  ASSERT(!isolated_store_);
-}
+void Allocator::setThreadLocalStore() { ASSERT(!isolated_store_); }
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void Allocator::debugPrint() {
@@ -96,9 +86,9 @@ public:
     // scopes teardown from the store. Otherwise stats that are kept in vectors
     // during main-thread operations such as stats sinks can race destruction.
     if (!alloc_.shuttingDown() && !alloc_.isIsolatedStore()) {
-      //if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
-      //  ENVOY_LOG_MISC(error, "unexpected destruction of {}", BaseClass::name());
-      //}
+      // if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
+      //   ENVOY_LOG_MISC(error, "unexpected destruction of {}", BaseClass::name());
+      // }
       ASSERT_IS_MAIN_OR_TEST_THREAD();
     }
 

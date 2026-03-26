@@ -3,13 +3,13 @@
 #include <algorithm>
 #include <string>
 
-#include "absl/strings/match.h"
-#include "absl/strings/str_replace.h"
-#include "absl/types/optional.h"
-
 #include "envoy/stats/store.h"
 
 #include "source/common/common/thread.h"
+
+#include "absl/strings/match.h"
+#include "absl/strings/str_replace.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -148,9 +148,9 @@ std::vector<Stats::Gauge*> gaugesMainThread(Stats::Store& store) {
 std::vector<Stats::TextReadout*> textReadoutsMainThread(Stats::Store& store) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   std::vector<Stats::TextReadout*> text_readouts;
-  store.forEachTextReadout([&text_readouts](size_t size) { text_readouts.reserve(size); },
-                           [&text_readouts](TextReadout& text_readout) {
-                             text_readouts.push_back(&text_readout); });
+  store.forEachTextReadout(
+      [&text_readouts](size_t size) { text_readouts.reserve(size); },
+      [&text_readouts](TextReadout& text_readout) { text_readouts.push_back(&text_readout); });
 
   return text_readouts;
 }
@@ -158,10 +158,9 @@ std::vector<Stats::TextReadout*> textReadoutsMainThread(Stats::Store& store) {
 std::vector<Stats::ParentHistogram*> histogramsMainThread(Stats::Store& store) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   std::vector<Stats::ParentHistogram*> histograms;
-  store.forEachHistogram([&histograms](size_t size) { histograms.reserve(size); },
-                         [&histograms](ParentHistogram& histogram) {
-                           histograms.push_back(&histogram);
-                         });
+  store.forEachHistogram(
+      [&histograms](size_t size) { histograms.reserve(size); },
+      [&histograms](ParentHistogram& histogram) { histograms.push_back(&histogram); });
   return histograms;
 }
 

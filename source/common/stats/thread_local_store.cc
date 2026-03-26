@@ -349,7 +349,8 @@ ThreadLocalStoreImpl::TlsCache::insertScope(uint64_t scope_id) {
   return scope_cache_[scope_id];
 }
 
-void ThreadLocalStoreImpl::TlsCache::eraseScopes(const std::vector<uint64_t>& scope_ids, std::vector<TlsCacheEntry>& tls_cache_entries) {
+void ThreadLocalStoreImpl::TlsCache::eraseScopes(const std::vector<uint64_t>& scope_ids,
+                                                 std::vector<TlsCacheEntry>& tls_cache_entries) {
   for (uint64_t scope_id : scope_ids) {
     auto iter = scope_cache_.find(scope_id);
     if (iter != scope_cache_.end()) {
@@ -394,7 +395,8 @@ void ThreadLocalStoreImpl::clearScopesFromCaches() {
     auto tls_cache_entries = std::make_shared<std::vector<TlsCacheEntry>>();
     auto tls_mutex = std::make_shared<absl::Mutex>();
     tls_cache_->runOnAllThreads(
-        [scope_ids, tls_cache_entries = tls_cache_entries.get(), tls_mutex](OptRef<TlsCache> tls_cache) {
+        [scope_ids, tls_cache_entries = tls_cache_entries.get(),
+         tls_mutex](OptRef<TlsCache> tls_cache) {
           absl::MutexLock lock(tls_mutex.get());
           tls_cache->eraseScopes(*scope_ids, *tls_cache_entries);
         },

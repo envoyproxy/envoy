@@ -193,9 +193,9 @@ void StatsHandler::prometheusRender(Stats::Store& stats,
   std::vector<Stats::ParentHistogram*> histograms = Stats::Utility::histogramsMainThread(stats);
   std::vector<Stats::TextReadout*> text_readouts = Stats::Utility::textReadoutsMainThread(stats);
 
-  PrometheusStatsFormatter::statsAsPrometheus(
-      counters, gauges, histograms, text_readouts, cluster_manager,
-      request_headers, response_headers, response, params, custom_namespaces);
+  PrometheusStatsFormatter::statsAsPrometheus(counters, gauges, histograms, text_readouts,
+                                              cluster_manager, request_headers, response_headers,
+                                              response, params, custom_namespaces);
 }
 
 Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_headers,

@@ -540,7 +540,7 @@ public:
     return TestUtility::findHistogram(statStore(), name);
   }
 
-  //std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
+  // std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
 
   std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
 

@@ -291,7 +291,7 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
 
   EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1"));
-  //EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
+  // EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
@@ -341,7 +341,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
 
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1"));
-  //EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1")).use_count());
+  // EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1")).use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
@@ -355,7 +355,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
 
   EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1"));
-  //EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
+  // EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
@@ -1763,7 +1763,8 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   TextReadout& textReadout = scope_.textReadoutFromString("t1");
   ASSERT_EQ(1, Stats::Utility::countersMainThread(*store_).size()); // "c1".
   EXPECT_TRUE(&counter == Stats::Utility::countersMainThread(*store_)[0] ||
-              &counter == Stats::Utility::countersMainThread(*store_)[1]); // counters() order is non-deterministic.
+              &counter == Stats::Utility::countersMainThread(
+                              *store_)[1]); // counters() order is non-deterministic.
   ASSERT_EQ(1, store_->gauges().size());
   EXPECT_EQ("g1", store_->gauges()[0]->name());
   ASSERT_EQ(1, store_->histograms().size());
@@ -1926,8 +1927,8 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   // We do not keep ref-counts for counters and gauges in the TLS cache, so
   // all these stats should have a ref-count of 2: one for the SharedPtr
   // returned from find*(), and one for the central cache.
-  //EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
-  //EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g1").use_count());
+  // EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
+  // EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g1").use_count());
 
   // c1, g1, t1 should have a thread local ref, but c2, g2, t2 should not.
   /*EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
@@ -1988,7 +1989,6 @@ protected:
   OneWorkerThread() : ThreadLocalRealThreadsMixin(NumThreads) {}
 };
 
-
 TEST_F(OneWorkerThread, ConstructDestruct) {
   ScopeSharedPtr scope1 = store_->createScope("scope1.");
 }
@@ -2004,7 +2004,7 @@ TEST_F(OneWorkerThread, ScopeDelete) {
 
     scope1.reset();
   });
-  // We expct the use-count to eventually go to 1 as the effect of
+  // We expect the use-count to eventually go to 1 as the effect of
   // resetting the scope and clearing out its caches reverberates through
   // posts to the main thread.
   for (int i = 0; i < 10 && c1.use_count() > 1; ++i) {
@@ -2017,7 +2017,7 @@ TEST_F(OneWorkerThread, ScopeDelete) {
   EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
 
   runOnMainBlocking([&c1]() { c1.reset(); });
-  runOnMainBlocking([]() { });
+  runOnMainBlocking([]() {});
 
   // Removing the counter from the local variable, should now remove it from the
   // allocator.
@@ -2603,8 +2603,8 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   scope2.reset();
   histograms.clear();
   mergeHistograms();
-  runOnMainBlocking([]() { });
-  runOnMainBlocking([]() { });
+  runOnMainBlocking([]() {});
+  runOnMainBlocking([]() {});
 
   EXPECT_EQ(0, store_->histograms().size());
   EXPECT_EQ(0, numTlsHistograms());

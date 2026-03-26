@@ -26,8 +26,8 @@ enum class StoreType {
 
 class StatsUtilityTest : public testing::TestWithParam<StoreType> {
 protected:
-  //template <class StatType>
-      //using IterateFn = std::function<bool(const RefcountPtr<StatType>& stat)>;
+  // template <class StatType>
+  // using IterateFn = std::function<bool(const RefcountPtr<StatType>& stat)>;
   using MakeStatFn = std::function<void(Scope& scope, const ElementVec& elements)>;
 
   StatsUtilityTest()

@@ -232,7 +232,6 @@ TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
 
-
 /**
  * Returns vectors of stats held in the store. This must only be called
  * from the main thread. The stats are returns as pointers, and the the
@@ -245,7 +244,6 @@ std::vector<Stats::Counter*> countersMainThread(Stats::Store& store);
 std::vector<Stats::Gauge*> gaugesMainThread(Stats::Store& store);
 std::vector<Stats::TextReadout*> textReadoutsMainThread(Stats::Store& store);
 std::vector<Stats::ParentHistogram*> histogramsMainThread(Stats::Store& store);
-
 
 } // namespace Utility
 

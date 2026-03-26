@@ -81,7 +81,7 @@ public:
   /**
    * @return a list of all known counters.
    */
-  //virtual std::vector<CounterSharedPtr> counters() const PURE;
+  // virtual std::vector<CounterSharedPtr> counters() const PURE;
 
   /**
    * @return a list of all known gauges.
