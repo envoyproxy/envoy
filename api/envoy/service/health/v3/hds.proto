@@ -10,6 +10,7 @@ import "envoy/config/endpoint/v3/endpoint_components.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -109,6 +110,19 @@ message EndpointHealth {
   config.endpoint.v3.Endpoint endpoint = 1;
 
   config.core.v3.HealthStatus health_status = 2;
+
+  // Optional metadata about the health check result, populated by the active
+  // health checker and forwarded to the management server for richer health
+  // state interpretation.
+  //
+  // Well-known keys:
+  //
+  // ``http_status_code`` (number)
+  //   Set by the HTTP health checker. Contains the HTTP response status code
+  //   returned by the upstream endpoint during the most recent health check,
+  //   e.g. ``200``, ``503``. Only present when the health check received a
+  //   complete HTTP response; absent on connection failures or timeouts.
+  google.protobuf.Struct health_metadata = 3;
 }
 
 // Group endpoint health by locality under each cluster.

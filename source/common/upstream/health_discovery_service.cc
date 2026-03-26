@@ -124,6 +124,14 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
             }
           }
 
+          // If a HTTP health check has run, attach the last response code to the
+          // HDS report so the control plane can interpret richer health states.
+          auto http_status = host->lastHealthCheckHttpStatus();
+          if (http_status.has_value()) {
+            (*endpoint->mutable_health_metadata()->mutable_fields())["http_status_code"]
+                .set_number_value(http_status.value());
+          }
+
           // TODO(drewsortega): remove this once we are on v4 and endpoint_health_response is
           // removed. Copy this endpoint's health info to the legacy flat-list.
           response.mutable_endpoint_health_response()->add_endpoints_health()->MergeFrom(*endpoint);

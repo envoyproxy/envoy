@@ -1,5 +1,5 @@
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
-load("@rules_rust//rust:defs.bzl", "rust_clippy", "rust_shared_library", "rust_static_library", "rust_test", "rustfmt_test")
+load("@rules_rust//rust:defs.bzl", "rust_clippy", "rust_shared_library", "rust_static_library", "rust_test")
 load("//source/extensions/dynamic_modules:dynamic_modules.bzl", "envoy_dynamic_module_prefix_symbols")
 
 def test_program(name):
@@ -39,14 +39,6 @@ def test_program(name):
         archive = ":" + _static_lib_name,
     )
 
-    # As per the discussion in https://github.com/envoyproxy/envoy/pull/35627,
-    # we set the rust_fmt and clippy target here instead of the part of //tools/code_format target for now.
-    rustfmt_test(
-        name = "fmt_" + name,
-        tags = ["nocoverage"],
-        targets = [":" + _name],
-        testonly = True,
-    )
     rust_clippy(
         name = "clippy_" + name,
         tags = ["nocoverage"],

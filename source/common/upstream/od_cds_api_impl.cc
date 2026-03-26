@@ -1,6 +1,7 @@
 #include "source/common/upstream/od_cds_api_impl.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
 #include "source/common/grpc/common.h"
 
 #include "absl/strings/str_join.h"
@@ -264,9 +265,12 @@ private:
     }
     void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                               const EnvoyException* e) override {
-      ASSERT(reason != Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure);
-      ENVOY_LOG(trace, "ODCDS-manager: error while fetching a single resource {}: {}",
-                resource_name_, e->what());
+      // The passed exception object is null iff the error reason is
+      // Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure or
+      // Envoy::Config::ConfigUpdateFailureReason::FetchTimedout.
+      ENVOY_LOG(
+          trace, "ODCDS-manager: error while fetching a single resource {}: (reason = {}), {}",
+          resource_name_, enumToInt(reason), e == nullptr ? "exception not provided" : e->what());
       // If the resource wasn't previously updated, this sends a notification that it was removed,
       // so if there are any resources waiting for this one, they can proceed.
       if (!resource_was_updated_) {
