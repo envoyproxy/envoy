@@ -38,6 +38,74 @@ MetricAggregator::AggregationResult MetricAggregator::releaseResult() {
           snapshot_time_ns_,      cumulative_start_time_ns_, delta_start_time_ns_};
 }
 
+void MetricAggregator::addGauge(absl::string_view metric_name, uint64_t value,
+                                AttributesVector attributes) {
+  MetricViewKey view_key{metric_name, attributes};
+  auto it = gauge_data_.find(view_key);
+  if (it != gauge_data_.end()) {
+    it->second += value;
+  } else {
+    MetricKey key{metric_name, std::move(attributes)};
+    gauge_data_.insert_or_assign(std::move(key), value);
+  }
+}
+
+void MetricAggregator::addCounter(absl::string_view metric_name, uint64_t value, uint64_t delta,
+                                  AttributesVector attributes) {
+  const uint64_t point_value =
+      (counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta
+                                                                                      : value;
+  if (point_value == 0 &&
+      counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+    return;
+  }
+
+  MetricViewKey view_key{metric_name, attributes};
+  auto it = counter_data_.find(view_key);
+  if (it != counter_data_.end()) {
+    it->second += point_value;
+  } else {
+    MetricKey key{metric_name, std::move(attributes)};
+    counter_data_.insert_or_assign(std::move(key), point_value);
+  }
+}
+
+void MetricAggregator::addHistogram(absl::string_view metric_name,
+                                    const Envoy::Stats::HistogramStatistics& stats,
+                                    AttributesVector attributes) {
+  if (stats.sampleCount() == 0 &&
+      histogram_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+    return;
+  }
+
+  MetricViewKey view_key{metric_name, attributes};
+  auto it = histogram_data_.find(view_key);
+  if (it != histogram_data_.end()) {
+    std::vector<uint64_t> new_bucket_counts = stats.computeDisjointBuckets();
+    auto& existing_point = it->second;
+    if (existing_point.explicit_bounds_.size() == stats.supportedBuckets().size() &&
+        existing_point.bucket_counts_.size() == new_bucket_counts.size() + 1) {
+      existing_point.count_ += stats.sampleCount();
+      existing_point.sum_ += stats.sampleSum();
+      for (size_t i = 0; i < new_bucket_counts.size(); ++i) {
+        existing_point.bucket_counts_[i] += new_bucket_counts[i];
+      }
+      existing_point.bucket_counts_.back() += stats.outOfBoundCount();
+    } else {
+      ENVOY_LOG(error, "Histogram bounds mismatch for metric {} aggregated from stat", metric_name);
+    }
+  } else {
+    CustomHistogram custom_hist;
+    custom_hist.count_ = stats.sampleCount();
+    custom_hist.sum_ = stats.sampleSum();
+    custom_hist.bucket_counts_ = stats.computeDisjointBuckets();
+    custom_hist.bucket_counts_.push_back(stats.outOfBoundCount());
+    custom_hist.explicit_bounds_ = stats.supportedBuckets();
+    MetricKey key{metric_name, std::move(attributes)};
+    histogram_data_.insert_or_assign(std::move(key), std::move(custom_hist));
+  }
+}
+
 RequestStreamer::RequestStreamer(
     uint32_t max_dp,
     const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
@@ -182,74 +250,6 @@ void RequestStreamer::addAggregationResult(MetricAggregator::AggregationResult&&
 void RequestStreamer::send() {
   if (current_request_ != nullptr) {
     send_callback_(std::move(current_request_));
-  }
-}
-
-void MetricAggregator::addGauge(absl::string_view metric_name, uint64_t value,
-                                AttributesVector attributes) {
-  MetricViewKey view_key{metric_name, attributes};
-  auto it = gauge_data_.find(view_key);
-  if (it != gauge_data_.end()) {
-    it->second += value;
-  } else {
-    MetricKey key{metric_name, std::move(attributes)};
-    gauge_data_.insert_or_assign(std::move(key), value);
-  }
-}
-
-void MetricAggregator::addCounter(absl::string_view metric_name, uint64_t value, uint64_t delta,
-                                  AttributesVector attributes) {
-  const uint64_t point_value =
-      (counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta
-                                                                                      : value;
-  if (point_value == 0 &&
-      counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
-    return;
-  }
-
-  MetricViewKey view_key{metric_name, attributes};
-  auto it = counter_data_.find(view_key);
-  if (it != counter_data_.end()) {
-    it->second += point_value;
-  } else {
-    MetricKey key{metric_name, std::move(attributes)};
-    counter_data_.insert_or_assign(std::move(key), point_value);
-  }
-}
-
-void MetricAggregator::addHistogram(absl::string_view metric_name,
-                                    const Envoy::Stats::HistogramStatistics& stats,
-                                    AttributesVector attributes) {
-  if (stats.sampleCount() == 0 &&
-      histogram_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
-    return;
-  }
-
-  MetricViewKey view_key{metric_name, attributes};
-  auto it = histogram_data_.find(view_key);
-  if (it != histogram_data_.end()) {
-    std::vector<uint64_t> new_bucket_counts = stats.computeDisjointBuckets();
-    auto& existing_point = it->second;
-    if (existing_point.explicit_bounds_.size() == stats.supportedBuckets().size() &&
-        existing_point.bucket_counts_.size() == new_bucket_counts.size() + 1) {
-      existing_point.count_ += stats.sampleCount();
-      existing_point.sum_ += stats.sampleSum();
-      for (size_t i = 0; i < new_bucket_counts.size(); ++i) {
-        existing_point.bucket_counts_[i] += new_bucket_counts[i];
-      }
-      existing_point.bucket_counts_.back() += stats.outOfBoundCount();
-    } else {
-      ENVOY_LOG(error, "Histogram bounds mismatch for metric {} aggregated from stat", metric_name);
-    }
-  } else {
-    CustomHistogram custom_hist;
-    custom_hist.count_ = stats.sampleCount();
-    custom_hist.sum_ = stats.sampleSum();
-    custom_hist.bucket_counts_ = stats.computeDisjointBuckets();
-    custom_hist.bucket_counts_.push_back(stats.outOfBoundCount());
-    custom_hist.explicit_bounds_ = stats.supportedBuckets();
-    MetricKey key{metric_name, std::move(attributes)};
-    histogram_data_.insert_or_assign(std::move(key), std::move(custom_hist));
   }
 }
 
