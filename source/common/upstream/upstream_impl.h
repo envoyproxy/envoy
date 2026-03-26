@@ -221,6 +221,7 @@ public:
   }
   HostStats& stats() const override { return stats_; }
   LoadMetricStats& loadMetricStats() const override { return load_metric_stats_; }
+  OrcaUtilizationStore& orcaUtilization() const override { return orca_utilization_store_; }
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   const envoy::config::core::v3::Locality& locality() const override { return *locality_; }
@@ -285,6 +286,7 @@ private:
   Stats::StatNameDynamicStorage locality_zone_stat_name_;
   mutable HostStats stats_;
   mutable LoadMetricStatsImpl load_metric_stats_;
+  mutable OrcaUtilizationStore orca_utilization_store_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
