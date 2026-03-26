@@ -33,8 +33,7 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1, 0, 100,
-      clusterCircuitBreakersStats(store), absl::nullopt, absl::nullopt, absl::nullopt,
-      time_system);
+      clusterCircuitBreakersStats(store), absl::nullopt, absl::nullopt, absl::nullopt, time_system);
 
   EXPECT_CALL(
       runtime.snapshot_,

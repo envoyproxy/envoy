@@ -1133,11 +1133,10 @@ ClusterInfoImpl::ClusterInfoImpl(
               : nullptr),
       features_(ClusterInfoImpl::HttpProtocolOptionsConfigImpl::parseFeatures(
           config, *http_protocol_options_)),
-      resource_managers_(config, runtime, name_, *stats_scope_,
-                         factory_context.serverFactoryContext()
-                             .clusterManager()
-                             .clusterCircuitBreakersStatNames(),
-                         factory_context.serverFactoryContext().timeSource()),
+      resource_managers_(
+          config, runtime, name_, *stats_scope_,
+          factory_context.serverFactoryContext().clusterManager().clusterCircuitBreakersStatNames(),
+          factory_context.serverFactoryContext().timeSource()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           THROW_OR_RETURN_VALUE(createUpstreamLocalAddressSelector(config, bind_config),
@@ -1938,8 +1937,7 @@ ClusterInfoImpl::OptionalClusterStats::OptionalClusterStats(
 ClusterInfoImpl::ResourceManagers::ResourceManagers(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     const std::string& cluster_name, Stats::Scope& stats_scope,
-    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names,
-    TimeSource& time_source)
+    const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names, TimeSource& time_source)
     : circuit_breakers_stat_names_(circuit_breakers_stat_names), time_source_(time_source) {
   managers_[enumToInt(ResourcePriority::Default)] = THROW_OR_RETURN_VALUE(
       load(config, runtime, cluster_name, stats_scope, envoy::config::core::v3::DEFAULT),

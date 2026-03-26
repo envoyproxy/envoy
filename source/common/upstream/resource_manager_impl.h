@@ -88,8 +88,7 @@ public:
                       uint64_t max_connections_per_host, ClusterCircuitBreakersStats cb_stats,
                       absl::optional<double> budget_percent,
                       absl::optional<std::chrono::milliseconds> budget_interval,
-                      absl::optional<uint32_t> min_retry_concurrency,
-                      TimeSource& time_source)
+                      absl::optional<uint32_t> min_retry_concurrency, TimeSource& time_source)
       : connections_(max_connections, runtime, runtime_key + "max_connections", cb_stats.cx_open_,
                      cb_stats.remaining_cx_),
         pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests",
@@ -101,8 +100,8 @@ public:
         max_connections_per_host_(max_connections_per_host),
         retries_(budget_percent, budget_interval, min_retry_concurrency, max_retries, runtime,
                  runtime_key + "retry_budget.", runtime_key + "max_retries",
-                 cb_stats.rq_retry_open_, cb_stats.remaining_retries_, requests_,
-                 pending_requests_, time_source) {
+                 cb_stats.rq_retry_open_, cb_stats.remaining_retries_, requests_, pending_requests_,
+                 time_source) {
     // Count active requests when retry budget is configured.
     // Pending requests are not counted to avoid counting them twice.
     if (budget_percent.has_value() || min_retry_concurrency.has_value()) {
@@ -137,9 +136,10 @@ private:
           min_retry_concurrency_key_(retry_budget_runtime_key + "min_retry_concurrency"),
           requests_(requests), pending_requests_(pending_requests), remaining_(remaining),
           time_source_(time_source), slots_(),
-          slot_duration_seconds_(budget_interval.has_value()
-              ? std::chrono::duration<double>(budget_interval.value()).count() / windows
-              : 0),
+          slot_duration_seconds_(
+              budget_interval.has_value()
+                  ? std::chrono::duration<double>(budget_interval.value()).count() / windows
+                  : 0),
           writer_(0),
           generation_time_seconds_(budget_interval.has_value() ? timeNowInSeconds() : 0),
           generation_index_(0) {}
