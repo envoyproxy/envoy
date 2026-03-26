@@ -14,6 +14,8 @@ namespace FairTokenBucket {
 
 Client::~Client() { bucket_->clientDestroyed(*this); }
 
+std::chrono::milliseconds Client::fillInterval() const { return bucket_->fillInterval(); }
+
 Bucket::Bucket(uint64_t max_tokens, TimeSource& time_source,
                std::chrono::milliseconds fill_interval)
     : time_source_(time_source), fill_interval_(fill_interval), max_tokens_(max_tokens) {
