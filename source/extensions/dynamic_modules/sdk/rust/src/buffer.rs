@@ -29,10 +29,10 @@ impl EnvoyBuffer<'_> {
   /// This is a helper function to create an [`EnvoyBuffer`] from a string.
   ///
   /// This is meant for use by the end users in unit tests.
-  pub fn new(std: &str) -> Self {
+  pub fn new(s: &str) -> Self {
     Self {
-      raw_ptr: std.as_ptr(),
-      length: std.len(),
+      raw_ptr: s.as_ptr(),
+      length: s.len(),
       _marker: std::marker::PhantomData,
     }
   }
