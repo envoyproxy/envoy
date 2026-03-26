@@ -125,6 +125,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect_descriptor.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport_descriptor.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer_descriptor.pb.h"
+#include "envoy/extensions/transport_sockets/rustls/v3/rustls_descriptor.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert_descriptor.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common_descriptor.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/secret_descriptor.pb.h"
@@ -363,6 +364,8 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
       protobuf::reflection::envoy_extensions_transport_sockets_quic_v3_quic_transport::
           kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_transport_sockets_raw_buffer_v3_raw_buffer::
+          kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_transport_sockets_rustls_v3_rustls::
           kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_transport_sockets_tls_v3_cert::kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_transport_sockets_tls_v3_common::kFileDescriptorInfo,

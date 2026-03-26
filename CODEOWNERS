@@ -425,6 +425,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/load_balancing_policies/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/matching/input_matchers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/matching/http/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/transport_sockets/rustls @agrawroh @mathetake @wbpcode
 /*/extensions/transport_sockets/tls/cert_validator/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/upstreams/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/tracers/dynamic_modules @agrawroh @mathetake @wbpcode

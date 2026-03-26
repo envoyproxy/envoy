@@ -174,6 +174,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto_descriptor",
+        "@envoy_api//envoy/extensions/transport_sockets/rustls/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/udp_packet_writer/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto_descriptor",

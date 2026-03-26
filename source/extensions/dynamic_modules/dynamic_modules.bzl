@@ -58,6 +58,12 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
     # the archive target's outputs (cc_library may produce both .a and .pic.a);
     # falls back to any .a if all archives are PIC-suffixed.
     #
+    # --weaken converts all global symbols to weak binding. This prevents duplicate
+    # symbol errors when multiple Rust static archives are linked into the same
+    # binary, since each archive bundles identical LLVM compiler-rt builtins. The
+    # prefixed hook symbols remain in the symbol table as weak globals and are still
+    # exported via the version script pattern in bazel/exported_symbols.txt.
+    #
     # NOTE: The case statement is kept outside $() command substitution for
     # compatibility with bash 3.2 (macOS default), which cannot parse case
     # pattern delimiters inside $().
@@ -71,7 +77,7 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
             "[ -z \"$$ARCH\" ] && " +
             "for f in $(SRCS); do case $$f in *.a) ARCH=$$f; break;; esac; done; " +
             "$(location @llvm_toolchain_llvm//:objcopy) " +
-            "--redefine-syms=$(location :" + redefine_syms_name + ") $$ARCH $@"
+            "--redefine-syms=$(location :" + redefine_syms_name + ") --weaken $$ARCH $@"
         ),
         tools = ["@llvm_toolchain_llvm//:objcopy"],
         tags = tags,

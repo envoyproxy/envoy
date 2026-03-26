@@ -1228,6 +1228,19 @@ pub type NewDnsResolverConfigFunction = fn(
 pub static NEW_DNS_RESOLVER_CONFIG_FUNCTION: OnceLock<NewDnsResolverConfigFunction> =
   OnceLock::new();
 
+/// The factory function signature for creating a new transport socket factory configuration.
+pub type NewTransportSocketFactoryConfigFunction<ETS> =
+  fn(
+    name: &str,
+    config: &[u8],
+    is_upstream: bool,
+  ) -> Option<Box<dyn transport_socket::TransportSocketFactoryConfig<ETS>>>;
+
+/// Global storage for the transport socket factory configuration function.
+pub static NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION: OnceLock<
+  NewTransportSocketFactoryConfigFunction<EnvoyTransportSocketImpl>,
+> = OnceLock::new();
+
 /// Declare the init functions for a DNS resolver dynamic module.
 ///
 /// The first argument is the program init function with [`ProgramInitFunction`] type.
@@ -1299,19 +1312,6 @@ macro_rules! declare_dns_resolver_init_functions {
 // =================================================================================================
 // Transport Socket Dynamic Module Support
 // =================================================================================================
-
-/// The factory function signature for creating a new transport socket factory configuration.
-pub type NewTransportSocketFactoryConfigFunction<ETS> =
-  fn(
-    name: &str,
-    config: &[u8],
-    is_upstream: bool,
-  ) -> Option<Box<dyn transport_socket::TransportSocketFactoryConfig<ETS>>>;
-
-/// Global storage for the transport socket factory configuration function.
-pub static NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION: OnceLock<
-  NewTransportSocketFactoryConfigFunction<EnvoyTransportSocketImpl>,
-> = OnceLock::new();
 
 /// Declare the init functions for a transport socket dynamic module.
 ///
