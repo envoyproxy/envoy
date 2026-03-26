@@ -18,7 +18,7 @@ load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_depende
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
-load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
@@ -241,7 +241,7 @@ def envoy_download_go_sdks(go_version):
 def crates_repositories():
     crates_repository(
         name = "dynamic_modules_rust_sdk_crate_index",
-        cargo_lockfile = "@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
+        cargo_lockfile = "@envoy//:Cargo.lock",
         # TODO: Ideally we should uncomment the below to make using the Rust SDK via rules_rust reproducible.
         # However, rules_rust has a bug that when this Envoy repo is used as a dependency in another Bazel workspace,
         # the lockfile is not properly propagated, which causes the build to fail without CARGO_BAZEL_REPIN=true, which
@@ -257,10 +257,22 @@ def crates_repositories():
         # * https://github.com/bazelbuild/rules_rust/pull/3866
         #
         # lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
-        manifests = ["@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
-    )
-    crates_repository(
-        name = "hickory_dns_crate_index",
-        cargo_lockfile = "@envoy//:Cargo.lock",
-        manifests = ["@envoy//source/extensions/network/dns_resolver/hickory/rust:Cargo.toml"],
+        manifests = ["@envoy//:Cargo.toml"],
+        packages = {
+            "hickory-resolver": crate.spec(
+                version = "0.25",
+                features = ["system-config", "tokio", "tls-ring", "https-ring", "dnssec-ring", "webpki-roots"],
+            ),
+            "serde": crate.spec(
+                version = "1",
+                features = ["derive"],
+            ),
+            "serde_json": crate.spec(version = "1"),
+            "time": crate.spec(version = ">=0.3.0, <0.3.37"),
+            "tokio": crate.spec(
+                version = "1",
+                features = ["rt-multi-thread", "macros"],
+            ),
+            "url": crate.spec(version = "2"),
+        },
     )

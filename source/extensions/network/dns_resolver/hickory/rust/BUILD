@@ -1,4 +1,3 @@
-load("@hickory_dns_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_rust//rust:defs.bzl", "rust_clippy", "rust_static_library", "rustfmt_test")
 load("//bazel:envoy_build_system.bzl", "envoy_extension_package")
 load("//source/extensions/dynamic_modules:dynamic_modules.bzl", "envoy_dynamic_module_prefix_symbols")
@@ -13,9 +12,12 @@ rust_static_library(
     edition = "2021",
     deps = [
         "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
-    ] + all_crate_deps(
-        normal = True,
-    ),
+        "@dynamic_modules_rust_sdk_crate_index//:hickory-resolver",
+        "@dynamic_modules_rust_sdk_crate_index//:serde",
+        "@dynamic_modules_rust_sdk_crate_index//:serde_json",
+        "@dynamic_modules_rust_sdk_crate_index//:tokio",
+        "@dynamic_modules_rust_sdk_crate_index//:url",
+    ],
 )
 
 envoy_dynamic_module_prefix_symbols(
