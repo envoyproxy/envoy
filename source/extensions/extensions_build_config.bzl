@@ -630,6 +630,7 @@ EXTENSIONS = {
     "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
 
     # Certificate selectors
+    "envoy.tls.certificate_selectors.filter_state":                      "//source/extensions/transport_sockets/tls/cert_selectors/filter_state:config",
     "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
 
     # Certificate mappers
