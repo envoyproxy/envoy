@@ -218,6 +218,8 @@ public:
   MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
   MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
+  MOCK_METHOD(void, setLastHealthCheckHttpStatus, (uint64_t));
+  MOCK_METHOD(absl::optional<uint64_t>, lastHealthCheckHttpStatus, (), (const));
 
   bool disable_active_health_check_ = false;
 };
