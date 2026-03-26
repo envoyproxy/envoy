@@ -279,6 +279,10 @@ private:
     explicit CentralCacheEntry(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
     ~CentralCacheEntry();
 
+    bool empty() const {
+      return counters_.empty() && gauges_.empty() && histograms_.empty() && text_readouts_.empty();
+    }
+
     StatNameHashMap<CounterSharedPtr> counters_;
     StatNameHashMap<GaugeSharedPtr> gauges_;
     StatNameHashMap<ParentHistogramImplSharedPtr> histograms_;
@@ -445,6 +449,13 @@ private:
     const CentralCacheEntrySharedPtr& centralCacheLockHeld() const
         ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
       return central_cache_;
+    }
+
+    CentralCacheEntrySharedPtr releaseCentralCacheLockHeld()
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
+      CentralCacheEntrySharedPtr central_cache = std::move(central_cache_);
+      central_cache_.reset();
+      return central_cache;
     }
 
     CentralCacheEntrySharedPtr&

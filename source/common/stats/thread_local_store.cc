@@ -311,7 +311,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
     bool need_post = scopes_to_cleanup_.empty();
     scopes_to_cleanup_.push_back(scope->scope_id_);
     assertLocked(*scope);
-    central_cache_entries_to_cleanup_.push_back(scope->centralCacheLockHeld());
+    central_cache_entries_to_cleanup_.push_back(scope->releaseCentralCacheLockHeld());
     lock.release();
 
     if (need_post) {
@@ -394,14 +394,16 @@ void ThreadLocalStoreImpl::clearScopesFromCaches() {
     auto tls_cache_entries = std::make_shared<std::vector<TlsCacheEntry>>();
     auto tls_mutex = std::make_shared<absl::Mutex>();
     tls_cache_->runOnAllThreads(
-        [scope_ids, tls_cache_entries, tls_mutex](OptRef<TlsCache> tls_cache) {
+        [scope_ids, tls_cache_entries = tls_cache_entries.get(), tls_mutex](OptRef<TlsCache> tls_cache) {
           absl::MutexLock lock(tls_mutex.get());
           tls_cache->eraseScopes(*scope_ids, *tls_cache_entries);
         },
         [central_caches, tls_cache_entries, this]() {
           /* Holds onto central_caches until all tls caches are clear */
-          main_thread_dispatcher_->post([central_caches, tls_cache_entries]() {
-          });
+          if (!shutting_down_) {
+            main_thread_dispatcher_->post([central_caches = std::move(central_caches),
+                                           tls_cache_entries = std::move(tls_cache_entries)]() {});
+          }
         });
   }
 }
@@ -1196,7 +1198,7 @@ void ThreadLocalStoreImpl::evictUnused() {
           }
         },
         [evicted_metrics, this]() {
-          main_thread_dispatcher_->post([evicted_metrics]() {
+          main_thread_dispatcher_->post([evicted_metrics = std::move(evicted_metrics)]() {
             // We want to delete stale stats on the main thread since stat
             // destructors lock the stats allocator. Note that we might have
             // received fresh values on the stale cache-local stats after deleting them from the

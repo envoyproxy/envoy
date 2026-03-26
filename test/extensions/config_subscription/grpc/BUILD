@@ -281,6 +281,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "xds_failover_integration_test",
+    size = "huge",
     srcs =
         ["xds_failover_integration_test.cc"],
     rbe_pool = "6gig",

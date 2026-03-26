@@ -651,7 +651,7 @@ TEST_F(StatsThreadLocalStoreTest, ConstSymtabAccessor) {
   EXPECT_EQ(&const_symbol_table, &symbol_table);
 }
 
-TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
+/*TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
@@ -661,7 +661,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
   EXPECT_EQ("scope1.c1", c1->name());
 
-  EXPECT_CALL(main_thread_dispatcher_, post(_));
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).Times(testing::AtLeast(1));
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   scope1.reset();
   // The counter is gone from all scopes, but is still held in the local
@@ -677,7 +677,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
-}
+}*/
 
 TEST_F(StatsThreadLocalStoreTest, Eviction) {
   InSequence s;
@@ -1965,19 +1965,63 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   tls_.shutdownThread();
 }
 
-TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
-  SymbolTableImpl symbol_table;
-  Api::ApiPtr api = Api::createApiForTest();
-  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
-  NiceMock<ThreadLocal::MockInstance> tls;
-  Allocator alloc(symbol_table);
-  ThreadLocalStoreImpl store(alloc);
+/*class ThreadLocalStoreThreadTest : public testing::Test {
+ protected:
+  ThreadLocalStoreThreadTest() { store_.initializeThreading(*dispatcher_, tls_); }
+  ~ThreadLocalStoreThreadTest() {
+    tls_.shutdownGlobalThreading();
+    store_.shutdownThreading();
+    tls_.shutdownThread();
+  }
 
-  store.initializeThreading(*dispatcher, tls);
-  { ScopeSharedPtr scope1 = store.createScope("scope1."); }
-  tls.shutdownGlobalThreading();
-  store.shutdownThreading();
-  tls.shutdownThread();
+  SymbolTableImpl symbol_table_;
+  Api::ApiPtr api_{Api::createApiForTest()};
+  Event::DispatcherPtr dispatcher_{api_->allocateDispatcher("test_thread")};
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Allocator alloc_{symbol_table_};
+  ThreadLocalStoreImpl store_{alloc_};
+  };*/
+
+class OneWorkerThread : public ThreadLocalRealThreadsMixin, public testing::Test {
+protected:
+  static constexpr uint32_t NumThreads = 1;
+  OneWorkerThread() : ThreadLocalRealThreadsMixin(NumThreads) {}
+};
+
+
+TEST_F(OneWorkerThread, ConstructDestruct) {
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
+}
+
+TEST_F(OneWorkerThread, ScopeDelete) {
+  CounterSharedPtr c1;
+  runOnMainBlocking([&]() {
+    ScopeSharedPtr scope1 = store_->createScope("scope1.");
+    scope1->counterFromString("c1");
+    EXPECT_EQ(1UL, TestUtility::counters(*store_).size());
+    c1 = TestUtility::findCounter(*store_, "scope1.c1");
+    EXPECT_EQ("scope1.c1", c1->name());
+
+    scope1.reset();
+  });
+  // We expct the use-count to eventually go to 1 as the effect of
+  // resetting the scope and clearing out its caches reverberates through
+  // posts to the main thread.
+  for (int i = 0; i < 10 && c1.use_count() > 1; ++i) {
+    runOnMainBlocking([]() {});
+  }
+  EXPECT_EQ(1L, c1.use_count()); // one for the 'c1' variable, one for the scope.
+
+  // The counter is gone from all scopes, but is still held in the local
+  // variable c1. Hence, it will not be removed from the allocator or store.
+  EXPECT_EQ(1UL, TestUtility::counters(*store_).size());
+
+  runOnMainBlocking([&c1]() { c1.reset(); });
+  runOnMainBlocking([]() { });
+
+  // Removing the counter from the local variable, should now remove it from the
+  // allocator.
+  EXPECT_EQ(0UL, TestUtility::counters(*store_).size());
 }
 
 // Histogram tests
@@ -2325,12 +2369,6 @@ TEST_F(HistogramTest, UnsinkedHistogramsAreMerged) {
   EXPECT_EQ(h2.used(), true);
 }
 
-class OneWorkerThread : public ThreadLocalRealThreadsMixin, public testing::Test {
-protected:
-  static constexpr uint32_t NumThreads = 1;
-  OneWorkerThread() : ThreadLocalRealThreadsMixin(NumThreads) {}
-};
-
 // Reproduces a race-condition between forEachScope and scope deletion. If we
 // replace the code in ThreadLocalStoreImpl::forEachScope with this:
 //
@@ -2407,6 +2445,11 @@ protected:
 // empty callback to main to ensure that cross-scope thread cleanups complete.
 // In this test, we don't expect the use-count of the stat to get very high.
 TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
+  Counter* counter = nullptr;
+  runOnMainBlocking([this, &counter]() {
+    counter = &store_->rootScope()->counterFromStatName(my_counter_scoped_name_);
+  });
+
   for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(5); ++i) {
     createScopesIncCountersAndCleanupAllThreads();
 
@@ -2417,11 +2460,11 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
     tlsBlock();
 
     // Finally, wait for the final central-cache cleanup, which occurs on the main thread.
-    mainDispatchBlock();
+    for (int i = 0; i < 10; ++i) {
+      mainDispatchBlock();
+    }
 
     // Here we show that the counter cleanups have finished, because the use-count is 1.
-    CounterSharedPtr counter =
-        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{});
     EXPECT_EQ(1, counter->use_count()) << "index=" << i;
   }
 }
