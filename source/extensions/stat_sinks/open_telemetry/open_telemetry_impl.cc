@@ -21,18 +21,6 @@ using NumberDataPoint = opentelemetry::proto::metrics::v1::NumberDataPoint;
 using HistogramDataPoint = opentelemetry::proto::metrics::v1::HistogramDataPoint;
 using KeyValue = opentelemetry::proto::common::v1::KeyValue;
 
-Protobuf::RepeatedPtrField<KeyValue>
-generateResourceAttributes(const Tracers::OpenTelemetry::Resource& resource) {
-  Protobuf::RepeatedPtrField<KeyValue> result;
-
-  for (const auto& [key, value] : resource.attributes_) {
-    auto* attr = result.Add();
-    attr->set_key(key);
-    attr->mutable_value()->set_string_value(value);
-  }
-  return result;
-}
-
 MetricAggregator::AggregationResult MetricAggregator::releaseResult() {
   return {std::move(gauge_data_), std::move(counter_data_),  std::move(histogram_data_),
           snapshot_time_ns_,      cumulative_start_time_ns_, delta_start_time_ns_};
@@ -251,6 +239,18 @@ void RequestStreamer::send() {
   if (current_request_ != nullptr) {
     send_callback_(std::move(current_request_));
   }
+}
+
+Protobuf::RepeatedPtrField<KeyValue>
+generateResourceAttributes(const Tracers::OpenTelemetry::Resource& resource) {
+  Protobuf::RepeatedPtrField<KeyValue> result;
+
+  for (const auto& [key, value] : resource.attributes_) {
+    auto* attr = result.Add();
+    attr->set_key(key);
+    attr->mutable_value()->set_string_value(value);
+  }
+  return result;
 }
 
 Matcher::MatchTreePtr<Stats::StatMatchingData>
