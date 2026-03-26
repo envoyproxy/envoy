@@ -59,7 +59,14 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
   ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(callbacks.dispatcher_));
   ON_CALL(callbacks, streamInfo()).WillByDefault(ReturnRef(callbacks.stream_info_));
   ON_CALL(callbacks, route()).WillByDefault(Return(callbacks.route_));
-  ON_CALL(callbacks, clusterInfo()).WillByDefault(Return(callbacks.cluster_info_));
+  ON_CALL(callbacks, clusterInfo())
+      .WillByDefault(Invoke([&callbacks]() -> OptRef<const Upstream::ClusterInfo> {
+        return makeOptRefFromPtr<const Upstream::ClusterInfo>(callbacks.cluster_info_.get());
+      }));
+  ON_CALL(callbacks, clusterInfoSharedPtr())
+      .WillByDefault(Invoke([&callbacks]() -> Upstream::ClusterInfoConstSharedPtr {
+        return callbacks.cluster_info_;
+      }));
   ON_CALL(callbacks, downstreamCallbacks())
       .WillByDefault(
           Return(OptRef<DownstreamStreamFilterCallbacks>{callbacks.downstream_callbacks_}));

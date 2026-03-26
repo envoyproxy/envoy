@@ -48,8 +48,8 @@ void recordLatestDataFilter(typename Filters::Iterator current_filter,
 
 void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& stream_info,
                      ResponseHeaderMap& headers) {
-  const Router::RouteConstSharedPtr& route = stream_info.route();
-  if (route != nullptr && route->routeEntry() != nullptr) {
+  const auto route = stream_info.route();
+  if (route && route->routeEntry() != nullptr) {
     const Formatter::Context formatter_context{
         callbacks.requestHeaders().ptr(), &headers, {}, {}, {}, &callbacks.activeSpan()};
     route->routeEntry()->finalizeResponseHeaders(headers, formatter_context, stream_info);
@@ -291,8 +291,12 @@ OptRef<const Tracing::Config> ActiveStreamFilterBase::tracingConfig() const {
   return parent_.filter_manager_callbacks_.tracingConfig();
 }
 
-Upstream::ClusterInfoConstSharedPtr ActiveStreamFilterBase::clusterInfo() {
+OptRef<const Upstream::ClusterInfo> ActiveStreamFilterBase::clusterInfo() {
   return parent_.filter_manager_callbacks_.clusterInfo();
+}
+
+Upstream::ClusterInfoConstSharedPtr ActiveStreamFilterBase::clusterInfoSharedPtr() {
+  return parent_.filter_manager_callbacks_.clusterInfoSharedPtr();
 }
 
 Router::RouteConstSharedPtr ActiveStreamFilterBase::route() { return getRoute(); }
@@ -301,7 +305,7 @@ Router::RouteConstSharedPtr ActiveStreamFilterBase::getRoute() const {
   if (parent_.filter_manager_callbacks_.downstreamCallbacks()) {
     return parent_.filter_manager_callbacks_.downstreamCallbacks()->route(nullptr);
   }
-  return parent_.streamInfo().route();
+  return parent_.streamInfo().routeSharedPtr();
 }
 
 void ActiveStreamFilterBase::resetIdleTimer() {
@@ -470,6 +474,8 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
     parent_.state().observed_decode_end_stream_ = end_stream;
+    ENVOY_STREAM_LOG(trace, "injectDecodedDataToFilterChain with end_stream updated: {}", parent_,
+                     end_stream);
   }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
@@ -1889,6 +1895,8 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
     parent_.state_.observed_encode_end_stream_ = end_stream;
+    ENVOY_STREAM_LOG(trace, "injectEncodedDataToFilterChain with end_stream updated: {}", parent_,
+                     end_stream);
   }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
