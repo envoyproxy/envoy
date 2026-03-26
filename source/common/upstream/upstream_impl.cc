@@ -16,6 +16,8 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/config/upstream/local_address_selector/v3/default_local_address_selector.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -55,6 +57,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/stats/deferred_creation.h"
+#include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/locality_pool.h"
@@ -172,12 +175,6 @@ HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
   }
 
   return net_hosts;
-}
-
-Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
-                                         Stats::Store& stats) {
-  return stats.createScope(fmt::format(
-      "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
 }
 
 Network::ConnectionSocket::OptionsSharedPtr
@@ -418,6 +415,39 @@ const absl::string_view ClusterImplBase::DoNotValidateAlpnRuntimeKey =
 // Overriding drop_overload ratio settings from EDS.
 const absl::string_view ClusterImplBase::DropOverloadRuntimeKey =
     "load_balancing_policy.drop_overload_limit";
+
+constexpr absl::string_view StatsMatcherMetadataKey = "envoy.stats_matcher";
+
+Stats::ScopeSharedPtr
+generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
+                   Server::Configuration::ServerFactoryContext& server_context,
+                   bool use_alt_stat_name) {
+  auto& stats = server_context.serverScope().store();
+  Stats::StatsMatcherSharedPtr scope_matcher;
+
+  // Check for a per-cluster stats matcher in typed_filter_metadata under the specific key. If
+  // present, unpack it as StatsMatcher and use it to restrict which stats are created for this
+  // cluster's scope.
+  const auto& typed_meta = config.metadata().typed_filter_metadata();
+  if (auto it = typed_meta.find(StatsMatcherMetadataKey); it != typed_meta.end()) {
+    envoy::config::metrics::v3::StatsMatcher stats_matcher_proto;
+    if (auto status = MessageUtil::unpackTo(it->second, stats_matcher_proto); status.ok()) {
+      MessageUtil::validate(stats_matcher_proto, server_context.messageValidationVisitor());
+      scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(
+          stats_matcher_proto, stats.symbolTable(), server_context);
+    } else {
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::upstream), warn,
+                          "Failed to unpack stats matcher for cluster {}: {}", config.name(),
+                          status.message());
+    }
+  }
+
+  return stats.createScope(
+      fmt::format("cluster.{}.", (!config.alt_stat_name().empty() && use_alt_stat_name)
+                                     ? config.alt_stat_name()
+                                     : config.name()),
+      false, {}, std::move(scope_matcher));
+}
 
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
 // stat name into every host that receives a copy of that metric. This can be improved by putting
@@ -674,6 +704,10 @@ Host::CreateConnectionData HostImplBase::createConnection(
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
+  const auto timeout = cluster.perConnectionBufferHighWatermarkTimeout();
+  if (timeout.count() > 0) {
+    connection->setBufferHighWatermarkTimeout(timeout);
+  }
   if (auto upstream_info = connection->streamInfo().upstreamInfo(); upstream_info) {
     upstream_info->setUpstreamHost(host);
   }
@@ -1184,6 +1218,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       shadow_policies_(http_protocol_options_->shadow_policies_),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
+      buffer_high_watermark_timeout_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, per_connection_buffer_high_watermark_timeout, 0))),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
@@ -1559,7 +1595,7 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
           cluster_context.serverFactoryContext().mainThreadDispatcher())) {
   auto& server_context = cluster_context.serverFactoryContext();
 
-  auto stats_scope = generateStatsScope(cluster, server_context.serverScope().store());
+  auto stats_scope = generateStatsScope(cluster, server_context);
   transport_factory_context_ =
       std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
           server_context, *stats_scope, cluster_context.messageValidationVisitor());
@@ -1730,6 +1766,10 @@ void ClusterImplBase::onPreInitComplete() {
 void ClusterImplBase::onInitDone() {
   info()->configUpdateStats().warming_state_.set(0);
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.health_check_after_cluster_warming")) {
+      health_checker_->start();
+    }
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
         if (host->disableActiveHealthCheck()) {
@@ -1837,7 +1877,10 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
 void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {
   ASSERT(!health_checker_);
   health_checker_ = health_checker;
-  health_checker_->start();
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.health_check_after_cluster_warming")) {
+    health_checker_->start();
+  }
   health_checker_->addHostCheckCompleteCb(
       [this](const HostSharedPtr& host, HealthTransition changed_state, HealthState) -> void {
         // If we get a health check completion that resulted in a state change, signal to

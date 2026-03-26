@@ -6,13 +6,13 @@
 #include <memory>
 #include <string>
 
-#include "envoy/stats/allocator.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/lock_guard.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
@@ -914,7 +914,7 @@ bool ParentHistogramImpl::decRefCount() {
     // decrement it, and we'll wind up with a dtor/update race. To avoid this we
     // must hold the lock until the histogram is removed from the map.
     //
-    // See also StatsSharedImpl::decRefCount() in allocator_impl.cc, which has
+    // See also StatsSharedImpl::decRefCount() in allocator.cc, which has
     // the same issue.
     ret = thread_local_store_.decHistogramRefCount(*this, ref_count_);
   }

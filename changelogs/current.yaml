@@ -37,14 +37,13 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: jwt_authn
+- area: compressor
   change: |
-    added configurable ``verification_status_header`` to ``extract_only_without_validation``
-    JWT requirement type. When claims are extracted without signature verification, Envoy
-    now sets ``x-jwt-signature-verified: false`` by default so downstream filters (RBAC,
-    ext_authz) can distinguish unverified claims. The header name is configurable via the
-    ``verification_status_header`` field. This behavior is runtime-guarded by
-    ``envoy.reloadable_features.jwt_authn_add_verification_status_header``.
+    Strong ``ETag`` removal when compressing now uses the same weak ``W/`` check as
+    :ref:`weaken_etag_on_compress
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.weaken_etag_on_compress>`.
+    Previously removal applied only when ``ETag`` length was greater than 2; two-character strong
+    values are now removed as well (the only two-character weak form is ``W/``).
 - area: memory
   change: |
     Replaced the custom timer-based tcmalloc memory release with tcmalloc's native
@@ -105,6 +104,17 @@ minor_behavior_changes:
     Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
     serialize the ``google.protobuf.Struct`` configuration message to JSON string and pass it to the
     dynamic module side as the configuration.
+- area: proto_api_scrubber
+  change: |
+    If :ref:`scrub_unknown_fields
+    <envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.scrub_unknown_fields>`
+    is set to ``true`` in the :ref:`ProtoApiScrubberConfig
+    <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig>`,
+    unknown fields will now be scrubbed. This is disabled by default.
+- area: stat_sinks
+  change: |
+    OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
+    stopped reporting empty delta counters and histograms.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -335,6 +345,15 @@ new_features:
   change: |
     Added ability to configure a default proxy address that is used when the proxy address is not
     configured via metadata.
+- area: compressor
+  change: |
+    Added :ref:`weaken_etag_on_compress
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.weaken_etag_on_compress>`
+    to the :ref:`compressor filter <config_http_filters_compressor>`. When enabled in
+    ``response_direction_config``, strong ``ETag`` response headers are weakened (``W/`` prefix)
+    instead of removed when compression is applied, allowing caches and conditional requests to
+    work while indicating the body was modified by compression. When both ``weaken_etag_on_compress``
+    and ``disable_on_etag_header`` are true, the new field takes precedence.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,

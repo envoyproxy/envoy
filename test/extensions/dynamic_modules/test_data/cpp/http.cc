@@ -137,6 +137,7 @@ public:
 
   HeadersStatus onRequestHeaders(HeaderMap& headers, bool) override {
     handle_.clearRouteCache();
+    handle_.refreshRouteCluster();
 
     testHeaders(headers);
 
