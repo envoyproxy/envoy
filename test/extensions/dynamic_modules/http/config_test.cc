@@ -8,6 +8,7 @@
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/dynamic_modules/background_fetch_manager.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
@@ -710,13 +711,18 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeInFlightDedup) {
   EXPECT_FALSE(result2.ok());
   EXPECT_THAT(result2.status().message(), testing::HasSubstr("not cached"));
 
-  // Clean up: cancel the in-flight request so the fetcher destructor doesn't assert.
+  // Clean up: erase the in-flight entry from the singleton so the fetcher is destroyed
+  // while the mock request is still alive. This triggers cancel() on the mock.
   EXPECT_CALL(request, cancel());
+  Extensions::DynamicModules::BackgroundFetchManager::singleton(
+      context_.server_factory_context_.singletonManager())
+      ->erase("deadbeef1234567890abcdef1234567890abcdef1234567890abcdef12345678");
 }
 
 // When a background fetch delivers bytes that pass SHA256 validation but are
-// not a valid shared object, onSuccess logs the error, the invalid file is
-// cleaned up by newDynamicModuleFromBytes, and the entry is marked completed.
+// not a valid shared object, onSuccess writes the file to disk (no dlopen
+// attempted in background). The next config push finds the cached file,
+// attempts to load it, and returns a clear load error.
 TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchBadModule) {
   const std::string bad_data = "this is not a valid shared object";
   Buffer::OwnedImpl hash_buffer(bad_data);
@@ -757,14 +763,23 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchBadModule) {
           }));
 
   DynamicModuleConfigFactory factory;
-  auto result = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
-                                            stats_scope_, &init_manager_);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("not cached"));
+  auto result1 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
+                                             stats_scope_, &init_manager_);
+  EXPECT_FALSE(result1.ok());
+  EXPECT_THAT(result1.status().message(), testing::HasSubstr("not cached"));
 
-  // newDynamicModuleFromBytes writes the file, tries dlopen, fails, then deletes the file.
+  // The background fetch only writes bytes to disk (no dlopen), so the file persists.
   auto cached_path = Extensions::DynamicModules::moduleTempPath(sha256);
-  EXPECT_FALSE(std::filesystem::exists(cached_path));
+  EXPECT_TRUE(std::filesystem::exists(cached_path));
+
+  // Next config push finds the cached file, tries to load it, and gets a load error.
+  auto result2 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
+                                             stats_scope_, &init_manager_);
+  EXPECT_FALSE(result2.ok());
+  EXPECT_THAT(result2.status().message(),
+              testing::HasSubstr("Cached remote module failed to load"));
+
+  std::filesystem::remove(cached_path);
 }
 
 // When the cached temp file is deleted, the factory should detect the missing file
