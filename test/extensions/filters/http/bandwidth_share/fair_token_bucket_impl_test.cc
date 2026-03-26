@@ -20,221 +20,131 @@ class ClientTest : public testing::Test {
 protected:
   Event::SimulatedTimeSystem time_system_;
   std::chrono::milliseconds time_to_next_token_;
-  std::shared_ptr<Factory> factory_ = Factory::create(1000, time_system_);
+  std::shared_ptr<Bucket> bucket_ = Bucket::create(1000, time_system_);
 };
 
 TEST_F(ClientTest, NotImplementedConsumeWithTimeToNextToken) {
-  Client client(*factory_, "foo", 1);
+  Client client(bucket_, "foo", 1);
   std::chrono::milliseconds unused_out;
   EXPECT_ENVOY_BUG(client.consume(750, true, unused_out), "not expected");
 }
 
 TEST_F(ClientTest, NotImplementedConsumeWithAllowPartialFalse) {
-  Client client(*factory_, "foo", 1);
+  Client client(bucket_, "foo", 1);
   EXPECT_ENVOY_BUG(client.consume(750, false), "not expected");
 }
 
 TEST_F(ClientTest, NotImplementedNextTokenAvailable) {
-  Client client(*factory_, "foo", 1);
+  Client client(bucket_, "foo", 1);
   EXPECT_ENVOY_BUG(client.nextTokenAvailable(), "not expected");
 }
 
 TEST_F(ClientTest, MaybeResetDoesNothingAndThisTestJustProvidesCoverage) {
-  Client client(*factory_, "foo", 1);
+  Client client(bucket_, "foo", 1);
   client.maybeReset(12345);
 }
 
 TEST_F(ClientTest, InitializationAndTimeBothFillTheBucket) {
-  Client client(*factory_, "foo", 1);
+  Client client(bucket_, "foo", 1);
   EXPECT_EQ(750, client.consume(750));
-  EXPECT_EQ(250, client.consume(750));
-  EXPECT_EQ(0, client.consume(500));
+  // Can get to a total of 950 before limiting kicks in.
+  EXPECT_EQ(200, client.consume(750));
+  // With only one client, can get the other 50 tokens in one shot while limiting.
+  EXPECT_EQ(50, client.consume(500));
   time_system_.setMonotonicTime(std::chrono::seconds(1));
-  EXPECT_EQ(500, client.consume(500));
+  // When the bucket has refilled, all tokens are available again.
+  EXPECT_EQ(950, client.consume(950));
 }
 
 TEST_F(ClientTest, CompetingRequestsGetAppropriateShares) {
-  Client client0(*factory_, "baz", 1);
-  Client client1(*factory_, "foo", 2);
-  Client client2(*factory_, "foo", 2);
-  Client client3(*factory_, "bar", 8);
-  // Empty the bucket for baz.
-  EXPECT_EQ(1000, client0.consume(1000));
-  // Queue a 1000 request for everyone else.
+  Client client0(bucket_, "baz", 1);
+  Client client1(bucket_, "foo", 2);
+  Client client2(bucket_, "foo", 2);
+  Client client3(bucket_, "bar", 8);
+  // Empty the free tokens for baz.
+  EXPECT_EQ(950, client0.consume(950));
+  // Put everyone else in the queue.
   EXPECT_EQ(0, client1.consume(1000));
   EXPECT_EQ(0, client2.consume(1000));
   EXPECT_EQ(0, client3.consume(1000));
-  // Fill the bucket.
-  time_system_.setMonotonicTime(std::chrono::seconds(1));
-  // Now everyone should get a split; the total weight is 10, 2 to foo and
-  // 8 to bar, so foo should have 200 split between 2 requests, resulting in
-  // 100 each, and bar should get 800 not split.
-  EXPECT_EQ(100, client1.consume(1000));
-  EXPECT_EQ(100, client2.consume(1000));
-  EXPECT_EQ(800, client3.consume(1000));
+  // They should each get a weighted share of the 50 tokens.
+  EXPECT_EQ(5, client1.consume(1000));
+  EXPECT_EQ(5, client2.consume(1000));
+  EXPECT_EQ(40, client3.consume(1000));
+  // Advance one fill-interval.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(50));
+  // Now they should each get an equal share of the new 50 tokens.
+  EXPECT_EQ(5, client1.consume(1000));
+  EXPECT_EQ(5, client2.consume(1000));
+  EXPECT_EQ(40, client3.consume(1000));
 }
 
 TEST_F(ClientTest, DeletingARequestCancelsItsShare) {
-  Client client0(*factory_, "baz", 1);
-  Client client1(*factory_, "foo", 2);
-  Client client2(*factory_, "foo", 2);
-  absl::optional<Client> client3(std::in_place, *factory_, "bar", 8);
-  // Empty the bucket for baz.
-  EXPECT_EQ(1000, client0.consume(1000));
-  // Queue a 1000 request for everyone else.
+  Client client0(bucket_, "baz", 1);
+  Client client1(bucket_, "foo", 2);
+  Client client2(bucket_, "foo", 2);
+  absl::optional<Client> client3(std::in_place, bucket_, "bar", 8);
+  // Empty the loose bucket for baz.
+  EXPECT_EQ(950, client0.consume(950));
+  // Put everyone else in the queue.
   EXPECT_EQ(0, client1.consume(1000));
   EXPECT_EQ(0, client2.consume(1000));
   EXPECT_EQ(0, client3->consume(1000));
-  // Fill the bucket.
-  time_system_.setMonotonicTime(std::chrono::seconds(1));
+  // They should each get a weighted share.
+  EXPECT_EQ(5, client1.consume(1000));
+  EXPECT_EQ(5, client2.consume(1000));
+  EXPECT_EQ(40, client3->consume(1000));
   // Cancel bar's request by deletion.
   client3.reset();
+  // Pass a fill-interval and let the drain apply for bar so it's removed from the queue.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(50));
   // Now the other two should get a 50:50 split on the same tenant.
-  EXPECT_EQ(500, client1.consume(1000));
-  EXPECT_EQ(500, client2.consume(1000));
+  EXPECT_EQ(25, client1.consume(1000));
+  EXPECT_EQ(25, client2.consume(1000));
+}
+
+TEST_F(ClientTest, ClientDrainedCancelsItsShare) {
+  Client client0(bucket_, "baz", 1);
+  Client client1(bucket_, "foo", 2);
+  Client client2(bucket_, "foo", 2);
+  Client client3(bucket_, "bar", 8);
+  // Empty the loose bucket for baz.
+  EXPECT_EQ(950, client0.consume(950));
+  // Put everyone else in the queue.
+  EXPECT_EQ(0, client1.consume(1000));
+  EXPECT_EQ(0, client2.consume(1000));
+  EXPECT_EQ(0, client3.consume(1000));
+  // They should each get a weighted share.
+  EXPECT_EQ(5, client1.consume(1000));
+  EXPECT_EQ(5, client2.consume(1000));
+  EXPECT_EQ(40, client3.consume(40));
+  // bar should be removed from the queue due to receiving all the tokens it wanted.
+  // Pass a fill-interval and let the drain apply for bar so it's removed from the queue.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(50));
+  // Now the other two should get a 50:50 split on the same tenant.
+  EXPECT_EQ(25, client1.consume(1000));
+  EXPECT_EQ(25, client2.consume(1000));
 }
 
 TEST_F(ClientTest, PoorlyDividedSplitsStillEmptyTheBucket) {
-  Client client0(*factory_, "baz", 1);
-  Client client1(*factory_, "foo", 1);
-  Client client2(*factory_, "bar", 73);
+  Client client0(bucket_, "baz", 1);
+  Client client1(bucket_, "foo", 1);
+  Client client2(bucket_, "bar", 22);
   // Empty the bucket for baz.
-  EXPECT_EQ(1000, client0.consume(1000));
-  // Queue a 1000 request for everyone else.
+  EXPECT_EQ(950, client0.consume(950));
+  // Put everyone else in the queue.
   EXPECT_EQ(0, client1.consume(1000));
   EXPECT_EQ(0, client2.consume(1000));
-  // Fill the bucket.
-  time_system_.setMonotonicTime(std::chrono::seconds(1));
+  // They should each get their expected share of 50.
+  EXPECT_EQ(2, client1.consume(1000));
+  EXPECT_EQ(47, client2.consume(1000));
+  // advance by a fill_interval.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(50));
 
-  // Each of them should get their expected amount maybe plus the indivisible
-  // part. The remainders go to whoever is earliest in the queue.
-  uint64_t remainder = 1000 % 74;
-  uint64_t foo_fraction = 1000 / 74;
-  uint64_t bar_fraction = 1000 / 74 * 73;
-  EXPECT_EQ(foo_fraction + remainder, client1.consume(1000));
-  EXPECT_EQ(bar_fraction, client2.consume(1000));
-}
-
-TEST_F(ClientTest, PoorlyDividedSplitsWithinATenantStillEmptiesTheBucket) {
-  Client client0(*factory_, "baz", 1);
-  Client client1(*factory_, "foo", 1);
-  Client client2(*factory_, "foo", 1);
-  Client client3(*factory_, "foo", 1);
-  // Empty the bucket for baz.
-  EXPECT_EQ(1000, client0.consume(1000));
-  // Queue a 1000 request for everyone else.
-  EXPECT_EQ(0, client1.consume(1000));
-  EXPECT_EQ(0, client2.consume(1000));
-  EXPECT_EQ(0, client3.consume(1000));
-  // Fill the bucket.
-  time_system_.setMonotonicTime(std::chrono::seconds(1));
-
-  // Each of them should get their expected amount maybe plus the indivisible
-  // part. The remainders go to whoever is earliest in the queue.
-  EXPECT_EQ(334, client1.consume(1000));
-  EXPECT_EQ(333, client2.consume(1000));
-  EXPECT_EQ(333, client3.consume(1000));
-}
-
-TEST_F(ClientTest, MismatchedFlowsOnFirstPassStillEmptiesTheBucket) {
-  Client client0(*factory_, "baz", 1);
-  Client client1(*factory_, "foo", 1);
-  Client client2(*factory_, "foo", 1);
-  Client client3(*factory_, "bar", 1);
-  // Empty the bucket for baz.
-  EXPECT_EQ(1000, client0.consume(1000));
-  // At first pass, bar will have 500 available, and foo will have 500.
-  // First foo client only wants 100.
-  EXPECT_EQ(0, client1.consume(100));
-  // Second foo client wants 600.
-  EXPECT_EQ(0, client2.consume(600));
-  // And bar wants 300.
-  EXPECT_EQ(0, client3.consume(300));
-
-  // Fill the bucket.
-  time_system_.setMonotonicTime(std::chrono::seconds(1));
-
-  // Each of them should get everything they wanted, as the leftovers get
-  // spilled again until the spilling is done.
-  EXPECT_EQ(100, client1.consume(100));
-  EXPECT_EQ(600, client2.consume(600));
-  EXPECT_EQ(300, client3.consume(300));
-}
-
-TEST_F(ClientTest, PoorlyDividedSplitsCanBeSubdivided) {
-  Client client0(*factory_, "baz", 1);
-  Client client1(*factory_, "foo", 1);
-  Client client2(*factory_, "foo2", 1);
-  Client client3(*factory_, "bar", 72);
-  // Empty the bucket for baz.
-  EXPECT_EQ(1000, client0.consume(1000));
-  // Queue a 1000 request for everyone else, except foo only wants to consume
-  // a little bit of "indivisible spill".
-  EXPECT_EQ(0, client1.consume(1000 / 74 + 2));
-  EXPECT_EQ(0, client2.consume(1000));
-  EXPECT_EQ(0, client3.consume(1000));
-  // Fill the bucket.
-  time_system_.setMonotonicTime(std::chrono::seconds(1));
-  // Each should have between their share and their share plus the remainder,
-  // which gets given to whoever is earlier in the queue.
-  // Since foo only wants 2, it takes only part of the remainder, with the
-  // rest of the remainder going to foo2.
-  uint64_t remainder = 1000 % 74;
-  uint64_t foo_fraction = 1000 / 74;
-  uint64_t bar_fraction = 1000 / 74 * 72;
-  EXPECT_EQ(foo_fraction + 2, client1.consume(1000 / 74 + 2));
-  EXPECT_EQ(foo_fraction + remainder - 2, client2.consume(1000));
-  EXPECT_EQ(bar_fraction, client3.consume(1000));
-}
-
-TEST_F(ClientTest, UnclaimedSharesCanStackUp) {
-  Client client0(*factory_, "baz", 1);
-  Client client1(*factory_, "foo", 1);
-  // Empty the bucket and queue up another 4000 for baz.
-  EXPECT_EQ(1000, client0.consume(5000));
-  // Put foo in the queue too.
-  EXPECT_EQ(0, client1.consume(1));
-  // Fill the bucket and take one token for foo (baz will get 999).
-  time_system_.setMonotonicTime(std::chrono::seconds(1));
-  EXPECT_EQ(1, client1.consume(1));
-  // Fill the bucket and put foo back in the queue (baz will get 1000).
-  time_system_.setMonotonicTime(std::chrono::seconds(2));
-  EXPECT_EQ(0, client1.consume(1));
-  // Fill the bucket and take one token for foo (baz will get 999).
-  time_system_.setMonotonicTime(std::chrono::seconds(3));
-  EXPECT_EQ(1, client1.consume(1));
-  // Baz finally gets around to requesting the tokens it didn't already
-  // get, and has saved up 2998 of them.
-  EXPECT_EQ(2998, client0.consume(4000));
-}
-
-TEST_F(ClientTest, RequestForLessThanEarmarkedFractionFreesUpTokensForOtherRequestsOrTenants) {
-  Client client0(*factory_, "baz", 1);
-  Client client1(*factory_, "foo", 1);
-  Client client2(*factory_, "foo", 1);
-  Client client3(*factory_, "bar", 1);
-  // Empty the bucket for baz.
-  EXPECT_EQ(1000, client0.consume(1000));
-  // Queue 100 for foo request 1, and 300 for foo request 2 - they will be splitting
-  // 500, and should both be satisfied even though the fair share is only 250,
-  // because there is enough left over from foo1 not claiming its entire share
-  // for foo2 to get more.
-  // Queue 1000 for bar - this should get 600 even though bar's share of 1000
-  // is only 500, because foo only took 400 so bar can take the excess.
-  EXPECT_EQ(0, client1.consume(100));
-  EXPECT_EQ(0, client2.consume(300));
-  EXPECT_EQ(0, client3.consume(1000));
-  // Fill the bucket.
-  time_system_.setMonotonicTime(std::chrono::seconds(1));
-  uint64_t foo_gets = client1.consume(100);
-  uint64_t foo2_gets = client2.consume(300);
-  uint64_t bar_gets = client3.consume(1000);
-  // Combined they should get all the tokens.
-  EXPECT_EQ(1000, foo_gets + foo2_gets + bar_gets);
-  // Both `foo` should be fully satisfied, and `bar` should have 600.
-  EXPECT_EQ(100, foo_gets);
-  EXPECT_EQ(300, foo2_gets);
-  EXPECT_EQ(600, bar_gets);
+  // Now they should each get their expected share but the first client
+  // also gets the remainder from last time.
+  EXPECT_EQ(3, client1.consume(1000));
+  EXPECT_EQ(47, client2.consume(1000));
 }
 
 TEST_F(ClientTest, RunWithAggressiveThreadsToEnsureNoDeadlocks) {
@@ -247,7 +157,7 @@ TEST_F(ClientTest, RunWithAggressiveThreadsToEnsureNoDeadlocks) {
     absl::optional<Client> client;
   } threads[10];
   for (size_t i = 0; i < 10; i++) {
-    threads[i].client.emplace(*factory_, "foo", 1);
+    threads[i].client.emplace(bucket_, "foo", 1);
     threads[i].thread = std::thread([&mu, &total_consumed, thread = &threads[i]] {
       while (true) {
         uint64_t got = thread->client->consume(1000);
