@@ -914,7 +914,7 @@ jemalloc:
   project_name: "jemalloc"
   project_desc: "General-purpose scalable concurrent memory allocator"
   project_url: "https://github.com/jemalloc/jemalloc"
-  release_date: "2022-11-06"
+  release_date: "2022-05-06"
   use_category:
   - dataplane_core
   - controlplane

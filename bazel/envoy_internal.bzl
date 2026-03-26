@@ -94,8 +94,8 @@ def envoy_copts(repository, test = False):
                _repo("//bazel:gperftools_tcmalloc"): ["-DGPERFTOOLS_TCMALLOC"],
                _repo("//bazel:jemalloc_enabled"): ["-DJEMALLOC"],
                (
-                   _repo("//bazel:tcmalloc_x86_64"),
-                   _repo("//bazel:tcmalloc_aarch64"),
+                   "@platforms//cpu:x86_64",
+                   "@platforms//cpu:aarch64",
                ): ["-DTCMALLOC"],
                "//conditions:default": ["-DGPERFTOOLS_TCMALLOC"],
            }) + select({
