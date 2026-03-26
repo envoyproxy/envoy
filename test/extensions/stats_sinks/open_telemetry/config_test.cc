@@ -95,9 +95,9 @@ TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
   }
 }
 
-// Verify that the factory injects node.id and node.cluster from LocalInfo into
-// the resource attributes when creating the sink, so consumers can identify the
-// originating Envoy instance.
+// Verify that the factory injects service.instance.id and service.namespace from
+// LocalInfo into the resource attributes when creating the sink, so consumers can
+// identify the originating Envoy instance.
 TEST(OpenTelemetryConfigTest, NodeAttributesAutoPopulatedFromLocalInfo) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
 
@@ -121,30 +121,30 @@ TEST(OpenTelemetryConfigTest, NodeAttributesAutoPopulatedFromLocalInfo) {
   EXPECT_NE(sink_or.value(), nullptr);
 }
 
-// Verify that when a resource detector already sets node.id, it takes priority
-// over the auto-populated value from LocalInfo (try_emplace semantics).
+// Verify that when a resource detector already sets service.instance.id, it takes
+// priority over the auto-populated value from LocalInfo (try_emplace semantics).
 TEST(OpenTelemetryConfigTest, NodeAttributesNotOverriddenByAutoPopulation) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
   envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
 
-  // Manually build a resource as if a detector already set node.id.
+  // Manually build a resource as if a detector already set service.instance.id.
   Tracers::OpenTelemetry::Resource resource;
-  resource.attributes_["node.id"] = "detector-set-id";
-  resource.attributes_["node.cluster"] = "detector-set-cluster";
+  resource.attributes_["service.instance.id"] = "detector-set-id";
+  resource.attributes_["service.namespace"] = "detector-set-cluster";
 
   OtlpOptions options(sink_config, resource, server);
-  std::string node_id_val;
-  std::string node_cluster_val;
+  std::string instance_id_val;
+  std::string namespace_val;
   for (const auto& attr : options.resource_attributes()) {
-    if (attr.key() == "node.id") {
-      node_id_val = attr.value().string_value();
-    } else if (attr.key() == "node.cluster") {
-      node_cluster_val = attr.value().string_value();
+    if (attr.key() == "service.instance.id") {
+      instance_id_val = attr.value().string_value();
+    } else if (attr.key() == "service.namespace") {
+      namespace_val = attr.value().string_value();
     }
   }
   // Detector-set values must be preserved.
-  EXPECT_EQ("detector-set-id", node_id_val);
-  EXPECT_EQ("detector-set-cluster", node_cluster_val);
+  EXPECT_EQ("detector-set-id", instance_id_val);
+  EXPECT_EQ("detector-set-cluster", namespace_val);
 }
 
 } // namespace
