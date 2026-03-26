@@ -219,7 +219,7 @@ private:
 
   // Sets common fields (timestamp, attributes) for a data point.
   template <class PointType>
-  void setCommonFields(PointType* point, const MetricAggregator::AttributesVector& attributes,
+  void setCommonFields(PointType* point, MetricAggregator::AttributesVector attributes,
                        opentelemetry::proto::metrics::v1::AggregationTemporality temp) const;
 
   const uint32_t max_dp_;

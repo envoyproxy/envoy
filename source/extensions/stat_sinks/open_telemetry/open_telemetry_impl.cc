@@ -152,7 +152,7 @@ RequestStreamer::findOrCreateMetric(absl::string_view name) {
 
 template <class PointType>
 void RequestStreamer::setCommonFields(PointType* point,
-                                      const MetricAggregator::AttributesVector& attributes,
+                                      MetricAggregator::AttributesVector attributes,
                                       AggregationTemporality temp) const {
   point->set_time_unix_nano(snapshot_time_ns_);
   if (temp == AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE) {
