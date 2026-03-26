@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/network/transport_socket.h"
@@ -157,7 +158,7 @@ public:
         : host(host_arg), strict(strict_arg) {}
 
     // The target host address to select.
-    absl::string_view host;
+    std::string host;
     // Whether the host should be selected strictly or not.
     // If strict and no valid host is found, the load balancer should return nullptr.
     // If not strict, the load balancer will select another host if the target host is not valid.
@@ -168,7 +169,7 @@ public:
    * the host can be selected directly, the load balancer can bypass the load balancing algorithm
    * and return the corresponding host directly.
    */
-  virtual absl::optional<OverrideHost> overrideHostToSelect() const PURE;
+  virtual OptRef<const OverrideHost> overrideHostToSelect() const PURE;
 
   /* Called by the load balancer when asynchronous host selection completes
    * @param host supplies the upstream host selected

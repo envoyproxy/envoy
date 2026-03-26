@@ -101,7 +101,7 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, routeConfig())
       .WillByDefault(Return(absl::optional<Router::ConfigConstSharedPtr>()));
   ON_CALL(*this, upstreamOverrideHost())
-      .WillByDefault(Return(absl::optional<Upstream::LoadBalancerContext::OverrideHost>()));
+      .WillByDefault(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
   ON_CALL(*this, mostSpecificPerFilterConfig())
       .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {

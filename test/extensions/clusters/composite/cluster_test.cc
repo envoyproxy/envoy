@@ -601,13 +601,13 @@ TEST_F(CompositeClusterTest, LoadBalancerContextAdditionalMethods) {
   EXPECT_EQ(&criteria, wrapper.metadataMatchCriteria());
 
   // Test overrideHostToSelect.
-  absl::optional<Upstream::LoadBalancerContext::OverrideHost> override_host =
-      Upstream::LoadBalancerContext::OverrideHost{"override_host", true};
-  EXPECT_CALL(mock_context, overrideHostToSelect()).WillOnce(Return(override_host));
+  Upstream::LoadBalancerContext::OverrideHost override_host{"override_host", true};
+  EXPECT_CALL(mock_context, overrideHostToSelect())
+      .WillOnce(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
   auto result = wrapper.overrideHostToSelect();
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(override_host.value().host, result.value().host);
-  EXPECT_EQ(override_host.value().strict, result.value().strict);
+  EXPECT_EQ(override_host.host, result->host);
+  EXPECT_EQ(override_host.strict, result->strict);
 
   // Test setHeadersModifier.
   std::function<void(Http::ResponseHeaderMap&)> modifier;

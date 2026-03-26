@@ -1933,9 +1933,10 @@ TEST_F(DynamicModuleClusterTest, LbContextShouldSelectAnotherHostNullContext) {
 // Test get_override_host with an override set.
 TEST_F(DynamicModuleClusterTest, LbContextGetOverrideHostPresent) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
+  Upstream::LoadBalancerContext::OverrideHost override_host{"10.0.0.1:8080", true};
   ON_CALL(context, overrideHostToSelect())
-      .WillByDefault(Return(
-          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.1:8080", true})));
+      .WillByDefault(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   envoy_dynamic_module_type_envoy_buffer address;
@@ -1949,9 +1950,10 @@ TEST_F(DynamicModuleClusterTest, LbContextGetOverrideHostPresent) {
 // Test get_override_host non-strict.
 TEST_F(DynamicModuleClusterTest, LbContextGetOverrideHostNonStrict) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
+  Upstream::LoadBalancerContext::OverrideHost override_host{"10.0.0.2:9090", false};
   ON_CALL(context, overrideHostToSelect())
-      .WillByDefault(Return(
-          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.2:9090", false})));
+      .WillByDefault(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   envoy_dynamic_module_type_envoy_buffer address;
@@ -1965,7 +1967,8 @@ TEST_F(DynamicModuleClusterTest, LbContextGetOverrideHostNonStrict) {
 // Test get_override_host when not set.
 TEST_F(DynamicModuleClusterTest, LbContextGetOverrideHostNotSet) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
-  ON_CALL(context, overrideHostToSelect()).WillByDefault(Return(absl::nullopt));
+  ON_CALL(context, overrideHostToSelect())
+      .WillByDefault(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   envoy_dynamic_module_type_envoy_buffer address;

@@ -149,13 +149,13 @@ std::pair<HostConstSharedPtr, bool> HostUtility::selectOverrideHost(const HostMa
     return {nullptr, false};
   }
 
-  const bool strict_mode = override_host.value().strict;
+  const bool strict_mode = override_host->strict;
 
   if (host_map == nullptr) {
     return {nullptr, strict_mode};
   }
 
-  auto host_iter = host_map->find(override_host.value().host);
+  auto host_iter = host_map->find(override_host->host);
 
   // The override host cannot be found in the host map.
   if (host_iter == host_map->end()) {

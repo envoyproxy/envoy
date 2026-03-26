@@ -1989,15 +1989,15 @@ Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const 
 
 void ActiveStreamDecoderFilter::setUpstreamOverrideHost(
     Upstream::LoadBalancerContext::OverrideHost upstream_override_host) {
-  parent_.upstream_override_host_ = upstream_override_host;
+  parent_.upstream_override_host_ = std::move(upstream_override_host);
 }
 
-absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+OptRef<const Upstream::LoadBalancerContext::OverrideHost>
 ActiveStreamDecoderFilter::upstreamOverrideHost() const {
   if (parent_.upstream_override_host_.host.empty()) {
-    return absl::nullopt;
+    return {};
   }
-  return parent_.upstream_override_host_.toOverrideHost();
+  return parent_.upstream_override_host_;
 }
 
 } // namespace Http
