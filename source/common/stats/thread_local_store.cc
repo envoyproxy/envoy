@@ -393,19 +393,23 @@ void ThreadLocalStoreImpl::clearScopesFromCaches() {
     }
 
     auto tls_cache_entries = std::make_shared<std::vector<TlsCacheEntry>>();
-    auto tls_mutex = std::make_shared<absl::Mutex>();
+    auto tls_mutex = std::make_shared<absl::Mutex>(); // protects tls_cache_entries
     tls_cache_->runOnAllThreads(
         [scope_ids, tls_cache_entries = tls_cache_entries.get(),
          tls_mutex](OptRef<TlsCache> tls_cache) {
           absl::MutexLock lock(tls_mutex.get());
           tls_cache->eraseScopes(*scope_ids, *tls_cache_entries);
         },
-        [central_caches, tls_cache_entries, this]() {
+        [central_caches, tls_cache_entries /*, this*/]() {
+          central_caches->clear();
+          tls_cache_entries->clear();
           /* Holds onto central_caches until all tls caches are clear */
+          /*
           if (!shutting_down_) {
             main_thread_dispatcher_->post([central_caches = std::move(central_caches),
                                            tls_cache_entries = std::move(tls_cache_entries)]() {});
           }
+          */
         });
   }
 }
