@@ -861,6 +861,15 @@ WEAK_STUB(NetworkGetSocketOptionsSize,
           envoy_dynamic_module_callback_network_get_socket_options_size(nullptr))
 WEAK_STUB(AccessLoggerGetAttemptCount,
           envoy_dynamic_module_callback_access_logger_get_attempt_count(nullptr))
+WEAK_STUB(AccessLoggerGetAttributeBool,
+          envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_ConnectionMtls, nullptr))
+WEAK_STUB(AccessLoggerGetAttributeInt,
+          envoy_dynamic_module_callback_access_logger_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_ResponseCode, nullptr))
+WEAK_STUB(AccessLoggerGetAttributeString,
+          envoy_dynamic_module_callback_access_logger_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
 WEAK_STUB(AccessLoggerGetConnectionId,
           envoy_dynamic_module_callback_access_logger_get_connection_id(nullptr))
 WEAK_STUB(AccessLoggerGetDownstreamLocalDnsSanSize,
@@ -1107,6 +1116,34 @@ WEAK_STUB(HttpGetMetadataListString, envoy_dynamic_module_callback_http_get_meta
 WEAK_STUB(HttpGetMetadataListBool, envoy_dynamic_module_callback_http_get_metadata_list_bool(
                                        nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                        {nullptr, 0}, {nullptr, 0}, 0, nullptr))
+
+WEAK_STUB(DnsResolveComplete,
+          envoy_dynamic_module_callback_dns_resolve_complete(
+              nullptr, 0, envoy_dynamic_module_type_dns_resolution_status_Completed, {nullptr, 0},
+              nullptr, 0))
+WEAK_STUB(DnsResolverConfigDefineCounter,
+          envoy_dynamic_module_callback_dns_resolver_config_define_counter(nullptr, {nullptr, 0},
+                                                                           nullptr, 0, nullptr))
+WEAK_STUB(DnsResolverConfigIncrementCounter,
+          envoy_dynamic_module_callback_dns_resolver_config_increment_counter(nullptr, 0, nullptr,
+                                                                              0, 0))
+WEAK_STUB(DnsResolverConfigDefineGauge,
+          envoy_dynamic_module_callback_dns_resolver_config_define_gauge(nullptr, {nullptr, 0},
+                                                                         nullptr, 0, nullptr))
+WEAK_STUB(DnsResolverConfigSetGauge,
+          envoy_dynamic_module_callback_dns_resolver_config_set_gauge(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(DnsResolverConfigIncrementGauge,
+          envoy_dynamic_module_callback_dns_resolver_config_increment_gauge(nullptr, 0, nullptr, 0,
+                                                                            0))
+WEAK_STUB(DnsResolverConfigDecrementGauge,
+          envoy_dynamic_module_callback_dns_resolver_config_decrement_gauge(nullptr, 0, nullptr, 0,
+                                                                            0))
+WEAK_STUB(DnsResolverConfigDefineHistogram,
+          envoy_dynamic_module_callback_dns_resolver_config_define_histogram(nullptr, {nullptr, 0},
+                                                                             nullptr, 0, nullptr))
+WEAK_STUB(DnsResolverConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_dns_resolver_config_record_histogram_value(nullptr, 0,
+                                                                                   nullptr, 0, 0))
 
 } // namespace
 } // namespace DynamicModules
