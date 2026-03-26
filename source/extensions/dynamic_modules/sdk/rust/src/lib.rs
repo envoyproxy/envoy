@@ -415,32 +415,32 @@ pub struct ClusterHostCount {
 /// The identifier for an EnvoyCounter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyCounterId(usize);
+pub struct EnvoyCounterId(pub usize);
 
 /// The identifier for an EnvoyCounterVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyCounterVecId(usize);
+pub struct EnvoyCounterVecId(pub usize);
 
 /// The identifier for an EnvoyGauge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyGaugeId(usize);
+pub struct EnvoyGaugeId(pub usize);
 
 /// The identifier for an EnvoyGaugeVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyGaugeVecId(usize);
+pub struct EnvoyGaugeVecId(pub usize);
 
 /// The identifier for an EnvoyHistogram.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyHistogramId(usize);
+pub struct EnvoyHistogramId(pub usize);
 
 /// The identifier for an EnvoyHistogramVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyHistogramVecId(usize);
+pub struct EnvoyHistogramVecId(pub usize);
 
 impl From<envoy_dynamic_module_type_metrics_result>
   for Result<(), envoy_dynamic_module_type_metrics_result>
