@@ -37,6 +37,13 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: compressor
+  change: |
+    Strong ``ETag`` removal when compressing now uses the same weak ``W/`` check as
+    :ref:`weaken_etag_on_compress
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.weaken_etag_on_compress>`.
+    Previously removal applied only when ``ETag`` length was greater than 2; two-character strong
+    values are now removed as well (the only two-character weak form is ``W/``).
 - area: memory
   change: |
     Replaced the custom timer-based tcmalloc memory release with tcmalloc's native
@@ -97,6 +104,17 @@ minor_behavior_changes:
     Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
     serialize the ``google.protobuf.Struct`` configuration message to JSON string and pass it to the
     dynamic module side as the configuration.
+- area: proto_api_scrubber
+  change: |
+    If :ref:`scrub_unknown_fields
+    <envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.scrub_unknown_fields>`
+    is set to ``true`` in the :ref:`ProtoApiScrubberConfig
+    <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig>`,
+    unknown fields will now be scrubbed. This is disabled by default.
+- area: stat_sinks
+  change: |
+    OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
+    stopped reporting empty delta counters and histograms.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -115,6 +133,9 @@ bug_fixes:
     properly as the API definition requires.
     The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
     to the dynamic module side as the configuration.
+- area: http_11_proxy
+  change: |
+    Fixed bug where providing an empty inner socket config would cause Envoy to crash.
 - area: tls
   change: |
     Fixed on-demand TLS selector to enforce session resumption settings.
@@ -235,6 +256,12 @@ bug_fixes:
   change: |
     Fixed MCP router to support session-less backends that do not return ``mcp-session-id``
     headers. Previously, this caused a spurious 500 error.
+- area: health_check
+  change: |
+    Fixed a race condition where active health checks could start before required upstream TLS SDS secrets
+    were fetched, causing intermittent health check failures `#43116 <https://github.com/envoyproxy/envoy/issues/43116>`_.
+    This fix can be disabled by setting runtime guard ``envoy.reloadable_features.health_check_after_cluster_warming``
+    to ``false``.
 - area: upstream
   change: |
     Fixed an out-of-bounds issue in ThreadAwareLoadBalancerBase that could occur during mid-batch EDS host updates
@@ -265,6 +292,11 @@ bug_fixes:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module filter may result in a incomplete body being sent to upstream
+    or downstream when some filters before or after the dynamic module filter in the chain
+    buffered the body and the dynamic module filter did not.
 - area: io_socket
   change: |
     Fixed an issue where a userspace IO socket could fail to drain the write buffer of a connection
@@ -272,8 +304,19 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: tcp_proxy
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection``
+    and legacy code path.
 
 new_features:
+- area: overload_manager
+  change: |
+    Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed
+    configuration for the ``envoy.overload_actions.shrink_heap`` overload action. This allows
+    operators to configure the timer interval (``timer_interval``, minimum 1s, default 10s) and
+    the memory release threshold (``max_unfreed_memory_bytes``, default 100MB) passed to
+    ``tcmalloc::MallocExtension::ReleaseMemoryToSystem()``.
 - area: dynamic_modules
   change: |
     Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform
@@ -306,6 +349,15 @@ new_features:
   change: |
     Added ability to configure a default proxy address that is used when the proxy address is not
     configured via metadata.
+- area: compressor
+  change: |
+    Added :ref:`weaken_etag_on_compress
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.weaken_etag_on_compress>`
+    to the :ref:`compressor filter <config_http_filters_compressor>`. When enabled in
+    ``response_direction_config``, strong ``ETag`` response headers are weakened (``W/`` prefix)
+    instead of removed when compression is applied, allowing caches and conditional requests to
+    work while indicating the body was modified by compression. When both ``weaken_etag_on_compress``
+    and ``disable_on_etag_header`` are true, the new field takes precedence.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
@@ -377,6 +429,12 @@ new_features:
     endpoint now supports `native histograms <https://prometheus.io/docs/specs/native_histograms>`_
     when using the prometheus protobuf exposition format, using query
     ``/stats/prometheus?histogram_buckets=prometheusnative``.
+- area: stats
+  change: |
+    Added support for cluster-level stats matcher, allowing more granular control over which stats
+    are enabled and reported at the cluster level. This the stats matcher could be configured via
+    the xDS API dynamically on a per-cluster basis.
+    See :ref:`envoy.stats_matcher <well_known_metadata_envoy_stats_matcher>` for more details.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
@@ -514,6 +572,15 @@ new_features:
     Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected
     close type of downstream and upstream connections. The possible values are ``Normal``, ``LocalReset``,
     and ``RemoteReset``.
+- area: formatter
+  change: |
+    Added extensions for :ref:`%FILE_CONTENT(/path/to/file)% <envoy_v3_api_msg_extensions.formatter.file_content.v3.FileContent>`
+    and :ref:`%SECRET(name)% <envoy_v3_api_msg_extensions.formatter.generic_secret.v3.GenericSecret>`.
+- area: http_service
+  change: |
+    Added the ability for :ref:`request_headers_to_add <envoy_v3_api_field_config.core.v3.HttpService.request_headers_to_add>`
+    to use a formatter extension that can retrieve secrets, for including authentication tokens. This support is added for
+    all uses of this message, including the open telemetry, ``ext_proc``, and ``zipkin`` tracers.
 - area: reverse_tunnel
   change: |
     Added optional tenant isolation support to the reverse tunnel network filter. When
@@ -623,6 +690,10 @@ new_features:
   change: |
     Added admin handler API to the bootstrap extension dynamic modules ABI, enabling modules to
     register custom admin HTTP endpoints.
+- area: formatter
+  change: |
+    Added ``SPAN_ID`` :ref:`access log formatter <config_access_log_format>` to log the span ID of
+    the active (downstream) span for a request, complementing the existing ``TRACE_ID`` formatter.
 - area: formatter
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
@@ -743,6 +814,9 @@ new_features:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: redis
+  change: |
+    Added support for ``BITFIELD_RO`` in ``redis_proxy``.
 - area: network_filter
   change: |
     Added support for
@@ -754,5 +828,10 @@ new_features:
   change: |
     Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
     This filter is currently a work-in-progress and not recommended for production use.
+- area: http_filter
+  change: |
+    Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
+    ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
+    This is necessary if the route configuration may depend on the filter state values set.
 
 deprecated:
