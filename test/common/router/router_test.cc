@@ -7772,7 +7772,8 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   EXPECT_CALL(callbacks_, upstreamOverrideHost())
       .WillOnce(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(expected_host)));
 
-  auto override_host = router_->overrideHostToSelect();
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> override_host =
+      router_->overrideHostToSelect();
   EXPECT_EQ("1.2.3.4", override_host->host);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};

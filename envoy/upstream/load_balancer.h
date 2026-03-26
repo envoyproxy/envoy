@@ -150,13 +150,6 @@ public:
    * Upstream override host structure.
    */
   struct OverrideHost {
-    // Default constructor
-    OverrideHost() = default;
-
-    // Constructor (host, strict)
-    OverrideHost(absl::string_view host_arg, bool strict_arg)
-        : host(host_arg), strict(strict_arg) {}
-
     // The target host address to select.
     std::string host;
     // Whether the host should be selected strictly or not.

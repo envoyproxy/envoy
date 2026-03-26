@@ -604,7 +604,7 @@ TEST_F(CompositeClusterTest, LoadBalancerContextAdditionalMethods) {
   Upstream::LoadBalancerContext::OverrideHost override_host{"override_host", true};
   EXPECT_CALL(mock_context, overrideHostToSelect())
       .WillOnce(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
-  auto result = wrapper.overrideHostToSelect();
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> result = wrapper.overrideHostToSelect();
   ASSERT_TRUE(result.has_value());
   EXPECT_EQ(override_host.host, result->host);
   EXPECT_EQ(override_host.strict, result->strict);

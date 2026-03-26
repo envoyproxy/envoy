@@ -436,7 +436,8 @@ TEST_F(FilterManagerTest, SetAndGetUpstreamOverrideHost) {
   decoder_filter->callbacks_->setUpstreamOverrideHost(
       Upstream::LoadBalancerContext::OverrideHost{"1.2.3.4", true});
 
-  auto override_host = decoder_filter->callbacks_->upstreamOverrideHost();
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> override_host =
+      decoder_filter->callbacks_->upstreamOverrideHost();
   EXPECT_TRUE(override_host.has_value());
   EXPECT_EQ(override_host->host, "1.2.3.4");
   EXPECT_TRUE(override_host->strict);

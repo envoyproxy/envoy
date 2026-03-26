@@ -580,7 +580,7 @@ private:
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
     void
     setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host_and_strict) override {
-      callbacks_->setUpstreamOverrideHost(host_and_strict);
+      callbacks_->setUpstreamOverrideHost(std::move(host_and_strict));
     }
     void clearRouteCache() override {
       if (auto cb = callbacks_->downstreamCallbacks(); cb.has_value()) {

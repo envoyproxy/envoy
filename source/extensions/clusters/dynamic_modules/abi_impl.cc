@@ -775,11 +775,12 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
   if (context_envoy_ptr == nullptr || address == nullptr || strict == nullptr) {
     return false;
   }
-  auto override_host = getContext(context_envoy_ptr)->overrideHostToSelect();
+  Envoy::OptRef<const Envoy::Upstream::LoadBalancerContext::OverrideHost> override_host =
+      getContext(context_envoy_ptr)->overrideHostToSelect();
   if (!override_host.has_value()) {
     return false;
   }
-  const auto& host_address = override_host->host;
+  const std::string& host_address = override_host->host;
   address->ptr = const_cast<char*>(host_address.data());
   address->length = host_address.size();
   *strict = override_host->strict;

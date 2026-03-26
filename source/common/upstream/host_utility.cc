@@ -144,7 +144,8 @@ std::pair<HostConstSharedPtr, bool> HostUtility::selectOverrideHost(const HostMa
     return {nullptr, false};
   }
 
-  auto override_host = context->overrideHostToSelect();
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> override_host =
+      context->overrideHostToSelect();
   if (!override_host.has_value()) {
     return {nullptr, false};
   }

@@ -24,7 +24,7 @@ public:
    * @param host_address the address of the host to select
    */
   explicit ReverseConnectionLoadBalancerContext(const std::string& host_address)
-      : host_to_select_(host_address, false) {}
+      : host_to_select_{host_address, false} {}
 
   // Upstream::LoadBalancerContext overrides
   OptRef<const OverrideHost> overrideHostToSelect() const override { return host_to_select_; }

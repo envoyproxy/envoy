@@ -220,7 +220,7 @@ public:
   }
 
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host_and_strict) {
-    decoder_callbacks_->setUpstreamOverrideHost(host_and_strict);
+    decoder_callbacks_->setUpstreamOverrideHost(std::move(host_and_strict));
   }
 
 private:
