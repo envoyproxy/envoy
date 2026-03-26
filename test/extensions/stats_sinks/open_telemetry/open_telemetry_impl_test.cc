@@ -1411,16 +1411,31 @@ TEST_F(OpenTelemetrySinkTests, BasicFlow) {
 class MetricAggregatorTests : public testing::Test {
 public:
   void SetUp() override {
-    metric_aggregator_ = std::make_unique<MetricAggregator>(true, 1000, 500, 200);
+    metric_aggregator_ = std::make_unique<MetricAggregator>(
+        true, 1000, 500, 200,
+        opentelemetry::proto::metrics::v1::AggregationTemporality::
+            AGGREGATION_TEMPORALITY_CUMULATIVE,
+        opentelemetry::proto::metrics::v1::AggregationTemporality::
+            AGGREGATION_TEMPORALITY_CUMULATIVE);
   }
 
   void setupAggregatorWithNoAggregation() {
-    metric_aggregator_ = std::make_unique<MetricAggregator>(false, 1000, 500, 200);
+    metric_aggregator_ = std::make_unique<MetricAggregator>(
+        false, 1000, 500, 200,
+        opentelemetry::proto::metrics::v1::AggregationTemporality::
+            AGGREGATION_TEMPORALITY_CUMULATIVE,
+        opentelemetry::proto::metrics::v1::AggregationTemporality::
+            AGGREGATION_TEMPORALITY_CUMULATIVE);
   }
 
-  void setupAggregatorWithMaxDatapoints(uint32_t /*max_dp*/, bool enable_metric_aggregation) {
-    metric_aggregator_ =
-        std::make_unique<MetricAggregator>(enable_metric_aggregation, 1000, 500, 200);
+  void setupAggregatorWithMaxDatapoints(
+      uint32_t /*max_dp*/, bool enable_metric_aggregation,
+      opentelemetry::proto::metrics::v1::AggregationTemporality counter_temp = opentelemetry::
+          proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+      opentelemetry::proto::metrics::v1::AggregationTemporality hist_temp = opentelemetry::proto::
+          metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE) {
+    metric_aggregator_ = std::make_unique<MetricAggregator>(enable_metric_aggregation, 1000, 500,
+                                                            200, counter_temp, hist_temp);
   }
 
   class CustomMockHistogramStatistics : public Stats::HistogramStatistics {
@@ -1540,36 +1555,20 @@ TEST_F(MetricAggregatorTests, GaugeAggregation) {
 }
 
 TEST_F(MetricAggregatorTests, CounterNoAggregation) {
-  setupAggregatorWithMaxDatapoints(2, /*enable_metric_aggregation=*/false);
+  setupAggregatorWithMaxDatapoints(
+      2, /*enable_metric_aggregation=*/false,
+      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
   attr1.Add()->set_key("key1");
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr2;
   attr2.Add()->set_key("key2");
 
-  metric_aggregator_->addCounter(
-      "metric1", /*value=*/10, /*delta=*/5,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr1);
-  metric_aggregator_->addCounter(
-      "metric2", /*value=*/20, /*delta=*/15,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr1);
-  metric_aggregator_->addCounter(
-      "metric1", /*value=*/15, /*delta=*/15,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr1);
-  metric_aggregator_->addCounter(
-      "metric3", /*value=*/30, /*delta=*/25,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr1);
-  metric_aggregator_->addCounter(
-      "metric1", /*value=*/15, /*delta=*/15,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr2);
-  metric_aggregator_->addCounter(
-      "metric4", /*value=*/40, /*delta=*/35,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr1);
+  metric_aggregator_->addCounter("metric1", /*value=*/10, /*delta=*/5, attr1);
+  metric_aggregator_->addCounter("metric2", /*value=*/20, /*delta=*/15, attr1);
+  metric_aggregator_->addCounter("metric1", /*value=*/15, /*delta=*/15, attr1);
+  metric_aggregator_->addCounter("metric3", /*value=*/30, /*delta=*/25, attr1);
+  metric_aggregator_->addCounter("metric1", /*value=*/15, /*delta=*/15, attr2);
+  metric_aggregator_->addCounter("metric4", /*value=*/40, /*delta=*/35, attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.counter_data_.size(), 5);
@@ -1582,36 +1581,22 @@ TEST_F(MetricAggregatorTests, CounterNoAggregation) {
 }
 
 TEST_F(MetricAggregatorTests, CounterAggregation) {
-  setupAggregatorWithMaxDatapoints(2, /*enable_metric_aggregation=*/true);
+  setupAggregatorWithMaxDatapoints(
+      2, /*enable_metric_aggregation=*/true,
+      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
   attr1.Add()->set_key("key1");
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr2;
   attr2.Add()->set_key("key2");
 
-  metric_aggregator_->addCounter(
-      "metric1", /*value=*/10, /*delta=*/5,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr1);
-  metric_aggregator_->addCounter(
-      "metric2", /*value=*/20, /*delta=*/15,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr1);
-  metric_aggregator_->addCounter(
-      "metric1", /*value=*/15, /*delta=*/15,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr1); // Aggregated -> delta sum is 5 + 15 = 20
-  metric_aggregator_->addCounter(
-      "metric3", /*value=*/30, /*delta=*/25,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr1);
-  metric_aggregator_->addCounter(
-      "metric1", /*value=*/15, /*delta=*/15,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr2); // Different attribute
-  metric_aggregator_->addCounter(
-      "metric4", /*value=*/40, /*delta=*/35,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
-      attr1);
+  metric_aggregator_->addCounter("metric1", /*value=*/10, /*delta=*/5, attr1);
+  metric_aggregator_->addCounter("metric2", /*value=*/20, /*delta=*/15, attr1);
+  metric_aggregator_->addCounter("metric1", /*value=*/15, /*delta=*/15,
+                                 attr1); // Aggregated -> delta sum is 5 + 15 = 20
+  metric_aggregator_->addCounter("metric3", /*value=*/30, /*delta=*/25, attr1);
+  metric_aggregator_->addCounter("metric1", /*value=*/15, /*delta=*/15,
+                                 attr2); // Different attribute
+  metric_aggregator_->addCounter("metric4", /*value=*/40, /*delta=*/35, attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.counter_data_.size(), 5);
@@ -1635,32 +1620,14 @@ TEST_F(MetricAggregatorTests, HistogramNoAggregation) {
   std::vector<uint64_t> computed_buckets2 = {4, 5, 6};
 
   mockHistogram(supported_buckets, computed_buckets1, 6, 60);
-  metric_aggregator_->addHistogram(
-      "metric1", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1);
-  metric_aggregator_->addHistogram(
-      "metric2", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1);
+  metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
+  metric_aggregator_->addHistogram("metric2", custom_stats_, attr1);
 
   mockHistogram(supported_buckets, computed_buckets2, 15, 150);
-  metric_aggregator_->addHistogram(
-      "metric1", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1);
-  metric_aggregator_->addHistogram(
-      "metric3", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1);
-  metric_aggregator_->addHistogram(
-      "metric1", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr2);
-  metric_aggregator_->addHistogram(
-      "metric4", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1);
+  metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
+  metric_aggregator_->addHistogram("metric3", custom_stats_, attr1);
+  metric_aggregator_->addHistogram("metric1", custom_stats_, attr2);
+  metric_aggregator_->addHistogram("metric4", custom_stats_, attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.histogram_data_.size(), 5);
@@ -1699,32 +1666,14 @@ TEST_F(MetricAggregatorTests, HistogramAggregation) {
   std::vector<uint64_t> computed_buckets2 = {4, 5, 6};
 
   mockHistogram(supported_buckets, computed_buckets1, 6, 60);
-  metric_aggregator_->addHistogram(
-      "metric1", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1);
-  metric_aggregator_->addHistogram(
-      "metric2", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1);
+  metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
+  metric_aggregator_->addHistogram("metric2", custom_stats_, attr1);
 
   mockHistogram(supported_buckets, computed_buckets2, 15, 150);
-  metric_aggregator_->addHistogram(
-      "metric1", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1); // Aggregated
-  metric_aggregator_->addHistogram(
-      "metric3", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1);
-  metric_aggregator_->addHistogram(
-      "metric1", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr2);
-  metric_aggregator_->addHistogram(
-      "metric4", custom_stats_,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      attr1);
+  metric_aggregator_->addHistogram("metric1", custom_stats_, attr1); // Aggregated
+  metric_aggregator_->addHistogram("metric3", custom_stats_, attr1);
+  metric_aggregator_->addHistogram("metric1", custom_stats_, attr2);
+  metric_aggregator_->addHistogram("metric4", custom_stats_, attr1);
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.histogram_data_.size(), 5);
@@ -1763,8 +1712,12 @@ public:
   void SetUp() override { resource_attributes_.Add()->set_key("resource_key"); }
 
   void setupStreamer(bool enable_metric_aggregation, uint32_t max_dp) {
-    streamer_ = std::make_unique<OtlpRequestStreamer>(enable_metric_aggregation, max_dp,
-                                                      resource_attributes_);
+    streamer_ = std::make_unique<OtlpRequestStreamer>(
+        enable_metric_aggregation, max_dp, resource_attributes_,
+        opentelemetry::proto::metrics::v1::AggregationTemporality::
+            AGGREGATION_TEMPORALITY_CUMULATIVE,
+        opentelemetry::proto::metrics::v1::AggregationTemporality::
+            AGGREGATION_TEMPORALITY_CUMULATIVE);
   }
 
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
@@ -1832,17 +1785,22 @@ TEST_F(OtlpRequestStreamerTests, TestMaxDatapointsPerRequestNoAggregation) {
   setupStreamer(/*enable_metric_aggregation=*/false, 0);
   MetricAggregator::AggregationResult metrics;
 
-  for (int i = 0; i < 1000; i++) {
-    MetricAggregator::MetricKey key{"metric" + std::to_string(i),
-                                    MetricAggregator::AttributesMap{}};
-    metrics.gauge_data_[key] = i;
-  }
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr1;
+  attr1.Add()->set_key("key1");
+  MetricAggregator::MetricKey key1{"metric1", attr1};
+  metrics.gauge_data_[key1] = 1;
+
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attr2;
+  attr2.Add()->set_key("key2");
+  MetricAggregator::MetricKey key2{"metric1", attr2};
+  metrics.gauge_data_[key2] = 2;
 
   streamer_->streamRequests(metrics, [this](MetricsExportRequestPtr request) {
     requests_.push_back(std::move(request));
   });
+
   EXPECT_EQ(requests_.size(), 1);
-  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 1000);
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 2);
 }
 
 } // namespace

@@ -22,14 +22,8 @@ using HistogramDataPoint = opentelemetry::proto::metrics::v1::HistogramDataPoint
 using AggregationTemporality = opentelemetry::proto::metrics::v1::AggregationTemporality;
 
 MetricAggregator::AggregationResult MetricAggregator::releaseResult() {
-  return {std::move(gauge_data_),
-          std::move(counter_data_),
-          std::move(histogram_data_),
-          std::move(counter_temporalities_),
-          std::move(histogram_temporalities_),
-          snapshot_time_ns_,
-          cumulative_start_time_ns_,
-          delta_start_time_ns_};
+  return {std::move(gauge_data_), std::move(counter_data_),  std::move(histogram_data_),
+          snapshot_time_ns_,      cumulative_start_time_ns_, delta_start_time_ns_};
 }
 
 void OtlpRequestStreamer::streamRequests(
@@ -86,10 +80,7 @@ void OtlpRequestStreamer::streamRequests(
   for (const auto& [key, value] : metrics.counter_data_) {
     ensureRequest();
     Metric* metric = find_or_create_metric(key.name_);
-    auto it = metrics.counter_temporalities_.find(key.name_);
-    AggregationTemporality temp = (it != metrics.counter_temporalities_.end())
-                                      ? it->second
-                                      : AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED;
+    AggregationTemporality temp = counter_temporality_;
     if (metric->mutable_sum()->data_points_size() == 0) {
       metric->mutable_sum()->set_is_monotonic(true);
       metric->mutable_sum()->set_aggregation_temporality(temp);
@@ -103,10 +94,7 @@ void OtlpRequestStreamer::streamRequests(
   for (const auto& [key, custom_hist] : metrics.histogram_data_) {
     ensureRequest();
     Metric* metric = find_or_create_metric(key.name_);
-    auto it = metrics.histogram_temporalities_.find(key.name_);
-    AggregationTemporality temp = (it != metrics.histogram_temporalities_.end())
-                                      ? it->second
-                                      : AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED;
+    AggregationTemporality temp = histogram_temporality_;
     if (metric->mutable_histogram()->data_points_size() == 0) {
       metric->mutable_histogram()->set_aggregation_temporality(temp);
     }
@@ -133,10 +121,12 @@ void OtlpRequestStreamer::setCommonFields(
     opentelemetry::proto::metrics::v1::AggregationTemporality temp,
     const MetricAggregator::AggregationResult& metrics) const {
   point->set_time_unix_nano(metrics.snapshot_time_ns_);
-  if (temp != opentelemetry::proto::metrics::v1::AggregationTemporality::
-                  AGGREGATION_TEMPORALITY_UNSPECIFIED) {
-    auto* sum = point; // This template works for Sum points too if they have temporality
-    (void)sum;         // To avoid unused warning if used in a context without temporality
+  if (temp == opentelemetry::proto::metrics::v1::AggregationTemporality::
+                  AGGREGATION_TEMPORALITY_CUMULATIVE) {
+    point->set_start_time_unix_nano(metrics.cumulative_start_time_ns_);
+  } else if (temp == opentelemetry::proto::metrics::v1::AggregationTemporality::
+                         AGGREGATION_TEMPORALITY_DELTA) {
+    point->set_start_time_unix_nano(metrics.delta_start_time_ns_);
   }
 
   for (const auto& [k, v] : key.attributes_) {
@@ -161,16 +151,16 @@ void MetricAggregator::addGauge(
 
 void MetricAggregator::addCounter(
     absl::string_view metric_name, uint64_t value, uint64_t delta,
-    AggregationTemporality temporality,
     const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
   const uint64_t point_value =
-      (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value;
-  if (point_value == 0 && temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+      (counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta
+                                                                                      : value;
+  if (point_value == 0 &&
+      counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
 
   MetricKey key{metric_name, attributes};
-  counter_temporalities_[std::string(metric_name)] = temporality;
 
   auto it = counter_data_.find(key);
   if (it != counter_data_.end() && enable_metric_aggregation_) {
@@ -182,15 +172,13 @@ void MetricAggregator::addCounter(
 
 void MetricAggregator::addHistogram(
     absl::string_view metric_name, const Envoy::Stats::HistogramStatistics& stats,
-    AggregationTemporality temporality,
     const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
   if (stats.sampleCount() == 0 &&
-      temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+      histogram_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
 
   MetricKey key{metric_name, attributes};
-  histogram_temporalities_[std::string(metric_name)] = temporality;
 
   auto it = histogram_data_.find(key);
   if (it != histogram_data_.end() && enable_metric_aggregation_) {
@@ -342,12 +330,21 @@ OtlpMetricsFlusherImpl::getCombinedAttributes(
 void OtlpMetricsFlusherImpl::flush(
     Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns, int64_t cumulative_start_time_ns,
     absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const {
-  MetricAggregator aggregator =
-      MetricAggregator(config_->enableMetricAggregation(),
-                       std::chrono::duration_cast<std::chrono::nanoseconds>(
-                           snapshot.snapshotTime().time_since_epoch())
-                           .count(),
-                       delta_start_time_ns, cumulative_start_time_ns);
+  AggregationTemporality counter_temporality =
+      config_->reportCountersAsDeltas()
+          ? AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
+          : AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
+  AggregationTemporality histogram_temporality =
+      config_->reportHistogramsAsDeltas()
+          ? AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
+          : AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
+
+  MetricAggregator aggregator = MetricAggregator(
+      config_->enableMetricAggregation(),
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          snapshot.snapshotTime().time_since_epoch())
+          .count(),
+      delta_start_time_ns, cumulative_start_time_ns, counter_temporality, histogram_temporality);
   // Process Gauges
   for (const auto& gauge : snapshot.gauges()) {
     if (predicate_(gauge)) {
@@ -373,10 +370,7 @@ void OtlpMetricsFlusherImpl::flush(
   }
 
   // Process Counters
-  AggregationTemporality counter_temporality =
-      config_->reportCountersAsDeltas()
-          ? AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
-          : AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
+
   for (const auto& counter : snapshot.counters()) {
     if (predicate_(counter.counter_)) {
       auto metric_config = getMetricConfig(counter.counter_.get());
@@ -389,7 +383,7 @@ void OtlpMetricsFlusherImpl::flush(
       auto attributes =
           getCombinedAttributes(counter.counter_.get(), metric_config.conversion_action);
       aggregator.addCounter(metric_name, counter.counter_.get().value(), counter.delta_,
-                            counter_temporality, attributes);
+                            attributes);
     }
   }
   for (const auto& counter : snapshot.hostCounters()) {
@@ -400,15 +394,11 @@ void OtlpMetricsFlusherImpl::flush(
 
     const std::string metric_name = getMetricName(counter, metric_config.conversion_action);
     auto attributes = getCombinedAttributes(counter, metric_config.conversion_action);
-    aggregator.addCounter(metric_name, counter.value(), counter.delta(), counter_temporality,
-                          attributes);
+    aggregator.addCounter(metric_name, counter.value(), counter.delta(), attributes);
   }
 
   // Process Histograms
-  AggregationTemporality histogram_temporality =
-      config_->reportHistogramsAsDeltas()
-          ? AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
-          : AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
+
   for (const auto& histogram : snapshot.histograms()) {
     if (predicate_(histogram)) {
       auto metric_config = getMetricConfig(histogram.get());
@@ -422,7 +412,7 @@ void OtlpMetricsFlusherImpl::flush(
       const Stats::HistogramStatistics& histogram_stats =
           config_->reportHistogramsAsDeltas() ? histogram.get().intervalStatistics()
                                               : histogram.get().cumulativeStatistics();
-      aggregator.addHistogram(metric_name, histogram_stats, histogram_temporality, attributes);
+      aggregator.addHistogram(metric_name, histogram_stats, attributes);
     }
   }
 

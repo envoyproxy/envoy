@@ -46,10 +46,13 @@ public:
   using AttributesMap = absl::flat_hash_map<std::string, std::string>;
 
   explicit MetricAggregator(bool enable_metric_aggregation, int64_t snapshot_time_ns,
-                            int64_t delta_start_time_ns, int64_t cumulative_start_time_ns)
+                            int64_t delta_start_time_ns, int64_t cumulative_start_time_ns,
+                            AggregationTemporality counter_temporality,
+                            AggregationTemporality histogram_temporality)
       : enable_metric_aggregation_(enable_metric_aggregation), snapshot_time_ns_(snapshot_time_ns),
         delta_start_time_ns_(delta_start_time_ns),
-        cumulative_start_time_ns_(cumulative_start_time_ns) {}
+        cumulative_start_time_ns_(cumulative_start_time_ns),
+        counter_temporality_(counter_temporality), histogram_temporality_(histogram_temporality) {}
 
   struct MetricKey {
     // Full name of the metric.
@@ -93,10 +96,6 @@ public:
     absl::flat_hash_map<MetricKey, uint64_t> gauge_data_;
     absl::flat_hash_map<MetricKey, uint64_t> counter_data_;
     absl::flat_hash_map<MetricKey, CustomHistogram> histogram_data_;
-    // Temporalities for counters. Key is the metric name.
-    absl::flat_hash_map<std::string, AggregationTemporality> counter_temporalities_;
-    // Temporalities for histograms. Key is the metric name.
-    absl::flat_hash_map<std::string, AggregationTemporality> histogram_temporalities_;
     // Timestamp for the snapshot.
     int64_t snapshot_time_ns_;
     // Start time for cumulative metrics.
@@ -117,14 +116,12 @@ public:
   // based on temporality if a point with the same attributes exists.
   void addCounter(
       absl::string_view metric_name, uint64_t value, uint64_t delta,
-      AggregationTemporality temporality,
       const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
   // Adds a histogram metric data point. Aggregates counts and sums if a point
   // with the same attributes and compatible bounds exists.
   void addHistogram(
       absl::string_view metric_name, const Envoy::Stats::HistogramStatistics& stats,
-      AggregationTemporality temporality,
       const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
   const bool enable_metric_aggregation_;
@@ -135,23 +132,27 @@ public:
   absl::flat_hash_map<MetricKey, uint64_t> gauge_data_;
   absl::flat_hash_map<MetricKey, uint64_t> counter_data_;
   absl::flat_hash_map<MetricKey, CustomHistogram> histogram_data_;
-  absl::flat_hash_map<std::string, AggregationTemporality> counter_temporalities_;
-  absl::flat_hash_map<std::string, AggregationTemporality> histogram_temporalities_;
+  const AggregationTemporality counter_temporality_;
+  const AggregationTemporality histogram_temporality_;
 };
 
 /**
- * Helper class to build ExportMetricsServiceRequest objects from MetricDataPoints.
+ * Helper class to build ExportMetricsServiceRequest objects from AggregationResult.
  * It handles the batching of data points into requests, controlled by max_dp_ per request.
  * Once a request reaches its data point limit, it is seamlessly dispatched to the provided
  * send_callback_.
  */
 class OtlpRequestStreamer {
 public:
-  OtlpRequestStreamer(bool enable_metric_aggregation, uint32_t max_dp,
-                      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
-                          resource_attributes)
+  OtlpRequestStreamer(
+      bool enable_metric_aggregation, uint32_t max_dp,
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
+          resource_attributes,
+      opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality,
+      opentelemetry::proto::metrics::v1::AggregationTemporality histogram_temporality)
       : enable_metric_aggregation_(enable_metric_aggregation), max_dp_(max_dp),
-        resource_attributes_(resource_attributes) {}
+        resource_attributes_(resource_attributes), counter_temporality_(counter_temporality),
+        histogram_temporality_(histogram_temporality) {}
 
   void streamRequests(MetricAggregator::AggregationResult& metrics,
                       absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const;
@@ -166,6 +167,8 @@ private:
   const uint32_t max_dp_;
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
       resource_attributes_;
+  const opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality_;
+  const opentelemetry::proto::metrics::v1::AggregationTemporality histogram_temporality_;
 };
 
 class OtlpOptions {
@@ -233,7 +236,17 @@ public:
                                              [](const auto& metric) { return metric.used(); })
       : config_(config), predicate_(predicate),
         streamer_(config->enableMetricAggregation(), config->maxDataPointsPerRequest(),
-                  config->resource_attributes()) {}
+                  config->resource_attributes(),
+                  config->reportCountersAsDeltas()
+                      ? opentelemetry::proto::metrics::v1::AggregationTemporality::
+                            AGGREGATION_TEMPORALITY_DELTA
+                      : opentelemetry::proto::metrics::v1::AggregationTemporality::
+                            AGGREGATION_TEMPORALITY_CUMULATIVE,
+                  config->reportHistogramsAsDeltas()
+                      ? opentelemetry::proto::metrics::v1::AggregationTemporality::
+                            AGGREGATION_TEMPORALITY_DELTA
+                      : opentelemetry::proto::metrics::v1::AggregationTemporality::
+                            AGGREGATION_TEMPORALITY_CUMULATIVE) {}
 
   void flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
              int64_t cumulative_start_time_ns,
