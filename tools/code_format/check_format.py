@@ -1093,7 +1093,7 @@ class FormatChecker:
         except subprocess.CalledProcessError as e:
             if (e.returncode != 0 and e.returncode != 1):
                 self.error_messages.append("Failed to check visibility with command %s" % command)
-    
+
     def run_rustfmt(self):
         # Run bazel
         command = "bazel run @rules_rust//:rustfmt"
