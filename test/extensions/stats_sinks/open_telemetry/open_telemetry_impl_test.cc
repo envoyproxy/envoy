@@ -203,6 +203,16 @@ TEST_F(OpenTelemetryGrpcMetricsExporterImplTest, PartialSuccess) {
 
 class OtlpMetricsFlusherTests : public OpenTelemetryStatsSinkTests {
 public:
+  MetricsExportRequestSharedPtr flushToSingleRequest(const OtlpMetricsFlusherImpl& flusher) {
+    std::vector<MetricsExportRequestPtr> requests;
+    flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                  [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+    if (requests.size() != 1) {
+      return nullptr;
+    }
+    return std::move(requests[0]);
+  }
+
   void expectMetricsCount(const MetricsExportRequestSharedPtr& request, int count) {
     EXPECT_EQ(1, request->resource_metrics().size());
     EXPECT_EQ(1, request->resource_metrics()[0].scope_metrics().size());
@@ -411,12 +421,9 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
   addHostGaugeToSnapshot("test_host_gauge", 4);
   addHistogramToSnapshot("test_histogram");
 
-  std::vector<MetricsExportRequestPtr> requests;
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-  ASSERT_EQ(1, requests.size());
-  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
-  expectMetricsCount(metrics, /*count=*/5);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 5);
 
   {
     const auto* metric = findGauge(metrics, getTagExtractedName("test_gauge"));
@@ -454,11 +461,8 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
   }
 
   gauge_storage_.back()->used_ = false;
-  requests.clear();
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-  ASSERT_EQ(1, requests.size());
-  metrics = std::move(requests[0]);
+  metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
   expectMetricsCount(metrics, /*count=*/4);
 }
 
@@ -473,12 +477,9 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithStatsPrefix) {
   addGaugeToSnapshot("test_host_gauge", 1);
   addHistogramToSnapshot("test_histogram");
 
-  std::vector<MetricsExportRequestPtr> requests;
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-  ASSERT_EQ(1, requests.size());
-  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
-  expectMetricsCount(metrics, /*count=*/5);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 5);
 
   {
     const auto* metric = findGauge(metrics, getTagExtractedName("prefix.test_gauge"));
@@ -516,12 +517,9 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithNoTaggedName) {
   addGaugeToSnapshot("test_gauge", 1);
   addHistogramToSnapshot("test_histogram");
 
-  std::vector<MetricsExportRequestPtr> requests;
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-  ASSERT_EQ(1, requests.size());
-  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
-  expectMetricsCount(metrics, /*count=*/3);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 3);
 
   {
     const auto* metric = findGauge(metrics, "test_gauge");
@@ -548,12 +546,9 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithNoAttributes) {
   addCounterToSnapshot("test_counter", 1, 1);
   addGaugeToSnapshot("test_gauge", 1);
   addHistogramToSnapshot("test_histogram");
-  std::vector<MetricsExportRequestPtr> requests;
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-  ASSERT_EQ(1, requests.size());
-  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
-  expectMetricsCount(metrics, /*count=*/3);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 3);
   {
     const auto* metric = findGauge(metrics, getTagExtractedName("test_gauge"));
     ASSERT_NE(metric, nullptr);
@@ -584,12 +579,9 @@ TEST_F(OtlpMetricsFlusherTests, GaugeMetric) {
   addHostGaugeToSnapshot("test_host_gauge1", 3);
   addHostGaugeToSnapshot("test_host_gauge2", 4);
 
-  std::vector<MetricsExportRequestPtr> requests;
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-  ASSERT_EQ(1, requests.size());
-  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
-  expectMetricsCount(metrics, /*count=*/4);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 4);
   expectGauge(*findGauge(metrics, getTagExtractedName("test_gauge1")),
               getTagExtractedName("test_gauge1"), /*value=*/1);
   expectGauge(*findGauge(metrics, getTagExtractedName("test_gauge2")),
@@ -608,12 +600,9 @@ TEST_F(OtlpMetricsFlusherTests, CumulativeCounterMetric) {
   addHostCounterToSnapshot("test_host_counter1", 2, 4);
   addHostCounterToSnapshot("test_host_counter2", 5, 10);
 
-  std::vector<MetricsExportRequestPtr> requests;
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-  ASSERT_EQ(1, requests.size());
-  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
-  expectMetricsCount(metrics, /*count=*/4);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 4);
   expectSum(*findSum(metrics, getTagExtractedName("test_counter1")),
             getTagExtractedName("test_counter1"), /*value=*/1, /*is_delta=*/false);
   expectSum(*findSum(metrics, getTagExtractedName("test_counter2")),
@@ -635,13 +624,9 @@ TEST_F(OtlpMetricsFlusherTests, DeltaCounterMetric) {
   addHostCounterToSnapshot("test_host_counter1", 2, 4);
   addHostCounterToSnapshot("test_host_counter2", 5, 10);
 
-  std::vector<MetricsExportRequestPtr> requests;
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-  ASSERT_EQ(1, requests.size());
-  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
-
-  expectMetricsCount(metrics, /*count=*/4);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 4);
   expectSum(*findSum(metrics, getTagExtractedName("test_counter1")),
             getTagExtractedName("test_counter1"), 1, true);
   expectSum(*findSum(metrics, getTagExtractedName("test_counter2")),
@@ -658,12 +643,9 @@ TEST_F(OtlpMetricsFlusherTests, CumulativeHistogramMetric) {
   addHistogramToSnapshot("test_histogram1");
   addHistogramToSnapshot("test_histogram2");
 
-  std::vector<MetricsExportRequestPtr> requests;
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-  ASSERT_EQ(1, requests.size());
-  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
-  expectMetricsCount(metrics, /*count=*/2);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 2);
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram1")),
                   getTagExtractedName("test_histogram1"), /*is_delta=*/false);
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram2")),
@@ -679,16 +661,29 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
   addHistogramToSnapshot("test_histogram2", true);
   addHistogramToSnapshot("test_histogram3", true, true, {}, false);
 
-  std::vector<MetricsExportRequestPtr> requests;
-  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
-                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
-  ASSERT_EQ(1, requests.size());
-  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
-  expectMetricsCount(metrics, /*count=*/2);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 2);
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram1")),
                   getTagExtractedName("test_histogram1"), /*is_delta=*/true);
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram2")),
                   getTagExtractedName("test_histogram2"), /*is_delta=*/true);
+}
+
+TEST_F(OtlpMetricsFlusherTests, SetResourceAttributes) {
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(true, false, true, true, "", {{"key_foo", "val_foo"}}));
+  addCounterToSnapshot("test_counter1", 1, 1);
+
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 1);
+  expectSum(metricAt(0, metrics), getTagExtractedName("test_counter1"), 1, true);
+  EXPECT_EQ(1, metrics->resource_metrics().size());
+  EXPECT_EQ(1, metrics->resource_metrics()[0].resource().attributes().size());
+  EXPECT_EQ("key_foo", metrics->resource_metrics()[0].resource().attributes()[0].key());
+  EXPECT_EQ("val_foo",
+            metrics->resource_metrics()[0].resource().attributes()[0].value().string_value());
 }
 
 TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestNoLimits) {
