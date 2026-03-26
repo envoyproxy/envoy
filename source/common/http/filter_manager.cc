@@ -48,8 +48,8 @@ void recordLatestDataFilter(typename Filters::Iterator current_filter,
 
 void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& stream_info,
                      ResponseHeaderMap& headers) {
-  const Router::RouteConstSharedPtr& route = stream_info.route();
-  if (route != nullptr && route->routeEntry() != nullptr) {
+  const auto route = stream_info.route();
+  if (route && route->routeEntry() != nullptr) {
     const Formatter::Context formatter_context{
         callbacks.requestHeaders().ptr(), &headers, {}, {}, {}, &callbacks.activeSpan()};
     route->routeEntry()->finalizeResponseHeaders(headers, formatter_context, stream_info);
@@ -305,7 +305,7 @@ Router::RouteConstSharedPtr ActiveStreamFilterBase::getRoute() const {
   if (parent_.filter_manager_callbacks_.downstreamCallbacks()) {
     return parent_.filter_manager_callbacks_.downstreamCallbacks()->route(nullptr);
   }
-  return parent_.streamInfo().route();
+  return parent_.streamInfo().routeSharedPtr();
 }
 
 void ActiveStreamFilterBase::resetIdleTimer() {
