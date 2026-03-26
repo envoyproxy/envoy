@@ -164,6 +164,7 @@ EXTENSIONS = {
     "envoy.filters.http.aws_lambda":                    "//source/extensions/filters/http/aws_lambda:config",
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.bandwidth_limit":               "//source/extensions/filters/http/bandwidth_limit:config",
+    "envoy.filters.http.bandwidth_share":               "//source/extensions/filters/http/bandwidth_share:config",
     "envoy.filters.http.basic_auth":                    "//source/extensions/filters/http/basic_auth:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",

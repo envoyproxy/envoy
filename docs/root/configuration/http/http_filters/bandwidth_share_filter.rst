@@ -53,9 +53,9 @@ The HTTP bandwidth share filter outputs statistics in the ``<stat_prefix>.http_b
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  request_enabled, Counter, Total number of request streams for which the bandwidth share filter was consulted
-  request_enforced, Counter, Total number of request streams for which the bandwidth share filter was enforced
-  request_pending, GAUGE, Number of request streams which are currently pending transfer in bandwidth share filter
+  bytes_unlimited, Counter, Total number of bytes for which the bandwidth share filter was consulted
+  bytes_limited, Counter, Total number of bytes for which the bandwidth share filter added a delay
+  streams_currently_limited, GAUGE, Number of request streams which are currently pending transfer in bandwidth share filter
   request_incoming_size, GAUGE, Size in bytes of incoming request data to bandwidth share filter
   request_allowed_size, GAUGE, Size in bytes of outgoing request data from bandwidth share filter
   request_incoming_total_size, Counter, Total size in bytes of incoming request data to bandwidth share filter

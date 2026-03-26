@@ -1,0 +1,142 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.bandwidth_share.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+
+import "xds/type/matcher/v3/matcher.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_share.v3";
+option java_outer_classname = "BandwidthShareProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/bandwidth_share/v3;bandwidth_sharev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Bandwidth share]
+// Bandwidth share :ref:`configuration overview <config_http_filters_bandwidth_share>`.
+// [#extension: envoy.filters.http.bandwidth_share]
+
+// [#next-free-field: 9]
+message BandwidthShare {
+  message TenantConfig {
+    // Weight of the tenant. For example, if two tenants are competing for
+    // limited bandwidth, one has weight=3 and the other has weight=1, the
+    // contested bandwidth will be distributed 3/4 to the weight=3 tenant
+    // and 1/4 to the weight=1 tenant.
+    //
+    // If unset or 0, the default weight of 1 will be used.
+    uint32 weight = 1;
+
+    // True to record stats with ``tenant`` tag set to the tenant name.
+    // If false or unset, the stats tag will be empty. It is recommended not
+    // to set this to default true if tenant names are dynamically generated
+    // from untrusted sources (or otherwise with unlimited scope), to
+    // avoid creating unlimited stats cardinality.
+    bool include_stats_tag = 2;
+  }
+
+  message Limit {
+    // The unique id of the limiter. Should be set if you want to apply distinct
+    // limits on different listeners, or distinct limits for requests and responses.
+    // With matching ``bucket_id``s, multiple listeners can share a single limit
+    // (e.g. for https and http listener that share a network bandwidth constraint).
+    //
+    // Also used for the ``bucket_id`` stats tag.
+    //
+    // The empty string is a valid ``bucket_id``.
+    string bucket_id = 1;
+
+    // The limit supplied in KiB/s.
+    //
+    // .. note::
+    //   The limit is associated with the ``bucket_id``. If the same ``bucket_id``
+    //   is used in multiple listeners/routes, it is a config error for the
+    //   configurations to not be identical. If the configuration is updated
+    //   dynamically via xds, changing the runtime key, the ``bucket_id`` must
+    //   also be changed or it is a config error.
+    //
+    // The limit can be updated dynamically via runtime. Setting the limit
+    // to zero, or unset, disables the filter.
+    config.core.v3.RuntimeUInt32 kbps = 2 [(validate.rules).message = {required: true}];
+  }
+
+  // Configuration for request limiting. If unset, requests are not limited.
+  // If ``kbps`` is zero, requests are not limited.
+  Limit request_limit = 1;
+
+  // Configuration for response limiting. If unset, responses are not limited.
+  // If ``kbps`` is zero, responses are not limited.
+  Limit response_limit = 2;
+
+  // Optional fill interval in milliseconds for the token refills. Defaults to 50ms.
+  // It must be at least 20ms to avoid too aggressive refills.
+  //
+  // Lower values will use more CPU and provide smoother bandwidth distribution
+  // when the limit is being enforced.
+  google.protobuf.Duration fill_interval = 3 [(validate.rules).duration = {
+    lte {seconds: 1}
+    gte {nanos: 20000000}
+  }];
+
+  // Enable response trailers.
+  //
+  // .. note::
+  //
+  //   If set true, the following 4 trailers will be added, prefixed by ``response_trailer_prefix``:
+  //   * bandwidth-request-delay-ms: delay time in milliseconds it took for the request stream transfer including request body transfer time and the time added by the filter.
+  //   * bandwidth-response-delay-ms: delay time in milliseconds it took for the response stream transfer including response body transfer time and the time added by the filter.
+  //   * bandwidth-request-filter-delay-ms: delay time in milliseconds in request stream transfer added by the filter.
+  //   * bandwidth-response-filter-delay-ms: delay time in milliseconds that added by the filter.
+  //
+  //   If ``response_limit`` is unset or has ``kbps`` of 0, the trailers will not be set.
+  //
+  //   If both the request and response delay time is 0, the trailers will not be set.
+  bool enable_response_trailers = 4;
+
+  // The prefix for the response trailers. Empty string is a valid prefix.
+  string response_trailer_prefix = 5
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // An optional matcher which returns a string to use as a tenant name.
+  //
+  // If unset, the tenant name will always be the empty string, and all requests will
+  // have equal weight when limiting is being enforced.
+  //
+  // If tenant names are set when limiting is being enforced, traffic may be
+  // distributed unevenly - for example, assuming all requests want all possible
+  // bandwidth, if there are five streams with tenant ``foo`` and two streams with
+  // tenant ``bar``, and no custom weights, ``foo`` and ``bar`` will get an equal
+  // share of the bandwidth (half), then the requests within each tenant will get
+  // an equal share of that tenant's share, i.e. the ``foo`` requests will each
+  // get a fifth of the ``foo`` half, a tenth of the total, and the ``bar`` requests
+  // will each get half of the ``bar`` half, a quarter of the total.
+  //
+  // An example way this might be used is to have ``tenant_name_selector`` make
+  // each source IP address a tenant. Then if one source IP is trying to make 100
+  // requests in parallel, and 99 other IPs are making one request each, the
+  // total bandwidth distribution (assuming the limit is being exceeded) would
+  // be equal per IP, versus with no tenants it would be equal per request and
+  // the greedy IP address would be getting 100x more bandwidth than the others.
+  //
+  // Note that if the limit is not consistently exceeded, all available bandwidth
+  // is still distributed - so in this case if the 99 other IPs were only using
+  // half the available bandwidth total between them, the greedy IP would still
+  // be able to get 50x more bandwidth than the rest. In this example the value is
+  // clearer - the less greedy tenants get all the bandwidth they want, and
+  // only the greedy tenant gets throttled, vs. without tenants all the requests
+  // would be throttled equally.
+  xds.type.matcher.v3.Matcher tenant_name_selector = 6;
+
+  // A map from tenant names to configurations. If a tenant name is not present
+  // in the map, ``default_tenant_config`` is used.
+  map<string, TenantConfig> tenant_configs = 7;
+
+  // Optional configuration override for the default tenant. If unset, the
+  // default values are used.
+  TenantConfig default_tenant_config = 8;
+}

@@ -332,6 +332,13 @@ envoy.filters.http.bandwidth_limit:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.bandwidth_limit.v3.BandwidthLimit
+envoy.filters.http.bandwidth_share:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare
 envoy.filters.http.basic_auth:
   categories:
   - envoy.filters.http
