@@ -25,7 +25,7 @@ public:
     }
   }
 
-  void onHostSelected(Upstream::HostDescriptionConstSharedPtr) override {
+  void onHostSelected(const Upstream::HostDescriptionConstSharedPtr&) override {
     decoder_callbacks_->sendLocalReply(Http::Code::Forbidden, "host rejected", nullptr,
                                        absl::nullopt, "host_rejected_by_filter");
   }

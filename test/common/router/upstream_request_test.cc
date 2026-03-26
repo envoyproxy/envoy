@@ -262,7 +262,7 @@ public:
   void onDestroy() override {}
 
   // Http::UpstreamCallbacks
-  void onHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
+  void onHostSelected(const Upstream::HostDescriptionConstSharedPtr& host) override {
     on_host_selected_called_ = true;
     last_host_ = host;
     if (reject_connection_) {

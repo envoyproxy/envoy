@@ -220,7 +220,7 @@ public:
   // upstream connection attempt.
   //
   // @param host the selected upstream host.
-  virtual void onHostSelected(Upstream::HostDescriptionConstSharedPtr) PURE;
+  virtual void onHostSelected(const Upstream::HostDescriptionConstSharedPtr& host) PURE;
 
   // Called when the upstream connection is established and
   // UpstreamStreamFilterCallbacks::upstream should be available.

@@ -74,8 +74,8 @@ public:
                                                           details);
   }
   void executeLocalReplyIfPrepared() override {}
-  // Returns true if sendLocalReply() has been called, aborting the filter chain.
-  bool isAborted() { return state().decoder_filter_chain_aborted_; }
+  // Returns true if the decoder filter chain should stop (local reply sent or downstream reset).
+  bool isAborted() { return state().decoder_filter_chain_aborted_ || state().saw_downstream_reset_; }
   UpstreamRequest& upstream_request_;
 };
 
@@ -425,11 +425,14 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
 
   // Allow upstream HTTP filters to inspect the selected host before the connection is initiated.
   auto* upstream_fm = static_cast<UpstreamFilterManager*>(filter_manager_.get());
+  // host is guaranteed non-null: createConnPool() returns nullptr when the host is null,
+  // and the caller checks for that before creating the UpstreamRequest.
   Upstream::HostDescriptionConstSharedPtr host = conn_pool_->host();
   ASSERT(host != nullptr);
   for (auto* callback : upstream_callbacks_) {
     callback->onHostSelected(host);
     if (upstream_fm->isAborted()) {
+      ENVOY_LOG(debug, "upstream request aborted during onHostSelected");
       return;
     }
   }

@@ -22,7 +22,7 @@ public:
     }
   }
 
-  void onHostSelected(Upstream::HostDescriptionConstSharedPtr) override {}
+  void onHostSelected(const Upstream::HostDescriptionConstSharedPtr&) override {}
 
   void onUpstreamConnectionEstablished() override {
     if (latched_end_stream_.has_value()) {
