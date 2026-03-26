@@ -75,7 +75,9 @@ public:
   }
   void executeLocalReplyIfPrepared() override {}
   // Returns true if the decoder filter chain should stop (local reply sent or downstream reset).
-  bool isAborted() { return state().decoder_filter_chain_aborted_ || state().saw_downstream_reset_; }
+  bool isAborted() {
+    return state().decoder_filter_chain_aborted_ || state().saw_downstream_reset_;
+  }
   UpstreamRequest& upstream_request_;
 };
 
