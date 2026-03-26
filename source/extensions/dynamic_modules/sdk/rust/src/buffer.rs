@@ -26,14 +26,13 @@ impl Default for EnvoyBuffer<'_> {
 }
 
 impl EnvoyBuffer<'_> {
-  /// This is a helper function to create an [`EnvoyBuffer`] from a static string.
+  /// This is a helper function to create an [`EnvoyBuffer`] from a string.
   ///
   /// This is meant for use by the end users in unit tests.
-  // TODO: relax the lifetime constraint to 'static, so that it becomes more flexible.
-  pub fn new(static_str: &'static str) -> Self {
+  pub fn new(std: &str) -> Self {
     Self {
-      raw_ptr: static_str.as_ptr(),
-      length: static_str.len(),
+      raw_ptr: std.as_ptr(),
+      length: std.len(),
       _marker: std::marker::PhantomData,
     }
   }
