@@ -29,28 +29,6 @@ def _get_python_bin(rctx):
     if python_bin != None:
         return python_bin
 
-    result = rctx.execute([
-        "bash", 
-        "-l", 
-        "-c", 
-        "python" + python_version + " -c 'import sys; print(sys.executable)'"
-    ])
-    if result.return_code == 0:
-        python_path = result.stdout.strip()
-        if python_path:
-            return python_path
-
-    result = rctx.execute([
-        "bash", 
-        "-l", 
-        "-c", 
-        "python -c 'import sys; print(sys.executable)'"
-    ])
-    if result.return_code == 0:
-        python_path = result.stdout.strip()
-        if python_path:
-            return python_path
-
     fail("cannot find python binary")
 
 def _get_python_tag(rctx, python_bin):
@@ -95,5 +73,4 @@ declare_python_abi = repository_rule(
         "python_version": attr.string(mandatory = True),
     },
     local = True,
-    environ = [_PYTHON_BIN_PATH_ENV, "PATH"],
 )
