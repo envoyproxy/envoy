@@ -26,7 +26,7 @@ void Utils::releaseFreeMemory(uint64_t max_unfreed_bytes) {
 #elif defined(JEMALLOC)
   UNREFERENCED_PARAMETER(max_unfreed_bytes);
   // Purge all arenas to release dirty pages back to the OS.
-  // MALLCTL_ARENAS_ALL is jemalloc's pseudo-index for addressing all arenas at once.
+  // `MALLCTL_ARENAS_ALL` is jemalloc's pseudo-index for addressing all arenas at once.
   char purge_cmd[32];
   snprintf(purge_cmd, sizeof(purge_cmd), "arena.%u.purge", MALLCTL_ARENAS_ALL);
   mallctl(purge_cmd, nullptr, nullptr, nullptr, 0);

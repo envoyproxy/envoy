@@ -987,7 +987,6 @@ iteratively
 javascript
 jitter
 jittered
-jemalloc
 joinable
 js
 kafka
@@ -1044,8 +1043,6 @@ luajit
 lyft
 maglev
 malloc
-mallctl
-MALLCTL
 marshaller
 matchable
 matcher
