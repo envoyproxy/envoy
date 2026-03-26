@@ -49,9 +49,9 @@ public:
 
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
   void updateOnDemand(const std::string& with_route_config_name_prefix);
-  static std::string domainNameToAlias(const std::string& route_config_name,
+  static std::string domainNameToAlias(const std::string& resource_prefix,
                                        const std::string& domain) {
-    return route_config_name + "/" + domain;
+    return resource_prefix + "/" + domain;
   }
   static std::string aliasToDomainName(const std::string& alias) {
     const auto pos = alias.find_last_of('/');

@@ -3265,6 +3265,136 @@ TEST_P(AdsIntegrationTest, VHDSUpdatesAfterListenerRemoval) {
                                                                   {":authority", "bar.com"}});
 }
 
+// Tests xdstp:// VHDS with multiple listeners using different xdstp collections over ADS.
+// Two listeners reference different route configs, each with its own xdstp VHDS collection.
+TEST_P(AdsIntegrationTest, MultipleXdstpVhdsCollectionsOverAds) {
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::Delta &&
+      sotw_or_delta_ != Grpc::SotwOrDelta::UnifiedDelta) {
+    GTEST_SKIP_("This test is for delta only");
+  }
+  initialize();
+
+  // Helper to build a route config with xdstp VHDS over ADS.
+  auto buildRouteConfigWithXdstpVhds = [](const std::string& name,
+                                          const std::string& xdstp_collection) {
+    envoy::config::route::v3::RouteConfiguration route;
+    route.set_name(name);
+    auto* vhds = route.mutable_vhds();
+    vhds->mutable_config_source()->mutable_ads();
+    vhds->set_default_virtual_host_resource_name(xdstp_collection);
+    return route;
+  };
+
+  // Build virtual hosts with xdstp resource names programmatically (YAML parsing
+  // can mangle xdstp:// URIs that contain special characters).
+  auto buildXdstpVirtualHost = [](const std::string& name, const std::string& domain,
+                                  const std::string& prefix, const std::string& cluster) {
+    envoy::config::route::v3::VirtualHost vhost;
+    vhost.set_name(name);
+    vhost.add_domains(domain);
+    auto* route = vhost.add_routes();
+    route->mutable_match()->set_prefix(prefix);
+    route->mutable_route()->set_cluster(cluster);
+    return vhost;
+  };
+
+  // CDS
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+
+  // EDS
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "", {},
+                                      {"cluster_0"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}));
+
+  // LDS: add two listeners
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {},
+      {buildListener("listener_0", "route_config_0"),
+       buildListener("listener_1", "route_config_1")},
+      {}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {},
+                                      {"route_config_0", "route_config_1"}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+
+  // The listeners should still be warming.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 0);
+
+  // RDS response with xdstp VHDS.
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TestTypeUrl::get().RouteConfiguration, {},
+      {buildRouteConfigWithXdstpVhds(
+           "route_config_0", "xdstp://test/envoy.config.route.v3.VirtualHost/route_config_0/*"),
+       buildRouteConfigWithXdstpVhds(
+           "route_config_1", "xdstp://test/envoy.config.route.v3.VirtualHost/route_config_1/*")},
+      {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {},
+                                      {"xdstp://test/envoy.config.route.v3.VirtualHost/"
+                                       "route_config_0/*",
+                                       "xdstp://test/envoy.config.route.v3.VirtualHost/"
+                                       "route_config_1/*"},
+                                      {}));
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {}, {}, {}));
+  // The listeners should still be warming after the RDS response. They can only finish
+  // initialization once the VHDS subscriptions receive their first response.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 0);
+
+  // Respond with virtual hosts for both collections.
+  sendDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {},
+      {buildXdstpVirtualHost(
+           "xdstp://test/envoy.config.route.v3.VirtualHost/route_config_0/vhost.first",
+           "vhost.first", "/", "cluster_0"),
+       buildXdstpVirtualHost(
+           "xdstp://test/envoy.config.route.v3.VirtualHost/route_config_1/vhost.second",
+           "vhost.second", "/", "cluster_0")},
+      {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
+
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  registerTestServerPorts({"http0", "http1"});
+
+  auto send_request_and_verify = [this](const std::string& port_name,
+                                        const Http::TestRequestHeaderMapImpl& headers,
+                                        bool verify_404 = false) {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort(port_name))));
+    if (verify_404) {
+      auto response = codec_client_->makeHeaderOnlyRequest(headers);
+      ASSERT_TRUE(response->waitForEndStream());
+      EXPECT_EQ("404", response->headers().getStatusValue());
+    } else {
+      auto response = sendRequestAndWaitForResponse(headers, 0, default_response_headers_, 0, 0);
+      checkSimpleRequestSuccess(0U, 0U, response.get());
+    }
+    cleanupUpstreamAndDownstream();
+  };
+
+  auto first_request_headers = Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "vhost.first"}};
+  auto second_request_headers = Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "vhost.second"}};
+
+  // Verify routing on listener_0 (route_config_0 collection, domain vhost.first).
+  send_request_and_verify("http0", first_request_headers);
+  // Verify routing on listener_1 (route_config_1 collection, domain vhost.second).
+  send_request_and_verify("http1", second_request_headers);
+  // Verify that each listener only serves the virtual hosts from its own VHDS collection.
+  send_request_and_verify("http0", second_request_headers, true);
+  send_request_and_verify("http1", first_request_headers, true);
+}
+
 // Tests that when a new listener arrives referencing an existing route config, it doesn't request
 // for new route config resources and instead uses the local copy.
 TEST_P(AdsIntegrationTest, NewListenerUsesLocalRouteConfig) {

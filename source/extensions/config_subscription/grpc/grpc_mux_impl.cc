@@ -4,6 +4,7 @@
 #include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/utility.h"
 #include "source/common/memory/utils.h"
 #include "source/common/protobuf/protobuf.h"
@@ -406,6 +407,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // the delta state. The proper fix for this is to converge these implementations,
   // see https://github.com/envoyproxy/envoy/issues/11477.
   same_type_resume = pause(type_url);
+  // pause dependent type URLs after pausing the same type URL to ensure that dependent types are
+  // resumed before same_type_resume.
+  ScopedResume resume_dependent_type_urls = pause(Config::dependentTypeUrls(type_url));
   TRY_ASSERT_MAIN_THREAD {
     std::vector<DecodedResourcePtr> resources;
     OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;

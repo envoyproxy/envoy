@@ -38,7 +38,7 @@ public:
   static absl::StatusOr<OdCdsApiSharedPtr>
   create(const envoy::config::core::v3::ConfigSource& odcds_config,
          OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-         Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
+         Config::XdsManager& /*xds_manager*/, ClusterManager& cm, MissingClusterNotifier& notifier,
          Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
          Server::Configuration::ServerFactoryContext& server_factory_context);
 
@@ -57,8 +57,7 @@ private:
 
   OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-               Config::XdsManager& xds_manager, ClusterManager& cm,
-               MissingClusterNotifier& notifier, Stats::Scope& scope,
+               ClusterManager& cm, MissingClusterNotifier& notifier, Stats::Scope& scope,
                ProtobufMessage::ValidationVisitor& validation_visitor,
                absl::Status& creation_status);
   void sendAwaiting();

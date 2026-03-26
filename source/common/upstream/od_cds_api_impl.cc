@@ -12,13 +12,13 @@ namespace Upstream {
 absl::StatusOr<OdCdsApiSharedPtr>
 OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                     Config::XdsManager& xds_manager, ClusterManager& cm,
+                     Config::XdsManager& /*xds_manager*/, ClusterManager& cm,
                      MissingClusterNotifier& notifier, Stats::Scope& scope,
                      ProtobufMessage::ValidationVisitor& validation_visitor,
                      Server::Configuration::ServerFactoryContext&) {
   absl::Status creation_status = absl::OkStatus();
   auto ret =
-      OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, xds_manager, cm,
+      OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm,
                                          notifier, scope, validation_visitor, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
@@ -26,13 +26,12 @@ OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
 
 OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
                            OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                           Config::XdsManager& xds_manager, ClusterManager& cm,
-                           MissingClusterNotifier& notifier, Stats::Scope& scope,
+                           ClusterManager& cm, MissingClusterNotifier& notifier, Stats::Scope& scope,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            absl::Status& creation_status)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
                                                                            "name"),
-      helper_(cm, xds_manager, "odcds"), notifier_(notifier),
+      helper_(cm, "odcds"), notifier_(notifier),
       scope_(scope.createScope("cluster_manager.odcds.")) {
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
@@ -132,7 +131,7 @@ public:
   XdstpOdcdsSubscriptionsManager(Config::XdsManager& xds_manager, ClusterManager& cm,
                                  MissingClusterNotifier& notifier, Stats::Scope& scope,
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
-      : xds_manager_(xds_manager), helper_(cm, xds_manager, "odcds-xdstp"), notifier_(notifier),
+      : xds_manager_(xds_manager), helper_(cm, "odcds-xdstp"), notifier_(notifier),
         scope_(scope.createScope("cluster_manager.odcds.")),
         validation_visitor_(validation_visitor) {}
 

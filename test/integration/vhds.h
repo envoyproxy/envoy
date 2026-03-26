@@ -139,6 +139,18 @@ enum class RouteConfigType { Rds, Static };
 using VhdsIntegrationTestParam = std::tuple<Network::Address::IpVersion, Grpc::ClientType,
                                             Grpc::LegacyOrUnified, RouteConfigType>;
 
+const char RdsConfigWithXdstp[] = R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/my_route/*"
+)EOF";
+
 class VhdsIntegrationTest : public HttpIntegrationTest,
                             public testing::TestWithParam<VhdsIntegrationTestParam> {
 public:
@@ -307,6 +319,117 @@ public:
 
   FakeStreamPtr vhds_stream_;
   bool use_rds_with_vhosts{false};
+};
+
+// Sends a delta discovery response for a VHDS collection subscription.
+// Collection subscriptions require explicit xdstp:// resource names in responses.
+inline void sendDeltaVhdsResponse(
+    FakeStreamPtr& stream,
+    const absl::flat_hash_map<std::string, envoy::config::route::v3::VirtualHost>& to_update,
+    const std::vector<std::string>& to_delete, const std::string& version) {
+  envoy::service::discovery::v3::DeltaDiscoveryResponse response;
+  response.set_system_version_info(version);
+  response.set_type_url(Config::TestTypeUrl::get().VirtualHost);
+  for (const auto& removed : to_delete) {
+    *response.add_removed_resources() = removed;
+  }
+  for (const auto& [resource_name, vhost] : to_update) {
+    auto* resource = response.add_resources();
+    resource->set_name(resource_name);
+    resource->set_version(version);
+    resource->mutable_resource()->PackFrom(vhost);
+  }
+  stream->sendGrpcMessage(response);
+}
+
+// Single-listener xdstp VHDS integration test.
+class VhdsXdstpIntegrationTest : public HttpIntegrationTest,
+                                 public testing::TestWithParam<VhdsIntegrationTestParam>  {
+public:
+  VhdsXdstpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
+    use_lds_ = false;
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      isUnified() ? "true" : "false");
+  }
+
+  Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const { return std::get<1>(GetParam()); }
+  bool isUnified() const { return std::get<2>(GetParam()) == Grpc::LegacyOrUnified::Unified; }
+  RouteConfigType routeConfigType() const { return std::get<3>(GetParam()); }
+
+  void TearDown() override { cleanUpXdsConnection(); }
+
+  std::string virtualHostYaml(const std::string& name, const std::string& domain) {
+    return fmt::format(VhostTemplate, name, domain);
+  }
+
+  envoy::config::route::v3::VirtualHost buildVirtualHost() {
+    return TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+        virtualHostYaml("my_route/vhost_0", "sni.lyft.com"));
+  }
+
+  void initialize() override {
+    if (routeConfigType() == RouteConfigType::Static) {
+      // Static route config - remove the "rds" configuration in the HCM, and
+      // set the contents statically in "route_config".
+      config_helper_.addConfigModifier(
+          [&](envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager& hcm) -> void {
+            hcm.clear_rds();
+            auto* route_config = hcm.mutable_route_config();
+            route_config->CopyFrom(TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(RdsConfigWithXdstp));
+          });
+    }
+
+    setUpstreamCount(2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+
+    defer_listener_finalization_ = true;
+    HttpIntegrationTest::initialize();
+
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+
+    if (routeConfigType() == RouteConfigType::Rds) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+
+      // RDS delivers route config with xdstp VHDS.
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                              {"my_route"}, true));
+      sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+          Config::TestTypeUrl::get().RouteConfiguration,
+          {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(RdsConfigWithXdstp)},
+          "1");
+    }
+
+    // VHDS opens a delta stream subscribing to the xdstp collection.
+    result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    vhds_stream_->startGrpcStream();
+
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(
+        Config::TestTypeUrl::get().VirtualHost,
+        {"xdstp://test/envoy.config.route.v3.VirtualHost/my_route/*"}, {}, vhds_stream_.get()));
+
+    // Respond with a virtual host using xdstp resource naming.
+    sendDeltaVhdsResponse(vhds_stream_,
+                          {{"xdstp://test/envoy.config.route.v3.VirtualHost/my_route/sni.lyft.com",
+                            TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+                                fmt::format(VhostTemplate, "vhost_0", "sni.lyft.com"))}},
+                          {}, "1");
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+
+    test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
+  }
+
+  FakeStreamPtr vhds_stream_;
 };
 
 // VHDS Integration tests are similar to other xDS-dynamic config tests, but
