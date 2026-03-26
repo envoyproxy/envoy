@@ -7,7 +7,6 @@ licenses(["notice"])  # Apache 2
 api_proto_package(
     deps = [
         "//envoy/config/core/v3:pkg",
-        "@com_envoyproxy_protoc_gen_validate//validate:validate",
         "@xds//udpa/annotations:pkg",
     ],
 )

@@ -34,7 +34,7 @@ public:
 class FilterStateTest : public ::testing::Test {
 protected:
   absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr> create(const std::string& config_yaml,
-                                                                bool for_quic = false) {
+                                                               bool for_quic = false) {
     envoy::extensions::transport_sockets::tls::cert_selectors::filter_state::v3::Config config;
     TestUtility::loadFromYaml(config_yaml, config);
     Ssl::TlsCertificateSelectorConfigFactory& provider_factory =

@@ -43,8 +43,7 @@ private:
 class DynamicContext : public ScopeHolder,
                        public Extensions::TransportSockets::Tls::ServerContextImpl {
 public:
-  DynamicContext(Stats::Scope& scope,
-                 Server::Configuration::ServerFactoryContext& factory_context,
+  DynamicContext(Stats::Scope& scope, Server::Configuration::ServerFactoryContext& factory_context,
                  const Ssl::ServerContextConfig& tls_config,
                  const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
       : ScopeHolder(scope),

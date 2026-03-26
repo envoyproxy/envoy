@@ -25,9 +25,8 @@ constexpr absl::string_view kDefaultPrivateKeyKey = "envoy.tls.certificate.priva
 } // namespace
 
 FilterStateCertSelector::FilterStateCertSelector(
-    Ssl::TlsCertificateMapperPtr&& mapper,
-    ThreadLocal::TypedSlot<ThreadLocalCerts>& cert_contexts, Stats::Scope& scope,
-    Server::Configuration::ServerFactoryContext& factory_context,
+    Ssl::TlsCertificateMapperPtr&& mapper, ThreadLocal::TypedSlot<ThreadLocalCerts>& cert_contexts,
+    Stats::Scope& scope, Server::Configuration::ServerFactoryContext& factory_context,
     const Ssl::ServerContextConfig& tls_config, const std::string& cert_chain_key,
     const std::string& private_key_key, uint32_t max_cache_size)
     : mapper_(std::move(mapper)), cert_contexts_(cert_contexts),
@@ -82,17 +81,16 @@ FilterStateCertSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hel
       filter_state->getDataReadOnly<Router::StringAccessor>(private_key_key_);
 
   if (cert_accessor == nullptr || key_accessor == nullptr) {
-    ENVOY_LOG(debug,
-              "filter_state_cert: PEM not found in filter state for '{}' (keys: '{}', '{}')", name,
-              cert_chain_key_, private_key_key_);
+    ENVOY_LOG(debug, "filter_state_cert: PEM not found in filter state for '{}' (keys: '{}', '{}')",
+              name, cert_chain_key_, private_key_key_);
     return Ssl::SelectionResult{
         .status = Ssl::SelectionResult::SelectionStatus::Failed,
     };
   }
 
   // Create a TLS context from the PEM data.
-  auto ctx = createContext(std::string(cert_accessor->asString()),
-                           std::string(key_accessor->asString()));
+  auto ctx =
+      createContext(std::string(cert_accessor->asString()), std::string(key_accessor->asString()));
   if (ctx == nullptr) {
     ENVOY_LOG(warn, "filter_state_cert: failed to create TLS context for '{}'", name);
     return Ssl::SelectionResult{
@@ -157,9 +155,9 @@ absl::Status FilterStateCertSelectorFactory::onConfigUpdate() {
 
 Ssl::TlsCertificateSelectorPtr
 FilterStateCertSelectorFactory::create(Ssl::TlsCertificateSelectorContext&) {
-  return std::make_unique<FilterStateCertSelector>(
-      mapper_factory_(), cert_contexts_, *scope_, factory_context_, tls_config_, cert_chain_key_,
-      private_key_key_, max_cache_size_);
+  return std::make_unique<FilterStateCertSelector>(mapper_factory_(), cert_contexts_, *scope_,
+                                                   factory_context_, tls_config_, cert_chain_key_,
+                                                   private_key_key_, max_cache_size_);
 }
 
 absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr>
@@ -189,8 +187,7 @@ FilterStateCertSelectorConfigFactory::createTlsCertificateSelectorFactory(
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       config.certificate_mapper().typed_config(), factory_context.messageValidationVisitor(),
       mapper_config);
-  auto mapper_factory =
-      mapper_config.createTlsCertificateMapperFactory(*message, factory_context);
+  auto mapper_factory = mapper_config.createTlsCertificateMapperFactory(*message, factory_context);
   RETURN_IF_NOT_OK(mapper_factory.status());
 
   std::string cert_chain_key = config.cert_chain_filter_state_key().empty()
@@ -204,8 +201,7 @@ FilterStateCertSelectorConfigFactory::createTlsCertificateSelectorFactory(
 
   ThreadLocal::TypedSlot<ThreadLocalCerts> cert_contexts(
       factory_context.serverFactoryContext().threadLocal());
-  cert_contexts.set(
-      [](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
+  cert_contexts.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
 
   return std::make_unique<FilterStateCertSelectorFactory>(
       *std::move(mapper_factory), std::move(cert_contexts), std::move(stats_scope),
