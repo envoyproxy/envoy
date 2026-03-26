@@ -1671,48 +1671,56 @@ TEST_F(MetricAggregatorTests, HistogramAggregationCumulative) {
 }
 
 TEST_F(MetricAggregatorTests, HistogramAggregationDelta) {
-  setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-                  /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
 
   std::vector<double> supported_buckets = {10, 20, 30};
 
-  // 1. Add a 0-count histogram -> should be ignored (early return)
-  mockHistogram(supported_buckets, {0, 0, 0}, 0, 0);
-  metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
+  {
+    setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                    /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
 
-  auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_TRUE(metrics.histogram_data_.empty());
+    // 1. Add a 0-count histogram -> should be ignored (early return)
+    mockHistogram(supported_buckets, {0, 0, 0}, 0, 0);
+    metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
 
-  // 2. Add valid data
-  std::vector<uint64_t> computed_buckets1 = {1, 2, 3};
-  mockHistogram(supported_buckets, computed_buckets1, 6, 60);
-  metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
-  metric_aggregator_->addHistogram("metric2", custom_stats_, attr1);
+    auto metrics = metric_aggregator_->releaseResult();
+    EXPECT_TRUE(metrics.histogram_data_.empty());
+  }
 
-  MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
-  metric_aggregator_->addHistogram("metric1", custom_stats_, attr2); // Diff attribute
+  {
+    setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                    /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
 
-  // 3. Add colliding data -> should aggregate (sum up)
-  std::vector<uint64_t> computed_buckets2 = {4, 5, 6};
-  mockHistogram(supported_buckets, computed_buckets2, 15, 150);
-  metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
+    // 2. Add valid data
+    std::vector<uint64_t> computed_buckets1 = {1, 2, 3};
+    mockHistogram(supported_buckets, computed_buckets1, 6, 60);
+    metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
+    metric_aggregator_->addHistogram("metric2", custom_stats_, attr1);
 
-  metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.histogram_data_.size(), 3);
+    MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
+    metric_aggregator_->addHistogram("metric1", custom_stats_, attr2); // Diff attribute
 
-  auto* dp1 = getHistogramPoint(metrics, "metric1", attr1);
-  ASSERT_NE(dp1, nullptr);
-  EXPECT_EQ(dp1->count_, 21); // 6 + 15
-  EXPECT_EQ(dp1->sum_, 210);
+    // 3. Add colliding data -> should aggregate (sum up)
+    std::vector<uint64_t> computed_buckets2 = {4, 5, 6};
+    mockHistogram(supported_buckets, computed_buckets2, 15, 150);
+    metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
 
-  auto* dp2 = getHistogramPoint(metrics, "metric2", attr1);
-  ASSERT_NE(dp2, nullptr);
-  EXPECT_EQ(dp2->count_, 6);
+    auto metrics = metric_aggregator_->releaseResult();
+    EXPECT_EQ(metrics.histogram_data_.size(), 3);
 
-  auto* dp3 = getHistogramPoint(metrics, "metric1", attr2);
-  ASSERT_NE(dp3, nullptr);
-  EXPECT_EQ(dp3->count_, 6);
+    auto* dp1 = getHistogramPoint(metrics, "metric1", attr1);
+    ASSERT_NE(dp1, nullptr);
+    EXPECT_EQ(dp1->count_, 21); // 6 + 15
+    EXPECT_EQ(dp1->sum_, 210);
+
+    auto* dp2 = getHistogramPoint(metrics, "metric2", attr1);
+    ASSERT_NE(dp2, nullptr);
+    EXPECT_EQ(dp2->count_, 6);
+
+    auto* dp3 = getHistogramPoint(metrics, "metric1", attr2);
+    ASSERT_NE(dp3, nullptr);
+    EXPECT_EQ(dp3->count_, 6);
+  }
 }
 
 class RequestStreamerTests : public testing::Test {
