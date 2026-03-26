@@ -219,6 +219,9 @@ public:
   // Returns the time source used for measuring latency.
   TimeSource& timeSource() const { return time_source_; }
 
+  // Returns true if unknown fields should be scrubbed.
+  bool scrubUnknownFields() const { return scrub_unknown_fields_; }
+
 protected:
   // Protected constructor to make sure that this class is used in a factory fashion using the
   // public `create` method.
@@ -365,6 +368,9 @@ private:
 
   // The time source used for measuring latency.
   TimeSource& time_source_;
+
+  // Whether to scrub unknown fields.
+  bool scrub_unknown_fields_ = false;
 };
 
 // A class to validate the input type specified for the unified matcher in the config.

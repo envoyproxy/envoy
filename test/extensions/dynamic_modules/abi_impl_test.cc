@@ -861,6 +861,15 @@ WEAK_STUB(NetworkGetSocketOptionsSize,
           envoy_dynamic_module_callback_network_get_socket_options_size(nullptr))
 WEAK_STUB(AccessLoggerGetAttemptCount,
           envoy_dynamic_module_callback_access_logger_get_attempt_count(nullptr))
+WEAK_STUB(AccessLoggerGetAttributeBool,
+          envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+              nullptr, envoy_dynamic_module_type_attribute_id_ConnectionMtls, nullptr))
+WEAK_STUB(AccessLoggerGetAttributeInt,
+          envoy_dynamic_module_callback_access_logger_get_attribute_int(
+              nullptr, envoy_dynamic_module_type_attribute_id_ResponseCode, nullptr))
+WEAK_STUB(AccessLoggerGetAttributeString,
+          envoy_dynamic_module_callback_access_logger_get_attribute_string(
+              nullptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, nullptr))
 WEAK_STUB(AccessLoggerGetConnectionId,
           envoy_dynamic_module_callback_access_logger_get_connection_id(nullptr))
 WEAK_STUB(AccessLoggerGetDownstreamLocalDnsSanSize,
