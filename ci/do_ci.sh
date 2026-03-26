@@ -413,28 +413,22 @@ case $CI_TARGET in
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
         fi
-        if [[ -z "$ENVOY_SKIP_CTO_JEMALLOC" ]]; then
-            echo "Building and testing with jemalloc: ${TEST_TARGETS[*]}"
-            bazel_with_collection \
-                test "${BAZEL_BUILD_OPTIONS[@]}" \
-                --@envoy//bazel:jemalloc=True \
-                -c fastbuild \
-                @envoy//test/common/memory/...
-            echo "Building binary with jemalloc..."
-            bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-                --@envoy//bazel:jemalloc=True \
-                -c fastbuild \
-                @envoy//source/exe:envoy-static
-        fi
         if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
             exit 0
         fi
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
+        # --define tcmalloc=disabled is required here because --config=compile-time-options sets
+        # --define=tcmalloc=gperftools, which would conflict with --@envoy//bazel:jemalloc=True.
+        # Normally the jemalloc bool_flag alone is sufficient to select jemalloc (tcmalloc is
+        # disabled implicitly by the flag taking precedence in the select), but when gperftools is
+        # explicitly enabled via --define, both conditions become active and must be resolved manually.
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define wasm=wasmtime \
             --define admin_functionality=disabled \
+            --define tcmalloc=disabled \
+            --@envoy//bazel:jemalloc=True \
             -c fastbuild \
             "${TEST_TARGETS[@]}"
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
