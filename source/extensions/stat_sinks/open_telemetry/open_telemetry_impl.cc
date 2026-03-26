@@ -27,7 +27,7 @@ MetricAggregator::AggregationResult MetricAggregator::releaseResult() {
 }
 
 void MetricAggregator::addGauge(absl::string_view metric_name, uint64_t value,
-                                AttributesVector attributes) {
+                                SortedAttributesVector attributes) {
   MetricViewKey view_key{metric_name, attributes};
   auto it = gauge_data_.find(view_key);
   if (it != gauge_data_.end()) {
@@ -39,7 +39,7 @@ void MetricAggregator::addGauge(absl::string_view metric_name, uint64_t value,
 }
 
 void MetricAggregator::addCounter(absl::string_view metric_name, uint64_t value, uint64_t delta,
-                                  AttributesVector attributes) {
+                                  SortedAttributesVector attributes) {
   const uint64_t point_value =
       (counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta
                                                                                       : value;
@@ -50,6 +50,7 @@ void MetricAggregator::addCounter(absl::string_view metric_name, uint64_t value,
 
   MetricViewKey view_key{metric_name, attributes};
   auto it = counter_data_.find(view_key);
+
   if (it != counter_data_.end()) {
     it->second += point_value;
   } else {
@@ -60,7 +61,7 @@ void MetricAggregator::addCounter(absl::string_view metric_name, uint64_t value,
 
 void MetricAggregator::addHistogram(absl::string_view metric_name,
                                     const Envoy::Stats::HistogramStatistics& stats,
-                                    AttributesVector attributes) {
+                                    SortedAttributesVector attributes) {
   if (stats.sampleCount() == 0 &&
       histogram_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
@@ -140,7 +141,7 @@ RequestStreamer::findOrCreateMetric(absl::string_view name) {
 
 template <class PointType>
 void RequestStreamer::setCommonFields(PointType* point,
-                                      MetricAggregator::AttributesVector attributes,
+                                      MetricAggregator::SortedAttributesVector attributes,
                                       AggregationTemporality temp) const {
   point->set_time_unix_nano(snapshot_time_ns_);
   if (temp == AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE) {
@@ -149,7 +150,8 @@ void RequestStreamer::setCommonFields(PointType* point,
     point->set_start_time_unix_nano(delta_start_time_ns_);
   }
 
-  for (auto& [k, v] : attributes) {
+  auto attrs = std::move(attributes).release();
+  for (auto& [k, v] : attrs) {
     auto* attr = point->add_attributes();
     attr->set_key(std::move(k));
     attr->mutable_value()->set_string_value(std::move(v));
@@ -157,7 +159,7 @@ void RequestStreamer::setCommonFields(PointType* point,
 }
 
 void RequestStreamer::addGauge(absl::string_view name, uint64_t value,
-                               MetricAggregator::AttributesVector attributes) {
+                               MetricAggregator::SortedAttributesVector attributes) {
   sendIfFull();
   auto* metric = findOrCreateMetric(name);
   auto* point = metric->mutable_gauge()->add_data_points();
@@ -168,7 +170,7 @@ void RequestStreamer::addGauge(absl::string_view name, uint64_t value,
 }
 
 void RequestStreamer::addCounter(absl::string_view name, uint64_t value, uint64_t delta,
-                                 MetricAggregator::AttributesVector attributes) {
+                                 MetricAggregator::SortedAttributesVector attributes) {
   sendIfFull();
   auto temp = counter_temporality_;
   if (delta == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
@@ -188,7 +190,7 @@ void RequestStreamer::addCounter(absl::string_view name, uint64_t value, uint64_
 }
 
 void RequestStreamer::addHistogram(absl::string_view name, MetricAggregator::CustomHistogram hist,
-                                   MetricAggregator::AttributesVector attributes) {
+                                   MetricAggregator::SortedAttributesVector attributes) {
   sendIfFull();
   auto temp = histogram_temporality_;
   if (hist.count_ == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
@@ -213,7 +215,7 @@ void RequestStreamer::addHistogram(absl::string_view name, MetricAggregator::Cus
 
 void RequestStreamer::addHistogram(absl::string_view name,
                                    const Envoy::Stats::HistogramStatistics& stats,
-                                   MetricAggregator::AttributesVector attributes) {
+                                   MetricAggregator::SortedAttributesVector attributes) {
   MetricAggregator::CustomHistogram custom_hist;
   custom_hist.count_ = stats.sampleCount();
   custom_hist.sum_ = stats.sampleSum();
@@ -225,13 +227,13 @@ void RequestStreamer::addHistogram(absl::string_view name,
 
 void RequestStreamer::addAggregationResult(MetricAggregator::AggregationResult&& metrics) {
   for (const auto& [key, value] : metrics.gauge_data_) {
-    addGauge(key.name_, value, key.attributes_);
+    addGauge(key.name(), value, key.sorted_attributes());
   }
   for (const auto& [key, value] : metrics.counter_data_) {
-    addCounter(key.name_, value, value, key.attributes_);
+    addCounter(key.name(), value, value, key.sorted_attributes());
   }
   for (const auto& [key, value] : metrics.histogram_data_) {
-    addHistogram(key.name_, value, key.attributes_);
+    addHistogram(key.name(), value, key.sorted_attributes());
   }
 }
 
@@ -344,23 +346,24 @@ std::string OtlpMetricsFlusherImpl::getMetricName(
 }
 
 template <class StatType>
-MetricAggregator::AttributesVector OtlpMetricsFlusherImpl::getCombinedAttributes(
+MetricAggregator::SortedAttributesVector OtlpMetricsFlusherImpl::getCombinedAttributes(
     const StatType& stat, OptRef<const SinkConfig::ConversionAction> conversion_config) const {
-  MetricAggregator::AttributesVector attributes;
+  std::vector<std::pair<std::string, std::string>> attrs;
   if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {
-      attributes.emplace_back(tag.name_, tag.value_);
+      attrs.emplace_back(tag.name_, tag.value_);
     }
   }
   if (conversion_config.has_value()) {
     for (const auto& attr : conversion_config->static_metric_labels()) {
-      attributes.emplace_back(attr.key(), attr.value().string_value());
+      attrs.emplace_back(attr.key(), attr.value().string_value());
     }
   }
   // Sort attributes to ensure a deterministic order, which is critical since these
   // attributes are used as part of the lookup key for metric aggregation.
-  std::sort(attributes.begin(), attributes.end());
-  return attributes;
+  std::sort(attrs.begin(), attrs.end());
+
+  return MetricAggregator::SortedAttributesVector(std::move(attrs));
 }
 
 template <typename SinkType>

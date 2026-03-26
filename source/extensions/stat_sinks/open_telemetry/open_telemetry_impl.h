@@ -47,6 +47,28 @@ public:
   // and faster for the small number of attributes (usually < 10) typical for metrics.
   // This also allows for faster linear comparisons when using this vector as a map key.
   using AttributesVector = std::vector<std::pair<std::string, std::string>>;
+  class SortedAttributesVector {
+  public:
+    explicit SortedAttributesVector(AttributesVector&& vec) : sorted_attributes_(std::move(vec)) {
+      ASSERT(std::is_sorted(sorted_attributes_.begin(), sorted_attributes_.end()));
+    }
+    SortedAttributesVector(std::initializer_list<std::pair<std::string, std::string>> list)
+        : sorted_attributes_(list) {
+      ASSERT(std::is_sorted(sorted_attributes_.begin(), sorted_attributes_.end()));
+    }
+
+    AttributesVector release() && { return std::move(sorted_attributes_); }
+    bool operator==(const SortedAttributesVector& other) const {
+      return sorted_attributes_ == other.sorted_attributes_;
+    }
+
+    template <typename H> friend H AbslHashValue(H h, const SortedAttributesVector& v) {
+      return H::combine(std::move(h), v.sorted_attributes_);
+    }
+
+  private:
+    AttributesVector sorted_attributes_;
+  };
 
   explicit MetricAggregator(int64_t snapshot_time_ns, int64_t delta_start_time_ns,
                             int64_t cumulative_start_time_ns,
@@ -56,22 +78,25 @@ public:
         cumulative_start_time_ns_(cumulative_start_time_ns),
         counter_temporality_(counter_temporality), histogram_temporality_(histogram_temporality) {}
 
-  struct MetricKey {
-    // Full name of the metric.
-    std::string name_;
-    // Attributes associated with the data points for this metric.
-    AttributesVector attributes_;
-
-    MetricKey(absl::string_view name, AttributesVector attributes)
-        : name_(name), attributes_(std::move(attributes)) {}
+  class MetricKey {
+  public:
+    MetricKey(absl::string_view name, SortedAttributesVector sorted_attributes)
+        : name_(name), sorted_attributes_(std::move(sorted_attributes)) {}
 
     bool operator==(const MetricKey& other) const {
-      return name_ == other.name_ && attributes_ == other.attributes_;
+      return name_ == other.name_ && sorted_attributes_ == other.sorted_attributes_;
     }
 
     template <typename H> friend H AbslHashValue(H h, const MetricKey& k) {
-      return H::combine(std::move(h), k.name_, k.attributes_);
+      return H::combine(std::move(h), k.name_, k.sorted_attributes_);
     }
+
+    absl::string_view name() const { return name_; }
+    const SortedAttributesVector& sorted_attributes() const { return sorted_attributes_; }
+
+  private:
+    std::string name_;
+    SortedAttributesVector sorted_attributes_;
   };
 
   // MetricViewKey is a temporary view of MetricKey that does not own the name or attributes.
@@ -79,20 +104,25 @@ public:
   // Since `MetricKeyHash` and `MetricKeyEqual` are marked as transparent, the map can compute
   // the view's hash and compare it directly against the stored `MetricKey` without allocating
   // memory to create a `MetricKey` just to search the map.
-  struct MetricViewKey {
-    absl::string_view name_;
-    const AttributesVector& attributes_;
-
-    MetricViewKey(absl::string_view name, const AttributesVector& attributes)
-        : name_(name), attributes_(attributes) {}
+  class MetricViewKey {
+  public:
+    MetricViewKey(absl::string_view name, const SortedAttributesVector& sorted_attributes)
+        : name_(name), sorted_attributes_(sorted_attributes) {}
 
     bool operator==(const MetricViewKey& other) const {
-      return name_ == other.name_ && attributes_ == other.attributes_;
+      return name_ == other.name_ && sorted_attributes_ == other.sorted_attributes_;
     }
 
     template <typename H> friend H AbslHashValue(H h, const MetricViewKey& v) {
-      return H::combine(std::move(h), v.name_, v.attributes_);
+      return H::combine(std::move(h), v.name_, v.sorted_attributes_);
     }
+
+    absl::string_view name() const { return name_; }
+    const SortedAttributesVector& sorted_attributes() const { return sorted_attributes_; }
+
+  private:
+    absl::string_view name_;
+    const SortedAttributesVector& sorted_attributes_;
   };
 
   struct MetricKeyHash {
@@ -109,11 +139,11 @@ public:
     bool operator()(const MetricKey& a, const MetricKey& b) const { return a == b; }
 
     bool operator()(const MetricKey& a, const MetricViewKey& b) const {
-      return a.name_ == b.name_ && a.attributes_ == b.attributes_;
+      return a.name() == b.name() && a.sorted_attributes() == b.sorted_attributes();
     }
 
     bool operator()(const MetricViewKey& a, const MetricKey& b) const {
-      return a.name_ == b.name_ && a.attributes_ == b.attributes_;
+      return a.name() == b.name() && a.sorted_attributes() == b.sorted_attributes();
     }
   };
 
@@ -145,17 +175,17 @@ public:
 
   // Adds a gauge metric data point. Aggregates by summing if a point with the
   // same attributes exists.
-  void addGauge(absl::string_view metric_name, uint64_t value, AttributesVector attributes);
+  void addGauge(absl::string_view metric_name, uint64_t value, SortedAttributesVector attributes);
 
   // Adds a counter metric data point. Aggregates by summing the delta or value
   // based on temporality if a point with the same attributes exists.
   void addCounter(absl::string_view metric_name, uint64_t value, uint64_t delta,
-                  AttributesVector attributes);
+                  SortedAttributesVector attributes);
 
   // Adds a histogram metric data point. Aggregates counts and sums if a point
   // with the same attributes and compatible bounds exists.
   void addHistogram(absl::string_view metric_name, const Envoy::Stats::HistogramStatistics& stats,
-                    AttributesVector attributes);
+                    SortedAttributesVector attributes);
 
 private:
   const int64_t snapshot_time_ns_;
@@ -188,19 +218,19 @@ public:
 
   // Adds a gauge metric data point to the streamer.
   void addGauge(absl::string_view name, uint64_t value,
-                MetricAggregator::AttributesVector attributes);
+                MetricAggregator::SortedAttributesVector attributes);
 
   // Adds a counter metric data point to the streamer.
   void addCounter(absl::string_view name, uint64_t value, uint64_t delta,
-                  MetricAggregator::AttributesVector attributes);
+                  MetricAggregator::SortedAttributesVector attributes);
 
   // Adds a custom histogram data point to the streamer.
   void addHistogram(absl::string_view name, MetricAggregator::CustomHistogram hist,
-                    MetricAggregator::AttributesVector attributes);
+                    MetricAggregator::SortedAttributesVector attributes);
 
   // Adds a stats histogram data point to the streamer, converting it first.
   void addHistogram(absl::string_view name, const Envoy::Stats::HistogramStatistics& stats,
-                    MetricAggregator::AttributesVector attributes);
+                    MetricAggregator::SortedAttributesVector attributes);
 
   // Adds all metrics from an aggregation result to the streamer.
   void addAggregationResult(MetricAggregator::AggregationResult&& result);
@@ -219,7 +249,7 @@ private:
 
   // Sets common fields (timestamp, attributes) for a data point.
   template <class PointType>
-  void setCommonFields(PointType* point, MetricAggregator::AttributesVector attributes,
+  void setCommonFields(PointType* point, MetricAggregator::SortedAttributesVector attributes,
                        opentelemetry::proto::metrics::v1::AggregationTemporality temp) const;
 
   const uint32_t max_dp_;
@@ -336,7 +366,7 @@ private:
                             OptRef<const SinkConfig::ConversionAction> conversion_config) const;
 
   template <class StatType>
-  MetricAggregator::AttributesVector
+  MetricAggregator::SortedAttributesVector
   getCombinedAttributes(const StatType& stat,
                         OptRef<const SinkConfig::ConversionAction> conversion_config) const;
 
