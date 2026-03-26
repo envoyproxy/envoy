@@ -143,15 +143,25 @@ void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint6
   }
 }
 
-std::vector<Stats::CounterSharedPtr> TestUtility::counters(Stats::Store& store) {
-  std::vector<Stats::CounterSharedPtr> counters;
+/*std::vector<Stats::Counter*> Stats::Utility::countersMainThread(Stats::Store& store) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  std::vector<Stats::Counter*> counters;
   store.forEachCounter([&counters](size_t size) { counters.reserve(size); },
                        [&counters](Stats::Counter& counter) { counters.push_back(&counter); });
   return counters;
-}
+  }*/
 
-Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
-  return findByName(counters(store), name);
+Stats::Counter* TestUtility::findCounter(Stats::Store& store, const std::string& name) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  Stats::Counter* found = nullptr;
+  store.forEachCounter(nullptr,
+                       [&found, &name](Stats::Counter& counter) {
+                         if (found == nullptr && counter.name() == name) {
+                           found = &counter;
+                         }
+                       });
+  return found;
+
   /*
   Stats::CounterSharedPtr ret;
   store.forEachCounter(nullptr, [&ret, &name](Stats::Counter& counter) {

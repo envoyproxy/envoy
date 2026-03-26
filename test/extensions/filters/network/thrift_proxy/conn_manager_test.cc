@@ -179,7 +179,7 @@ stat_prefix: test
     // Destroy any existing filter first.
     filter_ = nullptr;
 
-    for (Stats::Counter* counter : Stats::Utility::collectCountersMainThread(store_)) {
+    for (Stats::Counter* counter : Stats::Utility::countersMainThread(store_)) {
       counter->reset();
     }
 

@@ -197,7 +197,7 @@ protected:
 
   void printServerCounters() {
     std::cerr << "all counters" << std::endl;
-    for (Stats::Counter* counter : Stats::Utility::collectCountersMainThread(
+    for (Stats::Counter* counter : Stats::Utility::countersMainThread(
              test_server_->statStore())) {
       std::cerr << "counter: " << counter->name() << ", value: " << counter->value() << std::endl;
     }

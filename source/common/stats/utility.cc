@@ -129,7 +129,7 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
   return scope.textReadoutFromStatNameWithTags(StatName(joined.get()), tags);
 }
 
-std::vector<Stats::Counter*> collectCountersMainThread(Stats::Store& store) {
+std::vector<Stats::Counter*> countersMainThread(Stats::Store& store) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   std::vector<Stats::Counter*> counters;
   store.forEachCounter([&counters](size_t size) { counters.reserve(size); },
@@ -137,7 +137,7 @@ std::vector<Stats::Counter*> collectCountersMainThread(Stats::Store& store) {
   return counters;
 }
 
-std::vector<Stats::Gauge*> collectGaugesMainThread(Stats::Store& store) {
+std::vector<Stats::Gauge*> gaugesMainThread(Stats::Store& store) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   std::vector<Stats::Gauge*> gauges;
   store.forEachGauge([&gauges](size_t size) { gauges.reserve(size); },
@@ -145,7 +145,7 @@ std::vector<Stats::Gauge*> collectGaugesMainThread(Stats::Store& store) {
   return gauges;
 }
 
-std::vector<Stats::TextReadout*> collectTextReadoutsMainThread(Stats::Store& store) {
+std::vector<Stats::TextReadout*> textReadoutsMainThread(Stats::Store& store) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   std::vector<Stats::TextReadout*> text_readouts;
   store.forEachTextReadout([&text_readouts](size_t size) { text_readouts.reserve(size); },
@@ -155,7 +155,7 @@ std::vector<Stats::TextReadout*> collectTextReadoutsMainThread(Stats::Store& sto
   return text_readouts;
 }
 
-std::vector<Stats::ParentHistogram*> collectHistogramsMainThread(Stats::Store& store) {
+std::vector<Stats::ParentHistogram*> histogramsMainThread(Stats::Store& store) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   std::vector<Stats::ParentHistogram*> histograms;
   store.forEachHistogram([&histograms](size_t size) { histograms.reserve(size); },

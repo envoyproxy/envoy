@@ -241,10 +241,10 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
  *
  * These functions handle de-duplication.
  */
-std::vector<Stats::Counter*> collectCountersMainThread(Stats::Store& store);
-std::vector<Stats::Gauge*> collectGaugesMainThread(Stats::Store& store);
-std::vector<Stats::TextReadout*> collectTextreadoutsMainThread(Stats::Store& store);
-std::vector<Stats::ParentHistogram*> collectHistogramsMainThread(Stats::Store& store);
+std::vector<Stats::Counter*> countersMainThread(Stats::Store& store);
+std::vector<Stats::Gauge*> gaugesMainThread(Stats::Store& store);
+std::vector<Stats::TextReadout*> textReadoutsMainThread(Stats::Store& store);
+std::vector<Stats::ParentHistogram*> histogramsMainThread(Stats::Store& store);
 
 
 } // namespace Utility

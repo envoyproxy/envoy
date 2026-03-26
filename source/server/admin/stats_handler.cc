@@ -188,10 +188,10 @@ void StatsHandler::prometheusRender(Stats::Store& stats,
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       params.prometheus_text_readouts_ ? stats.textReadouts()
                                        : std::vector<Stats::TextReadoutSharedPtr>();
-  std::vector<Stats::Counter*> counters;
-  std::vector<Stats::Gauge*> gauges;
-  std::vector<Stats::ParentHistogram*> histograms;
-  std::vector<Stats::TextReadout*> text_readouts;
+  std::vector<Stats::Counter*> counters = Stats::Utility::countersMainThread(stats);
+  std::vector<Stats::Gauge*> gauges = Stats::Utility::gaugesMainThread(stats);
+  std::vector<Stats::ParentHistogram*> histograms = Stats::Utility::histogramsMainThread(stats);
+  std::vector<Stats::TextReadout*> text_readouts = Stats::Utility::textReadoutsMainThread(stats);
 
   PrometheusStatsFormatter::statsAsPrometheus(
       counters, gauges, histograms, text_readouts, cluster_manager,
