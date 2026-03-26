@@ -94,7 +94,6 @@ message SinkConfig {
   // The supported actions are
   // - ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction``.
   // - ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
-  // - ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.PrependPrefixAction``.
   // If stats are not matched, they will be directly converted to OTLP metrics as usual.
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
 }
