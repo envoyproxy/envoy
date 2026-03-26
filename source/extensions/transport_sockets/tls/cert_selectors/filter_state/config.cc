@@ -145,7 +145,7 @@ DynamicContextConstSharedPtr FilterStateCertSelector::createContext(const std::s
 absl::Status FilterStateCertSelectorFactory::onConfigUpdate() {
   // Clear the thread-local cache so new connections pick up updated TLS config
   // (e.g., changed cipher suites or CA certs from the parent context).
-  cert_contexts_.runOnAllThreads([](OptRef<ThreadLocalCerts> certs) {
+  cert_contexts_->runOnAllThreads([](OptRef<ThreadLocalCerts> certs) {
     if (certs.has_value()) {
       certs->ctx_by_name_.clear();
     }
@@ -155,7 +155,7 @@ absl::Status FilterStateCertSelectorFactory::onConfigUpdate() {
 
 Ssl::TlsCertificateSelectorPtr
 FilterStateCertSelectorFactory::create(Ssl::TlsCertificateSelectorContext&) {
-  return std::make_unique<FilterStateCertSelector>(mapper_factory_(), cert_contexts_, *scope_,
+  return std::make_unique<FilterStateCertSelector>(mapper_factory_(), *cert_contexts_, *scope_,
                                                    factory_context_, tls_config_, cert_chain_key_,
                                                    private_key_key_, max_cache_size_);
 }
@@ -199,9 +199,9 @@ FilterStateCertSelectorConfigFactory::createTlsCertificateSelectorFactory(
 
   auto stats_scope = factory_context.scope().createScope("filter_state_cert.");
 
-  ThreadLocal::TypedSlot<ThreadLocalCerts> cert_contexts(
+  auto cert_contexts = std::make_unique<ThreadLocal::TypedSlot<ThreadLocalCerts>>(
       factory_context.serverFactoryContext().threadLocal());
-  cert_contexts.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
+  cert_contexts->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
 
   return std::make_unique<FilterStateCertSelectorFactory>(
       *std::move(mapper_factory), std::move(cert_contexts), std::move(stats_scope),

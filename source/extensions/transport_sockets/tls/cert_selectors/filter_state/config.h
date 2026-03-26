@@ -116,13 +116,12 @@ private:
 
 class FilterStateCertSelectorFactory : public Ssl::TlsCertificateSelectorFactory {
 public:
-  FilterStateCertSelectorFactory(Ssl::TlsCertificateMapperFactory&& mapper_factory,
-                                 ThreadLocal::TypedSlot<ThreadLocalCerts>&& cert_contexts,
-                                 Stats::ScopeSharedPtr scope,
-                                 Server::Configuration::ServerFactoryContext& factory_context,
-                                 const Ssl::ServerContextConfig& tls_config,
-                                 const std::string& cert_chain_key,
-                                 const std::string& private_key_key, uint32_t max_cache_size)
+  FilterStateCertSelectorFactory(
+      Ssl::TlsCertificateMapperFactory&& mapper_factory,
+      std::unique_ptr<ThreadLocal::TypedSlot<ThreadLocalCerts>>&& cert_contexts,
+      Stats::ScopeSharedPtr scope, Server::Configuration::ServerFactoryContext& factory_context,
+      const Ssl::ServerContextConfig& tls_config, const std::string& cert_chain_key,
+      const std::string& private_key_key, uint32_t max_cache_size)
       : mapper_factory_(std::move(mapper_factory)), cert_contexts_(std::move(cert_contexts)),
         scope_(std::move(scope)), factory_context_(factory_context), tls_config_(tls_config),
         cert_chain_key_(cert_chain_key), private_key_key_(private_key_key),
@@ -133,7 +132,7 @@ public:
 
 private:
   Ssl::TlsCertificateMapperFactory mapper_factory_;
-  ThreadLocal::TypedSlot<ThreadLocalCerts> cert_contexts_;
+  std::unique_ptr<ThreadLocal::TypedSlot<ThreadLocalCerts>> cert_contexts_;
   Stats::ScopeSharedPtr scope_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const Ssl::ServerContextConfig& tls_config_;
