@@ -122,7 +122,7 @@ struct TenantHashEq {
  * "Near" here is defined as within one fill_interval worth of tokens
  * from the bucket being empty.
  */
-class Bucket : public std::enable_shared_from_this<Bucket> {
+class Bucket {
 public:
   /**
    * @param max_tokens supplies the maximum number of tokens in the bucket.
