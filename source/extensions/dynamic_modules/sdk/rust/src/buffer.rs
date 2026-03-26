@@ -26,10 +26,10 @@ impl Default for EnvoyBuffer<'_> {
 }
 
 impl EnvoyBuffer<'_> {
-  /// This is a helper function to create an [`EnvoyBuffer`] from a string.
+  /// This is a helper function to create an [`EnvoyBuffer`] from a byte slice.
   ///
   /// This is meant for use by the end users in unit tests.
-  pub fn new(s: &str) -> Self {
+  pub fn new(s: &[u8]) -> Self {
     Self {
       raw_ptr: s.as_ptr(),
       length: s.len(),
