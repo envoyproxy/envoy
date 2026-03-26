@@ -73,4 +73,5 @@ declare_python_abi = repository_rule(
         "python_version": attr.string(mandatory = True),
     },
     local = True,
+    environ = [_PYTHON_BIN_PATH_ENV, "PATH"],
 )
