@@ -157,6 +157,7 @@ public:
   void addHistogram(absl::string_view metric_name, const Envoy::Stats::HistogramStatistics& stats,
                     AttributesVector attributes);
 
+private:
   const int64_t snapshot_time_ns_;
   const int64_t delta_start_time_ns_;
   const int64_t cumulative_start_time_ns_;
@@ -174,16 +175,16 @@ public:
  * Once a request reaches its data point limit, it is seamlessly dispatched to the provided
  * send_callback_.
  */
-class OtlpRequestStreamer {
+class RequestStreamer {
 public:
-  OtlpRequestStreamer(
-      uint32_t max_dp,
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
-          resource_attributes,
-      opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality,
-      opentelemetry::proto::metrics::v1::AggregationTemporality histogram_temporality,
-      absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback, int64_t snapshot_time_ns,
-      int64_t delta_start_time_ns, int64_t cumulative_start_time_ns);
+  RequestStreamer(uint32_t max_dp,
+                  const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
+                      resource_attributes,
+                  opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality,
+                  opentelemetry::proto::metrics::v1::AggregationTemporality histogram_temporality,
+                  absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback,
+                  int64_t snapshot_time_ns, int64_t delta_start_time_ns,
+                  int64_t cumulative_start_time_ns);
 
   // Adds a gauge metric data point to the streamer.
   void addGauge(absl::string_view name, uint64_t value,
@@ -204,18 +205,21 @@ public:
   // Adds all metrics from an aggregation result to the streamer.
   void addAggregationResult(MetricAggregator::AggregationResult&& result);
 
-  // Flushes any current buffered metrics to the send callback.
-  void flush();
+  // Sends any current buffered metrics to the send callback.
+  void send();
 
-  // Checks if the request limit is reached, and flushes if necessary.
-  void tryFlushRequest();
+private:
+  // Checks if the request limit is reached, and sends if necessary.
+  void sendIfFull();
+  // Initializes a new MetricsExportRequest.
+  void initNewRequest();
 
   // Finds or creates a metric in the current scope metrics, using zero-allocation lookups.
   ::opentelemetry::proto::metrics::v1::Metric* findOrCreateMetric(absl::string_view name);
 
   // Sets common fields (timestamp, attributes) for a data point.
   template <class PointType>
-  void setCommonFields(PointType* point, MetricAggregator::AttributesVector attributes,
+  void setCommonFields(PointType* point, const MetricAggregator::AttributesVector& attributes,
                        opentelemetry::proto::metrics::v1::AggregationTemporality temp) const;
 
   const uint32_t max_dp_;
@@ -241,7 +245,8 @@ public:
 
 class OtlpOptions {
 public:
-  OtlpOptions(const SinkConfig& sink_config, Server::Configuration::ServerFactoryContext& server);
+  OtlpOptions(const SinkConfig& sink_config, const Tracers::OpenTelemetry::Resource& resource,
+              Server::Configuration::ServerFactoryContext& server);
 
   bool reportCountersAsDeltas() { return report_counters_as_deltas_; }
   bool reportHistogramsAsDeltas() { return report_histograms_as_deltas_; }
@@ -334,11 +339,16 @@ private:
   MetricAggregator::AttributesVector
   getCombinedAttributes(const StatType& stat,
                         OptRef<const SinkConfig::ConversionAction> conversion_config) const;
-  template <class StatType, typename SinkCallFunc>
-  void processMetricItem(const StatType& stat, SinkCallFunc&& sink_call) const;
 
+  /**
+   * Processes all metrics (gauges, counters, histograms) from the snapshot and
+   * adds them to the provided sink.
+   * @param snapshot supplies the metrics snapshot to process.
+   * @param sink supplies the sink to add the metrics to (e.g., MetricAggregator or
+   * RequestStreamer).
+   */
   template <typename SinkType>
-  void flushMetrics(Stats::MetricSnapshot& snapshot, SinkType& sink, int64_t snapshot_time) const;
+  void sinkMetrics(Stats::MetricSnapshot& snapshot, SinkType& sink) const;
 
   template <class GaugeType>
   void addGaugeDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,

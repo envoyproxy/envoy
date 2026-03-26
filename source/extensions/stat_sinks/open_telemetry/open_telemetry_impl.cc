@@ -19,13 +19,26 @@ using MetricsExportRequest =
 using Metric = opentelemetry::proto::metrics::v1::Metric;
 using NumberDataPoint = opentelemetry::proto::metrics::v1::NumberDataPoint;
 using HistogramDataPoint = opentelemetry::proto::metrics::v1::HistogramDataPoint;
+using KeyValue = opentelemetry::proto::common::v1::KeyValue;
+
+Protobuf::RepeatedPtrField<KeyValue>
+generateResourceAttributes(const Tracers::OpenTelemetry::Resource& resource) {
+  Protobuf::RepeatedPtrField<KeyValue> result;
+
+  for (const auto& [key, value] : resource.attributes_) {
+    auto* attr = result.Add();
+    attr->set_key(key);
+    attr->mutable_value()->set_string_value(value);
+  }
+  return result;
+}
 
 MetricAggregator::AggregationResult MetricAggregator::releaseResult() {
   return {std::move(gauge_data_), std::move(counter_data_),  std::move(histogram_data_),
           snapshot_time_ns_,      cumulative_start_time_ns_, delta_start_time_ns_};
 }
 
-OtlpRequestStreamer::OtlpRequestStreamer(
+RequestStreamer::RequestStreamer(
     uint32_t max_dp,
     const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
         resource_attributes,
@@ -38,11 +51,15 @@ OtlpRequestStreamer::OtlpRequestStreamer(
       delta_start_time_ns_(delta_start_time_ns),
       cumulative_start_time_ns_(cumulative_start_time_ns) {}
 
-void OtlpRequestStreamer::tryFlushRequest() {
+void RequestStreamer::sendIfFull() {
   if (current_request_ != nullptr && (max_dp_ == 0 || dp_num_ < max_dp_)) {
     return;
   }
-  flush();
+  send();
+  initNewRequest();
+}
+
+void RequestStreamer::initNewRequest() {
   current_request_ = std::make_unique<MetricsExportRequest>();
   auto* rm = current_request_->add_resource_metrics();
   for (const auto& attr : resource_attributes_) {
@@ -54,7 +71,7 @@ void OtlpRequestStreamer::tryFlushRequest() {
 }
 
 ::opentelemetry::proto::metrics::v1::Metric*
-OtlpRequestStreamer::findOrCreateMetric(absl::string_view name) {
+RequestStreamer::findOrCreateMetric(absl::string_view name) {
   auto it = name_to_metric_.find(name);
   if (it != name_to_metric_.end()) {
     return it->second;
@@ -66,9 +83,9 @@ OtlpRequestStreamer::findOrCreateMetric(absl::string_view name) {
 }
 
 template <class PointType>
-void OtlpRequestStreamer::setCommonFields(PointType* point,
-                                          MetricAggregator::AttributesVector attributes,
-                                          AggregationTemporality temp) const {
+void RequestStreamer::setCommonFields(PointType* point,
+                                      const MetricAggregator::AttributesVector& attributes,
+                                      AggregationTemporality temp) const {
   point->set_time_unix_nano(snapshot_time_ns_);
   if (temp == AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE) {
     point->set_start_time_unix_nano(cumulative_start_time_ns_);
@@ -83,9 +100,9 @@ void OtlpRequestStreamer::setCommonFields(PointType* point,
   }
 }
 
-void OtlpRequestStreamer::addGauge(absl::string_view name, uint64_t value,
-                                   MetricAggregator::AttributesVector attributes) {
-  tryFlushRequest();
+void RequestStreamer::addGauge(absl::string_view name, uint64_t value,
+                               MetricAggregator::AttributesVector attributes) {
+  sendIfFull();
   auto* metric = findOrCreateMetric(name);
   auto* point = metric->mutable_gauge()->add_data_points();
   point->set_as_int(value);
@@ -94,9 +111,9 @@ void OtlpRequestStreamer::addGauge(absl::string_view name, uint64_t value,
   dp_num_++;
 }
 
-void OtlpRequestStreamer::addCounter(absl::string_view name, uint64_t value, uint64_t delta,
-                                     MetricAggregator::AttributesVector attributes) {
-  tryFlushRequest();
+void RequestStreamer::addCounter(absl::string_view name, uint64_t value, uint64_t delta,
+                                 MetricAggregator::AttributesVector attributes) {
+  sendIfFull();
   auto temp = counter_temporality_;
   if (delta == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
@@ -114,10 +131,9 @@ void OtlpRequestStreamer::addCounter(absl::string_view name, uint64_t value, uin
   dp_num_++;
 }
 
-void OtlpRequestStreamer::addHistogram(absl::string_view name,
-                                       MetricAggregator::CustomHistogram hist,
-                                       MetricAggregator::AttributesVector attributes) {
-  tryFlushRequest();
+void RequestStreamer::addHistogram(absl::string_view name, MetricAggregator::CustomHistogram hist,
+                                   MetricAggregator::AttributesVector attributes) {
+  sendIfFull();
   auto temp = histogram_temporality_;
   if (hist.count_ == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
@@ -139,9 +155,9 @@ void OtlpRequestStreamer::addHistogram(absl::string_view name,
   dp_num_++;
 }
 
-void OtlpRequestStreamer::addHistogram(absl::string_view name,
-                                       const Envoy::Stats::HistogramStatistics& stats,
-                                       MetricAggregator::AttributesVector attributes) {
+void RequestStreamer::addHistogram(absl::string_view name,
+                                   const Envoy::Stats::HistogramStatistics& stats,
+                                   MetricAggregator::AttributesVector attributes) {
   MetricAggregator::CustomHistogram custom_hist;
   custom_hist.count_ = stats.sampleCount();
   custom_hist.sum_ = stats.sampleSum();
@@ -151,7 +167,7 @@ void OtlpRequestStreamer::addHistogram(absl::string_view name,
   addHistogram(name, std::move(custom_hist), std::move(attributes));
 }
 
-void OtlpRequestStreamer::addAggregationResult(MetricAggregator::AggregationResult&& metrics) {
+void RequestStreamer::addAggregationResult(MetricAggregator::AggregationResult&& metrics) {
   for (const auto& [key, value] : metrics.gauge_data_) {
     addGauge(key.name_, value, key.attributes_);
   }
@@ -163,7 +179,7 @@ void OtlpRequestStreamer::addAggregationResult(MetricAggregator::AggregationResu
   }
 }
 
-void OtlpRequestStreamer::flush() {
+void RequestStreamer::send() {
   if (current_request_ != nullptr) {
     send_callback_(std::move(current_request_));
   }
@@ -248,6 +264,7 @@ createMatcher(const xds::type::matcher::v3::Matcher& matcher_config,
 }
 
 OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
+                         const Tracers::OpenTelemetry::Resource& resource,
                          Server::Configuration::ServerFactoryContext& server)
     : report_counters_as_deltas_(sink_config.report_counters_as_deltas()),
       report_histograms_as_deltas_(sink_config.report_histograms_as_deltas()),
@@ -257,6 +274,7 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
       stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : ""),
       enable_metric_aggregation_(sink_config.has_custom_metric_conversions()),
+      resource_attributes_(generateResourceAttributes(resource)),
       matcher_(createMatcher(sink_config.custom_metric_conversions(), server)),
       max_data_points_per_request_(sink_config.max_data_points_per_request()) {}
 
@@ -346,9 +364,7 @@ MetricAggregator::AttributesVector OtlpMetricsFlusherImpl::getCombinedAttributes
 }
 
 template <typename SinkType>
-void OtlpMetricsFlusherImpl::flushMetrics(Stats::MetricSnapshot& snapshot, SinkType& sink,
-                                          int64_t snapshot_time) const {
-  UNREFERENCED_PARAMETER(snapshot_time);
+void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkType& sink) const {
   // Process Gauges
   for (const auto& gauge : snapshot.gauges()) {
     const auto& g = gauge.get();
@@ -415,31 +431,21 @@ void OtlpMetricsFlusherImpl::flush(
   const int64_t snapshot_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                     snapshot.snapshotTime().time_since_epoch())
                                     .count();
+  RequestStreamer streamer(config_->maxDataPointsPerRequest(), config_->resource_attributes(),
+                           counter_temporality_, histogram_temporality_, std::move(send_callback),
+                           snapshot_time, delta_start_time_ns, cumulative_start_time_ns);
 
   if (!config_->enableMetricAggregation()) {
-
-    OtlpRequestStreamer streamer(config_->maxDataPointsPerRequest(), config_->resource_attributes(),
-                                 counter_temporality_, histogram_temporality_,
-                                 std::move(send_callback), snapshot_time, delta_start_time_ns,
-                                 cumulative_start_time_ns);
-
-    flushMetrics(snapshot, streamer, snapshot_time);
-    streamer.flush();
+    sinkMetrics(snapshot, streamer);
+    streamer.send();
     return;
   }
 
   MetricAggregator aggregator(snapshot_time, delta_start_time_ns, cumulative_start_time_ns,
                               counter_temporality_, histogram_temporality_);
-  flushMetrics(snapshot, aggregator, snapshot_time);
-  auto metrics = aggregator.releaseResult();
-
-  OtlpRequestStreamer streamer(config_->maxDataPointsPerRequest(), config_->resource_attributes(),
-                               counter_temporality_, histogram_temporality_,
-                               std::move(send_callback), snapshot_time, delta_start_time_ns,
-                               cumulative_start_time_ns);
-
-  streamer.addAggregationResult(std::move(metrics));
-  streamer.flush();
+  sinkMetrics(snapshot, aggregator);
+  streamer.addAggregationResult(aggregator.releaseResult());
+  streamer.send();
 }
 
 } // namespace OpenTelemetry
