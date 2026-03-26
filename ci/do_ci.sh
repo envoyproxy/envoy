@@ -409,6 +409,7 @@ case $CI_TARGET in
             bazel_with_collection \
                 test "${BAZEL_BUILD_OPTIONS[@]}" \
                 --config=compile-time-options \
+                --define tcmalloc=gperftools \
                 --define wasm=wamr \
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
@@ -416,18 +417,12 @@ case $CI_TARGET in
         if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
             exit 0
         fi
-        echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
-        # --define tcmalloc=disabled is required here because --config=compile-time-options sets
-        # --define=tcmalloc=gperftools, which would conflict with --@envoy//bazel:jemalloc=True.
-        # Normally the jemalloc bool_flag alone is sufficient to select jemalloc (tcmalloc is
-        # disabled implicitly by the flag taking precedence in the select), but when gperftools is
-        # explicitly enabled via --define, both conditions become active and must be resolved manually.
+        echo "Building and testing with wasm=wasmtime and jemalloc: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define wasm=wasmtime \
             --define admin_functionality=disabled \
-            --define tcmalloc=disabled \
             --@envoy//bazel:jemalloc=True \
             -c fastbuild \
             "${TEST_TARGETS[@]}"
@@ -436,6 +431,7 @@ case $CI_TARGET in
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
+            --define tcmalloc=gperftools \
             --define wasm=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
@@ -444,6 +440,7 @@ case $CI_TARGET in
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
+            --define tcmalloc=gperftools \
             --define wasm=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
@@ -452,6 +449,7 @@ case $CI_TARGET in
         echo "Building binary with wasm=wasmtime... and logging disabled"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
+            --define tcmalloc=gperftools \
             --define wasm=wasmtime \
             --define enable_logging=disabled \
             -c fastbuild \
