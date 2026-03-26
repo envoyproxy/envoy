@@ -305,7 +305,7 @@ OptRef<const Router::Route> ActiveStreamFilterBase::getRoute() const {
   if (parent_.filter_manager_callbacks_.downstreamCallbacks()) {
     return parent_.filter_manager_callbacks_.downstreamCallbacks()->route(nullptr);
   }
-  return parent_.streamInfo().routeSharedPtr();
+  return parent_.streamInfo().route();
 }
 
 Router::RouteConstSharedPtr ActiveStreamFilterBase::routeSharedPtr() { return getRouteSharedPtr(); }
