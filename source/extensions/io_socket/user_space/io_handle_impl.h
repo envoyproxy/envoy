@@ -132,7 +132,7 @@ public:
   }
   bool canReceiveData() const override { return !pending_received_data_.highWatermarkTriggered(); }
   bool hasReceivedEof() const override { return receive_data_end_stream_; }
-  bool isWritable() const override {
+  bool isWriteUnblocked() const override {
     if (peer_handle_ == nullptr) {
       // Treat closed peer handle as writable so that the connection cleans up. (Analogously,
       // Linux sends EPOLLOUT along with EPOLLHUP if the peer is shutdown for reads.)
