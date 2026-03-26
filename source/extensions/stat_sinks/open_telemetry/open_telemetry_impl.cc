@@ -19,139 +19,170 @@ using MetricsExportRequest =
 using Metric = opentelemetry::proto::metrics::v1::Metric;
 using NumberDataPoint = opentelemetry::proto::metrics::v1::NumberDataPoint;
 using HistogramDataPoint = opentelemetry::proto::metrics::v1::HistogramDataPoint;
-using AggregationTemporality = opentelemetry::proto::metrics::v1::AggregationTemporality;
 
 MetricAggregator::AggregationResult MetricAggregator::releaseResult() {
   return {std::move(gauge_data_), std::move(counter_data_),  std::move(histogram_data_),
           snapshot_time_ns_,      cumulative_start_time_ns_, delta_start_time_ns_};
 }
 
-void OtlpRequestStreamer::streamRequests(
-    MetricAggregator::AggregationResult& metrics,
-    absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const {
-  std::unique_ptr<MetricsExportRequest> current_request;
-  opentelemetry::proto::metrics::v1::ScopeMetrics* current_scope_metrics = nullptr;
-  uint32_t dp_num = 0;
-  absl::flat_hash_map<std::string, opentelemetry::proto::metrics::v1::Metric*> name_to_metric;
+OtlpRequestStreamer::OtlpRequestStreamer(
+    uint32_t max_dp,
+    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
+        resource_attributes,
+    AggregationTemporality counter_temporality, AggregationTemporality histogram_temporality,
+    absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback, int64_t snapshot_time_ns,
+    int64_t delta_start_time_ns, int64_t cumulative_start_time_ns)
+    : max_dp_(max_dp), resource_attributes_(resource_attributes),
+      counter_temporality_(counter_temporality), histogram_temporality_(histogram_temporality),
+      send_callback_(std::move(send_callback)), snapshot_time_ns_(snapshot_time_ns),
+      delta_start_time_ns_(delta_start_time_ns),
+      cumulative_start_time_ns_(cumulative_start_time_ns) {}
 
-  auto ensureRequest = [&]() {
-    if (current_request != nullptr && (max_dp_ == 0 || dp_num < max_dp_)) {
-      return;
-    }
-    if (current_request != nullptr) {
-      send_callback(std::move(current_request));
-    }
-    current_request = std::make_unique<MetricsExportRequest>();
-    auto* rm = current_request->add_resource_metrics();
-    for (const auto& attr : resource_attributes_) {
-      *rm->mutable_resource()->add_attributes() = attr;
-    }
-    current_scope_metrics = rm->add_scope_metrics();
-    name_to_metric.clear();
-    dp_num = 0;
-  };
-
-  auto find_or_create_metric = [&](const std::string& name) -> Metric* {
-    if (!enable_metric_aggregation_) {
-      Metric* m = current_scope_metrics->add_metrics();
-      m->set_name(name);
-      return m;
-    }
-    auto it = name_to_metric.find(name);
-    if (it != name_to_metric.end()) {
-      return it->second;
-    }
-    Metric* m = current_scope_metrics->add_metrics();
-    m->set_name(name);
-    name_to_metric[name] = m;
-    return m;
-  };
-
-  for (const auto& [key, value] : metrics.gauge_data_) {
-    ensureRequest();
-    Metric* metric = find_or_create_metric(key.name_);
-    auto* point = metric->mutable_gauge()->add_data_points();
-    point->set_as_int(value);
-    setCommonFields(point, key, AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED,
-                    metrics);
-    dp_num++;
+void OtlpRequestStreamer::tryFlushRequest() {
+  if (current_request_ != nullptr && (max_dp_ == 0 || dp_num_ < max_dp_)) {
+    return;
   }
+  flush();
+  current_request_ = std::make_unique<MetricsExportRequest>();
+  auto* rm = current_request_->add_resource_metrics();
+  for (const auto& attr : resource_attributes_) {
+    *rm->mutable_resource()->add_attributes() = attr;
+  }
+  current_scope_metrics_ = rm->add_scope_metrics();
+  name_to_metric_.clear();
+  dp_num_ = 0;
+}
 
-  for (const auto& [key, value] : metrics.counter_data_) {
-    ensureRequest();
-    Metric* metric = find_or_create_metric(key.name_);
-    AggregationTemporality temp = counter_temporality_;
-    if (metric->mutable_sum()->data_points_size() == 0) {
-      metric->mutable_sum()->set_is_monotonic(true);
-      metric->mutable_sum()->set_aggregation_temporality(temp);
-    }
-    auto* point = metric->mutable_sum()->add_data_points();
-    point->set_as_int(value);
-    setCommonFields(point, key, temp, metrics);
-    dp_num++;
+::opentelemetry::proto::metrics::v1::Metric*
+OtlpRequestStreamer::findOrCreateMetric(absl::string_view name) {
+  auto it = name_to_metric_.find(name);
+  if (it != name_to_metric_.end()) {
+    return it->second;
   }
-
-  for (const auto& [key, custom_hist] : metrics.histogram_data_) {
-    ensureRequest();
-    Metric* metric = find_or_create_metric(key.name_);
-    AggregationTemporality temp = histogram_temporality_;
-    if (metric->mutable_histogram()->data_points_size() == 0) {
-      metric->mutable_histogram()->set_aggregation_temporality(temp);
-    }
-    auto* point = metric->mutable_histogram()->add_data_points();
-    point->set_count(custom_hist.count_);
-    point->set_sum(custom_hist.sum_);
-    for (double bound : custom_hist.explicit_bounds_) {
-      point->add_explicit_bounds(bound);
-    }
-    for (uint64_t count : custom_hist.bucket_counts_) {
-      point->add_bucket_counts(count);
-    }
-    setCommonFields(point, key, temp, metrics);
-    dp_num++;
-  }
-  if (current_request != nullptr) {
-    send_callback(std::move(current_request));
-  }
+  auto* m = current_scope_metrics_->add_metrics();
+  m->set_name(std::string(name));
+  name_to_metric_.emplace(m->name(), m);
+  return m;
 }
 
 template <class PointType>
-void OtlpRequestStreamer::setCommonFields(
-    PointType* point, const MetricAggregator::MetricKey& key,
-    opentelemetry::proto::metrics::v1::AggregationTemporality temp,
-    const MetricAggregator::AggregationResult& metrics) const {
-  point->set_time_unix_nano(metrics.snapshot_time_ns_);
-  if (temp == opentelemetry::proto::metrics::v1::AggregationTemporality::
-                  AGGREGATION_TEMPORALITY_CUMULATIVE) {
-    point->set_start_time_unix_nano(metrics.cumulative_start_time_ns_);
-  } else if (temp == opentelemetry::proto::metrics::v1::AggregationTemporality::
-                         AGGREGATION_TEMPORALITY_DELTA) {
-    point->set_start_time_unix_nano(metrics.delta_start_time_ns_);
+void OtlpRequestStreamer::setCommonFields(PointType* point,
+                                          MetricAggregator::AttributesVector attributes,
+                                          AggregationTemporality temp) const {
+  point->set_time_unix_nano(snapshot_time_ns_);
+  if (temp == AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE) {
+    point->set_start_time_unix_nano(cumulative_start_time_ns_);
+  } else if (temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+    point->set_start_time_unix_nano(delta_start_time_ns_);
   }
 
-  for (const auto& [k, v] : key.attributes_) {
+  for (auto& [k, v] : attributes) {
     auto* attr = point->add_attributes();
-    attr->set_key(k);
-    attr->mutable_value()->set_string_value(v);
+    attr->set_key(std::move(k));
+    attr->mutable_value()->set_string_value(std::move(v));
   }
 }
 
-void MetricAggregator::addGauge(
-    absl::string_view metric_name, uint64_t value,
-    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
-  MetricKey key{metric_name, attributes};
+void OtlpRequestStreamer::addGauge(absl::string_view name, uint64_t value,
+                                   MetricAggregator::AttributesVector attributes) {
+  tryFlushRequest();
+  auto* metric = findOrCreateMetric(name);
+  auto* point = metric->mutable_gauge()->add_data_points();
+  point->set_as_int(value);
+  setCommonFields(point, std::move(attributes),
+                  AggregationTemporality::AGGREGATION_TEMPORALITY_UNSPECIFIED);
+  dp_num_++;
+}
 
-  auto it = gauge_data_.find(key);
-  if (it != gauge_data_.end() && enable_metric_aggregation_) {
+void OtlpRequestStreamer::addCounter(absl::string_view name, uint64_t value, uint64_t delta,
+                                     MetricAggregator::AttributesVector attributes) {
+  tryFlushRequest();
+  auto temp = counter_temporality_;
+  if (delta == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+    return;
+  }
+  auto* metric = findOrCreateMetric(name);
+  if (metric->mutable_sum()->data_points_size() == 0) {
+    metric->mutable_sum()->set_is_monotonic(true);
+    metric->mutable_sum()->set_aggregation_temporality(temp);
+  }
+  auto* point = metric->mutable_sum()->add_data_points();
+  const uint64_t point_value =
+      (temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value;
+  point->set_as_int(point_value);
+  setCommonFields(point, std::move(attributes), temp);
+  dp_num_++;
+}
+
+void OtlpRequestStreamer::addHistogram(absl::string_view name,
+                                       MetricAggregator::CustomHistogram hist,
+                                       MetricAggregator::AttributesVector attributes) {
+  tryFlushRequest();
+  auto temp = histogram_temporality_;
+  if (hist.count_ == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+    return;
+  }
+  auto* metric = findOrCreateMetric(name);
+  if (metric->mutable_histogram()->data_points_size() == 0) {
+    metric->mutable_histogram()->set_aggregation_temporality(temp);
+  }
+  auto* point = metric->mutable_histogram()->add_data_points();
+  point->set_count(hist.count_);
+  point->set_sum(hist.sum_);
+  for (double bound : hist.explicit_bounds_) {
+    point->add_explicit_bounds(bound);
+  }
+  for (uint64_t count : hist.bucket_counts_) {
+    point->add_bucket_counts(count);
+  }
+  setCommonFields(point, std::move(attributes), temp);
+  dp_num_++;
+}
+
+void OtlpRequestStreamer::addHistogram(absl::string_view name,
+                                       const Envoy::Stats::HistogramStatistics& stats,
+                                       MetricAggregator::AttributesVector attributes) {
+  MetricAggregator::CustomHistogram custom_hist;
+  custom_hist.count_ = stats.sampleCount();
+  custom_hist.sum_ = stats.sampleSum();
+  custom_hist.bucket_counts_ = stats.computeDisjointBuckets();
+  custom_hist.bucket_counts_.push_back(stats.outOfBoundCount());
+  custom_hist.explicit_bounds_ = stats.supportedBuckets();
+  addHistogram(name, std::move(custom_hist), std::move(attributes));
+}
+
+void OtlpRequestStreamer::addAggregationResult(MetricAggregator::AggregationResult&& metrics) {
+  for (const auto& [key, value] : metrics.gauge_data_) {
+    addGauge(key.name_, value, key.attributes_);
+  }
+  for (const auto& [key, value] : metrics.counter_data_) {
+    addCounter(key.name_, value, value, key.attributes_);
+  }
+  for (const auto& [key, value] : metrics.histogram_data_) {
+    addHistogram(key.name_, value, key.attributes_);
+  }
+}
+
+void OtlpRequestStreamer::flush() {
+  if (current_request_ != nullptr) {
+    send_callback_(std::move(current_request_));
+  }
+}
+
+void MetricAggregator::addGauge(absl::string_view metric_name, uint64_t value,
+                                AttributesVector attributes) {
+  MetricViewKey view_key{metric_name, attributes};
+  auto it = gauge_data_.find(view_key);
+  if (it != gauge_data_.end()) {
     it->second += value;
   } else {
-    gauge_data_[key] = value;
+    MetricKey key{metric_name, std::move(attributes)};
+    gauge_data_.insert_or_assign(std::move(key), value);
   }
 }
 
-void MetricAggregator::addCounter(
-    absl::string_view metric_name, uint64_t value, uint64_t delta,
-    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
+void MetricAggregator::addCounter(absl::string_view metric_name, uint64_t value, uint64_t delta,
+                                  AttributesVector attributes) {
   const uint64_t point_value =
       (counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta
                                                                                       : value;
@@ -160,28 +191,27 @@ void MetricAggregator::addCounter(
     return;
   }
 
-  MetricKey key{metric_name, attributes};
-
-  auto it = counter_data_.find(key);
-  if (it != counter_data_.end() && enable_metric_aggregation_) {
+  MetricViewKey view_key{metric_name, attributes};
+  auto it = counter_data_.find(view_key);
+  if (it != counter_data_.end()) {
     it->second += point_value;
   } else {
-    counter_data_[key] = point_value;
+    MetricKey key{metric_name, std::move(attributes)};
+    counter_data_.insert_or_assign(std::move(key), point_value);
   }
 }
 
-void MetricAggregator::addHistogram(
-    absl::string_view metric_name, const Envoy::Stats::HistogramStatistics& stats,
-    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
+void MetricAggregator::addHistogram(absl::string_view metric_name,
+                                    const Envoy::Stats::HistogramStatistics& stats,
+                                    AttributesVector attributes) {
   if (stats.sampleCount() == 0 &&
       histogram_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
 
-  MetricKey key{metric_name, attributes};
-
-  auto it = histogram_data_.find(key);
-  if (it != histogram_data_.end() && enable_metric_aggregation_) {
+  MetricViewKey view_key{metric_name, attributes};
+  auto it = histogram_data_.find(view_key);
+  if (it != histogram_data_.end()) {
     std::vector<uint64_t> new_bucket_counts = stats.computeDisjointBuckets();
     auto& existing_point = it->second;
     if (existing_point.explicit_bounds_.size() == stats.supportedBuckets().size() &&
@@ -202,19 +232,9 @@ void MetricAggregator::addHistogram(
     custom_hist.bucket_counts_ = stats.computeDisjointBuckets();
     custom_hist.bucket_counts_.push_back(stats.outOfBoundCount());
     custom_hist.explicit_bounds_ = stats.supportedBuckets();
-    histogram_data_[key] = std::move(custom_hist);
+    MetricKey key{metric_name, std::move(attributes)};
+    histogram_data_.insert_or_assign(std::move(key), std::move(custom_hist));
   }
-}
-
-Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
-generateResourceAttributes(const Tracers::OpenTelemetry::Resource& resource) {
-  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes;
-  for (const auto& attr : resource.attributes_) {
-    auto* attribute = resource_attributes.Add();
-    attribute->set_key(attr.first);
-    attribute->mutable_value()->set_string_value(attr.second);
-  }
-  return resource_attributes;
 }
 
 Matcher::MatchTreePtr<Stats::StatMatchingData>
@@ -228,7 +248,6 @@ createMatcher(const xds::type::matcher::v3::Matcher& matcher_config,
 }
 
 OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
-                         const Tracers::OpenTelemetry::Resource& resource,
                          Server::Configuration::ServerFactoryContext& server)
     : report_counters_as_deltas_(sink_config.report_counters_as_deltas()),
       report_histograms_as_deltas_(sink_config.report_histograms_as_deltas()),
@@ -238,7 +257,6 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
       stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : ""),
       enable_metric_aggregation_(sink_config.has_custom_metric_conversions()),
-      resource_attributes_(generateResourceAttributes(resource)),
       matcher_(createMatcher(sink_config.custom_metric_conversions(), server)),
       max_data_points_per_request_(sink_config.max_data_points_per_request()) {}
 
@@ -308,82 +326,60 @@ std::string OtlpMetricsFlusherImpl::getMetricName(
 }
 
 template <class StatType>
-Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
-OtlpMetricsFlusherImpl::getCombinedAttributes(
+MetricAggregator::AttributesVector OtlpMetricsFlusherImpl::getCombinedAttributes(
     const StatType& stat, OptRef<const SinkConfig::ConversionAction> conversion_config) const {
-  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attributes;
+  MetricAggregator::AttributesVector attributes;
   if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {
-      auto* attribute = attributes.Add();
-      attribute->set_key(tag.name_);
-      attribute->mutable_value()->set_string_value(tag.value_);
+      attributes.emplace_back(tag.name_, tag.value_);
     }
   }
   if (conversion_config.has_value()) {
     for (const auto& attr : conversion_config->static_metric_labels()) {
-      *attributes.Add() = attr;
+      attributes.emplace_back(attr.key(), attr.value().string_value());
     }
   }
+  // Sort attributes to ensure a deterministic order, which is critical since these
+  // attributes are used as part of the lookup key for metric aggregation.
+  std::sort(attributes.begin(), attributes.end());
   return attributes;
 }
 
-void OtlpMetricsFlusherImpl::flush(
-    Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns, int64_t cumulative_start_time_ns,
-    absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const {
-  AggregationTemporality counter_temporality =
-      config_->reportCountersAsDeltas()
-          ? AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
-          : AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
-  AggregationTemporality histogram_temporality =
-      config_->reportHistogramsAsDeltas()
-          ? AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA
-          : AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
-
-  MetricAggregator aggregator = MetricAggregator(
-      config_->enableMetricAggregation(),
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-          snapshot.snapshotTime().time_since_epoch())
-          .count(),
-      delta_start_time_ns, cumulative_start_time_ns, counter_temporality, histogram_temporality);
+template <typename SinkType>
+void OtlpMetricsFlusherImpl::flushMetrics(Stats::MetricSnapshot& snapshot, SinkType& sink,
+                                          int64_t snapshot_time) const {
+  UNREFERENCED_PARAMETER(snapshot_time);
   // Process Gauges
   for (const auto& gauge : snapshot.gauges()) {
-    if (predicate_(gauge)) {
-      auto metric_config = getMetricConfig(gauge.get());
+    const auto& g = gauge.get();
+    if (predicate_(g)) {
+      auto metric_config = getMetricConfig(g);
       if (metric_config.drop_stat) {
         continue;
       }
-
-      const std::string metric_name = getMetricName(gauge.get(), metric_config.conversion_action);
-      auto attributes = getCombinedAttributes(gauge.get(), metric_config.conversion_action);
-      aggregator.addGauge(metric_name, gauge.get().value(), attributes);
-    };
+      sink.addGauge(getMetricName(g, metric_config.conversion_action), g.value(),
+                    getCombinedAttributes(g, metric_config.conversion_action));
+    }
   }
   for (const auto& gauge : snapshot.hostGauges()) {
     auto metric_config = getMetricConfig(gauge);
     if (metric_config.drop_stat) {
       continue;
     }
-
-    const std::string metric_name = getMetricName(gauge, metric_config.conversion_action);
-    auto attributes = getCombinedAttributes(gauge, metric_config.conversion_action);
-    aggregator.addGauge(metric_name, gauge.value(), attributes);
+    sink.addGauge(getMetricName(gauge, metric_config.conversion_action), gauge.value(),
+                  getCombinedAttributes(gauge, metric_config.conversion_action));
   }
 
   // Process Counters
-
   for (const auto& counter : snapshot.counters()) {
-    if (predicate_(counter.counter_)) {
-      auto metric_config = getMetricConfig(counter.counter_.get());
+    const auto& c = counter.counter_.get();
+    if (predicate_(c)) {
+      auto metric_config = getMetricConfig(c);
       if (metric_config.drop_stat) {
         continue;
       }
-
-      const std::string metric_name =
-          getMetricName(counter.counter_.get(), metric_config.conversion_action);
-      auto attributes =
-          getCombinedAttributes(counter.counter_.get(), metric_config.conversion_action);
-      aggregator.addCounter(metric_name, counter.counter_.get().value(), counter.delta_,
-                            attributes);
+      sink.addCounter(getMetricName(c, metric_config.conversion_action), c.value(), counter.delta_,
+                      getCombinedAttributes(c, metric_config.conversion_action));
     }
   }
   for (const auto& counter : snapshot.hostCounters()) {
@@ -391,33 +387,59 @@ void OtlpMetricsFlusherImpl::flush(
     if (metric_config.drop_stat) {
       continue;
     }
-
-    const std::string metric_name = getMetricName(counter, metric_config.conversion_action);
-    auto attributes = getCombinedAttributes(counter, metric_config.conversion_action);
-    aggregator.addCounter(metric_name, counter.value(), counter.delta(), attributes);
+    sink.addCounter(getMetricName(counter, metric_config.conversion_action), counter.value(),
+                    counter.delta(),
+                    getCombinedAttributes(counter, metric_config.conversion_action));
   }
 
   // Process Histograms
-
   for (const auto& histogram : snapshot.histograms()) {
-    if (predicate_(histogram)) {
-      auto metric_config = getMetricConfig(histogram.get());
+    const auto& h = histogram.get();
+    if (predicate_(h)) {
+      auto metric_config = getMetricConfig(h);
       if (metric_config.drop_stat) {
         continue;
       }
-
-      const std::string metric_name =
-          getMetricName(histogram.get(), metric_config.conversion_action);
-      auto attributes = getCombinedAttributes(histogram.get(), metric_config.conversion_action);
       const Stats::HistogramStatistics& histogram_stats =
-          config_->reportHistogramsAsDeltas() ? histogram.get().intervalStatistics()
-                                              : histogram.get().cumulativeStatistics();
-      aggregator.addHistogram(metric_name, histogram_stats, attributes);
+          config_->reportHistogramsAsDeltas() ? h.intervalStatistics() : h.cumulativeStatistics();
+      sink.addHistogram(getMetricName(h, metric_config.conversion_action), histogram_stats,
+                        getCombinedAttributes(h, metric_config.conversion_action));
     }
   }
+}
 
+void OtlpMetricsFlusherImpl::flush(
+    Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns, int64_t cumulative_start_time_ns,
+    absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const {
+
+  const int64_t snapshot_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                    snapshot.snapshotTime().time_since_epoch())
+                                    .count();
+
+  if (!config_->enableMetricAggregation()) {
+
+    OtlpRequestStreamer streamer(config_->maxDataPointsPerRequest(), config_->resource_attributes(),
+                                 counter_temporality_, histogram_temporality_,
+                                 std::move(send_callback), snapshot_time, delta_start_time_ns,
+                                 cumulative_start_time_ns);
+
+    flushMetrics(snapshot, streamer, snapshot_time);
+    streamer.flush();
+    return;
+  }
+
+  MetricAggregator aggregator(snapshot_time, delta_start_time_ns, cumulative_start_time_ns,
+                              counter_temporality_, histogram_temporality_);
+  flushMetrics(snapshot, aggregator, snapshot_time);
   auto metrics = aggregator.releaseResult();
-  streamer_.streamRequests(metrics, std::move(send_callback));
+
+  OtlpRequestStreamer streamer(config_->maxDataPointsPerRequest(), config_->resource_attributes(),
+                               counter_temporality_, histogram_temporality_,
+                               std::move(send_callback), snapshot_time, delta_start_time_ns,
+                               cumulative_start_time_ns);
+
+  streamer.addAggregationResult(std::move(metrics));
+  streamer.flush();
 }
 
 } // namespace OpenTelemetry

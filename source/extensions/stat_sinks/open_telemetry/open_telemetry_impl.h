@@ -43,14 +43,16 @@ using SinkConfig = envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig
  */
 class MetricAggregator : public Logger::Loggable<Logger::Id::stats> {
 public:
-  using AttributesMap = absl::flat_hash_map<std::string, std::string>;
+  // Using a sorted vector of pairs instead of a hash map is more memory efficient
+  // and faster for the small number of attributes (usually < 10) typical for metrics.
+  // This also allows for faster linear comparisons when using this vector as a map key.
+  using AttributesVector = std::vector<std::pair<std::string, std::string>>;
 
-  explicit MetricAggregator(bool enable_metric_aggregation, int64_t snapshot_time_ns,
-                            int64_t delta_start_time_ns, int64_t cumulative_start_time_ns,
+  explicit MetricAggregator(int64_t snapshot_time_ns, int64_t delta_start_time_ns,
+                            int64_t cumulative_start_time_ns,
                             AggregationTemporality counter_temporality,
                             AggregationTemporality histogram_temporality)
-      : enable_metric_aggregation_(enable_metric_aggregation), snapshot_time_ns_(snapshot_time_ns),
-        delta_start_time_ns_(delta_start_time_ns),
+      : snapshot_time_ns_(snapshot_time_ns), delta_start_time_ns_(delta_start_time_ns),
         cumulative_start_time_ns_(cumulative_start_time_ns),
         counter_temporality_(counter_temporality), histogram_temporality_(histogram_temporality) {}
 
@@ -58,17 +60,9 @@ public:
     // Full name of the metric.
     std::string name_;
     // Attributes associated with the data points for this metric.
-    AttributesMap attributes_;
+    AttributesVector attributes_;
 
-    MetricKey(absl::string_view name,
-              const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& kvs)
-        : name_(name) {
-      for (const auto& attr : kvs) {
-        attributes_.emplace(attr.key(), attr.value().string_value());
-      }
-    }
-
-    MetricKey(absl::string_view name, AttributesMap attributes)
+    MetricKey(absl::string_view name, AttributesVector attributes)
         : name_(name), attributes_(std::move(attributes)) {}
 
     bool operator==(const MetricKey& other) const {
@@ -77,6 +71,49 @@ public:
 
     template <typename H> friend H AbslHashValue(H h, const MetricKey& k) {
       return H::combine(std::move(h), k.name_, k.attributes_);
+    }
+  };
+
+  // MetricViewKey is a temporary view of MetricKey that does not own the name or attributes.
+  // It is used for zero-allocation heterogeneous searches in the map (e.g., using `find()`).
+  // Since `MetricKeyHash` and `MetricKeyEqual` are marked as transparent, the map can compute
+  // the view's hash and compare it directly against the stored `MetricKey` without allocating
+  // memory to create a `MetricKey` just to search the map.
+  struct MetricViewKey {
+    absl::string_view name_;
+    const AttributesVector& attributes_;
+
+    MetricViewKey(absl::string_view name, const AttributesVector& attributes)
+        : name_(name), attributes_(attributes) {}
+
+    bool operator==(const MetricViewKey& other) const {
+      return name_ == other.name_ && attributes_ == other.attributes_;
+    }
+
+    template <typename H> friend H AbslHashValue(H h, const MetricViewKey& v) {
+      return H::combine(std::move(h), v.name_, v.attributes_);
+    }
+  };
+
+  struct MetricKeyHash {
+    using is_transparent = void;
+
+    size_t operator()(const MetricKey& k) const { return absl::Hash<MetricKey>{}(k); }
+
+    size_t operator()(const MetricViewKey& v) const { return absl::Hash<MetricViewKey>{}(v); }
+  };
+
+  struct MetricKeyEqual {
+    using is_transparent = void;
+
+    bool operator()(const MetricKey& a, const MetricKey& b) const { return a == b; }
+
+    bool operator()(const MetricKey& a, const MetricViewKey& b) const {
+      return a.name_ == b.name_ && a.attributes_ == b.attributes_;
+    }
+
+    bool operator()(const MetricViewKey& a, const MetricKey& b) const {
+      return a.name_ == b.name_ && a.attributes_ == b.attributes_;
     }
   };
 
@@ -93,9 +130,9 @@ public:
 
   // Maps a unique combination of metric name and attributes to their data point.
   struct AggregationResult {
-    absl::flat_hash_map<MetricKey, uint64_t> gauge_data_;
-    absl::flat_hash_map<MetricKey, uint64_t> counter_data_;
-    absl::flat_hash_map<MetricKey, CustomHistogram> histogram_data_;
+    absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> gauge_data_;
+    absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> counter_data_;
+    absl::flat_hash_map<MetricKey, CustomHistogram, MetricKeyHash, MetricKeyEqual> histogram_data_;
     // Timestamp for the snapshot.
     int64_t snapshot_time_ns_;
     // Start time for cumulative metrics.
@@ -108,30 +145,25 @@ public:
 
   // Adds a gauge metric data point. Aggregates by summing if a point with the
   // same attributes exists.
-  void addGauge(
-      absl::string_view metric_name, uint64_t value,
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
+  void addGauge(absl::string_view metric_name, uint64_t value, AttributesVector attributes);
 
   // Adds a counter metric data point. Aggregates by summing the delta or value
   // based on temporality if a point with the same attributes exists.
-  void addCounter(
-      absl::string_view metric_name, uint64_t value, uint64_t delta,
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
+  void addCounter(absl::string_view metric_name, uint64_t value, uint64_t delta,
+                  AttributesVector attributes);
 
   // Adds a histogram metric data point. Aggregates counts and sums if a point
   // with the same attributes and compatible bounds exists.
-  void addHistogram(
-      absl::string_view metric_name, const Envoy::Stats::HistogramStatistics& stats,
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
+  void addHistogram(absl::string_view metric_name, const Envoy::Stats::HistogramStatistics& stats,
+                    AttributesVector attributes);
 
-  const bool enable_metric_aggregation_;
   const int64_t snapshot_time_ns_;
   const int64_t delta_start_time_ns_;
   const int64_t cumulative_start_time_ns_;
 
-  absl::flat_hash_map<MetricKey, uint64_t> gauge_data_;
-  absl::flat_hash_map<MetricKey, uint64_t> counter_data_;
-  absl::flat_hash_map<MetricKey, CustomHistogram> histogram_data_;
+  absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> gauge_data_;
+  absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> counter_data_;
+  absl::flat_hash_map<MetricKey, CustomHistogram, MetricKeyHash, MetricKeyEqual> histogram_data_;
   const AggregationTemporality counter_temporality_;
   const AggregationTemporality histogram_temporality_;
 };
@@ -145,36 +177,71 @@ public:
 class OtlpRequestStreamer {
 public:
   OtlpRequestStreamer(
-      bool enable_metric_aggregation, uint32_t max_dp,
+      uint32_t max_dp,
       const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
           resource_attributes,
       opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality,
-      opentelemetry::proto::metrics::v1::AggregationTemporality histogram_temporality)
-      : enable_metric_aggregation_(enable_metric_aggregation), max_dp_(max_dp),
-        resource_attributes_(resource_attributes), counter_temporality_(counter_temporality),
-        histogram_temporality_(histogram_temporality) {}
+      opentelemetry::proto::metrics::v1::AggregationTemporality histogram_temporality,
+      absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback, int64_t snapshot_time_ns,
+      int64_t delta_start_time_ns, int64_t cumulative_start_time_ns);
 
-  void streamRequests(MetricAggregator::AggregationResult& metrics,
-                      absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) const;
+  // Adds a gauge metric data point to the streamer.
+  void addGauge(absl::string_view name, uint64_t value,
+                MetricAggregator::AttributesVector attributes);
 
-private:
+  // Adds a counter metric data point to the streamer.
+  void addCounter(absl::string_view name, uint64_t value, uint64_t delta,
+                  MetricAggregator::AttributesVector attributes);
+
+  // Adds a custom histogram data point to the streamer.
+  void addHistogram(absl::string_view name, MetricAggregator::CustomHistogram hist,
+                    MetricAggregator::AttributesVector attributes);
+
+  // Adds a stats histogram data point to the streamer, converting it first.
+  void addHistogram(absl::string_view name, const Envoy::Stats::HistogramStatistics& stats,
+                    MetricAggregator::AttributesVector attributes);
+
+  // Adds all metrics from an aggregation result to the streamer.
+  void addAggregationResult(MetricAggregator::AggregationResult&& result);
+
+  // Flushes any current buffered metrics to the send callback.
+  void flush();
+
+  // Checks if the request limit is reached, and flushes if necessary.
+  void tryFlushRequest();
+
+  // Finds or creates a metric in the current scope metrics, using zero-allocation lookups.
+  ::opentelemetry::proto::metrics::v1::Metric* findOrCreateMetric(absl::string_view name);
+
+  // Sets common fields (timestamp, attributes) for a data point.
   template <class PointType>
-  void setCommonFields(PointType* point, const MetricAggregator::MetricKey& key,
-                       opentelemetry::proto::metrics::v1::AggregationTemporality temp,
-                       const MetricAggregator::AggregationResult& metrics) const;
+  void setCommonFields(PointType* point, MetricAggregator::AttributesVector attributes,
+                       opentelemetry::proto::metrics::v1::AggregationTemporality temp) const;
 
-  const bool enable_metric_aggregation_;
   const uint32_t max_dp_;
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
       resource_attributes_;
   const opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality_;
   const opentelemetry::proto::metrics::v1::AggregationTemporality histogram_temporality_;
+
+  absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback_;
+  const int64_t snapshot_time_ns_;
+  const int64_t delta_start_time_ns_;
+  const int64_t cumulative_start_time_ns_;
+
+  std::unique_ptr<MetricsExportRequest> current_request_;
+  ::opentelemetry::proto::metrics::v1::ScopeMetrics* current_scope_metrics_{nullptr};
+  uint32_t dp_num_{0};
+  // Maps metric name to its corresponding Metric object.
+  // The string_view key points to the name owned by the Metric object (stored in
+  // current_scope_metrics_), ensuring zero-allocation lookups and insertions.
+  absl::flat_hash_map<absl::string_view, ::opentelemetry::proto::metrics::v1::Metric*>
+      name_to_metric_;
 };
 
 class OtlpOptions {
 public:
-  OtlpOptions(const SinkConfig& sink_config, const Tracers::OpenTelemetry::Resource& resource,
-              Server::Configuration::ServerFactoryContext& server);
+  OtlpOptions(const SinkConfig& sink_config, Server::Configuration::ServerFactoryContext& server);
 
   bool reportCountersAsDeltas() { return report_counters_as_deltas_; }
   bool reportHistogramsAsDeltas() { return report_histograms_as_deltas_; }
@@ -235,18 +302,16 @@ public:
       const OtlpOptionsSharedPtr config, std::function<bool(const Stats::Metric&)> predicate =
                                              [](const auto& metric) { return metric.used(); })
       : config_(config), predicate_(predicate),
-        streamer_(config->enableMetricAggregation(), config->maxDataPointsPerRequest(),
-                  config->resource_attributes(),
-                  config->reportCountersAsDeltas()
-                      ? opentelemetry::proto::metrics::v1::AggregationTemporality::
-                            AGGREGATION_TEMPORALITY_DELTA
-                      : opentelemetry::proto::metrics::v1::AggregationTemporality::
-                            AGGREGATION_TEMPORALITY_CUMULATIVE,
-                  config->reportHistogramsAsDeltas()
-                      ? opentelemetry::proto::metrics::v1::AggregationTemporality::
-                            AGGREGATION_TEMPORALITY_DELTA
-                      : opentelemetry::proto::metrics::v1::AggregationTemporality::
-                            AGGREGATION_TEMPORALITY_CUMULATIVE) {}
+        counter_temporality_(config->reportCountersAsDeltas()
+                                 ? opentelemetry::proto::metrics::v1::AggregationTemporality::
+                                       AGGREGATION_TEMPORALITY_DELTA
+                                 : opentelemetry::proto::metrics::v1::AggregationTemporality::
+                                       AGGREGATION_TEMPORALITY_CUMULATIVE),
+        histogram_temporality_(config->reportHistogramsAsDeltas()
+                                   ? opentelemetry::proto::metrics::v1::AggregationTemporality::
+                                         AGGREGATION_TEMPORALITY_DELTA
+                                   : opentelemetry::proto::metrics::v1::AggregationTemporality::
+                                         AGGREGATION_TEMPORALITY_CUMULATIVE) {}
 
   void flush(Stats::MetricSnapshot& snapshot, int64_t delta_start_time_ns,
              int64_t cumulative_start_time_ns,
@@ -266,9 +331,15 @@ private:
                             OptRef<const SinkConfig::ConversionAction> conversion_config) const;
 
   template <class StatType>
-  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
+  MetricAggregator::AttributesVector
   getCombinedAttributes(const StatType& stat,
                         OptRef<const SinkConfig::ConversionAction> conversion_config) const;
+  template <class StatType, typename SinkCallFunc>
+  void processMetricItem(const StatType& stat, SinkCallFunc&& sink_call) const;
+
+  template <typename SinkType>
+  void flushMetrics(Stats::MetricSnapshot& snapshot, SinkType& sink, int64_t snapshot_time) const;
+
   template <class GaugeType>
   void addGaugeDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
                          const GaugeType& gauge_stat, int64_t snapshot_time_ns) const;
@@ -291,7 +362,8 @@ private:
 
   const OtlpOptionsSharedPtr config_;
   const std::function<bool(const Stats::Metric&)> predicate_;
-  const OtlpRequestStreamer streamer_;
+  const opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality_;
+  const opentelemetry::proto::metrics::v1::AggregationTemporality histogram_temporality_;
 };
 
 /**
