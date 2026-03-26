@@ -354,7 +354,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   // call so that the header is added after all upstream headers passed, due to messageBegin
   // possibly not getting headers in transportBegin.
   if (cm.drain_decision_.drainClose(Network::DrainDirection::All)) {
-    ENVOY_STREAM_LOG(debug, "propogate Drain header for drain close decision", parent_);
+    ENVOY_STREAM_LOG(debug, "propagate Drain header for drain close decision", parent_);
     // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
     // over)?
     metadata->responseHeaders().addReferenceKey(Headers::get().Drain, "true");
