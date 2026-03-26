@@ -453,6 +453,7 @@ configure_make(
         "--disable-shared",
         "--enable-static",
         "--disable-doc",
+        "--disable-cxx",
     ],
     lib_source = "@jemalloc//:all",
     out_static_libs = ["libjemalloc.a"],
