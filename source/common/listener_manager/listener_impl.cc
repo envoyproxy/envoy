@@ -5,6 +5,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 #include "envoy/network/exception.h"
@@ -30,6 +32,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/stats_matcher_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -239,6 +242,8 @@ absl::Status ListenSocketFactoryImpl::doFinalPreWorkerInit() {
   return absl::OkStatus();
 }
 
+constexpr absl::string_view StatsMatcherMetadataKey = "envoy.stats_matcher";
+
 namespace {
 std::string listenerStatsScope(const envoy::config::listener::v3::Listener& config) {
   if (!config.stat_prefix().empty()) {
@@ -254,15 +259,41 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
   // Listener creation will fail shortly when the address is used.
   return absl::StrCat("invalid_address_listener");
 }
+
+Stats::ScopeSharedPtr
+generateListenerStatsScope(const envoy::config::listener::v3::Listener& config,
+                           Envoy::Server::Instance& server) {
+  auto& stats = server.stats();
+  Stats::StatsMatcherSharedPtr scope_matcher;
+
+  // Check for a per-listener stats matcher in typed_filter_metadata. If present, unpack it as
+  // StatsMatcher and use it to restrict which stats are created for this listener's scope.
+  const auto& typed_meta = config.metadata().typed_filter_metadata();
+  if (auto it = typed_meta.find(StatsMatcherMetadataKey); it != typed_meta.end()) {
+    envoy::config::metrics::v3::StatsMatcher stats_matcher_proto;
+    if (auto status = MessageUtil::unpackTo(it->second, stats_matcher_proto); status.ok()) {
+      MessageUtil::validate(stats_matcher_proto,
+                            server.messageValidationContext().staticValidationVisitor());
+      scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(
+          stats_matcher_proto, stats.symbolTable(), server.serverFactoryContext());
+    } else {
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::config), warn,
+                          "Failed to unpack stats matcher for listener {}: {}", config.name(),
+                          status.message());
+    }
+  }
+
+  return stats.createScope(fmt::format("listener.{}.", listenerStatsScope(config)), false, {},
+                           std::move(scope_matcher));
+}
 } // namespace
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
-    : Server::FactoryContextImplBase(
-          server, validation_visitor, server.stats().createScope(""),
-          server.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config))),
-          std::make_shared<ListenerInfoImpl>(config)),
+    : Server::FactoryContextImplBase(server, validation_visitor, server.stats().createScope(""),
+                                     generateListenerStatsScope(config, server),
+                                     std::make_shared<ListenerInfoImpl>(config)),
       drain_manager_(std::move(drain_manager)) {}
 
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }

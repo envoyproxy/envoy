@@ -3503,6 +3503,107 @@ filter_chains:
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.test_prefix.foo").value());
 }
 
+// Listener without stats matcher metadata: all stats are created normally.
+TEST_P(ListenerManagerImplTest, StatsMatcherNoMetadata) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // Without a stats matcher, any stat name is accepted.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  EXPECT_NE("", scope.counterFromString("bar").name());
+}
+
+// Listener with reject_all stats matcher: no stats are created.
+TEST_P(ListenerManagerImplTest, StatsMatcherRejectAll) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      reject_all: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // With reject_all, no stats are created for this listener.
+  EXPECT_EQ("", scope.counterFromString("foo").name());
+  EXPECT_EQ("", scope.counterFromString("bar").name());
+}
+
+// Listener with inclusion list: only stats matching the prefix are created.
+TEST_P(ListenerManagerImplTest, StatsMatcherInclusionList) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      inclusion_list:
+        patterns:
+          - prefix: "listener.test_prefix.foo"
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // "listener.test_prefix.foo" matches the inclusion prefix — accepted.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  // "listener.test_prefix.bar" does not match the inclusion prefix — rejected.
+  EXPECT_EQ("", scope.counterFromString("bar").name());
+}
+
+// Listener with exclusion list: stats matching the prefix are not created.
+TEST_P(ListenerManagerImplTest, StatsMatcherExclusionList) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      exclusion_list:
+        patterns:
+          - prefix: "listener.test_prefix.bar"
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // "listener.test_prefix.foo" does not match the exclusion prefix — accepted.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  // "listener.test_prefix.bar" matches the exclusion prefix — rejected.
+  EXPECT_EQ("", scope.counterFromString("bar").name());
+}
+
 TEST_P(ListenerManagerImplTest, DuplicateAddressDontBind) {
   InSequence s;
 
