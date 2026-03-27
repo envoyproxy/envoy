@@ -106,6 +106,7 @@ uint64_t Stats::totalPageHeapFree() {
   MallocExtension::instance()->GetNumericProperty("tcmalloc.pageheap_free_bytes", &value);
   return value;
 #elif defined(JEMALLOC)
+  refreshJemallocEpoch();
   size_t active = 0, allocated = 0;
   size_t sz = sizeof(size_t);
   mallctl("stats.active", &active, &sz, nullptr, 0);
