@@ -514,20 +514,20 @@ void statsAsText(const std::map<std::string, uint64_t>& all_stats,
 void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
   std::map<std::string, uint64_t> all_stats;
   stats.forEachCounter(nullptr, [&all_stats](Stats::Counter& counter) {
-    if (counter->used()) {
-      all_stats.emplace(counter->name(), counter->value());
+    if (counter.used()) {
+      all_stats.emplace(counter.name(), counter.value());
     }
   });
 
-  stats.forEachGauge(nullptr, [&all_stats](Stats::Gauge& value) {
-    if (gauge->used()) {
-      all_stats.emplace(gauge->name(), gauge->value());
+  stats.forEachGauge(nullptr, [&all_stats](Stats::Gauge& gauge) {
+    if (gauge.used()) {
+      all_stats.emplace(gauge.name(), gauge.value());
     }
   });
 
   std::vector<Stats::ParentHistogram*> histograms;
   stats.forEachHistogram([&histograms](size_t size) { histograms.reserve(size); },
-                         [&histograms](ParentHistogram& histogram) {
+                         [&histograms](Stats::ParentHistogram& histogram) {
                            histograms.push_back(&histogram);
                          });
   stats.symbolTable().sortByStatNames<Stats::ParentHistogram*>(
