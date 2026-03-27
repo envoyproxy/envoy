@@ -41,7 +41,7 @@ public:
 class FilterStateTest : public ::testing::Test {
 protected:
   absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr> create(const std::string& config_yaml,
-                                                                bool for_quic = false) {
+                                                               bool for_quic = false) {
     envoy::extensions::transport_sockets::tls::cert_selectors::filter_state::v3::Config config;
     TestUtility::loadFromYaml(config_yaml, config);
     Ssl::TlsCertificateSelectorConfigFactory& provider_factory =
@@ -55,10 +55,13 @@ protected:
                                                                 server_context_, for_quic);
   }
 
+  // Creates a selector AND stores the factory as a member so the selector's references
+  // (cert_contexts_, etc.) don't dangle.
   Ssl::TlsCertificateSelectorPtr createSelector() {
     auto factory = create(defaultConfig());
     EXPECT_TRUE(factory.ok());
-    return factory.value()->create(selector_context_);
+    selector_factory_ = std::move(factory.value());
+    return selector_factory_->create(selector_context_);
   }
 
   // Set up an SSL object with ex_data pointing to mock TransportSocketCallbacks.
@@ -67,12 +70,9 @@ protected:
     ssl_.reset(SSL_new(ssl_ctx_.get()));
 
     // Mock chain: callbacks -> connection -> streamInfo -> filterState
-    EXPECT_CALL(mock_callbacks_, connection())
-        .WillRepeatedly(ReturnRef(mock_connection_));
-    EXPECT_CALL(mock_connection_, streamInfo())
-        .WillRepeatedly(ReturnRef(mock_stream_info_));
-    EXPECT_CALL(mock_stream_info_, filterState())
-        .WillRepeatedly(ReturnRef(filter_state));
+    EXPECT_CALL(mock_callbacks_, connection()).WillRepeatedly(ReturnRef(mock_connection_));
+    EXPECT_CALL(mock_connection_, streamInfo()).WillRepeatedly(ReturnRef(mock_stream_info_));
+    EXPECT_CALL(mock_stream_info_, filterState()).WillRepeatedly(ReturnRef(filter_state));
 
     // Store the mock callbacks as ex_data on the SSL object (same as SslSocket does).
     SSL_set_ex_data(ssl_.get(), ContextImpl::sslSocketIndex(),
@@ -108,6 +108,9 @@ protected:
   NiceMock<Network::MockTransportSocketCallbacks> mock_callbacks_;
   NiceMock<Network::MockConnection> mock_connection_;
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info_;
+
+  // Factory must outlive the selector (selector holds references to factory members).
+  Ssl::TlsCertificateSelectorFactoryPtr selector_factory_;
 
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   bssl::UniquePtr<SSL> ssl_;
@@ -162,19 +165,12 @@ TEST_F(FilterStateTest, CustomFilterStateKeys) {
 
 // --- selectTlsContext tests ---
 
-TEST_F(FilterStateTest, EmptyMapperNameReturnsFailed) {
-  // The SNI mapper with default_value="fallback" always returns "fallback", never empty.
-  // Use a config with static mapper that has empty default to test the empty-name path.
-  // Since SNI mapper always returns non-empty (it has a default), we test with an SSL
-  // object that has no SNI set — the mapper returns the default_value "fallback".
-  // To properly test empty name, we'd need a custom mapper. Skip this case for now
-  // as the SNI mapper always returns a non-empty string.
+TEST_F(FilterStateTest, NoCallbacksReturnsFailed) {
   auto selector = createSelector();
 
-  // Instead test the no-callbacks path (no ex_data set).
+  // Create SSL object without setting ex_data — no TransportSocketCallbacks available.
   ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
   ssl_.reset(SSL_new(ssl_ctx_.get()));
-  // Don't set ex_data — callbacks will be null.
   auto hello = buildClientHello();
   auto result = selector->selectTlsContext(hello, nullptr);
   EXPECT_EQ(result.status, Ssl::SelectionResult::SelectionStatus::Failed);
@@ -238,14 +234,12 @@ TEST_F(FilterStateTest, ValidPemReturnsSuccess) {
 
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData("envoy.tls.certificate.cert_chain",
-                        std::make_shared<Router::StringAccessorImpl>(cert_pem),
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData("envoy.tls.certificate.private_key",
-                        std::make_shared<Router::StringAccessorImpl>(key_pem),
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(
+      "envoy.tls.certificate.cert_chain", std::make_shared<Router::StringAccessorImpl>(cert_pem),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(
+      "envoy.tls.certificate.private_key", std::make_shared<Router::StringAccessorImpl>(key_pem),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
   setupSslWithFilterState(filter_state);
 
   auto hello = buildClientHello();
@@ -263,14 +257,12 @@ TEST_F(FilterStateTest, CacheHitOnSecondCall) {
 
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData("envoy.tls.certificate.cert_chain",
-                        std::make_shared<Router::StringAccessorImpl>(cert_pem),
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData("envoy.tls.certificate.private_key",
-                        std::make_shared<Router::StringAccessorImpl>(key_pem),
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(
+      "envoy.tls.certificate.cert_chain", std::make_shared<Router::StringAccessorImpl>(cert_pem),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(
+      "envoy.tls.certificate.private_key", std::make_shared<Router::StringAccessorImpl>(key_pem),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
   setupSslWithFilterState(filter_state);
 
   auto hello = buildClientHello();
@@ -286,44 +278,55 @@ TEST_F(FilterStateTest, CacheHitOnSecondCall) {
   EXPECT_EQ(result2.selected_ctx, ctx1);
 }
 
-// --- onConfigUpdate tests ---
-
-TEST_F(FilterStateTest, OnConfigUpdateClearsCache) {
-  auto factory_result = create(defaultConfig());
+TEST_F(FilterStateTest, CacheEvictionOnMaxSize) {
+  // Config with max_cache_size=1 — only one cert can be cached at a time.
+  const std::string config_yaml = R"EOF(
+    certificate_mapper:
+      name: sni
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+        default_value: fallback
+    max_cache_size: 1
+  )EOF";
+  auto factory_result = create(config_yaml);
   ASSERT_TRUE(factory_result.ok());
-  auto& factory = *factory_result.value();
-  auto selector = factory.create(selector_context_);
+  selector_factory_ = std::move(factory_result.value());
+  auto selector = selector_factory_->create(selector_context_);
 
   const std::string cert_pem = readTestFile("servercert.pem");
   const std::string key_pem = readTestFile("serverkey.pem");
 
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData("envoy.tls.certificate.cert_chain",
-                        std::make_shared<Router::StringAccessorImpl>(cert_pem),
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData("envoy.tls.certificate.private_key",
-                        std::make_shared<Router::StringAccessorImpl>(key_pem),
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(
+      "envoy.tls.certificate.cert_chain", std::make_shared<Router::StringAccessorImpl>(cert_pem),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(
+      "envoy.tls.certificate.private_key", std::make_shared<Router::StringAccessorImpl>(key_pem),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
   setupSslWithFilterState(filter_state);
 
-  auto hello = buildClientHello();
-
-  // Populate cache.
-  auto result1 = selector->selectTlsContext(hello, nullptr);
+  // First request with SNI "first.example.com" — cache miss, inserted.
+  SSL_set_tlsext_host_name(ssl_.get(), "first.example.com");
+  auto hello1 = buildClientHello();
+  auto result1 = selector->selectTlsContext(hello1, nullptr);
   EXPECT_EQ(result1.status, Ssl::SelectionResult::SelectionStatus::Success);
-  const auto* ctx1 = result1.selected_ctx;
 
-  // Clear cache via config update.
-  EXPECT_TRUE(factory.onConfigUpdate().ok());
-
-  // Next call should create a NEW context (cache was cleared).
-  auto result2 = selector->selectTlsContext(hello, nullptr);
+  // Second request with SNI "second.example.com" — cache miss, evicts first, inserts second.
+  SSL_set_tlsext_host_name(ssl_.get(), "second.example.com");
+  auto hello2 = buildClientHello();
+  auto result2 = selector->selectTlsContext(hello2, nullptr);
   EXPECT_EQ(result2.status, Ssl::SelectionResult::SelectionStatus::Success);
-  // After cache clear, a new context is created (different pointer).
-  EXPECT_NE(result2.selected_ctx, ctx1);
+  // Different cert name → different context (first was evicted).
+  EXPECT_NE(result1.selected_ctx, result2.selected_ctx);
+}
+
+// --- onConfigUpdate tests ---
+
+TEST_F(FilterStateTest, OnConfigUpdateReturnsOk) {
+  auto factory_result = create(defaultConfig());
+  ASSERT_TRUE(factory_result.ok());
+  EXPECT_TRUE(factory_result.value()->onConfigUpdate().ok());
 }
 
 } // namespace
