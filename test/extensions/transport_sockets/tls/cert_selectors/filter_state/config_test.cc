@@ -12,6 +12,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -94,6 +95,11 @@ protected:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
           default_value: fallback
     )EOF";
+  }
+
+  std::string readTestFile(const std::string& name) {
+    return TestEnvironment::readFileToStringForTest(
+        TestEnvironment::runfilesPath("test/config/integration/certs/" + name));
   }
 
   NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
@@ -220,8 +226,32 @@ TEST_F(FilterStateTest, InvalidPemReturnsFailed) {
   EXPECT_EQ(result.status, Ssl::SelectionResult::SelectionStatus::Failed);
 }
 
-// Success paths (valid PEM, cache hit, eviction) are in integration_test.cc since
-// they need a real ServerContextConfig to create DynamicContext.
+// Valid PEM but mock ServerContextConfig lacks cipher suites/TLS versions, so
+// DynamicContext (ServerContextImpl) creation fails. This exercises the createContext
+// failure path that InvalidPemReturnsFailed does not reach (PEM parses ok, context fails).
+TEST_F(FilterStateTest, ValidPemButBadServerConfigReturnsFailed) {
+  auto selector = createSelector();
+
+  const std::string cert_pem = readTestFile("servercert.pem");
+  const std::string key_pem = readTestFile("serverkey.pem");
+
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(
+      "envoy.tls.certificate.cert_chain", std::make_shared<Router::StringAccessorImpl>(cert_pem),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state->setData(
+      "envoy.tls.certificate.private_key", std::make_shared<Router::StringAccessorImpl>(key_pem),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+  setupSslWithFilterState(filter_state);
+
+  auto hello = buildClientHello();
+  auto result = selector->selectTlsContext(hello, nullptr);
+  // PEM is valid but DynamicContext creation fails due to incomplete mock config.
+  EXPECT_EQ(result.status, Ssl::SelectionResult::SelectionStatus::Failed);
+}
+
+// Full success paths (valid PEM + real config, cache hit, eviction) are in integration_test.cc.
 
 // --- onConfigUpdate tests ---
 
