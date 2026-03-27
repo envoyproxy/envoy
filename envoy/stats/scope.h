@@ -6,7 +6,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
@@ -28,17 +27,6 @@ using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogr
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
-
-// Settings for limiting the number of counters, gauges and histograms allowed
-// in a scope. This currently only supports thread local stats.
-struct ScopeStatsLimitSettings {
-  // Max number of counters allowed in this scope. 0 means no limit.
-  uint32_t max_counters = 0;
-  // Max number of gauges allowed in this scope. 0 means no limit.
-  uint32_t max_gauges = 0;
-  // Max number of histograms allowed in this scope. 0 means no limit.
-  uint32_t max_histograms = 0;
-};
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
@@ -85,14 +73,8 @@ public:
    * @param name supplies the scope's namespace prefix.
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
    * that the metrics are not stored by reference.
-   * @param limits metric limits for counters, gauges and histograms allowed in this scope.
-   * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
-   * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
-   * unless another matcher is explicitly set.
    */
-  virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {},
-                                     StatsMatcherSharedPtr matcher = nullptr) PURE;
+  virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -102,14 +84,8 @@ public:
    * @param name supplies the scope's namespace prefix.
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
    * that the metrics are not stored by reference.
-   * @param limits metric limits for counters, gauges and histograms allowed in this scope.
-   * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
-   * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
-   * unless another matcher is explicitly set.
    */
-  virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                           const ScopeStatsLimitSettings& limits = {},
-                                           StatsMatcherSharedPtr matcher = nullptr) PURE;
+  virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false) PURE;
 
   /**
    * Creates a Counter from the stat name. Tag extraction will be performed on the name.

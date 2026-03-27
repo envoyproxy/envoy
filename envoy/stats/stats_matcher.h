@@ -84,7 +84,6 @@ public:
 };
 
 using StatsMatcherPtr = std::unique_ptr<const StatsMatcher>;
-using StatsMatcherSharedPtr = std::shared_ptr<const StatsMatcher>;
 
 } // namespace Stats
 } // namespace Envoy

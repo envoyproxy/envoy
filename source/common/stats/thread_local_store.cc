@@ -77,10 +77,6 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   iterateScopesLockHeld([this](const ScopeImplSharedPtr& scope) ABSL_EXCLUSIVE_LOCKS_REQUIRED(
                             lock_) -> bool {
     assertLocked(*scope);
-    // Scopes with their own matcher are unaffected by global matcher changes.
-    if (scope->scope_matcher_ != nullptr) {
-      return true;
-    }
     const CentralCacheEntrySharedPtr& central_cache = scope->centralCacheLockHeld();
     removeRejectedStats<CounterSharedPtr>(central_cache->counters_,
                                           [this](const CounterSharedPtr& counter) mutable {
@@ -158,23 +154,15 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name, bool evictable,
-                                                            const ScopeStatsLimitSettings& limits,
-                                                            StatsMatcherSharedPtr matcher) {
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name,
+                                                            bool evictable) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(stat_name_storage.statName(), evictable, limits, std::move(matcher));
+  return scopeFromStatName(stat_name_storage.statName(), evictable);
 }
 
-ScopeSharedPtr
-ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name, bool evictable,
-                                                   const ScopeStatsLimitSettings& limits,
-                                                   StatsMatcherSharedPtr matcher) {
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name, bool evictable) {
   SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
-  // Use explicit matcher if provided; otherwise inherit scope_matcher_ (which may be null,
-  // meaning the store-level matcher is used).
-  StatsMatcherSharedPtr child_matcher = matcher ? std::move(matcher) : scope_matcher_;
-  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()), evictable, limits,
-                                               std::move(child_matcher));
+  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()), evictable);
   parent_.addScope(new_scope);
   return new_scope;
 }
@@ -408,13 +396,10 @@ void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
 }
 
 ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix,
-                                           bool evictable, const ScopeStatsLimitSettings& limits,
-                                           StatsMatcherSharedPtr scope_matcher)
-    : scope_id_(parent.next_scope_id_++), parent_(parent), evictable_(evictable), limits_(limits),
-      scope_matcher_(std::move(scope_matcher)), prefix_(prefix, parent.alloc_.symbolTable()),
-      central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {
-  parent_.ensureOverflowStats(limits_);
-}
+                                           bool evictable)
+    : scope_id_(parent.next_scope_id_++), parent_(parent), evictable_(evictable),
+      prefix_(prefix, parent.alloc_.symbolTable()),
+      central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   // Helps reproduce a previous race condition by pausing here in tests while we
@@ -471,9 +456,8 @@ private:
 bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
                                                      StatsMatcher::FastResult fast_reject_result,
                                                      StatNameStorageSet& central_rejected_stats,
-                                                     StatNameHashSet* tls_rejected_stats,
-                                                     const StatsMatcher& matcher) {
-  if (matcher.acceptsAll()) {
+                                                     StatNameHashSet* tls_rejected_stats) {
+  if (stats_matcher_->acceptsAll()) {
     return false;
   }
 
@@ -482,7 +466,7 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
   if (iter != central_rejected_stats.end()) {
     rejected_name = &(*iter);
   } else {
-    if (matcher.slowRejects(fast_reject_result, name)) {
+    if (slowRejects(fast_reject_result, name)) {
       auto insertion = central_rejected_stats.insert(StatNameStorage(name, symbolTable()));
       const StatNameStorage& rejected_name_ref = *(insertion.first);
       rejected_name = &rejected_name_ref;
@@ -527,28 +511,9 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   if (iter != central_cache_map.end()) {
     central_ref = &(iter->second);
   } else if (parent_.checkAndRememberRejection(full_stat_name, fast_reject_result,
-                                               central_rejected_stats, tls_rejected_stats,
-                                               effectiveMatcher())) {
+                                               central_rejected_stats, tls_rejected_stats)) {
     return null_stat;
   } else {
-    // Stat creation here. Check limits.
-    if constexpr (std::is_same_v<StatType, Counter>) {
-      if (limits_.max_counters != 0 && central_cache_map.size() >= limits_.max_counters) {
-        parent_.counters_overflow_->inc();
-        return null_stat;
-      }
-    } else if constexpr (std::is_same_v<StatType, Gauge>) {
-      if (limits_.max_gauges != 0 && central_cache_map.size() >= limits_.max_gauges) {
-        parent_.gauges_overflow_->inc();
-        return null_stat;
-      }
-    } else {
-      // TextReadouts are currently not limited, but we must ensure they are the only
-      // other type being handled. This static_assert will trigger a compilation error
-      // if a new StatType is introduced in the future, forcing the developer to
-      // explicitly decide how to handle its limits.
-      static_assert(std::is_same_v<StatType, TextReadout>, "Unexpected StatType");
-    }
     StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
 
     RefcountPtr<StatType> stat = make_stat(
@@ -570,7 +535,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
-  if (scopeRejectsAll()) {
+  if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
 
@@ -578,7 +543,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
-  StatsMatcher::FastResult fast_reject_result = scopeFastRejects(final_stat_name);
+  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
   if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_counter_;
   }
@@ -623,7 +588,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
     Gauge::ImportMode import_mode) {
   // If a gauge is "hidden" it should not be rejected as these are used for deferred stats.
-  if (scopeRejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
+  if (parent_.rejectsAll() && import_mode != Gauge::ImportMode::HiddenAccumulate) {
     return parent_.null_gauge_;
   }
 
@@ -634,7 +599,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 
   StatsMatcher::FastResult fast_reject_result;
   if (import_mode != Gauge::ImportMode::HiddenAccumulate) {
-    fast_reject_result = scopeFastRejects(final_stat_name);
+    fast_reject_result = parent_.fastRejects(final_stat_name);
   } else {
     fast_reject_result = StatsMatcher::FastResult::Matches;
   }
@@ -667,7 +632,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit) {
   // See safety analysis comment in counterFromStatNameWithTags above.
 
-  if (scopeRejectsAll()) {
+  if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
   }
 
@@ -676,7 +641,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
 
-  StatsMatcher::FastResult fast_reject_result = scopeFastRejects(final_stat_name);
+  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
   if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_histogram_;
   }
@@ -703,8 +668,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   if (iter != central_cache->histograms_.end()) {
     central_ref = &iter->second;
   } else if (parent_.checkAndRememberRejection(final_stat_name, fast_reject_result,
-                                               central_cache->rejected_stats_, tls_rejected_stats,
-                                               effectiveMatcher())) {
+                                               central_cache->rejected_stats_,
+                                               tls_rejected_stats)) {
     return parent_.null_histogram_;
   } else {
     StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), stat_name_tags);
@@ -721,11 +686,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       if (iter != parent_.histogram_set_.end()) {
         stat = RefcountPtr<ParentHistogramImpl>(*iter);
       } else {
-        if (limits_.max_histograms != 0 &&
-            central_cache->histograms_.size() >= limits_.max_histograms) {
-          parent_.histograms_overflow_->inc();
-          return parent_.null_histogram_;
-        }
         stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
                                        tag_helper.tagExtractedName(), tag_helper.statNameTags(),
                                        *buckets, bins, parent_.next_histogram_id_++);
@@ -751,7 +711,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 
 TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
-  if (scopeRejectsAll()) {
+  if (parent_.rejectsAll()) {
     return parent_.null_text_readout_;
   }
 
@@ -759,7 +719,7 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
-  StatsMatcher::FastResult fast_reject_result = scopeFastRejects(final_stat_name);
+  StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
   if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_text_readout_;
   }
@@ -1262,33 +1222,6 @@ void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatName
   tagProducer().produceTags(name, tags);
   for (const auto& tag : tags) {
     stat_tags.emplace_back(pool.add(tag.name_), pool.add(tag.value_));
-  }
-}
-
-void ThreadLocalStoreImpl::ensureOverflowStats(const ScopeStatsLimitSettings& limits) {
-  const bool need_counter_overflow_stat = limits.max_counters != 0;
-  const bool need_gauge_overflow_stat = limits.max_gauges != 0;
-  const bool need_histogram_overflow_stat = limits.max_histograms != 0;
-
-  if (!need_counter_overflow_stat && !need_gauge_overflow_stat && !need_histogram_overflow_stat) {
-    return;
-  }
-
-  Thread::LockGuard lock(lock_);
-  if (need_counter_overflow_stat && counters_overflow_ == nullptr) {
-    StatNamePool pool(symbolTable());
-    StatName name = pool.add("server.stats_overflow.counter");
-    counters_overflow_ = alloc_.makeCounter(name, name, {});
-  }
-  if (need_gauge_overflow_stat && gauges_overflow_ == nullptr) {
-    StatNamePool pool(symbolTable());
-    StatName name = pool.add("server.stats_overflow.gauge");
-    gauges_overflow_ = alloc_.makeCounter(name, name, {});
-  }
-  if (need_histogram_overflow_stat && histograms_overflow_ == nullptr) {
-    StatNamePool pool(symbolTable());
-    StatName name = pool.add("server.stats_overflow.histogram");
-    histograms_overflow_ = alloc_.makeCounter(name, name, {});
   }
 }
 
