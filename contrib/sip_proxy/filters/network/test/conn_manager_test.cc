@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/stats/utility.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/network/mocks.h"
@@ -57,7 +58,7 @@ public:
     // Destroy any existing filter first.
     filter_ = nullptr;
 
-    for (const auto& counter : store_.counters()) {
+    for (Stats::Counter* counter : Stats::Utility::countersMainThread(store_)) {
       counter->reset();
     }
 

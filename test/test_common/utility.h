@@ -185,8 +185,6 @@ public:
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                              uint64_t seed = 0, uint64_t n_slice = 1);
 
-  // static std::vector<Stats::Counter*> countersMainThread(Stats::Store& store);
-
   /**
    * Finds a stat in a vector with the given name.
    * @param name the stat name to look for.
