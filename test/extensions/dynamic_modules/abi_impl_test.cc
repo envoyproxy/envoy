@@ -1117,6 +1117,37 @@ WEAK_STUB(HttpGetMetadataListBool, envoy_dynamic_module_callback_http_get_metada
                                        nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                        {nullptr, 0}, {nullptr, 0}, 0, nullptr))
 
+WEAK_STUB(TracerGetTraceContextValue,
+          envoy_dynamic_module_callback_tracer_get_trace_context_value(nullptr, {nullptr, 0},
+                                                                       nullptr))
+WEAK_STUB(TracerSetTraceContextValue,
+          envoy_dynamic_module_callback_tracer_set_trace_context_value(nullptr, {nullptr, 0},
+                                                                       {nullptr, 0}))
+WEAK_STUB(TracerRemoveTraceContextValue,
+          envoy_dynamic_module_callback_tracer_remove_trace_context_value(nullptr, {nullptr, 0}))
+WEAK_STUB(TracerGetTraceContextProtocol,
+          envoy_dynamic_module_callback_tracer_get_trace_context_protocol(nullptr, nullptr))
+WEAK_STUB(TracerGetTraceContextHost,
+          envoy_dynamic_module_callback_tracer_get_trace_context_host(nullptr, nullptr))
+WEAK_STUB(TracerGetTraceContextPath,
+          envoy_dynamic_module_callback_tracer_get_trace_context_path(nullptr, nullptr))
+WEAK_STUB(TracerGetTraceContextMethod,
+          envoy_dynamic_module_callback_tracer_get_trace_context_method(nullptr, nullptr))
+WEAK_STUB(TracerDefineCounter,
+          envoy_dynamic_module_callback_tracer_define_counter(nullptr, {nullptr, 0}, nullptr, 0,
+                                                              nullptr))
+WEAK_STUB(TracerDefineGauge,
+          envoy_dynamic_module_callback_tracer_define_gauge(nullptr, {nullptr, 0}, nullptr, 0,
+                                                            nullptr))
+WEAK_STUB(TracerDefineHistogram,
+          envoy_dynamic_module_callback_tracer_define_histogram(nullptr, {nullptr, 0}, nullptr, 0,
+                                                                nullptr))
+WEAK_STUB(TracerIncrementCounter,
+          envoy_dynamic_module_callback_tracer_increment_counter(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(TracerRecordHistogramValue,
+          envoy_dynamic_module_callback_tracer_record_histogram_value(nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(TracerSetGauge, envoy_dynamic_module_callback_tracer_set_gauge(nullptr, 0, nullptr, 0, 0))
+
 WEAK_STUB(DnsResolveComplete,
           envoy_dynamic_module_callback_dns_resolve_complete(
               nullptr, 0, envoy_dynamic_module_type_dns_resolution_status_Completed, {nullptr, 0},

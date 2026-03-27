@@ -115,6 +115,17 @@ minor_behavior_changes:
   change: |
     OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
     stopped reporting empty delta counters and histograms.
+- area: http
+  change: |
+    The ``route()``, ``clusterInfo()`` and ``virtualHost()`` methods on the HTTP filter callbacks
+    and stream info interfaces now are refactored to return ``OptRef<const T>`` instead of shared
+    pointers. And additional methods ``routeSharedPtr()``, ``clusterInfoSharedPtr()`` and
+    ``virtualHostSharedPtr()`` are added to return shared pointers.
+    The shorter ``route()``, ``clusterInfo()`` and ``virtualHost()`` methods are preferred for
+    most use cases where the returned reference is not used beyond the scope of the current function
+    and the caller does not want to manage shared pointer ownership. The new shared pointer methods
+    are intended for use cases where the caller needs to keep the ownerships to the route, cluster,
+    or virtual host.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -313,6 +324,11 @@ new_features:
     operators to configure the timer interval (``timer_interval``, minimum 1s, default 10s) and
     the memory release threshold (``max_unfreed_memory_bytes``, default 100MB) passed to
     ``tcmalloc::MallocExtension::ReleaseMemoryToSystem()``.
+- area: dynamic_modules
+  change: |
+    Added :ref:`tracer <envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer>`
+    support for dynamic modules, enabling custom distributed tracing backends to be implemented
+    in dynamic modules.
 - area: dynamic_modules
   change: |
     Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform

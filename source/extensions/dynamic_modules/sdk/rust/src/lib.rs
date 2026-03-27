@@ -16,6 +16,7 @@ pub mod listener;
 pub mod load_balancer;
 pub mod matcher;
 pub mod network;
+pub mod tracer;
 pub mod transport_socket;
 pub mod udp_listener;
 pub mod upstream_http_tcp_bridge;
@@ -30,6 +31,7 @@ pub use http::*;
 pub use listener::*;
 pub use load_balancer::*;
 pub use network::*;
+pub use tracer::*;
 pub use transport_socket::*;
 pub use udp_listener::*;
 pub use upstream_http_tcp_bridge::*;
@@ -540,6 +542,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
 /// - `upstream_http_tcp_bridge:` — [`NewUpstreamHttpTcpBridgeConfigFunction`] for upstream HTTP TCP
 ///   bridges
+/// - `tracer:` — [`NewTracerConfigFunction`] for tracers
 /// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
 /// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
 ///
@@ -602,6 +605,10 @@ macro_rules! declare_all_init_functions {
   };
   (@register upstream_http_tcp_bridge : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register tracer : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_TRACER_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
   (@register dns_resolver : $fn:expr) => {
@@ -1116,6 +1123,20 @@ pub type NewUpstreamHttpTcpBridgeConfigFunction =
 pub static NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION: OnceLock<
   NewUpstreamHttpTcpBridgeConfigFunction,
 > = OnceLock::new();
+
+// =================================================================================================
+// Tracer Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new tracer configuration.
+///
+/// The `ctx` provides access to metrics definition and update APIs. Metrics should be defined
+/// during configuration creation and the context stored for runtime metric updates.
+pub type NewTracerConfigFunction =
+  fn(ctx: TracerConfigContext, name: &str, config: &[u8]) -> Option<Box<dyn TracerConfig>>;
+
+/// Global storage for the tracer config factory function.
+pub static NEW_TRACER_CONFIG_FUNCTION: OnceLock<NewTracerConfigFunction> = OnceLock::new();
 
 // =================================================================================================
 // DNS Resolver Dynamic Module Support
