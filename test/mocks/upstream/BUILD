@@ -29,6 +29,7 @@ envoy_cc_mock(
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
