@@ -66,10 +66,11 @@ void StaticRouteConfigProviderImpl::requestVirtualHostsUpdate(
   }
   // If no VHDS is configured, immediately notify the callback that the
   // virtual-host doesn't exist.
-  auto current_cb = route_config_updated_cb.lock();
-  if (current_cb) {
-    thread_local_dispatcher.post([current_cb] { (*current_cb)(false); });
-  }
+  thread_local_dispatcher.post([current_cb = route_config_updated_cb] {
+    if (auto cb = current_cb.lock()) {
+      (*cb)(false);
+    }
+  });
 }
 
 StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
