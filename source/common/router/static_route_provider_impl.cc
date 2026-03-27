@@ -141,7 +141,7 @@ void StaticRouteConfigProviderImpl::VhdsContext::requestVirtualHostsUpdate(
       config_update_info_->protobufConfigurationCast().name(), for_domain);
   // The StaticRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
-  // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
+  // the StaticRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
   // determine if the RdsRouteConfigProviderImpl instance is still valid.
   factory_context_.mainThreadDispatcher().post(
       [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), alias, &thread_local_dispatcher,
