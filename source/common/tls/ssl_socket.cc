@@ -1,11 +1,13 @@
 #include "source/common/tls/ssl_socket.h"
 
+#include "envoy/common/platform.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/io_handle_bio.h"
 #include "source/common/tls/ssl_handshaker.h"
 #include "source/common/tls/utility.h"
@@ -24,6 +26,18 @@ namespace Tls {
 namespace {
 
 constexpr absl::string_view NotReadyReason{"TLS error: Secret is not supplied by SDS"};
+
+absl::optional<Api::IoError::IoErrorCode> checkForConnectionReset() {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
+    const uint32_t err = ERR_peek_error();
+    if (ERR_GET_LIB(err) == ERR_LIB_SYS &&
+        ERR_GET_REASON(err) == SOCKET_ERROR_CONNRESET) {
+      return Api::IoError::IoErrorCode::ConnectionReset;
+    }
+  }
+  return absl::nullopt;
+}
 
 } // namespace
 
@@ -121,6 +135,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   bool end_stream = false;
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
+  absl::optional<Api::IoError::IoErrorCode> err_code;
   while (keep_reading) {
     uint64_t bytes_read_this_iteration = 0;
     Buffer::Reservation reservation = read_buffer.reserveForRead();
@@ -145,6 +160,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
             end_stream = true;
             break;
           }
+          err_code = checkForConnectionReset();
           FALLTHRU;
         case SSL_ERROR_WANT_WRITE:
           // Renegotiation has started. We don't handle renegotiation so just fall through.
@@ -169,7 +185,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
-  return {action, bytes_read, end_stream};
+  return {action, bytes_read, end_stream, err_code};
 }
 
 void SslSocket::onPrivateKeyMethodComplete() { resumeHandshake(); }
@@ -312,15 +328,19 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       int err = SSL_get_error(rawSsl(), rc);
       ENVOY_CONN_LOG(trace, "ssl error occurred while write: {}", callbacks_->connection(),
                      Utility::getErrorDescription(err));
+      absl::optional<Api::IoError::IoErrorCode> write_err_code;
       switch (err) {
       case SSL_ERROR_WANT_WRITE:
         bytes_to_retry_ = bytes_to_write;
         break;
+      case SSL_ERROR_SYSCALL:
+        write_err_code = checkForConnectionReset();
+        FALLTHRU;
       case SSL_ERROR_WANT_READ:
       // Renegotiation has started. We don't handle renegotiation so just fall through.
       default:
         drainErrorQueue();
-        return {PostIoAction::Close, total_bytes_written, false};
+        return {PostIoAction::Close, total_bytes_written, false, write_err_code};
       }
 
       break;

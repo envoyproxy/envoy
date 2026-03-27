@@ -845,5 +845,11 @@ new_features:
     Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
     ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
     This is necessary if the route configuration may depend on the filter state values set.
+- area: tls
+  change: |
+    SslSocket now reports ECONNRESET as ConnectionReset by reading the system error
+    code from BoringSSL's error queue, matching RawBufferSocket behavior.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.ssl_socket_report_connection_reset`` to false.
 
 deprecated:
