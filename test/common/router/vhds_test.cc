@@ -391,7 +391,7 @@ vhds:
                   .ok());
 
   EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
-  EXPECT_TRUE(messageDifferencer_.Equals(
+  EXPECT_TRUE(TestUtility::protoEqual(
       vhost, config_update_info->protobufConfigurationCast().virtual_hosts(0)));
 }
 
