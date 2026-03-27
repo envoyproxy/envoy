@@ -318,6 +318,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/matcher:matcher_interface",
         "//source/common/buffer:watermark_buffer_lib",
+        "//source/common/common:bit_array_lib",
         "//source/common/common:linked_object",
         "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:scope_tracker",

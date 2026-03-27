@@ -14,6 +14,7 @@
 #include "envoy/protobuf/message_validator.h"
 
 #include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/bit_array.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
@@ -956,11 +957,13 @@ protected:
     bool encoder_filter_chain_aborted_{};
 
     // Each Nth bit in the array denotes if Nth filter has received `end_stream=true`
-    // via decodeHeaders() or decodeData().
-    std::bitset<32> filters_observed_decode_end_stream_;
+    // via decodeHeaders() or decodeData(). Initialized in createFilterChain() with the
+    // actual filter count.
+    std::unique_ptr<BitArray> filters_observed_decode_end_stream_;
     // Each Nth bit in the array denotes if Nth filter has received `end_stream=true`
-    // via encodeHeaders() or encodeData().
-    std::bitset<32> filters_observed_encode_end_stream_;
+    // via encodeHeaders() or encodeData(). Initialized in createFilterChain() with the
+    // actual filter count.
+    std::unique_ptr<BitArray> filters_observed_encode_end_stream_;
 
     bool saw_downstream_reset_{};
     // True when the stream was recreated.
