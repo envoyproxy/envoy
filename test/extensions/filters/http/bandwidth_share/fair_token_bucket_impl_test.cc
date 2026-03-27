@@ -17,7 +17,13 @@ auto IsBetween = [](uint64_t min, uint64_t max) {
 };
 
 class ClientTest : public testing::Test {
+  void SetUp() {
+    // Avoid starting at time zero.
+    time_system_.setMonotonicTime(start_time_);
+  }
+
 protected:
+  MonotonicTime start_time_{std::chrono::seconds(5)};
   Event::SimulatedTimeSystem time_system_;
   std::chrono::milliseconds time_to_next_token_;
   std::shared_ptr<Bucket> bucket_ = Bucket::create(1000, time_system_);
@@ -51,7 +57,7 @@ TEST_F(ClientTest, InitializationAndTimeBothFillTheBucket) {
   EXPECT_EQ(200, client.consume(750));
   // With only one client, can get the other 50 tokens in one shot while limiting.
   EXPECT_EQ(50, client.consume(500));
-  time_system_.setMonotonicTime(std::chrono::seconds(1));
+  time_system_.advanceTimeAsyncImpl(std::chrono::seconds(1));
   // When the bucket has refilled, all tokens are available again.
   EXPECT_EQ(950, client.consume(950));
 }
@@ -72,7 +78,7 @@ TEST_F(ClientTest, CompetingRequestsGetAppropriateShares) {
   EXPECT_EQ(5, client2.consume(1000));
   EXPECT_EQ(40, client3.consume(1000));
   // Advance one fill-interval.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(50));
+  time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(50));
   // Now they should each get an equal share of the new 50 tokens.
   EXPECT_EQ(5, client1.consume(1000));
   EXPECT_EQ(5, client2.consume(1000));
@@ -97,7 +103,7 @@ TEST_F(ClientTest, DeletingARequestCancelsItsShare) {
   // Cancel bar's request by deletion.
   client3.reset();
   // Pass a fill-interval and let the drain apply for bar so it's removed from the queue.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(50));
+  time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(50));
   // Now the other two should get a 50:50 split on the same tenant.
   EXPECT_EQ(25, client1.consume(1000));
   EXPECT_EQ(25, client2.consume(1000));
@@ -120,7 +126,7 @@ TEST_F(ClientTest, ClientDrainedCancelsItsShare) {
   EXPECT_EQ(40, client3.consume(40));
   // bar should be removed from the queue due to receiving all the tokens it wanted.
   // Pass a fill-interval and let the drain apply for bar so it's removed from the queue.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(50));
+  time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(50));
   // Now the other two should get a 50:50 split on the same tenant.
   EXPECT_EQ(25, client1.consume(1000));
   EXPECT_EQ(25, client2.consume(1000));
@@ -139,7 +145,7 @@ TEST_F(ClientTest, PoorlyDividedSplitsStillEmptyTheBucket) {
   EXPECT_EQ(2, client1.consume(1000));
   EXPECT_EQ(47, client2.consume(1000));
   // advance by a fill_interval.
-  time_system_.setMonotonicTime(std::chrono::milliseconds(50));
+  time_system_.advanceTimeAsyncImpl(std::chrono::milliseconds(50));
 
   // Now they should each get their expected share but the first client
   // also gets the remainder from last time.
@@ -206,10 +212,10 @@ TEST_F(ClientTest, RunWithAggressiveThreadsToEnsureNoDeadlocks) {
   }
   // We definitely shouldn't have granted more than 100000 tokens in less
   // than 99 fake-seconds.
-  EXPECT_THAT(std::chrono::duration_cast<std::chrono::seconds>(
-                  time_system_.monotonicTime().time_since_epoch())
-                  .count(),
-              IsBetween(99, 101));
+  EXPECT_THAT(
+      std::chrono::duration_cast<std::chrono::seconds>(time_system_.monotonicTime() - start_time_)
+          .count(),
+      IsBetween(99, 101));
 }
 
 } // namespace FairTokenBucket

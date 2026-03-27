@@ -14,19 +14,13 @@ namespace FairTokenBucket {
 Client::~Client() { bucket_->clientDestroyed(*this); }
 
 Bucket::Bucket(uint64_t max_tokens, TimeSource& time_source,
-               std::chrono::milliseconds fill_interval, double fill_rate)
-    : impl_(max_tokens, time_source, fill_rate), time_source_(time_source),
-      fill_interval_(fill_interval), max_tokens_(max_tokens) {
-  Thread::LockGuard lock(mutex_);
-  impl_.maybeReset(max_tokens);
-}
+               std::chrono::milliseconds fill_interval)
+    : time_source_(time_source), fill_interval_(fill_interval), max_tokens_(max_tokens),
+      nanoseconds_per_token_(1000000000 / max_tokens) {}
 
 std::shared_ptr<Bucket> Bucket::create(uint64_t max_tokens, TimeSource& time_source,
-                                       std::chrono::milliseconds fill_interval, double fill_rate) {
-  if (fill_rate <= 0) {
-    fill_rate = max_tokens;
-  }
-  return std::shared_ptr<Bucket>{new Bucket(max_tokens, time_source, fill_interval, fill_rate)};
+                                       std::chrono::milliseconds fill_interval) {
+  return std::shared_ptr<Bucket>{new Bucket(max_tokens, time_source, fill_interval)};
 }
 
 void Bucket::clientDestroyed(Client& client) {
@@ -74,16 +68,30 @@ void Bucket::clientDrained(Client& client) {
 
 uint64_t Bucket::tokensPerInterval() const { return max_tokens_ * fill_interval_.count() / 1000; }
 
+uint64_t Bucket::tokensInBucket() {
+  MonotonicTime now = time_source_.monotonicTime();
+  // Move empty timestamp forward if necessary so bucket is not more than full.
+  empty_at_ = std::max(empty_at_, now - std::chrono::seconds{1});
+  std::chrono::nanoseconds fill_duration =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(now - empty_at_);
+  return fill_duration.count() / nanoseconds_per_token_.count();
+}
+
+void Bucket::consumeTokens(uint64_t tokens) { empty_at_ += nanoseconds_per_token_ * tokens; }
+
 uint64_t Bucket::requestTokens(Client& client, uint64_t want_tokens) {
   Thread::LockGuard lock(mutex_);
   purgeDrainedTenants();
-  held_tokens_ += impl_.consume(max_tokens_ - held_tokens_, /*allow_partial=*/true);
+  uint64_t tokens_in_bucket = tokensInBucket();
+  // Start with tokens that can be claimed before limiting kicks in.
   uint64_t avail_tokens =
-      (tokensPerInterval() < held_tokens_) ? held_tokens_ - tokensPerInterval() : 0;
+      (tokensPerInterval() < tokens_in_bucket) ? tokens_in_bucket - tokensPerInterval() : 0;
   if (avail_tokens < want_tokens) {
     if (!client.known_limited_) {
+      // If the client was not already being limited, start being limited and
+      // give the client only the loose tokens (if any).
       clientLimited(client);
-      held_tokens_ -= avail_tokens;
+      consumeTokens(avail_tokens);
       return avail_tokens;
     }
     auto it = active_tenants_.find(client.tenant_name_);
@@ -91,13 +99,14 @@ uint64_t Bucket::requestTokens(Client& client, uint64_t want_tokens) {
     uint64_t tokens_to_tenant_per_interval =
         tokensPerInterval() * it->weight_ / active_tenants_total_weight_;
     uint64_t tokens_to_client_per_interval = tokens_to_tenant_per_interval / it->active_clients_;
-    avail_tokens = std::min(held_tokens_, avail_tokens + tokens_to_client_per_interval);
+    // Add the appropriate rate-limited tokens to the loose tokens.
+    avail_tokens = std::min(tokens_in_bucket, avail_tokens + tokens_to_client_per_interval);
   }
   if (avail_tokens >= want_tokens) {
     avail_tokens = want_tokens;
     clientDrained(client);
   }
-  held_tokens_ -= avail_tokens;
+  consumeTokens(avail_tokens);
   return avail_tokens;
 }
 

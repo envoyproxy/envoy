@@ -7,9 +7,9 @@
 #include <vector>
 
 #include "envoy/common/time.h"
+#include "envoy/common/token_bucket.h"
 
 #include "source/common/common/thread.h"
-#include "source/common/common/token_bucket_impl.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
@@ -125,16 +125,14 @@ struct TenantHashEq {
 class Bucket {
 public:
   /**
-   * @param max_tokens supplies the maximum number of tokens in the bucket.
+   * @param max_tokens supplies the maximum number of tokens in the bucket (also the per-second
+   * rate).
    * @param time_source supplies the time source.
    * @param fill_interval duration between token distributions when limiting.
-   * @param fill_rate supplies the number of tokens that will return to the bucket per second.
-   * The default is max_tokens.
    */
   static std::shared_ptr<Bucket>
   create(uint64_t max_tokens, TimeSource& time_source,
-         std::chrono::milliseconds fill_interval = std::chrono::milliseconds{50},
-         double fill_rate = 0);
+         std::chrono::milliseconds fill_interval = std::chrono::milliseconds{50});
 
   Bucket(const Bucket&) = delete;
   Bucket(Bucket&&) = delete;
@@ -146,15 +144,20 @@ private:
   void clientDrained(Client& client) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void clientLimited(Client& client) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void purgeDrainedTenants() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  uint64_t tokensInBucket() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void consumeTokens(uint64_t) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   uint64_t tokensPerInterval() const;
   explicit Bucket(uint64_t max_tokens, TimeSource& time_source,
-                  std::chrono::milliseconds fill_interval, double fill_rate);
+                  std::chrono::milliseconds fill_interval);
   Thread::MutexBasicLockable mutex_;
-  TokenBucketImpl impl_ ABSL_GUARDED_BY(mutex_);
   TimeSource& time_source_;
   const std::chrono::milliseconds fill_interval_;
   const uint64_t max_tokens_;
-  uint64_t held_tokens_ ABSL_GUARDED_BY(mutex_) = 0;
+  const std::chrono::nanoseconds nanoseconds_per_token_;
+  // The empty_at_ value is used to store how many tokens are in the bucket,
+  // for example if empty_at_ is 100ms in the past, then there is 1/10 of
+  // max_tokens_, or if 1000ms or more, then there is max_tokens_.
+  MonotonicTime empty_at_ ABSL_GUARDED_BY(mutex_){};
   absl::flat_hash_set<Tenant, TenantHash, TenantHashEq> active_tenants_ ABSL_GUARDED_BY(mutex_);
   std::vector<std::pair<MonotonicTime, std::string>> draining_tenants_ ABSL_GUARDED_BY(mutex_);
   uint32_t active_tenants_total_weight_ = 0;
