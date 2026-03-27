@@ -55,6 +55,7 @@ envoy_extension_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/common/set_filter_state/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/set_filter_state/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/cert_selectors/filter_state/v3:pkg_cc_proto",

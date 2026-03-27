@@ -2,11 +2,13 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/common/set_filter_state/v3/value.pb.h"
 #include "envoy/extensions/filters/listener/set_filter_state/v3/set_filter_state.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/filter_state/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration.h"
 #include "test/test_common/environment.h"
@@ -28,7 +30,7 @@ public:
   FilterStateCertIntegrationTest() : BaseTcpProxySslIntegrationTest(GetParam()) {}
 
   void setup() {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       auto* filter_chain = listener->mutable_filter_chains(0);
 
@@ -43,13 +45,13 @@ public:
       lf->set_name("envoy.filters.listener.set_filter_state");
       envoy::extensions::filters::listener::set_filter_state::v3::Config set_filter_state_config;
       {
-        auto* entry = set_filter_state_config.add_on_new_connection();
+        auto* entry = set_filter_state_config.add_on_accept();
         entry->set_object_key("envoy.tls.certificate.cert_chain");
         entry->set_factory_key("envoy.string");
         entry->mutable_format_string()->mutable_text_format_source()->set_inline_string(cert_pem);
       }
       {
-        auto* entry = set_filter_state_config.add_on_new_connection();
+        auto* entry = set_filter_state_config.add_on_accept();
         entry->set_object_key("envoy.tls.certificate.private_key");
         entry->set_factory_key("envoy.string");
         entry->mutable_format_string()->mutable_text_format_source()->set_inline_string(key_pem);
