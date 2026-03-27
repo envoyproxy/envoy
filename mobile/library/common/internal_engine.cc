@@ -526,10 +526,9 @@ void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
   });
 
   std::vector<Stats::ParentHistogram*> histograms;
-  stats.forEachHistogram([&histograms](size_t size) { histograms.reserve(size); },
-                         [&histograms](Stats::ParentHistogram& histogram) {
-                           histograms.push_back(&histogram);
-                         });
+  stats.forEachHistogram(
+      [&histograms](size_t size) { histograms.reserve(size); },
+      [&histograms](Stats::ParentHistogram& histogram) { histograms.push_back(&histogram); });
   stats.symbolTable().sortByStatNames<Stats::ParentHistogram*>(
       histograms.begin(), histograms.end(),
       [](const Stats::ParentHistogram* a) -> Stats::StatName { return a->statName(); });
