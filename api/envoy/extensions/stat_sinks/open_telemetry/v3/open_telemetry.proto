@@ -42,7 +42,8 @@ message SinkConfig {
   }
 
   // DropAction is an action that, when matched, will prevent the stat from being converted to an OTLP metric and flushed.
-  message DropAction {}
+  message DropAction {
+  }
 
   oneof protocol_specifier {
     option (validate.required) = true;
