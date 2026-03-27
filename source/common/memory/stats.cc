@@ -71,10 +71,11 @@ uint64_t Stats::totalCurrentlyReserved() {
   MallocExtension::instance()->GetNumericProperty("generic.heap_size", &value);
   return value;
 #elif defined(JEMALLOC)
-  size_t resident = 0;
-  size_t sz = sizeof(resident);
-  mallctl("stats.resident", &resident, &sz, nullptr, 0);
-  return resident;
+  refreshJemallocEpoch();
+  size_t mapped = 0;
+  size_t sz = sizeof(mapped);
+  mallctl("stats.mapped", &mapped, &sz, nullptr, 0);
+  return mapped;
 #else
   return 0;
 #endif
