@@ -861,4 +861,14 @@ new_features:
     ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
     This is necessary if the route configuration may depend on the filter state values set.
 
+- area: stateful_session
+  change: |
+    Added :ref:`status_on_strict_destination_not_found
+    <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.status_on_strict_destination_not_found>`
+    to the :ref:`stateful session filter <config_http_filters_stateful_session>`. When
+    :ref:`strict <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.strict>`
+    mode is enabled and the requested destination is not found in the set of available endpoints, Envoy
+    will return the configured HTTP status code instead of the default ``503``. This does not apply when
+    the destination exists but is unhealthy.
+
 deprecated:
