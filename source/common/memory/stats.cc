@@ -141,6 +141,7 @@ uint64_t Stats::totalPhysicalBytes() {
   MallocExtension::instance()->GetNumericProperty("generic.total_physical_bytes", &value);
   return value;
 #elif defined(JEMALLOC)
+  refreshJemallocEpoch();
   size_t resident = 0;
   size_t sz = sizeof(resident);
   mallctl("stats.resident", &resident, &sz, nullptr, 0);
