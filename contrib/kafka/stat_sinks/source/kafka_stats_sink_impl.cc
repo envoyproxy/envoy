@@ -36,7 +36,7 @@ void jsonEscape(std::string& output, const std::string& input) {
 // KafkaMetricsFlusher
 
 std::vector<std::string> KafkaMetricsFlusher::flush(Stats::MetricSnapshot& snapshot,
-                                                     uint32_t batch_size) const {
+                                                    uint32_t batch_size) const {
   if (format_ == SerializationFormat::Protobuf) {
     return flushProtobuf(snapshot, batch_size);
   }
@@ -46,7 +46,7 @@ std::vector<std::string> KafkaMetricsFlusher::flush(Stats::MetricSnapshot& snaps
 // --- JSON serialization ---
 
 std::vector<std::string> KafkaMetricsFlusher::flushJson(Stats::MetricSnapshot& snapshot,
-                                                         uint32_t batch_size) const {
+                                                        uint32_t batch_size) const {
   std::vector<std::string> messages;
   int64_t snapshot_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                  snapshot.snapshotTime().time_since_epoch())
@@ -129,7 +129,7 @@ void KafkaMetricsFlusher::flushCounterJson(
 }
 
 void KafkaMetricsFlusher::flushGaugeJson(std::string& output, const Stats::Gauge& gauge,
-                                          int64_t snapshot_time_ms, bool& first) const {
+                                         int64_t snapshot_time_ms, bool& first) const {
   if (!first) {
     output += ',';
   }
@@ -147,8 +147,8 @@ void KafkaMetricsFlusher::flushGaugeJson(std::string& output, const Stats::Gauge
 }
 
 void KafkaMetricsFlusher::flushHistogramJson(std::string& output,
-                                              const Stats::ParentHistogram& histogram,
-                                              int64_t snapshot_time_ms, bool& first) const {
+                                             const Stats::ParentHistogram& histogram,
+                                             int64_t snapshot_time_ms, bool& first) const {
   if (!first) {
     output += ',';
   }
@@ -203,9 +203,9 @@ void KafkaMetricsFlusher::flushHistogramJson(std::string& output,
 // --- Protobuf serialization ---
 
 void KafkaMetricsFlusher::populateMetricsFamily(io::prometheus::client::MetricFamily& family,
-                                                 io::prometheus::client::MetricType type,
-                                                 int64_t snapshot_time_ms,
-                                                 const Stats::Metric& metric) const {
+                                                io::prometheus::client::MetricType type,
+                                                int64_t snapshot_time_ms,
+                                                const Stats::Metric& metric) const {
   family.set_type(type);
   auto* prometheus_metric = family.add_metric();
   prometheus_metric->set_timestamp_ms(snapshot_time_ms);
@@ -223,7 +223,7 @@ void KafkaMetricsFlusher::populateMetricsFamily(io::prometheus::client::MetricFa
 }
 
 std::vector<std::string> KafkaMetricsFlusher::flushProtobuf(Stats::MetricSnapshot& snapshot,
-                                                             uint32_t batch_size) const {
+                                                            uint32_t batch_size) const {
   std::vector<std::string> messages;
   int64_t snapshot_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                  snapshot.snapshotTime().time_since_epoch())
@@ -243,8 +243,8 @@ std::vector<std::string> KafkaMetricsFlusher::flushProtobuf(Stats::MetricSnapsho
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
       auto* family = current_message.add_envoy_metrics();
-      populateMetricsFamily(*family, io::prometheus::client::MetricType::COUNTER,
-                            snapshot_time_ms, counter.counter_.get());
+      populateMetricsFamily(*family, io::prometheus::client::MetricType::COUNTER, snapshot_time_ms,
+                            counter.counter_.get());
       auto* counter_metric = family->mutable_metric(0)->mutable_counter();
       if (report_counters_as_deltas_) {
         counter_metric->set_value(counter.delta_);
@@ -293,8 +293,7 @@ std::vector<std::string> KafkaMetricsFlusher::flushProtobuf(Stats::MetricSnapsho
   return messages;
 }
 
-void KafkaMetricsFlusher::appendMetricName(std::string& output,
-                                            const Stats::Metric& metric) const {
+void KafkaMetricsFlusher::appendMetricName(std::string& output, const Stats::Metric& metric) const {
   output += ",\"name\":\"";
   if (emit_tags_as_labels_) {
     jsonEscape(output, metric.tagExtractedName());

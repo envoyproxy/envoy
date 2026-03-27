@@ -1,10 +1,9 @@
-#include "contrib/kafka/stat_sinks/source/kafka_stats_sink_impl.h"
-
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
 
 #include "test/mocks/stats/mocks.h"
 
 #include "contrib/kafka/filters/network/test/mesh/kafka_mocks.h"
+#include "contrib/kafka/stat_sinks/source/kafka_stats_sink_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -354,13 +353,12 @@ TEST_F(KafkaStatsSinkTest, ProduceCalledOnFlush) {
   setupCounterAndGauge();
   wireSnapshot();
 
-  auto mock_producer =
-      std::make_unique<NiceMock<NetworkFilters::Kafka::Mesh::MockKafkaProducer>>();
+  auto mock_producer = std::make_unique<NiceMock<NetworkFilters::Kafka::Mesh::MockKafkaProducer>>();
   auto* producer_ptr = mock_producer.get();
 
   EXPECT_CALL(*producer_ptr, produce(std::string("test-topic"), _, _, _, _, _, _, _, _, _))
       .WillOnce(Return(RdKafka::ERR_NO_ERROR));
-  EXPECT_CALL(*producer_ptr, poll(0)).Times(1);
+  EXPECT_CALL(*producer_ptr, poll(0));
 
   KafkaMetricsFlusher flusher(true, true);
   KafkaStatsSink sink(std::move(mock_producer), "test-topic", 0, std::move(flusher));
@@ -371,16 +369,14 @@ TEST_F(KafkaStatsSinkTest, ProduceFailureLogged) {
   setupCounterAndGauge();
   wireSnapshot();
 
-  auto mock_producer =
-      std::make_unique<NiceMock<NetworkFilters::Kafka::Mesh::MockKafkaProducer>>();
+  auto mock_producer = std::make_unique<NiceMock<NetworkFilters::Kafka::Mesh::MockKafkaProducer>>();
   auto* producer_ptr = mock_producer.get();
 
   EXPECT_CALL(*producer_ptr, produce(std::string("test-topic"), _, _, _, _, _, _, _, _, _))
       .WillOnce(Return(RdKafka::ERR__QUEUE_FULL));
   EXPECT_CALL(*producer_ptr, poll(_)).Times(testing::AtLeast(1));
 
-  KafkaStatsSink sink(std::move(mock_producer), "test-topic", 0,
-                      KafkaMetricsFlusher(true, true));
+  KafkaStatsSink sink(std::move(mock_producer), "test-topic", 0, KafkaMetricsFlusher(true, true));
   sink.flush(snapshot_);
 }
 
@@ -388,14 +384,13 @@ TEST_F(KafkaStatsSinkTest, BatchingProducesMultipleMessages) {
   setupCounterAndGauge();
   wireSnapshot();
 
-  auto mock_producer =
-      std::make_unique<NiceMock<NetworkFilters::Kafka::Mesh::MockKafkaProducer>>();
+  auto mock_producer = std::make_unique<NiceMock<NetworkFilters::Kafka::Mesh::MockKafkaProducer>>();
   auto* producer_ptr = mock_producer.get();
 
   EXPECT_CALL(*producer_ptr, produce(std::string("test-topic"), _, _, _, _, _, _, _, _, _))
       .Times(2)
       .WillRepeatedly(Return(RdKafka::ERR_NO_ERROR));
-  EXPECT_CALL(*producer_ptr, poll(0)).Times(1);
+  EXPECT_CALL(*producer_ptr, poll(0));
 
   KafkaMetricsFlusher flusher(true, true);
   KafkaStatsSink sink(std::move(mock_producer), "test-topic", 1, std::move(flusher));
@@ -406,13 +401,12 @@ TEST_F(KafkaStatsSinkTest, ProtobufFormatProducesToKafka) {
   setupCounterAndGauge();
   wireSnapshot();
 
-  auto mock_producer =
-      std::make_unique<NiceMock<NetworkFilters::Kafka::Mesh::MockKafkaProducer>>();
+  auto mock_producer = std::make_unique<NiceMock<NetworkFilters::Kafka::Mesh::MockKafkaProducer>>();
   auto* producer_ptr = mock_producer.get();
 
   EXPECT_CALL(*producer_ptr, produce(std::string("test-topic"), _, _, _, _, _, _, _, _, _))
       .WillOnce(Return(RdKafka::ERR_NO_ERROR));
-  EXPECT_CALL(*producer_ptr, poll(0)).Times(1);
+  EXPECT_CALL(*producer_ptr, poll(0));
 
   KafkaMetricsFlusher flusher(true, true, SerializationFormat::Protobuf);
   KafkaStatsSink sink(std::move(mock_producer), "test-topic", 0, std::move(flusher));

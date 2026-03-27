@@ -14,8 +14,8 @@ envoy_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
-        "//contrib/kafka/stat_sinks/source:kafka_stats_sink_impl_lib",
         "//contrib/kafka/filters/network/test/mesh:kafka_mocks_lib",
+        "//contrib/kafka/stat_sinks/source:kafka_stats_sink_impl_lib",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/service/metrics/v3:pkg_cc_proto",
     ],

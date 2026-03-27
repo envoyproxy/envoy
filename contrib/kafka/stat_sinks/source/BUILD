@@ -31,12 +31,12 @@ envoy_cc_contrib_extension(
     tags = ["skip_on_windows"],
     deps = [
         ":kafka_stats_sink_impl_lib",
+        "//contrib/kafka/filters/network/source/mesh:librdkafka_utils_impl_lib",
         "//envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
         "//source/server:configuration_lib",
-        "//contrib/kafka/filters/network/source/mesh:librdkafka_utils_impl_lib",
         "@envoy_api//contrib/envoy/extensions/stat_sinks/kafka/v3:pkg_cc_proto",
     ],
 )

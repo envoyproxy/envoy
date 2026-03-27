@@ -1,8 +1,7 @@
-#include "contrib/kafka/stat_sinks/source/config.h"
-
-#include "contrib/envoy/extensions/stat_sinks/kafka/v3/kafka_stats_sink.pb.h"
 #include "test/mocks/server/server_factory_context.h"
 
+#include "contrib/envoy/extensions/stat_sinks/kafka/v3/kafka_stats_sink.pb.h"
+#include "contrib/kafka/stat_sinks/source/config.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -16,9 +15,8 @@ TEST(KafkaStatsSinkFactoryTest, CreateEmptyConfigProto) {
   KafkaStatsSinkFactory factory;
   auto proto = factory.createEmptyConfigProto();
   EXPECT_NE(nullptr, proto);
-  EXPECT_NE(
-      nullptr,
-      dynamic_cast<envoy::extensions::stat_sinks::kafka::v3::KafkaStatsSinkConfig*>(proto.get()));
+  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::stat_sinks::kafka::v3::KafkaStatsSinkConfig*>(
+                         proto.get()));
 }
 
 TEST(KafkaStatsSinkFactoryTest, Name) {
