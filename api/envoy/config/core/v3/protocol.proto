@@ -781,7 +781,7 @@ message Http2ProtocolOptions {
   // obs-text = %x80-FF
   // [#comment: TODO Unify this knob and default value for H1/H2/H3 and move
   // this configuration to HttpProtocolOptions.]
-  bool disallow_obs_text = 20;
+  google.protobuf.BoolValue disallow_obs_text = 20;
 }
 
 // [#not-implemented-hide:]

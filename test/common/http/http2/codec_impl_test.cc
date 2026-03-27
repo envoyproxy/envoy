@@ -584,7 +584,7 @@ TEST_P(Http2CodecImplTest, DisallowObsTextBehaviorDisallow) {
   }
 
   // With disallow_obs_text = true, the request is rejected.
-  server_http2_options_.set_disallow_obs_text(true);
+  server_http2_options_.mutable_disallow_obs_text()->set_value(true);
   initialize();
 
   InSequence s;
@@ -612,7 +612,7 @@ TEST_P(Http2CodecImplTest, DisallowObsTextBehaviorAllow) {
   }
 
   // With disallow_obs_text = false, the request is accepted.
-  server_http2_options_.set_disallow_obs_text(false);
+  server_http2_options_.mutable_disallow_obs_text()->set_value(false);
   initialize();
 
   InSequence s;
