@@ -1,11 +1,11 @@
 #include "source/common/config/dependent_type_urls.h"
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
-#include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
 
 #include "source/common/config/resource_name.h"

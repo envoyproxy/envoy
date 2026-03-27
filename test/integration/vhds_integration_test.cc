@@ -159,8 +159,8 @@ TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
 
 // xdstp:// VHDS integration tests.
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsXdstpIntegrationTest,
-                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsXdstpIntegrationTest, VHDS_INTEGRATION_PARAMS,
+                         vhdsTestParamsToString);
 
 // Verify that creating a listener with xdstp VHDS results in:
 // 1. A delta discovery request for the xdstp collection resource name

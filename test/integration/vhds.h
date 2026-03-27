@@ -344,7 +344,7 @@ inline void sendDeltaVhdsResponse(
 
 // Single-listener xdstp VHDS integration test.
 class VhdsXdstpIntegrationTest : public HttpIntegrationTest,
-                                 public testing::TestWithParam<VhdsIntegrationTestParam>  {
+                                 public testing::TestWithParam<VhdsIntegrationTestParam> {
 public:
   VhdsXdstpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
@@ -377,7 +377,9 @@ public:
                   HttpConnectionManager& hcm) -> void {
             hcm.clear_rds();
             auto* route_config = hcm.mutable_route_config();
-            route_config->CopyFrom(TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(RdsConfigWithXdstp));
+            route_config->CopyFrom(
+                TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+                    RdsConfigWithXdstp));
           });
     }
 
@@ -401,7 +403,8 @@ public:
                                               {"my_route"}, true));
       sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
           Config::TestTypeUrl::get().RouteConfiguration,
-          {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(RdsConfigWithXdstp)},
+          {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+              RdsConfigWithXdstp)},
           "1");
     }
 

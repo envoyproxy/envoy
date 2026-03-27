@@ -71,9 +71,8 @@ public:
     // during onDiscoveryResponse).
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(testing::AnyNumber())
-        .WillRepeatedly(testing::Invoke([](Event::TimerCb) {
-          return new NiceMock<Event::MockTimer>();
-        }));
+        .WillRepeatedly(
+            testing::Invoke([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
   }
 
   void setup() { setup(rate_limit_settings_); }
@@ -316,9 +315,8 @@ TEST_P(GrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
       // Happens when adding a type url watch and for dependent type URL TTL timers
       // created lazily in apiStateFor(). Each call must return a fresh timer because
       // the caller takes ownership via unique_ptr.
-      .WillRepeatedly(testing::Invoke([](Event::TimerCb) {
-        return new NiceMock<Event::MockTimer>();
-      }));
+      .WillRepeatedly(
+          testing::Invoke([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
   setup();
   InSequence s;
   const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;

@@ -17,16 +17,16 @@ OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
                      ProtobufMessage::ValidationVisitor& validation_visitor,
                      Server::Configuration::ServerFactoryContext&) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret =
-      OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm,
-                                         notifier, scope, validation_visitor, creation_status));
+  auto ret = OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm, notifier,
+                                                scope, validation_visitor, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
                            OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                           ClusterManager& cm, MissingClusterNotifier& notifier, Stats::Scope& scope,
+                           ClusterManager& cm, MissingClusterNotifier& notifier,
+                           Stats::Scope& scope,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            absl::Status& creation_status)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,

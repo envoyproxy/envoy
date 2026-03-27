@@ -56,8 +56,8 @@ private:
                             const EnvoyException* e) override;
 
   OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
-               OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-               ClusterManager& cm, MissingClusterNotifier& notifier, Stats::Scope& scope,
+               OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
+               MissingClusterNotifier& notifier, Stats::Scope& scope,
                ProtobufMessage::ValidationVisitor& validation_visitor,
                absl::Status& creation_status);
   void sendAwaiting();

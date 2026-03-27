@@ -57,9 +57,8 @@ public:
     // pause(dependentTypeUrls(...)) is called during onDiscoveryResponse).
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(testing::AnyNumber())
-        .WillRepeatedly(testing::Invoke([](Event::TimerCb) {
-          return new NiceMock<Event::MockTimer>();
-        }));
+        .WillRepeatedly(
+            testing::Invoke([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
 
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
