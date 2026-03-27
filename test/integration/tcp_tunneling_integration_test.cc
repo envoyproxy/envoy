@@ -371,6 +371,50 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
   cleanupUpstreamAndDownstream();
 }
 
+// Verify that upstream RST through tunneled CONNECT propagates as downstream RST
+// (default behavior with both guards enabled).
+TEST_P(ConnectTerminationIntegrationTest, UpstreamRstPropagationThroughTunnel) {
+  enableHalfClose(false);
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Upstream sends RST (AbortReset).
+  ASSERT_TRUE(fake_raw_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForDisconnect());
+
+  // Downstream should be disconnected (stream reset or connection close).
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForAnyTermination());
+  }
+}
+
+// Verify that upstream RST through tunneled CONNECT does NOT propagate as downstream RST
+// when the HTTP guard is explicitly disabled.
+TEST_P(ConnectTerminationIntegrationTest, UpstreamRstNotPropagatedWithoutHttpGuard) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.map_http_stream_reset_to_tcp_rst", "false");
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Upstream sends RST.
+  ASSERT_TRUE(fake_raw_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForDisconnect());
+
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    ASSERT_TRUE(response_->waitForAnyTermination());
+  } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
+    ASSERT_TRUE(response_->waitForAnyTermination());
+  } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+}
+
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
   enable_timeout_ = true;
   initialize();
