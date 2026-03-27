@@ -273,9 +273,13 @@ private:
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
   void resetIdleTimer() override {}
-  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
-  absl::optional<Upstream::LoadBalancerContext::OverrideHost>
-  upstreamOverrideHost() const override {
+  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host) override {
+    upstream_override_host_ = std::move(host);
+  }
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override {
+    if (upstream_override_host_.host.empty()) {
+      return {};
+    }
     return upstream_override_host_;
   }
   bool shouldLoadShed() const override { return false; }
@@ -319,7 +323,7 @@ private:
   bool router_destroyed_{false};
 
   // Upstream override host for bypassing load balancer selection
-  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
+  Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
 
   friend class AsyncClientImpl;
   friend class AsyncClientImplUnitTest;

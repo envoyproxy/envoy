@@ -7768,12 +7768,13 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   // Simulate the load balancer to call the `overrideHostToSelect`. When `overrideHostToSelect` of
   // `LoadBalancerContext` is called, `upstreamOverrideHost` of StreamDecoderFilterCallbacks will be
   // called to get address of upstream host that should be selected first.
+  Upstream::LoadBalancerContext::OverrideHost expected_host{"1.2.3.4", false};
   EXPECT_CALL(callbacks_, upstreamOverrideHost())
-      .WillOnce(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("1.2.3.4", false))));
+      .WillOnce(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(expected_host)));
 
-  auto override_host = router_->overrideHostToSelect();
-  EXPECT_EQ("1.2.3.4", override_host.value().first);
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> override_host =
+      router_->overrideHostToSelect();
+  EXPECT_EQ("1.2.3.4", override_host->host);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -7806,7 +7807,7 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   // Simulate the load balancer to call the `overrideHostToSelect` again. The upstream override host
   // will be ignored when the request is retried.
   EXPECT_CALL(callbacks_, upstreamOverrideHost()).Times(0);
-  EXPECT_EQ(absl::nullopt, router_->overrideHostToSelect());
+  EXPECT_FALSE(router_->overrideHostToSelect().has_value());
 
   // Normal response.
   Http::ResponseHeaderMapPtr response_headers_200(

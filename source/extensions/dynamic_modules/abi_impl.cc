@@ -3038,6 +3038,114 @@ envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_trailers(
                "not implemented in this context");
 }
 
+// ---------------------- Tracer callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the tracer abi_impl.cc when the tracer extension is used.
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_tracer_get_trace_context_value(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_get_trace_context_value: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_tracer_set_trace_context_value(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_set_trace_context_value: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_tracer_remove_trace_context_value(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr, envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_remove_trace_context_value: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_tracer_get_trace_context_protocol(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_get_trace_context_protocol: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_tracer_get_trace_context_host(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_get_trace_context_host: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_tracer_get_trace_context_path(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_get_trace_context_path: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_tracer_get_trace_context_method(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_get_trace_context_method: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_tracer_define_counter(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_define_counter: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_tracer_define_gauge(envoy_dynamic_module_type_tracer_config_envoy_ptr,
+                                                  envoy_dynamic_module_type_module_buffer,
+                                                  envoy_dynamic_module_type_module_buffer*, size_t,
+                                                  size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_define_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_tracer_define_histogram(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_define_histogram: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_tracer_increment_counter(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_increment_counter: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_tracer_record_histogram_value(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr, size_t,
+    envoy_dynamic_module_type_module_buffer*, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_record_histogram_value: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_tracer_set_gauge(envoy_dynamic_module_type_tracer_config_envoy_ptr,
+                                               size_t, envoy_dynamic_module_type_module_buffer*,
+                                               size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_tracer_set_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
 __attribute__((weak)) bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
     envoy_dynamic_module_type_module_buffer, double) {

@@ -16,6 +16,7 @@ pub mod listener;
 pub mod load_balancer;
 pub mod matcher;
 pub mod network;
+pub mod tracer;
 pub mod udp_listener;
 pub mod upstream_http_tcp_bridge;
 pub mod utility;
@@ -29,6 +30,7 @@ pub use http::*;
 pub use listener::*;
 pub use load_balancer::*;
 pub use network::*;
+pub use tracer::*;
 pub use udp_listener::*;
 pub use upstream_http_tcp_bridge::*;
 pub use utility::*;
@@ -415,32 +417,32 @@ pub struct ClusterHostCount {
 /// The identifier for an EnvoyCounter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyCounterId(usize);
+pub struct EnvoyCounterId(pub usize);
 
 /// The identifier for an EnvoyCounterVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyCounterVecId(usize);
+pub struct EnvoyCounterVecId(pub usize);
 
 /// The identifier for an EnvoyGauge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyGaugeId(usize);
+pub struct EnvoyGaugeId(pub usize);
 
 /// The identifier for an EnvoyGaugeVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyGaugeVecId(usize);
+pub struct EnvoyGaugeVecId(pub usize);
 
 /// The identifier for an EnvoyHistogram.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyHistogramId(usize);
+pub struct EnvoyHistogramId(pub usize);
 
 /// The identifier for an EnvoyHistogramVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyHistogramVecId(usize);
+pub struct EnvoyHistogramVecId(pub usize);
 
 impl From<envoy_dynamic_module_type_metrics_result>
   for Result<(), envoy_dynamic_module_type_metrics_result>
@@ -538,6 +540,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
 /// - `upstream_http_tcp_bridge:` — [`NewUpstreamHttpTcpBridgeConfigFunction`] for upstream HTTP TCP
 ///   bridges
+/// - `tracer:` — [`NewTracerConfigFunction`] for tracers
 /// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
 ///
 /// # Examples
@@ -599,6 +602,10 @@ macro_rules! declare_all_init_functions {
   };
   (@register upstream_http_tcp_bridge : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register tracer : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_TRACER_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
   (@register dns_resolver : $fn:expr) => {
@@ -1109,6 +1116,20 @@ pub type NewUpstreamHttpTcpBridgeConfigFunction =
 pub static NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION: OnceLock<
   NewUpstreamHttpTcpBridgeConfigFunction,
 > = OnceLock::new();
+
+// =================================================================================================
+// Tracer Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new tracer configuration.
+///
+/// The `ctx` provides access to metrics definition and update APIs. Metrics should be defined
+/// during configuration creation and the context stored for runtime metric updates.
+pub type NewTracerConfigFunction =
+  fn(ctx: TracerConfigContext, name: &str, config: &[u8]) -> Option<Box<dyn TracerConfig>>;
+
+/// Global storage for the tracer config factory function.
+pub static NEW_TRACER_CONFIG_FUNCTION: OnceLock<NewTracerConfigFunction> = OnceLock::new();
 
 // =================================================================================================
 // DNS Resolver Dynamic Module Support
