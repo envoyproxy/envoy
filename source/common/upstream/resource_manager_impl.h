@@ -175,7 +175,7 @@ private:
 
       const double budget_percent = runtime_.snapshot().getDouble(
           budget_percent_key_, budget_percent_ ? *budget_percent_ : 20.0);
-      const uint64_t budget_interval_ms = runtime_.snapshot().getInteger(
+      const uint64_t budget_interval = runtime_.snapshot().getInteger(
           budget_interval_key_,
           budget_interval_ ? static_cast<uint64_t>(budget_interval_->count()) : 100);
       const uint32_t min_retry_concurrency = runtime_.snapshot().getInteger(
@@ -184,7 +184,7 @@ private:
       clearRemainingGauge();
 
       // Use the in-flight request count when budget_interval is explicitly set to 0.
-      if (budget_interval_ms == 0) {
+      if (budget_interval == 0) {
         // We enforce that the retry concurrency is never allowed to go below the
         // min_retry_concurrency, even if the configured percent of the current active requests
         // yields a value that is smaller.
@@ -228,6 +228,8 @@ private:
       return sum;
     }
 
+    // Retry budget implementation across a fixed window heavily inspired by tower.rs:
+    // https://github.com/tower-rs/tower/blob/master/tower/src/retry/budget/tps_budget.rs
     void expire() {
       const double now = timeNowInSeconds();
       double gen_time = generation_time_seconds_.load(std::memory_order_relaxed);
@@ -276,6 +278,10 @@ private:
     Stats::Gauge& remaining_;
     TimeSource& time_source_;
 
+    // budget_interval is divided into a fixed number of windows.
+    // Each window tracks the number of requests that started in that window.
+    // Inspired by:
+    // https://github.com/tower-rs/tower/blob/master/tower/src/retry/budget/tps_budget.rs
     static constexpr uint32_t windows = 10;
     std::array<std::atomic<uint64_t>, windows> slots_;
     const double slot_duration_seconds_;
