@@ -80,6 +80,10 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
                                             "default.retry_budget.min_retry_concurrency",
                                             _))
       .WillRepeatedly(Return(5U));
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.runtime_resource_manager_test."
+                                            "default.retry_budget.budget_interval",
+                                            _))
+      .WillRepeatedly(Return(100U));
   EXPECT_EQ(5U, resource_manager.retries().max());
   EXPECT_TRUE(resource_manager.retries().canCreate());
 }
