@@ -296,10 +296,12 @@ class MockScope : public TestUtil::TestScope {
 public:
   MockScope(StatName prefix, MockStore& store);
 
-  ScopeSharedPtr createScope(const std::string& name, bool) override {
+  ScopeSharedPtr createScope(const std::string& name, bool, const ScopeStatsLimitSettings&,
+                             StatsMatcherSharedPtr = nullptr) override {
     return ScopeSharedPtr(createScope_(name));
   }
-  ScopeSharedPtr scopeFromStatName(StatName name, bool) override {
+  ScopeSharedPtr scopeFromStatName(StatName name, bool, const ScopeStatsLimitSettings&,
+                                   StatsMatcherSharedPtr = nullptr) override {
     return createScope_(symbolTable().toString(name));
   }
 
@@ -349,7 +351,7 @@ public:
     return *scope;
   }
 
-  ScopeSharedPtr makeScope(StatName name) override;
+  ScopeSharedPtr makeScope(StatName name, StatsMatcherSharedPtr matcher = nullptr) override;
 
   TestUtil::TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;

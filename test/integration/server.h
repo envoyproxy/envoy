@@ -77,15 +77,21 @@ public:
   TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope, Store& store)
       : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
-  ScopeSharedPtr createScope(const std::string& name, bool) override {
+  ScopeSharedPtr createScope(const std::string& name, bool evictable,
+                             const ScopeStatsLimitSettings& limits,
+                             StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
-    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->createScope(name), store_);
+    return std::make_shared<TestScopeWrapper>(
+        lock_, wrapped_scope_->createScope(name, evictable, limits, std::move(matcher)), store_);
   }
 
-  ScopeSharedPtr scopeFromStatName(StatName name, bool) override {
+  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable,
+                                   const ScopeStatsLimitSettings& limits,
+                                   StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
-    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->scopeFromStatName(name),
-                                              store_);
+    return std::make_shared<TestScopeWrapper>(
+        lock_, wrapped_scope_->scopeFromStatName(name, evictable, limits, std::move(matcher)),
+        store_);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,

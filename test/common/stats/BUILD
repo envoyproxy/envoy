@@ -38,6 +38,9 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:stats_matcher_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 
