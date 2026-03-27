@@ -14,6 +14,7 @@
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
@@ -75,6 +76,7 @@ public:
                const Http::ResponseHeaderMap& response_headers,
                const StreamInfo::StreamInfo& stream_info, std::string& body_out),
               (const));
+  MOCK_METHOD(absl::string_view, responseContentType, (), (const));
 };
 
 class TestCorsPolicy : public CorsPolicy {
@@ -234,7 +236,8 @@ public:
   MOCK_METHOD(void, onHostAttempted, (Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD(bool, shouldSelectAnotherHost, (const Upstream::Host& host));
   MOCK_METHOD(const Upstream::HealthyAndDegradedLoad&, priorityLoadForRetry,
-              (const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad&,
+              (StreamInfo::StreamInfo*, const Upstream::PrioritySet&,
+               const Upstream::HealthyAndDegradedLoad&,
                const Upstream::RetryPriority::PriorityMappingFunc&));
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
   MOCK_METHOD(bool, wouldRetryFromRetriableStatusCode, (Http::Code code), (const));
@@ -336,7 +339,6 @@ public:
   MOCK_METHOD(bool, includeIsTimeoutRetryHeader, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, ());
   MOCK_METHOD(Upstream::RetryHostPredicateSharedPtr, retryHostPredicate, ());
-  MOCK_METHOD(uint64_t, requestBodyBufferLimit, (), (const));
   MOCK_METHOD(RouteSpecificFilterConfigs, perFilterConfigs, (absl::string_view), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
@@ -516,11 +518,15 @@ public:
   MOCK_METHOD(const envoy::type::v3::FractionalPercent&, getRandomSampling, (), (const));
   MOCK_METHOD(const envoy::type::v3::FractionalPercent&, getOverallSampling, (), (const));
   MOCK_METHOD(const Tracing::CustomTagMap&, getCustomTags, (), (const));
+  MOCK_METHOD(OptRef<const Formatter::Formatter>, operation, (), (const));
+  MOCK_METHOD(OptRef<const Formatter::Formatter>, upstreamOperation, (), (const));
 
   envoy::type::v3::FractionalPercent client_sampling_;
   envoy::type::v3::FractionalPercent random_sampling_;
   envoy::type::v3::FractionalPercent overall_sampling_;
   Tracing::CustomTagMap custom_tags_;
+  Formatter::FormatterPtr operation_;
+  Formatter::FormatterPtr upstream_operation_;
 };
 
 class MockRoute : public RouteEntryAndRoute {
@@ -541,7 +547,8 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
-  MOCK_METHOD(const VirtualHostConstSharedPtr&, virtualHost, (), (const));
+  MOCK_METHOD(const VirtualHost&, virtualHost, (), (const));
+  MOCK_METHOD(VirtualHostConstSharedPtr, virtualHostSharedPtr, (), (const));
 
   // Router::RouteEntry
   MOCK_METHOD(const std::string&, clusterName, (), (const));
@@ -606,8 +613,6 @@ public:
   std::string route_name_{"fake_route_name"};
   std::shared_ptr<testing::NiceMock<MockVirtualHost>> virtual_host_ =
       std::make_shared<testing::NiceMock<MockVirtualHost>>();
-  // Same with virtual_host_ but this could be returned as VirtualHostConstSharedPtr reference.
-  VirtualHostConstSharedPtr virtual_host_copy_ = virtual_host_;
 };
 
 class MockConfig : public Config {

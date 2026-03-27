@@ -67,6 +67,13 @@ public:
   afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response,
                                   absl::Status processing_status,
                                   Envoy::StreamInfo::StreamInfo&) PURE;
+
+  // Called after processing the response from the external processor with
+  // :ref:`streamed_immediate_response
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.streamed_immediate_response>` set.
+  virtual void afterProcessingStreamingImmediateResponse(
+      const envoy::service::ext_proc::v3::StreamedImmediateResponse& response,
+      absl::Status processing_status, Envoy::StreamInfo::StreamInfo&) PURE;
 };
 
 class OnProcessingResponseFactory : public Config::TypedFactory {

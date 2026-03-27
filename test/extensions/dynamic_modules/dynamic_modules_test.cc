@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -33,8 +35,7 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
 
   // Release the module, and reload it.
   module->reset();
-  module = newDynamicModule(testSharedObjectPath("no_op", language),
-                            true); // This time, do not close the module.
+  module = newDynamicModule(testSharedObjectPath("no_op", language), true);
   EXPECT_TRUE(module.ok());
 
   // This module must be reloaded and the variable must be reset.
@@ -116,16 +117,14 @@ TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
 }
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
+  // We expect a warning log for ABI version mismatch but still load the module successfully.
   std::string language = GetParam();
   absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("ABI version mismatch: got invalid-version-hash, but expected"));
+  EXPECT_TRUE(result.ok());
 }
 
-TEST(CreateDynamicModulesByName, OK) {
+TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {
   TestEnvironment::setEnvVar(
       "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
       TestEnvironment::substitute(
@@ -133,17 +132,134 @@ TEST(CreateDynamicModulesByName, OK) {
       1);
 
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
-  EXPECT_TRUE(module.ok());
+  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
 
-TEST(CreateDynamicModulesByName, EnvVarNotSet) {
-  // Without setting the search path, this should fail.
+TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathNotSetFallbackToCwd) {
+  std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
+  std::filesystem::path staged_lib = TestEnvironment::substitute("{{ test_rundir }}/libfoo.so");
+  std::filesystem::copy(test_lib, staged_lib);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("foo", false);
+  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
+  std::filesystem::remove(staged_lib);
+}
+
+TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
+  TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", "/should/not/find/this/path", 1);
+
+  std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
+  std::filesystem::path staged_lib =
+      TestEnvironment::substitute("{{ test_rundir }}/libwhatever.so");
+  std::filesystem::copy(test_lib, staged_lib);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("whatever", false);
+  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
+
+  TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+  std::filesystem::remove(staged_lib);
+}
+
+TEST(StaticModule, LoadSuccess) {
+  absl::StatusOr<DynamicModulePtr> result = newStaticModule("matcher_no_op_static");
+  EXPECT_TRUE(result.ok()) << result.status().message();
+}
+
+TEST(StaticModule, SymbolNotFound) {
+  // "nonexistent_module" has no prefixed symbols in the binary.
+  absl::StatusOr<DynamicModulePtr> result = newStaticModule("nonexistent_module");
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("Failed to resolve symbol "
+                                 "envoy_dynamic_module_on_program_init"));
+}
+
+TEST(StaticModule, MultipleLoads) {
+  absl::StatusOr<DynamicModulePtr> c_module =
+      newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
+  EXPECT_TRUE(c_module.ok()) << c_module.status().message();
+
+  absl::StatusOr<DynamicModulePtr> c_module_2 =
+      newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
+  EXPECT_TRUE(c_module_2.ok()) << c_module_2.status().message();
+}
+
+TEST(CreateDynamicModulesByName, ModuleNotFound) {
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
   EXPECT_FALSE(module.ok());
   EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(module.status().message(),
-              testing::HasSubstr("ENVOY_DYNAMIC_MODULES_SEARCH_PATH is not set"));
+              testing::HasSubstr(
+                  "Failed to load dynamic module: libno_op.so not found in any search path"));
+}
+
+TEST(NewDynamicModuleFromBytes, Success) {
+  std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
+  std::ifstream input(test_lib, std::ios::binary);
+  ASSERT_TRUE(input.good()) << "Failed to open test shared object file: " << test_lib;
+  const std::string module_bytes((std::istreambuf_iterator<char>(input)),
+                                 std::istreambuf_iterator<char>());
+
+  const std::string sha256 = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+  // Ensure no leftover from previous runs.
+  const std::filesystem::path temp_path =
+      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::remove(temp_path);
+
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleFromBytes(module_bytes, sha256, false, false);
+  EXPECT_TRUE(module.ok()) << "Failed to load module from bytes: " << module.status().message();
+  EXPECT_TRUE(std::filesystem::exists(temp_path));
+
+  // Cleanup.
+  module->reset();
+  std::filesystem::remove(temp_path);
+}
+
+TEST(NewDynamicModuleFromBytes, InvalidBytes) {
+  const std::string garbage = "this is not a valid shared object";
+  const std::string sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+  const std::filesystem::path temp_path =
+      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::remove(temp_path);
+
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleFromBytes(garbage, sha256, false, false);
+  EXPECT_FALSE(module.ok());
+  EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
+
+  // The invalid file should have been cleaned up.
+  EXPECT_FALSE(std::filesystem::exists(temp_path));
+}
+
+TEST(NewDynamicModuleFromBytes, RepeatedLoadReusesDlopenHandle) {
+  std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
+  std::ifstream input(test_lib, std::ios::binary);
+  ASSERT_TRUE(input.good());
+  const std::string module_bytes((std::istreambuf_iterator<char>(input)),
+                                 std::istreambuf_iterator<char>());
+
+  const std::string sha256 = "1111111111111111111111111111111111111111111111111111111111111111";
+  const std::filesystem::path temp_path =
+      std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
+  std::filesystem::remove(temp_path);
+
+  // First load writes and loads the module.
+  absl::StatusOr<DynamicModulePtr> module1 =
+      newDynamicModuleFromBytes(module_bytes, sha256, true, false);
+  ASSERT_TRUE(module1.ok()) << module1.status().message();
+  ASSERT_TRUE(std::filesystem::exists(temp_path));
+
+  // Second load with the same sha256 — writes again but the RTLD_NOLOAD check in
+  // newDynamicModule returns the existing handle, so the init function is not called twice.
+  absl::StatusOr<DynamicModulePtr> module2 =
+      newDynamicModuleFromBytes(module_bytes, sha256, true, false);
+  ASSERT_TRUE(module2.ok()) << module2.status().message();
+
+  // Cleanup.
+  module1->reset();
+  module2->reset();
+  std::filesystem::remove(temp_path);
 }
 
 } // namespace DynamicModules

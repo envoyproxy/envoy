@@ -33,7 +33,9 @@ using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Me
  *
  * {rq_success, rq_error} have specific semantics driven by the needs of EDS load reporting. See
  * envoy.api.v2.endpoint.UpstreamLocalityStats for the definitions of success/error. These are
- * latched by LoadStatsReporter, independent of the normal stats sink flushing.
+ * latched by LoadStatsReporter interface implementations, independent of the normal stats sink
+ * flushing.
+
  */
 #define ALL_HOST_STATS(COUNTER, GAUGE)                                                             \
   COUNTER(cx_connect_fail)                                                                         \
@@ -142,6 +144,11 @@ public:
    * @return the metadata associated with this host
    */
   virtual MetadataConstSharedPtr metadata() const PURE;
+
+  /**
+   * @return the cached hash of the metadata associated with this host, or 0 if no metadata.
+   */
+  virtual std::size_t metadataHash() const PURE;
 
   /**
    * Set the current metadata.
@@ -273,9 +280,18 @@ public:
    */
   virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
 
-  virtual Network::UpstreamTransportSocketFactory&
-  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
-                                const envoy::config::core::v3::Metadata* metadata) const PURE;
+  /**
+   * Resolve the transport socket factory to use for connections to this host.
+   * @param dest_address the destination address for the connection.
+   * @param metadata optional endpoint metadata for matching.
+   * @param transport_socket_options optional transport socket options containing
+   *        filter state shared from downstream for per-connection matching.
+   * @return the resolved transport socket factory.
+   */
+  virtual Network::UpstreamTransportSocketFactory& resolveTransportSocketFactory(
+      const Network::Address::InstanceConstSharedPtr& dest_address,
+      const envoy::config::core::v3::Metadata* metadata,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options = nullptr) const PURE;
 
   /**
    * Set load balancing policy related data to the host.
@@ -343,10 +359,16 @@ public:
       const envoy::config::core::v3::Metadata* locality_metadata,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options = nullptr) const PURE;
 
-  /*
-   * return true if all matches support ALPN, false otherwise.
+  /**
+   * @return true if all matches support ALPN, false otherwise.
    */
   virtual bool allMatchesSupportAlpn() const PURE;
+
+  /**
+   * @return true if the matcher uses filter state for transport socket selection. When true,
+   *         transport socket resolution must be done per-connection with transport_socket_options.
+   */
+  virtual bool usesFilterState() const PURE;
 };
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;

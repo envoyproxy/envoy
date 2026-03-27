@@ -94,6 +94,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     Server::Configuration::CommonFactoryContext& context)
     : disable_key_(config.disable_key()),
       stage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0)) {
+  actions_.reserve(config.actions().size());
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kSourceCluster:
@@ -144,6 +145,7 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
     Server::Configuration::CommonFactoryContext& context)
     : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
+  rate_limit_entries_.reserve(rate_limits.size());
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
         new RateLimitPolicyEntryImpl(rate_limit, context));

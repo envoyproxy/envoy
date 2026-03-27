@@ -4,12 +4,18 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/network/listen_socket.h"
 
 #include "absl/strings/string_view.h"
 #include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
 #include "library/common/network/network_types.h"
 
 namespace Envoy {
+
+namespace Platform {
+class NetworkChangeListener;
+class NetworkChangeMonitor;
+} // namespace Platform
 
 namespace test {
 class SystemHelperPeer;
@@ -46,6 +52,21 @@ public:
   virtual int64_t getDefaultNetworkHandle() PURE;
 
   virtual std::vector<std::pair<int64_t, ConnectionType>> getAllConnectedNetworks() PURE;
+
+  /**
+   * Creates and returns a platform-specific network change monitor.
+   */
+  virtual std::unique_ptr<Platform::NetworkChangeMonitor>
+  initializeNetworkChangeMonitor(Platform::NetworkChangeListener& network_change_listener) PURE;
+
+  /**
+   * Binds the given socket to the network interface associated with the handle.
+   * @param socket the socket to bind.
+   * @param network_handle the handle of the network to bind to. The caller is responsible for
+   *     ensuring that this handle is valid.
+   */
+  virtual void bindSocketToNetwork(Network::ConnectionSocket& socket, int64_t network_handle) PURE;
+
   /**
    * @return a reference to the current SystemHelper instance.
    */

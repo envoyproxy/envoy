@@ -347,8 +347,8 @@ class OnDemandVhdsIntegrationTest : public VhdsIntegrationTest {
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandVhdsIntegrationTest,
-                         UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandVhdsIntegrationTest, VHDS_INTEGRATION_PARAMS,
+                         vhdsTestParamsToString);
 // tests a scenario when:
 //  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
 //  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
@@ -762,18 +762,67 @@ TEST_P(OnDemandVhdsIntegrationTest, AttemptAddingDuplicateDomainNames) {
   cleanupUpstreamAndDownstream();
 }
 
+// Verifies that when a disconnect to the xds server happens, there should be a proper upgrade to
+// "*" for the VHDS subscription when the Envoy reconnects to the server and has resources that were
+// fetched through the wildcard.
+TEST_P(OnDemandVhdsIntegrationTest, VhdsWildcardUpgradeOnReconnect) {
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.first")}, {},
+                                           vhds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "103", vhds_stream_.get(),
+      {"my_route/vhost.first"});
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+
+  if (routeConfigType() == RouteConfigType::Rds) {
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                        {"my_route"}, {}, {}, true));
+  }
+
+  // Disconnect VHDS stream and reconnect.
+  vhds_stream_->finishGrpcStream(Grpc::Status::Internal);
+  AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  vhds_stream_->startGrpcStream();
+
+  // Upon reconnection, we expect re-subscriptions to "*" and "my_route/vhost.first" that was
+  // obtained through the on demand request earlier.
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {"*", "my_route/vhost.first"}, {}, vhds_stream_.get()));
+}
+
 // Test class for VHDS on-demand updates with request bodies
 class OnDemandVhdsWithBodyIntegrationTest
-    : public testing::TestWithParam<
-          std::tuple<HttpProtocolTestParams, std::tuple<Network::Address::IpVersion,
-                                                        Grpc::ClientType, Grpc::LegacyOrUnified>>>,
+    : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, VhdsIntegrationTestParam>>,
       public HttpIntegrationTest {
 public:
-  using ParamType =
-      std::tuple<HttpProtocolTestParams,
-                 std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::LegacyOrUnified>>;
+  using ParamType = std::tuple<HttpProtocolTestParams, VhdsIntegrationTestParam>;
 
   const HttpProtocolTestParams& httpProtocolParams() const { return std::get<0>(GetParam()); }
+  const VhdsIntegrationTestParam& vhdsParams() const { return std::get<1>(GetParam()); }
+
+  Network::Address::IpVersion ipVersion() const { return std::get<0>(vhdsParams()); }
+  Grpc::ClientType clientType() const { return std::get<1>(vhdsParams()); }
+  bool isUnified() const { return std::get<2>(vhdsParams()) == Grpc::LegacyOrUnified::Unified; }
+  RouteConfigType routeConfigType() const { return std::get<3>(vhdsParams()); }
 
   OnDemandVhdsWithBodyIntegrationTest()
       : HttpIntegrationTest(httpProtocolParams().downstream_protocol, httpProtocolParams().version,
@@ -785,9 +834,8 @@ public:
     config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
                                       use_universal_header_validator_ ? "true" : "false");
     use_lds_ = false;
-    config_helper_.addRuntimeOverride(
-        "envoy.reloadable_features.unified_mux",
-        std::get<2>(std::get<1>(GetParam())) == Grpc::LegacyOrUnified::Unified ? "true" : "false");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      isUnified() ? "true" : "false");
     config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
@@ -826,7 +874,7 @@ routes:
     setUpstreamProtocol(Http::CodecType::HTTP2); // xDS uses gRPC uses HTTP2
 
     const auto ip_version = httpProtocolParams().version;
-    config_helper_.addConfigModifier([ip_version](
+    config_helper_.addConfigModifier([this, ip_version](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add xds_cluster for VHDS
       auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -844,17 +892,32 @@ routes:
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
           *config_blob);
 
-      // Use RDS instead of static route_config so Envoy connects to xDS server
-      hcm_config.clear_route_config();
-      auto* rds_config = hcm_config.mutable_rds();
-      rds_config->set_route_config_name("my_route");
-      auto* rds_config_source = rds_config->mutable_config_source();
-      rds_config_source->mutable_api_config_source()->set_api_type(
-          envoy::config::core::v3::ApiConfigSource::GRPC);
-      rds_config_source->mutable_api_config_source()
-          ->add_grpc_services()
-          ->mutable_envoy_grpc()
-          ->set_cluster_name("xds_cluster");
+      if (routeConfigType() == RouteConfigType::Rds) {
+        // Use RDS instead of static route_config so Envoy connects to xDS server.
+        hcm_config.clear_route_config();
+        auto* rds_config = hcm_config.mutable_rds();
+        rds_config->set_route_config_name("my_route");
+        auto* rds_config_source = rds_config->mutable_config_source();
+        rds_config_source->mutable_api_config_source()->set_api_type(
+            envoy::config::core::v3::ApiConfigSource::GRPC);
+        rds_config_source->mutable_api_config_source()
+            ->add_grpc_services()
+            ->mutable_envoy_grpc()
+            ->set_cluster_name("xds_cluster");
+      } else {
+        // Use static route, and set the VHDS so it uses the xds_cluster.
+        hcm_config.clear_rds();
+        auto* route_config = hcm_config.mutable_route_config();
+        route_config->set_name("my_route");
+        route_config->clear_virtual_hosts();
+        auto* vhds_config_source = route_config->mutable_vhds()->mutable_config_source();
+        vhds_config_source->mutable_api_config_source()->set_api_type(
+            envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+        vhds_config_source->mutable_api_config_source()
+            ->add_grpc_services()
+            ->mutable_envoy_grpc()
+            ->set_cluster_name("xds_cluster");
+      }
 
       config_blob->PackFrom(hcm_config);
     });
@@ -867,23 +930,27 @@ routes:
     // Set up xDS connection (xds_cluster is the second cluster, so it maps to fake_upstreams_[1])
     auto result = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
-    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
-    RELEASE_ASSERT(result, result.message());
-    xds_stream_->startGrpcStream();
 
-    EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
-                                            {"my_route"}, true));
-    envoy::config::route::v3::RouteConfiguration route_config;
-    route_config.set_name("my_route");
-    auto* vhds_config_source = route_config.mutable_vhds()->mutable_config_source();
-    vhds_config_source->mutable_api_config_source()->set_api_type(
-        envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
-    vhds_config_source->mutable_api_config_source()
-        ->add_grpc_services()
-        ->mutable_envoy_grpc()
-        ->set_cluster_name("xds_cluster");
-    sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-        Config::TestTypeUrl::get().RouteConfiguration, {route_config}, "1");
+    if (routeConfigType() == RouteConfigType::Rds) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                              {"my_route"}, true));
+      // Set a RouteConfiguration with dynamic VHDS.
+      envoy::config::route::v3::RouteConfiguration route_config;
+      route_config.set_name("my_route");
+      auto* vhds_config_source = route_config.mutable_vhds()->mutable_config_source();
+      vhds_config_source->mutable_api_config_source()->set_api_type(
+          envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+      vhds_config_source->mutable_api_config_source()
+          ->add_grpc_services()
+          ->mutable_envoy_grpc()
+          ->set_cluster_name("xds_cluster");
+      sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+          Config::TestTypeUrl::get().RouteConfiguration, {route_config}, "1");
+    }
 
     result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
     RELEASE_ASSERT(result, result.message());
@@ -903,26 +970,21 @@ INSTANTIATE_TEST_SUITE_P(
     ProtocolsAndGrpcTypes, OnDemandVhdsWithBodyIntegrationTest,
     testing::Combine(
         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
-        UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS),
-    [](const testing::TestParamInfo<
-        std::tuple<HttpProtocolTestParams, std::tuple<Network::Address::IpVersion, Grpc::ClientType,
-                                                      Grpc::LegacyOrUnified>>>& info) {
+        VHDS_INTEGRATION_PARAMS),
+    [](const testing::TestParamInfo<std::tuple<HttpProtocolTestParams, VhdsIntegrationTestParam>>&
+           info) {
       return absl::StrCat(
           HttpProtocolIntegrationTest::protocolTestParamsToString(
               testing::TestParamInfo<HttpProtocolTestParams>(std::get<0>(info.param), 0)),
           "_",
-          Grpc::UnifiedOrLegacyMuxIntegrationParamTest::protocolTestParamsToString(
-              testing::TestParamInfo<
-                  std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::LegacyOrUnified>>(
-                  std::get<1>(info.param), 0)));
+          vhdsTestParamsToString(
+              testing::TestParamInfo<VhdsIntegrationTestParam>(std::get<1>(info.param), 0)));
     });
 
 // Test VHDS on-demand update with a request body
 TEST_P(OnDemandVhdsWithBodyIntegrationTest, VhdsOnDemandUpdateWithBody) {
   // TODO(wdauchy): Fix Unified mux to properly handle on-demand VHDS updates.
-  const bool is_unified_mux =
-      std::get<2>(std::get<1>(GetParam())) == Grpc::LegacyOrUnified::Unified;
-  if (is_unified_mux) {
+  if (isUnified()) {
     GTEST_SKIP() << "Unified mux times out when processing on-demand VHDS updates";
   }
   initialize();

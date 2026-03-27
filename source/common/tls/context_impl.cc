@@ -26,6 +26,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -66,10 +67,11 @@ int ContextImpl::sslExtendedSocketInfoIndex() {
   }());
 }
 
-ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
-                         Server::Configuration::CommonFactoryContext& factory_context,
-                         Ssl::ContextAdditionalInitFunc additional_init,
-                         absl::Status& creation_status)
+ContextImpl::ContextImpl(
+    Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+    const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
+    Server::Configuration::CommonFactoryContext& factory_context,
+    Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status)
     : scope_(scope), stats_(generateSslStats(scope)), factory_context_(factory_context),
       tls_max_version_(config.maxProtocolVersion()),
       stat_name_set_(scope.symbolTable().makeSet("TransportSockets::Tls")),
@@ -98,7 +100,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   SET_AND_RETURN_IF_NOT_OK(validator_or_error.status(), creation_status);
   cert_validator_ = std::move(*validator_or_error);
 
-  const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
   std::vector<SSL_CTX*> ssl_contexts(tls_contexts_.size());
@@ -161,6 +162,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
             "Failed to initialize TLS signature algorithms ", config.signatureAlgorithms()));
         return;
       }
+    }
+
+    // Register certificate compression algorithms to reduce TLS handshake size (RFC 8879).
+    // Priority: brotli > zlib (brotli generally provides best compression for certs).
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tls_certificate_compression_brotli")) {
+      CertCompression::registerBrotli(ctx.ssl_ctx_.get());
+      CertCompression::registerZlib(ctx.ssl_ctx_.get());
     }
   }
 
@@ -486,6 +495,10 @@ enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* ou
   case ValidationResults::ValidationStatus::Failed: {
     if (result.tls_alert.has_value() && out_alert) {
       *out_alert = result.tls_alert.value();
+    }
+    // Store detailed error information for access log reporting.
+    if (result.error_details.has_value()) {
+      extended_socket_info->setCertificateValidationError(result.error_details.value());
     }
     return ssl_verify_invalid;
   }

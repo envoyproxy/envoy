@@ -1,4 +1,5 @@
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/address.h"
 
 #include "test/common/network/socket_option_test.h"
 
@@ -74,6 +75,30 @@ TEST_F(SocketOptionImplTest, SetStreamOptionOnDatagramSocketType) {
   ON_CALL(socket_, socketType()).WillByDefault(Return(Socket::Type::Datagram));
   SocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
                                  ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1, Socket::Type::Stream};
+  EXPECT_CALL(socket_, setSocketOption(_, _, _, _)).Times(0);
+  EXPECT_TRUE(
+      socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
+}
+
+TEST_F(SocketOptionImplTest, SetOptionWithIpVersionSuccess) {
+  ON_CALL(socket_, ipVersion()).WillByDefault(Return(Network::Address::IpVersion::v4));
+  SocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                                 ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1, std::nullopt,
+                                 Network::Address::IpVersion::v4};
+  EXPECT_CALL(socket_, setSocketOption(5, 10, _, sizeof(int)))
+      .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+        EXPECT_EQ(1, *static_cast<const int*>(optval));
+        return {0, 0};
+      }));
+  EXPECT_TRUE(
+      socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
+}
+
+TEST_F(SocketOptionImplTest, SetOptionWithIpVersionSkip) {
+  ON_CALL(socket_, ipVersion()).WillByDefault(Return(Network::Address::IpVersion::v6));
+  SocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                                 ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1, std::nullopt,
+                                 Network::Address::IpVersion::v4};
   EXPECT_CALL(socket_, setSocketOption(_, _, _, _)).Times(0);
   EXPECT_TRUE(
       socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));

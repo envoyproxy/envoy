@@ -6,8 +6,8 @@
 #include "source/common/protobuf/utility.h"
 
 #if defined(USE_CEL_PARSER)
-#include "parser/parser.h"
 #include "eval/public/value_export_util.h"
+#include "parser/parser.h"
 #endif
 
 namespace Envoy {

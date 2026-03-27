@@ -48,6 +48,22 @@ public:
 
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
 
+protected:
+  /**
+   * Wrapper for converting a StreamMessage back to an Envoy Buffer using the provided converter.
+   * This method exists to be overridden in tests, allowing simulation of conversion failures
+   * (e.g. buffer limits) which are otherwise difficult to trigger with real dependencies.
+   *
+   * @param converter The message converter instance to use.
+   * @param message The stream message to convert.
+   * @return The converted Envoy buffer or an error status.
+   */
+  virtual absl::StatusOr<Buffer::InstancePtr>
+  convertMessageToBuffer(GrpcFieldExtraction::MessageConverter& converter,
+                         std::unique_ptr<GrpcFieldExtraction::StreamMessage> message) {
+    return converter.convertBackToBuffer(std::move(message));
+  }
+
 private:
   // Rejects requests and sends local reply back to the client.
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,

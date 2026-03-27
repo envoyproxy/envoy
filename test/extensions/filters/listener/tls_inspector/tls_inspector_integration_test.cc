@@ -8,6 +8,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
@@ -294,9 +295,9 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
 TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   // These TLS options will create a client hello message with
   // `JA3` fingerprint:
-  //   `771,49199,23-65281-10-11-35-16-13,23,0`
+  //   `771,49199,27-23-65281-10-11-35-16-13,23,0`
   // MD5 hash:
-  //   `71d1f47d1125ac53c3c6a4863c087cfe`
+  //   `c68cd85633d6847f599328eb2df750b7`
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
@@ -307,7 +308,7 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   client_->close(Network::ConnectionCloseType::NoFlush);
 
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::Eq("71d1f47d1125ac53c3c6a4863c087cfe"));
+              testing::Eq("c68cd85633d6847f599328eb2df750b7"));
 
   test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
   auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
@@ -316,14 +317,14 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
       1);
   EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
-            115);
+            124);
 }
 
 // The `JA4` fingerprint is correct in the access log.
 TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
   // These TLS options will create a client hello message with
   // `JA4` fingerprint:
-  //   `t12i0107en_f06271c2b022_0f3b2bcde21d`
+  //   `t12i0108en_f06271c2b022_91d8455748bc`
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
@@ -334,7 +335,7 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
   client_->close(Network::ConnectionCloseType::NoFlush);
 
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::Eq("t12i0107en_f06271c2b022_0f3b2bcde21d"));
+              testing::Eq("t12i0108en_f06271c2b022_91d8455748bc"));
 
   test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
   auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
@@ -343,7 +344,7 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
       1);
   EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
-            115);
+            124);
 }
 
 TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
@@ -389,7 +390,7 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
       1);
   EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
-            515);
+            514);
 }
 
 TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
@@ -427,7 +428,7 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
       1);
   auto bytes_processed = static_cast<int>(
       TestUtility::readSampleSum(test_server_->server().dispatcher(), *bytes_processed_histogram));
-  EXPECT_EQ(bytes_processed, 515);
+  EXPECT_EQ(bytes_processed, 514);
   // Double check that the test is effective by ensuring that the
   // LargeBufferListenerFilter::BUFFER_SIZE is smaller than the client hello.
   EXPECT_GT(bytes_processed, LargeBufferListenerFilter::BUFFER_SIZE);
@@ -602,6 +603,48 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintWithMinimalExtensions) {
   // no SNI (i character) in the logs
   std::string log_content = waitForAccessLog(listener_access_log_name_);
   EXPECT_THAT(log_content, testing::HasSubstr("i"));
+}
+
+// Test that SNI is captured and available in access logs even when the TLS connection
+// fails.
+TEST_P(TlsInspectorIntegrationTest, SniCapturedOnFilterChainNotFound) {
+  const std::string test_sni = "test.example.com";
+  initializeWithTlsInspector(/*ssl_client=*/true,
+                             /*log_format=*/"%REQUESTED_SERVER_NAME%|%RESPONSE_CODE_DETAILS%",
+                             /*listener_filter_disabled=*/absl::nullopt);
+
+  // Set up the SSL client with an SNI that won't match any filter chain.
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("echo"));
+
+  Ssl::ClientSslTransportOptions ssl_options;
+  ssl_options.setSni(test_sni);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+
+  // Use ALPN that doesn't match the filter chain.
+  Network::TransportSocketPtr transport_socket = context_->createTransportSocket(
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"nomatch"}),
+      nullptr);
+
+  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                std::move(transport_socket), nullptr, nullptr);
+  client_->addConnectionCallbacks(connect_callbacks_);
+  client_->connect();
+
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Connection should fail due to filter chain not found.
+  ASSERT_FALSE(connect_callbacks_.connected());
+  ASSERT(connect_callbacks_.closed());
+
+  // Verify that even though the connection failed, the SNI was captured and is in the access log.
+  std::string log_content = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(log_content, testing::HasSubstr(test_sni));
+  EXPECT_THAT(log_content,
+              testing::HasSubstr(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TlsInspectorIntegrationTest,

@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
 
 #include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
 
 #include "absl/memory/memory.h"
 
@@ -17,7 +18,11 @@ GeoipFilterConfig::GeoipFilterConfig(
     : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")), use_xff_(config.has_xff_config()),
       xff_num_trusted_hops_(config.has_xff_config() ? config.xff_config().xff_num_trusted_hops()
-                                                    : 0) {
+                                                    : 0),
+      ip_address_header_(config.has_custom_header_config()
+                             ? absl::make_optional<Http::LowerCaseString>(
+                                   config.custom_header_config().header_name())
+                             : absl::nullopt) {
   stat_name_set_->rememberBuiltin("total");
 }
 
@@ -38,11 +43,27 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
   request_headers_ = headers;
 
   Network::Address::InstanceConstSharedPtr remote_address;
-  if (config_->useXff() && config_->xffNumTrustedHops() > 0) {
+  const auto& ip_address_header = config_->ipAddressHeader();
+  if (ip_address_header.has_value()) {
+    // Extract IP address from the configured custom header.
+    const auto header_value = headers.get(ip_address_header.value());
+    if (!header_value.empty()) {
+      const std::string ip_string(header_value[0]->value().getStringView());
+      remote_address = Network::Utility::parseInternetAddressNoThrow(ip_string);
+      if (remote_address == nullptr) {
+        ENVOY_LOG(debug, "Geoip filter: failed to parse IP address from header '{}': '{}'",
+                  ip_address_header->get(), ip_string);
+      }
+    } else {
+      ENVOY_LOG(debug, "Geoip filter: configured header '{}' is missing from request",
+                ip_address_header->get());
+    }
+  } else if (config_->useXff() && config_->xffNumTrustedHops() > 0) {
     remote_address =
         Envoy::Http::Utility::getLastAddressFromXFF(headers, config_->xffNumTrustedHops()).address_;
   }
-  // If `config_->useXff() == false` or xff header has not been populated for some reason.
+  // Fallback to the downstream connection source address if no other address source is configured
+  // or if extraction from the configured source failed.
   if (!remote_address) {
     remote_address = decoder_callbacks_->streamInfo().downstreamAddressProvider().remoteAddress();
   }

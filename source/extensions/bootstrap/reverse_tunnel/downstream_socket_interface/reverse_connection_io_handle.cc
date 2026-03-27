@@ -51,6 +51,13 @@ ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Starting cleanup of reverse connection resources.");
 
+  // Reset file events before closing trigger pipe to avoid busy loop from EOF on read FD.
+  ENVOY_LOG_MISC(trace,
+                 "reverse_tunnel: resetting file events before closing trigger pipe; "
+                 "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
+                 trigger_pipe_write_fd_, trigger_pipe_read_fd_);
+  resetFileEvents();
+
   // Clean up pipe trigger mechanism first to prevent use-after-free.
   ENVOY_LOG_MISC(trace,
                  "reverse_tunnel: cleaning up trigger pipe; "
@@ -567,12 +574,15 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
     }
     // Get current number of successful connections to this host.
     uint32_t current_connections = host_to_conn_info_map_[key].connection_keys.size();
+    uint32_t pending_connections = host_to_conn_info_map_[key].connecting_count;
 
     ENVOY_LOG(info,
               "reverse_tunnel: Number of reverse connections to host {} of cluster {}: "
-              "Current: {}, Required: {}",
-              host_address, cluster_name, current_connections,
+              "Current: {}, Pending: {}, Required: {}",
+              host_address, cluster_name, current_connections, pending_connections,
               cluster_config.reverse_connection_count);
+    // Update with the pending connections also for checking against required.
+    current_connections += pending_connections;
     if (current_connections >= cluster_config.reverse_connection_count) {
       ENVOY_LOG(debug,
                 "reverse_tunnel: No more reverse connections needed to host {} of cluster {}",
@@ -734,10 +744,18 @@ void ReverseConnectionIOHandle::updateConnectionState(const std::string& host_ad
   // Update connection state in host info and handle old state.
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it != host_to_conn_info_map_.end()) {
+    // Increment first and then decrement if needed.
+    if (new_state == ReverseConnectionState::Connecting) {
+      host_it->second.connecting_count++;
+    }
+
     // Remove old connection state if it exists.
     auto old_state_it = host_it->second.connection_states.find(connection_key);
     if (old_state_it != host_it->second.connection_states.end()) {
       ReverseConnectionState old_state = old_state_it->second;
+      if (old_state == ReverseConnectionState::Connecting) {
+        host_it->second.connecting_count--;
+      }
       // Decrement old state gauge using unified function.
       updateStateGauge(host_address, cluster_name, old_state, false /* decrement */);
     }
@@ -1156,22 +1174,7 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
 
     // Set quiet shutdown since we are duplicating the socket and closing the original socket. When
     // the original socket is closed, a TLS close_notify alert is otherwise sent.
-    if (connection->ssl()) {
-      ENVOY_LOG(
-          trace,
-          "reverse_tunnel: Setting quiet shutdown on SSL connection to prevent close_notify alert");
-      const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_handshaker =
-          dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
-              connection->ssl().get());
-      if (ssl_handshaker && ssl_handshaker->ssl()) {
-        SSL_set_quiet_shutdown(ssl_handshaker->ssl(), 1);
-        ENVOY_LOG(trace, "reverse_tunnel: Quiet shutdown enabled for connection {}",
-                  connection_key);
-      } else {
-        ENVOY_LOG(warn,
-                  "reverse_tunnel: Failed to cast to SslHandshakerImpl or ssl() returned null");
-      }
-    }
+    ReverseConnectionUtility::applySslQuietClose(*connection);
 
     Network::ClientConnectionPtr released_conn = wrapper->releaseConnection();
 

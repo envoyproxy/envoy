@@ -29,7 +29,7 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/http:hash_policy_lib",
         "//source/common/http:headers_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
@@ -41,6 +41,23 @@ envoy_cc_library(
     deps = [
         "//envoy/upstream:upstream_interface",
         "//source/common/upstream:scheduler_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "orca_weight_manager_lib",
+    srcs = ["orca_weight_manager.cc"],
+    hdrs = ["orca_weight_manager.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/orca:orca_load_metrics_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
 

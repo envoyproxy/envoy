@@ -173,12 +173,12 @@ protected:
   }
 
   std::string virtualHostName(const Route* route) {
-    Stats::StatName name = route->virtualHost()->statName();
+    Stats::StatName name = route->virtualHost().statName();
     return factory_context_.scope().symbolTable().toString(name);
   }
 
   std::string virtualClusterName(const Route* route, Http::TestRequestHeaderMapImpl& headers) {
-    Stats::StatName name = route->virtualHost()->virtualCluster(headers)->statName();
+    Stats::StatName name = route->virtualHost().virtualCluster(headers)->statName();
     return factory_context_.scope().symbolTable().toString(name);
   }
 
@@ -3780,9 +3780,9 @@ virtual_hosts:
     route->routeEntry()->rateLimitPolicy();
     route->routeEntry()->retryPolicy();
     route->routeEntry()->shadowPolicies();
-    route->virtualHost()->virtualCluster(headers);
+    route->virtualHost().virtualCluster(headers);
     route->virtualHost();
-    route->virtualHost()->rateLimitPolicy();
+    route->virtualHost().rateLimitPolicy();
     route->routeEntry()->pathMatchCriterion();
     route->routeEntry()->hedgePolicy();
     route->routeEntry()->maxGrpcTimeout();
@@ -4422,7 +4422,7 @@ virtual_hosts:
 
   EXPECT_TRUE(config.route(genHeaders("www.example.com", "/foo", "GET"), 0)
                   ->virtualHost()
-                  ->includeIsTimeoutRetryHeader());
+                  .includeIsTimeoutRetryHeader());
 }
 
 TEST_F(RouteMatcherTest, NoIsTimeoutRetryHeader) {
@@ -4442,7 +4442,7 @@ virtual_hosts:
 
   EXPECT_FALSE(config.route(genHeaders("www.example.com", "/foo", "GET"), 0)
                    ->virtualHost()
-                   ->includeIsTimeoutRetryHeader());
+                   .includeIsTimeoutRetryHeader());
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCode) {
@@ -7547,7 +7547,7 @@ virtual_hosts:
                         creation_status_);
 
   const Router::CorsPolicy* cors_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->virtualHost()->corsPolicy();
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->virtualHost().corsPolicy();
 
   EXPECT_EQ(cors_policy->enabled(), false);
   EXPECT_EQ(cors_policy->shadowEnabled(), true);
@@ -8244,6 +8244,73 @@ virtual_hosts:
   EXPECT_EQ(creation_status_.message(), "response body size is 4097 bytes; maximum is 4096");
 }
 
+// Test that responseContentType() returns the correct content type based on body_format config.
+TEST_F(RouteConfigurationV2, DirectResponseBodyFormatContentType) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: direct
+    domains: [example.com]
+    routes:
+      - match: { prefix: "/html" }
+        direct_response:
+          status: 200
+          body_format:
+            text_format_source:
+              inline_string: "Hello"
+            content_type: "text/html"
+      - match: { prefix: "/json" }
+        direct_response:
+          status: 200
+          body_format:
+            json_format:
+              key: "value"
+      - match: { prefix: "/text" }
+        direct_response:
+          status: 200
+          body_format:
+            text_format_source:
+              inline_string: "Hello"
+      - match: { prefix: "/nobody" }
+        direct_response:
+          status: 200
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  // Explicit content_type in body_format should be returned.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/html", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("text/html", direct_response->responseContentType());
+  }
+
+  // json_format without explicit content_type should return "application/json".
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/json", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("application/json", direct_response->responseContentType());
+  }
+
+  // text_format without explicit content_type should return empty string.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/text", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("", direct_response->responseContentType());
+  }
+
+  // No body_format at all should return empty string.
+  {
+    const auto* direct_response =
+        config.route(genHeaders("example.com", "/nobody", "GET"), 0)->directResponseEntry();
+    ASSERT_NE(nullptr, direct_response);
+    EXPECT_EQ("", direct_response->responseContentType());
+  }
+}
+
 // Test loading broken config throws EnvoyException.
 TEST_F(RouteConfigurationV2, BrokenTypedMetadata) {
   const std::string yaml = R"EOF(
@@ -8309,12 +8376,12 @@ virtual_hosts:
   EXPECT_NE(nullptr, typed_metadata.get<Baz>(baz_factory.name()));
   EXPECT_EQ("bluh", typed_metadata.get<Baz>(baz_factory.name())->name);
 
-  EXPECT_EQ("bar", symbol_table_->toString(route->virtualHost()->statName()));
-  EXPECT_EQ("foo", route->virtualHost()->routeConfig().name());
+  EXPECT_EQ("bar", symbol_table_->toString(route->virtualHost().statName()));
+  EXPECT_EQ("foo", route->virtualHost().routeConfig().name());
 
   // Get metadata of virtual host.
-  const auto& vh_metadata = route->virtualHost()->metadata();
-  const auto& vh_typed_metadata = route->virtualHost()->typedMetadata();
+  const auto& vh_metadata = route->virtualHost().metadata();
+  const auto& vh_typed_metadata = route->virtualHost().typedMetadata();
 
   EXPECT_EQ(
       "test_vh_value",
@@ -8323,8 +8390,8 @@ virtual_hosts:
   EXPECT_EQ("vh_bluh", vh_typed_metadata.get<Baz>(baz_factory.name())->name);
 
   // Get metadata of route configuration.
-  const auto& config_metadata = route->virtualHost()->routeConfig().metadata();
-  const auto& config_typed_metadata = route->virtualHost()->routeConfig().typedMetadata();
+  const auto& config_metadata = route->virtualHost().routeConfig().metadata();
+  const auto& config_typed_metadata = route->virtualHost().routeConfig().typedMetadata();
 
   EXPECT_EQ("test_config_value",
             Envoy::Config::Metadata::metadataValue(&config_metadata, "com.bar.foo", "baz")
@@ -8378,6 +8445,8 @@ virtual_hosts:
               metadata_key:
                 key: com.bar.foo
                 path: [ { key: xx }, { key: yy } ]
+          operation: "%REQ(my-custom-downstream-operation)%"
+          upstream_operation: "my-custom-fixed-upstream-operation"
         route: { cluster: ww2 }
   )EOF";
   BazFactory baz_factory;
@@ -8395,10 +8464,14 @@ virtual_hosts:
   EXPECT_EQ(0, route1->tracingConfig()->getRandomSampling().denominator());
   EXPECT_EQ(100, route1->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route1->tracingConfig()->getOverallSampling().denominator());
+  EXPECT_FALSE(route1->tracingConfig()->operation().has_value());
+  EXPECT_FALSE(route1->tracingConfig()->upstreamOperation().has_value());
 
   // Check default values for client sampling
   EXPECT_EQ(100, route2->tracingConfig()->getClientSampling().numerator());
   EXPECT_EQ(0, route2->tracingConfig()->getClientSampling().denominator());
+  EXPECT_FALSE(route2->tracingConfig()->operation().has_value());
+  EXPECT_FALSE(route2->tracingConfig()->upstreamOperation().has_value());
 
   EXPECT_EQ(1, route3->tracingConfig()->getClientSampling().numerator());
   EXPECT_EQ(0, route3->tracingConfig()->getClientSampling().denominator());
@@ -8406,12 +8479,23 @@ virtual_hosts:
   EXPECT_EQ(1, route3->tracingConfig()->getRandomSampling().denominator());
   EXPECT_EQ(3, route3->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route3->tracingConfig()->getOverallSampling().denominator());
+  EXPECT_TRUE(route3->tracingConfig()->operation().has_value());
+  EXPECT_TRUE(route3->tracingConfig()->upstreamOperation().has_value());
 
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
   const Tracing::CustomTagMap& map = route3->tracingConfig()->getCustomTags();
   for (const std::string& custom_tag : custom_tags) {
     EXPECT_NE(map.find(custom_tag), map.end());
   }
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl headers{{"my-custom-downstream-operation", "downstream_op"}};
+  Formatter::Context formatter_context;
+  formatter_context.setRequestHeaders(headers);
+  EXPECT_EQ("downstream_op",
+            route3->tracingConfig()->operation()->format(formatter_context, stream_info));
+  EXPECT_EQ("my-custom-fixed-upstream-operation",
+            route3->tracingConfig()->upstreamOperation()->format(formatter_context, stream_info));
 }
 
 // Test to check Prefix Rewrite for redirects
@@ -9489,6 +9573,106 @@ virtual_hosts:
     headers.addCopy("cookies", "");
 
     EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
+TEST_F(RouteMatcherTest, CookieMatch) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: cookie
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          cookies:
+            - name: session
+              string_match:
+                exact: foo
+            - name: build
+              string_match:
+                prefix: "1"
+        route: { cluster: cookie-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cookie-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; build=123");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; build=999");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=bar; build=123");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
+TEST_F(RouteMatcherTest, CookieMatchInvert) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: cookie-invert
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          cookies:
+            - name: blocked
+              string_match:
+                exact: nope
+              invert_match: true
+        route: { cluster: cookie-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cookie-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "blocked=nope");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "blocked=maybe");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
   }
 }
 
@@ -12005,7 +12189,7 @@ virtual_hosts:
                         creation_status_);
 
   const auto& shared_config = dynamic_cast<const CommonConfigImpl&>(
-      config.route(genHeaders("bat.com", "/", "GET"), 0)->virtualHost()->routeConfig());
+      config.route(genHeaders("bat.com", "/", "GET"), 0)->virtualHost().routeConfig());
 
   EXPECT_EQ(config.mostSpecificHeaderMutationsWins(),
             shared_config.mostSpecificHeaderMutationsWins());
@@ -12085,6 +12269,32 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ(4194304U, route->requestBodyBufferLimit());
+}
+
+// Test that route-level request_body_buffer_limit takes precedence over virtual_host
+// request_body_buffer_limit
+TEST_F(RouteConfigurationV2,
+       DEPRECATED_FEATURE_TEST(LegacyRequestBodyBufferLimitPrecedenceRouteOverridesVirtualHost)) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [test.example.com]
+  name: test_host
+  per_request_buffer_limit_bytes: 223
+  routes:
+  - match: {prefix: /test}
+    route:
+      cluster: backend
+    per_request_buffer_limit_bytes: 334
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(334U, route->requestBodyBufferLimit());
 }
 
 } // namespace

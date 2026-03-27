@@ -19,11 +19,12 @@ namespace JwtAuthn {
  *  CreateJwksFetcherCb is a callback interface for creating a JwksFetcher instance.
  */
 using CreateJwksFetcherCb = std::function<Common::JwksFetcherPtr(
-    Upstream::ClusterManager&, const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)>;
+    Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr retry_policy,
+    const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)>;
 /**
  *  JwksDoneFetched is a callback interface to set a Jwks when fetch is done.
  */
-using JwksDoneFetched = std::function<void(google::jwt_verify::JwksPtr&& jwks)>;
+using JwksDoneFetched = std::function<void(Envoy::JwtVerify::JwksPtr&& jwks)>;
 
 // This class handles fetching Jwks asynchronously.
 // It will be no-op if async_fetch is not enabled.
@@ -34,6 +35,7 @@ class JwksAsyncFetcher : public Logger::Loggable<Logger::Id::jwt>,
                          public Common::JwksFetcher::JwksReceiver {
 public:
   JwksAsyncFetcher(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks,
+                   Router::RetryPolicyConstSharedPtr retry_policy,
                    Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
                    JwtAuthnFilterStats& stats, JwksDoneFetched done_fn);
 
@@ -48,11 +50,13 @@ private:
   void handleFetchDone();
 
   // Override the functions from Common::JwksFetcher::JwksReceiver
-  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
+  void onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
 
   // the remote Jwks config
   const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks_;
+  // the parsed retry policy
+  const Router::RetryPolicyConstSharedPtr retry_policy_;
   // the factory context
   Server::Configuration::FactoryContext& context_;
   // the jwks fetcher creator function

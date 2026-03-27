@@ -274,6 +274,15 @@ following are the command line options that Envoy supports.
   when tailing :ref:`access logs <arch_overview_access_logs>` in order to
   get more (or less) immediate flushing.
 
+.. option:: --file-flush-min-size-kb <integer>
+
+  *(optional)* The minimum size in kilobytes for file flushing. Defaults to 64.
+  This setting is used during file creation to determine the minimum buffer size
+  before flushing to files. The buffer will flush every time it gets full, or every time
+  the interval has elapsed, whichever comes first. Adjusting this setting is useful
+  when tailing :ref:`access logs <arch_overview_access_logs>` in order to
+  get more (or less) immediate flushing.
+
 .. option:: --drain-time-s <integer>
 
   *(optional)* The time in seconds that Envoy will drain connections during

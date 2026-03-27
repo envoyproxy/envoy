@@ -24,6 +24,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -185,6 +186,8 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
 }
 
 TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", true}});
   initialize();
   ResponseDecoder* inner_decoder;
   NiceMock<MockRequestEncoder> inner_encoder;
@@ -269,10 +272,102 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
   EXPECT_EQ(client_->idleTimer(), nullptr);
 }
 
+// Test that idle timeout closes the connection and increments stats when connected (default
+// behavior).
+TEST_F(CodecClientTest, IdleTimeoutWhenConnectedDefault) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", true}});
+  initialize();
+
+  // Connect the connection first.
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+
+  // Trigger idle timeout - it should close the connection and increment stats.
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  client_->triggerIdleTimeout();
+
+  // Verify idle timeout stat was incremented.
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_idle_timeout_.value());
+}
+
+// Test that idle timeout closes the connection and increments stats when connected (old behavior).
+TEST_F(CodecClientTest, IdleTimeoutWhenConnectedOldBehavior) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", false}});
+  initialize();
+
+  // Connect the connection first.
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+
+  // Trigger idle timeout - it should close the connection and increment stats.
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  client_->triggerIdleTimeout();
+
+  // Verify idle timeout stat was incremented.
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_idle_timeout_.value());
+}
+
+// Test that idle timer is NOT enabled when connection is not yet established (default behavior).
+TEST_F(CodecClientTest, IdleTimerNotEnabledWhenNotConnectedDefault) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", true}});
+
+  connection_ = new NiceMock<Network::MockClientConnection>();
+
+  EXPECT_CALL(*connection_, connecting()).WillOnce(Return(true));
+  EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
+  EXPECT_CALL(*connection_, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
+  EXPECT_CALL(*connection_, connect());
+  EXPECT_CALL(*connection_, addReadFilter(_))
+      .WillOnce(Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
+
+  codec_ = new Http::MockClientConnection();
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+
+  Network::ClientConnectionPtr connection{connection_};
+  Event::MockTimer* idle_timer = new Event::MockTimer();
+  // With the flag enabled (default), idle timer should NOT be enabled when connection is not yet
+  // established.
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(idle_timer));
+  client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
+                                                 nullptr, host_, dispatcher_);
+  ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+}
+
+// Test that idle timer IS enabled when connection is not yet established (old behavior with flag
+// disabled).
+TEST_F(CodecClientTest, IdleTimerEnabledWhenNotConnectedOldBehavior) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", false}});
+
+  connection_ = new NiceMock<Network::MockClientConnection>();
+
+  EXPECT_CALL(*connection_, connecting()).WillOnce(Return(true));
+  EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
+  EXPECT_CALL(*connection_, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
+  EXPECT_CALL(*connection_, connect());
+  EXPECT_CALL(*connection_, addReadFilter(_))
+      .WillOnce(Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
+
+  codec_ = new Http::MockClientConnection();
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+
+  Network::ClientConnectionPtr connection{connection_};
+  Event::MockTimer* idle_timer = new Event::MockTimer();
+  // With the flag disabled, idle timer SHOULD be enabled when connection is not yet established
+  // (old behavior). It will be called once in the constructor.
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(idle_timer));
+  client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
+                                                 nullptr, host_, dispatcher_);
+  ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+}
+
 TEST_F(CodecClientTest, ProtocolError) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(codecProtocolError("protocol error")));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
@@ -284,7 +379,7 @@ TEST_F(CodecClientTest, 408Response) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Return(prematureResponseError("", Code::RequestTimeout)));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
@@ -295,7 +390,7 @@ TEST_F(CodecClientTest, 408Response) {
 TEST_F(CodecClientTest, PrematureResponse) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(prematureResponseError("", Code::OK)));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
@@ -477,7 +572,7 @@ TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
       .WillOnce(Return(HeaderValidator::ValidationResult{
           HeaderValidator::ValidationResult::Action::Reject, "some error"}));
   // By default H/2 and H/3 connections are disconnected on protocol errors
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(_, _));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   // Connection closure will cause stream to be reset
   inner_encoder.stream_.callbacks_.front()->onResetStream(StreamResetReason::LocalReset,

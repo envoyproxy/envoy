@@ -24,4 +24,9 @@ message Config {
   // A sequence of the filter state values to apply in the specified order
   // when a new request is received.
   repeated common.set_filter_state.v3.FilterStateValue on_request_headers = 1;
+
+  // Clear the route cache for the current client request. This is necessary
+  // if the route configuration may depend on the filter state values set by
+  // this filter.
+  bool clear_route_cache = 2;
 }

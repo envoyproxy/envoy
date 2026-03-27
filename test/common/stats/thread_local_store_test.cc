@@ -94,11 +94,11 @@ public:
     bool done = false;
     ThreadLocalStoreTestingPeer::numTlsHistograms(
         *store_, [&mutex, &done, &num_tls_histograms](uint32_t num) {
-          absl::MutexLock lock(&mutex);
+          absl::MutexLock lock(mutex);
           num_tls_histograms = num;
           done = true;
         });
-    absl::MutexLock lock(&mutex);
+    absl::MutexLock lock(mutex);
     mutex.Await(absl::Condition(&done));
     return num_tls_histograms;
   }
@@ -107,7 +107,7 @@ public:
   SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   MockSink sink_;
   ThreadLocalStoreImplPtr store_;
   Scope& scope_;
@@ -235,7 +235,7 @@ public:
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatNamePool pool_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   MockSink sink_;
   ThreadLocalStoreImplPtr store_;
   Scope& scope_;
@@ -500,6 +500,79 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopeSharedPtr scope = store_->createScope("scope.", true, {1, 1, 1});
+  EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+  EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+  EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+
+  {
+    Counter& c1 = scope->counterFromString("c1");
+    EXPECT_EQ("scope.c1", c1.name());
+    Counter& c2 = scope->counterFromString("c2");
+    EXPECT_EQ(&c2, &store_->nullCounter());
+    EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+
+    Gauge& g1 = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+    EXPECT_EQ("scope.g1", g1.name());
+    Gauge& g2 = scope->gaugeFromString("g2", Gauge::ImportMode::Accumulate);
+    EXPECT_EQ(&g2, &store_->nullGauge());
+    EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+
+    Histogram& h1 = scope->histogramFromString("h1", Histogram::Unit::Unspecified);
+    EXPECT_EQ("scope.h1", h1.name());
+    Histogram& h2 = scope->histogramFromString("h2", Histogram::Unit::Unspecified);
+    EXPECT_EQ("", h2.name());
+    EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+
+    // c1, g1, h1 are used.
+    c1.inc();
+    g1.set(1);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+    h1.recordValue(1);
+    store_->mergeHistograms([]() -> void {});
+
+    // First eviction marks stats as unused.
+    store_->evictUnused();
+    EXPECT_FALSE(c1.used());
+    EXPECT_FALSE(g1.used());
+    EXPECT_FALSE(h1.used());
+  }
+
+  // Second eviction removes stats.
+  EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
+  store_->evictUnused();
+
+  // After eviction, we should be able to create new stats.
+  Counter& c3 = scope->counterFromString("c3");
+  EXPECT_EQ("scope.c3", c3.name());
+  EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+  Counter& c4 = scope->counterFromString("c4");
+  EXPECT_EQ(&c4, &store_->nullCounter());
+  EXPECT_EQ(2, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+
+  Gauge& g3 = scope->gaugeFromString("g3", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("scope.g3", g3.name());
+  EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+  Gauge& g4 = scope->gaugeFromString("g4", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(&g4, &store_->nullGauge());
+  EXPECT_EQ(2, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+
+  Histogram& h3 = scope->histogramFromString("h3", Histogram::Unit::Unspecified);
+  EXPECT_EQ("scope.h3", h3.name());
+  EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+  Histogram& h4 = scope->histogramFromString("h4", Histogram::Unit::Unspecified);
+  EXPECT_EQ("", h4.name());
+  EXPECT_EQ(2, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
 TEST_F(StatsThreadLocalStoreTest, ForEach) {
   auto collect_scopes = [this]() -> std::vector<std::string> {
     std::vector<std::string> names;
@@ -680,6 +753,63 @@ TEST_F(StatsThreadLocalStoreTest, Eviction) {
     Histogram& h2 = scope1->histogramFromString("h1", Histogram::Unit::Unspecified);
     EXPECT_EQ(&h1, &h2);
   }
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
+TEST_F(StatsThreadLocalStoreTest, EvictionGaugesInterleavedOperations) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopeSharedPtr scope = store_->rootScope()->createScope("scope.", /*evictable=*/true);
+
+  // 1. Create gauge and PAIRED_ADD (add)
+  Gauge& g1 = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  g1.add(10);
+  EXPECT_EQ(10, g1.value());
+  EXPECT_TRUE(g1.used());
+
+  // Hold a reference to prevent destruction upon eviction
+  GaugeSharedPtr g1_ref = TestUtility::findGauge(*store_, "scope.g1");
+  ASSERT_NE(g1_ref, nullptr);
+
+  // 2. MarkUnused / Evict
+  // First pass marks unused. Note that evictUnused() only removes if it was ALREADY unused.
+  // Since we just used it (g1.add(10)), the first call will only mark it as unused.
+  store_->evictUnused();
+  EXPECT_FALSE(g1.used());
+  EXPECT_EQ(1UL, store_->gauges().size());
+
+  // Second pass evicts from scope cache because it is now unused.
+  EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
+  store_->evictUnused();
+
+  // Verify removed from scope
+  StatNameManagedStorage g1_name("scope.g1", symbol_table_);
+  EXPECT_FALSE(scope->findGauge(g1_name.statName()).has_value());
+
+  // Verify still in store (allocator) due to held ref
+  EXPECT_EQ(1UL, store_->gauges().size());
+
+  // 3. Interleaved PAIRED_ADD (add) on the held reference
+  g1_ref->add(5);
+  EXPECT_EQ(15, g1_ref->value());
+  EXPECT_TRUE(g1_ref->used());
+
+  // 4. Re-resolve and PAIRED_SUBTRACT (sub)
+  Gauge& g1_resurrected = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+
+  // Should be the same object
+  EXPECT_EQ(g1_ref.get(), &g1_resurrected);
+
+  // Value should be preserved
+  EXPECT_EQ(15, g1_resurrected.value());
+
+  // Perform subtract
+  g1_resurrected.sub(15);
+  EXPECT_EQ(0, g1_resurrected.value());
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
@@ -1314,6 +1444,146 @@ TEST_F(StatsMatcherTLSTest, DoNotRejectAllHidden) {
   EXPECT_EQ(hidden_gauge.name(), "hidden_gauge");
 }
 
+// Helper: build a StatsMatcherSharedPtr that rejects the given prefix.
+static StatsMatcherSharedPtr
+makePrefixMatcher(absl::string_view prefix, SymbolTable& symbol_table,
+                  Server::Configuration::MockServerFactoryContext& ctx) {
+  envoy::config::metrics::v3::StatsConfig cfg;
+  cfg.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      std::string(prefix));
+  return std::make_shared<StatsMatcherImpl>(cfg, symbol_table, ctx);
+}
+
+// Tests per-scope StatsMatcher: scope matcher replaces (not supplements) the
+// global store-level matcher for all stats created within that scope.
+// Note: the scope matcher operates on the FULL stat name (scope prefix + stat name).
+TEST_F(StatsMatcherTLSTest, ScopeMatcherReplacesGlobal) {
+  // Global matcher rejects prefix "global_rejected.".
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "global_rejected.");
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  // Confirm global rejection works on root scope.
+  Counter& global_rejected = scope_.counterFromString("global_rejected.foo");
+  EXPECT_EQ(global_rejected.name(), ""); // rejected → null counter
+
+  // Create a scope "scope" with its own matcher that rejects full names starting with
+  // "scope.scope_rejected." (i.e. stat "scope_rejected.foo" inside "scope").
+  StatsMatcherSharedPtr scope_matcher =
+      makePrefixMatcher("scope.scope_rejected.", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("scope", false, {}, scope_matcher);
+
+  // Within the scope, "scope_rejected.foo" has full name "scope.scope_rejected.foo" → rejected.
+  Counter& scope_rejected = my_scope->counterFromString("scope_rejected.foo");
+  EXPECT_EQ(scope_rejected.name(), ""); // rejected by scope matcher
+
+  // Within the scope, "global_rejected.foo" has full name "scope.global_rejected.foo".
+  // The scope matcher does NOT reject this (scope replaces global, not supplements it).
+  Counter& global_not_rejected = my_scope->counterFromString("global_rejected.foo");
+  EXPECT_NE(global_not_rejected.name(), ""); // accepted by scope matcher
+
+  // Counters outside the scope still use the global matcher.
+  Counter& out_global_rejected = scope_.counterFromString("global_rejected.bar");
+  EXPECT_EQ(out_global_rejected.name(), ""); // rejected by global matcher
+}
+
+// Tests that setStatsMatcher on the store does not remove stats from scopes
+// that have their own scope-level matcher.
+TEST_F(StatsMatcherTLSTest, SetStatsMatcherDoesNotAffectScopeWithOwnMatcher) {
+  // Create a scope with its own matcher (rejects "scope.rejected").
+  StatsMatcherSharedPtr scope_matcher =
+      makePrefixMatcher("scope.rejected", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("scope", false, {}, scope_matcher);
+
+  // Create a counter that is accepted by the scope matcher.
+  Counter& c = my_scope->counterFromString("accepted.foo");
+  EXPECT_NE(c.name(), "");
+  c.inc();
+  EXPECT_EQ(c.value(), 1);
+
+  // Now apply a global matcher that would reject "scope.accepted.foo".
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "scope");
+  store_->setStatsMatcher(
+      std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+
+  // The counter should still exist and be usable (scope matcher shields it from global changes).
+  EXPECT_EQ(c.value(), 1);
+  c.inc();
+  EXPECT_EQ(c.value(), 2);
+}
+
+// Tests that the scope matcher rejects all stat types (Counter, Gauge, Histogram, TextReadout),
+// that HiddenAccumulate gauges bypass the scope matcher, and that child scopes inherit the matcher.
+TEST_F(StatsMatcherTLSTest, ScopeMatcherRejectsAllStatTypesAndInheritsToChildren) {
+  StatsMatcherSharedPtr scope_matcher =
+      makePrefixMatcher("scope.rejected.", symbol_table_, context_);
+  ScopeSharedPtr my_scope = store_->rootScope()->createScope("scope", false, {}, scope_matcher);
+
+  // Gauge: rejected stat returns null gauge (empty name, NeverImport).
+  Gauge& rejected_gauge = my_scope->gaugeFromString("rejected.g", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("", rejected_gauge.name());
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, rejected_gauge.importMode());
+
+  // Gauge: accepted stat is real.
+  Gauge& accepted_gauge = my_scope->gaugeFromString("accepted.g", Gauge::ImportMode::Accumulate);
+  EXPECT_NE("", accepted_gauge.name());
+  accepted_gauge.set(5);
+  EXPECT_EQ(5, accepted_gauge.value());
+
+  // HiddenAccumulate gauge is never rejected even if name matches.
+  Gauge& hidden_gauge =
+      my_scope->gaugeFromString("rejected.hidden", Gauge::ImportMode::HiddenAccumulate);
+  EXPECT_EQ("scope.rejected.hidden", hidden_gauge.name());
+
+  // Histogram: rejected stat returns null histogram (empty name, Unit::Null).
+  Histogram& rejected_histogram =
+      my_scope->histogramFromString("rejected.h", Histogram::Unit::Unspecified);
+  EXPECT_EQ("", rejected_histogram.name());
+  EXPECT_EQ(Histogram::Unit::Null, rejected_histogram.unit());
+
+  // Histogram: accepted stat is real.
+  Histogram& accepted_histogram =
+      my_scope->histogramFromString("accepted.h", Histogram::Unit::Milliseconds);
+  EXPECT_NE("", accepted_histogram.name());
+  EXPECT_EQ(Histogram::Unit::Milliseconds, accepted_histogram.unit());
+
+  // TextReadout: rejected stat returns null text readout (empty name, value always "").
+  TextReadout& rejected_tr = my_scope->textReadoutFromString("rejected.tr");
+  EXPECT_EQ("", rejected_tr.name());
+  rejected_tr.set("hello");
+  EXPECT_EQ("", rejected_tr.value());
+
+  // TextReadout: accepted stat is real.
+  TextReadout& accepted_tr = my_scope->textReadoutFromString("accepted.tr");
+  EXPECT_NE("", accepted_tr.name());
+  accepted_tr.set("world");
+  EXPECT_EQ("world", accepted_tr.value());
+
+  // Counter: rejected stat returns null counter (empty name, value always 0).
+  Counter& rejected_counter = my_scope->counterFromString("rejected.c");
+  EXPECT_EQ("", rejected_counter.name());
+  rejected_counter.inc();
+  EXPECT_EQ(0, rejected_counter.value());
+
+  // Counter: accepted stat is real.
+  Counter& accepted_counter = my_scope->counterFromString("accepted.c");
+  EXPECT_NE("", accepted_counter.name());
+  accepted_counter.inc();
+  EXPECT_EQ(1, accepted_counter.value());
+
+  // Child scope "rejected" has prefix — all its stats are rejected.
+  ScopeSharedPtr child_scope = my_scope->createScope("rejected");
+  Counter& child_counter = child_scope->counterFromString("c");
+  EXPECT_EQ("", child_counter.name());
+
+  // Grandchild also inherits the matcher.
+  ScopeSharedPtr grandchild_scope = child_scope->createScope("grandchild");
+  Counter& grandchild_counter = grandchild_scope->counterFromString("c");
+  EXPECT_EQ("", grandchild_counter.name());
+}
+
 // Tests the logic for caching the stats-matcher results, and in particular the
 // private impl method checkAndRememberRejection(). That method behaves
 // differently depending on whether TLS is enabled or not, so we parameterize
@@ -1439,7 +1709,7 @@ public:
   SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  AllocatorImpl heap_alloc_;
+  Allocator heap_alloc_;
   ThreadLocalStoreImpl store_;
   ScopeSharedPtr scope_;
 };
@@ -1615,7 +1885,7 @@ protected:
   NiceMock<ThreadLocal::MockInstance> tls_;
   MockSink sink_;
   SymbolTableImpl symbol_table_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   ThreadLocalStoreImpl store_;
   Scope& scope_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
@@ -1700,7 +1970,7 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   NiceMock<ThreadLocal::MockInstance> tls;
-  AllocatorImpl alloc(symbol_table);
+  Allocator alloc(symbol_table);
   ThreadLocalStoreImpl store(alloc);
 
   store.initializeThreading(*dispatcher, tls);
@@ -1791,18 +2061,18 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
   EXPECT_EQ(2, validateMerge());
 
   const std::string h1_expected_summary =
-      "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
-      "P99: 1.099, P99.5: 1.0995, P99.9: 1.0999, P100: 1.1";
+      "P0: 1.05, P25: 1.05, P50: 1.05, P75: 1.05, P90: 1.05, P95: 1.05, "
+      "P99: 1.05, P99.5: 1.05, P99.9: 1.05, P100: 1.05";
   const std::string h2_expected_summary =
-      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, "
-      "P99.5: 99.5, P99.9: 99.9, P100: 100";
+      "P0: 0, P25: 24.5, P50: 49.5, P75: 74.5, P90: 89.5, P95: 94.5, P99: 98.5, "
+      "P99.5: 99.5, P99.9: 99.5, P100: 99.5";
 
   const std::string h1_expected_buckets =
-      "B0.5: 0, B1: 0, B5: 1, B10: 1, B25: 1, B50: 1, B100: 1, B250: 1, "
+      "B0.5: 0, B1: 1, B5: 1, B10: 1, B25: 1, B50: 1, B100: 1, B250: 1, "
       "B500: 1, B1000: 1, B2500: 1, B5000: 1, B10000: 1, B30000: 1, B60000: 1, "
       "B300000: 1, B600000: 1, B1.8e+06: 1, B3.6e+06: 1";
   const std::string h2_expected_buckets =
-      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B0.5: 1, B1: 2, B5: 6, B10: 11, B25: 26, B50: 51, B100: 100, B250: 100, "
       "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
       "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
@@ -1835,10 +2105,11 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
   }
   EXPECT_EQ(1, validateMerge());
 
-  const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
-                                       "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
+  const std::string expected_summary =
+      "P0: 0, P25: 24.5, P50: 49.5, P75: 74.5, P90: 89.5, P95: 94.5, P99: 98.5, "
+      "P99.5: 99.5, P99.9: 99.5, P100: 99.5";
   const std::string expected_bucket_summary =
-      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B0.5: 1, B1: 2, B5: 6, B10: 11, B25: 26, B50: 51, B100: 100, B250: 100, "
       "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
       "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
@@ -1890,7 +2161,7 @@ TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 10));
   histogram.recordValue(10);
   store_->mergeHistograms([]() -> void {});
-  EXPECT_EQ("B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(1,1) B50(1,1) B100(1,1) "
+  EXPECT_EQ("B0.5(0,0) B1(0,0) B5(0,0) B10(1,1) B25(1,1) B50(1,1) B100(1,1) "
             "B250(1,1) B500(1,1) B1000(1,1) B2500(1,1) B5000(1,1) B10000(1,1) "
             "B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) "
             "B3.6e+06(1,1)",
@@ -2260,7 +2531,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   // a string. This expectation captures the bucket transition to indicate
   // 0 samples at less than 100, and 10 between 100 and 249 inclusive.
   EXPECT_THAT(histograms[0]->bucketSummary(),
-              HasSubstr(absl::StrCat(" B100(0,0) B250(", NumThreads, ",", NumThreads, ") ")));
+              HasSubstr(absl::StrCat(" B100(10,10) B250(", NumThreads, ",", NumThreads, ") ")));
 
   // The histogram was created in scope1, which can now be destroyed. But the
   // histogram is kept alive by scope2.
@@ -2281,7 +2552,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
 
   // Shows the bucket summary with 10 samples at >=100, and 20 at >=250.
   EXPECT_THAT(histograms[0]->bucketSummary(),
-              HasSubstr(absl::StrCat(" B100(0,0) B250(0,", NumThreads, ") B500(", NumThreads, ",",
+              HasSubstr(absl::StrCat(" B100(0,10) B250(0,", NumThreads, ") B500(", NumThreads, ",",
                                      2 * NumThreads, ") ")));
 
   // Now clear everything, and synchronize the system by calling mergeHistograms().

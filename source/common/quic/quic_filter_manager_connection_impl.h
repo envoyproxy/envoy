@@ -45,6 +45,7 @@ public:
   void addReadFilter(Network::ReadFilterSharedPtr filter) override;
   void removeReadFilter(Network::ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
   // Network::Connection
   void addBytesSentCallback(Network::Connection::BytesSentCb /*cb*/) override {
@@ -66,8 +67,8 @@ public:
     IS_ENVOY_BUG("unexpected call to closeConnection for QUIC");
   }
 
-  Network::DetectedCloseType detectedCloseType() const override {
-    return Network::DetectedCloseType::Normal;
+  StreamInfo::DetectedCloseType detectedCloseType() const override {
+    return StreamInfo::DetectedCloseType::Normal;
   }
   Event::Dispatcher& dispatcher() const override { return dispatcher_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
@@ -131,6 +132,7 @@ public:
     IS_ENVOY_BUG("unexpected write call");
   }
   void setBufferLimits(uint32_t limit) override;
+  void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) override;
   uint32_t bufferLimit() const override {
     // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
     PANIC("not implemented");

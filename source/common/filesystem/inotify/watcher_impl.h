@@ -40,6 +40,7 @@ private:
   };
 
   absl::Status onInotifyEvent();
+  void callAndLogOnError(OnChangedCb& cb, uint32_t events, const std::string& file);
 
   Filesystem::Instance& file_system_;
   int inotify_fd_;

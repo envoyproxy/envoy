@@ -997,7 +997,8 @@ CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_v
 
   if (state.isThreadSafe()) {
     // it's safe to write header in the safe thread.
-    s->setUpstreamOverrideHost(std::make_pair(std::string(host), strict));
+    s->setUpstreamOverrideHost(
+        Upstream::LoadBalancerContext::OverrideHost{std::string(host), strict});
   } else {
     // should deep copy the string_view before post to dispatcher callback.
     auto host_str = std::string(host);
@@ -1008,7 +1009,8 @@ CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_v
     // in the Go thread.
     state.getDispatcher().post([this, s, weak_ptr, host_str] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
-        s->setUpstreamOverrideHost(std::make_pair(std::string(host_str), false));
+        s->setUpstreamOverrideHost(
+            Upstream::LoadBalancerContext::OverrideHost{std::string(host_str), false});
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in setUpstreamOverrideHost");
       }
@@ -1077,6 +1079,66 @@ CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
     }
     *value = streamInfo().attemptCount().value();
     break;
+  // SSL Integer/Boolean values
+  case EnvoyValue::SslConnectionExists: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    *value = (ssl != nullptr) ? 1 : 0;
+    break;
+  }
+  case EnvoyValue::SslPeerCertificatePresented: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = ssl->peerCertificatePresented() ? 1 : 0;
+    break;
+  }
+  case EnvoyValue::SslPeerCertificateValidated: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = ssl->peerCertificateValidated() ? 1 : 0;
+    break;
+  }
+  case EnvoyValue::SslCiphersuiteId: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto cipher_id = ssl->ciphersuiteId();
+    if (cipher_id == SSL_INVALID_CIPHERSUITE_ID) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = cipher_id;
+    break;
+  }
+  case EnvoyValue::SslValidFromPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto time_val = ssl->validFromPeerCertificate();
+    if (!time_val.has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = std::chrono::duration_cast<std::chrono::seconds>(time_val.value().time_since_epoch())
+                 .count();
+    break;
+  }
+  case EnvoyValue::SslExpirationPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto time_val = ssl->expirationPeerCertificate();
+    if (!time_val.has_value()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    *value = std::chrono::duration_cast<std::chrono::seconds>(time_val.value().time_since_epoch())
+                 .count();
+    break;
+  }
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid integer value id: ", id));
   }
@@ -1130,9 +1192,8 @@ CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) 
     }
     break;
   case EnvoyValue::UpstreamClusterName:
-    if (streamInfo().upstreamClusterInfo().has_value() &&
-        streamInfo().upstreamClusterInfo().value()) {
-      req_->strValue = streamInfo().upstreamClusterInfo().value()->name();
+    if (const auto cluster_info = streamInfo().upstreamClusterInfo()) {
+      req_->strValue = cluster_info->name();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
@@ -1143,6 +1204,127 @@ CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) 
     }
     req_->strValue = streamInfo().virtualClusterName().value();
     break;
+  // SSL String values
+  case EnvoyValue::SslSha256PeerCertificateDigest: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->sha256PeerCertificateDigest();
+    break;
+  }
+  case EnvoyValue::SslSerialNumberPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->serialNumberPeerCertificate();
+    break;
+  }
+  case EnvoyValue::SslSubjectPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->subjectPeerCertificate();
+    break;
+  }
+  case EnvoyValue::SslIssuerPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->issuerPeerCertificate();
+    break;
+  }
+  case EnvoyValue::SslSubjectLocalCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->subjectLocalCertificate();
+    break;
+  }
+  case EnvoyValue::SslTlsVersion: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->tlsVersion();
+    break;
+  }
+  case EnvoyValue::SslCiphersuiteString: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    auto cipher_val = ssl->ciphersuiteString();
+    if (cipher_val.empty()) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = std::string(cipher_val);
+    break;
+  }
+  case EnvoyValue::SslSessionId: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->sessionId();
+    break;
+  }
+  case EnvoyValue::SslUrlEncodedPemEncodedPeerCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->urlEncodedPemEncodedPeerCertificate();
+    break;
+  }
+  case EnvoyValue::SslUrlEncodedPemEncodedPeerCertificateChain: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    req_->strValue = ssl->urlEncodedPemEncodedPeerCertificateChain();
+    break;
+  }
+  // SSL String array values (serialized as null-separated strings)
+  case EnvoyValue::SslUriSanPeerCertificate:
+  case EnvoyValue::SslUriSanLocalCertificate:
+  case EnvoyValue::SslDnsSansPeerCertificate:
+  case EnvoyValue::SslDnsSansLocalCertificate: {
+    const auto& ssl = streamInfo().downstreamAddressProvider().sslConnection();
+    if (ssl == nullptr) {
+      return CAPIStatus::CAPIValueNotFound;
+    }
+    absl::Span<const std::string> strings;
+    switch (static_cast<EnvoyValue>(id)) {
+    case EnvoyValue::SslUriSanPeerCertificate:
+      strings = ssl->uriSanPeerCertificate();
+      break;
+    case EnvoyValue::SslUriSanLocalCertificate:
+      strings = ssl->uriSanLocalCertificate();
+      break;
+    case EnvoyValue::SslDnsSansPeerCertificate:
+      strings = ssl->dnsSansPeerCertificate();
+      break;
+    case EnvoyValue::SslDnsSansLocalCertificate:
+      strings = ssl->dnsSansLocalCertificate();
+      break;
+    default:
+      PANIC("unreachable");
+    }
+    // Serialize to null-separated string
+    req_->strValue.clear();
+    for (size_t i = 0; i < strings.size(); ++i) {
+      if (i > 0) {
+        req_->strValue.push_back('\0');
+      }
+      req_->strValue.append(strings[i]);
+    }
+    break;
+  }
   default:
     RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
   }
@@ -1544,6 +1726,16 @@ CAPIStatus Filter::getSecret(const absl::string_view name, uint64_t* value_data,
         });
     return CAPIStatus::CAPIYield;
   }
+}
+
+CAPIStatus Filter::setDrainConnectionUponCompletion() {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  streamInfo().setShouldDrainConnectionUponCompletion(true);
+  return CAPIStatus::CAPIOK;
 }
 
 /* ConfigId */

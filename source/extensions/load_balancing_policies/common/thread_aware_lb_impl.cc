@@ -6,6 +6,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -126,8 +127,23 @@ absl::Status ThreadAwareLoadBalancerBase::initialize() {
   // I will look into doing this in a follow up. Doing everything using a background thread heavily
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
-  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector&) { refresh(); });
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
+    member_update_cb_ =
+        priority_set_.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
+          processDirtyPriorities();
+          refresh();
+        });
+
+    // PriorityUpdateCb can fire before initialize() during batch host updates, while MemberUpdateCb
+    // (which flushes dirty priorities) is deferred until the batch completes. If initialize() is
+    // invoked mid-batch, process any queued priorities now so per_priority_panic_ is sized for all
+    // current priorities before refresh() indexes into it.
+    processDirtyPriorities();
+  } else {
+    priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+        [this](uint32_t, const HostVector&, const HostVector&) { refresh(); });
+  }
 
   refresh();
   return absl::OkStatus();
@@ -147,6 +163,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
     const auto& per_priority_state = (*per_priority_state_vector)[priority];
     // Copy panic flag from LoadBalancerBase. It is calculated when there is a change
     // in hosts set or hosts' health.
+    ASSERT(priority < per_priority_panic_.size());
     per_priority_state->global_panic_ = per_priority_panic_[priority];
 
     // Normalize host and locality weights such that the sum of all normalized weights is 1.
@@ -224,7 +241,7 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(Loa
 
   // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.
-  absl::ReaderMutexLock lock(&mutex_);
+  absl::ReaderMutexLock lock(mutex_);
   lb->healthy_per_priority_load_ = healthy_per_priority_load_;
   lb->degraded_per_priority_load_ = degraded_per_priority_load_;
   lb->per_priority_state_ = per_priority_state_;

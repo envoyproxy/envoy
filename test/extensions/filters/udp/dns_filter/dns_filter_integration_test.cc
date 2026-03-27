@@ -35,6 +35,7 @@ public:
     ai->ai_addr = reinterpret_cast<sockaddr*>(storage);
     memcpy(ai->ai_addr, addr->sockAddr(), addr->sockAddrLen());
     ai->ai_addrlen = addr->sockAddrLen();
+    ai->ai_next = nullptr;
     return ai;
   }
 
@@ -87,6 +88,13 @@ public:
   }
 
   void setupResponseParser() { histogram_.unit_ = Stats::Histogram::Unit::Milliseconds; }
+
+  void TearDown() override {
+    if (test_server_) {
+      test_server_.reset();
+    }
+    fake_upstreams_.clear();
+  }
 
   static std::string configToUse() {
     return fmt::format(R"EOF(
@@ -506,6 +514,7 @@ TEST_P(DnsFilterIntegrationTest, WildcardLookupTest) {
   EXPECT_EQ(3, response_ctx_->answers_.size());
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 }
+
 } // namespace
 } // namespace DnsFilter
 } // namespace UdpFilters

@@ -26,6 +26,7 @@ public:
   MOCK_METHOD(void, setFlushTimeout, (std::chrono::milliseconds timeout));
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
   MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr));
+  MOCK_METHOD(absl::optional<uint32_t>, codecStreamId, (), (const));
 
   absl::string_view responseDetails() override { return details_; }
 

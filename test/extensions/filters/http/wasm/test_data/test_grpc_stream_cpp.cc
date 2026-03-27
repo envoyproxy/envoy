@@ -24,9 +24,9 @@ public:
       : RootContext(id, root_id) {}
 };
 
-static RegisterContextFactory register_GrpcStreamContextProto(CONTEXT_FACTORY(GrpcStreamContextProto),
-                                                         ROOT_FACTORY(GrpcStreamRootContext),
-                                                         "grpc_stream_proto");
+static RegisterContextFactory
+    register_GrpcStreamContextProto(CONTEXT_FACTORY(GrpcStreamContextProto),
+                                    ROOT_FACTORY(GrpcStreamRootContext), "grpc_stream_proto");
 
 class MyGrpcStreamHandler
     : public GrpcStreamHandler<google::protobuf::Value, google::protobuf::Value> {
@@ -89,8 +89,9 @@ FilterHeadersStatus GrpcStreamContextProto::onRequestHeaders(uint32_t, bool) {
                                     new MyGrpcStreamHandler())) == WasmResult::InternalFailure) {
     logError("expected bogus method call failure");
   }
-  if (root()->grpcStreamHandler(grpc_service_string, "service", "method", initial_metadata,
-                            std::unique_ptr<GrpcStreamHandlerBase>(new MyGrpcStreamHandler())) == WasmResult::Ok) {
+  if (root()->grpcStreamHandler(
+          grpc_service_string, "service", "method", initial_metadata,
+          std::unique_ptr<GrpcStreamHandlerBase>(new MyGrpcStreamHandler())) == WasmResult::Ok) {
     logError("cluster call succeeded");
   }
   return FilterHeadersStatus::StopIteration;
@@ -120,8 +121,9 @@ FilterHeadersStatus GrpcStreamContext::onRequestHeaders(uint32_t, bool) {
                                     new MyGrpcStreamHandler())) == WasmResult::InternalFailure) {
     logError("expected bogus method call failure");
   }
-  if (root()->grpcStreamHandler("cluster", "service", "method", initial_metadata,
-                            std::unique_ptr<GrpcStreamHandlerBase>(new MyGrpcStreamHandler())) == WasmResult::Ok) {
+  if (root()->grpcStreamHandler(
+          "cluster", "service", "method", initial_metadata,
+          std::unique_ptr<GrpcStreamHandlerBase>(new MyGrpcStreamHandler())) == WasmResult::Ok) {
     logError("cluster call succeeded");
   }
   return FilterHeadersStatus::StopIteration;

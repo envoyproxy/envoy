@@ -1,10 +1,12 @@
 #include <thread>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -35,12 +37,15 @@ typed_config:
   enable_detailed_stats: true
 )EOF");
 
-    config_helper_.addBootstrapExtension(R"EOF(
+    config_helper_.addBootstrapExtension(fmt::format(R"EOF(
 name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
   enable_detailed_stats: true
-)EOF");
+  http_handshake:
+    request_path: "{}"
+)EOF",
+                                                     downstream_handshake_request_path_));
 
     // Call parent initialize to complete setup.
     BaseIntegrationTest::initialize();
@@ -175,9 +180,95 @@ typed_config:
     return request;
   }
 
+  void runEndToEndReverseConnectionHandshakeScenario();
+
+  std::string downstream_handshake_request_path_ =
+      std::string(Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+                      DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+  std::string upstream_request_path_ =
+      std::string(Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+                      DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::trace);
 };
+
+void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeScenario() {
+  const uint32_t upstream_port = GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
+  const std::string loopback_addr =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
+
+  config_helper_.addConfigModifier([this, upstream_port, loopback_addr](
+                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()->clear_listeners();
+
+    if (!bootstrap.has_admin()) {
+      auto* admin = bootstrap.mutable_admin();
+      auto* admin_address = admin->mutable_address()->mutable_socket_address();
+      admin_address->set_address(loopback_addr);
+      admin_address->set_port_value(0);
+    }
+
+    auto* upstream_listener = bootstrap.mutable_static_resources()->add_listeners();
+    upstream_listener->set_name("upstream_listener");
+    upstream_listener->mutable_address()->mutable_socket_address()->set_address(loopback_addr);
+    upstream_listener->mutable_address()->mutable_socket_address()->set_port_value(upstream_port);
+
+    auto* upstream_chain = upstream_listener->add_filter_chains();
+    auto* rt_filter = upstream_chain->add_filters();
+    rt_filter->set_name("envoy.filters.network.reverse_tunnel");
+
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
+    rt_config.mutable_ping_interval()->set_seconds(300);
+    rt_config.set_auto_close_connections(false);
+    rt_config.set_request_path(upstream_request_path_);
+    rt_config.set_request_method(envoy::config::core::v3::GET);
+    rt_filter->mutable_typed_config()->PackFrom(rt_config);
+
+    auto* rc_listener = bootstrap.mutable_static_resources()->add_listeners();
+    rc_listener->set_name("reverse_connection_listener");
+    auto* rc_address = rc_listener->mutable_address()->mutable_socket_address();
+    rc_address->set_address("rc://e2e-node:e2e-cluster:e2e-tenant@upstream_cluster:1");
+    rc_address->set_port_value(0);
+    rc_address->set_resolver_name("envoy.resolvers.reverse_connection");
+
+    auto* rc_chain = rc_listener->add_filter_chains();
+    auto* echo_filter = rc_chain->add_filters();
+    echo_filter->set_name("envoy.filters.network.echo");
+    auto* echo_config = echo_filter->mutable_typed_config();
+    echo_config->set_type_url("type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo");
+
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->set_name("upstream_cluster");
+    cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    cluster->mutable_load_assignment()->set_cluster_name("upstream_cluster");
+
+    auto* locality = cluster->mutable_load_assignment()->add_endpoints();
+    auto* lb_endpoint = locality->add_lb_endpoints();
+    auto* endpoint = lb_endpoint->mutable_endpoint();
+    auto* addr = endpoint->mutable_address()->mutable_socket_address();
+    addr->set_address(loopback_addr);
+    addr->set_port_value(upstream_port);
+  });
+
+  initialize();
+  registerTestServerPorts({});
+
+  ENVOY_LOG_MISC(info, "Waiting for reverse connections to be established.");
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+
+  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.e2e-node", 1);
+  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.e2e-cluster", 1);
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+
+  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
+  EXPECT_TRUE(admin_response->complete());
+  EXPECT_EQ("200", admin_response->headers().getStatusValue());
+
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 2);
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseTunnelFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -388,100 +479,14 @@ TEST_P(ReverseTunnelFilterIntegrationTest, BasicReverseTunnelHandshake) {
 // accepted reverse connections.
 TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshake) {
   DISABLE_IF_ADMIN_DISABLED; // Test requires admin interface for draining listener.
+  runEndToEndReverseConnectionHandshakeScenario();
+}
 
-  // Use a deterministic port to avoid timing issues.
-  const uint32_t upstream_port = GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
-  const std::string loopback_addr =
-      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
-
-  // Configure listeners and clusters for the full reverse tunnel flow.
-  config_helper_.addConfigModifier([upstream_port, loopback_addr](
-                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    // Clear existing listeners and add our custom setup.
-    bootstrap.mutable_static_resources()->clear_listeners();
-
-    // Ensure admin interface is configured.
-    if (!bootstrap.has_admin()) {
-      auto* admin = bootstrap.mutable_admin();
-      auto* admin_address = admin->mutable_address()->mutable_socket_address();
-      admin_address->set_address(loopback_addr);
-      admin_address->set_port_value(0); // Use ephemeral port
-    }
-
-    // Listener 1: Upstream listener with reverse tunnel filter (accepts reverse connections).
-    auto* upstream_listener = bootstrap.mutable_static_resources()->add_listeners();
-    upstream_listener->set_name("upstream_listener");
-    upstream_listener->mutable_address()->mutable_socket_address()->set_address(loopback_addr);
-    upstream_listener->mutable_address()->mutable_socket_address()->set_port_value(upstream_port);
-
-    auto* upstream_chain = upstream_listener->add_filter_chains();
-    auto* rt_filter = upstream_chain->add_filters();
-    rt_filter->set_name("envoy.filters.network.reverse_tunnel");
-
-    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
-    rt_config.mutable_ping_interval()->set_seconds(
-        300); // Set the ping interval to the max value to avoid ping timeout.
-    rt_config.set_auto_close_connections(false);
-    rt_config.set_request_path("/reverse_connections/request");
-    rt_config.set_request_method(envoy::config::core::v3::GET);
-    rt_filter->mutable_typed_config()->PackFrom(rt_config);
-
-    // Listener 2: Reverse connection listener (initiates reverse connections).
-    auto* rc_listener = bootstrap.mutable_static_resources()->add_listeners();
-    rc_listener->set_name("reverse_connection_listener");
-    auto* rc_address = rc_listener->mutable_address()->mutable_socket_address();
-    // Use rc:// scheme to trigger reverse connection initiation.
-    rc_address->set_address("rc://e2e-node:e2e-cluster:e2e-tenant@upstream_cluster:1");
-    rc_address->set_port_value(0); // Not used for rc:// addresses
-    rc_address->set_resolver_name("envoy.resolvers.reverse_connection");
-
-    // Add filter chain with echo filter to process the connection.
-    auto* rc_chain = rc_listener->add_filter_chains();
-    auto* echo_filter = rc_chain->add_filters();
-    echo_filter->set_name("envoy.filters.network.echo");
-    auto* echo_config = echo_filter->mutable_typed_config();
-    echo_config->set_type_url("type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo");
-
-    // Cluster that points to our upstream listener using regular TCP.
-    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-    cluster->set_name("upstream_cluster");
-    cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
-    cluster->mutable_load_assignment()->set_cluster_name("upstream_cluster");
-
-    // Point to the upstream listener's port.
-    auto* locality = cluster->mutable_load_assignment()->add_endpoints();
-    auto* lb_endpoint = locality->add_lb_endpoints();
-    auto* endpoint = lb_endpoint->mutable_endpoint();
-    auto* addr = endpoint->mutable_address()->mutable_socket_address();
-    addr->set_address(loopback_addr);
-    addr->set_port_value(upstream_port);
-  });
-
-  initialize();
-
-  // Register admin port after initialization since we cleared listeners.
-  registerTestServerPorts({});
-
-  ENVOY_LOG_MISC(info, "Waiting for reverse connections to be established.");
-  // Wait for reverse connections to be established.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
-
-  // Test that the full flow works by checking upstream socket interface metrics.
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.e2e-node", 1);
-  test_server_->waitForGaugeGe("reverse_tunnel_acceptor.clusters.e2e-cluster", 1);
-
-  // Verify stats show successful reverse tunnel handshake.
-  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
-
-  // Drain listeners to trigger proper cleanup of ReverseConnectionIOHandle.
-  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
-  EXPECT_TRUE(admin_response->complete());
-  EXPECT_EQ("200", admin_response->headers().getStatusValue());
-
-  // Wait for listeners to be stopped, which triggers ReverseConnectionIOHandle cleanup.
-  test_server_->waitForCounterEq("listener_manager.listener_stopped",
-                                 2); // 2 listeners in this test
+TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshakeCustomRequestPath) {
+  DISABLE_IF_ADMIN_DISABLED;
+  downstream_handshake_request_path_ = "/custom/reverse";
+  upstream_request_path_ = downstream_handshake_request_path_;
+  runEndToEndReverseConnectionHandshakeScenario();
 }
 
 // Test validation with static expected values.
@@ -490,6 +495,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesSuccess) {
           validation:
             node_id_format: "test-node"
             cluster_id_format: "test-cluster"
+            tenant_id_format: "test-tenant"
             emit_dynamic_metadata: true)";
 
   addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
@@ -511,13 +517,14 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesFailure) {
   const std::string validation_config = R"(
           validation:
             node_id_format: "expected-node"
-            cluster_id_format: "expected-cluster")";
+            cluster_id_format: "expected-cluster"
+            tenant_id_format: "expected-tenant")";
 
   addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
   initialize();
 
   std::string http_request = createHttpRequestWithRtHeaders(
-      "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "test-tenant");
+      "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "wrong-tenant");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   (void)tcp_client->write(http_request);
@@ -591,12 +598,45 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyClusterId) {
   test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
 }
 
+// Test validation with only tenant_id validation.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyTenantId) {
+  const std::string validation_config = R"(
+          validation:
+            tenant_id_format: "expected-tenant")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Success: tenant_id matches, node_id and cluster_id ignored.
+  std::string http_request_pass = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "any-node", "any-cluster", "expected-tenant");
+
+  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client1->write(http_request_pass));
+  tcp_client1->waitForData("HTTP/1.1 200 OK");
+  tcp_client1->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+
+  // Failure: tenant_id doesn't match.
+  std::string http_request_fail = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "any-node", "any-cluster", "wrong-tenant");
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
+  (void)tcp_client2->write(http_request_fail);
+  tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client2->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
 // Test validation with empty format strings. In this case validation is skipped.
 TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithEmptyFormatters) {
   const std::string validation_config = R"(
           validation:
             node_id_format: ""
-            cluster_id_format: "")";
+            cluster_id_format: ""
+            tenant_id_format: "")";
 
   addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
   initialize();
@@ -1191,6 +1231,151 @@ typed_config:
   tcp_client->waitForDisconnect();
 
   test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test end-to-end tenant isolation flow.
+TEST_P(ReverseTunnelFilterIntegrationTest, IntegrationTenantIsolationEndToEnd) {
+  // Override bootstrap extension to enable tenant isolation.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
+      if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
+        envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+            UpstreamReverseConnectionSocketInterface config;
+        extension.typed_config().UnpackTo(&config);
+        config.mutable_enable_tenant_isolation()->set_value(true);
+        extension.mutable_typed_config()->PackFrom(config);
+        break;
+      }
+    }
+    // Add reverse connection cluster with tenant_id_format.
+    envoy::config::cluster::v3::Cluster cluster;
+    TestUtility::loadFromYaml(R"EOF(
+name: reverse_connection_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cleanup_interval: 1s
+cluster_type:
+  name: envoy.clusters.reverse_connection
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+    cleanup_interval: 10s
+    host_id_format: "%REQ(x-node-id)%"
+    tenant_id_format: "%REQ(x-tenant-id)%"
+)EOF",
+                              cluster);
+    bootstrap.mutable_static_resources()->add_clusters()->CopyFrom(cluster);
+  });
+
+  addReverseTunnelFilter();
+  initialize();
+
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  std::string http_request = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                            "node1", "cluster1", "tenant1");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test multiple tenants are isolated correctly.
+TEST_P(ReverseTunnelFilterIntegrationTest, IntegrationTenantIsolationMultipleTenants) {
+  // Override bootstrap extension to enable tenant isolation.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
+      if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
+        envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+            UpstreamReverseConnectionSocketInterface config;
+        extension.typed_config().UnpackTo(&config);
+        config.mutable_enable_tenant_isolation()->set_value(true);
+        extension.mutable_typed_config()->PackFrom(config);
+        break;
+      }
+    }
+    // Add reverse connection cluster with tenant_id_format.
+    envoy::config::cluster::v3::Cluster cluster;
+    TestUtility::loadFromYaml(R"EOF(
+name: reverse_connection_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cleanup_interval: 1s
+cluster_type:
+  name: envoy.clusters.reverse_connection
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+    cleanup_interval: 10s
+    host_id_format: "%REQ(x-node-id)%"
+    tenant_id_format: "%REQ(x-tenant-id)%"
+)EOF",
+                              cluster);
+    bootstrap.mutable_static_resources()->add_clusters()->CopyFrom(cluster);
+  });
+
+  addReverseTunnelFilter();
+  initialize();
+
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  std::string http_request_tenant_a = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "node-a", "cluster-a", "tenant-a");
+
+  IntegrationTcpClientPtr tcp_client_a = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client_a->write(http_request_tenant_a));
+  tcp_client_a->waitForData("HTTP/1.1 200 OK");
+  tcp_client_a->close();
+
+  std::string http_request_tenant_b = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "node-b", "cluster-b", "tenant-b");
+
+  IntegrationTcpClientPtr tcp_client_b = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client_b->write(http_request_tenant_b));
+  tcp_client_b->waitForData("HTTP/1.1 200 OK");
+  tcp_client_b->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 2);
+}
+
+// Test startup validation fails when tenant isolation enabled but tenant_id_format missing.
+TEST_P(ReverseTunnelFilterIntegrationTest, IntegrationTenantIsolationStartupValidation) {
+  // Override bootstrap extension to enable tenant isolation.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    for (auto& extension : *bootstrap.mutable_bootstrap_extensions()) {
+      if (extension.name() == "envoy.bootstrap.reverse_tunnel.upstream_socket_interface") {
+        envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+            UpstreamReverseConnectionSocketInterface config;
+        extension.typed_config().UnpackTo(&config);
+        config.mutable_enable_tenant_isolation()->set_value(true);
+        extension.mutable_typed_config()->PackFrom(config);
+        break;
+      }
+    }
+    // Add reverse connection cluster WITHOUT tenant_id_format - should fail at startup.
+    envoy::config::cluster::v3::Cluster cluster;
+    TestUtility::loadFromYaml(R"EOF(
+name: reverse_connection_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cleanup_interval: 1s
+cluster_type:
+  name: envoy.clusters.reverse_connection
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+    cleanup_interval: 10s
+    host_id_format: "%REQ(x-node-id)%"
+)EOF",
+                              cluster);
+    bootstrap.mutable_static_resources()->add_clusters()->CopyFrom(cluster);
+  });
+
+  addReverseTunnelFilter();
+  // Should fail to start with validation error.
+  EXPECT_DEATH(initialize(), "tenant_id_format must be configured");
 }
 
 } // namespace

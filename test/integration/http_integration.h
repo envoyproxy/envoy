@@ -130,7 +130,10 @@ public:
             ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/downstream_protocol ==
                                           Http::CodecType::HTTP3)) {}
   HttpIntegrationTest(Http::CodecType downstream_protocol, Network::Address::IpVersion version,
-                      const std::string& config);
+                      const std::string& config)
+      : HttpIntegrationTest(downstream_protocol, version, configToBootstrap(config)) {}
+  HttpIntegrationTest(Http::CodecType downstream_protocol, Network::Address::IpVersion version,
+                      const envoy::config::bootstrap::v3::Bootstrap& config);
 
   HttpIntegrationTest(Http::CodecType downstream_protocol,
                       const InstanceConstSharedPtrFn& upstream_address_fn,
@@ -141,7 +144,13 @@ public:
                                           Http::CodecType::HTTP3)) {}
   HttpIntegrationTest(Http::CodecType downstream_protocol,
                       const InstanceConstSharedPtrFn& upstream_address_fn,
-                      Network::Address::IpVersion version, const std::string& config);
+                      Network::Address::IpVersion version, const std::string& config)
+      : HttpIntegrationTest(downstream_protocol, upstream_address_fn, version,
+                            configToBootstrap(config)) {}
+  HttpIntegrationTest(Http::CodecType downstream_protocol,
+                      const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version,
+                      const envoy::config::bootstrap::v3::Bootstrap& config);
   ~HttpIntegrationTest() override;
 
   void initialize() override;
@@ -348,8 +357,6 @@ protected:
   std::string downstreamProtocolStatsRoot() const;
   // Return the upstream protocol part of the stats root.
   std::string upstreamProtocolStatsRoot() const;
-  // Prefix listener stat with IP:port, including IP version dependent loopback address.
-  std::string listenerStatPrefix(const std::string& stat_name);
 
   Network::UpstreamTransportSocketFactoryPtr quic_transport_socket_factory_;
   // Must outlive |codec_client_| because it may not close connection till the end of its life

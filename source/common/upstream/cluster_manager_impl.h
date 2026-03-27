@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <functional>
 #include <list>
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -28,8 +27,10 @@
 #include "envoy/tcp/async_tcp_client.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/common/thread.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
@@ -38,9 +39,10 @@
 #include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/host_utility.h"
-#include "source/common/upstream/load_stats_reporter.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
+
+#include "absl/container/btree_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -271,6 +273,13 @@ public:
     return clusters_maps;
   }
 
+  void forEachActiveCluster(std::function<void(const Cluster&)> cb) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    for (const auto& [unused_name, cluster_data] : active_clusters_) {
+      cb(*cluster_data->cluster_);
+    }
+  }
+
   OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
@@ -312,6 +321,7 @@ public:
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     xds_manager_.shutdown();
+    load_stats_reporter_.reset();
     active_clusters_.clear();
     warming_clusters_.clear();
     updateClusterCounts();
@@ -472,25 +482,23 @@ protected:
    */
   class OdCdsApiHandleImpl : public OdCdsApiHandle {
   public:
-    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds) {
-      return std::make_unique<OdCdsApiHandleImpl>(parent, std::move(odcds));
+    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, uint64_t config_source_key) {
+      return std::make_unique<OdCdsApiHandleImpl>(parent, config_source_key);
     }
 
-    OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds)
-        : parent_(parent), odcds_(std::move(odcds)) {
-      ASSERT(odcds_ != nullptr);
-    }
+    OdCdsApiHandleImpl(ClusterManagerImpl& parent, uint64_t config_source_key)
+        : parent_(parent), config_source_key_(config_source_key) {}
 
     ClusterDiscoveryCallbackHandlePtr
     requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,
                                     std::chrono::milliseconds timeout) override {
-      return parent_.requestOnDemandClusterDiscovery(odcds_, std::string(name), std::move(callback),
-                                                     timeout);
+      return parent_.requestOnDemandClusterDiscovery(config_source_key_, std::string(name),
+                                                     std::move(callback), timeout);
     }
 
   private:
     ClusterManagerImpl& parent_;
-    OdCdsApiSharedPtr odcds_;
+    uint64_t config_source_key_;
   };
 
   virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
@@ -546,7 +554,7 @@ private:
     struct TcpConnPoolsContainer {
       TcpConnPoolsContainer(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
 
-      using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
+      using ConnPools = absl::btree_map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
       // Destroyed after pools.
       const HostHandlePtr host_handle_;
@@ -821,7 +829,7 @@ private:
 
   using ClusterDataPtr = std::unique_ptr<ClusterData>;
   // This map is ordered so that config dumping is consistent.
-  using ClusterMap = std::map<std::string, ClusterDataPtr>;
+  using ClusterMap = absl::btree_map<std::string, ClusterDataPtr>;
 
   struct PendingUpdates {
     ~PendingUpdates() { disableTimer(); }
@@ -896,7 +904,7 @@ private:
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std::string name,
+  requestOnDemandClusterDiscovery(uint64_t subscription_key, std::string name,
                                   ClusterDiscoveryCallbackPtr callback,
                                   std::chrono::milliseconds timeout);
 
@@ -904,6 +912,10 @@ private:
 
 protected:
   ClusterInitializationMap cluster_initialization_map_;
+  // OdCDS subscriptions keyed by config source hash. Subscriptions persist for the lifetime
+  // of ClusterManagerImpl to avoid complexity around cleanup. A future optimization could
+  // add proper lifetime management to close unnecessary connections.
+  absl::flat_hash_map<uint64_t, OdCdsApiSharedPtr> odcds_subscriptions_;
 
 private:
   /**

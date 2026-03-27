@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <memory>
 
+#include "quiche/quic/test_tools/quic_connection_peer.h"
+
 namespace Envoy {
 
 using Extensions::TransportSockets::Tls::ContextImplPeer;
@@ -101,8 +103,8 @@ TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
   initialize();
 
   EXPECT_LOG_CONTAINS_ALL_OF(
-      Envoy::ExpectedLogMessages(
-          {{"trace", "Cert compression successful"}, {"trace", "Cert decompression successful"}}),
+      Envoy::ExpectedLogMessages({{"trace", "Cert brotli compression successful"},
+                                  {"trace", "Cert brotli decompression successful"}}),
       { testRouterHeaderOnlyRequestAndResponse(); });
 }
 
@@ -1544,9 +1546,9 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddress) {
   EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
             quic_connection_->peer_address().host().ToString());
   ASSERT_TRUE((version_ == Network::Address::IpVersion::v4 &&
-               quic_session->config()->HasReceivedIPv4AlternateServerAddress()) ||
+               quic_session->received_ipv4_alternate_server_address().has_value()) ||
               (version_ == Network::Address::IpVersion::v6 &&
-               quic_session->config()->HasReceivedIPv6AlternateServerAddress()));
+               quic_session->received_ipv6_alternate_server_address().has_value()));
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   EXPECT_TRUE(quic_connection_->IsValidatingServerPreferredAddress());
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1637,9 +1639,9 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
   EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
             quic_connection_->peer_address().host().ToString());
   ASSERT_TRUE((version_ == Network::Address::IpVersion::v4 &&
-               quic_session->config()->HasReceivedIPv4AlternateServerAddress()) ||
+               quic_session->received_ipv4_alternate_server_address().has_value()) ||
               (version_ == Network::Address::IpVersion::v6 &&
-               quic_session->config()->HasReceivedIPv6AlternateServerAddress()));
+               quic_session->received_ipv6_alternate_server_address().has_value()));
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   EXPECT_TRUE(quic_connection_->IsValidatingServerPreferredAddress());
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1711,8 +1713,8 @@ TEST_P(QuicHttpIntegrationSPATest, PreferredAddressRuntimeFlag) {
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
             quic_connection_->peer_address().host().ToString());
-  EXPECT_TRUE(!quic_session->config()->HasReceivedIPv4AlternateServerAddress() &&
-              !quic_session->config()->HasReceivedIPv6AlternateServerAddress());
+  EXPECT_TRUE(!quic_session->received_ipv4_alternate_server_address().has_value() &&
+              !quic_session->received_ipv6_alternate_server_address().has_value());
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   EXPECT_FALSE(quic_connection_->IsValidatingServerPreferredAddress());
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1769,7 +1771,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDualStack) {
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
             quic_connection_->peer_address().host().ToString());
-  ASSERT_TRUE(quic_session->config()->HasReceivedIPv4AlternateServerAddress());
+  ASSERT_TRUE(quic_session->received_ipv4_alternate_server_address().has_value());
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   EXPECT_TRUE(quic_connection_->IsValidatingServerPreferredAddress());
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1837,8 +1839,8 @@ TEST_P(QuicHttpIntegrationTest, PreferredAddressDroppedByIncompatibleListenerFil
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
             quic_connection_->peer_address().host().ToString());
-  EXPECT_TRUE(!quic_session->config()->HasReceivedIPv4AlternateServerAddress() &&
-              !quic_session->config()->HasReceivedIPv6AlternateServerAddress());
+  EXPECT_TRUE(!quic_session->received_ipv4_alternate_server_address().has_value() &&
+              !quic_session->received_ipv6_alternate_server_address().has_value());
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   EXPECT_FALSE(quic_connection_->IsValidatingServerPreferredAddress());
   IntegrationStreamDecoderPtr response =
@@ -1871,7 +1873,8 @@ TEST_P(QuicHttpIntegrationTest, SendDisableActiveMigration) {
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
 
   // Validate the setting was transmitted.
-  EXPECT_TRUE(quic_session->config()->DisableConnectionMigration());
+  EXPECT_TRUE(
+      quic::test::QuicConnectionPeer::ConnectionMigrationDisabled(quic_session->connection()));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
@@ -1917,7 +1920,8 @@ TEST_P(QuicHttpIntegrationTest, UnsetSendDisableActiveMigration) {
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
 
   // Validate the setting was not transmitted.
-  EXPECT_FALSE(quic_session->config()->DisableConnectionMigration());
+  EXPECT_FALSE(
+      quic::test::QuicConnectionPeer::ConnectionMigrationDisabled(quic_session->connection()));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},

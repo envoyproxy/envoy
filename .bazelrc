@@ -63,6 +63,7 @@ common --experimental_allow_tags_propagation
 
 # Python
 common --@rules_python//python/config_settings:bootstrap_impl=script
+build --incompatible_default_to_explicit_init_py
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -139,6 +140,7 @@ build:gcc --copt=-Wno-error=uninitialized
 build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
+build:gcc --cxxopt=-Wno-trigraphs
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
@@ -202,18 +204,37 @@ build:compile-time-options --define=admin_html=disabled
 build:compile-time-options --define=signal_trace=disabled
 build:compile-time-options --define=hot_restart=disabled
 build:compile-time-options --define=google_grpc=disabled
-build:compile-time-options --define=boringssl=fips
+build:compile-time-options --config=boringssl-fips
 build:compile-time-options --define=log_debug_assert_in_release=enabled
 build:compile-time-options --define=path_normalization_by_default=true
 build:compile-time-options --define=deprecated_features=disabled
 build:compile-time-options --define=tcmalloc=gperftools
-build:compile-time-options --define=zlib=ng
 build:compile-time-options --define=uhv=enabled
 # gRPC has a lot of deprecated-enum-enum-conversion warnings with C++20
 build:compile-time-options --copt=-Wno-error=deprecated-enum-enum-conversion
 build:compile-time-options --test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true
 build:compile-time-options --@envoy//bazel:http3=False
 build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
+
+
+#############################################################################
+# SSL
+#############################################################################
+
+common:fips-common --test_tag_filters=-nofips
+common:fips-common --build_tag_filters=-nofips
+common:fips-common --@envoy//bazel:fips=True
+
+# BoringSSL FIPS
+common:boringssl-fips --config=fips-common
+common:boringssl-fips --@envoy//bazel:ssl=@boringssl_fips//:ssl
+common:boringssl-fips --@envoy//bazel:crypto=@boringssl_fips//:crypto
+
+# AWS-LC FIPS
+common:aws-lc-fips --config=fips-common
+common:aws-lc-fips --@envoy//bazel:ssl=@aws_lc//:ssl
+common:aws-lc-fips --@envoy//bazel:crypto=@aws_lc//:crypto
+common:aws-lc-fips --@envoy//bazel:http3=False
 
 
 #############################################################################
@@ -245,7 +266,7 @@ build:asan-common --build_tag_filters=-no_san
 build:asan-common --test_tag_filters=-no_san
 build:asan-common --copt -fsanitize=address,undefined
 build:asan-common --linkopt -fsanitize=address,undefined
-# vptr and function sanitizer are enabled in asan if it is set up via bazel/setup_clang.sh.
+# vptr and function sanitizer are enabled in asan when using --config=clang.
 build:asan-common --copt -fno-sanitize=vptr,function
 build:asan-common --linkopt -fno-sanitize=vptr,function
 build:asan-common --copt -DADDRESS_SANITIZER=1
@@ -364,8 +385,7 @@ build:clang-pch --spawn_strategy=local
 build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Clang-tidy
-# TODO(phlax): enable this, its throwing some errors as well as finding more issues
-# build:clang-tidy --@envoy_toolshed//format/clang_tidy:executable=@envoy//tools/clang-tidy
+build:clang-tidy --@envoy_toolshed//format/clang_tidy:executable=@envoy//tools/clang-tidy
 build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=//:clang_tidy_config
 build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 build:clang-tidy --output_groups=report

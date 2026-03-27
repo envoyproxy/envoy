@@ -288,13 +288,13 @@ absl::Status Cluster::addOrUpdateHost(
       ASSERT(host_info == host_map_it->second.shared_host_info_);
       ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
       host_map_it->second.logical_host_->setNewAddresses(
-          host_info->address(), host_info->addressList(/*filtered=*/true), dummy_lb_endpoint_);
+          host_info->address(), host_info->addressList(), dummy_lb_endpoint_);
       return absl::OkStatus();
     }
 
     ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
     auto host_or_error = Upstream::LogicalHost::create(
-        info(), std::string{host}, host_info->address(), host_info->addressList(/*filtered=*/true),
+        info(), std::string{host}, host_info->address(), host_info->addressList(),
         dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr);
     RETURN_IF_NOT_OK_REF(host_or_error.status());
 

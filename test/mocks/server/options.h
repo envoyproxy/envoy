@@ -43,6 +43,7 @@ public:
   MOCK_METHOD(const std::string&, logPath, (), (const));
   MOCK_METHOD(uint64_t, restartEpoch, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, fileFlushIntervalMsec, (), (const));
+  MOCK_METHOD(uint64_t, fileFlushMinSizeKB, (), (const));
   MOCK_METHOD(Mode, mode, (), (const));
   MOCK_METHOD(const std::string&, serviceClusterName, (), (const));
   MOCK_METHOD(const std::string&, serviceNodeName, (), (const));

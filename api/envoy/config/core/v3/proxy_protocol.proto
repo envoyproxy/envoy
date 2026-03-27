@@ -102,6 +102,9 @@ message ProxyProtocolConfig {
   //   at the transport socket level and override them at the host level.
   // - Any TLV defined in the ``pass_through_tlvs`` field will be overridden by either the host-level
   //   or transport socket-level TLV.
+  //
+  // If there are multiple TLVs with the same type, only the TLVs from the highest precedence level
+  // will be used.
   repeated TlvEntry added_tlvs = 3;
 }
 

@@ -1,3 +1,4 @@
+#include "source/common/router/retry_policy_impl.h"
 #include "source/extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
@@ -59,16 +60,30 @@ public:
       timer_ = new NiceMock<Event::MockTimer>(&context_.server_factory_context_.dispatcher_);
     }
 
+    Router::RetryPolicyConstSharedPtr retry_policy = nullptr;
+    if (config_.has_retry_policy()) {
+      envoy::config::route::v3::RetryPolicy route_retry_policy =
+          Http::Utility::convertCoreToRouteRetryPolicy(config_.retry_policy(),
+                                                       "5xx,gateway-error,connect-failure,reset");
+      // Use the null validation visitor because it was used by the async client in the previous
+      // implementation.
+      auto policy_or_error = Router::RetryPolicyImpl::create(
+          route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
+          context_.serverFactoryContext());
+      THROW_IF_NOT_OK_REF(policy_or_error.status());
+      retry_policy = std::move(policy_or_error.value());
+    }
+
     async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
-        config_, context_,
-        [this](Upstream::ClusterManager&, const RemoteJwks&) {
+        config_, std::move(retry_policy), context_,
+        [this](Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr, const RemoteJwks&) {
           return std::make_unique<MockJwksFetcher>(
               [this](Common::JwksFetcher::JwksReceiver& receiver) {
                 fetch_receiver_array_.push_back(&receiver);
               });
         },
         stats_,
-        [this](google::jwt_verify::JwksPtr&& jwks) { out_jwks_array_.push_back(std::move(jwks)); });
+        [this](Envoy::JwtVerify::JwksPtr&& jwks) { out_jwks_array_.push_back(std::move(jwks)); });
 
     if (initManagerUsed()) {
       init_target_handle_->initialize(init_watcher_);
@@ -80,7 +95,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   JwtAuthnFilterStats stats_;
   std::vector<Common::JwksFetcher::JwksReceiver*> fetch_receiver_array_;
-  std::vector<google::jwt_verify::JwksPtr> out_jwks_array_;
+  std::vector<Envoy::JwtVerify::JwksPtr> out_jwks_array_;
 
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
@@ -130,7 +145,7 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetch) {
 
   // Trigger the Jwks response
   EXPECT_EQ(fetch_receiver_array_.size(), 1);
-  auto jwks = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
+  auto jwks = Envoy::JwtVerify::Jwks::createFrom(PublicKey, Envoy::JwtVerify::Jwks::JWKS);
   fetch_receiver_array_[0]->onJwksSuccess(std::move(jwks));
 
   // Output 1 jwks.
@@ -183,7 +198,7 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetchAndRefresh) {
   setupAsyncFetcher(config);
   // Initial fetch is successful
   EXPECT_EQ(fetch_receiver_array_.size(), 1);
-  auto jwks = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
+  auto jwks = Envoy::JwtVerify::Jwks::createFrom(PublicKey, Envoy::JwtVerify::Jwks::JWKS);
   fetch_receiver_array_[0]->onJwksSuccess(std::move(jwks));
 
   // Output 1 jwks.
@@ -198,7 +213,7 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetchAndRefresh) {
 
   // refetch again after cache duration interval: successful.
   EXPECT_EQ(fetch_receiver_array_.size(), 2);
-  auto jwks1 = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
+  auto jwks1 = Envoy::JwtVerify::Jwks::createFrom(PublicKey, Envoy::JwtVerify::Jwks::JWKS);
   fetch_receiver_array_[1]->onJwksSuccess(std::move(jwks1));
 
   // Output 2 jwks.

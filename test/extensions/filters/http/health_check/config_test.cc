@@ -282,6 +282,26 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
   testHealthCheckHeaderMatch(config, headers, false);
 }
 
+TEST(HealthCheckFilterConfig, HealthCheckFilterWithServerContext) {
+  const std::string yaml_string = R"EOF(
+  pass_through_mode: true
+  headers:
+    - name: ":path"
+      string_match:
+        exact: "/hc"
+  )EOF";
+
+  envoy::extensions::filters::http::health_check::v3::HealthCheck proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  HealthCheckFilterConfig factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
 } // namespace
 } // namespace HealthCheck
 } // namespace HttpFilters

@@ -225,6 +225,17 @@ void FilterManagerImpl::onResumeWriting(ActiveWriteFilter* filter,
   }
 }
 
+void FilterManagerImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  access_logs_.push_back(handler);
+}
+
+void FilterManagerImpl::log(AccessLog::AccessLogType type) {
+  AccessLog::LogContext context(nullptr, nullptr, nullptr, {}, type);
+  for (const auto& log : access_logs_) {
+    log->log(context, connection_.streamInfo());
+  }
+}
+
 void FilterManagerImpl::ActiveReadFilter::disableClose(bool disable) {
   if (disable) {
     // Handle the case where we are disabling the close

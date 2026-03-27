@@ -1,0 +1,35 @@
+diff --git a/src/message_reader.cc b/src/message_reader.cc
+index 9284551..c8e1d9e 100644
+--- a/src/message_reader.cc
++++ b/src/message_reader.cc
+@@ -86,7 +86,7 @@ std::unique_ptr<pbio::ZeroCopyInputStream> MessageReader::NextMessage() {
+   // Check if we have the current message size. If not try to read it.
+   if (!have_current_message_size_) {
+     if (in_->BytesAvailable() <
+-        static_cast<pb::int64>(kGrpcDelimiterByteSize)) {
++        static_cast<int64_t>(kGrpcDelimiterByteSize)) {
+       // We don't have 5 bytes available to read the length of the message.
+       // Find out whether the stream is finished and return false.
+       finished_ = in_->Finished();
+@@ -115,7 +115,7 @@ std::unique_ptr<pbio::ZeroCopyInputStream> MessageReader::NextMessage() {
+     have_current_message_size_ = true;
+   }
+ 
+-  if (in_->BytesAvailable() < static_cast<pb::int64>(current_message_size_)) {
++  if (in_->BytesAvailable() < static_cast<int64_t>(current_message_size_)) {
+     if (in_->Finished()) {
+       status_ = absl::Status(
+           absl::StatusCode::kInternal,
+diff --git a/src/request_stream_translator.cc b/src/request_stream_translator.cc
+index ab679cc..176f2d3 100644
+--- a/src/request_stream_translator.cc
++++ b/src/request_stream_translator.cc
+@@ -172,7 +172,7 @@ RequestStreamTranslator* RequestStreamTranslator::RenderUint32(
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderInt64(
+-    absl::string_view name, pb::int64 value) {
++    absl::string_view name, int64_t value) {
+   RenderData(name, [this, name, value]() {
+     translator_->Input().RenderInt64(name, value);
+   });

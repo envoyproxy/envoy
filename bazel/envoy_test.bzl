@@ -1,3 +1,5 @@
+load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
+
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy test targets. This includes both test library and test binary targets.
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
@@ -41,7 +43,7 @@ def _envoy_cc_test_infrastructure_library(
     extra_deps = []
     pch_copts = []
     if disable_pch:
-        extra_deps = ["@com_google_googletest//:gtest"]
+        extra_deps = ["@googletest//:gtest"]
     else:
         extra_deps = envoy_pch_deps(repository, "//test:test_pch")
         pch_copts = envoy_pch_copts(repository, "//test:test_pch")
@@ -183,6 +185,7 @@ def envoy_cc_test(
         name = name,
         srcs = srcs,
         data = data + select({
+            "%s//bazel:local_asan_build" % repository: [],
             "%s//bazel:asan_build" % repository: ["@llvm_toolchain_llvm//:symbolizer"],
             "//conditions:default": [],
         }),
@@ -194,7 +197,7 @@ def envoy_cc_test(
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//test:main",
             repository + "//test/test_common:test_version_linkstamp",
-            "@com_google_googletest//:gtest",
+            "@googletest//:gtest",
         ] + envoy_pch_deps(repository, "//test:test_pch"),
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
         # 2 - by default, mocks act as StrictMocks.
@@ -205,6 +208,7 @@ def envoy_cc_test(
         size = size,
         flaky = flaky,
         env = env | select({
+            "%s//bazel:local_asan_build" % repository: {"ASAN_SYMBOLIZER_PATH": "%s/bin/llvm-symbolizer" % LLVM_PATH},
             "%s//bazel:asan_build" % repository: {"ASAN_SYMBOLIZER_PATH": "$(location @llvm_toolchain_llvm//:symbolizer)"},
             "//conditions:default": {},
         }),
@@ -305,9 +309,10 @@ def envoy_benchmark_test(
     sh_test(
         name = name,
         srcs = [repository + "//bazel:test_for_benchmark_wrapper.sh"],
+        deps = ["@bazel_tools//tools/bash/runfiles"],
         data = [":" + benchmark_binary] + data,
         exec_properties = exec_properties,
-        args = ["%s/%s" % (native.package_name(), benchmark_binary)],
+        args = ["$(rlocationpath %s)" % native.package_relative_label(benchmark_binary)],
         tags = tags + ["nocoverage"],
         **kargs
     )

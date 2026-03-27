@@ -18,14 +18,16 @@ public:
   ~MockConfig() override;
 
   MOCK_METHOD(OperationName, operationName, (), (const));
-  MOCK_METHOD(void, modifySpan, (Span&), (const));
+  MOCK_METHOD(void, modifySpan, (Span&, bool), (const));
   MOCK_METHOD(bool, verbose, (), (const));
   MOCK_METHOD(uint32_t, maxPathTagLength, (), (const));
   MOCK_METHOD(bool, spawnUpstreamSpan, (), (const));
+  MOCK_METHOD(bool, noContextPropagation, (), (const));
 
   OperationName operation_name_{OperationName::Ingress};
   bool verbose_{false};
   bool spawn_upstream_span_{false};
+  bool no_context_propagation_{false};
 };
 
 class MockSpan : public Span {

@@ -709,6 +709,79 @@ on_no_match:
     EXPECT_EQ("namespace_a_id", factory.id()); // on_no_match defaults to namespace_a_socket
     EXPECT_EQ("namespace_a_socket", result.name_);
   }
+
+  // Test 5: Verify usesFilterState() returns true for filter state matchers.
+  EXPECT_TRUE(matcher_->usesFilterState());
+}
+
+TEST_F(TransportSocketMatcherTest, UsesFilterStateReturnsFalseForMetadataMatcher) {
+  Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch> matches;
+  auto* m = matches.Add();
+  TestUtility::loadFromYaml(R"EOF(
+name: "metadata_socket"
+transport_socket:
+  name: "foo"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "metadata_id"
+)EOF",
+                            *m);
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(R"EOF(
+matcher_tree:
+  input:
+    name: envoy.matching.inputs.endpoint_metadata
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.EndpointMetadataInput
+      filter: "envoy.transport_socket_match"
+      path:
+        - key: "socket_type"
+  exact_match_map:
+    map:
+      "tls":
+        action:
+          name: envoy.matching.action.transport_socket.name
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+            name: metadata_socket
+on_no_match:
+  action:
+    name: envoy.matching.action.transport_socket.name
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+      name: metadata_socket
+)EOF",
+                            matcher);
+
+  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                mock_factory_context_, mock_default_factory_,
+                                                *stats_scope_)
+                 .value();
+
+  EXPECT_FALSE(matcher_->usesFilterState());
+}
+
+TEST_F(TransportSocketMatcherTest, UsesFilterStateReturnsFalseForLegacyMatcher) {
+  Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch> matches;
+  auto* m = matches.Add();
+  TestUtility::loadFromYaml(R"EOF(
+name: "legacy_socket"
+match:
+  mtls: "true"
+transport_socket:
+  name: "foo"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "legacy_id"
+)EOF",
+                            *m);
+
+  matcher_ = TransportSocketMatcherImpl::create(matches, mock_factory_context_,
+                                                mock_default_factory_, *stats_scope_)
+                 .value();
+
+  EXPECT_FALSE(matcher_->usesFilterState());
 }
 
 } // namespace

@@ -189,7 +189,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
   span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
 
-  setCommonTags(span, stream_info, tracing_config);
+  setCommonTags(span, stream_info, tracing_config, false);
   onUpstreamResponseHeaders(span, response_headers);
   onUpstreamResponseTrailers(span, response_trailers);
 
@@ -211,7 +211,7 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span, const StreamInfo::Strea
     span.setTag(Tracing::Tags::get().PeerAddress, upstream_address->asStringView());
   }
 
-  setCommonTags(span, stream_info, tracing_config);
+  setCommonTags(span, stream_info, tracing_config, true);
 
   span.finishSpan();
 }
@@ -231,16 +231,14 @@ void HttpTracerUtility::onUpstreamResponseTrailers(
 }
 
 void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& stream_info,
-                                      const Config& tracing_config) {
+                                      const Config& tracing_config, bool upstream_span) {
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
   // Cluster info.
-  if (auto cluster_info = stream_info.upstreamClusterInfo();
-      cluster_info.has_value() && cluster_info.value() != nullptr) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info.value()->name());
-    span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                cluster_info.value()->observabilityName());
+  if (const auto cluster_info = stream_info.upstreamClusterInfo()) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info->name());
+    span.setTag(Tracing::Tags::get().UpstreamClusterName, cluster_info->observabilityName());
   }
 
   setSpanHttpStatusCode(span, stream_info);
@@ -256,7 +254,7 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
     span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
 
-  tracing_config.modifySpan(span);
+  tracing_config.modifySpan(span, upstream_span);
 }
 
 } // namespace Tracing

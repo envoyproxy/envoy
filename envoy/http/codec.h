@@ -463,6 +463,16 @@ public:
    * Get the bytes meter for this stream.
    */
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
+
+  /**
+   * @return absl::optional<uint32_t> the codec level stream ID if available
+   * or nullopt if not applicable or not yet assigned.
+   *
+   * HTTP/1 streams return nullopt.
+   * HTTP/2 streams return the HTTP/2 stream ID or nullopt if not available.
+   * HTTP/3 streams return the HTTP/3 stream ID or nullopt if not available.
+   */
+  virtual absl::optional<uint32_t> codecStreamId() const PURE;
 };
 
 /**

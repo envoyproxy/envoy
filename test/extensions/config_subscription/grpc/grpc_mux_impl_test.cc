@@ -24,6 +24,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/upstream/load_stats_reporter.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
@@ -88,8 +89,9 @@ public:
             SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
             random_),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_)};
-    grpc_mux_ = std::make_unique<GrpcMuxImpl>(grpc_mux_context, true);
+        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+        /*skip_subsequent_node_=*/true};
+    grpc_mux_ = std::make_unique<GrpcMuxImpl>(grpc_mux_context);
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -1052,9 +1054,10 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr};
+      /*eds_resources_cache_=*/nullptr,
+      /*skip_subsequent_node_=*/true};
   EXPECT_THROW_WITH_MESSAGE(
-      GrpcMuxImpl(grpc_mux_context, true), EnvoyException,
+      (GrpcMuxImpl(grpc_mux_context)), EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }
@@ -1078,9 +1081,10 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr};
+      /*eds_resources_cache_=*/nullptr,
+      /*skip_subsequent_node_=*/true};
   EXPECT_THROW_WITH_MESSAGE(
-      GrpcMuxImpl(grpc_mux_context, true), EnvoyException,
+      (GrpcMuxImpl(grpc_mux_context)), EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }
@@ -1515,6 +1519,92 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                     &async_stream_);
 }
 
+// Ensures that the load-stats-reporter is created if enabled.
+TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporter) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "true"}});
+
+  bool factory_called = false;
+  auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    factory_called = true;
+    return std::make_unique<Upstream::MockLoadStatsReporter>();
+  };
+
+  // Re-setup with the factory
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+      /*backoff_strategy_=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/true,
+      /*load_stats_reporter_factory_=*/lrs_factory};
+  grpc_mux_ = std::make_unique<GrpcMuxImpl>(grpc_mux_context);
+
+  // Initial state: not created
+  EXPECT_EQ(nullptr, grpc_mux_->loadStatsReporter());
+  EXPECT_FALSE(factory_called);
+
+  // First call to maybeCreate: creates it
+  Upstream::LoadStatsReporter* reporter = grpc_mux_->maybeCreateLoadStatsReporter();
+  EXPECT_NE(nullptr, reporter);
+  EXPECT_TRUE(factory_called);
+  EXPECT_EQ(reporter, grpc_mux_->loadStatsReporter());
+
+  // Second call: returns existing one, doesn't call factory again
+  factory_called = false;
+  EXPECT_EQ(reporter, grpc_mux_->maybeCreateLoadStatsReporter());
+  EXPECT_FALSE(factory_called);
+}
+
+// Ensures that the load-stats-reporter is not created if disabled.
+// One envoy.reloadable_features.enable_lrs_server_self_ads is deprecated, this test
+// can be removed.
+TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporterRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "false"}});
+
+  auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    return nullptr; // Should not be called
+  };
+
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+      /*backoff_strategy_=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/true,
+      /*load_stats_reporter_factory_=*/lrs_factory};
+  grpc_mux_ = std::make_unique<GrpcMuxImpl>(grpc_mux_context);
+
+  EXPECT_EQ(nullptr, grpc_mux_->maybeCreateLoadStatsReporter());
+}
+
 /**
  * Tests the NullGrpcMuxImpl object to increase code-coverage.
  */
@@ -1590,7 +1680,7 @@ TEST(GrpcMuxFactoryTest, InvalidRateLimit) {
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               absl::nullopt, absl::nullopt, false),
+                               absl::nullopt, absl::nullopt, nullptr),
                EnvoyException);
 }
 

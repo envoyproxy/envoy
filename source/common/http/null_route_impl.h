@@ -63,7 +63,6 @@ struct NullVirtualHost : public Router::VirtualHost {
   bool includeAttemptCountInRequest() const override { return false; }
   bool includeAttemptCountInResponse() const override { return false; }
   bool includeIsTimeoutRetryHeader() const override { return false; }
-  uint64_t requestBodyBufferLimit() const override { return std::numeric_limits<uint64_t>::max(); }
   const Router::RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(absl::string_view) const override {
     return nullptr;
@@ -269,7 +268,8 @@ struct NullRouteImpl : public Router::Route {
   }
   absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
   const std::string& routeName() const override { return EMPTY_STRING; }
-  const Router::VirtualHostConstSharedPtr& virtualHost() const override { return virtual_host_; }
+  const Router::VirtualHost& virtualHost() const override { return *virtual_host_; }
+  Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return virtual_host_; }
 
   std::unique_ptr<RouteEntryImpl> route_entry_;
   static const Router::VirtualHostConstSharedPtr virtual_host_;

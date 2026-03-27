@@ -3,10 +3,6 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
-)
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary")
 
 licenses(["notice"])  # Apache 2
@@ -25,7 +21,7 @@ envoy_cc_test_library(
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_lib",
-        "@com_google_absl//absl/container:node_hash_map",
+        "@abseil-cpp//absl/container:node_hash_map",
     ],
 )
 

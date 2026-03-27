@@ -93,6 +93,8 @@ Available field names:
   response_trailer_call_status, Integer, gRPC status code for response trailer call
   bytes_sent, Integer, Total bytes sent to external processor (Envoy gRPC only)
   bytes_received, Integer, Total bytes received from external processor (Envoy gRPC only)
+  immediate_responses_sent, Integer, Total number of immediate responses sent
+  server_half_closed, Integer, Number of streams closed by the server
 
 Example usage in access log configuration:
 

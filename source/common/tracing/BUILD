@@ -73,6 +73,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "tracer_config_lib",
+    srcs = [
+        "tracer_config_impl.cc",
+    ],
     hdrs = [
         "tracer_config_impl.h",
     ],
@@ -133,5 +136,15 @@ envoy_cc_library(
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "tracing_validation_lib",
+    srcs = ["tracing_validation.cc"],
+    hdrs = ["tracing_validation.h"],
+    deps = [
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
     ],
 )

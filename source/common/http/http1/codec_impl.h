@@ -90,6 +90,9 @@ public:
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
+  // http1 doesn't have a codec level stream id.
+  absl::optional<uint32_t> codecStreamId() const override { return absl::nullopt; }
+
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter);
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
@@ -347,18 +350,6 @@ private:
   Status completeCurrentHeader();
 
   /**
-   * Check if header name contains underscore character.
-   * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
-   * as a security measure due to systems that treat '_' and '-' as interchangeable.
-   * The ServerConnectionImpl may drop header or reject request based on the
-   * `common_http_protocol_options.headers_with_underscores_action` configuration option in the
-   * HttpConnectionManager.
-   */
-  virtual bool shouldDropHeaderWithUnderscoresInNames(absl::string_view /* header_name */) const {
-    return false;
-  }
-
-  /**
    * Dispatch a memory span.
    * @param slice supplies the start address.
    * @len supplies the length of the span.
@@ -488,7 +479,6 @@ protected:
     ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
-  ActiveRequest* activeRequest() { return active_request_.get(); }
   // ConnectionImpl
   CallbackResult onMessageCompleteBase() override;
   // Add the size of the request_url to the reported header size when processing request headers.

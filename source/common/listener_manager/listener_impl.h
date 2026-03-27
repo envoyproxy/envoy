@@ -295,6 +295,9 @@ public:
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
+  std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+    return per_connection_buffer_high_watermark_timeout_;
+  }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return listener_filters_timeout_;
   }
@@ -408,8 +411,7 @@ private:
   absl::Status buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
                                        uint32_t concurrency);
   void buildListenSocketOptions(const envoy::config::listener::v3::Listener& config,
-                                std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
-                                    envoy::config::core::v3::SocketOption>>>& address_opts_list);
+                                std::vector<Network::Socket::OptionsSharedPtr>& address_opts_list);
   absl::Status createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
   absl::Status validateFilterChains(const envoy::config::listener::v3::Listener& config);
   absl::Status buildFilterChains(const envoy::config::listener::v3::Listener& config);
@@ -442,6 +444,7 @@ private:
   const bool mptcp_enabled_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
+  const std::chrono::milliseconds per_connection_buffer_high_watermark_timeout_;
   const uint64_t listener_tag_;
   const std::string name_;
   const bool added_via_api_;

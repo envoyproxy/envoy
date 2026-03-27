@@ -114,6 +114,29 @@ void verifyOpenTelemetryOutput(KeyValueList output, OpenTelemetryFormatMap expec
   }
 }
 
+// Verifies that unsupported top-level value types (e.g., bool_value) throw an exception.
+TEST(SubstitutionFormatterTest, UnsupportedValueTypeThrows) {
+  KeyValueList key_mapping;
+  auto* kv = key_mapping.add_values();
+  kv->set_key("test");
+  kv->mutable_value()->set_bool_value(true);
+
+  std::vector<Formatter::CommandParserPtr> commands;
+  EXPECT_THROW(OpenTelemetryFormatter(key_mapping, commands), EnvoyException);
+}
+
+// Verifies that unsupported array element types (e.g., int_value) throw an exception.
+TEST(SubstitutionFormatterTest, UnsupportedArrayValueTypeThrows) {
+  KeyValueList key_mapping;
+  auto* kv = key_mapping.add_values();
+  kv->set_key("test");
+  auto* array = kv->mutable_value()->mutable_array_value();
+  array->add_values()->set_int_value(42);
+
+  std::vector<Formatter::CommandParserPtr> commands;
+  EXPECT_THROW(OpenTelemetryFormatter(key_mapping, commands), EnvoyException);
+}
+
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
 
@@ -557,18 +580,16 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterDynamicMetadataTest) {
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataTest) {
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
-  absl::optional<std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>> cluster =
-      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(**cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
-  EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
-  EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
+  stream_info.upstream_cluster_info_ = cluster;
 
   OpenTelemetryFormatMap expected = {
       {"test_key", "test_value"},
@@ -619,16 +640,10 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping, {});
 
-  // Empty optional (absl::nullopt)
+  // No cluster info
   {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
-    verifyOpenTelemetryOutput(
-        formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
-        expected);
-  }
-  // Empty cluster info (nullptr)
-  {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(nullptr));
+    EXPECT_CALL(Const(stream_info), upstreamClusterInfo())
+        .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
     verifyOpenTelemetryOutput(
         formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
         expected);

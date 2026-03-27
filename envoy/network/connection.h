@@ -78,15 +78,6 @@ enum class ConnectionCloseType {
 };
 
 /**
- * Type of connection close which is detected from the socket.
- */
-enum class DetectedCloseType {
-  Normal,      // The normal socket close from Envoy's connection perspective.
-  LocalReset,  // The local reset initiated from Envoy.
-  RemoteReset, // The peer reset detected by the connection.
-};
-
-/**
  * Combines connection event and close type for connection close operations
  */
 struct ConnectionCloseAction {
@@ -191,7 +182,7 @@ public:
   /**
    * @return the detected close type from socket.
    */
-  virtual DetectedCloseType detectedCloseType() const PURE;
+  virtual StreamInfo::DetectedCloseType detectedCloseType() const PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this connection.
@@ -331,6 +322,14 @@ public:
    * resuming reading.
    */
   virtual void setBufferLimits(uint32_t limit) PURE;
+
+  /**
+   * Set the timeout when connection will be closed due to buffer high watermark usage. This is used
+   * to prevent the connection from staying above the buffer high watermark indefinitely due to slow
+   * processing. By default, the timeout is not set.
+   * @param timeout The timeout value in milliseconds
+   */
+  virtual void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) PURE;
 
   /**
    * Get the value set with setBufferLimits.

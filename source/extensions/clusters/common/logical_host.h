@@ -85,6 +85,7 @@ public:
   // Upstream:HostDescription observers are delegated to logical_host_.
   bool canary() const override { return logical_host_->canary(); }
   MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
+  std::size_t metadataHash() const override { return logical_host_->metadataHash(); }
   const MetadataConstSharedPtr localityMetadata() const override {
     return logical_host_->localityMetadata();
   }
@@ -124,10 +125,13 @@ public:
     return logical_host_->lastHcPassTime();
   }
   uint32_t priority() const override { return logical_host_->priority(); }
-  Network::UpstreamTransportSocketFactory&
-  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
-                                const envoy::config::core::v3::Metadata* metadata) const override {
-    return logical_host_->resolveTransportSocketFactory(dest_address, metadata);
+  Network::UpstreamTransportSocketFactory& resolveTransportSocketFactory(
+      const Network::Address::InstanceConstSharedPtr& dest_address,
+      const envoy::config::core::v3::Metadata* metadata,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
+          nullptr) const override {
+    return logical_host_->resolveTransportSocketFactory(dest_address, metadata,
+                                                        transport_socket_options);
   }
   OptRef<HostLbPolicyData> lbPolicyData() const override { return logical_host_->lbPolicyData(); }
 

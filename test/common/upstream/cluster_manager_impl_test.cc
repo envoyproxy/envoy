@@ -12,6 +12,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
+#include "test/common/quic/test_utils.h"
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/config/v2_link_hacks.h"
@@ -24,6 +25,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -1614,7 +1616,8 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
-  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillOnce(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
   EXPECT_CALL(*to_create, addIdleCallback(_));
@@ -1630,9 +1633,10 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
+  Upstream::LoadBalancerContext::OverrideHost override_host_11001{"127.0.0.1:11001", false};
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("127.0.0.1:11001", false))));
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_11001)));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
@@ -1660,10 +1664,10 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
+  Upstream::LoadBalancerContext::OverrideHost override_host_non_existing{"127.0.0.2:12345", false};
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          // Return non-existing host. Let the LB choose the host.
-          std::make_pair("127.0.0.2:12345", false))));
+      .WillRepeatedly(Return(
+          OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_non_existing)));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
@@ -1682,11 +1686,10 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHostStrict) 
   createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
 
+  Upstream::LoadBalancerContext::OverrideHost override_host_strict{"127.0.0.2:12345", true};
   EXPECT_CALL(context, overrideHostToSelect())
-      .WillRepeatedly(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          // Return non-existing host and indicate strict mode.
-          // LB should not be allowed to choose host.
-          std::make_pair("127.0.0.2:12345", true))));
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_strict)));
 
   // Requested upstream host 127.0.0.2:12345 is not part of the cluster.
   // Connection pool should not be created.
@@ -2337,7 +2340,7 @@ TEST_F(ClusterManagerImplTest, PassDownNetworkObserverRegistryToConnectionPool) 
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_api), "v1"));
   auto cluster_added_via_api = cluster_manager_->getThreadLocalCluster("added_via_api");
 
-  Quic::EnvoyQuicNetworkObserverRegistryFactory registry_factory;
+  Quic::TestEnvoyQuicNetworkObserverRegistryFactory registry_factory;
   cluster_manager_->createNetworkObserverRegistries(registry_factory);
 
   NiceMock<MockLoadBalancerContext> lb_context;
@@ -2511,6 +2514,7 @@ TEST_F(ClusterManagerImplTest, CheckAddressesList) {
 
 // Verify that non-IP additional addresses are rejected.
 TEST_F(ClusterManagerImplTest, RejectNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
   const std::string bootstrap = R"EOF(
   static_resources:
     clusters:
@@ -2532,12 +2536,48 @@ TEST_F(ClusterManagerImplTest, RejectNonIpAdditionalAddresses) {
                   address: 127.0.0.1
                   port_value: 11001
   )EOF";
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "false"}});
   try {
     create(parseBootstrapFromV3Yaml(bootstrap));
     FAIL() << "Invalid address was not rejected";
   } catch (const EnvoyException& e) {
     EXPECT_STREQ("additional_addresses must be IP addresses.", e.what());
   }
+}
+
+TEST_F(ClusterManagerImplTest, AllowNonIpAdditionalAddresses) {
+  TestScopedRuntime scoped_runtime;
+  const std::string bootstrap = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_0
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              additionalAddresses:
+              - address:
+                  envoyInternalAddress:
+                   server_listener_name: internal_address
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses", "true"}});
+  create(parseBootstrapFromV3Yaml(bootstrap));
+
+  const auto& cluster = cluster_manager_->getThreadLocalCluster("cluster_0");
+  const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts[0]->addressListOrNull()->size(), 2);
+  EXPECT_EQ((*hosts[0]->addressListOrNull())[0]->asString(), "127.0.0.1:11001");
+  EXPECT_EQ((*hosts[0]->addressListOrNull())[1]->asString(), "envoy://internal_address/");
 }
 
 TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {

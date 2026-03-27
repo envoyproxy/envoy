@@ -6,6 +6,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/metadata.h"
+#include "source/common/formatter/coalesce_formatter.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/status.h"
 #include "source/common/http/header_map_impl.h"
@@ -183,6 +184,33 @@ absl::optional<std::string> TraceIDFormatter::format(const Context& context,
   return trace_id;
 }
 
+Protobuf::Value SpanIDFormatter::formatValue(const Context& context,
+                                             const StreamInfo::StreamInfo&) const {
+  const auto active_span = context.activeSpan();
+  if (!active_span.has_value()) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  auto span_id = active_span->getSpanId();
+  if (span_id.empty()) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return ValueUtil::stringValue(span_id);
+}
+
+absl::optional<std::string> SpanIDFormatter::format(const Context& context,
+                                                    const StreamInfo::StreamInfo&) const {
+  const auto active_span = context.activeSpan();
+  if (!active_span.has_value()) {
+    return absl::nullopt;
+  }
+
+  auto span_id = active_span->getSpanId();
+  if (span_id.empty()) {
+    return absl::nullopt;
+  }
+  return span_id;
+}
+
 GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
   if (format.empty() || format == "CAMEL_STRING") {
     return GrpcStatusFormatter::CamelString;
@@ -303,6 +331,52 @@ QueryParameterFormatter::formatValue(const Context& context,
   return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
+QueryParametersFormatter::DecodeOption
+QueryParametersFormatter::parseDecodeOption(absl::string_view decoding) {
+
+  if (decoding.empty() || decoding == "ORIG") {
+    return DecodeOption::Original;
+  } else if (decoding == "DECODED") {
+    return DecodeOption::Decoded;
+  } else {
+    throw EnvoyException(fmt::format(
+        "Invalid QUERY_PARAMS option: '{}', only 'ORIG'/'DECODED' are allowed", decoding));
+  }
+}
+
+// FormatterProvider
+absl::optional<std::string> QueryParametersFormatter::format(const Context& context,
+                                                             const StreamInfo::StreamInfo&) const {
+  const auto request_headers = context.requestHeaders();
+  if (!request_headers.has_value()) {
+    return absl::nullopt;
+  }
+
+  // Gather query parameters substring from path
+  absl::string_view path_view = request_headers->getPathValue();
+  auto query_offset = path_view.find('?');
+
+  if (query_offset == absl::string_view::npos) {
+    return absl::nullopt;
+  }
+
+  std::string query_params = std::string(path_view.substr(query_offset + 1));
+
+  // Apply percent decoding on the query params if requested
+  if (option_ == DecodeOption::Decoded) {
+    query_params = Http::Utility::PercentEncoding::urlDecodeQueryParameter(query_params);
+  }
+
+  SubstitutionFormatUtils::truncate(query_params, max_length_);
+  return query_params;
+}
+
+Protobuf::Value
+QueryParametersFormatter::formatValue(const Context& context,
+                                      const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(format(context, stream_info));
+}
+
 absl::optional<std::string> PathFormatter::format(const Context& context,
                                                   const StreamInfo::StreamInfo&) const {
 
@@ -338,11 +412,7 @@ absl::optional<std::string> PathFormatter::format(const Context& context,
     }
   }
 
-  // Truncate the path if needed.
-  if (max_length_.has_value()) {
-    path_view = SubstitutionFormatUtils::truncateStringView(path_view, max_length_);
-  }
-
+  path_view = SubstitutionFormatUtils::truncateStringView(path_view, max_length_);
   return std::string(path_view);
 }
 
@@ -489,10 +559,21 @@ BuiltInHttpCommandParser::getKnownFormatters() {
          [](absl::string_view, absl::optional<size_t>) {
            return std::make_unique<TraceIDFormatter>();
          }}},
+       {"SPAN_ID",
+        {CommandSyntaxChecker::COMMAND_ONLY,
+         [](absl::string_view, absl::optional<size_t>) {
+           return std::make_unique<SpanIDFormatter>();
+         }}},
        {"QUERY_PARAM",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, absl::optional<size_t> max_length) {
            return std::make_unique<QueryParameterFormatter>(std::string(format), max_length);
+         }}},
+       {"QUERY_PARAMS",
+        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view decoding, absl::optional<size_t> max_length) {
+           return std::make_unique<QueryParametersFormatter>(
+               QueryParametersFormatter::parseDecodeOption(decoding), max_length);
          }}},
        {"PATH",
         {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
@@ -501,6 +582,12 @@ BuiltInHttpCommandParser::getKnownFormatters() {
            absl::string_view option;
            SubstitutionFormatUtils::parseSubcommand(format, ':', query, option);
            return THROW_OR_RETURN_VALUE(PathFormatter::create(query, option, max_length),
+                                        FormatterProviderPtr);
+         }}},
+       {"COALESCE",
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           return THROW_OR_RETURN_VALUE(CoalesceFormatter::create(format, max_length),
                                         FormatterProviderPtr);
          }}}});
 }

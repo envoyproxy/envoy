@@ -8,15 +8,30 @@ import subprocess
 from pathlib import Path
 
 
+def get_bazel_startup_options():
+    return shlex.split(os.environ.get("BAZEL_STARTUP_OPTION_LIST", ""))
+
+
+def get_bazel_build_options():
+    return shlex.split(os.environ.get("BAZEL_BUILD_OPTION_LIST", "")) + [
+        "--config=compdb",
+        "--remote_download_outputs=all",
+    ]
+
+
+def get_output_base():
+    bazel_startup_options = get_bazel_startup_options()
+    bazel_options = get_bazel_build_options()
+    return subprocess.check_output(
+        ["bazel", *bazel_startup_options, "info", *bazel_options, "output_base"]).decode().strip()
+
+
 # This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.py
 def generate_compilation_database(args):
     # We need to download all remote outputs for generated source code. This option lives here to override those
     # specified in bazelrc.
-    bazel_startup_options = shlex.split(os.environ.get("BAZEL_STARTUP_OPTION_LIST", ""))
-    bazel_options = shlex.split(os.environ.get("BAZEL_BUILD_OPTION_LIST", "")) + [
-        "--config=compdb",
-        "--remote_download_outputs=all",
-    ]
+    bazel_startup_options = get_bazel_startup_options()
+    bazel_options = get_bazel_build_options()
 
     source_dir_targets = args.bazel_targets
     if args.exclude_contrib:
@@ -76,12 +91,13 @@ def is_compile_target(target, args):
     return True
 
 
-def modify_compile_command(target, args):
+def modify_compile_command(target, args, output_base):
     cc, options = target["command"].split(" ", 1)
 
-    # Strip wrapper path so that clangd can find the compiler.
+    # cc_wrapper.sh is a script of llvm_toolchain to wrap clang/clang++. Make sure to
+    # use the one from output_base.
     if cc.endswith("cc_wrapper.sh"):
-        cc = "cc_wrapper.sh"
+        cc = os.path.join(output_base, cc)
 
     # Workaround for bazel added C++11 options, those doesn't affect build itself but
     # clang-tidy will misinterpret them.
@@ -92,10 +108,6 @@ def modify_compile_command(target, args):
         # Visual Studio Code doesn't seem to like "-iquote". Replace it with
         # old-style "-I".
         options = options.replace("-iquote ", "-I ")
-
-    if args.system_clang:
-        if cc.find("clang"):
-            cc = "clang++"
 
     if is_header(target["file"]):
         options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
@@ -112,7 +124,13 @@ def modify_compile_command(target, args):
 
 
 def fix_compilation_database(args, db):
-    db = [modify_compile_command(target, args) for target in db if is_compile_target(target, args)]
+    output_base = get_output_base()
+
+    db = [
+        modify_compile_command(target, args, output_base)
+        for target in db
+        if is_compile_target(target, args)
+    ]
 
     with open("compile_commands.json", "w") as db_file:
         json.dump(db, db_file, indent=2)
@@ -126,12 +144,6 @@ if __name__ == "__main__":
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument('--include_all', action='store_true')
     parser.add_argument('--exclude_contrib', action='store_true')
-    parser.add_argument(
-        '--system-clang',
-        action='store_true',
-        help=
-        'Use `clang++` instead of the bazel wrapper for commands. This may help if `clangd` cannot find/run the tools.'
-    )
     parser.add_argument(
         'bazel_targets', nargs='*', default=[
             "//source/...",

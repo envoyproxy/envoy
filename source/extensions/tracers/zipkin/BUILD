@@ -47,6 +47,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:http_service_headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
@@ -55,9 +56,9 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:cluster_update_tracker_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
-        "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@zipkin-api",
     ],
 )
 

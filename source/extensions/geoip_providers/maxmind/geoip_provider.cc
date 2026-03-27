@@ -14,7 +14,9 @@ static constexpr const char* MMDB_CITY_LOOKUP_ARGS[] = {"city", "names", "en"};
 static constexpr const char* MMDB_REGION_LOOKUP_ARGS[] = {"subdivisions", "0", "iso_code"};
 static constexpr const char* MMDB_COUNTRY_LOOKUP_ARGS[] = {"country", "iso_code"};
 static constexpr const char* MMDB_ASN_LOOKUP_ARGS[] = {"autonomous_system_number"};
+static constexpr const char* MMDB_ASN_ORG_LOOKUP_ARGS[] = {"autonomous_system_organization"};
 static constexpr const char* MMDB_ISP_LOOKUP_ARGS[] = {"isp", "autonomous_system_number"};
+static constexpr const char* MMDB_ISP_ORG_LOOKUP_ARGS[] = {"organization"};
 static constexpr const char* MMDB_ANON_LOOKUP_ARGS[] = {"is_anonymous", "is_anonymous_vpn",
                                                         "is_hosting_provider", "is_tor_exit_node",
                                                         "is_public_proxy"};
@@ -23,61 +25,63 @@ static constexpr absl::string_view CITY_DB_TYPE = "city_db";
 static constexpr absl::string_view ISP_DB_TYPE = "isp_db";
 static constexpr absl::string_view ANON_DB_TYPE = "anon_db";
 static constexpr absl::string_view ASN_DB_TYPE = "asn_db";
+static constexpr absl::string_view COUNTRY_DB_TYPE = "country_db";
+
+// Helper to get optional string from config field, returns nullopt if empty.
+absl::optional<std::string> getOptionalString(const std::string& value) {
+  return !value.empty() ? absl::make_optional(value) : absl::nullopt;
+}
 } // namespace
 
 GeoipProviderConfig::GeoipProviderConfig(
     const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& config,
     const std::string& stat_prefix, Stats::Scope& scope)
-    : city_db_path_(!config.city_db_path().empty() ? absl::make_optional(config.city_db_path())
-                                                   : absl::nullopt),
-      isp_db_path_(!config.isp_db_path().empty() ? absl::make_optional(config.isp_db_path())
-                                                 : absl::nullopt),
-      anon_db_path_(!config.anon_db_path().empty() ? absl::make_optional(config.anon_db_path())
-                                                   : absl::nullopt),
-      asn_db_path_(!config.asn_db_path().empty() ? absl::make_optional(config.asn_db_path())
-                                                 : absl::nullopt),
+    : city_db_path_(getOptionalString(config.city_db_path())),
+      isp_db_path_(getOptionalString(config.isp_db_path())),
+      anon_db_path_(getOptionalString(config.anon_db_path())),
+      asn_db_path_(getOptionalString(config.asn_db_path())),
+      country_db_path_(getOptionalString(config.country_db_path())),
       stats_scope_(scope.createScope(absl::StrCat(stat_prefix, "maxmind."))),
       stat_name_set_(stats_scope_->symbolTable().makeSet("Maxmind")) {
-  auto geo_headers_to_add = config.common_provider_config().geo_headers_to_add();
-  country_header_ = !geo_headers_to_add.country().empty()
-                        ? absl::make_optional(geo_headers_to_add.country())
-                        : absl::nullopt;
-  city_header_ = !geo_headers_to_add.city().empty() ? absl::make_optional(geo_headers_to_add.city())
-                                                    : absl::nullopt;
-  region_header_ = !geo_headers_to_add.region().empty()
-                       ? absl::make_optional(geo_headers_to_add.region())
-                       : absl::nullopt;
-  asn_header_ = !geo_headers_to_add.asn().empty() ? absl::make_optional(geo_headers_to_add.asn())
-                                                  : absl::nullopt;
+  const auto& common_config = config.common_provider_config();
 
-  // TODO(barroca): When the is_anon field is fully deprecated, remove the part of the code that use
-  // it.
-  anon_header_ = !geo_headers_to_add.anon().empty()
-                     ? absl::make_optional(geo_headers_to_add.anon())
-                     : (!geo_headers_to_add.is_anon().empty()
-                            ? absl::make_optional(geo_headers_to_add.is_anon())
-                            : absl::nullopt);
+  if (common_config.has_geo_field_keys()) {
+    // Use geo_field_keys (preferred).
+    const auto& keys = common_config.geo_field_keys();
+    country_header_ = getOptionalString(keys.country());
+    city_header_ = getOptionalString(keys.city());
+    region_header_ = getOptionalString(keys.region());
+    asn_header_ = getOptionalString(keys.asn());
+    asn_org_header_ = getOptionalString(keys.asn_org());
+    anon_header_ = getOptionalString(keys.anon());
+    anon_vpn_header_ = getOptionalString(keys.anon_vpn());
+    anon_hosting_header_ = getOptionalString(keys.anon_hosting());
+    anon_tor_header_ = getOptionalString(keys.anon_tor());
+    anon_proxy_header_ = getOptionalString(keys.anon_proxy());
+    isp_header_ = getOptionalString(keys.isp());
+    apple_private_relay_header_ = getOptionalString(keys.apple_private_relay());
+  } else if (common_config.has_geo_headers_to_add()) {
+    // Fall back to deprecated geo_headers_to_add for backward compatibility.
+    const auto& headers = common_config.geo_headers_to_add();
+    country_header_ = getOptionalString(headers.country());
+    city_header_ = getOptionalString(headers.city());
+    region_header_ = getOptionalString(headers.region());
+    asn_header_ = getOptionalString(headers.asn());
+    asn_org_header_ = getOptionalString(headers.asn_org());
+    // TODO(barroca): When the is_anon field is fully deprecated, remove this fallback.
+    anon_header_ = !headers.anon().empty() ? absl::make_optional(headers.anon())
+                                           : getOptionalString(headers.is_anon());
+    anon_vpn_header_ = getOptionalString(headers.anon_vpn());
+    anon_hosting_header_ = getOptionalString(headers.anon_hosting());
+    anon_tor_header_ = getOptionalString(headers.anon_tor());
+    anon_proxy_header_ = getOptionalString(headers.anon_proxy());
+    isp_header_ = getOptionalString(headers.isp());
+    apple_private_relay_header_ = getOptionalString(headers.apple_private_relay());
+  }
 
-  anon_vpn_header_ = !geo_headers_to_add.anon_vpn().empty()
-                         ? absl::make_optional(geo_headers_to_add.anon_vpn())
-                         : absl::nullopt;
-  anon_hosting_header_ = !geo_headers_to_add.anon_hosting().empty()
-                             ? absl::make_optional(geo_headers_to_add.anon_hosting())
-                             : absl::nullopt;
-  anon_tor_header_ = !geo_headers_to_add.anon_tor().empty()
-                         ? absl::make_optional(geo_headers_to_add.anon_tor())
-                         : absl::nullopt;
-  anon_proxy_header_ = !geo_headers_to_add.anon_proxy().empty()
-                           ? absl::make_optional(geo_headers_to_add.anon_proxy())
-                           : absl::nullopt;
-  isp_header_ = !geo_headers_to_add.isp().empty() ? absl::make_optional(geo_headers_to_add.isp())
-                                                  : absl::nullopt;
-  apple_private_relay_header_ = !geo_headers_to_add.apple_private_relay().empty()
-                                    ? absl::make_optional(geo_headers_to_add.apple_private_relay())
-                                    : absl::nullopt;
-  if (!city_db_path_ && !anon_db_path_ && !asn_db_path_ && !isp_db_path_) {
+  if (!city_db_path_ && !anon_db_path_ && !asn_db_path_ && !isp_db_path_ && !country_db_path_) {
     throw EnvoyException("At least one geolocation database path needs to be configured: "
-                         "city_db_path, isp_db_path, asn_db_path or anon_db_path");
+                         "city_db_path, isp_db_path, asn_db_path, anon_db_path or country_db_path");
   }
   if (city_db_path_) {
     registerGeoDbStats(CITY_DB_TYPE);
@@ -90,6 +94,9 @@ GeoipProviderConfig::GeoipProviderConfig(
   }
   if (asn_db_path_) {
     registerGeoDbStats(ASN_DB_TYPE);
+  }
+  if (country_db_path_) {
+    registerGeoDbStats(COUNTRY_DB_TYPE);
   }
 };
 
@@ -126,6 +133,9 @@ GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api,
       config_->anonDbPath() ? initMaxmindDb(config_->anonDbPath().value(), ANON_DB_TYPE) : nullptr;
   asn_db_ =
       config_->asnDbPath() ? initMaxmindDb(config_->asnDbPath().value(), ASN_DB_TYPE) : nullptr;
+  country_db_ = config_->countryDbPath()
+                    ? initMaxmindDb(config_->countryDbPath().value(), COUNTRY_DB_TYPE)
+                    : nullptr;
   mmdb_reload_dispatcher_ = api.allocateDispatcher("mmdb_reload_routine");
   mmdb_watcher_ = dispatcher.createFilesystemWatcher();
   mmdb_reload_thread_ = api.threadFactory().createThread(
@@ -157,6 +167,13 @@ GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api,
                 return onMaxmindDbUpdate(config_->asnDbPath().value(), ASN_DB_TYPE);
               }));
         }
+        if (config_->countryDbPath()) {
+          THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
+              config_->countryDbPath().value(), Filesystem::Watcher::Events::MovedTo,
+              [this](uint32_t) {
+                return onMaxmindDbUpdate(config_->countryDbPath().value(), COUNTRY_DB_TYPE);
+              }));
+        }
         mmdb_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
       },
       Thread::Options{std::string("mmdb_reload_routine")});
@@ -177,6 +194,7 @@ void GeoipProvider::lookup(Geolocation::LookupRequest&& request,
                            Geolocation::LookupGeoHeadersCallback&& cb) const {
   auto& remote_address = request.remoteAddress();
   auto lookup_result = absl::flat_hash_map<std::string, std::string>{};
+  lookupInCountryDb(remote_address, lookup_result);
   lookupInCityDb(remote_address, lookup_result);
   lookupInAsnDb(remote_address, lookup_result);
   lookupInAnonDb(remote_address, lookup_result);
@@ -187,9 +205,12 @@ void GeoipProvider::lookup(Geolocation::LookupRequest&& request,
 void GeoipProvider::lookupInCityDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
+  // Country lookup falls back to City DB only if Country DB is not configured.
+  const bool should_lookup_country_from_city_db =
+      !config_->isCountryDbPathSet() && config_->isLookupEnabledForHeader(config_->countryHeader());
   if (config_->isLookupEnabledForHeader(config_->cityHeader()) ||
       config_->isLookupEnabledForHeader(config_->regionHeader()) ||
-      config_->isLookupEnabledForHeader(config_->countryHeader())) {
+      should_lookup_country_from_city_db) {
     int mmdb_error;
     auto city_db_ptr = getCityDb();
     // Used for testing.
@@ -217,7 +238,8 @@ void GeoipProvider::lookupInCityDb(
                                   config_->regionHeader().value(), MMDB_REGION_LOOKUP_ARGS[0],
                                   MMDB_REGION_LOOKUP_ARGS[1], MMDB_REGION_LOOKUP_ARGS[2]);
         }
-        if (config_->isLookupEnabledForHeader(config_->countryHeader())) {
+        // Country lookup from City DB only when Country DB is not configured.
+        if (should_lookup_country_from_city_db) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
                                   config_->countryHeader().value(), MMDB_COUNTRY_LOOKUP_ARGS[0],
                                   MMDB_COUNTRY_LOOKUP_ARGS[1]);
@@ -238,7 +260,8 @@ void GeoipProvider::lookupInCityDb(
 void GeoipProvider::lookupInAsnDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-  if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
+  if (config_->isLookupEnabledForHeader(config_->asnHeader()) ||
+      config_->isLookupEnabledForHeader(config_->asnOrgHeader())) {
     int mmdb_error;
     auto asn_db_ptr = getAsnDb();
     // Used for testing.
@@ -263,6 +286,10 @@ void GeoipProvider::lookupInAsnDb(
         if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
                                   MMDB_ASN_LOOKUP_ARGS[0]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->asnOrgHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->asnOrgHeader().value(), MMDB_ASN_ORG_LOOKUP_ARGS[0]);
         }
 
         MMDB_free_entry_data_list(entry_data_list);
@@ -335,7 +362,9 @@ void GeoipProvider::lookupInIspDb(
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (config_->isLookupEnabledForHeader(config_->ispHeader()) ||
       config_->isLookupEnabledForHeader(config_->applePrivateRelayHeader()) ||
-      (!config_->isAsnDbPathSet() && config_->isLookupEnabledForHeader(config_->asnHeader()))) {
+      (!config_->isAsnDbPathSet() &&
+       (config_->isLookupEnabledForHeader(config_->asnHeader()) ||
+        config_->isLookupEnabledForHeader(config_->asnOrgHeader())))) {
     int mmdb_error;
     auto isp_db_ptr = getIspDb();
     // Used for testing.
@@ -372,6 +401,11 @@ void GeoipProvider::lookupInIspDb(
           populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
                                   MMDB_ISP_LOOKUP_ARGS[1]);
         }
+        if (!config_->isAsnDbPathSet() &&
+            config_->isLookupEnabledForHeader(config_->asnOrgHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->asnOrgHeader().value(), MMDB_ISP_ORG_LOOKUP_ARGS[0]);
+        }
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit(ISP_DB_TYPE);
         }
@@ -381,6 +415,51 @@ void GeoipProvider::lookupInIspDb(
       }
     }
     config_->incTotal(ISP_DB_TYPE);
+  }
+}
+
+void GeoipProvider::lookupInCountryDb(
+    const Network::Address::InstanceConstSharedPtr& remote_address,
+    absl::flat_hash_map<std::string, std::string>& lookup_result) const {
+  if (config_->isLookupEnabledForHeader(config_->countryHeader())) {
+    // Country DB takes precedence if configured, otherwise fall back to City DB.
+    if (!config_->isCountryDbPathSet()) {
+      // Country lookup will be handled by lookupInCityDb.
+      return;
+    }
+    int mmdb_error;
+    auto country_db_ptr = getCountryDb();
+    // Used for testing.
+    synchronizer_.syncPoint(std::string(COUNTRY_DB_TYPE).append("_lookup_pre_complete"));
+    if (!country_db_ptr) {
+      if (config_->isCityDbPathSet()) {
+        // Country information can be looked up from City database as well, so we don't need to
+        // throw an error if it is not set.
+        return;
+      }
+      IS_ENVOY_BUG("Maxmind country database must be initialised for performing lookups");
+      return;
+    }
+    auto country_db = country_db_ptr.get();
+    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
+        country_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
+        &mmdb_error);
+    const uint32_t n_prev_hits = lookup_result.size();
+    if (!mmdb_error && mmdb_lookup_result.found_entry) {
+      MMDB_entry_data_list_s* entry_data_list;
+      int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
+      if (status == MMDB_SUCCESS) {
+        populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->countryHeader().value(),
+                                MMDB_COUNTRY_LOOKUP_ARGS[0], MMDB_COUNTRY_LOOKUP_ARGS[1]);
+        if (lookup_result.size() > n_prev_hits) {
+          config_->incHit(COUNTRY_DB_TYPE);
+        }
+        MMDB_free_entry_data_list(entry_data_list);
+      } else {
+        config_->incLookupError(COUNTRY_DB_TYPE);
+      }
+    }
+    config_->incTotal(COUNTRY_DB_TYPE);
   }
 }
 
@@ -422,6 +501,9 @@ absl::Status GeoipProvider::mmdbReload(const MaxmindDbSharedPtr reloaded_db,
     } else if (db_type == ASN_DB_TYPE) {
       updateAsnDb(reloaded_db);
       config_->incDbReloadSuccess(db_type);
+    } else if (db_type == COUNTRY_DB_TYPE) {
+      updateCountryDb(reloaded_db);
+      config_->incDbReloadSuccess(db_type);
     } else {
       ENVOY_LOG(error, "Unsupported maxmind db type {}", db_type);
       return absl::InvalidArgumentError(fmt::format("Unsupported maxmind db type {}", db_type));
@@ -433,43 +515,54 @@ absl::Status GeoipProvider::mmdbReload(const MaxmindDbSharedPtr reloaded_db,
 }
 
 MaxmindDbSharedPtr GeoipProvider::getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  absl::ReaderMutexLock lock(mmdb_mutex_);
   return city_db_;
 }
 
 void GeoipProvider::updateCityDb(MaxmindDbSharedPtr city_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(&mmdb_mutex_);
+  absl::MutexLock lock(mmdb_mutex_);
   city_db_ = city_db;
 }
 
 MaxmindDbSharedPtr GeoipProvider::getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  absl::ReaderMutexLock lock(mmdb_mutex_);
   return isp_db_;
 }
 
 void GeoipProvider::updateIspDb(MaxmindDbSharedPtr isp_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(&mmdb_mutex_);
+  absl::MutexLock lock(mmdb_mutex_);
   isp_db_ = isp_db;
 }
 
 MaxmindDbSharedPtr GeoipProvider::getAsnDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  absl::ReaderMutexLock lock(mmdb_mutex_);
   return asn_db_;
 }
 
 void GeoipProvider::updateAsnDb(MaxmindDbSharedPtr asn_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(&mmdb_mutex_);
+  absl::MutexLock lock(mmdb_mutex_);
   asn_db_ = asn_db;
 }
 
 MaxmindDbSharedPtr GeoipProvider::getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::ReaderMutexLock lock(&mmdb_mutex_);
+  absl::ReaderMutexLock lock(mmdb_mutex_);
   return anon_db_;
 }
 
 void GeoipProvider::updateAnonDb(MaxmindDbSharedPtr anon_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
-  absl::MutexLock lock(&mmdb_mutex_);
+  absl::MutexLock lock(mmdb_mutex_);
   anon_db_ = anon_db;
+}
+
+MaxmindDbSharedPtr GeoipProvider::getCountryDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
+  absl::ReaderMutexLock lock(mmdb_mutex_);
+  return country_db_;
+}
+
+void GeoipProvider::updateCountryDb(MaxmindDbSharedPtr country_db)
+    ABSL_LOCKS_EXCLUDED(mmdb_mutex_) {
+  absl::MutexLock lock(mmdb_mutex_);
+  country_db_ = country_db;
 }
 
 absl::Status GeoipProvider::onMaxmindDbUpdate(const std::string& db_path,

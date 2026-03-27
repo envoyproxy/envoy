@@ -401,6 +401,9 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // 2022/03/14                       42000   Fix test flakes
   // 2022/10/27                       44000   Update tcmalloc
   // 2025/07/28  40266    44299       44500   Add request_count_ field to ActiveClient
+  // 2026/01/23           44528       45000   Fix test flakes
+  // 2026/02/13  43467    45575       46000   Update tcmalloc to 12f2552 (2025-09-27)
+  // 2026/02/22           46519       47000   Coalesce LB rebuilds during batch updates
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -414,14 +417,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  //
-  // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
-  // different number of bytes. We still run the approximate test.
-  if (ip_version_ != Network::Address::IpVersion::v6) {
-    // https://github.com/envoyproxy/envoy/issues/12209
-    // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
-  }
-  EXPECT_MEMORY_LE(m_per_cluster, 44500); // Round up to allow platform variations.
+
+  EXPECT_MEMORY_LE(m_per_cluster, 47000); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {

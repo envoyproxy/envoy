@@ -1,4 +1,5 @@
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/address.h"
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_option_factory.h"
@@ -226,8 +227,25 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   ASSERT_TRUE(parser.ParseFromString(datagram_socket_type_textproto, &socket_option_proto));
   *socket_options_proto.Add() = socket_option_proto;
 
+  static constexpr char socket_ip_version_option_format[] = R"proto(
+    state: STATE_PREBIND
+    level: %d
+    name: %d
+    int_value: 1
+    ip_version: %s
+  )proto";
+  auto ipv4_socket_ip_version_textproto = absl::StrFormat(
+      socket_ip_version_option_format, SOL_SOCKET, SO_KEEPALIVE, "SOCKET_IP_VERSION_IPV4");
+  ASSERT_TRUE(parser.ParseFromString(ipv4_socket_ip_version_textproto, &socket_option_proto));
+  *socket_options_proto.Add() = socket_option_proto;
+
+  auto ipv6_socket_ip_version_textproto = absl::StrFormat(
+      socket_ip_version_option_format, SOL_SOCKET, SO_KEEPALIVE, "SOCKET_IP_VERSION_IPV6");
+  ASSERT_TRUE(parser.ParseFromString(ipv6_socket_ip_version_textproto, &socket_option_proto));
+  *socket_options_proto.Add() = socket_option_proto;
+
   auto socket_options = SocketOptionFactory::buildLiteralOptions(socket_options_proto);
-  EXPECT_EQ(7, socket_options->size());
+  EXPECT_EQ(9, socket_options->size());
   auto option_details = socket_options->at(0)->getOptionDetails(
       socket_mock_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   EXPECT_TRUE(option_details.has_value());
@@ -266,6 +284,16 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
       dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(6));
   EXPECT_TRUE(datagram_socket_type_option->socketType().has_value());
   EXPECT_EQ(Socket::Type::Datagram, *datagram_socket_type_option->socketType());
+
+  auto ipv4_socket_ip_version_option =
+      dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(7));
+  EXPECT_TRUE(ipv4_socket_ip_version_option->socketIpVersion().has_value());
+  EXPECT_EQ(Address::IpVersion::v4, *ipv4_socket_ip_version_option->socketIpVersion());
+
+  auto ipv6_socket_ip_version_option =
+      dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(8));
+  EXPECT_TRUE(ipv6_socket_ip_version_option->socketIpVersion().has_value());
+  EXPECT_EQ(Address::IpVersion::v6, *ipv6_socket_ip_version_option->socketIpVersion());
 }
 
 TEST_F(SocketOptionFactoryTest, TestBuildZeroSoLingerOptions) {

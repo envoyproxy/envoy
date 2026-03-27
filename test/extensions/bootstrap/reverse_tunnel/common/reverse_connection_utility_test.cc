@@ -2,11 +2,16 @@
 #include "source/common/network/connection_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
+#include "test/common/tls/mock_ssl_handshaker.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/ssl/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -16,6 +21,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
+
+using TransportSockets::Tls::MockSslHandshakerImpl;
 
 class ReverseConnectionUtilityTest : public testing::Test {
 protected:
@@ -228,6 +235,66 @@ TEST_F(ReverseConnectionUtilityTest, PingMessageHandlerGetPingCount) {
 
   handler->processPingMessage("RPING", *connection);
   EXPECT_EQ(handler->getPingCount(), 1);
+}
+
+TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierWithDelimiter) {
+  const std::string composite =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-alpha", "node-1");
+  const auto result = ReverseConnectionUtility::splitTenantScopedIdentifier(composite);
+  EXPECT_TRUE(result.hasTenant());
+  EXPECT_EQ(result.tenant, "tenant-alpha");
+  EXPECT_EQ(result.identifier, "node-1");
+}
+
+TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierWithoutDelimiter) {
+  const absl::string_view composite = "node-plain";
+  const auto result = ReverseConnectionUtility::splitTenantScopedIdentifier(composite);
+  EXPECT_FALSE(result.hasTenant());
+  EXPECT_TRUE(result.tenant.empty());
+  EXPECT_EQ(result.identifier, "node-plain");
+}
+
+TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierEmptyValue) {
+  const auto result = ReverseConnectionUtility::splitTenantScopedIdentifier("");
+  EXPECT_FALSE(result.hasTenant());
+  EXPECT_TRUE(result.tenant.empty());
+  EXPECT_TRUE(result.identifier.empty());
+}
+
+TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithTenant) {
+  const std::string composite =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-alpha", "node-1");
+  EXPECT_EQ(composite, absl::StrCat("tenant-alpha",
+                                    ReverseConnectionUtility::TENANT_SCOPE_DELIMITER, "node-1"));
+}
+
+TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithoutTenant) {
+  const std::string composite = ReverseConnectionUtility::buildTenantScopedIdentifier("", "node-1");
+  EXPECT_EQ(composite, "node-1");
+}
+
+TEST_F(ReverseConnectionUtilityTest, ApplySslQuietCloseWithoutSsl) {
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(connection, ssl()).WillOnce(Return(nullptr));
+
+  ReverseConnectionUtility::applySslQuietClose(connection);
+}
+
+TEST_F(ReverseConnectionUtilityTest, ApplySslQuietCloseOnValidSslHandshaker) {
+  NiceMock<Network::MockConnection> connection;
+
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ctx, nullptr);
+  SSL* ssl = SSL_new(ctx.get());
+  ASSERT_NE(ssl, nullptr);
+  auto mock_ssl_handshaker = std::make_shared<MockSslHandshakerImpl>(ssl);
+
+  EXPECT_CALL(connection, ssl()).WillOnce(Return(mock_ssl_handshaker));
+  EXPECT_EQ(0, SSL_get_quiet_shutdown(ssl));
+
+  ReverseConnectionUtility::applySslQuietClose(connection);
+
+  EXPECT_EQ(1, SSL_get_quiet_shutdown(ssl));
 }
 
 } // namespace ReverseConnection

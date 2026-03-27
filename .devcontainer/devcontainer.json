@@ -30,7 +30,7 @@
         "bazel.buildifierFixOnFormat": true,
         "clangd.path": "${workspaceFolder}/.devcontainer/clangd-wrapper.sh",
         "clangd.arguments": [
-          "--query-driver=/usr/local/bin/cc_wrapper.sh"
+          "--query-driver=**"
         ],
         "python.pythonPath": "/usr/bin/python3",
         "python.formatting.provider": "yapf",

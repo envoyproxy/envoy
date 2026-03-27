@@ -1,11 +1,14 @@
 #include <cstdint>
 #include <fstream>
 
+#include "envoy/common/exception.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/filesystem/watcher_impl.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -213,6 +216,93 @@ TEST_F(WatcherImplTest, SymlinkAtomicRename) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 #endif
+
+// Test that callback returning error status is logged and doesn't crash.
+TEST_F(WatcherImplTest, CallbackReturnsErrorStatus) {
+  Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
+
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+  std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+
+  WatchCallback callback;
+  EXPECT_CALL(callback, called(Watcher::Events::Modified));
+  ASSERT_TRUE(watcher
+                  ->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                             Watcher::Events::Modified,
+                             [&](uint32_t events) {
+                               callback.called(events);
+                               dispatcher_->exit();
+                               // Return an error status - should be logged but not crash.
+                               return absl::InternalError("simulated callback error");
+                             })
+                  .ok());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_LOG_CONTAINS("warn", "Filesystem watch callback for", file << "text" << std::flush;
+                      file.close(); dispatcher_->run(Event::Dispatcher::RunType::Block););
+}
+
+// Test that callback throwing exception is caught and logged.
+TEST_F(WatcherImplTest, CallbackThrowsException) {
+  Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
+
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+  std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+
+  WatchCallback callback;
+  EXPECT_CALL(callback, called(Watcher::Events::Modified));
+  ASSERT_TRUE(watcher
+                  ->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                             Watcher::Events::Modified,
+                             [&](uint32_t events) -> absl::Status {
+                               callback.called(events);
+                               dispatcher_->exit();
+                               // Throw an exception - should be caught and logged.
+                               throw EnvoyException("simulated callback exception");
+                             })
+                  .ok());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_LOG_CONTAINS("warn", "threw exception", file << "text" << std::flush; file.close();
+                      dispatcher_->run(Event::Dispatcher::RunType::Block););
+}
+
+// Test that multiple callbacks can fail without affecting each other.
+TEST_F(WatcherImplTest, MultipleCallbacksWithErrors) {
+  Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
+
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+  std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+
+  int callback_count = 0;
+  ASSERT_TRUE(watcher
+                  ->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                             Watcher::Events::Modified,
+                             [&](uint32_t) {
+                               callback_count++;
+                               if (callback_count >= 2) {
+                                 dispatcher_->exit();
+                               }
+                               // First callback returns error, second returns OK.
+                               if (callback_count == 1) {
+                                 return absl::InternalError("first callback error");
+                               }
+                               return absl::OkStatus();
+                             })
+                  .ok());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Trigger first modification. The first callback returns error, but watcher continues.
+  file << "text1" << std::flush;
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Trigger second modification. It should still work.
+  file << "text2" << std::flush;
+  file.close();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(2, callback_count);
+}
 
 } // namespace Filesystem
 } // namespace Envoy

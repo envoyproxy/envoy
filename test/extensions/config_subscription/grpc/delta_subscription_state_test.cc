@@ -33,6 +33,11 @@ const char TypeUrl[] = "type.googleapis.com/envoy.config.cluster.v3.Cluster";
 enum class LegacyOrUnified { Legacy, Unified };
 const auto WildcardStr = std::string(Wildcard);
 
+struct DeltaSubscriptionStateTestParams {
+  LegacyOrUnified legacy_or_unified;
+  bool skip_subsequent_node;
+};
+
 Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
 populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add_to;
@@ -53,10 +58,12 @@ Protobuf::RepeatedPtrField<std::string> populateRepeatedString(std::vector<std::
   return add_to;
 }
 
-class DeltaSubscriptionStateTestBase : public testing::TestWithParam<LegacyOrUnified> {
+class DeltaSubscriptionStateTestBase
+    : public testing::TestWithParam<DeltaSubscriptionStateTestParams> {
 protected:
-  DeltaSubscriptionStateTestBase(const std::string& type_url, LegacyOrUnified legacy_or_unified)
-      : should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {
+  DeltaSubscriptionStateTestBase(const std::string& type_url,
+                                 const DeltaSubscriptionStateTestParams& params)
+      : should_use_unified_(params.legacy_or_unified == LegacyOrUnified::Unified) {
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
 
     if (should_use_unified_) {
@@ -64,7 +71,7 @@ protected:
           type_url, callbacks_, dispatcher_, XdsConfigTrackerOptRef());
     } else {
       state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(
-          type_url, callbacks_, local_info_, dispatcher_, XdsConfigTrackerOptRef());
+          type_url, callbacks_, dispatcher_, XdsConfigTrackerOptRef());
     }
   }
 
@@ -190,8 +197,12 @@ public:
   DeltaSubscriptionStateTestBlank() : DeltaSubscriptionStateTestBase(TypeUrl, GetParam()) {}
 };
 
-INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionStateTestBlank, DeltaSubscriptionStateTestBlank,
-                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+INSTANTIATE_TEST_SUITE_P(
+    DeltaSubscriptionStateTestBlank, DeltaSubscriptionStateTestBlank,
+    testing::ValuesIn<DeltaSubscriptionStateTestParams>({{LegacyOrUnified::Legacy, false},
+                                                         {LegacyOrUnified::Legacy, true},
+                                                         {LegacyOrUnified::Unified, false},
+                                                         {LegacyOrUnified::Unified, true}}));
 
 // Checks if subscriptionUpdatePending returns correct value depending on scenario.
 TEST_P(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
@@ -229,6 +240,29 @@ TEST_P(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
   // anything.
   markStreamFresh(true);
   EXPECT_FALSE(subscriptionUpdatePending());
+}
+
+TEST_P(DeltaSubscriptionStateTestBlank, DynamicContextChange) {
+  // Initial request
+  EXPECT_TRUE(subscriptionUpdatePending());
+  getNextRequestAckless();
+  EXPECT_FALSE(subscriptionUpdatePending());
+
+  if (should_use_unified_) {
+    auto* sub = absl::get<1>(state_).get();
+    EXPECT_FALSE(sub->dynamicContextChanged());
+    sub->setDynamicContextChanged();
+    EXPECT_TRUE(sub->dynamicContextChanged());
+    EXPECT_TRUE(subscriptionUpdatePending());
+  } else {
+    auto* sub = absl::get<0>(state_).get();
+    EXPECT_FALSE(sub->dynamicContextChanged());
+    sub->setDynamicContextChanged();
+    EXPECT_TRUE(sub->dynamicContextChanged());
+    EXPECT_TRUE(subscriptionUpdatePending());
+    sub->clearDynamicContextChanged();
+    EXPECT_FALSE(sub->dynamicContextChanged());
+  }
 }
 
 // Check if requested resources are dropped from the cache immediately after losing interest in them
@@ -537,9 +571,9 @@ TEST_P(DeltaSubscriptionStateTestBlank, IgnoreSuperfluousResources) {
 class DeltaSubscriptionStateTestWithResources : public DeltaSubscriptionStateTestBase {
 protected:
   DeltaSubscriptionStateTestWithResources(
-      const std::string& type_url, LegacyOrUnified legacy_or_unified,
+      const std::string& type_url, const DeltaSubscriptionStateTestParams& params,
       const absl::flat_hash_set<std::string> initial_resources = {"name1", "name2", "name3"})
-      : DeltaSubscriptionStateTestBase(type_url, legacy_or_unified) {
+      : DeltaSubscriptionStateTestBase(type_url, params) {
     updateSubscriptionInterest(initial_resources, {});
     auto cur_request = getNextRequestAckless();
     EXPECT_THAT(cur_request->resource_names_subscribe(),
@@ -553,8 +587,12 @@ public:
   DeltaSubscriptionStateTest() : DeltaSubscriptionStateTestWithResources(TypeUrl, GetParam()) {}
 };
 
-INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionStateTest, DeltaSubscriptionStateTest,
-                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+INSTANTIATE_TEST_SUITE_P(
+    DeltaSubscriptionStateTest, DeltaSubscriptionStateTest,
+    testing::ValuesIn<DeltaSubscriptionStateTestParams>({{LegacyOrUnified::Legacy, false},
+                                                         {LegacyOrUnified::Legacy, true},
+                                                         {LegacyOrUnified::Unified, false},
+                                                         {LegacyOrUnified::Unified, true}}));
 
 // Delta subscription state of a wildcard subscription request.
 class WildcardDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestWithResources {
@@ -563,8 +601,12 @@ public:
       : DeltaSubscriptionStateTestWithResources(TypeUrl, GetParam(), {}) {}
 };
 
-INSTANTIATE_TEST_SUITE_P(WildcardDeltaSubscriptionStateTest, WildcardDeltaSubscriptionStateTest,
-                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+INSTANTIATE_TEST_SUITE_P(
+    WildcardDeltaSubscriptionStateTest, WildcardDeltaSubscriptionStateTest,
+    testing::ValuesIn<DeltaSubscriptionStateTestParams>({{LegacyOrUnified::Legacy, false},
+                                                         {LegacyOrUnified::Legacy, true},
+                                                         {LegacyOrUnified::Unified, false},
+                                                         {LegacyOrUnified::Unified, true}}));
 
 // Basic gaining/losing interest in resources should lead to subscription updates.
 TEST_P(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
@@ -1393,8 +1435,12 @@ public:
       : DeltaSubscriptionStateTestWithResources("envoy.config.route.v3.VirtualHost", GetParam()) {}
 };
 
-INSTANTIATE_TEST_SUITE_P(VhdsDeltaSubscriptionStateTest, VhdsDeltaSubscriptionStateTest,
-                         testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+INSTANTIATE_TEST_SUITE_P(
+    VhdsDeltaSubscriptionStateTest, VhdsDeltaSubscriptionStateTest,
+    testing::ValuesIn<DeltaSubscriptionStateTestParams>({{LegacyOrUnified::Legacy, false},
+                                                         {LegacyOrUnified::Legacy, true},
+                                                         {LegacyOrUnified::Unified, false},
+                                                         {LegacyOrUnified::Unified, true}}));
 
 TEST_P(VhdsDeltaSubscriptionStateTest, ResourceTTL) {
   Event::SimulatedTimeSystem time_system;

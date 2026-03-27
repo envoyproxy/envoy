@@ -4,9 +4,11 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/bootstrap/reverse_tunnel/reverse_tunnel_reporter.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/network/io_handle.h"
@@ -16,9 +18,13 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/config/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+
+#include "absl/container/flat_hash_map.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,6 +58,14 @@ public:
    */
   UpstreamSocketManager* socketManager() { return socket_manager_.get(); }
   const UpstreamSocketManager* socketManager() const { return socket_manager_.get(); }
+
+  // Per-worker tracking of unique clusters and nodes (no mutex needed - single worker thread).
+  // Maps track connection counts per cluster/node. Size of map = number of unique clusters/nodes.
+  absl::flat_hash_map<std::string, uint64_t> cluster_connection_counts_;
+  absl::flat_hash_map<std::string, uint64_t> node_connection_counts_;
+  // Per-worker aggregate metrics gauges.
+  Stats::Gauge* total_clusters_gauge_{nullptr};
+  Stats::Gauge* total_nodes_gauge_{nullptr};
 
 private:
   // Thread-local dispatcher.
@@ -88,10 +102,24 @@ public:
     ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
     // Configure detailed stats flag (defaults to false).
     enable_detailed_stats_ = config.enable_detailed_stats();
+    // Configure tenant isolation flag (defaults to false).
+    enable_tenant_isolation_ =
+        config.has_enable_tenant_isolation() ? config.enable_tenant_isolation().value() : false;
     ENVOY_LOG(debug,
               "ReverseTunnelAcceptorExtension: creating upstream reverse connection "
-              "socket interface with stat_prefix: {}",
-              stat_prefix_);
+              "socket interface with stat_prefix: {}, tenant_isolation: {}",
+              stat_prefix_, enable_tenant_isolation_);
+    // Construct the reporter if enabled from the yaml.
+    if (config.has_reporter_config()) {
+      auto& reporter_factory =
+          Config::Utility::getAndCheckFactoryByName<ReverseTunnelReporterFactory>(
+              config.reporter_config().name());
+      auto reporter_config = Config::Utility::translateAnyToFactoryConfig(
+          config.reporter_config().typed_config(), context_.messageValidationVisitor(),
+          reporter_factory);
+
+      reporter_ = reporter_factory.createReporter(context, std::move(reporter_config));
+    }
     // Ensure the socket interface has a reference to this extension early, so stats can be
     // recorded even before onServerInitialized().
     if (socket_interface_ != nullptr) {
@@ -102,7 +130,7 @@ public:
   /**
    * Called when the server is initialized.
    */
-  void onServerInitialized() override;
+  void onServerInitialized(Server::Instance&) override;
 
   /**
    * Called when a worker thread is initialized.
@@ -146,7 +174,7 @@ public:
    * @param increment whether to increment (true) or decrement (false) the connection count.
    */
   void updateConnectionStats(const std::string& node_id, const std::string& cluster_id,
-                             bool increment);
+                             bool increment, bool tenant_isolation_enabled = false);
 
   /**
    * Get per-worker connection stats for debugging.
@@ -159,6 +187,37 @@ public:
    * @return reference to the stats scope.
    */
   Stats::Scope& getStatsScope() const { return context_.scope(); }
+
+  /**
+   * @return whether tenant isolation is enabled.
+   */
+  bool enableTenantIsolation() const { return enable_tenant_isolation_; }
+
+  /**
+   * Forward a connection event to the configured reporter.
+   * If no reporter is present, the call is ignored.
+   * @param node_id node to which the connection is made.
+   * @param cluster_id cluster which the node belongs to.
+   * @param tenant_id tenant identifier supplied by the peer.
+   */
+  void reportConnection(absl::string_view node_id, absl::string_view cluster_id,
+                        absl::string_view tenant_id) {
+    if (reporter_ != nullptr) {
+      reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id);
+    }
+  }
+
+  /**
+   * Forward a disconnection event to the configured reporter.
+   * If no reporter is present, the call is ignored.
+   * @param node_id node to which the connection is made.
+   * @param cluster_id cluster which the node belongs to.
+   */
+  void reportDisconnection(absl::string_view node_id, absl::string_view cluster_id) {
+    if (reporter_ != nullptr) {
+      reporter_->reportDisconnectionEvent(node_id, cluster_id);
+    }
+  }
 
   /**
    * Test-only method to set the thread local slot.
@@ -177,6 +236,18 @@ private:
   std::string stat_prefix_;
   uint32_t ping_failure_threshold_{3};
   bool enable_detailed_stats_{false};
+  bool enable_tenant_isolation_{false};
+  ReverseTunnelReporterPtr reporter_{nullptr};
+
+  /**
+   * Update per-worker aggregate metrics (total_clusters and total_nodes).
+   * This is an internal function called only from updateConnectionStats.
+   * @param node_id the node identifier for the connection.
+   * @param cluster_id the cluster identifier for the connection.
+   * @param increment whether to increment (true) or decrement (false) the connection count.
+   */
+  void updatePerWorkerAggregateMetrics(const std::string& node_id, const std::string& cluster_id,
+                                       bool increment);
 
   /**
    * Update per-worker connection stats for debugging.
@@ -186,7 +257,7 @@ private:
    * @param increment whether to increment (true) or decrement (false) the connection count.
    */
   void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
-                                      bool increment);
+                                      bool increment, bool tenant_isolation_enabled);
 };
 
 } // namespace ReverseConnection

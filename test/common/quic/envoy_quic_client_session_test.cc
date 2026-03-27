@@ -149,7 +149,8 @@ public:
     if (!quiche_handles_migration_) {
       quic_connection_->setWriterFactory(writer_factory_);
     } else {
-      migration_helper = &quic_connection_->getOrCreateMigrationHelper(writer_factory_, {});
+      migration_helper = &quic_connection_->getOrCreateMigrationHelper(
+          writer_factory_, quic::kInvalidNetworkHandle, {});
     }
 
     OptRef<Http::HttpServerPropertiesCache> cache;
@@ -271,6 +272,19 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   stream.OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
+TEST_P(EnvoyQuicClientSessionTest, ProtocolStreamId) {
+  NiceMock<Http::MockResponseDecoder> response_decoder;
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  int stream_id = 0;
+  for (int i = 0; i < 10; ++i) {
+    NiceMock<Http::MockStreamCallbacks> stream_callbacks;
+    EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
+    EXPECT_EQ(stream_id, stream.codecStreamId());
+    stream_id += 4;
+    stream.resetStream(Http::StreamResetReason::LocalReset);
+  }
+}
+
 TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
   // We always allow for reading packets, even if there's no stream.
   EXPECT_EQ(0, envoy_quic_session_->GetNumActiveStreams());
@@ -350,6 +364,11 @@ TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
 
   EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
   envoy_quic_session_->OnHttp3GoAway(4u);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, StartDraining) {
+  EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  envoy_quic_session_->StartDraining();
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {

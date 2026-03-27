@@ -120,6 +120,8 @@ MockRouteEntry::MockRouteEntry()
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(path_matcher_));
   ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(path_rewriter_));
   ON_CALL(*this, routeStatsContext()).WillByDefault(Return(RouteStatsContextOptRef()));
+  ON_CALL(*this, requestBodyBufferLimit())
+      .WillByDefault(Return(std::numeric_limits<uint64_t>::max()));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;
@@ -149,6 +151,12 @@ MockRouteTracing::MockRouteTracing() {
   ON_CALL(*this, getClientSampling()).WillByDefault(ReturnRef(client_sampling_));
   ON_CALL(*this, getRandomSampling()).WillByDefault(ReturnRef(random_sampling_));
   ON_CALL(*this, getOverallSampling()).WillByDefault(ReturnRef(overall_sampling_));
+  ON_CALL(*this, operation()).WillByDefault(Invoke([this]() {
+    return makeOptRefFromPtr(operation_.get());
+  }));
+  ON_CALL(*this, upstreamOperation()).WillByDefault(Invoke([this]() {
+    return makeOptRefFromPtr(upstream_operation_.get());
+  }));
 }
 MockRouteTracing::~MockRouteTracing() = default;
 
@@ -160,7 +168,8 @@ MockRoute::MockRoute() {
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
-  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_copy_));
+  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(*virtual_host_));
+  ON_CALL(*this, virtualHostSharedPtr()).WillByDefault(Return(virtual_host_));
 
   // Route entry methods.
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(route_entry_.cluster_name_));
@@ -185,6 +194,8 @@ MockRoute::MockRoute() {
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(route_entry_.path_matcher_));
   ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(route_entry_.path_rewriter_));
   ON_CALL(*this, routeStatsContext()).WillByDefault(Return(RouteStatsContextOptRef()));
+  ON_CALL(*this, requestBodyBufferLimit())
+      .WillByDefault(Return(std::numeric_limits<uint64_t>::max()));
 }
 MockRoute::~MockRoute() = default;
 

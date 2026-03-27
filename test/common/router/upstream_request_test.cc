@@ -144,18 +144,14 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   std::shared_ptr<Http::MockStreamDecoderFilter> filter(
       new NiceMock<Http::MockStreamDecoderFilter>());
 
-  EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_, _))
-      .WillOnce(
-          Invoke([&](Http::FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
-            auto factory = createDecoderFilterFactoryCb(filter);
-            manager.applyFilterFactoryCb({}, factory);
-            Http::FilterFactoryCb factory_cb =
-                [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-              callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-            };
-            manager.applyFilterFactoryCb({}, factory_cb);
-            return true;
-          }));
+  EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(filter);
+        callbacks.setFilterConfigName("");
+        callbacks.addStreamDecoderFilter(filter);
+        callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+        return true;
+      }));
 
   initialize();
   ASSERT_TRUE(filter->callbacks_ != nullptr);
@@ -238,7 +234,8 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
 
 TEST_F(UpstreamRequestTest, TestSetStreamInfoFields) {
   initialize();
-  EXPECT_EQ(upstream_request_->streamInfo().route(), router_filter_interface_.callbacks_.route());
+  EXPECT_EQ(upstream_request_->streamInfo().routeSharedPtr(),
+            router_filter_interface_.callbacks_.route());
 }
 
 TEST_F(UpstreamRequestTest, TestSetStreamInfoHost) {

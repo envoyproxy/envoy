@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -90,6 +91,7 @@ envoy_cc_test(
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/tracing:tracer_config_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
 
@@ -103,4 +105,21 @@ envoy_cc_test(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:trace_context_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "tracing_validation_test",
+    srcs = ["tracing_validation_test.cc"],
+    deps = [
+        "//source/common/tracing:tracing_validation_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "tracing_validation_fuzz_test",
+    srcs = ["tracing_validation_fuzz_test.cc"],
+    corpus = "tracing_validation_corpus",
+    deps = ["//source/common/tracing:tracing_validation_lib"],
 )

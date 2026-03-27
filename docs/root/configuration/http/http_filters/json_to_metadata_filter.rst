@@ -38,6 +38,18 @@ absence of a version attribute could be:
 Statistics
 ----------
 
+Note that this filter also supports per route configuration.
+
+.. literalinclude:: _include/json-to-metadata-filter-route-config.yaml
+    :language: yaml
+    :lines: 14-45
+    :lineno-start: 14
+    :linenos:
+    :caption: :download:`json-to-metadata-filter-route-config.yaml <_include/json-to-metadata-filter-route-config.yaml>`
+
+This can be used to either override the global configuration or if the global configuration
+is empty (no rules), it can be used to only enable the filter at a per route level.
+
 The json to metadata filter outputs statistics in the *http.<stat_prefix>.json_to_metadata.* namespace. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager.

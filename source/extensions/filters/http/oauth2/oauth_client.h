@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/http/async_client.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -38,6 +39,7 @@ public:
                                        AuthType auth_type = AuthType::UrlEncodedBody) PURE;
 
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
+  virtual void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) PURE;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override PURE;
@@ -48,9 +50,10 @@ public:
 class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2ClientImpl(Upstream::ClusterManager& cm, const HttpUri& uri,
-                   const OptRef<const RouteRetryPolicy> retry_policy,
+                   Router::RetryPolicyConstSharedPtr retry_policy,
                    const std::chrono::seconds default_expires_in)
-      : cm_(cm), uri_(uri), retry_policy_(retry_policy), default_expires_in_(default_expires_in) {}
+      : cm_(cm), uri_(uri), retry_policy_(std::move(retry_policy)),
+        default_expires_in_(default_expires_in) {}
 
   ~OAuth2ClientImpl() override {
     if (in_flight_request_ != nullptr) {
@@ -70,6 +73,9 @@ public:
                                const std::string& secret, AuthType auth_type) override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
 
   // AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override;
@@ -82,10 +88,11 @@ private:
   friend class OAuth2ClientTest;
 
   FilterCallbacks* parent_{nullptr};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
 
   Upstream::ClusterManager& cm_;
   const HttpUri uri_;
-  const OptRef<const RouteRetryPolicy> retry_policy_;
+  const Router::RetryPolicyConstSharedPtr retry_policy_;
   const std::chrono::seconds default_expires_in_;
 
   // Tracks any outstanding in-flight requests, allowing us to cancel the request

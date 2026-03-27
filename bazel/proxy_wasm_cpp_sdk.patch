@@ -1,40 +1,29 @@
-diff --git a/proxy_wasm_api.h b/proxy_wasm_api.h
-index 166b49c..b44637c 100644
---- a/proxy_wasm_api.h
-+++ b/proxy_wasm_api.h
-@@ -1207,8 +1207,9 @@ struct SimpleHistogram {
- template <typename... Tags> struct Counter : public MetricBase {
-   static Counter<Tags...> *New(std::string_view name, MetricTagDescriptor<Tags>... fieldnames);
- 
--  Counter<Tags...>(std::string_view name, MetricTagDescriptor<Tags>... descriptors)
--      : Counter<Tags...>(std::string(name), std::vector<MetricTag>({toMetricTag(descriptors)...})) {
-+  template <typename... T>
-+  Counter(std::string_view name, MetricTagDescriptor<T>... descriptors)
-+      : Counter<T...>(std::string(name), std::vector<MetricTag>({toMetricTag(descriptors)...})) {
-   }
- 
-   SimpleCounter resolve(Tags... f) {
-@@ -1256,8 +1257,9 @@ inline Counter<Tags...> *Counter<Tags...>::New(std::string_view name,
- template <typename... Tags> struct Gauge : public MetricBase {
-   static Gauge<Tags...> *New(std::string_view name, MetricTagDescriptor<Tags>... fieldnames);
- 
--  Gauge<Tags...>(std::string_view name, MetricTagDescriptor<Tags>... descriptors)
--      : Gauge<Tags...>(std::string(name), std::vector<MetricTag>({toMetricTag(descriptors)...})) {}
-+  template <typename... T>
-+  Gauge(std::string_view name, MetricTagDescriptor<T>... descriptors)
-+      : Gauge<T...>(std::string(name), std::vector<MetricTag>({toMetricTag(descriptors)...})) {}
- 
-   SimpleGauge resolve(Tags... f) {
-     std::vector<std::string> fields{toString(f)...};
-@@ -1302,8 +1304,9 @@ inline Gauge<Tags...> *Gauge<Tags...>::New(std::string_view name,
- template <typename... Tags> struct Histogram : public MetricBase {
-   static Histogram<Tags...> *New(std::string_view name, MetricTagDescriptor<Tags>... fieldnames);
- 
--  Histogram<Tags...>(std::string_view name, MetricTagDescriptor<Tags>... descriptors)
--      : Histogram<Tags...>(std::string(name),
-+  template <typename... T>
-+  Histogram(std::string_view name, MetricTagDescriptor<T>... descriptors)
-+      : Histogram<T...>(std::string(name),
-                            std::vector<MetricTag>({toMetricTag(descriptors)...})) {}
- 
-   SimpleHistogram resolve(Tags... f) {
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
+@@ -20,6 +20,8 @@ def _optimized_wasm_cc_binary_transition_impl(settings, attr):
+         "//command_line_option:copt": ["-O3", "-flto", "-DSTANDALONE_WASM"],
+         "//command_line_option:cxxopt": [],
+         "//command_line_option:linkopt": [],
++        # LTO is not compatible with fission (split DWARF), so disable fission.
++        "//command_line_option:fission": "no",
+         "//command_line_option:collect_code_coverage": False,
+     }
+
+@@ -30,6 +32,7 @@ _optimized_wasm_cc_binary_transition = transition(
+         "//command_line_option:copt",
+         "//command_line_option:cxxopt",
+         "//command_line_option:linkopt",
++        "//command_line_option:fission",
+         "//command_line_option:collect_code_coverage",
+     ],
+ )
+@@ -103,8 +106,6 @@ def proxy_wasm_cc_binary(
+             "-sEXPORTED_FUNCTIONS=_malloc",
+             # Allow allocating memory past initial heap size
+             "-sALLOW_MEMORY_GROWTH=1",
+-            # Initial amount of heap memory. 64KB matches Rust SDK starting heap size.
+-            "-sINITIAL_HEAP=64KB",
+         ],
+         tags = tags + [
+             "manual",

@@ -96,8 +96,8 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
           process_context ? ProcessContextOptRef(std::ref(*process_context)) : absl::nullopt,
           watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
-      access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
-                          store),
+      access_log_manager_(options.fileFlushIntervalMsec(), options.fileFlushMinSizeKB(), *api_,
+                          *dispatcher_, access_log_lock, store),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
@@ -567,8 +567,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
                                   server_stats_->dynamic_unknown_fields_,
                                   server_stats_->wip_protos_);
 
-  memory_allocator_manager_ = std::make_unique<Memory::AllocatorManager>(
-      *api_, *stats_store_.rootScope(), bootstrap_.memory_allocator_manager());
+  memory_allocator_manager_ =
+      std::make_unique<Memory::AllocatorManager>(*api_, bootstrap_.memory_allocator_manager());
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
@@ -650,9 +650,15 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   OptRef<Server::ConfigTracker> config_tracker;
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-  admin_ = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
-                                       initial_config.admin().ignoreGlobalConnLimit());
+  auto admin_impl = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
+                                                initial_config.admin().ignoreGlobalConnLimit());
 
+  for (const auto& allowlisted_path : bootstrap_.admin().allow_paths()) {
+    admin_impl->addAllowlistedPath(
+        std::make_unique<Matchers::StringMatcherImpl>(allowlisted_path, server_contexts_));
+  }
+
+  admin_ = admin_impl;
   config_tracker = admin_->getConfigTracker();
 #endif
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(config_tracker);
@@ -853,13 +859,17 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Now that we are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {
-    bootstrap_extension->onServerInitialized();
+    bootstrap_extension->onServerInitialized(*this);
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  main_thread_guard_dog_ = maybeCreateGuardDog("main_thread");
-  worker_guard_dog_ = maybeCreateGuardDog("workers");
+  main_thread_guard_dog_ = maybeCreateGuardDog("main_thread", config_.mainThreadWatchdogConfig());
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.worker_threads_watchdog_fix")) {
+    worker_guard_dog_ = maybeCreateGuardDog("workers", config_.workerWatchdogConfig());
+  } else {
+    worker_guard_dog_ = maybeCreateGuardDog("workers", config_.mainThreadWatchdogConfig());
+  }
   return absl::OkStatus();
 }
 

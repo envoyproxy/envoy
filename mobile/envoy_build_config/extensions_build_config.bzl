@@ -32,6 +32,8 @@ EXTENSIONS = {
     "envoy.connection_handler.default":                    "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
     "envoy.load_balancing_policies.round_robin":           "//source/extensions/load_balancing_policies/round_robin:config",
     "envoy.load_balancing_policies.cluster_provided":      "//source/extensions/load_balancing_policies/cluster_provided:config",
+    "envoy.quic.packet_writer.platform":                   "@envoy_mobile//library/common/extensions/quic_packet_writer/platform:config",
+    "envoy.quic.packet_writer.default":                    "//source/extensions/quic/client_packet_writer:default_quic_client_packet_writer_factory_config",
 }
 WINDOWS_EXTENSIONS = {}
 LEGACY_ALWAYSLINK = 1

@@ -6,6 +6,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/crypto.h"
 
 namespace Envoy {
 namespace {

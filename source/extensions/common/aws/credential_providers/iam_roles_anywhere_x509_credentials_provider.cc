@@ -40,9 +40,11 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
 
   absl::Status status = absl::InvalidArgumentError("IAM Roles Anywhere will not be enabled");
 
-  auto provider_or_error = Config::DataSource::DataSourceProvider::create(
+  auto provider_or_error = Config::DataSource::DataSourceProvider<std::string>::create(
       certificate_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
-      context_.api(), false, X509_CERTIFICATE_MAX_BYTES);
+      context_.api(), false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); },
+      X509_CERTIFICATE_MAX_BYTES);
   if (provider_or_error.ok()) {
     certificate_data_source_provider_ = std::move(provider_or_error.value());
   } else {
@@ -53,9 +55,11 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
   }
 
   if (certificate_chain_data_source_.has_value()) {
-    auto chain_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+    auto chain_provider_or_error_ = Config::DataSource::DataSourceProvider<std::string>::create(
         certificate_chain_data_source_.value(), context_.mainThreadDispatcher(),
-        context_.threadLocal(), context_.api(), false, X509_CERTIFICATE_MAX_BYTES * 5);
+        context_.threadLocal(), context_.api(), false,
+        [](absl::string_view data) { return std::make_shared<std::string>(data); },
+        X509_CERTIFICATE_MAX_BYTES * 5);
     if (chain_provider_or_error_.ok()) {
       certificate_chain_data_source_provider_ = std::move(chain_provider_or_error_.value());
     } else {
@@ -67,9 +71,11 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
     certificate_chain_data_source_provider_ = absl::nullopt;
   }
 
-  auto pkey_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+  auto pkey_provider_or_error_ = Config::DataSource::DataSourceProvider<std::string>::create(
       private_key_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
-      context_.api(), false, X509_PRIVATE_KEY_MAX_BYTES);
+      context_.api(), false,
+      [](absl::string_view data) { return std::make_shared<std::string>(data); },
+      X509_PRIVATE_KEY_MAX_BYTES);
   if (pkey_provider_or_error_.ok()) {
     private_key_data_source_provider_ = std::move(pkey_provider_or_error_.value());
   } else {
@@ -266,7 +272,9 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
     return;
   }
 
-  auto cert_pem = certificate_data_source_provider_->data();
+  auto cert_pem = certificate_data_source_provider_->data() == nullptr
+                      ? EMPTY_STRING
+                      : *certificate_data_source_provider_->data();
   if (!cert_pem.empty()) {
     status = pemToDerB64(cert_pem, cert_der_b64, false);
     if (!status.ok()) {
@@ -287,7 +295,9 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
 
   // Certificate Chain
   if (certificate_chain_data_source_provider_.has_value()) {
-    auto chain_pem = certificate_chain_data_source_provider_.value()->data();
+    auto chain_pem = certificate_chain_data_source_provider_.value()->data() == nullptr
+                         ? EMPTY_STRING
+                         : *certificate_chain_data_source_provider_.value()->data();
     if (!chain_pem.empty()) {
       // If a certificate chain is provided, it must be valid
       status = pemToDerB64(chain_pem, cert_chain_der_b64, true);
@@ -301,7 +311,9 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
   }
 
   // Private Key
-  private_key_pem = private_key_data_source_provider_->data();
+  private_key_pem = (private_key_data_source_provider_->data() == nullptr)
+                        ? EMPTY_STRING
+                        : *private_key_data_source_provider_->data();
   auto keysize = private_key_pem.size();
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(private_key_pem.c_str(), keysize));
   bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));

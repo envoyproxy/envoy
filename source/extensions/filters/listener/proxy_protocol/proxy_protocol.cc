@@ -15,6 +15,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
@@ -27,6 +28,7 @@
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
@@ -51,6 +53,55 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
+
+/**
+ * Filter state object that stores TLV values as a map-like structure.
+ * Supports field access via getField() for accessing individual TLV values.
+ */
+class TlvFilterStateObject : public StreamInfo::FilterState::Object {
+public:
+  TlvFilterStateObject() = default;
+
+  /**
+   * Add a TLV value to the map.
+   * @param key The key (rule key) for the TLV value.
+   * @param value The sanitized TLV value string.
+   */
+  void addTlvValue(const std::string& key, const std::string& value) { tlv_values_[key] = value; }
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto s = std::make_unique<Protobuf::Struct>();
+    for (const auto& [key, value] : tlv_values_) {
+      (*s->mutable_fields())[key] = ValueUtil::stringValue(value);
+    }
+    return s;
+  }
+
+  absl::optional<std::string> serializeAsString() const override {
+    Protobuf::Struct struct_proto;
+    for (const auto& [key, value] : tlv_values_) {
+      (*struct_proto.mutable_fields())[key] = ValueUtil::stringValue(value);
+    }
+    auto json_or_error = MessageUtil::getJsonStringFromMessage(struct_proto, false, true);
+    if (json_or_error.ok()) {
+      return json_or_error.value();
+    }
+    return absl::nullopt;
+  }
+
+  bool hasFieldSupport() const override { return true; }
+
+  StreamInfo::FilterState::Object::FieldType getField(absl::string_view field_name) const override {
+    auto it = tlv_values_.find(std::string(field_name));
+    if (it != tlv_values_.end()) {
+      return absl::string_view(it->second);
+    }
+    return absl::monostate{};
+  }
+
+private:
+  absl::flat_hash_map<std::string, std::string> tlv_values_;
+};
 
 constexpr absl::string_view kProxyProtoStatsPrefix = "proxy_proto.";
 constexpr absl::string_view kVersionStatsPrefix = "versions.";
@@ -115,7 +166,8 @@ Config::Config(
       pass_all_tlvs_(proto_config.has_pass_through_tlvs()
                          ? proto_config.pass_through_tlvs().match_type() ==
                                ProxyProtocolPassThroughTLVs::INCLUDE_ALL
-                         : false) {
+                         : false),
+      tlv_location_(proto_config.tlv_location()) {
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
@@ -554,35 +606,62 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     absl::string_view tlv_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
-      std::string metadata_key = key_value_pair->metadata_namespace().empty()
-                                     ? "envoy.filters.listener.proxy_protocol"
-                                     : key_value_pair->metadata_namespace();
-      auto& typed_filter_metadata = (*cb_->dynamicMetadata().mutable_typed_filter_metadata());
-
-      const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
-      envoy::data::core::v3::TlvsMetadata tlvs_metadata;
-      auto status = absl::OkStatus();
-      if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
-        status = MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
-      }
-      if (!status.ok()) {
-        ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(1),
-                           "proxy_protocol: Failed to unpack typed metadata for TLV type ",
-                           tlv_type);
-      } else {
-        (*tlvs_metadata.mutable_typed_metadata())[key_value_pair->key()] = tlv_value;
-        Protobuf::Any typed_metadata;
-        typed_metadata.PackFrom(tlvs_metadata);
-        cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
-      }
-      // Always populate untyped metadata for backwards compatibility.
-      Protobuf::Value metadata_value;
       // Sanitize any non utf8 characters.
       auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
-      metadata_value.set_string_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
-      Protobuf::Struct metadata((*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
-      metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
-      cb_->setDynamicMetadata(metadata_key, metadata);
+      std::string sanitised_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
+
+      if (config_->tlvLocation() ==
+          envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE) {
+        // Store TLV values in a single filter state object.
+        constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";
+        TlvFilterStateObject* tlv_filter_state_obj = nullptr;
+        const auto* existing_obj = cb_->filterState().getDataReadOnlyGeneric(kFilterStateKey);
+        if (existing_obj != nullptr) {
+          tlv_filter_state_obj = const_cast<TlvFilterStateObject*>(
+              dynamic_cast<const TlvFilterStateObject*>(existing_obj));
+        }
+        if (tlv_filter_state_obj == nullptr) {
+          auto new_obj = std::make_unique<TlvFilterStateObject>();
+          tlv_filter_state_obj = new_obj.get();
+          cb_->filterState().setData(kFilterStateKey, std::move(new_obj),
+                                     StreamInfo::FilterState::StateType::ReadOnly,
+                                     StreamInfo::FilterState::LifeSpan::Connection);
+          ENVOY_LOG(trace, "proxy_protocol: Created TLV FilterState object");
+        }
+        tlv_filter_state_obj->addTlvValue(key_value_pair->key(), sanitised_value);
+        ENVOY_LOG(trace, "proxy_protocol: Stored TLV type {} value in FilterState with key {}",
+                  tlv_type, key_value_pair->key());
+      } else {
+        // Store in dynamic metadata (default, backwards compatible behavior).
+        std::string metadata_key = key_value_pair->metadata_namespace().empty()
+                                       ? "envoy.filters.listener.proxy_protocol"
+                                       : key_value_pair->metadata_namespace();
+        auto& typed_filter_metadata = (*cb_->dynamicMetadata().mutable_typed_filter_metadata());
+
+        const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
+        envoy::data::core::v3::TlvsMetadata tlvs_metadata;
+        auto status = absl::OkStatus();
+        if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
+          status = MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
+        }
+        if (!status.ok()) {
+          ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(1),
+                             "proxy_protocol: Failed to unpack typed metadata for TLV type ",
+                             tlv_type);
+        } else {
+          (*tlvs_metadata.mutable_typed_metadata())[key_value_pair->key()] = tlv_value;
+          Protobuf::Any typed_metadata;
+          typed_metadata.PackFrom(tlvs_metadata);
+          cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
+        }
+        // Always populate untyped metadata for backwards compatibility.
+        Protobuf::Value metadata_value;
+        metadata_value.set_string_value(sanitised_value.data(), sanitised_value.size());
+        Protobuf::Struct metadata(
+            (*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
+        metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
+        cb_->setDynamicMetadata(metadata_key, metadata);
+      }
     } else {
       ENVOY_LOG(trace,
                 "proxy_protocol: Skip TLV of type {} since it's not needed for dynamic metadata",

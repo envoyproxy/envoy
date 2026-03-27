@@ -77,16 +77,10 @@ public:
     encoder_filter_ = new NiceMock<MockStreamEncoderFilter>();
 
     EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([this](FilterChainManager& manager) -> bool {
-          FilterFactoryCb decoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
-            callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
-          };
-          FilterFactoryCb encoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
-            callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
-          };
-
-          manager.applyFilterFactoryCb({}, decoder_filter_factory);
-          manager.applyFilterFactoryCb({}, encoder_filter_factory);
+        .WillOnce(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+          callbacks.setFilterConfigName("");
+          callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
+          callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
           return true;
         }));
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -95,12 +89,11 @@ public:
           callbacks.streamInfo().setResponseCodeDetails("");
         }));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
-    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _, _))
-        .WillRepeatedly(
-            Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                       FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
-              return filter_factory_.createFilterChain(manager);
-            }));
+    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
+        .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                   FilterChainFactoryCallbacks& callbacks) -> bool {
+          return filter_factory_.createFilterChain(callbacks);
+        }));
   }
 
   Http::ForwardClientCertType
@@ -207,6 +200,9 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
+  const Matcher::MatchTreePtr<Http::HttpMatchingData>& forwardClientCertMatcher() const override {
+    return forward_client_cert_matcher_;
+  }
   const Network::Address::Instance& localAddress() override { return local_address_; }
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
   Tracing::TracerSharedPtr tracer() override { return tracer_; }
@@ -251,9 +247,17 @@ public:
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return https_destination_ports_;
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return http_destination_ports_;
+  }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
+  absl::flat_hash_set<uint32_t> https_destination_ports_;
+  absl::flat_hash_set<uint32_t> http_destination_ports_;
   NiceMock<Random::MockRandomGenerator> random_;
   RequestIDExtensionSharedPtr request_id_extension_;
   AccessLog::InstanceSharedPtrVector access_logs_;
@@ -293,6 +297,7 @@ public:
   bool use_remote_address_{true};
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
   Tracing::TracerSharedPtr tracer_{std::make_shared<NiceMock<Tracing::MockTracer>>()};
@@ -304,7 +309,7 @@ public:
   Http::DefaultInternalAddressConfig internal_address_config_;
   bool normalize_path_{true};
   LocalReply::LocalReplyPtr local_reply_;
-  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
+  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_;
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 };

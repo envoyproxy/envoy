@@ -259,8 +259,8 @@ public:
         validation_failure_on_path_response_);
     EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* migration_helper = nullptr;
     if (quiche_handles_migration_) {
-      migration_helper =
-          &connection->getOrCreateMigrationHelper(*persistent_info.writer_factory_, {});
+      migration_helper = &connection->getOrCreateMigrationHelper(*persistent_info.writer_factory_,
+                                                                 quic::kInvalidNetworkHandle, {});
     } else {
       connection->setWriterFactory(*persistent_info.writer_factory_);
     }

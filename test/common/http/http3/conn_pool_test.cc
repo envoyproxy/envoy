@@ -49,7 +49,8 @@ public:
             new NiceMock<Ssl::MockClientContextConfig>),
         context_);
     factory_->initialize();
-    quic_info_ = Quic::createPersistentQuicInfoForCluster(dispatcher_, mockHost().cluster_);
+    quic_info_ = Quic::createPersistentQuicInfoForCluster(dispatcher_, mockHost().cluster_,
+                                                          context_.server_context_);
   }
 
   void initialize() {

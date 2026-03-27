@@ -19,6 +19,15 @@ Http::FilterFactoryCb ConnectGrpcFilterConfigFactory::createFilterFactoryFromPro
   };
 }
 
+Http::FilterFactoryCb
+ConnectGrpcFilterConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig&,
+    const std::string&, Server::Configuration::ServerFactoryContext&) {
+  return [](Http::FilterChainFactoryCallbacks& callbacks) {
+    callbacks.addStreamFilter(std::make_shared<ConnectGrpcBridgeFilter>());
+  };
+}
+
 /**
  * Static registration for the Connect RPC stats filter. @see RegisterFactory.
  */

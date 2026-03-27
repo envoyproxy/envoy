@@ -157,9 +157,7 @@ public:
   // and the templated c'tor handles both cases.
   template <class RegexMatcherType>
   RegexStringMatcher(const RegexMatcherType& safe_regex,
-                     Server::Configuration::CommonFactoryContext& context)
-      : regex_(THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(safe_regex, context.regexEngine()),
-                                     Regex::CompiledMatcherPtr)) {}
+                     Server::Configuration::CommonFactoryContext& context);
 
   RegexStringMatcher(RegexStringMatcher&& other) noexcept { regex_ = std::move(other.regex_); }
 
@@ -297,29 +295,7 @@ private:
 
   template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
   static StringMatcherVariant createVariant(const StringMatcherType& matcher,
-                                            Server::Configuration::CommonFactoryContext& context) {
-    switch (matcher.match_pattern_case()) {
-    case StringMatcherType::MatchPatternCase::kExact:
-      return ExactStringMatcher(matcher.exact(), matcher.ignore_case());
-    case StringMatcherType::MatchPatternCase::kPrefix:
-      return PrefixStringMatcher(matcher.prefix(), matcher.ignore_case());
-    case StringMatcherType::MatchPatternCase::kSuffix:
-      return SuffixStringMatcher(matcher.suffix(), matcher.ignore_case());
-    case StringMatcherType::MatchPatternCase::kSafeRegex:
-      if (matcher.ignore_case()) {
-        ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
-      }
-      return RegexStringMatcher(matcher.safe_regex(), context);
-    case StringMatcherType::MatchPatternCase::kContains:
-      return ContainsStringMatcher(matcher.contains(), matcher.ignore_case());
-    case StringMatcherType::MatchPatternCase::kCustom:
-      return CustomStringMatcher(matcher.custom(), context);
-    default:
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
-    }
-  }
-
+                                            Server::Configuration::CommonFactoryContext& context);
   bool doMatch(absl::string_view value, OptRef<const StringMatcher::Context> context) const {
     // Implementing polymorphism for match(absl::string_value) on the different
     // types that can be in the matcher_ variant.

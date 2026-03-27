@@ -4181,6 +4181,83 @@ TEST(PrioritySet, Extend) {
   EXPECT_EQ(2, membership_changes);
 }
 
+// Adds 100 hosts to P0 and 50 hosts to P1.
+class TestMultiPriorityBatchUpdateCb : public PrioritySet::BatchUpdateCb {
+public:
+  TestMultiPriorityBatchUpdateCb(std::shared_ptr<MockClusterInfo> info) : info_(info) {}
+
+  void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override {
+    HostVectorSharedPtr hosts_p0 = std::make_shared<HostVector>();
+    for (int i = 0; i < 100; i++) {
+      hosts_p0->push_back(makeTestHost(info_, fmt::format("tcp://127.0.0.{}:80", i)));
+    }
+    HostsPerLocalitySharedPtr hosts_per_locality_p0 = std::make_shared<HostsPerLocalityImpl>();
+    host_update_cb.updateHosts(
+        0,
+        updateHostsParams(hosts_p0, hosts_per_locality_p0,
+                          std::make_shared<const HealthyHostVector>(*hosts_p0),
+                          hosts_per_locality_p0),
+        {}, *hosts_p0, {}, absl::nullopt, absl::nullopt);
+
+    HostVectorSharedPtr hosts_p1 = std::make_shared<HostVector>();
+    for (int i = 0; i < 50; i++) {
+      hosts_p1->push_back(makeTestHost(info_, fmt::format("tcp://127.1.0.{}:80", i)));
+    }
+    HostsPerLocalitySharedPtr hosts_per_locality_p1 = std::make_shared<HostsPerLocalityImpl>();
+    host_update_cb.updateHosts(
+        1,
+        updateHostsParams(hosts_p1, hosts_per_locality_p1,
+                          std::make_shared<const HealthyHostVector>(*hosts_p1),
+                          hosts_per_locality_p1),
+        {}, *hosts_p1, {}, absl::nullopt, absl::nullopt);
+  }
+
+  std::shared_ptr<MockClusterInfo> info_;
+};
+
+// Verify MemberUpdateCb fires once per batch while PriorityUpdateCb fires per priority.
+// This is important for consumers like load balancers that can coalesce work
+// by tracking dirty priorities in PriorityUpdateCb and refreshing in MemberUpdateCb.
+TEST(PrioritySet, BatchUpdateMemberCallbackFiresOnce) {
+  PrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+
+  uint32_t priority_cb_count = 0;
+  uint32_t member_cb_count = 0;
+  absl::flat_hash_set<uint32_t> dirty_priorities;
+
+  auto priority_update_cb = priority_set.addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        priority_cb_count++;
+        dirty_priorities.insert(priority);
+        return absl::OkStatus();
+      });
+
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
+    member_cb_count++;
+    EXPECT_EQ(2, dirty_priorities.size());
+    EXPECT_TRUE(dirty_priorities.contains(0));
+    EXPECT_TRUE(dirty_priorities.contains(1));
+    dirty_priorities.clear();
+  });
+
+  TestMultiPriorityBatchUpdateCb batch_update(info);
+  priority_set.batchHostUpdate(batch_update);
+
+  // PriorityUpdateCb fires once per priority (2 priorities updated).
+  EXPECT_EQ(2, priority_cb_count);
+  // MemberUpdateCb fires once for the entire batch.
+  EXPECT_EQ(1, member_cb_count);
+  // Dirty set was cleared inside MemberUpdateCb.
+  EXPECT_TRUE(dirty_priorities.empty());
+
+  // Final state should have all hosts.
+  EXPECT_EQ(100, priority_set.hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(50, priority_set.hostSetsPerPriority()[1]->hosts().size());
+}
+
 // Helper class used to test MainPrioritySetImpl.
 class TestMainPrioritySetImpl : public MainPrioritySetImpl {
 public:
@@ -4313,6 +4390,49 @@ public:
     return nullptr;
   }
 };
+
+TEST_F(ClusterInfoImplTest, BufferHighWatermarkTimeoutConfigured) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 1234
+    per_connection_buffer_high_watermark_timeout: 7s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(std::chrono::seconds(7), cluster->info()->perConnectionBufferHighWatermarkTimeout());
+}
+
+TEST_F(ClusterInfoImplTest, ZeroBufferHighWatermarkTimeout) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 1234
+    per_connection_buffer_high_watermark_timeout: 0s
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            cluster->info()->perConnectionBufferHighWatermarkTimeout());
+}
 
 // Cluster metadata and common config retrieval.
 TEST_P(ParametrizedClusterInfoImplTest, Metadata) {
@@ -4523,6 +4643,131 @@ TEST_P(ParametrizedClusterInfoImplTest, BrokenTypedMetadata) {
   Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Cannot create a Baz when metadata is empty.");
+}
+
+// Cluster without stats matcher metadata: all stats are created normally.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherNoMetadata) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // Without a stats matcher, both connection and request stats are created.
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+// Cluster with reject_all stats matcher: no stats are instantiated.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherRejectAll) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    metadata:
+      typed_filter_metadata:
+        envoy.stats_matcher:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+          reject_all: true
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // With reject_all, no stats are created for this cluster.
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+// Cluster with stats matcher inclusion list: only stats matching the prefix are created.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherInclusionList) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    metadata:
+      typed_filter_metadata:
+        envoy.stats_matcher:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+          inclusion_list:
+            patterns:
+              - prefix: "cluster.name.upstream_cx"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // "upstream_cx_total" matches the inclusion prefix — accepted.
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  // "upstream_rq_total" does not match the inclusion prefix — rejected.
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+// Cluster with stats matcher exclusion list: stats matching the prefix are not created.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherExclusionList) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    metadata:
+      typed_filter_metadata:
+        envoy.stats_matcher:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+          exclusion_list:
+            patterns:
+              - prefix: "cluster.name.upstream_rq"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // "upstream_cx_total" does not match the exclusion prefix — accepted.
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  // "upstream_rq_total" matches the exclusion prefix — rejected.
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
 }
 
 // Cluster extension protocol options fails validation when configured for an unregistered filter.
@@ -6151,12 +6396,11 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
                                                          Network::Address::IpVersion::v4);
 
     auto cluster = makeCluster(yaml);
-    Http::MockFilterChainManager manager;
-    const Http::EmptyFilterChainOptions options;
-    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
+    NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, callbacks));
 
-    EXPECT_CALL(manager, applyFilterFactoryCb(_, _)).Times(0);
-    EXPECT_FALSE(cluster->info()->createFilterChain(manager));
+    EXPECT_CALL(callbacks, setFilterConfigName(_)).Times(0);
+    EXPECT_FALSE(cluster->info()->createFilterChain(callbacks));
   }
 
   {
@@ -6177,12 +6421,11 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
                                                          Network::Address::IpVersion::v4);
 
     auto cluster = makeCluster(yaml);
-    Http::MockFilterChainManager manager;
-    const Http::EmptyFilterChainOptions options;
-    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
+    NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, callbacks));
 
-    EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
-    EXPECT_TRUE(cluster->info()->createFilterChain(manager));
+    EXPECT_CALL(callbacks, setFilterConfigName(_));
+    EXPECT_TRUE(cluster->info()->createFilterChain(callbacks));
   }
 }
 

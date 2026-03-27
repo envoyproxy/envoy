@@ -31,6 +31,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:stat_names_lib",
         "//source/extensions/filters/common/ratelimit_config:ratelimit_config_lib",
+        "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
     ],
 )
@@ -43,6 +44,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/http/common:ratelimit_headers_lib",
+        "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
     ],
 )
 

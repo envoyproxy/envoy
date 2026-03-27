@@ -174,6 +174,11 @@ TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolveUsingMatche
   return {*default_match_.factory, default_match_.stats, default_match_.name};
 }
 
+namespace {
+constexpr absl::string_view kFilterStateInputName =
+    "envoy.matching.inputs.transport_socket_filter_state";
+} // namespace
+
 void TransportSocketMatcherImpl::setupTransportSocketMatcher(
     const xds::type::matcher::v3::Matcher& transport_socket_matcher,
     const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
@@ -209,26 +214,36 @@ void TransportSocketMatcherImpl::setupTransportSocketMatcher(
     matcher_stats_by_name_.emplace(socket_name, generateStats(absl::StrCat(socket_name, ".")));
   }
 
-  // Construct matcher.
-  // Create a validation visitor for the matcher.
-  class ValidationVisitor
+  // Create a validation visitor that detects if the filter state input is used.
+  class FilterStateDetectionVisitor
       : public Matcher::MatchTreeValidationVisitor<TransportSocketMatchingData> {
+  public:
+    explicit FilterStateDetectionVisitor(bool& uses_filter_state)
+        : uses_filter_state_(uses_filter_state) {}
+
   private:
-    absl::Status
-    performDataInputValidation(const Matcher::DataInputFactory<TransportSocketMatchingData>&,
-                               absl::string_view) override {
+    absl::Status performDataInputValidation(
+        const Matcher::DataInputFactory<TransportSocketMatchingData>& data_input_factory,
+        absl::string_view) override {
+      if (data_input_factory.name() == kFilterStateInputName) {
+        uses_filter_state_ = true;
+      }
       return absl::OkStatus();
     }
-  } validation_visitor;
 
-  // Use the standard matcher factory following the same pattern as filter_chain_matcher.
+    bool& uses_filter_state_;
+  };
+
+  uses_filter_state_ = false;
+  FilterStateDetectionVisitor validation_visitor(uses_filter_state_);
+
   Matcher::MatchTreeFactory<TransportSocketMatchingData, TransportSocketActionFactoryContext>
       factory(factory_context.serverFactoryContext(), factory_context.serverFactoryContext(),
               validation_visitor);
   auto factory_cb = factory.create(transport_socket_matcher);
-
   // Create the matcher instance from the factory callback.
   matcher_ = factory_cb();
+
   creation_status = absl::OkStatus();
 }
 

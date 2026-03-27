@@ -72,7 +72,7 @@ GradientController::GradientController(GradientControllerConfig config,
     }
 
     {
-      absl::MutexLock ml(&sample_mutation_mtx_);
+      absl::MutexLock ml(sample_mutation_mtx_);
       resetSampleWindow();
     }
 
@@ -108,7 +108,7 @@ void GradientController::enterMinRTTSamplingWindow() {
     return;
   }
 
-  absl::MutexLock ml(&sample_mutation_mtx_);
+  absl::MutexLock ml(sample_mutation_mtx_);
 
   stats_.min_rtt_calculation_active_.set(1);
 
@@ -246,7 +246,7 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
                                                             rq_send_time);
   synchronizer_.syncPoint("pre_hist_insert");
   {
-    absl::MutexLock ml(&sample_mutation_mtx_);
+    absl::MutexLock ml(sample_mutation_mtx_);
     hist_insert(latency_sample_hist_.get(), rq_latency.count(), 1);
     updateMinRTT();
   }

@@ -67,11 +67,12 @@ public:
         /*xds_config_tracker_=*/Config::XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/nullptr};
+        /*eds_resources_cache_=*/nullptr,
+        /*skip_subsequent_node_=*/true};
     if (use_unified_mux_) {
-      grpc_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
+      grpc_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context);
     } else {
-      grpc_mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context, true);
+      grpc_mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context);
     }
     resetCluster(R"EOF(
       name: name

@@ -1,3 +1,4 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:defs.bzl", "cc_toolchain", "cc_toolchain_suite")
 load(":armeabi_cc_toolchain_config.bzl", "armeabi_cc_toolchain_config")
 load(":cc_toolchain_config.bzl", "cc_toolchain_config")

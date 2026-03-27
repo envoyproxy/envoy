@@ -18,6 +18,7 @@ filters.
   ext_authz_filter
   ext_proc_filter
   generic_proxy_filter
+  geoip_filter
   golang_filter
   kafka_broker_filter
   kafka_mesh_filter

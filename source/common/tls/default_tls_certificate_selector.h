@@ -16,6 +16,10 @@ namespace Tls {
 // Defined in server_context_impl.h
 class ServerContextImpl;
 
+Ssl::OcspStapleAction
+ocspStapleAction(const Ssl::TlsContext& ctx, bool client_ocsp_capable,
+                 Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy);
+
 /**
  * The default TLS context provider, selecting certificate based on SNI.
  */
@@ -45,8 +49,6 @@ private:
 
   void populateServerNamesMap(const Ssl::TlsContext& ctx, const int pkey_id);
 
-  Ssl::OcspStapleAction ocspStapleAction(const Ssl::TlsContext& ctx, bool client_ocsp_capable);
-
   // ServerContext own this selector, it's safe to use itself here.
   ServerContextImpl& server_ctx_;
   const std::vector<Ssl::TlsContext>& tls_contexts_;
@@ -58,17 +60,30 @@ private:
   bool full_scan_certs_on_sni_mismatch_;
 };
 
+class DefaultTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorFactory {
+public:
+  explicit DefaultTlsCertificateSelectorFactory(const Ssl::ServerContextConfig& config)
+      : config_(config) {}
+  Ssl::TlsCertificateSelectorPtr create(Ssl::TlsCertificateSelectorContext& selector_ctx) override {
+    return std::make_unique<DefaultTlsCertificateSelector>(config_, selector_ctx);
+  };
+  absl::Status onConfigUpdate() override { return absl::OkStatus(); }
+
+private:
+  // TLS context config owns this factory instance.
+  const Ssl::ServerContextConfig& config_;
+};
+
 class TlsCertificateSelectorConfigFactoryImpl : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
   std::string name() const override { return "envoy.tls.certificate_selectors.default"; }
-  Ssl::TlsCertificateSelectorFactory createTlsCertificateSelectorFactory(
-      const Protobuf::Message&, Server::Configuration::CommonFactoryContext&,
-      ProtobufMessage::ValidationVisitor&, absl::Status&, bool) override {
-    return [](const Ssl::ServerContextConfig& config,
-              Ssl::TlsCertificateSelectorContext& selector_ctx) {
-      return std::make_unique<DefaultTlsCertificateSelector>(config, selector_ctx);
-    };
+  absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr>
+  createTlsCertificateSelectorFactory(const Protobuf::Message&,
+                                      Server::Configuration::GenericFactoryContext&,
+                                      const Ssl::ServerContextConfig& config, bool) override {
+    return std::make_unique<DefaultTlsCertificateSelectorFactory>(config);
   }
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::Struct>();
   }

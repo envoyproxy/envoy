@@ -106,9 +106,8 @@ public:
 
   void setupSecureConnection(const bool secure) {
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
-    EXPECT_CALL(decoder_callbacks_, connection())
-        .WillOnce(Return(OptRef<const Network::Connection>{connection_}));
-    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? ssl_ : nullptr));
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+    stream_info_.downstream_connection_info_provider_->setSslConnection(secure ? ssl_ : nullptr);
   }
 
   void setupMetadata(const std::string& yaml) {
@@ -124,8 +123,8 @@ public:
 
     ON_CALL(*virtual_host, metadata()).WillByDefault(ReturnRef(virtual_host_metadata_));
 
-    ON_CALL(decoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
-    ON_CALL(encoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
+    decoder_callbacks_.stream_info_.virtual_host_ = virtual_host;
+    encoder_callbacks_.stream_info_.virtual_host_ = virtual_host;
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
     EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
@@ -141,7 +140,7 @@ public:
     auto route = std::make_shared<NiceMock<Router::MockRoute>>();
     TestUtility::loadFromYaml(yaml, route->metadata_);
 
-    ON_CALL(stream_info_, route()).WillByDefault(Return(route));
+    stream_info_.route_ = route;
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
     EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
@@ -1042,6 +1041,59 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
                                    child_span_, &response_message->headers());
                                callbacks->onSuccess(request, std::move(response_message));
                              });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
+// HTTP call with multi-slice response body (tests linearize() path).
+TEST_F(LuaHttpFilterTest, HttpCallMultiSliceBody) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo"
+        },
+        "hello world",
+        5000)
+      request_handle:logTrace(string.len(body))
+      request_handle:logTrace(body)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks = &cb;
+            return &request;
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  // Add body in multiple parts to create multiple buffer slices.
+  response_message->body().add("first");
+  response_message->body().add("second");
+  response_message->body().add("third");
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "16"},
+                                 {"trace", "firstsecondthird"},
+                             }),
+                             { callbacks->onSuccess(request, std::move(response_message)); });
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
@@ -2720,6 +2772,7 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
 }
 
 // Check the connection.
+// Note: connection():ssl() is deprecated. Use streamInfo():downstreamSslConnection() instead.
 TEST_F(LuaHttpFilterTest, CheckConnection) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -3656,8 +3709,11 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHost) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(decoder_callbacks_,
-              setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), false)));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      setUpstreamOverrideHost(testing::AllOf(
+          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, false))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -3673,8 +3729,11 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostStrict) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(decoder_callbacks_,
-              setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), true)));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      setUpstreamOverrideHost(testing::AllOf(
+          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+          testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -3737,8 +3796,11 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
 
   {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/path1"}};
-    EXPECT_CALL(decoder_callbacks_,
-                setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), true)));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        setUpstreamOverrideHost(testing::AllOf(
+            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   }
 
@@ -3746,8 +3808,11 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
 
   {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/path2"}};
-    EXPECT_CALL(decoder_callbacks_,
-                setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), true)));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        setUpstreamOverrideHost(testing::AllOf(
+            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::host, "192.168.21.11"),
+            testing::Field(&Upstream::LoadBalancerContext::OverrideHost::strict, true))));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   }
 }

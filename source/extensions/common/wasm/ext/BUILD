@@ -1,3 +1,4 @@
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
@@ -32,8 +33,8 @@ envoy_cc_library(
     deps = [
         ":declare_property_cc_proto",
         ":set_envoy_filter_state_cc_proto",
-        ":verify_signature_cc_proto",
         ":sign_cc_proto",
+        ":verify_signature_cc_proto",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -50,8 +51,8 @@ cc_library(
         ":declare_property_cc_proto",
         ":node_subset_cc_proto",
         ":set_envoy_filter_state_cc_proto",
-        ":verify_signature_cc_proto",
         ":sign_cc_proto",
+        ":verify_signature_cc_proto",
         "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
     ],
     alwayslink = 1,

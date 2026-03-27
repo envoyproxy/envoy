@@ -87,8 +87,9 @@ public:
             SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
             random_),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_)};
-    grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
+        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+        /*skip_subsequent_node_=*/true};
+    grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -944,9 +945,10 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr};
+      /*eds_resources_cache_=*/nullptr,
+      /*skip_subsequent_node_=*/true};
   EXPECT_THROW_WITH_MESSAGE(
-      XdsMux::GrpcMuxSotw(grpc_mux_context, true), EnvoyException,
+      (XdsMux::GrpcMuxSotw(grpc_mux_context)), EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }
@@ -970,9 +972,10 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr};
+      /*eds_resources_cache_=*/nullptr,
+      /*skip_subsequent_node_=*/true};
   EXPECT_THROW_WITH_MESSAGE(
-      XdsMux::GrpcMuxSotw(grpc_mux_context, true), EnvoyException,
+      (XdsMux::GrpcMuxSotw(grpc_mux_context)), EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }
@@ -1097,8 +1100,9 @@ TEST_P(GrpcMuxImplTest, AllMuxesStateTest) {
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr};
-  auto grpc_mux_1 = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
+      /*eds_resources_cache_=*/nullptr,
+      /*skip_subsequent_node_=*/true};
+  auto grpc_mux_1 = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
   Config::XdsMux::GrpcMuxSotw::shutdownAll();
 
   EXPECT_TRUE(grpc_mux_->isShutdown());
@@ -1443,6 +1447,14 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                     &async_stream_);
 }
 
+// A temp test to increase coverage. The test will be modified once the
+// implementation will be added.
+TEST_P(GrpcMuxImplTest, LrsCoverageIncrease) {
+  setup();
+  EXPECT_EQ(grpc_mux_->loadStatsReporter(), nullptr);
+  EXPECT_EQ(grpc_mux_->maybeCreateLoadStatsReporter(), nullptr);
+}
+
 class NullGrpcMuxImplTest : public testing::Test {
 public:
   NullGrpcMuxImplTest() : null_mux_(std::make_unique<Config::XdsMux::NullGrpcMuxImpl>()) {}
@@ -1480,6 +1492,11 @@ TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
 
 TEST_F(NullGrpcMuxImplTest, NoEdsResourcesCache) { EXPECT_EQ({}, null_mux_->edsResourcesCache()); }
 
+TEST_F(NullGrpcMuxImplTest, LrsCoverageIncrease) {
+  EXPECT_EQ(null_mux_->loadStatsReporter(), nullptr);
+  EXPECT_EQ(null_mux_->maybeCreateLoadStatsReporter(), nullptr);
+}
+
 TEST(UnifiedSotwGrpcMuxFactoryTest, InvalidRateLimit) {
   auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
       "envoy.config_mux.sotw_grpc_mux_factory");
@@ -1494,7 +1511,7 @@ TEST(UnifiedSotwGrpcMuxFactoryTest, InvalidRateLimit) {
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               absl::nullopt, absl::nullopt, false),
+                               absl::nullopt, absl::nullopt, nullptr),
                EnvoyException);
 }
 
@@ -1512,7 +1529,7 @@ TEST(UnifiedDeltaGrpcMuxFactoryTest, InvalidRateLimit) {
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               absl::nullopt, absl::nullopt, false),
+                               absl::nullopt, absl::nullopt, nullptr),
                EnvoyException);
 }
 

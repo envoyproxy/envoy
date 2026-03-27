@@ -6,9 +6,11 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -63,6 +65,7 @@ protected:
   void verifyInitialState() {
     EXPECT_EQ(socket_manager_->accepted_reverse_connections_.size(), 0);
     EXPECT_EQ(socket_manager_->fd_to_node_map_.size(), 0);
+    EXPECT_EQ(socket_manager_->fd_to_socket_it_map_.size(), 0);
     EXPECT_EQ(socket_manager_->node_to_cluster_map_.size(), 0);
     EXPECT_EQ(socket_manager_->cluster_to_node_info_map_.size(), 0);
   }
@@ -86,6 +89,25 @@ protected:
 
   size_t getFDToEventMapSize() { return socket_manager_->fd_to_event_map_.size(); }
   size_t getFDToTimerMapSize() { return socket_manager_->fd_to_timer_map_.size(); }
+  size_t getFDToPingSendTimerMapSize() {
+    return socket_manager_->fd_to_ping_send_timer_map_.size();
+  }
+
+  bool verifyFDToPingSendTimerMap(int fd) {
+    return socket_manager_->fd_to_ping_send_timer_map_.find(fd) !=
+           socket_manager_->fd_to_ping_send_timer_map_.end();
+  }
+
+  bool verifyFDToSocketItMap(int fd) {
+    return socket_manager_->fd_to_socket_it_map_.find(fd) !=
+           socket_manager_->fd_to_socket_it_map_.end();
+  }
+  size_t getFDToSocketItMapSize() { return socket_manager_->fd_to_socket_it_map_.size(); }
+
+  uint32_t getNodeToActiveFdCount(const std::string& node_id) {
+    auto it = socket_manager_->node_to_active_fd_count_.find(node_id);
+    return (it != socket_manager_->node_to_active_fd_count_.end()) ? it->second : 0;
+  }
 
   size_t verifyAcceptedReverseConnectionsMap(const std::string& node_id) {
     auto it = socket_manager_->accepted_reverse_connections_.find(node_id);
@@ -506,7 +528,7 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadMultipleSockets) {
   EXPECT_EQ(getFDToTimerMapSize(), 0);
 }
 
-TEST_F(TestUpstreamSocketManager, PingConnectionsWriteSuccess) {
+TEST_F(TestUpstreamSocketManager, SendPingForConnectionWriteSuccess) {
   auto socket1 = createMockSocket(123);
   auto socket2 = createMockSocket(456);
   const std::string node_id = "test-node";
@@ -517,30 +539,25 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteSuccess) {
   socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket2), ping_interval);
 
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 2);
+  EXPECT_EQ(getFDToPingSendTimerMapSize(), 2);
 
   auto& sockets = getSocketsForNode(node_id);
   auto* mock_io_handle1 =
       dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets.front()->ioHandle());
-  auto* mock_io_handle2 =
-      dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets.back()->ioHandle());
 
   EXPECT_CALL(*mock_io_handle1, write(_))
       .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         buffer.drain(buffer.length());
         return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
       }));
-  EXPECT_CALL(*mock_io_handle2, write(_))
-      .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
-        buffer.drain(buffer.length());
-        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
-      }));
 
-  socket_manager_->pingConnections();
+  // Ping only one connection -- the other remains untouched.
+  socket_manager_->sendPingForConnection(123);
 
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 2);
 }
 
-TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
+TEST_F(TestUpstreamSocketManager, SendPingForConnectionWriteFailure) {
   auto socket1 = createMockSocket(123);
   auto socket2 = createMockSocket(456);
   const std::string node_id = "test-node";
@@ -565,13 +582,15 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
         return Api::IoCallUint64Result{0, Network::IoSocketError::create(ECONNRESET)};
       }));
 
-  socket_manager_->pingConnections(node_id);
+  socket_manager_->sendPingForConnection(123);
 
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 1);
   EXPECT_FALSE(verifyFDToNodeMap(123));
   EXPECT_FALSE(verifyFDToClusterMap(123));
+  EXPECT_FALSE(verifyFDToPingSendTimerMap(123));
   EXPECT_TRUE(verifyFDToNodeMap(456));
   EXPECT_TRUE(verifyFDToClusterMap(456));
+  EXPECT_TRUE(verifyFDToPingSendTimerMap(456));
   EXPECT_EQ(getNodeToClusterMapping(node_id), cluster_id);
   EXPECT_EQ(getAcceptedReverseConnectionsSize(), 1);
 
@@ -582,15 +601,62 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
         return Api::IoCallUint64Result{0, Network::IoSocketError::create(EPIPE)};
       }));
 
-  socket_manager_->pingConnections(node_id);
+  socket_manager_->sendPingForConnection(456);
 
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 0);
   EXPECT_FALSE(verifyFDToNodeMap(123));
   EXPECT_FALSE(verifyFDToClusterMap(123));
   EXPECT_FALSE(verifyFDToNodeMap(456));
   EXPECT_FALSE(verifyFDToClusterMap(456));
+  EXPECT_FALSE(verifyFDToPingSendTimerMap(456));
   EXPECT_EQ(getNodeToClusterMapping(node_id), "");
   EXPECT_EQ(getAcceptedReverseConnectionsSize(), 0);
+}
+
+TEST_F(TestUpstreamSocketManager, SendPingForConnectionStaleNodeCleanup) {
+  auto socket1 = createMockSocket(123);
+  auto socket2 = createMockSocket(456);
+
+  const std::string node1 = "node1";
+  const std::string node2 = "node2";
+
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node1, cluster_id, std::move(socket1), ping_interval);
+  socket_manager_->addConnectionSocket(node2, cluster_id, std::move(socket2), ping_interval);
+
+  auto& sockets_node1 = getSocketsForNode(node1);
+  auto& sockets_node2 = getSocketsForNode(node2);
+
+  auto* mock_io_handle1 =
+      dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets_node1.front()->ioHandle());
+  auto* mock_io_handle2 =
+      dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets_node2.front()->ioHandle());
+
+  EXPECT_CALL(*mock_io_handle1, write(_))
+      .Times(1)
+      .WillOnce(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        buffer.drain(buffer.length());
+        return Api::IoCallUint64Result{0, Network::IoSocketError::create(ECONNRESET)};
+      }));
+
+  EXPECT_CALL(*mock_io_handle2, write(_))
+      .Times(1)
+      .WillOnce(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        buffer.drain(buffer.length());
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      }));
+
+  // Ping each connection individually.
+  socket_manager_->sendPingForConnection(123);
+  socket_manager_->sendPingForConnection(456);
+
+  // Node1 should be cleaned up (write failure), node2 should remain.
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node1), 0);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node2), 1);
+  EXPECT_FALSE(verifyFDToNodeMap(123));
+  EXPECT_TRUE(verifyFDToNodeMap(456));
 }
 
 TEST_F(TestUpstreamSocketManager, OnPingResponseValidResponse) {
@@ -686,6 +752,79 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseInvalidData) {
   socket_manager_->onPingTimeout(123);
   EXPECT_FALSE(verifyFDToNodeMap(123));
   EXPECT_FALSE(verifyFDToClusterMap(123));
+}
+
+TEST_F(TestUpstreamSocketManager, NodeToActiveFdCountTracking) {
+  auto socket1 = createMockSocket(123);
+  auto socket2 = createMockSocket(456);
+  auto socket3 = createMockSocket(789);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 0);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket1), ping_interval);
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 1);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket2), ping_interval);
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 2);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket3), ping_interval);
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 3);
+
+  // getConnectionSocket removes from idle pool but FD stays in fd_to_node_map_ (used socket),
+  // so counter should NOT decrement.
+  auto retrieved = socket_manager_->getConnectionSocket(node_id);
+  EXPECT_NE(retrieved, nullptr);
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 3);
+
+  // markSocketDead on an idle socket should decrement.
+  socket_manager_->markSocketDead(456);
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 2);
+
+  // markSocketDead on the used socket (123) should also decrement.
+  socket_manager_->markSocketDead(123);
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 1);
+
+  // markSocketDead on last socket should remove the entry.
+  socket_manager_->markSocketDead(789);
+  EXPECT_EQ(getNodeToActiveFdCount(node_id), 0);
+}
+
+TEST_F(TestUpstreamSocketManager, SendTimerCleanupOnGetConnectionSocket) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  EXPECT_TRUE(verifyFDToPingSendTimerMap(123));
+  EXPECT_EQ(getFDToPingSendTimerMapSize(), 1);
+
+  auto retrieved = socket_manager_->getConnectionSocket(node_id);
+  EXPECT_NE(retrieved, nullptr);
+  EXPECT_FALSE(verifyFDToPingSendTimerMap(123));
+  EXPECT_EQ(getFDToPingSendTimerMapSize(), 0);
+}
+
+TEST_F(TestUpstreamSocketManager, SendTimerCleanupOnMarkSocketDead) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval);
+  EXPECT_TRUE(verifyFDToPingSendTimerMap(123));
+
+  socket_manager_->markSocketDead(123);
+  EXPECT_FALSE(verifyFDToPingSendTimerMap(123));
+  EXPECT_EQ(getFDToPingSendTimerMapSize(), 0);
+}
+
+TEST_F(TestUpstreamSocketManager, SendPingForConnectionNonExistentFd) {
+  // Should not crash when FD doesn't exist.
+  socket_manager_->sendPingForConnection(999);
 }
 
 TEST_F(TestUpstreamSocketManager, GetConnectionSocketNoSocketsButValidMapping) {
@@ -1029,6 +1168,51 @@ TEST_F(TestUpstreamSocketManager, GetNodeWithSocketComprehensiveMixedCalls) {
   EXPECT_EQ(result, node2);
 }
 
+// Checks that the dead socket is reported to the extension.
+// Inject a mock reporter and expect that it receives the data about the dead socket.
+TEST_F(TestUpstreamSocketManager, MarkSocketDeadCallsReportDisconnection) {
+  socket_manager_.reset();
+
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface config_with_reporter;
+
+  // Add the mock reporter to the config.
+  auto* reporter_cfg = config_with_reporter.mutable_reporter_config();
+  reporter_cfg->set_name(MOCK_REPORTER);
+  Protobuf::StringValue noop_config;
+  reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
+
+  NiceMock<MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  NiceMock<MockReverseTunnelReporter>* reporter_ptr = nullptr;
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+    reporter_ptr = reporter.get();
+    return reporter;
+  }));
+
+  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_,
+                                                                config_with_reporter);
+  socket_manager_ = std::make_unique<UpstreamSocketManager>(dispatcher_, extension_.get());
+
+  const int fd = 200;
+  const std::string node_id = "node";
+  const std::string cluster_id = "cluster";
+
+  auto socket = createMockSocket(fd);
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket),
+                                       std::chrono::seconds(30), /*rebalanced=*/false);
+
+  ASSERT_NE(reporter_ptr, nullptr);
+  EXPECT_CALL(*reporter_ptr,
+              reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id)));
+  socket_manager_->markSocketDead(fd);
+}
+
 // Socket Rebalancing Tests.
 
 // Separate fixture because rebalancing requires 3 socket managers with named dispatchers (set in
@@ -1306,6 +1490,47 @@ TEST_F(TestUpstreamSocketManagerRebalancing, RebalancingSkippedWhenAlreadyRebala
   EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 0);
   EXPECT_EQ(getNodeConnCount(socket_manager2_.get(), node_id), 0);
   EXPECT_EQ(getNodeConnCount(socket_manager3_.get(), node_id), 10);
+}
+
+TEST_F(TestUpstreamSocketManagerRebalancing, MainThreadExcludedFromRebalancing) {
+  // Create a socket manager on a "main_thread" dispatcher. It should not be
+  // registered in the static socket_managers_ list and therefore never receive
+  // rebalanced sockets.
+  NiceMock<Event::MockDispatcher> main_dispatcher("main_thread");
+  setupDispatcher(main_dispatcher);
+  auto main_socket_manager =
+      std::make_unique<UpstreamSocketManager>(main_dispatcher, extension_.get());
+
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Make all worker managers heavily loaded so the main_thread manager would
+  // be selected as the least loaded target if it were registered.
+  setNodeConnCount(socket_manager1_.get(), node_id, 100);
+  setNodeConnCount(socket_manager2_.get(), node_id, 100);
+  setNodeConnCount(socket_manager3_.get(), node_id, 100);
+
+  // post() must never be called on the main_thread dispatcher.
+  EXPECT_CALL(main_dispatcher, post(_)).Times(0);
+
+  // All workers are tied at 100, so the socket stays on the calling manager
+  // (worker_0 / socket_manager1_). No post() on any dispatcher.
+  EXPECT_CALL(dispatcher1_, post(_)).Times(0);
+  EXPECT_CALL(dispatcher2_, post(_)).Times(0);
+  EXPECT_CALL(dispatcher3_, post(_)).Times(0);
+
+  auto socket = createMockSocket(555);
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval,
+                                        false /* rebalanced */);
+
+  // Socket stays on worker_0, not moved to main_thread despite it having 0 connections.
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager1_.get(), node_id), 1);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(main_socket_manager.get(), node_id), 0);
+
+  // Verify connection count was incremented only on worker_0.
+  EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 101);
+  EXPECT_EQ(getNodeConnCount(main_socket_manager.get(), node_id), 0);
 }
 
 } // namespace ReverseConnection.

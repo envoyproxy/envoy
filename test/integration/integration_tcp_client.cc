@@ -178,6 +178,7 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
   if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
+  } else if (event == Network::ConnectionEvent::LocalClose) {
   }
 }
 

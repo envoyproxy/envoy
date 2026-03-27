@@ -9,6 +9,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/ssl/handshaker.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -100,6 +102,12 @@ public:
   virtual CertificateSelectionCallbackPtr createCertificateSelectionCallback() PURE;
 
   /**
+   * Attach additional certificate selection data to the TLS socket connection.
+   */
+  virtual void
+  setCertSelectionHandle(Ssl::SelectionHandleConstSharedPtr cert_selection_handle) PURE;
+
+  /**
    * Called after the cert selection completes either synchronously or asynchronously.
    * @param selected_ctx selected Ssl::TlsContext, it's empty when selection failed.
    * @param async true if the validation is completed asynchronously.
@@ -112,6 +120,17 @@ public:
    * @return CertificateSelectionStatus the cert selection status.
    */
   virtual CertificateSelectionStatus certificateSelectionResult() const PURE;
+
+  /**
+   * Set detailed certificate validation error information.
+   * @param error_details the detailed error message from certificate validation.
+   */
+  virtual void setCertificateValidationError(absl::string_view error_details) PURE;
+
+  /**
+   * @return the detailed certificate validation error message, or empty if none.
+   */
+  virtual absl::string_view certificateValidationError() const PURE;
 };
 
 } // namespace Ssl

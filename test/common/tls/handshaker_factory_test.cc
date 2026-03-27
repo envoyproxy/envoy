@@ -290,10 +290,10 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
       .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
 
   auto server_context_config = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-      tls_context_, mock_factory_ctx, false);
+      tls_context_, mock_factory_ctx, {}, false);
   EXPECT_TRUE(server_context_config->isReady());
-  EXPECT_NO_THROW(*context_manager_->createSslServerContext(
-      *stats_store_.rootScope(), *server_context_config, std::vector<std::string>{}, nullptr));
+  EXPECT_NO_THROW(*context_manager_->createSslServerContext(*stats_store_.rootScope(),
+                                                            *server_context_config, nullptr));
 }
 
 } // namespace

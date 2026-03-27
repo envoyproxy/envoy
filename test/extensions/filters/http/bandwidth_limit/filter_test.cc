@@ -106,7 +106,7 @@ TEST_F(FilterTest, LimitOnDecode) {
   )";
   setup(fmt::format(config_yaml, "1"));
 
-  ON_CALL(decoder_filter_callbacks_, decoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* token_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
@@ -229,7 +229,7 @@ TEST_F(FilterTest, LimitOnEncode) {
   )";
   setup(fmt::format(config_yaml, "1"));
 
-  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   ON_CALL(encoder_filter_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(trailers_));
   Event::MockTimer* token_timer =
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
@@ -354,8 +354,8 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
   )";
   setup(fmt::format(config_yaml, "1"));
 
-  ON_CALL(decoder_filter_callbacks_, decoderBufferLimit()).WillByDefault(Return(1050));
-  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1050));
+  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   ON_CALL(encoder_filter_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(trailers_));
   Event::MockTimer* request_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
@@ -493,8 +493,8 @@ TEST_F(FilterTest, WithTrailers) {
   )";
   setup(fmt::format(config_yaml, "1"));
 
-  ON_CALL(decoder_filter_callbacks_, decoderBufferLimit()).WillByDefault(Return(1050));
-  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1050));
+  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* request_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   Event::MockTimer* response_timer =
@@ -571,8 +571,8 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
   )";
   setup(fmt::format(config_yaml, "1"));
 
-  ON_CALL(decoder_filter_callbacks_, decoderBufferLimit()).WillByDefault(Return(1050));
-  ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1050));
+  ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* request_timer =
       new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   Event::MockTimer* response_timer =

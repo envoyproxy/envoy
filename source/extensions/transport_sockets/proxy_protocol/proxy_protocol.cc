@@ -179,7 +179,10 @@ void UpstreamProxyProtocolSocketFactory::hashKey(
 
 std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::buildCustomTLVs() const {
   std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs;
-  absl::flat_hash_set<uint8_t> processed_tlv_types;
+  absl::flat_hash_set<uint8_t> host_level_tlv_types;
+
+  const bool runtime_allow_duplicate_tlvs = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.proxy_protocol_allow_duplicate_tlvs");
 
   // Attempt to parse host-level TLVs first.
   const auto& upstream_info = callbacks_->connection().streamInfo().upstreamInfo();
@@ -198,16 +201,25 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
                     upstream_info->upstreamHost()->address()->asString(), status.message());
         } else {
           // Insert host-level TLVs.
-          for (const auto& entry : host_tlv_metadata.added_tlvs()) {
-            if (processed_tlv_types.contains(entry.type())) {
-              ENVOY_LOG_EVERY_POW_2_MISC(info, "Skipping duplicate TLV type from host metadata {}",
-                                         entry.type());
-              continue;
+          if (runtime_allow_duplicate_tlvs) {
+            for (const auto& entry : host_tlv_metadata.added_tlvs()) {
+              custom_tlvs.push_back(Network::ProxyProtocolTLV{
+                  static_cast<uint8_t>(entry.type()),
+                  std::vector<unsigned char>(entry.value().begin(), entry.value().end())});
+              host_level_tlv_types.insert(entry.type());
             }
-            custom_tlvs.push_back(Network::ProxyProtocolTLV{
-                static_cast<uint8_t>(entry.type()),
-                std::vector<unsigned char>(entry.value().begin(), entry.value().end())});
-            processed_tlv_types.insert(entry.type());
+          } else {
+            for (const auto& entry : host_tlv_metadata.added_tlvs()) {
+              if (host_level_tlv_types.contains(entry.type())) {
+                ENVOY_LOG_EVERY_POW_2_MISC(
+                    info, "Skipping duplicate TLV type from host metadata {}", entry.type());
+                continue;
+              }
+              custom_tlvs.push_back(Network::ProxyProtocolTLV{
+                  static_cast<uint8_t>(entry.type()),
+                  std::vector<unsigned char>(entry.value().begin(), entry.value().end())});
+              host_level_tlv_types.insert(entry.type());
+            }
           }
         }
       }
@@ -215,13 +227,22 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
   }
 
   // If host-level parse failed or was not present, we still read config-level TLVs.
-  for (const auto& tlv : added_tlvs_) {
-    if (processed_tlv_types.contains(tlv.type)) {
-      ENVOY_LOG_EVERY_POW_2_MISC(info, "Skipping duplicate TLV type from added_tlvs {}", tlv.type);
-      continue;
+  if (runtime_allow_duplicate_tlvs) {
+    for (const auto& tlv : added_tlvs_) {
+      if (!host_level_tlv_types.contains(tlv.type)) {
+        custom_tlvs.push_back(tlv);
+      }
     }
-    custom_tlvs.push_back(tlv);
-    processed_tlv_types.insert(tlv.type);
+  } else {
+    for (const auto& tlv : added_tlvs_) {
+      if (host_level_tlv_types.contains(tlv.type)) {
+        ENVOY_LOG_EVERY_POW_2_MISC(info, "Skipping duplicate TLV type from added_tlvs {}",
+                                   tlv.type);
+        continue;
+      }
+      custom_tlvs.push_back(tlv);
+      host_level_tlv_types.insert(tlv.type);
+    }
   }
 
   return custom_tlvs;

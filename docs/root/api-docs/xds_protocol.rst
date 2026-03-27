@@ -726,7 +726,6 @@ will not take effect until EDS/RDS responses are supplied.
 
    - Warming of ``Cluster`` is completed only when a new ``ClusterLoadAssignment``
      response is supplied by management server even if there is no change in endpoints.
-     If the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` is set to true,
      Envoy will use a cached ``ClusterLoadAssignment`` for a cluster, if exists, after
      the resource warming times out.
    - Warming of ``Listener`` is completed even if management server does not send a

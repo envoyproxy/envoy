@@ -9,6 +9,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "gtest/gtest.h"
 #include "opentelemetry/proto/collector/metrics/v1/metrics_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -20,19 +21,45 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class OpenTelemetryGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
-                                         public HttpIntegrationTest {
+enum class ExporterType { GRPC, HTTP };
+
+struct TransportDriver {
+  std::function<void(envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig&,
+                     Network::Address::InstanceConstSharedPtr)>
+      configureExporter;
+  std::function<AssertionResult(
+      FakeStreamPtr&, Event::Dispatcher&,
+      opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest&)>
+      waitForRequest;
+  std::function<void(FakeStreamPtr&)> sendResponse;
+  std::function<void(IntegrationTestServer&)> expectUpstreamRequestFinished;
+};
+
+class OpenTelemetryIntegrationTest
+    : public Grpc::BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, ExporterType>>,
+      public HttpIntegrationTest {
+protected:
+  TransportDriver driver_;
+
 public:
   using MetricsChecker = std::function<void(
       const Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&, bool&, bool&,
       bool&)>;
 
-  OpenTelemetryGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
+  OpenTelemetryIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {
     // TODO(ohadvano): add tag extraction rules.
     // Missing stat tag-extraction rule for stat 'grpc.otlp_collector.streams_closed_x' and
     // stat_prefix 'otlp_collector'.
     skip_tag_extraction_rule_check_ = true;
+    driver_ = (std::get<2>(GetParam()) == ExporterType::GRPC) ? makeGrpcDriver(clientType())
+                                                              : makeHttpDriver();
   }
+
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -59,8 +86,7 @@ public:
       auto* metrics_sink = bootstrap.add_stats_sinks();
       metrics_sink->set_name("envoy.stat_sinks.open_telemetry");
       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
-      setGrpcService(*sink_config.mutable_grpc_service(), "otlp_collector",
-                     fake_upstreams_.back()->localAddress());
+      driver_.configureExporter(sink_config, fake_upstreams_.back()->localAddress());
       sink_config.set_prefix(stat_prefix_);
       metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
@@ -94,11 +120,8 @@ public:
     while (!known_counter_exists || !known_gauge_exists || !known_histogram_exists) {
       VERIFY_ASSERTION(waitForMetricsStream());
       opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest export_request;
-      VERIFY_ASSERTION(otlp_collector_request_->waitForGrpcMessage(*dispatcher_, export_request));
-      EXPECT_EQ("POST", otlp_collector_request_->headers().getMethodValue());
-      EXPECT_EQ("/opentelemetry.proto.collector.metrics.v1.MetricsService/Export",
-                otlp_collector_request_->headers().getPathValue());
-      EXPECT_EQ("application/grpc", otlp_collector_request_->headers().getContentTypeValue());
+      VERIFY_ASSERTION(
+          driver_.waitForRequest(otlp_collector_request_, *dispatcher_, export_request));
 
       EXPECT_EQ(1, export_request.resource_metrics().size());
       EXPECT_EQ(1, export_request.resource_metrics()[0].scope_metrics().size());
@@ -108,12 +131,7 @@ public:
 
       checker(metrics, known_counter_exists, known_gauge_exists, known_histogram_exists);
 
-      // Since each export request creates a new stream, reply with an export response for each
-      // export request.
-      otlp_collector_request_->startGrpcStream();
-      opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse export_response;
-      otlp_collector_request_->sendGrpcMessage(export_response);
-      otlp_collector_request_->finishGrpcStream(Grpc::Status::Ok);
+      driver_.sendResponse(otlp_collector_request_);
     }
 
     EXPECT_TRUE(known_counter_exists);
@@ -165,19 +183,6 @@ public:
     }
   }
 
-  void expectUpstreamRequestFinished() {
-    switch (clientType()) {
-    case Grpc::ClientType::EnvoyGrpc:
-      test_server_->waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
-      break;
-    case Grpc::ClientType::GoogleGrpc:
-      test_server_->waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
-      break;
-    default:
-      PANIC("reached unexpected code");
-    }
-  }
-
   void cleanup() {
     if (fake_metrics_service_connection_ != nullptr) {
       AssertionResult result = fake_metrics_service_connection_->close();
@@ -187,16 +192,81 @@ public:
     }
   }
 
+private:
+  TransportDriver makeGrpcDriver(Grpc::ClientType client_type) {
+    return {[this](auto& config, auto addr) {
+              setGrpcService(*config.mutable_grpc_service(), "otlp_collector", addr);
+            },
+            [](auto& stream, auto& dispatcher, auto& request) -> AssertionResult {
+              VERIFY_ASSERTION(stream->waitForGrpcMessage(dispatcher, request));
+              EXPECT_EQ("POST", stream->headers().getMethodValue());
+              EXPECT_EQ("/opentelemetry.proto.collector.metrics.v1.MetricsService/Export",
+                        stream->headers().getPathValue());
+              EXPECT_EQ("application/grpc", stream->headers().getContentTypeValue());
+              return AssertionSuccess();
+            },
+            [](auto& stream) {
+              opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse response;
+              stream->startGrpcStream();
+              stream->sendGrpcMessage(response);
+              stream->finishGrpcStream(Grpc::Status::Ok);
+            },
+            // GoogleGrpc uses its own stream tracking; EnvoyGrpc uses Envoy's cluster stats.
+            [client_type](IntegrationTestServer& server) {
+              if (client_type == Grpc::ClientType::GoogleGrpc) {
+                server.waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
+              } else {
+                server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+              }
+            }};
+  }
+
+  TransportDriver makeHttpDriver() {
+    return {[this](auto& config, auto addr) {
+              auto* http = config.mutable_http_service();
+              http->mutable_http_uri()->set_uri(fmt::format(
+                  "http://{}:{}/v1/metrics",
+                  Network::Test::getLoopbackAddressUrlString(ipVersion()), addr->ip()->port()));
+              http->mutable_http_uri()->set_cluster("otlp_collector");
+              http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
+            },
+            [](auto& stream, auto& dispatcher, auto& request) -> AssertionResult {
+              VERIFY_ASSERTION(stream->waitForEndStream(dispatcher));
+              EXPECT_EQ("POST", stream->headers().getMethodValue());
+              EXPECT_EQ("/v1/metrics", stream->headers().getPathValue());
+              EXPECT_EQ("application/x-protobuf", stream->headers().getContentTypeValue());
+              EXPECT_TRUE(absl::StartsWith(stream->headers().getUserAgentValue(),
+                                           "OTel-OTLP-Exporter-Envoy/"));
+              EXPECT_TRUE(request.ParseFromString(stream->body().toString()));
+              return AssertionSuccess();
+            },
+            [](auto& stream) {
+              stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+            },
+            // HTTP uses standard cluster request tracking.
+            [](IntegrationTestServer& server) {
+              server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+            }};
+  }
+
   FakeHttpConnectionPtr fake_metrics_service_connection_;
   FakeStreamPtr otlp_collector_request_;
   std::string stat_prefix_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OpenTelemetryGrpcIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeExporterType, OpenTelemetryIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     testing::Values(ExporterType::GRPC, ExporterType::HTTP)),
+    [](const auto& info) {
+      return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(info.param)),
+                         std::get<1>(info.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                                 : "EnvoyGrpc",
+                         std::get<2>(info.param) == ExporterType::GRPC ? "gRPC" : "HTTP");
+    });
 
-TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlow) {
+TEST_P(OpenTelemetryIntegrationTest, BasicFlow) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -209,11 +279,11 @@ TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlow) {
         checkBasicMetrics(metrics, counter, gauge, hist);
       }));
 
-  expectUpstreamRequestFinished();
+  driver_.expectUpstreamRequestFinished(*test_server_);
   cleanup();
 }
 
-TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlowWithStatPrefix) {
+TEST_P(OpenTelemetryIntegrationTest, BasicFlowWithStatPrefix) {
   setStatPrefix("prefix");
   initialize();
 
@@ -227,11 +297,11 @@ TEST_P(OpenTelemetryGrpcIntegrationTest, BasicFlowWithStatPrefix) {
         checkBasicMetrics(metrics, counter, gauge, hist);
       }));
 
-  expectUpstreamRequestFinished();
+  driver_.expectUpstreamRequestFinished(*test_server_);
   cleanup();
 }
 
-class OpenTelemetryGrpcIntegrationTestCustomConversion : public OpenTelemetryGrpcIntegrationTest {
+class OpenTelemetryIntegrationTestCustomConversion : public OpenTelemetryIntegrationTest {
 public:
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -371,11 +441,19 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OpenTelemetryGrpcIntegrationTestCustomConversion,
-                         GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeExporterType, OpenTelemetryIntegrationTestCustomConversion,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     testing::Values(ExporterType::GRPC)),
+    [](const auto& info) {
+      return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(info.param)),
+                         std::get<1>(info.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                                 : "EnvoyGrpc",
+                         std::get<2>(info.param) == ExporterType::GRPC ? "gRPC" : "HTTP");
+    });
 
-TEST_P(OpenTelemetryGrpcIntegrationTestCustomConversion, CustomConversionWithAggregation) {
+TEST_P(OpenTelemetryIntegrationTestCustomConversion, CustomConversionWithAggregation) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -388,8 +466,103 @@ TEST_P(OpenTelemetryGrpcIntegrationTestCustomConversion, CustomConversionWithAgg
         checkCustomMetrics(metrics, counter, gauge, hist);
       }));
 
-  expectUpstreamRequestFinished();
+  driver_.expectUpstreamRequestFinished(*test_server_);
   cleanup();
 }
+
+class OpenTelemetryFormatterHeaderTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                         public HttpIntegrationTest {
+public:
+  OpenTelemetryFormatterHeaderTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    skip_tag_extraction_rule_check_ = true;
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* metrics_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      metrics_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      metrics_cluster->set_name("otlp_collector");
+      ConfigHelper::setHttp2(*metrics_cluster);
+    });
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* sink = bootstrap.add_stats_sinks();
+      sink->set_name("envoy.stat_sinks.open_telemetry");
+      envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig config;
+
+      auto* http = config.mutable_http_service();
+      http->mutable_http_uri()->set_uri(fmt::format(
+          "http://{}:{}/v1/metrics", Network::Test::getLoopbackAddressUrlString(GetParam()),
+          fake_upstreams_.back()->localAddress()->ip()->port()));
+      http->mutable_http_uri()->set_cluster("otlp_collector");
+      http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
+
+      auto* header = http->add_request_headers_to_add();
+      header->mutable_header()->set_key("x-custom-formatter");
+      header->mutable_header()->set_value("%HOSTNAME%");
+
+      sink->mutable_typed_config()->PackFrom(config);
+      bootstrap.mutable_stats_flush_interval()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+  void cleanup() {
+    if (codec_client_) {
+      codec_client_->close();
+    }
+    if (otlp_stream_) {
+      otlp_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    }
+    if (otlp_connection_) {
+      AssertionResult result = otlp_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = otlp_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+  }
+
+  FakeHttpConnectionPtr otlp_connection_;
+  FakeStreamPtr otlp_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, OpenTelemetryFormatterHeaderTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that request_headers_to_add with a substitution formatter is applied to HTTP exports.
+TEST_P(OpenTelemetryFormatterHeaderTest, HttpExportWithFormatterHeader) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/path"}, {":scheme", "http"}, {":authority", "host"}};
+
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  // Wait for the metrics export HTTP request.
+  ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, otlp_connection_));
+  ASSERT_TRUE(otlp_connection_->waitForNewStream(*dispatcher_, otlp_stream_));
+  ASSERT_TRUE(otlp_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ("POST", otlp_stream_->headers().getMethodValue());
+  EXPECT_EQ("/v1/metrics", otlp_stream_->headers().getPathValue());
+
+  // Verify the custom formatter header was applied.
+  auto values = otlp_stream_->headers().get(Http::LowerCaseString("x-custom-formatter"));
+  ASSERT_FALSE(values.empty());
+  EXPECT_FALSE(values[0]->value().empty());
+  EXPECT_NE(values[0]->value(), "%HOSTNAME%");
+
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy

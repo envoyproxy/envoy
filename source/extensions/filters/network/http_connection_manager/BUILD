@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
 )
 
@@ -12,6 +13,25 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
+envoy_cc_library(
+    name = "forward_client_cert_details_lib",
+    srcs = ["forward_client_cert_details.cc"],
+    hdrs = ["forward_client_cert_details.h"],
+    visibility = [
+        "//test/common:__subpackages__",
+    ],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/matcher:matcher_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/http:conn_manager_config_interface",
+        "//source/common/http:forward_client_cert_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/matcher:matcher_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
@@ -21,6 +41,7 @@ envoy_cc_extension(
         "//test/integration:__subpackages__",
     ],
     deps = [
+        ":forward_client_cert_details_lib",
         "//envoy/config:config_provider_manager_interface",
         "//envoy/filesystem:filesystem_interface",
         "//envoy/http:codec_interface",
@@ -29,6 +50,7 @@ envoy_cc_extension(
         "//envoy/http:header_validator_factory_interface",
         "//envoy/http:original_ip_detection_interface",
         "//envoy/http:request_id_extension_interface",
+        "//envoy/matcher:matcher_interface",
         "//envoy/registry",
         "//envoy/router:route_config_provider_manager_interface",
         "//envoy/router:scopes_interface",
@@ -51,6 +73,7 @@ envoy_cc_extension(
         "//source/common/http/http3:codec_stats_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/local_reply:local_reply_lib",
+        "//source/common/matcher:matcher_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:route_provider_manager_lib",

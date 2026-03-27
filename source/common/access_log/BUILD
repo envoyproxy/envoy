@@ -31,7 +31,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@com_google_absl//absl/hash",
+        "@abseil-cpp//absl/hash",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],

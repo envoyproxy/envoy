@@ -218,6 +218,14 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "mock_ssl_handshaker_lib",
+    hdrs = ["mock_ssl_handshaker.h"],
+    deps = [
+        "//source/common/tls:ssl_handshaker_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "test_private_key_method_provider_test_lib",
     srcs = [
         "test_private_key_method_provider.cc",
@@ -293,6 +301,16 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "cert_compression_test",
+    srcs = ["cert_compression_test.cc"],
+    external_deps = ["ssl"],
+    deps = [
+        "//source/common/tls:cert_compression_lib",
+        "//test/test_common:logging_lib",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "tls_throughput_benchmark",
     srcs = ["tls_throughput_benchmark.cc"],
@@ -305,7 +323,7 @@ envoy_cc_benchmark_binary(
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

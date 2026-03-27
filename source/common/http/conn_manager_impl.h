@@ -109,10 +109,14 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   // Pass connection watermark events on to all the streams associated with that connection.
   void onAboveWriteBufferHighWatermark() override {
-    codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+    if (codec_) {
+      codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+    }
   }
   void onBelowWriteBufferLowWatermark() override {
-    codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+    if (codec_) {
+      codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+    }
   }
 
   TimeSource& timeSource() { return time_source_; }
@@ -294,7 +298,8 @@ private:
     void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
                      absl::string_view transport_failure_reason = "") override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
-    Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
+    OptRef<const Upstream::ClusterInfo> clusterInfo() override;
+    Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
@@ -342,6 +347,7 @@ private:
     void refreshIdleAndFlushTimeouts();
     void refreshAccessLogFlushTimer();
     void refreshTracing();
+    void refreshBufferLimit();
 
     void setRequestDecorator(RequestHeaderMap& headers);
     void setResponseDecorator(ResponseHeaderMap& headers);
@@ -389,6 +395,12 @@ private:
       return state_.on_reset_stream_called_ || state_.codec_encode_complete_ ||
              state_.is_internally_destroyed_;
     }
+
+    // Computes whether to skip the delay when closing a draining connection.
+    // Returns true if we should use FlushWrite (immediate close after flush),
+    // false if we should use FlushWriteAndDelay (close with delay).
+    // See https://github.com/envoyproxy/envoy/issues/30010 for background.
+    bool shouldSkipDeferredCloseDelay() const;
 
     // Per-stream idle timeout callback.
     void onIdleTimeout();
@@ -526,15 +538,18 @@ private:
     // returned by the public tracingConfig() method.
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
-    void modifySpan(Tracing::Span& span) const override;
+    void modifySpan(Tracing::Span& span, bool upstream_span) const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
     bool spawnUpstreamSpan() const override;
+    bool noContextPropagation() const override;
 
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
     std::queue<MetadataMapPtr> deferred_metadata_;
     RequestTrailerMapPtr deferred_request_trailers_;
+    const Router::Decorator* route_decorator_{nullptr};
+    const Router::RouteTracing* route_tracing_{nullptr};
     const bool trace_refresh_after_route_refresh_{true};
   };
 
@@ -684,6 +699,10 @@ private:
   // request was incomplete at response completion, the stream is reset.
 
   const bool allow_upstream_half_close_{};
+  // Whether to call checkForDeferredClose() when zombie streams complete.
+  // This fixes a potential FD leak where connections with zombie streams in draining state
+  // would not be properly closed.
+  const bool close_connection_on_zombie_stream_complete_{};
 
   // Whether the connection manager is drained due to premature resets.
   bool drained_due_to_premature_resets_{false};

@@ -1,0 +1,16 @@
+date: December 9, 2025
+
+bug_fixes:
+- area: dns
+  change: |
+    Update c-ares to version 1.34.6 to resolve CVE-2025-0913.
+
+    Use-after-free in c-ares can crash Envoy via compromised or malfunctioning DNS.
+
+    advisory: https://github.com/envoyproxy/envoy/security/advisories/GHSA-fg9g-pvc4-776f.
+
+new_features:
+- area: dns
+  change: |
+    Update c-ares to version 1.34.4. This upgrade exposes ``ares_reinit()`` which allows the reinitialization of c-ares channels,
+    among several other new features, bug-fixes, etc.

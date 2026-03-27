@@ -152,8 +152,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   http_validation_policy.validate_transfer_encoding = false;
   http_validation_policy.require_content_length_if_body_required = false;
   http_validation_policy.disallow_invalid_header_characters_in_response = true;
-  http_validation_policy.disallow_lone_cr_in_chunk_extension = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension");
+  http_validation_policy.disallow_lone_cr_in_chunk_extension = true;
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
@@ -176,12 +175,10 @@ size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {
-    if (delay_reset_) {
-      if (first_message_) {
-        first_message_ = false;
-      } else {
-        framer_.Reset();
-      }
+    if (first_message_) {
+      first_message_ = false;
+    } else {
+      framer_.Reset();
     }
 
     if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
@@ -352,9 +349,6 @@ void BalsaParser::MessageDone() {
     return;
   }
   status_ = convertResult(connection_->onMessageComplete());
-  if (!delay_reset_) {
-    framer_.Reset();
-  }
   first_byte_processed_ = false;
   headers_done_ = false;
 }

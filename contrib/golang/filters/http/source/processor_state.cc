@@ -300,7 +300,7 @@ void DecodingProcessorState::addBufferData(Buffer::Instance& data) {
           }
         },
         []() -> void { /* TODO: Handle overflow watermark */ });
-    data_buffer_->setWatermarks(decoder_callbacks_->decoderBufferLimit());
+    data_buffer_->setWatermarks(decoder_callbacks_->bufferLimit());
   }
   data_buffer_->move(data);
 }
@@ -334,7 +334,7 @@ void EncodingProcessorState::addBufferData(Buffer::Instance& data) {
           }
         },
         []() -> void { /* TODO: Handle overflow watermark */ });
-    data_buffer_->setWatermarks(encoder_callbacks_->encoderBufferLimit());
+    data_buffer_->setWatermarks(encoder_callbacks_->bufferLimit());
   }
   data_buffer_->move(data);
 }

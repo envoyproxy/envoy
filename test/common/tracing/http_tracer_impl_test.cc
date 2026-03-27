@@ -45,9 +45,7 @@ protected:
   HttpConnManFinalizerImplTest() {
     Upstream::HostDescriptionConstSharedPtr shared_host(host_);
     stream_info.upstreamInfo()->setUpstreamHost(shared_host);
-    ON_CALL(stream_info, upstreamClusterInfo())
-        .WillByDefault(
-            Return(absl::make_optional<Upstream::ClusterInfoConstSharedPtr>(cluster_info_)));
+    stream_info.upstream_cluster_info_ = cluster_info_;
   }
   struct CustomTagCase {
     std::string custom_tag;
@@ -59,7 +57,8 @@ protected:
     for (const CustomTagCase& cas : cases) {
       envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
-      custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
+      auto custom_tag_ptr = CustomTagUtility::createCustomTag(custom_tag);
+      custom_tags_.emplace(custom_tag_ptr->tag(), custom_tag_ptr);
       if (cas.set) {
         EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
       } else {
@@ -67,7 +66,7 @@ protected:
       }
     }
 
-    EXPECT_CALL(config, modifySpan(_)).WillOnce(Invoke([this](Span& span) {
+    EXPECT_CALL(config, modifySpan).WillOnce(Invoke([this](Span& span, bool) {
       HttpTraceContext trace_context{request_headers_};
       const CustomTagContext ctx{trace_context, stream_info, {&request_headers_}};
       for (const auto& [_, custom_tag] : custom_tags_) {
@@ -195,9 +194,9 @@ TEST_F(HttpConnManFinalizerImplTest, NullRequestHeadersAndNullRouteEntry) {
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   // No upstream info.
   stream_info.upstreamInfo()->setUpstreamHost(nullptr);
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(nullptr));
   // No cluster info.
-  EXPECT_CALL(stream_info, upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(stream_info, upstreamClusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
@@ -300,7 +299,8 @@ TEST_F(HttpConnManFinalizerImplTest, UpstreamClusterTagSetAlthoughNoUpstreamInfo
 
 TEST_F(HttpConnManFinalizerImplTest, NoUpstreamClusterTagSetWhenNoClusterInfo) {
   // No cluster info.
-  EXPECT_CALL(stream_info, upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(stream_info, upstreamClusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
 
   EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
@@ -402,7 +402,7 @@ ree:
   TestUtility::loadFromYaml(yaml, fake_struct);
   (*stream_info.metadata_.mutable_filter_metadata())["m.req"].MergeFrom(fake_struct);
   std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(route));
+  stream_info.route_ = route;
   (*route->metadata_.mutable_filter_metadata())["m.rot"].MergeFrom(fake_struct);
   std::shared_ptr<envoy::config::core::v3::Metadata> host_metadata =
       std::make_shared<envoy::config::core::v3::Metadata>();

@@ -50,6 +50,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/access_loggers/filters/process_ratelimit:config",
         "//source/extensions/formatter/cel:config",
+        "//test/integration:ads_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",

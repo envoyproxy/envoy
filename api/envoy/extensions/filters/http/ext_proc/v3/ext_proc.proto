@@ -60,8 +60,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Request body: If the body is present, the behavior depends on the
 //   body send mode. In ``BUFFERED`` or ``BUFFERED_PARTIAL`` mode, the body is sent to the external
 //   processor in a single message. In ``STREAMED`` or ``FULL_DUPLEX_STREAMED`` mode, the body will
-//   be split across multiple messages sent to the external processor. In ``NONE`` mode, the body
-//   will not be sent to the external processor.
+//   be split across multiple messages sent to the external processor. In ``GRPC`` mode, as each
+//   gRPC message arrives, it will be sent to the external processor (there will be exactly one
+//   gRPC message in each message sent to the external processor). In ``NONE`` mode, the body will
+//   not be sent to the external processor.
 // * Request trailers: Delivered if they are present and if the trailer mode is set
 //   to ``SEND``.
 // * Response headers: Contains the headers from the HTTP response. Keep in mind
@@ -96,7 +98,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -209,9 +211,9 @@ message ExternalProcessor {
   // an error (subject to the processing mode) if the timer expires before a
   // matching response is received. There is no timeout when the filter is
   // running in observability mode or when the body send mode is
-  // ``FULL_DUPLEX_STREAMED``. Zero is a valid config which means the timer
-  // will be triggered immediately. If not configured, default is 200
-  // milliseconds.
+  // ``FULL_DUPLEX_STREAMED`` or ``GRPC``. Zero is a valid config which means
+  // the timer will be triggered immediately. If not configured, default is
+  // 200 milliseconds.
   google.protobuf.Duration message_timeout = 7 [(validate.rules).duration = {
     lte {seconds: 3600}
     gte {}
@@ -273,8 +275,8 @@ message ExternalProcessor {
   // without pausing on filter chain iteration. It is "Send and Go" mode that can be used
   // by external processor to observe the request's data and status. In this mode:
   //
-  // 1. Only ``STREAMED`` and ``NONE`` body processing modes are supported; for any other body
-  // processing mode, the body will not be sent.
+  // 1. Only ``STREAMED``, ``GRPC``, and ``NONE`` body processing modes are supported; for any
+  // other body processing mode, the body will not be sent.
   //
   // 2. External processor should not send back processing response, as any responses will be ignored.
   // This also means that
@@ -282,14 +284,6 @@ message ExternalProcessor {
   // restriction doesn't apply to this mode.
   //
   // 3. External processor may still close the stream to indicate that no more messages are needed.
-  //
-  // .. warning::
-  //
-  //    Flow control is a necessary mechanism to prevent the fast sender (either downstream client or upstream server)
-  //    from overwhelming the external processor when its processing speed is slower.
-  //    This protective measure is being explored and developed but has not been ready yet, so please use your own
-  //    discretion when enabling this feature.
-  //    This work is currently tracked under https://github.com/envoyproxy/envoy/issues/33319.
   //
   bool observability_mode = 17;
 
@@ -367,6 +361,20 @@ message ExternalProcessor {
   //
   // The default status is ``HTTP 500 Internal Server Error``.
   type.v3.HttpStatus status_on_error = 24;
+
+  // If true, the filter will not remove the ``content-length`` header from the request/response after external processing.
+  // It is typically used in
+  // :ref:`FULL_DUPLEX_STREAMED <envoy_v3_api_enum_value_extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode.FULL_DUPLEX_STREAMED>`
+  // mode. If the original body has been modified, the external processing server needs to set the correct content-length header in HeaderMutation
+  // that matches the modified body length.
+  //
+  // .. warning::
+  //
+  //    This configuration should only be used if you are sure that the content length matches
+  //    the body length after external processing. Otherwise, it may cause vulnerability issues such as
+  //    request smuggling. Thus, please use your own discretion when enabling this feature.
+  //
+  bool allow_content_length_header = 26;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.

@@ -9,6 +9,7 @@ load("@rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
 load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
 load("@rules_proto//proto:toolchains.bzl", "rules_proto_toolchains")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
+load("@rules_python//python:pip.bzl", "pip_parse")
 
 def _default_extra_swift_sources_impl(ctx):
     ctx.file("WORKSPACE", "")
@@ -50,6 +51,7 @@ def envoy_mobile_dependencies(extra_maven_dependencies = []):
 
     swift_dependencies()
     kotlin_dependencies(extra_maven_dependencies)
+    python_dependencies()
 
 def swift_dependencies():
     apple_support_dependencies()
@@ -63,7 +65,7 @@ def kotlin_dependencies(extra_maven_dependencies = []):
             "com.google.code.findbugs:jsr305:3.0.2",
             "androidx.annotation:annotation:1.5.0",
             # Java Proto Lite
-            "com.google.protobuf:protobuf-javalite:3.24.4",
+            "com.google.protobuf:protobuf-javalite:4.33.1",
             # Kotlin
             "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.6.21",
             "org.jetbrains.kotlin:kotlin-stdlib-common:1.6.21",
@@ -104,3 +106,10 @@ def kotlin_dependencies(extra_maven_dependencies = []):
     rules_proto_grpc_repos()
     rules_proto_dependencies()
     rules_proto_toolchains()
+
+def python_dependencies():
+    pip_parse(
+        name = "mobile_pip3",
+        requirements_lock = "//third_party/python:requirements.txt",
+        timeout = 1000,
+    )

@@ -1,0 +1,124 @@
+diff --git a/Makefile.am b/Makefile.am
+index c481820..eead5c1 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -44,8 +44,6 @@ nobase_pkginclude_HEADERS = v1/wd.h v1/wd_cipher.h v1/wd_aead.h v1/uacce.h v1/wd
+ lib_LTLIBRARIES=libwd.la libwd_comp.la libwd_crypto.la libwd_dae.la
+ 
+ uadk_driversdir=$(libdir)/uadk
+-uadk_drivers_LTLIBRARIES=libhisi_sec.la libhisi_hpre.la libhisi_zip.la \
+-			 libisa_ce.la libisa_sve.la libhisi_dae.la
+ 
+ libwd_la_SOURCES=wd.c wd_mempool.c wd.h	wd_alg.c wd_alg.h	\
+ 		 v1/wd.c v1/wd.h v1/wd_adapter.c v1/wd_adapter.h \
+@@ -97,14 +95,6 @@ libhisi_hpre_la_SOURCES=drv/hisi_hpre.c drv/hisi_qm_udrv.c \
+ libisa_ce_la_SOURCES=arm_arch_ce.h drv/isa_ce_sm3.c drv/isa_ce_sm3_armv8.S isa_ce_sm3.h \
+ 		drv/isa_ce_sm4.c drv/isa_ce_sm4_armv8.S drv/isa_ce_sm4.h
+ 
+-libisa_sve_la_SOURCES=drv/hash_mb/hash_mb.c wd_digest_drv.h drv/hash_mb/hash_mb.h \
+-		drv/hash_mb/sm3_sve_common.S drv/hash_mb/sm3_mb_asimd_x1.S \
+-		drv/hash_mb/sm3_mb_asimd_x4.S drv/hash_mb/sm3_mb_sve.S \
+-		drv/hash_mb/md5_sve_common.S drv/hash_mb/md5_mb_asimd_x1.S \
+-		drv/hash_mb/md5_mb_asimd_x4.S drv/hash_mb/md5_mb_sve.S
+-
+-libhisi_dae_la_SOURCES=drv/hisi_dae.c drv/hisi_qm_udrv.c \
+-		hisi_qm_udrv.h
+ 
+ if WD_STATIC_DRV
+ AM_CFLAGS += -DWD_STATIC_DRV -fPIC
+@@ -129,12 +119,6 @@ libhisi_sec_la_DEPENDENCIES = libwd.la libwd_crypto.la
+ libhisi_hpre_la_LIBADD = $(libwd_la_OBJECTS) $(libwd_crypto_la_OBJECTS)
+ libhisi_hpre_la_DEPENDENCIES = libwd.la libwd_crypto.la
+ 
+-libisa_ce_la_LIBADD = $(libwd_la_OBJECTS) $(libwd_crypto_la_OBJECTS)
+-libisa_ce_la_DEPENDENCIES = libwd.la libwd_crypto.la
+-
+-libisa_sve_la_LIBADD = $(libwd_la_OBJECTS) $(libwd_crypto_la_OBJECTS)
+-libisa_sve_la_DEPENDENCIES = libwd.la libwd_crypto.la
+-
+ libhisi_dae_la_LIBADD = $(libwd_la_OBJECTS) $(libwd_dae_la_OBJECTS)
+ libhisi_dae_la_DEPENDENCIES = libwd.la libwd_dae.la
+ 
+@@ -172,14 +156,6 @@ libhisi_hpre_la_LIBADD= -lwd -lwd_crypto
+ libhisi_hpre_la_LDFLAGS=$(UADK_VERSION)
+ libhisi_hpre_la_DEPENDENCIES= libwd.la libwd_crypto.la
+ 
+-libisa_ce_la_LIBADD= -lwd -lwd_crypto
+-libisa_ce_la_LDFLAGS=$(UADK_VERSION)
+-libisa_ce_la_DEPENDENCIES= libwd.la libwd_crypto.la
+-
+-libisa_sve_la_LIBADD= -lwd -lwd_crypto
+-libisa_sve_la_LDFLAGS=$(UADK_VERSION)
+-libisa_sve_la_DEPENDENCIES= libwd.la libwd_crypto.la
+-
+ libhisi_dae_la_LIBADD= -lwd -lwd_dae
+ libhisi_dae_la_LDFLAGS=$(UADK_VERSION)
+ libhisi_dae_la_DEPENDENCIES= libwd.la libwd_dae.la
+@@ -190,4 +166,4 @@ pkgconfigdir = $(libdir)/pkgconfig
+ pkgconfig_DATA = lib/libwd_crypto.pc lib/libwd_comp.pc lib/libwd.pc
+ CLEANFILES += $(pkgconfig_DATA)
+ 
+-SUBDIRS=. test v1/test uadk_tool sample
++SUBDIRS=. 
+diff --git a/configure.ac b/configure.ac
+index 592b868..172a161 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -4,6 +4,11 @@ AC_CONFIG_SRCDIR([wd.c])
+ AM_INIT_AUTOMAKE([1.10 no-define])
+ 
+ AC_CONFIG_MACRO_DIR([m4])
++
++# Suppress AC_DEFINE error messages
++m4_pattern_allow([AC_DEFINE])
++m4_pattern_allow([PKG_CHECK_MODULES])
++
+ AC_CONFIG_HEADERS([config.h])
+ 
+ # Checks for programs.
+@@ -50,12 +55,6 @@ AC_CHECK_LIB(z, zlibVersion,
+ 	     [ have_zlib=false ])
+ AM_CONDITIONAL([HAVE_ZLIB], [test "x$have_zlib" = "xtrue"])
+ 
+-PKG_CHECK_MODULES(libcrypto, libcrypto < 3.0 libcrypto >= 1.1,
+-	     [ AC_DEFINE(HAVE_CRYPTO, 1, [Have crypto])
+-	       have_crypto=true ],
+-	     [ have_crypto=false ])
+-AM_CONDITIONAL([HAVE_CRYPTO], [test "x$have_crypto" = "xtrue"])
+-
+ AC_ARG_WITH(log_file,
+ 	AS_HELP_STRING([--with-log_file], [File to write log]),
+ 	WITH_LOG_FILE=$withvar, WITH_LOG_FILE=)
+@@ -93,16 +92,5 @@ AC_CHECK_FUNCS([gettimeofday memmove memset munmap strstr strtoul strtoull])
+ 
+ AC_CONFIG_FILES([Makefile
+ 		 lib/libwd_crypto.pc lib/libwd_comp.pc lib/libwd.pc
+-		 test/Makefile
+-		 test/hisi_hpre_test/Makefile
+-		 uadk_tool/Makefile
+-		 sample/Makefile
+-		 v1/test/Makefile
+-		 v1/test/bmm_test/Makefile
+-		 v1/test/test_mm/Makefile
+-		 v1/test/hisi_hpre_test/Makefile
+-		 v1/test/hisi_sec_test/Makefile
+-		 v1/test/hisi_sec_test_sgl/Makefile
+-		 v1/test/hisi_zip_test/Makefile
+-		 v1/test/hisi_zip_test_sgl/Makefile])
++])
+ AC_OUTPUT
+diff --git a/v1/wd_util.h b/v1/wd_util.h
+index 9767be4..b11476c 100644
+--- a/v1/wd_util.h
++++ b/v1/wd_util.h
+@@ -112,8 +112,8 @@ struct wd_lock {
+ };
+ 
+ struct wd_fair_lock {
+-	__u32 ticket;
+-	__u32 serving;
++	_Atomic __u32 ticket;
++	_Atomic __u32 serving;
+ };
+ 
+ struct wd_ss_region {

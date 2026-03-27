@@ -60,11 +60,6 @@ message StatsConfig {
   // <envoy_v3_api_field_config.metrics.v3.StatsConfig.stats_tags>`. They will be processed before
   // the custom tags.
   //
-  // .. note::
-  //
-  //   If any default tags are specified twice, the config will be considered
-  //   invalid.
-  //
   // See :repo:`well_known_names.h <source/common/config/well_known_names.h>` for a list of the
   // default tags in Envoy.
   //

@@ -10,6 +10,13 @@ Thank you in advance for helping to keep Envoy secure.
 
 For an explanation of how to fill out the fields, please see the relevant section
 in [PULL_REQUESTS.md](https://github.com/envoyproxy/envoy/blob/main/PULL_REQUESTS.md)
+
+!!!ATTENTION!!!
+
+Please check the [use of generative AI policy](https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md?plain=1#L41).
+
+You may use generative AI only if you fully understand the code. You need to disclose
+this usage in the PR description to ensure transparency.
 -->
 
 Commit Message:

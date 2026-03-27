@@ -50,14 +50,6 @@ MockServerConnection::~MockServerConnection() = default;
 MockClientConnection::MockClientConnection() = default;
 MockClientConnection::~MockClientConnection() = default;
 
-MockFilterChainManager::MockFilterChainManager() {
-  ON_CALL(*this, applyFilterFactoryCb(_, _))
-      .WillByDefault(
-          Invoke([this](FilterContext, FilterFactoryCb& factory) { factory(callbacks_); }));
-}
-
-MockFilterChainManager::~MockFilterChainManager() = default;
-
 MockFilterChainFactory::MockFilterChainFactory() = default;
 MockFilterChainFactory::~MockFilterChainFactory() = default;
 
@@ -67,7 +59,14 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
   ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(callbacks.dispatcher_));
   ON_CALL(callbacks, streamInfo()).WillByDefault(ReturnRef(callbacks.stream_info_));
   ON_CALL(callbacks, route()).WillByDefault(Return(callbacks.route_));
-  ON_CALL(callbacks, clusterInfo()).WillByDefault(Return(callbacks.cluster_info_));
+  ON_CALL(callbacks, clusterInfo())
+      .WillByDefault(Invoke([&callbacks]() -> OptRef<const Upstream::ClusterInfo> {
+        return makeOptRefFromPtr<const Upstream::ClusterInfo>(callbacks.cluster_info_.get());
+      }));
+  ON_CALL(callbacks, clusterInfoSharedPtr())
+      .WillByDefault(Invoke([&callbacks]() -> Upstream::ClusterInfoConstSharedPtr {
+        return callbacks.cluster_info_;
+      }));
   ON_CALL(callbacks, downstreamCallbacks())
       .WillByDefault(
           Return(OptRef<DownstreamStreamFilterCallbacks>{callbacks.downstream_callbacks_}));
@@ -102,7 +101,7 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, routeConfig())
       .WillByDefault(Return(absl::optional<Router::ConfigConstSharedPtr>()));
   ON_CALL(*this, upstreamOverrideHost())
-      .WillByDefault(Return(absl::optional<Upstream::LoadBalancerContext::OverrideHost>()));
+      .WillByDefault(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
   ON_CALL(*this, mostSpecificPerFilterConfig())
       .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {

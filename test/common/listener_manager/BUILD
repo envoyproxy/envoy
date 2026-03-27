@@ -78,6 +78,7 @@ envoy_cc_test(
     shard_count = 5,
     deps = [
         ":listener_manager_impl_test_lib",
+        "//envoy/network:socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
         "//source/common/listener_manager:active_raw_udp_listener_config",
@@ -99,6 +100,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/integration/filters:test_listener_filter_lib",
+        "//test/mocks/server:listener_update_callbacks_mocks",
         "//test/server:utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
@@ -202,8 +204,8 @@ envoy_cc_benchmark_binary(
         "//test/mocks/stream_info:stream_info_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_googletest//:gtest",
+        "@benchmark",
+        "@googletest//:gtest",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )

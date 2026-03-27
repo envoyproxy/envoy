@@ -13,15 +13,19 @@ namespace HttpFilters {
 namespace JsonToMetadata {
 
 class JsonToMetadataConfig
-    : public Extensions::HttpFilters::Common::FactoryBase<
+    : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata> {
 public:
-  JsonToMetadataConfig();
+  JsonToMetadataConfig() : ExceptionFreeFactoryBase("envoy.filters.http.json_to_metadata") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata&,
       const std::string&, Server::Configuration::FactoryContext&) override;
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& config,
+      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace JsonToMetadata

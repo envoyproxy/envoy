@@ -60,8 +60,7 @@ class GrpcMuxImpl : public GrpcStreamCallbacks<RS>,
                     public ShutdownableMux,
                     Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, GrpcMuxContext& grpc_mux_context,
-              bool skip_subsequent_node);
+  GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, GrpcMuxContext& grpc_mux_context);
 
   ~GrpcMuxImpl() override;
 
@@ -114,6 +113,10 @@ public:
   EdsResourcesCacheOptRef edsResourcesCache() override {
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
+
+  // TODO(adisuissa): finish implementation.
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
 
   GrpcStreamInterface<RQ, RS>& grpcStreamForTest() {
     // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
@@ -258,7 +261,7 @@ class GrpcMuxDelta : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptio
                                         envoy::service::discovery::v3::DeltaDiscoveryRequest,
                                         envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
-  GrpcMuxDelta(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
+  explicit GrpcMuxDelta(GrpcMuxContext& grpc_mux_context);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -274,7 +277,7 @@ class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionSt
                                        envoy::service::discovery::v3::DiscoveryRequest,
                                        envoy::service::discovery::v3::DiscoveryResponse> {
 public:
-  GrpcMuxSotw(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
+  explicit GrpcMuxSotw(GrpcMuxContext& grpc_mux_context);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
@@ -313,6 +316,9 @@ public:
   }
 
   EdsResourcesCacheOptRef edsResourcesCache() override { return {}; }
+
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
 };
 
 } // namespace XdsMux

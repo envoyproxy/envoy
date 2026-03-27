@@ -41,7 +41,7 @@ class GrpcMuxImpl : public GrpcMux,
                     public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>,
                     public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node);
+  explicit GrpcMuxImpl(GrpcMuxContext& grpc_mux_context);
 
   ~GrpcMuxImpl() override;
 
@@ -78,6 +78,9 @@ public:
                   Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
                   BackOffStrategyPtr&& backoff_strategy,
                   const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
+
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override;
+  Upstream::LoadStatsReporter* loadStatsReporter() const override;
 
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
@@ -294,6 +297,11 @@ private:
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   EdsResourcesCachePtr eds_resources_cache_;
   const std::string target_xds_authority_;
+  // A Load-Stats-Reporter factory method that allows to lazily create the
+  // reporter if needed.
+  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory_;
+  // The load stats reporter, lazily created.
+  std::unique_ptr<Upstream::LoadStatsReporter> lrs_server_;
   bool first_stream_request_{true};
 
   // Helper function for looking up and potentially allocating a new ApiState.
