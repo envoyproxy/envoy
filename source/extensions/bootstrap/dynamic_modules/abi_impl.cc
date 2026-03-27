@@ -504,8 +504,8 @@ envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new(
 
   // Create the filesystem watcher on the main thread dispatcher and wrap it.
   auto envoy_watcher = config->main_thread_dispatcher_.createFilesystemWatcher();
-  auto* watcher_wrapper = new DynamicModuleBootstrapExtensionFileWatcher(
-      config->weak_from_this(), std::move(envoy_watcher));
+  auto* watcher_wrapper = new DynamicModuleBootstrapExtensionFileWatcher(config->weak_from_this(),
+                                                                         std::move(envoy_watcher));
   return static_cast<void*>(watcher_wrapper);
 }
 

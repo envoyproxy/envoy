@@ -114,12 +114,12 @@ absl::Status DynamicModuleBootstrapExtensionFileWatcher::addWatch(absl::string_v
                                                                   uint32_t events) {
   // Capture the path as a string so the on_file_changed callback can identify which file changed.
   // The watcher_wrapper raw pointer (this) is captured by value and is stable since it is
-  // heap-allocated and its lifetime is managed by the module via file_watcher_new/file_watcher_delete.
+  // heap-allocated and its lifetime is managed by the module via
+  // file_watcher_new/file_watcher_delete.
   auto* self = this;
   const std::string path_str(path);
   return watcher_->addWatch(
-      path_str, events,
-      [weak_config = config_, self, path_str](uint32_t events) -> absl::Status {
+      path_str, events, [weak_config = config_, self, path_str](uint32_t events) -> absl::Status {
         if (auto config_shared = weak_config.lock()) {
           if (config_shared->in_module_config_ != nullptr &&
               config_shared->on_bootstrap_extension_file_changed_ != nullptr) {

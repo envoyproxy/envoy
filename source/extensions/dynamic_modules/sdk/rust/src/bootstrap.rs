@@ -1,18 +1,9 @@
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi,
-  drop_wrapped_c_void_ptr,
-  str_to_module_buffer,
-  wrap_into_c_void_ptr,
-  EnvoyCounterId,
-  EnvoyCounterVecId,
-  EnvoyGaugeId,
-  EnvoyGaugeVecId,
-  EnvoyHistogramId,
-  EnvoyHistogramVecId,
-  NewBootstrapExtensionConfigFunction,
-  NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
+  abi, drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr, EnvoyCounterId,
+  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  NewBootstrapExtensionConfigFunction, NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
 };
 use mockall::*;
 
@@ -779,6 +770,8 @@ impl EnvoyBootstrapExtensionFileWatcher for EnvoyBootstrapExtensionFileWatcherRe
     self.raw_ptr as usize
   }
 
+  // Non-owning refs are only used inside on_file_changed callbacks for identity matching.
+  // Adding watches from within a callback is not supported.
   fn add_watch(&self, _path: &str, _events: u32) -> bool {
     false
   }
@@ -1608,13 +1601,8 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
 }
 
 /// Event hook called by Envoy when a watched file changes for a bootstrap extension.
-///
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
 #[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_file_changed(
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_file_changed(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
   watcher_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr,
@@ -1625,7 +1613,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_file_change
   let extension_config = unsafe { &**extension_config };
 
   // Create a non-owning reference to the watcher so the module can identify which watcher fired.
-  let watcher_ref = EnvoyBootstrapExtensionFileWatcherRef { raw_ptr: watcher_ptr };
+  let watcher_ref = EnvoyBootstrapExtensionFileWatcherRef {
+    raw_ptr: watcher_ptr,
+  };
 
   let path_str = unsafe {
     std::str::from_utf8_unchecked(std::slice::from_raw_parts(

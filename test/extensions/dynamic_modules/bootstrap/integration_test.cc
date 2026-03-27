@@ -119,18 +119,21 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, TimerRust) {
 }
 
 // This test verifies that the Rust bootstrap extension file watcher API works correctly.
-// A file watcher is created during config_new for a temporary file. A short timer triggers a write
-// to that file, which causes on_file_changed to fire. The watcher identity API (id()) is used to
-// verify the correct watcher fired. Init completes after the file change is detected.
+// A single watcher monitors two files. Three timed writes occur: file_a twice and file_b once.
+// on_file_changed verifies watcher identity, tracks per-path counts, and signals init complete
+// only after file_a has been seen at least 2 times and file_b at least 1 time.
 TEST_P(DynamicModulesBootstrapIntegrationTest, FileWatcherRust) {
-  // Create a temporary file for the watcher to monitor.
-  const std::string watch_path =
-      TestEnvironment::writeStringToFileForTest("file_watcher_test_target", "initial content");
+  // Create two temporary files for the watcher to monitor.
+  const std::string path_a =
+      TestEnvironment::writeStringToFileForTest("file_watcher_test_a", "initial a");
+  const std::string path_b =
+      TestEnvironment::writeStringToFileForTest("file_watcher_test_b", "initial b");
+  // Pass both paths separated by |.
+  const std::string config = path_a + "|" + path_b;
 
-  EXPECT_LOG_CONTAINS(
-      "info", "Bootstrap file watcher test completed successfully!",
-      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_file_watcher_test", "test",
-                                       watch_path));
+  EXPECT_LOG_CONTAINS("info", "Bootstrap file watcher test completed successfully!",
+                      initializeWithBootstrapExtension(
+                          testDataDir("rust"), "bootstrap_file_watcher_test", "test", config));
 }
 
 // This test verifies that the Rust bootstrap extension can register a custom admin HTTP endpoint

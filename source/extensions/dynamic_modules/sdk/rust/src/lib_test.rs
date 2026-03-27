@@ -3013,13 +3013,15 @@ fn test_bootstrap_extension_file_changed_identity() {
   // Fire watcher A with MovedTo event and verify the recorded id and events match.
   FIRED_WATCHER_ID.store(0, std::sync::atomic::Ordering::SeqCst);
   FIRED_EVENTS.store(0, std::sync::atomic::Ordering::SeqCst);
-  envoy_dynamic_module_on_bootstrap_extension_file_changed(
-    std::ptr::null_mut(),
-    config_ptr,
-    fake_watcher_a,
-    path_buf,
-    FILE_WATCHER_EVENT_MOVED_TO,
-  );
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_file_changed(
+      std::ptr::null_mut(),
+      config_ptr,
+      fake_watcher_a,
+      path_buf,
+      FILE_WATCHER_EVENT_MOVED_TO,
+    );
+  }
   assert_eq!(
     FIRED_WATCHER_ID.load(std::sync::atomic::Ordering::SeqCst),
     fake_watcher_a as usize
@@ -3032,13 +3034,15 @@ fn test_bootstrap_extension_file_changed_identity() {
   // Fire watcher B with Modified event and verify different id.
   FIRED_WATCHER_ID.store(0, std::sync::atomic::Ordering::SeqCst);
   FIRED_EVENTS.store(0, std::sync::atomic::Ordering::SeqCst);
-  envoy_dynamic_module_on_bootstrap_extension_file_changed(
-    std::ptr::null_mut(),
-    config_ptr,
-    fake_watcher_b,
-    path_buf,
-    FILE_WATCHER_EVENT_MODIFIED,
-  );
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_file_changed(
+      std::ptr::null_mut(),
+      config_ptr,
+      fake_watcher_b,
+      path_buf,
+      FILE_WATCHER_EVENT_MODIFIED,
+    );
+  }
   assert_eq!(
     FIRED_WATCHER_ID.load(std::sync::atomic::Ordering::SeqCst),
     fake_watcher_b as usize
