@@ -765,4 +765,16 @@ new_features:
     ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
     This is necessary if the route configuration may depend on the filter state values set.
 
+- area: contrib
+  change: |
+    Added a new :ref:`Kafka stats sink <config_stat_sinks_kafka>` contrib extension
+    (``envoy.stat_sinks.kafka``) that produces metrics directly to an Apache Kafka topic
+    using librdkafka. Supports both JSON and Protobuf serialization formats; the Protobuf
+    format uses the same ``StreamMetricsMessage`` wire format as the gRPC
+    :ref:`metrics_service <envoy_v3_api_msg_config.metrics.v3.MetricsServiceConfig>` sink,
+    allowing consumers to reuse existing deserializers. Configurable batching, delta counters,
+    tag-as-label emission, and full librdkafka producer tuning (including TLS and SASL
+    authentication) are supported via
+    :ref:`KafkaStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig>`.
+
 deprecated:
