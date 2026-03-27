@@ -1302,13 +1302,13 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
   // Refresh cached route after cache is cleared.
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
       .WillOnce(Return(Router::VirtualHostRoute{mock_route_1->virtual_host_, mock_route_1}));
-  EXPECT_EQ(filter->callbacks_->routeSharedPtr().get(), mock_route_1.get());
+  EXPECT_EQ(filter->callbacks_->route().ptr(), mock_route_1.get());
 
   auto mock_route_2 = std::make_shared<NiceMock<Router::MockRoute>>();
 
   // We can also set route directly.
   filter->callbacks_->downstreamCallbacks()->setRoute(mock_route_2);
-  EXPECT_EQ(filter->callbacks_->routeSharedPtr().get(), mock_route_2.get());
+  EXPECT_EQ(filter->callbacks_->route().ptr(), mock_route_2.get());
 
   ResponseHeaderMapPtr response_headers{
       new TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "2"}}};
@@ -1321,11 +1321,11 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
       {
         // The cached route will not be cleared after response headers are sent.
         filter->callbacks_->downstreamCallbacks()->clearRouteCache();
-        EXPECT_EQ(filter->callbacks_->routeSharedPtr().get(), mock_route_2.get());
+        EXPECT_EQ(filter->callbacks_->route().ptr(), mock_route_2.get());
 
         // We cannot set route after response headers are sent.
         filter->callbacks_->downstreamCallbacks()->setRoute(nullptr);
-        EXPECT_EQ(filter->callbacks_->routeSharedPtr().get(), mock_route_2.get());
+        EXPECT_EQ(filter->callbacks_->route().ptr(), mock_route_2.get());
       },
       "Should never try to refresh or clear the route cache when it is blocked!");
 

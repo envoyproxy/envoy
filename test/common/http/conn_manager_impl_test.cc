@@ -1127,7 +1127,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
         // refreshCachedRoute(cb), which (1) calls route_config_->route(_, _, _, _) mock to set
         // default_route as cached_route_, and (2) calls getThreadLocalCluster mock to set
         // cached_cluster_info_.
-        EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->routeSharedPtr());
+        EXPECT_EQ(default_route.get(), decoder_filters_[0]->callbacks_->route().ptr());
         EXPECT_EQ(default_cluster_name,
                   decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
         EXPECT_EQ(default_route.get(), decoder_filters_[0]->callbacks_->streamInfo().route().ptr());
@@ -1148,7 +1148,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         // Returns cached_route, does not invoke route(cb)
-        EXPECT_EQ(foo_route_override, decoder_filters_[1]->callbacks_->routeSharedPtr());
+        EXPECT_EQ(foo_route_override.get(), decoder_filters_[1]->callbacks_->route().ptr());
         // Note: The route filter determines the finalized route's upstream cluster name via
         // routeEntry()->clusterName(), so that's the key piece to check.
         // This should directly call the ExampleDerivedDelegatingRouteEntry overridden
@@ -1236,7 +1236,7 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         formatter_context.setRequestHeaders(test_req_headers);
 
         // Check that cached_route was correctly set to the delegating route.
-        EXPECT_EQ(delegating_route_foo, decoder_filters_[1]->callbacks_->routeSharedPtr());
+        EXPECT_EQ(delegating_route_foo.get(), decoder_filters_[1]->callbacks_->route().ptr());
 
         // Check that delegating route correctly overrides the routeEntry()->clusterName()
         EXPECT_EQ(foo_cluster_name, delegating_route_foo->routeEntry()->clusterName());
@@ -3437,8 +3437,8 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
         // Under heavy load it is possible that stream timeout will be reached before any headers
         // were received. Envoy will create a local reply that will go through the encoder filter
         // chain. We want to make sure that encoder filters get a null route object.
-        auto route = filter->callbacks_->routeSharedPtr();
-        EXPECT_EQ(route.get(), nullptr);
+        auto route = filter->callbacks_->route();
+        EXPECT_FALSE(route.has_value());
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*filter, encodeData(_, _));
