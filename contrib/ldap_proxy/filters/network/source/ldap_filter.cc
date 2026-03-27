@@ -182,6 +182,9 @@ void LdapFilter::onStartTlsRequest(uint32_t msg_id, size_t /*msg_length*/) {
   ENVOY_CONN_LOG(debug, "ldap_proxy: StartTLS request detected, msgID={}", 
                  read_callbacks_->connection(), msg_id);
 
+  stats_.starttls_req_total_.inc();
+  starttls_start_time_ = read_callbacks_->connection().dispatcher().timeSource().monotonicTime();
+
   pending_starttls_msg_id_ = msg_id;
   state_ = FilterState::NegotiatingUpstream;
   read_callbacks_->connection().readDisable(true);
@@ -290,7 +293,10 @@ void LdapFilter::sendUpstreamStartTlsRequest() {
         }
         ENVOY_CONN_LOG(error, "ldap_proxy: upstream StartTLS response timeout",
                        read_callbacks_->connection());
+        stats_.starttls_rsp_total_.inc();
+        stats_.starttls_rsp_error_.inc();
         stats_.decoder_error_.inc();
+        recordStartTlsOpTime();
         closeConnection();
       });
   upstream_starttls_timer_->enableTimer(kUpstreamStartTlsTimeout);
@@ -312,7 +318,10 @@ bool LdapFilter::handleUpstreamStartTlsResponse(Buffer::Instance& data) {
   if (!parseExtendedResponse(buf.data(), buf.size(), result_code, msg_id)) {
     ENVOY_CONN_LOG(error, "ldap_proxy: failed to parse upstream StartTLS response",
                    read_callbacks_->connection());
+    stats_.starttls_rsp_total_.inc();
+    stats_.starttls_rsp_error_.inc();
     stats_.decoder_error_.inc();
+    recordStartTlsOpTime();
     closeConnection();
     return true;
   }
@@ -320,10 +329,14 @@ bool LdapFilter::handleUpstreamStartTlsResponse(Buffer::Instance& data) {
   ENVOY_CONN_LOG(debug, "ldap_proxy: upstream StartTLS response: msgID={}, resultCode={}",
                  read_callbacks_->connection(), msg_id, result_code);
 
+  stats_.starttls_rsp_total_.inc();
+
   if (msg_id != upstream_starttls_msg_id_) {
     ENVOY_CONN_LOG(error, "ldap_proxy: upstream response msgID mismatch: expected={}, got={}",
                    read_callbacks_->connection(), upstream_starttls_msg_id_, msg_id);
+    stats_.starttls_rsp_error_.inc();
     stats_.decoder_error_.inc();
+    recordStartTlsOpTime();
     closeConnection();
     return true;
   }
@@ -331,13 +344,17 @@ bool LdapFilter::handleUpstreamStartTlsResponse(Buffer::Instance& data) {
   if (result_code != kLdapResultSuccess) {
     ENVOY_CONN_LOG(error, "ldap_proxy: upstream rejected StartTLS, resultCode={}",
                    read_callbacks_->connection(), result_code);
+    stats_.starttls_rsp_error_.inc();
     stats_.decoder_error_.inc();
+    recordStartTlsOpTime();
     closeConnection();
     return true;
   }
 
   ENVOY_CONN_LOG(debug, "ldap_proxy: upstream accepted StartTLS, proceeding with TLS switch",
                  read_callbacks_->connection());
+
+  stats_.starttls_rsp_success_.inc();
 
   if (upstream_starttls_timer_) {
     upstream_starttls_timer_->disableTimer();
@@ -456,7 +473,7 @@ void LdapFilter::transitionToEncrypted() {
   }
 
   read_callbacks_->connection().readDisable(false);
-  stats_.starttls_success_.inc();
+  recordStartTlsOpTime();
 
   pending_starttls_msg_id_ = 0;
   upstream_starttls_msg_id_ = kUpstreamStartTlsMsgId;
@@ -468,6 +485,9 @@ void LdapFilter::transitionToEncrypted() {
 void LdapFilter::initiateUpstreamStartTls() {
   ENVOY_CONN_LOG(debug, "ldap_proxy: initiating proactive upstream StartTLS",
                  read_callbacks_->connection());
+
+  stats_.starttls_req_total_.inc();
+  starttls_start_time_ = read_callbacks_->connection().dispatcher().timeSource().monotonicTime();
 
   state_ = FilterState::NegotiatingUpstream;
   read_callbacks_->connection().readDisable(true);
@@ -507,13 +527,20 @@ void LdapFilter::completeUpstreamOnlyTlsSwitch() {
   }
 
   read_callbacks_->connection().readDisable(false);
-  stats_.starttls_success_.inc();
+  recordStartTlsOpTime();
 
   inspect_buffer_.drain(inspect_buffer_.length());
   upstream_buffer_.drain(upstream_buffer_.length());
 
   ENVOY_CONN_LOG(info, "ldap_proxy: upstream TLS complete - downstream plaintext, upstream TLS",
                  read_callbacks_->connection());
+}
+
+void LdapFilter::recordStartTlsOpTime() {
+  auto end_time = read_callbacks_->connection().dispatcher().timeSource().monotonicTime();
+  auto duration_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end_time - starttls_start_time_);
+  stats_.starttls_op_time_.recordValue(duration_ms.count());
 }
 
 } // namespace LdapProxy

@@ -80,6 +80,14 @@ protected:
     };
   }
 
+  Stats::Counter& getStat(const std::string& name) {
+    return store_.counter(name);
+  }
+
+  Stats::Histogram& getHistogram(const std::string& name) {
+    return store_.histogram(name);
+  }
+
   Stats::TestUtil::TestStore store_;
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks_;
@@ -167,6 +175,7 @@ TEST_F(LdapFilterTest, OnDataStartTlsRequest) {
   
   EXPECT_EQ(Network::FilterStatus::StopIteration, status);
   EXPECT_EQ(FilterState::NegotiatingUpstream, filter_->state());
+  EXPECT_EQ(1, getStat("starttls_req_total").value());
 }
 
 // onData tests - passthrough mode
@@ -209,6 +218,7 @@ TEST_F(LdapFilterTest, OnDataInvalidBer) {
   
   EXPECT_EQ(Network::FilterStatus::StopIteration, status);
   EXPECT_EQ(FilterState::Closed, filter_->state());
+  EXPECT_EQ(1, getStat("decoder_error").value());
 }
 
 TEST_F(LdapFilterTest, OnDataBufferTooLarge) {
@@ -226,6 +236,7 @@ TEST_F(LdapFilterTest, OnDataBufferTooLarge) {
   
   EXPECT_EQ(Network::FilterStatus::StopIteration, status);
   EXPECT_EQ(FilterState::Closed, filter_->state());
+  EXPECT_EQ(1, getStat("decoder_error").value());
 }
 
 // onData tests - pipeline attack
@@ -245,6 +256,7 @@ TEST_F(LdapFilterTest, OnDataPipelineAttack) {
   
   EXPECT_EQ(Network::FilterStatus::StopIteration, status);
   EXPECT_EQ(FilterState::Closed, filter_->state());
+  EXPECT_EQ(1, getStat("protocol_violation").value());
 }
 
 // onWrite tests
@@ -283,6 +295,7 @@ TEST_F(LdapFilterTest, UpstreamStartTlsModeInitiatesOnFirstData) {
   
   EXPECT_EQ(Network::FilterStatus::StopIteration, status);
   EXPECT_EQ(FilterState::NegotiatingUpstream, filter_->state());
+  EXPECT_EQ(1, getStat("starttls_req_total").value());
 }
 
 // Connection event tests

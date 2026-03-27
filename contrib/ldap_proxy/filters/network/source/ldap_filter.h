@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <chrono>
+
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/event/timer.h"
@@ -25,13 +27,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace LdapProxy {
 
-#define ALL_LDAP_PROXY_STATS(COUNTER) \
-  COUNTER(starttls_success)           \
-  COUNTER(decoder_error)              \
-  COUNTER(protocol_violation)
+#define ALL_LDAP_PROXY_STATS(COUNTER, HISTOGRAM)                                                   \
+  COUNTER(starttls_req_total)                                                                      \
+  COUNTER(starttls_rsp_total)                                                                      \
+  COUNTER(starttls_rsp_success)                                                                    \
+  COUNTER(starttls_rsp_error)                                                                      \
+  COUNTER(decoder_error)                                                                           \
+  COUNTER(protocol_violation)                                                                      \
+  HISTOGRAM(starttls_op_time, Milliseconds)
 
 struct LdapProxyStats {
-  ALL_LDAP_PROXY_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_LDAP_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 enum class FilterState {
@@ -82,9 +88,11 @@ private:
   void transitionToEncrypted();
   void initiateUpstreamStartTls();
   void completeUpstreamOnlyTlsSwitch();
+  void recordStartTlsOpTime();
 
   LdapProxyStats generateStats(Stats::Scope& scope) {
-    return LdapProxyStats{ALL_LDAP_PROXY_STATS(POOL_COUNTER_PREFIX(scope, ""))};
+    return LdapProxyStats{ALL_LDAP_PROXY_STATS(POOL_COUNTER_PREFIX(scope, ""),
+                                               POOL_HISTOGRAM_PREFIX(scope, ""))};
   }
 
   Network::ReadFilterCallbacks* read_callbacks_{};
@@ -106,6 +114,8 @@ private:
   uint64_t pending_response_bytes_{0};
   Event::TimerPtr downstream_flush_timer_;
   Event::TimerPtr upstream_starttls_timer_;
+
+  MonotonicTime starttls_start_time_{};
 };
 
 } // namespace LdapProxy
