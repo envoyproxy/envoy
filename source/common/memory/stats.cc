@@ -125,6 +125,7 @@ uint64_t Stats::totalPageHeapUnmapped() {
   MallocExtension::instance()->GetNumericProperty("tcmalloc.pageheap_unmapped_bytes", &value);
   return value;
 #elif defined(JEMALLOC)
+  refreshJemallocEpoch();
   size_t retained = 0;
   size_t sz = sizeof(retained);
   mallctl("stats.retained", &retained, &sz, nullptr, 0);
