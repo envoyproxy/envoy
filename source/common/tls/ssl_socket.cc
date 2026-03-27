@@ -328,23 +328,19 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       int err = SSL_get_error(rawSsl(), rc);
       ENVOY_CONN_LOG(trace, "ssl error occurred while write: {}", callbacks_->connection(),
                      Utility::getErrorDescription(err));
+      absl::optional<Api::IoError::IoErrorCode> write_err_code;
       switch (err) {
       case SSL_ERROR_WANT_WRITE:
         bytes_to_retry_ = bytes_to_write;
         break;
-      case SSL_ERROR_SYSCALL: {
-        auto reset_err = checkForConnectionReset();
-        drainErrorQueue();
-        if (reset_err.has_value()) {
-          return {PostIoAction::Close, total_bytes_written, false, reset_err.value()};
-        }
-        return {PostIoAction::Close, total_bytes_written, false};
-      }
+      case SSL_ERROR_SYSCALL:
+        write_err_code = checkForConnectionReset();
+        FALLTHRU;
       case SSL_ERROR_WANT_READ:
       // Renegotiation has started. We don't handle renegotiation so just fall through.
       default:
         drainErrorQueue();
-        return {PostIoAction::Close, total_bytes_written, false};
+        return {PostIoAction::Close, total_bytes_written, false, write_err_code};
       }
 
       break;

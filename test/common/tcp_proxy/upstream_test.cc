@@ -140,9 +140,9 @@ TEST_P(HttpUpstreamTest, DownstreamDisconnect) {
 TEST_P(HttpUpstreamTest, UpstreamReset) {
   this->setupUpstream();
   EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
-  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   this->upstream_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
-  EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::RemoteReset);
+  EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
 }
 
 // Remote-originated reset reasons should produce RemoteClose (default behavior).
@@ -158,8 +158,6 @@ TEST_P(HttpUpstreamTest, UpstreamRemoteResetProducesRemoteClose) {
       Http::StreamResetReason::RemoteReset,
       Http::StreamResetReason::RemoteRefusedStreamReset,
       Http::StreamResetReason::RemoteConnectionFailure,
-      Http::StreamResetReason::ConnectionTermination,
-      Http::StreamResetReason::ConnectError,
   };
 
   for (const auto reason : remote_reasons) {
@@ -185,6 +183,8 @@ TEST_P(HttpUpstreamTest, UpstreamLocalResetProducesLocalClose) {
       Http::StreamResetReason::LocalRefusedStreamReset,
       Http::StreamResetReason::LocalConnectionFailure,
       Http::StreamResetReason::ConnectionTimeout,
+      Http::StreamResetReason::ConnectionTermination,
+      Http::StreamResetReason::ConnectError,
       Http::StreamResetReason::Overflow,
       Http::StreamResetReason::ProtocolError,
       Http::StreamResetReason::OverloadManager,
