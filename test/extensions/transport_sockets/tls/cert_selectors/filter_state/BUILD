@@ -44,6 +44,7 @@ envoy_extension_cc_test(
         "envoy.tls.certificate_selectors.filter_state",
         "envoy.tls.certificate_mappers.sni",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/listener/set_filter_state:config",
         "//source/extensions/filters/network/tcp_proxy:config",
