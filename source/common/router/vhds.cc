@@ -103,9 +103,10 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
     subscription_ = std::move(status_or.value());
   } else {
     // xdstp mode: use collection subscription.
-    const xds::core::v3::ResourceLocator resource_locator = THROW_OR_RETURN_VALUE(
-        Envoy::Config::XdsResourceIdentifier::decodeUrl(default_resource_name),
-        xds::core::v3::ResourceLocator);
+    auto resource_locator_or =
+        Envoy::Config::XdsResourceIdentifier::decodeUrl(default_resource_name);
+    SET_AND_RETURN_IF_NOT_OK(resource_locator_or.status(), status);
+    const auto& resource_locator = resource_locator_or.value();
     const auto resource_name = getResourceName();
     absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
         factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
