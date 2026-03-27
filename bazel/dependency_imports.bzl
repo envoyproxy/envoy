@@ -18,7 +18,7 @@ load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_depende
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
-load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
+load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
@@ -240,7 +240,7 @@ def envoy_download_go_sdks(go_version):
 
 def crates_repositories():
     crates_repository(
-        name = "dynamic_modules_rust_sdk_crate_index",
+        name = "envoy_rust_crate_index",
         cargo_lockfile = "@envoy//:Cargo.lock",
         # TODO: Ideally we should uncomment the below to make using the Rust SDK via rules_rust reproducible.
         # However, rules_rust has a bug that when this Envoy repo is used as a dependency in another Bazel workspace,
@@ -256,23 +256,6 @@ def crates_repositories():
         # * https://github.com/envoyproxy/envoy/issues/38951
         # * https://github.com/bazelbuild/rules_rust/pull/3866
         #
-        # lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
+        # lockfile = Label("@envoy//:Cargo.Bazel.lock"),
         manifests = ["@envoy//:Cargo.toml"],
-        packages = {
-            "hickory-resolver": crate.spec(
-                version = "0.25",
-                features = ["system-config", "tokio", "tls-ring", "https-ring", "dnssec-ring", "webpki-roots"],
-            ),
-            "serde": crate.spec(
-                version = "1",
-                features = ["derive"],
-            ),
-            "serde_json": crate.spec(version = "1"),
-            "time": crate.spec(version = ">=0.3.0, <0.3.37"),
-            "tokio": crate.spec(
-                version = "1",
-                features = ["rt-multi-thread", "macros"],
-            ),
-            "url": crate.spec(version = "2"),
-        },
     )

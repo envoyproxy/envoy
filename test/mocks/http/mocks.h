@@ -332,7 +332,7 @@ public:
                absl::string_view details));
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
   MOCK_METHOD(void, setUpstreamOverrideHost, (Upstream::LoadBalancerContext::OverrideHost));
-  MOCK_METHOD(absl::optional<Upstream::LoadBalancerContext::OverrideHost>, upstreamOverrideHost, (),
+  MOCK_METHOD(OptRef<const Upstream::LoadBalancerContext::OverrideHost>, upstreamOverrideHost, (),
               (const));
   MOCK_METHOD(bool, shouldLoadShed, (), (const));
 

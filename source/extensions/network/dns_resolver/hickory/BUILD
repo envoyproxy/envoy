@@ -28,6 +28,6 @@ envoy_cc_extension(
     name = "config",
     deps = [
         ":hickory_dns_lib",
-        "//source/extensions/network/dns_resolver/hickory/rust:hickory_dns_static",
+        "//source/extensions/dynamic_modules/builtin_extensions:hickory_dns_static",
     ],
 )

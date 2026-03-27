@@ -840,10 +840,10 @@ public:
   virtual void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) PURE;
 
   /**
-   * @return absl::optional<absl::string_view> optional override host for the upstream
-   * load balancing.
+   * @return OptRef<const Upstream::LoadBalancerContext::OverrideHost> optional override host
+   * for the upstream load balancing.
    */
-  virtual absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+  virtual OptRef<const Upstream::LoadBalancerContext::OverrideHost>
   upstreamOverrideHost() const PURE;
 
   /**
