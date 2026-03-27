@@ -573,6 +573,8 @@ TEST_F(EnvoyQuicServerStreamTest, FinPassedUpWhenReadDisableUponHeaders) {
 
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
   EXPECT_EQ(quic_stream_->read_side_closed(), true);
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
