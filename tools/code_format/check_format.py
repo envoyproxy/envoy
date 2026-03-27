@@ -722,7 +722,7 @@ class FormatChecker:
             report_error("Don't use 'using testing::Test;, elaborate the type instead")
         if line.startswith("using testing::TestWithParams;"):
             report_error("Don't use 'using testing::Test;, elaborate the type instead")
-        if re.match(r"^\s*using\s+\w+\s*=\s*[^;]*\*[^;]*;", line) and "(" not in line:
+        if re.match(r"^\s*using\s+\w*Ptr\s*=\s*[^;]*\*\s*(?:const|volatile)?\s*;", line) and "(" not in line:
             report_error("Don't type alias raw pointers")
         if "[[fallthrough]];" in line:
             report_error("Use 'FALLTHRU;' instead like the other parts of the code")
