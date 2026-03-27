@@ -326,6 +326,11 @@ new_features:
     ``tcmalloc::MallocExtension::ReleaseMemoryToSystem()``.
 - area: dynamic_modules
   change: |
+    Added :ref:`tracer <envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer>`
+    support for dynamic modules, enabling custom distributed tracing backends to be implemented
+    in dynamic modules.
+- area: dynamic_modules
+  change: |
     Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform
     HTTP requests into raw TCP data for upstream connections and convert TCP responses back into HTTP
     responses via explicit send callbacks. See :ref:`envoy.upstreams.http.dynamic_modules
