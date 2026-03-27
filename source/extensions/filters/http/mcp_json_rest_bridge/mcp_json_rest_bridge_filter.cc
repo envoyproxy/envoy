@@ -33,8 +33,8 @@ bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
   static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> kSupportedMcpVersions({
       McpConstants::LATEST_SUPPORTED_MCP_VERSION,
       McpConstants::DEFAULT_PROTOCOL_VERSION,
-      "2024-11-05",
-      "2025-06-18",
+      McpConstants::MCP_VERSION_2024_11_05,
+      McpConstants::MCP_VERSION_2025_06_18,
   });
   return kSupportedMcpVersions->contains(protocol_version);
 }
@@ -66,7 +66,7 @@ json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response,
 
 json generateInitializeResponse(const json& session_id, absl::string_view server_name,
                                 absl::string_view protocol_version) {
-  std::string negotiated_protocol_version = std::string(McpConstants::LATEST_SUPPORTED_MCP_VERSION);
+  absl::string_view negotiated_protocol_version = McpConstants::LATEST_SUPPORTED_MCP_VERSION;
   if (isMcpProtocolVersionSupported(protocol_version)) {
     negotiated_protocol_version = protocol_version;
   }
@@ -114,14 +114,13 @@ bool validateRequestMcpVersion(absl::string_view method,
   }
   // If MCP protocol version header is not provided, the default protocol
   // version is 2025-03-26.
-  std::string protocol_version = std::string(McpConstants::DEFAULT_PROTOCOL_VERSION);
-  if (request_headers.has_value() &&
-      !request_headers->get(Http::LowerCaseString(McpConstants::MCP_PROTOCOL_VERSION_HEADER))
-           .empty()) {
-    protocol_version =
-        request_headers->get(Http::LowerCaseString(McpConstants::MCP_PROTOCOL_VERSION_HEADER))[0]
-            ->value()
-            .getStringView();
+  absl::string_view protocol_version = McpConstants::DEFAULT_PROTOCOL_VERSION;
+  if (request_headers.has_value()) {
+    auto headers =
+        request_headers->get(Http::LowerCaseString(McpConstants::MCP_PROTOCOL_VERSION_HEADER));
+    if (!headers.empty()) {
+      protocol_version = headers[0]->value().getStringView();
+    }
   }
   return isMcpProtocolVersionSupported(protocol_version);
 }
