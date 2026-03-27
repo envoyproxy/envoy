@@ -12,7 +12,6 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -95,11 +94,6 @@ protected:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
           default_value: fallback
     )EOF";
-  }
-
-  std::string readTestFile(const std::string& name) {
-    return TestEnvironment::readFileToStringForTest(
-        TestEnvironment::runfilesPath("test/config/integration/certs/" + name));
   }
 
   NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
@@ -226,100 +220,8 @@ TEST_F(FilterStateTest, InvalidPemReturnsFailed) {
   EXPECT_EQ(result.status, Ssl::SelectionResult::SelectionStatus::Failed);
 }
 
-TEST_F(FilterStateTest, ValidPemReturnsSuccess) {
-  auto selector = createSelector();
-
-  const std::string cert_pem = readTestFile("servercert.pem");
-  const std::string key_pem = readTestFile("serverkey.pem");
-
-  auto filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.tls.certificate.cert_chain", std::make_shared<Router::StringAccessorImpl>(cert_pem),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.tls.certificate.private_key", std::make_shared<Router::StringAccessorImpl>(key_pem),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-  setupSslWithFilterState(filter_state);
-
-  auto hello = buildClientHello();
-  auto result = selector->selectTlsContext(hello, nullptr);
-  EXPECT_EQ(result.status, Ssl::SelectionResult::SelectionStatus::Success);
-  EXPECT_NE(result.selected_ctx, nullptr);
-  EXPECT_NE(result.handle, nullptr);
-}
-
-TEST_F(FilterStateTest, CacheHitOnSecondCall) {
-  auto selector = createSelector();
-
-  const std::string cert_pem = readTestFile("servercert.pem");
-  const std::string key_pem = readTestFile("serverkey.pem");
-
-  auto filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.tls.certificate.cert_chain", std::make_shared<Router::StringAccessorImpl>(cert_pem),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.tls.certificate.private_key", std::make_shared<Router::StringAccessorImpl>(key_pem),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-  setupSslWithFilterState(filter_state);
-
-  auto hello = buildClientHello();
-
-  // First call — cache miss, creates context.
-  auto result1 = selector->selectTlsContext(hello, nullptr);
-  EXPECT_EQ(result1.status, Ssl::SelectionResult::SelectionStatus::Success);
-  const auto* ctx1 = result1.selected_ctx;
-
-  // Second call — cache hit, same context.
-  auto result2 = selector->selectTlsContext(hello, nullptr);
-  EXPECT_EQ(result2.status, Ssl::SelectionResult::SelectionStatus::Success);
-  EXPECT_EQ(result2.selected_ctx, ctx1);
-}
-
-TEST_F(FilterStateTest, CacheEvictionOnMaxSize) {
-  // Config with max_cache_size=1 — only one cert can be cached at a time.
-  const std::string config_yaml = R"EOF(
-    certificate_mapper:
-      name: sni
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
-        default_value: fallback
-    max_cache_size: 1
-  )EOF";
-  auto factory_result = create(config_yaml);
-  ASSERT_TRUE(factory_result.ok());
-  selector_factory_ = std::move(factory_result.value());
-  auto selector = selector_factory_->create(selector_context_);
-
-  const std::string cert_pem = readTestFile("servercert.pem");
-  const std::string key_pem = readTestFile("serverkey.pem");
-
-  auto filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.tls.certificate.cert_chain", std::make_shared<Router::StringAccessorImpl>(cert_pem),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.tls.certificate.private_key", std::make_shared<Router::StringAccessorImpl>(key_pem),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-  setupSslWithFilterState(filter_state);
-
-  // First request with SNI "first.example.com" — cache miss, inserted.
-  SSL_set_tlsext_host_name(ssl_.get(), "first.example.com");
-  auto hello1 = buildClientHello();
-  auto result1 = selector->selectTlsContext(hello1, nullptr);
-  EXPECT_EQ(result1.status, Ssl::SelectionResult::SelectionStatus::Success);
-
-  // Second request with SNI "second.example.com" — cache miss, evicts first, inserts second.
-  SSL_set_tlsext_host_name(ssl_.get(), "second.example.com");
-  auto hello2 = buildClientHello();
-  auto result2 = selector->selectTlsContext(hello2, nullptr);
-  EXPECT_EQ(result2.status, Ssl::SelectionResult::SelectionStatus::Success);
-  // Different cert name → different context (first was evicted).
-  EXPECT_NE(result1.selected_ctx, result2.selected_ctx);
-}
+// Success paths (valid PEM, cache hit, eviction) are in integration_test.cc since
+// they need a real ServerContextConfig to create DynamicContext.
 
 // --- onConfigUpdate tests ---
 
