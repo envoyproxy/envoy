@@ -1203,26 +1203,26 @@ void ThreadLocalStoreImpl::evictUnused() {
                            });
           }
         },
-        [evicted_metrics, this]() {
-          main_thread_dispatcher_->post([evicted_metrics = std::move(evicted_metrics)]() {
-            // We want to delete stale stats on the main thread since stat
-            // destructors lock the stats allocator. Note that we might have
-            // received fresh values on the stale cache-local stats after deleting them from the
-            // central cache.. Eventually, we might also want to defer the deletion further in the
-            // allocator until the values are flushed to the sinks.
-            size_t scopes = 0, counters = 0, gauges = 0, readouts = 0, histograms = 0;
-            for (const auto& metrics : *evicted_metrics) {
-              scopes += 1;
-              counters += metrics.counters_.size();
-              gauges += metrics.gauges_.size();
-              readouts += metrics.text_readouts_.size();
-              histograms += metrics.histograms_.size();
-            }
-            ENVOY_LOG(debug,
-                      "deleted stale {} counters, {} gauges, {} text readouts, {} histograms from "
-                      "{} scopes",
-                      counters, gauges, readouts, histograms, scopes);
-          });
+        [evicted_metrics /*, this*/]() {
+          // main_thread_dispatcher_->post([evicted_metrics = std::move(evicted_metrics)]() {
+          // We want to delete stale stats on the main thread since stat
+          // destructors lock the stats allocator. Note that we might have
+          // received fresh values on the stale cache-local stats after deleting them from the
+          // central cache.. Eventually, we might also want to defer the deletion further in the
+          // allocator until the values are flushed to the sinks.
+          size_t scopes = 0, counters = 0, gauges = 0, readouts = 0, histograms = 0;
+          for (const auto& metrics : *evicted_metrics) {
+            scopes += 1;
+            counters += metrics.counters_.size();
+            gauges += metrics.gauges_.size();
+            readouts += metrics.text_readouts_.size();
+            histograms += metrics.histograms_.size();
+          }
+          ENVOY_LOG(debug,
+                    "deleted stale {} counters, {} gauges, {} text readouts, {} histograms from "
+                    "{} scopes",
+                    counters, gauges, readouts, histograms, scopes);
+          //});
         });
   }
 }
