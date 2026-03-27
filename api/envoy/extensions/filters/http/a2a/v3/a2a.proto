@@ -21,6 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.a2a]
 
 // This filter will inspect and get attributes from A2A traffic.
+// [#next-free-field: 6]
 message A2a {
   // Traffic handling mode for non-A2A traffic.
   enum TrafficMode {
@@ -29,6 +30,21 @@ message A2a {
 
     // Reject requests that are not following A2A spec.
     REJECT = 1;
+  }
+
+  // Where to store parsed A2A message attributes.
+  enum StorageMode {
+    // Default behavior: no storage.
+    NONE = 0;
+
+    // Store message attributes in dynamic metadata only.
+    DYNAMIC_METADATA = 1;
+
+    // Store message attributes in filter state only.
+    FILTER_STATE = 2;
+
+    // Store message attributes in both dynamic metadata and filter state.
+    DYNAMIC_METADATA_AND_FILTER_STATE = 3;
   }
 
   // Configures how the filter handles non-A2A traffic.
@@ -45,4 +61,39 @@ message A2a {
   // Setting it to 0 would disable the limit. It is not recommended to do so in
   // production.
   google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
+
+  // Customized configuration for A2A parser.
+  ParserConfig parser_config = 4;
+
+  // Where to store parsed A2A message attributes.
+  // Controls whether attributes are written to dynamic metadata, filter state, or both.
+  // Default is no storage.
+  StorageMode storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
+}
+
+message MethodParsingConfig {
+  // The group/category name to assign to this method (e.g., "tasks", "message").
+  // If provided, this overrides any built-in classification for the method.
+  // This will be emitted to dynamic metadata under the key specified by ``group_metadata_key``.
+  string group = 1;
+
+  // List of attributes to extract for this method, specified by their JSON paths (e.g., "params.name").
+  repeated string paths = 2;
+}
+
+message ParserConfig {
+  // Method-specific overrides for grouping and attribute extraction.
+  // If a method is not specified in method_configs, or if 'group' is empty in its config,
+  // its group will be determined by built-in classification based on method prefix
+  // (e.g., "message" for "message/send") and default extraction rules will be applied for that method.
+  map<string, MethodParsingConfig> method_configs = 1;
+
+  // Attributes that should always be extracted regardless of the method.
+  // Specified by their JSON paths (e.g., "params.id").
+  repeated string always_extract_attributes = 2;
+
+  // The dynamic metadata key under which the method's group name will be stored
+  // (e.g., "a2a_group"). If this key is empty, group information will not be
+  // added to dynamic metadata.
+  string group_metadata_key = 3;
 }

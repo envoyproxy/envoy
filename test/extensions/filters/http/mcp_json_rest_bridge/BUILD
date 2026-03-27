@@ -14,6 +14,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

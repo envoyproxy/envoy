@@ -9,12 +9,12 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/tls/ssl_handshaker.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include "test/common/tls/mock_ssl_handshaker.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -39,21 +39,7 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-// Mock SslHandshakerImpl for testing SSL quiet shutdown functionality.
-// This extends the real SslHandshakerImpl so dynamic_cast will succeed.
-class MockSslHandshakerImpl : public Extensions::TransportSockets::Tls::SslHandshakerImpl {
-public:
-  // Constructor that takes an SSL object to pass to the base class.
-  explicit MockSslHandshakerImpl(SSL* ssl)
-      : Extensions::TransportSockets::Tls::SslHandshakerImpl(bssl::UniquePtr<SSL>(ssl), 0, nullptr),
-        mock_ssl_(ssl) {}
-
-  // Override ssl() to return our mock SSL pointer.
-  SSL* ssl() const override { return mock_ssl_; }
-
-private:
-  SSL* mock_ssl_{nullptr};
-};
+using TransportSockets::Tls::MockSslHandshakerImpl;
 
 // ReverseConnectionIOHandle Test Class.
 
@@ -1497,7 +1483,7 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateMultipleConnectionsMixedResults) {
             auto override_host = reverse_context->overrideHostToSelect();
             EXPECT_TRUE(override_host.has_value());
 
-            std::string host_address = std::string(override_host->first);
+            std::string host_address = std::string(override_host->host);
 
             Upstream::MockHost::MockCreateConnectionData result;
             if (host_address == "192.168.1.1") {
@@ -1624,7 +1610,7 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
         auto override_host = reverse_context->overrideHostToSelect();
         EXPECT_TRUE(override_host.has_value());
 
-        std::string host_address = std::string(override_host->first);
+        std::string host_address = std::string(override_host->host);
 
         if (host_address == "192.168.1.1") {
           return success_conn_data1; // First host: success
@@ -3056,7 +3042,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionQuietShutdown
   auto mock_ssl_handshaker = std::make_shared<MockSslHandshakerImpl>(mock_ssl);
 
   // Mock ssl() to return MockSslHandshakerImpl.
-  EXPECT_CALL(*mock_connection, ssl()).WillRepeatedly(Return(mock_ssl_handshaker));
+  EXPECT_CALL(*mock_connection, ssl()).WillOnce(Return(mock_ssl_handshaker));
 
   Upstream::MockHost::MockCreateConnectionData success_conn_data;
   success_conn_data.connection_ = mock_connection.get();
