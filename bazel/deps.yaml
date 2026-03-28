@@ -910,6 +910,18 @@ gperftools:
   license: "BSD-3-Clause"
   license_url: "https://github.com/gperftools/gperftools/blob/gperftools-{version}/COPYING"
 
+jemalloc:
+  project_name: "jemalloc"
+  project_desc: "General-purpose scalable concurrent memory allocator"
+  project_url: "https://github.com/jemalloc/jemalloc"
+  release_date: "2022-05-06"
+  use_category:
+  - dataplane_core
+  - controlplane
+  cpe: "N/A"
+  license: "BSD-2-Clause"
+  license_url: "https://github.com/jemalloc/jemalloc/blob/{version}/COPYING"
+
 grpc_httpjson_transcoding:
   project_name: "grpc-httpjson-transcoding"
   project_desc: "Library that supports transcoding so that HTTP/JSON can be converted to gRPC"

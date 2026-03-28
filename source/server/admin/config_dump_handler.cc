@@ -286,10 +286,7 @@ ProtobufTypes::MessagePtr
 ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_matcher) const {
   auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
-  auto all_clusters = server_.clusterManager().clusters();
-  for (const auto& [name, cluster_ref] : all_clusters.active_clusters_) {
-    UNREFERENCED_PARAMETER(name);
-    const Upstream::Cluster& cluster = cluster_ref.get();
+  server_.clusterManager().forEachActiveCluster([&](const Upstream::Cluster& cluster) {
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
 
@@ -299,7 +296,7 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
       cluster_load_assignment.set_cluster_name(cluster_info->name());
     }
     if (!name_matcher.match(cluster_load_assignment.cluster_name())) {
-      continue;
+      return;
     }
     auto& policy = *cluster_load_assignment.mutable_policy();
 
@@ -351,7 +348,7 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
       auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
       static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
     }
-  }
+  });
   return endpoint_config_dump;
 }
 

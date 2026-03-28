@@ -16,6 +16,8 @@ pub mod listener;
 pub mod load_balancer;
 pub mod matcher;
 pub mod network;
+pub mod tracer;
+pub mod transport_socket;
 pub mod udp_listener;
 pub mod upstream_http_tcp_bridge;
 pub mod utility;
@@ -29,6 +31,8 @@ pub use http::*;
 pub use listener::*;
 pub use load_balancer::*;
 pub use network::*;
+pub use tracer::*;
+pub use transport_socket::*;
 pub use udp_listener::*;
 pub use upstream_http_tcp_bridge::*;
 pub use utility::*;
@@ -538,7 +542,9 @@ macro_rules! declare_network_filter_init_functions {
 /// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
 /// - `upstream_http_tcp_bridge:` — [`NewUpstreamHttpTcpBridgeConfigFunction`] for upstream HTTP TCP
 ///   bridges
+/// - `tracer:` — [`NewTracerConfigFunction`] for tracers
 /// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
+/// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
 ///
 /// # Examples
 ///
@@ -601,8 +607,16 @@ macro_rules! declare_all_init_functions {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
+  (@register tracer : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_TRACER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
   (@register dns_resolver : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_DNS_RESOLVER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register transport_socket : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
 }
@@ -1111,6 +1125,20 @@ pub static NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION: OnceLock<
 > = OnceLock::new();
 
 // =================================================================================================
+// Tracer Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new tracer configuration.
+///
+/// The `ctx` provides access to metrics definition and update APIs. Metrics should be defined
+/// during configuration creation and the context stored for runtime metric updates.
+pub type NewTracerConfigFunction =
+  fn(ctx: TracerConfigContext, name: &str, config: &[u8]) -> Option<Box<dyn TracerConfig>>;
+
+/// Global storage for the tracer config factory function.
+pub static NEW_TRACER_CONFIG_FUNCTION: OnceLock<NewTracerConfigFunction> = OnceLock::new();
+
+// =================================================================================================
 // DNS Resolver Dynamic Module Support
 // =================================================================================================
 
@@ -1187,6 +1215,68 @@ macro_rules! declare_dns_resolver_init_functions {
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_DNS_RESOLVER_CONFIG_FUNCTION
         .get_or_init(|| $new_dns_resolver_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+// =================================================================================================
+// Transport Socket Dynamic Module Support
+// =================================================================================================
+
+/// The factory function signature for creating a new transport socket factory configuration.
+pub type NewTransportSocketFactoryConfigFunction<ETS> =
+  fn(
+    name: &str,
+    config: &[u8],
+    is_upstream: bool,
+  ) -> Option<Box<dyn transport_socket::TransportSocketFactoryConfig<ETS>>>;
+
+/// Global storage for the transport socket factory configuration function.
+pub static NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION: OnceLock<
+  NewTransportSocketFactoryConfigFunction<EnvoyTransportSocketImpl>,
+> = OnceLock::new();
+
+/// Declare the init functions for a transport socket dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with
+/// [`NewTransportSocketFactoryConfigFunction`] type.
+///
+/// # Example
+///
+/// ```ignore
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_transport_socket_factory_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _is_upstream: bool,
+/// ) -> Option<Box<dyn TransportSocketFactoryConfig<EnvoyTransportSocketImpl>>> {
+///   None
+/// }
+///
+/// declare_transport_socket_init_functions!(
+///   program_init,
+///   new_transport_socket_factory_config
+/// );
+/// ```
+#[macro_export]
+macro_rules! declare_transport_socket_init_functions {
+  ($f:ident, $new_transport_socket_factory_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION
+        .get_or_init(|| $new_transport_socket_factory_config_fn);
       if ($f()) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char

@@ -326,6 +326,7 @@ EXTENSIONS = {
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
     "envoy.tracers.opentelemetry":                      "//source/extensions/tracers/opentelemetry:config",
     "envoy.tracers.fluentd":                            "//source/extensions/tracers/fluentd:config",
+    "envoy.tracers.dynamic_modules":                    "//source/extensions/tracers/dynamic_modules:config",
 
     #
     # OpenTelemetry Resource Detectors

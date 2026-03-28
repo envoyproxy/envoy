@@ -2367,7 +2367,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       dynamic_cast<Http::AsyncStreamImpl*>(stream);
   auto route = filter_callbacks->route();
-  ASSERT_NE(nullptr, route);
+  ASSERT_TRUE(route.has_value());
   auto route_entry = route->routeEntry();
   ASSERT_NE(nullptr, route_entry);
   auto& path_match_criterion = route_entry->pathMatchCriterion();

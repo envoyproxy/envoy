@@ -364,7 +364,13 @@ public:
    * subsequent filters. We may want to persist callbacks so they always participate in later route
    * resolution or make it an independent entity like filters that gets called on route resolution.
    */
-  virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
+  virtual OptRef<const Router::Route> route(const Router::RouteCallback& cb) PURE;
+
+  /**
+   * @return RouteConstSharedPtr the route for the current request, extended to allow a caller to
+   * extend or transfer ownership.
+   */
+  virtual Router::RouteConstSharedPtr routeSharedPtr(const Router::RouteCallback& cb) PURE;
 
   /**
    * Clears the route cache for the current request. This must be called when a filter has modified
@@ -425,7 +431,13 @@ public:
    * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
    * a way that affects routing, clearRouteCache() must be called to clear the cache.
    */
-  virtual Router::RouteConstSharedPtr route() PURE;
+  virtual OptRef<const Router::Route> route() PURE;
+
+  /**
+   * @return RouteConstSharedPtr the route for the current request, extended to allow a caller to
+   * extend or transfer ownership.
+   */
+  virtual Router::RouteConstSharedPtr routeSharedPtr() PURE;
 
   /**
    * Returns the clusterInfo for the cached route.

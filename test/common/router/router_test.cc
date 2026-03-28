@@ -353,7 +353,7 @@ TEST_F(RouterTest, RouteNotFound) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(callbacks_, routeSharedPtr()).WillOnce(Return(nullptr));
 
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1UL, stats_store_.counter("test.no_route").value());

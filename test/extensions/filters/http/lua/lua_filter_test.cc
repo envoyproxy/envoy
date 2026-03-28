@@ -2309,7 +2309,7 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoRoute) {
   )EOF"};
 
   InSequence s;
-  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>()));
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
@@ -4318,7 +4318,7 @@ TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandleNoRoute) {
   setupVirtualHostMetadata(METADATA);
 
   // Request path
-  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
@@ -4331,7 +4331,7 @@ TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandleNoRoute) {
                              });
 
   // Response path
-  ON_CALL(encoder_callbacks_, route()).WillByDefault(Return(nullptr));
+  ON_CALL(encoder_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>()));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
