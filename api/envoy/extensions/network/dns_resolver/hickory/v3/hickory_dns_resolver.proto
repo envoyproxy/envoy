@@ -43,8 +43,8 @@ message DnsOverHttpsConfig {
 // [#next-free-field: 10]
 message HickoryDnsResolverConfig {
   // A list of DNS resolver addresses for standard UDP/TCP resolution.
-  // If not specified and ``use_system_config`` is true (the default), the system configuration
-  // (``/etc/resolv.conf`` on Unix) will be used.
+  // If not specified and ``use_system_config`` is not explicitly set to false, the system
+  // configuration (``/etc/resolv.conf`` on Unix) will be used.
   repeated config.core.v3.Address resolvers = 1;
 
   // Configuration for DNS-over-TLS (DoT). When specified, queries will be sent over TLS
@@ -77,8 +77,9 @@ message HickoryDnsResolverConfig {
   // addresses and search domains. When ``resolvers`` are also specified, they take precedence
   // over the system configuration.
   //
-  // Defaults to true when no ``resolvers``, ``dns_over_tls``, or ``dns_over_https`` are specified.
-  bool use_system_config = 7;
+  // If not specified, defaults to true when no ``resolvers``, ``dns_over_tls``, or
+  // ``dns_over_https`` are configured.
+  google.protobuf.BoolValue use_system_config = 7;
 
   // Timeout for each individual DNS query attempt.
   //

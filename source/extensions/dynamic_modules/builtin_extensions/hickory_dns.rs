@@ -42,7 +42,7 @@ struct HickoryConfig {
   #[serde(default)]
   num_resolver_threads: Option<u32>,
   #[serde(default)]
-  use_system_config: bool,
+  use_system_config: Option<bool>,
   #[serde(default)]
   query_timeout: Option<String>,
   #[serde(default)]
@@ -100,10 +100,12 @@ impl HickoryConfig {
   }
 
   fn should_use_system_config(&self) -> bool {
-    if self.use_system_config {
-      return true;
+    match self.use_system_config {
+      Some(value) => value,
+      None => {
+        self.resolvers.is_empty() && self.dns_over_tls.is_none() && self.dns_over_https.is_none()
+      },
     }
-    self.resolvers.is_empty() && self.dns_over_tls.is_none() && self.dns_over_https.is_none()
   }
 }
 
