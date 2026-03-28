@@ -91,6 +91,7 @@ envoy_cc_test(
         "//test/mocks/router:upstream_request",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",

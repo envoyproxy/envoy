@@ -13,6 +13,7 @@
 #include "test/mocks/router/router_filter_interface.h"
 #include "test/mocks/router/upstream_request.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
@@ -189,6 +190,55 @@ TEST_P(HttpUpstreamTest, OnFailureCalledOnInvalidResponse) {
   EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "404"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+}
+
+TEST_P(HttpUpstreamTest, TunnelResponseStatusCapturedOnInvalidResponse) {
+  this->setupUpstream();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  auto mock_upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  ON_CALL(this->downstream_stream_info_, upstreamInfo()).WillByDefault(Return(mock_upstream_info));
+  EXPECT_CALL(*mock_upstream_info,
+              setUpstreamTransportFailureReason(absl::string_view("tunnel_response:403")));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "403"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 403);
+}
+
+TEST_P(HttpUpstreamTest, TunnelResponseStatusCaptured401) {
+  this->setupUpstream();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "401"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 401);
+}
+
+TEST_P(HttpUpstreamTest, TunnelResponseStatusCaptured500) {
+  this->setupUpstream();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "500"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 500);
+}
+
+TEST_P(HttpUpstreamTest, TunnelResponseStatusNotSetOnValidResponse) {
+  this->setupUpstream();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_));
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 0);
 }
 
 TEST_P(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
@@ -726,6 +776,33 @@ TEST_F(CombinedUpstreamTest, OnFailureCalledOnInvalidResponse) {
   EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "404"}}};
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+}
+
+TEST_F(CombinedUpstreamTest, TunnelResponseStatusCapturedOnInvalidResponse) {
+  this->setup();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  auto mock_upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  ON_CALL(this->downstream_stream_info_, upstreamInfo()).WillByDefault(Return(mock_upstream_info));
+  EXPECT_CALL(*mock_upstream_info,
+              setUpstreamTransportFailureReason(absl::string_view("tunnel_response:403")));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure());
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "403"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 403);
+}
+
+TEST_F(CombinedUpstreamTest, TunnelResponseStatusNotSetOnValidResponse) {
+  this->setup();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_));
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+  EXPECT_EQ(this->upstream_->tunnelResponseStatus(), 0);
 }
 
 TEST_F(CombinedUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {

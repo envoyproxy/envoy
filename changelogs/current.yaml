@@ -134,6 +134,12 @@ bug_fixes:
     Fixed a crash in scoped RDS when on-demand update is triggered for a scope that uses inline
     ``route_configuration`` instead of ``route_configuration_name``. The null RDS provider dereference
     is now guarded and the on-demand callback returns false for inline-config scopes.
+- area: tcp_proxy
+  change: |
+    Fixed a bug where a non-2xx response to an HTTP CONNECT request from the TCP proxy tunneling
+    feature would silently drop the upstream status code. The status is now recorded in the
+    ``%UPSTREAM_TRANSPORT_FAILURE_REASON%`` access log field as ``tunnel_response:<status>``,
+    allowing operators to see why the CONNECT tunnel was rejected.
 - area: hot_restart
   change: |
     Fixed hot restart for listeners with a network namespace in the address. Previously, socket
