@@ -4121,6 +4121,44 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
+TEST_F(RouterTest, EnableRedirectAndRetryButNoRetryWithBodyLimit) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
+
+  recreateFilter();
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  // Enable redirects also. This feature will not be used but will affects buffer logic.
+  enableRedirects(3);
+
+  // Set a per route body limit which disallows any buffering.
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(0));
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  // Unlike RetryUpstreamReset above the data won't be buffered as the body exceeds the buffer limit
+  EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  Buffer::OwnedImpl body("t");
+  router_->decodeData(body, false);
+  Buffer::OwnedImpl body2("t");
+  // Ensure the second chunk also isn't buffered and triggers the retry logic again.
+  router_->decodeData(body2, false);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
 TEST_F(RouterTest, NoRetryWithBodyLimitWithUpstreamHalfCloseEnabled) {
   // This test half closes upstream connection before downstream. Enabling the
   // allow_multiplexed_upstream_half_close flag causes the clean-up sequence to
