@@ -13,21 +13,35 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "local_ratelimit_lib",
-    srcs = ["local_ratelimit.cc"],
-    hdrs = ["local_ratelimit.h"],
+    name = "filter_config_lib",
+    srcs = ["filter_config.cc"],
+    hdrs = ["filter_config.h"],
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_macros",
         "//source/common/common:utility_lib",
-        "//source/common/http:header_utility_lib",
-        "//source/common/http:headers_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/common/ratelimit_config:ratelimit_config_lib",
+        "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/local_ratelimit/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "local_ratelimit_lib",
+    srcs = ["local_ratelimit.cc"],
+    hdrs = ["local_ratelimit.h"],
+    deps = [
+        ":filter_config_lib",
+        "//envoy/http:codes_interface",
+        "//source/common/http:header_utility_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/common:ratelimit_headers_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
