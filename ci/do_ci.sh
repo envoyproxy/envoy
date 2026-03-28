@@ -409,6 +409,7 @@ case $CI_TARGET in
             bazel_with_collection \
                 test "${BAZEL_BUILD_OPTIONS[@]}" \
                 --config=compile-time-options \
+                --define tcmalloc=gperftools \
                 --define wasm=wamr \
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
@@ -416,12 +417,13 @@ case $CI_TARGET in
         if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
             exit 0
         fi
-        echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
+        echo "Building and testing with wasm=wasmtime and jemalloc: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
             --define wasm=wasmtime \
             --define admin_functionality=disabled \
+            --@envoy//bazel:jemalloc=True \
             -c fastbuild \
             "${TEST_TARGETS[@]}"
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
@@ -429,6 +431,7 @@ case $CI_TARGET in
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
+            --define tcmalloc=gperftools \
             --define wasm=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
@@ -437,6 +440,7 @@ case $CI_TARGET in
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
+            --define tcmalloc=gperftools \
             --define wasm=wasmtime \
             -c opt \
             @envoy//test/common/common:assert_test \
@@ -445,6 +449,7 @@ case $CI_TARGET in
         echo "Building binary with wasm=wasmtime... and logging disabled"
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
             --config=compile-time-options \
+            --define tcmalloc=gperftools \
             --define wasm=wasmtime \
             --define enable_logging=disabled \
             -c fastbuild \

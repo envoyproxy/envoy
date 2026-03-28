@@ -134,10 +134,13 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest,
-                         UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest, VHDS_INTEGRATION_PARAMS,
+                         vhdsTestParamsToString);
 
 TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
+  if (routeConfigType() != RouteConfigType::Rds) {
+    GTEST_SKIP() << "This test requires RDS update";
+  }
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());

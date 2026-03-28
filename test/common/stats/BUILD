@@ -355,6 +355,17 @@ envoy_benchmark_test(
 )
 
 envoy_cc_test(
+    name = "tag_utility_test",
+    srcs = ["tag_utility_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":stat_test_utility_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:tag_utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "thread_local_store_test",
     srcs = ["thread_local_store_test.cc"],
     rbe_pool = "6gig",
