@@ -1614,6 +1614,58 @@ TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeaders) {
   tcp_client_->close();
 }
 
+// Issue #43977: when upstream rejects CONNECT with a non-2xx status, the status code
+// must appear in %UPSTREAM_TRANSPORT_FAILURE_REASON% in the access log.
+TEST_P(TcpTunnelingIntegrationTest, NonSuccessConnectResponseIncludesStatusInFailureReason) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_TRANSPORT_FAILURE_REASON%\n");
+    access_log_config.set_path(access_log_filename);
+    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+  initialize();
+
+  // Start a connection and wait for the CONNECT request to reach the upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Upstream rejects the CONNECT with a 403.
+  default_response_headers_.setStatus(enumToInt(Http::Code::Forbidden));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+  tcp_client_->waitForHalfClose();
+  tcp_client_->close();
+
+  // The access log must contain the CONNECT response status as the transport failure reason.
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("tunnel_response:403"));
+}
+
 TEST_P(TcpTunnelingIntegrationTest, CopyValidResponseHeaders) {
   const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());

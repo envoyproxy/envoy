@@ -18,6 +18,7 @@
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/null_route_impl.h"
 #include "source/common/http/response_decoder_impl_base.h"
+#include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/header_parser.h"
@@ -110,6 +111,7 @@ public:
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr, bool);
   void onHttpPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
                        Ssl::ConnectionInfoConstSharedPtr ssl_info);
+  uint64_t tunnelResponseStatus() const;
 
   class Callbacks {
   public:
@@ -136,8 +138,11 @@ public:
     }
     virtual void onFailure() {
       ASSERT(conn_pool_ != nullptr);
+      const uint64_t status = conn_pool_->tunnelResponseStatus();
+      const std::string failure_reason =
+          status != 0 ? "tunnel_response:" + std::to_string(status) : "";
       conn_pool_->callbacks_->onGenericPoolFailure(
-          ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "", host_);
+          ConnectionPool::PoolFailureReason::RemoteConnectionFailure, failure_reason, host_);
     }
 
   protected:
@@ -223,6 +228,7 @@ public:
   }
   Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override { return nullptr; }
   StreamInfo::DetectedCloseType detectedCloseType() const override;
+  uint64_t tunnelResponseStatus() const { return tunnel_response_status_; }
 
 protected:
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
@@ -241,9 +247,15 @@ private:
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
       bool is_valid_response = parent_.isValidResponse(*headers);
+      const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
       parent_.config_.propagateResponseHeaders(std::move(headers),
                                                parent_.downstream_info_.filterState());
       if (!is_valid_response || end_stream) {
+        parent_.tunnel_response_status_ = response_code;
+        if (parent_.downstream_info_.upstreamInfo()) {
+          parent_.downstream_info_.upstreamInfo()->setUpstreamTransportFailureReason(
+              "tunnel_response:" + std::to_string(response_code));
+        }
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
         parent_.conn_pool_callbacks_->onSuccess(parent_.request_encoder_);
@@ -276,6 +288,7 @@ private:
   const Http::CodecType type_;
   bool read_half_closed_{};
   bool write_half_closed_{};
+  uint64_t tunnel_response_status_{0};
 
   // Used to defer onGenericPoolReady and onGenericPoolFailure to the reception
   // of the CONNECT response or the resetEncoder.
@@ -346,6 +359,7 @@ public:
   bool downstreamResponseStarted() const override { return false; }
   bool downstreamEndStream() const override { return false; }
   uint32_t attemptCount() const override { return 0; }
+  uint64_t tunnelResponseStatus() const { return tunnel_response_status_; }
 
 protected:
   void onResetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
@@ -366,9 +380,15 @@ private:
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
       bool is_valid_response = parent_.isValidResponse(*headers);
+      const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
       parent_.config_.propagateResponseHeaders(std::move(headers),
                                                parent_.downstream_info_.filterState());
       if (!is_valid_response || end_stream) {
+        parent_.tunnel_response_status_ = response_code;
+        if (parent_.downstream_info_.upstreamInfo()) {
+          parent_.downstream_info_.upstreamInfo()->setUpstreamTransportFailureReason(
+              "tunnel_response:" + std::to_string(response_code));
+        }
         parent_.onResetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
         parent_.conn_pool_callbacks_->onSuccess(nullptr /*parent_.request_encoder_*/);
@@ -401,6 +421,7 @@ private:
   std::unique_ptr<HttpConnPool::Callbacks> conn_pool_callbacks_;
   bool read_half_closed_{};
   bool write_half_closed_{};
+  uint64_t tunnel_response_status_{0};
   // upstream_request_ has to be destroyed first as they may use CombinedUpstream parent
   // during destruction.
   UpstreamRequestPtr upstream_request_;
