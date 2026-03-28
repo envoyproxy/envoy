@@ -275,6 +275,13 @@ envoy.content_parsers.json:
   status: alpha
   type_urls:
   - envoy.extensions.content_parsers.json.v3.JsonContentParser
+envoy.filters.http.a2a:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.a2a.v3.A2a
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http
@@ -800,6 +807,13 @@ envoy.filters.listener.proxy_protocol:
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+envoy.filters.listener.set_filter_state:
+  categories:
+  - envoy.filters.listener
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.listener.set_filter_state.v3.Config
 envoy.filters.listener.tls_inspector:
   categories:
   - envoy.filters.listener
@@ -1029,6 +1043,20 @@ envoy.formatter.cel:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.cel.v3.Cel
+envoy.formatter.file_content:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.file_content.v3.FileContent
+envoy.formatter.generic_secret:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.generic_secret.v3.GenericSecret
 envoy.formatter.metadata:
   categories:
   - envoy.formatter
@@ -1464,6 +1492,13 @@ envoy.tls.cert_validator.spiffe:
   - envoy.tls.cert_validator
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tracers.dynamic_modules:
+  categories:
+  - envoy.tracers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.tracers.dynamic_modules.v3.DynamicModuleTracer
 envoy.tracers.fluentd:
   categories:
   - envoy.tracers
@@ -1636,6 +1671,11 @@ envoy.upstreams.http.http_protocol_options:
   - envoy.upstream_options
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.upstreams.http.dynamic_modules:
+  categories:
+  - envoy.upstreams
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.upstreams.http.tcp:
   categories:
   - envoy.upstreams
@@ -1806,6 +1846,13 @@ envoy.matching.inputs.query_params:
   status: stable
   type_urls:
   - envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
+envoy.matching.inputs.local_reply:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.type.matcher.v3.HttpResponseLocalReplyMatchInput
 envoy.matching.inputs.cel_data_input:
   categories:
   - envoy.matching.http.input
@@ -2079,6 +2126,13 @@ envoy.matching.actions.format_string:
   status: stable
   type_urls:
   - envoy.config.core.v3.SubstitutionFormatString
+envoy.matching.actions.transform_stat:
+  categories:
+  - envoy.matching.action
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.actions.transform_stat.v3.TransformStat
 envoy.matching.action.transport_socket.name:
   categories:
   - envoy.matching.action

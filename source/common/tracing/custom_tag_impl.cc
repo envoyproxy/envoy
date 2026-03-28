@@ -132,7 +132,7 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
     return &stream_info.dynamicMetadata();
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRoute: {
-    Router::RouteConstSharedPtr route = stream_info.route();
+    const auto route = stream_info.route();
     return route ? &route->metadata() : nullptr;
   }
   case envoy::type::metadata::v3::MetadataKind::KindCase::kCluster: {

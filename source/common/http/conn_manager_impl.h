@@ -109,10 +109,14 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   // Pass connection watermark events on to all the streams associated with that connection.
   void onAboveWriteBufferHighWatermark() override {
-    codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+    if (codec_) {
+      codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+    }
   }
   void onBelowWriteBufferLowWatermark() override {
-    codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+    if (codec_) {
+      codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+    }
   }
 
   TimeSource& timeSource() { return time_source_; }
@@ -294,7 +298,8 @@ private:
     void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
                      absl::string_view transport_failure_reason = "") override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
-    Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
+    OptRef<const Upstream::ClusterInfo> clusterInfo() override;
+    Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;

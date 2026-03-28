@@ -41,13 +41,13 @@ public:
 
 class MockIoHandle : public IoHandle {
 public:
-  MOCK_METHOD(void, setWriteEnd, ());
-  MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
+  MOCK_METHOD(void, setEof, ());
+  MOCK_METHOD(bool, hasReceivedEof, (), (const));
   MOCK_METHOD(void, onPeerDestroy, ());
   MOCK_METHOD(void, setNewDataAvailable, ());
-  MOCK_METHOD(Buffer::Instance*, getWriteBuffer, ());
+  MOCK_METHOD(Buffer::Instance*, getReceiveBuffer, ());
+  MOCK_METHOD(bool, canReceiveData, (), (const));
   MOCK_METHOD(bool, isWritable, (), (const));
-  MOCK_METHOD(bool, isPeerWritable, (), (const));
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
   MOCK_METHOD(PassthroughStateSharedPtr, passthroughState, ());
@@ -58,11 +58,9 @@ public:
   FileEventImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
-  void setWritable() { EXPECT_CALL(io_source_, isPeerWritable()).WillRepeatedly(Return(true)); }
+  void setWritable() { EXPECT_CALL(io_source_, isWritable()).WillRepeatedly(Return(true)); }
   void setReadable() { EXPECT_CALL(io_source_, isReadable()).WillRepeatedly(Return(true)); }
-  void setWriteEnd() {
-    EXPECT_CALL(io_source_, isPeerShutDownWrite()).WillRepeatedly(Return(true));
-  }
+  void setEof() { EXPECT_CALL(io_source_, hasReceivedEof()).WillRepeatedly(Return(true)); }
   void clearEventExpectation() { testing::Mock::VerifyAndClearExpectations(&io_source_); }
 
 protected:
@@ -84,7 +82,7 @@ TEST_F(FileEventImplTest, EnabledEventsTriggeredAfterCreate) {
       setWritable();
     }
     if (current_event & Event::FileReadyType::Closed) {
-      setWriteEnd();
+      setEof();
     }
     MockReadyCb ready_cb;
     auto user_file_event = std::make_unique<FileEventImpl>(
@@ -105,7 +103,7 @@ TEST_F(FileEventImplTest, ReadEventIsTriggeredWhenThePeerSetWriteEnd) {
        {Event::FileReadyType::Read, Event::FileReadyType::Read | Event::FileReadyType::Closed}) {
     SCOPED_TRACE(absl::StrCat("current event:", current_event));
     clearEventExpectation();
-    setWriteEnd();
+    setEof();
     MockReadyCb ready_cb;
     auto user_file_event = std::make_unique<FileEventImpl>(
         *dispatcher_,
@@ -203,7 +201,7 @@ TEST_F(FileEventImplTest, DefaultReturnAllEnabledReadAndWriteEvents) {
     EXPECT_CALL(io_source_, isReadable())
         .WillOnce(Return((current_event & Event::FileReadyType::Read) != 0))
         .RetiresOnSaturation();
-    EXPECT_CALL(io_source_, isPeerWritable())
+    EXPECT_CALL(io_source_, isWritable())
         .WillOnce(Return((current_event & Event::FileReadyType::Write) != 0))
         .RetiresOnSaturation();
     auto user_file_event = std::make_unique<FileEventImpl>(
@@ -364,7 +362,7 @@ TEST_F(FileEventImplTest, EnabledClearActivate) {
   // Ensure both events are pending so that any enabled event will be immediately delivered.
   setWritable();
   setReadable();
-  setWriteEnd();
+  setEof();
   // The enabled event are delivered but not the other.
   {
     user_file_event_->activate(Event::FileReadyType::Read);
@@ -447,7 +445,7 @@ TEST_F(FileEventImplTest, ActivateIfEnabledTriggerOnlyEnabled) {
 }
 
 TEST_F(FileEventImplTest, EventClosedIsTriggeredBySetWriteEnd) {
-  setWriteEnd();
+  setEof();
   user_file_event_ = std::make_unique<FileEventImpl>(
       *dispatcher_,
       [this](uint32_t arg) {

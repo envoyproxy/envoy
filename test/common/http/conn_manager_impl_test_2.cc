@@ -1366,8 +1366,9 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->streamInfo().route());
-        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        EXPECT_EQ(route1.get(), decoder_filters_[0]->callbacks_->streamInfo().route().ptr());
+        EXPECT_EQ(fake_cluster1->info().get(),
+                  decoder_filters_[0]->callbacks_->clusterInfo().ptr());
         decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
@@ -1375,9 +1376,9 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
-        EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->streamInfo().route());
+        EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->streamInfo().routeSharedPtr());
         // RDS & CDS consistency problem: route2 points to fake_cluster2, which doesn't exist.
-        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->clusterInfo());
+        EXPECT_EQ(absl::nullopt, decoder_filters_[1]->callbacks_->clusterInfo());
         decoder_filters_[1]->callbacks_->downstreamCallbacks()->clearRouteCache();
         return FilterHeadersStatus::Continue;
       }));
@@ -1385,20 +1386,21 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->route());
-        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->clusterInfo());
+        EXPECT_EQ(absl::nullopt, decoder_filters_[2]->callbacks_->clusterInfo());
 
         // Null route but the virtual host is set.
-        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().route());
-        EXPECT_EQ(mock_virtual_host, decoder_filters_[2]->callbacks_->streamInfo().virtualHost());
+        EXPECT_FALSE(decoder_filters_[2]->callbacks_->streamInfo().route().has_value());
+        EXPECT_EQ(mock_virtual_host.get(),
+                  decoder_filters_[2]->callbacks_->streamInfo().virtualHost().ptr());
 
         // Clear route cache again.
         decoder_filters_[2]->callbacks_->downstreamCallbacks()->clearRouteCache();
 
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->route());
-        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->clusterInfo());
+        EXPECT_EQ(absl::nullopt, decoder_filters_[2]->callbacks_->clusterInfo());
 
-        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().route());
-        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().virtualHost());
+        EXPECT_FALSE(decoder_filters_[2]->callbacks_->streamInfo().route().has_value());
+        EXPECT_FALSE(decoder_filters_[2]->callbacks_->streamInfo().virtualHost().has_value());
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -1437,11 +1439,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        EXPECT_EQ(fake_cluster1->info().get(),
+                  decoder_filters_[0]->callbacks_->clusterInfo().ptr());
 
-        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->streamInfo().route());
-        EXPECT_EQ(route1->virtual_host_,
-                  decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
+        EXPECT_EQ(route1.get(), decoder_filters_[0]->callbacks_->streamInfo().route().ptr());
+        EXPECT_EQ(route1->virtual_host_.get(),
+                  decoder_filters_[1]->callbacks_->streamInfo().virtualHost().ptr());
 
         decoder_filters_[0]->callbacks_->downstreamCallbacks()->setRoute(nullptr);
         return FilterHeadersStatus::Continue;
@@ -1450,10 +1453,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->route());
-        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->clusterInfo());
+        EXPECT_EQ(absl::nullopt, decoder_filters_[1]->callbacks_->clusterInfo());
 
-        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().route());
-        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
+        EXPECT_FALSE(decoder_filters_[1]->callbacks_->streamInfo().route().has_value());
+        EXPECT_FALSE(decoder_filters_[1]->callbacks_->streamInfo().virtualHost().has_value());
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -1628,6 +1631,20 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithL
     decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
   }
   doRemoteClose();
+}
+
+// Can happen if a network filter writes large payloads to downstream before the HTTP
+// filter gets data.
+TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarkLimitsNoCodec) {
+  // Not used in the test.
+  delete codec_;
+
+  server_transformation_ = HttpConnectionManagerProto::PASS_THROUGH;
+  setup();
+
+  // No-ops since no codec setup yet. Verify no crash.
+  conn_manager_->onAboveWriteBufferHighWatermark();
+  conn_manager_->onBelowWriteBufferLowWatermark();
 }
 
 TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {

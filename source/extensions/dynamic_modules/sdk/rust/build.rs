@@ -20,6 +20,7 @@ fn main() {
     .default_enum_style(bindgen::EnumVariation::Rust {
       non_exhaustive: false,
     })
+    .derive_partialeq(true)
     .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
     .parse_callbacks(Box::new(TrimEnumNameFromVariantName))
     .generate()

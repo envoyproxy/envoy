@@ -65,6 +65,7 @@ public:
   }
 
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   std::shared_ptr<std::atomic<bool>> shared_status_;
@@ -86,14 +87,14 @@ private:
 class ConfigSchedulerConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     auto shared_status = std::make_shared<std::atomic<bool>>(false);
 
     // Simulate async config update.
-    std::thread([shared_status]() {
+    handle.getScheduler()->schedule([shared_status]() {
       std::this_thread::sleep_for(std::chrono::milliseconds(100)); // NO_CHECK_FORMAT(real_time)
       shared_status->store(true);
-    }).detach();
+    });
 
     return std::make_unique<ConfigSchedulerFilterFactory>(shared_status);
   }
@@ -140,6 +141,7 @@ public:
   }
 
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -161,7 +163,7 @@ public:
 class PassthroughConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     return std::make_unique<PassthroughFilterFactory>();
   }
 };
@@ -274,6 +276,7 @@ public:
     assertTrue(res_headers_called_, "resHeadersCalled");
     assertTrue(res_trailers_called_, "resTrailersCalled");
   }
+  void onDestroy() override {}
 
 private:
   std::map<std::string, std::string> headers_to_add_;
@@ -299,7 +302,7 @@ private:
 class HeaderCallbacksConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     std::map<std::string, std::string> headers_to_add;
     if (!config_view.empty()) {
       std::string str(config_view);
@@ -322,6 +325,85 @@ public:
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(HeaderCallbacksConfigFactory, "header_callbacks");
+
+// -----------------------------------------------------------------------------
+// HeaderCallbacksOnCreation
+// -----------------------------------------------------------------------------
+
+class HeaderCallbacksOnCreationFilter : public HttpFilter {
+public:
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
+    return HeadersStatus::Continue;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+
+  TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
+    return HeadersStatus::Continue;
+  }
+
+  BodyStatus onResponseBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+
+  TrailersStatus onResponseTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+
+  void onStreamComplete() override {}
+
+  void onDestroy() override {}
+};
+
+class HeaderCallbacksOnCreationFilterFactory : public HttpFilterFactory {
+public:
+  HeaderCallbacksOnCreationFilterFactory(std::map<std::string, std::string> headers_to_add)
+      : headers_to_add_(std::move(headers_to_add)) {}
+
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    for (const auto& [k, v] : headers_to_add_) {
+      handle.requestHeaders().set(k, v);
+    }
+    return std::make_unique<HeaderCallbacksOnCreationFilter>();
+  }
+
+private:
+  std::map<std::string, std::string> headers_to_add_;
+};
+
+class HeaderCallbacksOnCreationConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view config_view) override {
+    std::map<std::string, std::string> headers_to_add;
+    if (!config_view.empty()) {
+      std::string str(config_view);
+      size_t pos = 0;
+      while ((pos = str.find(',')) != std::string::npos) {
+        std::string part = str.substr(0, pos);
+        size_t sep = part.find(':');
+        if (sep != std::string::npos) {
+          headers_to_add[part.substr(0, sep)] = part.substr(sep + 1);
+        }
+        str.erase(0, pos + 1);
+      }
+      size_t sep = str.find(':');
+      if (sep != std::string::npos) {
+        headers_to_add[str.substr(0, sep)] = str.substr(sep + 1);
+      }
+    }
+    return std::make_unique<HeaderCallbacksOnCreationFilterFactory>(std::move(headers_to_add));
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(HeaderCallbacksOnCreationConfigFactory,
+                                    "header_callbacks_on_creation");
 
 // -----------------------------------------------------------------------------
 // PerRoute
@@ -373,6 +455,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -395,11 +478,11 @@ private:
 class PerRouteConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     return std::make_unique<PerRouteFilterFactory>(std::string(config_view));
   }
 
-  std::unique_ptr<RouteSpecificConfig> createPerRoute(absl::string_view config_view) override {
+  std::unique_ptr<RouteSpecificConfig> createPerRoute(std::string_view config_view) override {
     return std::make_unique<PerRouteConfig>(std::string(config_view));
   }
 };
@@ -489,6 +572,7 @@ public:
     assertTrue(seen_request_body_, "seenRequestBody");
     assertTrue(seen_response_body_, "seenResponseBody");
   }
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -512,7 +596,7 @@ private:
 class BodyCallbacksConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     bool immediate = (config_view == "immediate_end_of_stream");
     return std::make_unique<BodyCallbacksFilterFactory>(immediate);
   }
@@ -566,6 +650,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -587,7 +672,7 @@ private:
 class SendResponseConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     return std::make_unique<SendResponseFilterFactory>(std::string(config_view));
   }
 };
@@ -618,8 +703,8 @@ public:
     return HeadersStatus::Stop;
   }
 
-  void onHttpCalloutDone(HttpCalloutResult result, absl::Span<const HeaderView> headers,
-                         absl::Span<const BufferView> body_chunks) override {
+  void onHttpCalloutDone(HttpCalloutResult result, std::span<const HeaderView> headers,
+                         std::span<const BufferView> body_chunks) override {
     if (cluster_name_ == "resetting_cluster") {
       assertTrue(result == HttpCalloutResult::Reset, "expected reset");
       return;
@@ -661,6 +746,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -683,7 +769,7 @@ private:
 class HttpCalloutsConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     return std::make_unique<HttpCalloutsFilterFactory>(std::string(config_view));
   }
 };
@@ -729,6 +815,7 @@ public:
       assertEq(event_ids_[i], i, "event id order");
     }
   }
+  void onDestroy() override {}
 
   TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
     return TrailersStatus::Continue;
@@ -758,7 +845,7 @@ public:
 class HttpFilterSchedulerConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     return std::make_unique<HttpFilterSchedulerFilterFactory>();
   }
 };
@@ -813,6 +900,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -828,7 +916,7 @@ public:
 class FakeExternalCacheConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     return std::make_unique<FakeExternalCacheFilterFactory>();
   }
 };
@@ -920,6 +1008,7 @@ public:
     std::vector<BufferView> res_tags = {{"on_response_headers"}, {method_}};
     handle_.decrementGaugeValue(ids_.epPending, 1, res_tags);
   }
+  void onDestroy() override {}
 
   TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
     return TrailersStatus::Continue;
@@ -954,7 +1043,7 @@ private:
 class StatsCallbacksConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     StatsCallbacksIDs ids;
     std::string cfg(config_view);
     size_t comma = cfg.find(',');
@@ -1080,6 +1169,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -1099,7 +1189,7 @@ public:
 class StreamingTerminalConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     return std::make_unique<StreamingTerminalFilterFactory>();
   }
 };
@@ -1129,7 +1219,7 @@ public:
     return HeadersStatus::StopAllAndBuffer;
   }
 
-  void onHttpStreamHeaders(uint64_t stream_id, absl::Span<const HeaderView> headers,
+  void onHttpStreamHeaders(uint64_t stream_id, std::span<const HeaderView> headers,
                            bool end_stream) override {
     assertEq(stream_id, stream_id_, "stream id");
     headers_received_ = true;
@@ -1142,13 +1232,13 @@ public:
     assertTrue(found, "status 200");
   }
 
-  void onHttpStreamData(uint64_t stream_id, absl::Span<const BufferView> body,
+  void onHttpStreamData(uint64_t stream_id, std::span<const BufferView> body,
                         bool end_stream) override {
     assertEq(stream_id, stream_id_, "stream id");
     data_received_ = true;
   }
 
-  void onHttpStreamTrailers(uint64_t stream_id, absl::Span<const HeaderView> trailers) override {}
+  void onHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) override {}
 
   void onHttpStreamComplete(uint64_t stream_id) override {
     assertEq(stream_id, stream_id_, "stream id");
@@ -1164,6 +1254,7 @@ public:
     assertTrue(data_received_, "data received");
     assertTrue(complete_, "stream complete");
   }
+  void onDestroy() override {}
 
   HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
     return HeadersStatus::Continue;
@@ -1204,7 +1295,7 @@ private:
 class HttpStreamBasicConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     return std::make_unique<HttpStreamBasicFilterFactory>(std::string(config_view));
   }
 };
@@ -1240,17 +1331,17 @@ public:
     return HeadersStatus::StopAllAndBuffer;
   }
 
-  void onHttpStreamHeaders(uint64_t stream_id, absl::Span<const HeaderView> headers,
+  void onHttpStreamHeaders(uint64_t stream_id, std::span<const HeaderView> headers,
                            bool end_stream) override {
     assertEq(stream_id, stream_id_, "id");
     recv_headers_ = true;
   }
-  void onHttpStreamData(uint64_t stream_id, absl::Span<const BufferView> body,
+  void onHttpStreamData(uint64_t stream_id, std::span<const BufferView> body,
                         bool end_stream) override {
     assertEq(stream_id, stream_id_, "id");
     recv_chunks_++;
   }
-  void onHttpStreamTrailers(uint64_t stream_id, absl::Span<const HeaderView> trailers) override {
+  void onHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) override {
     assertEq(stream_id, stream_id_, "id");
     recv_trailers_ = true;
   }
@@ -1275,6 +1366,7 @@ public:
     assertTrue(recv_trailers_, "recvTrailers");
     assertTrue(complete_, "complete");
   }
+  void onDestroy() override {}
 
   HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
     return HeadersStatus::Continue;
@@ -1318,7 +1410,7 @@ private:
 class HttpStreamBidiConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     return std::make_unique<HttpStreamBidiFilterFactory>(std::string(config_view));
   }
 };
@@ -1352,11 +1444,11 @@ public:
     handle_.sendLocalResponse(200, rh, "upstream_reset", "");
   }
 
-  void onHttpStreamHeaders(uint64_t stream_id, absl::Span<const HeaderView> headers,
+  void onHttpStreamHeaders(uint64_t stream_id, std::span<const HeaderView> headers,
                            bool end_stream) override {}
-  void onHttpStreamData(uint64_t stream_id, absl::Span<const BufferView> body,
+  void onHttpStreamData(uint64_t stream_id, std::span<const BufferView> body,
                         bool end_stream) override {}
-  void onHttpStreamTrailers(uint64_t stream_id, absl::Span<const HeaderView> trailers) override {}
+  void onHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) override {}
   void onHttpStreamComplete(uint64_t stream_id) override {}
 
   HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
@@ -1375,6 +1467,7 @@ public:
     return TrailersStatus::Continue;
   }
   void onStreamComplete() override {}
+  void onDestroy() override {}
 
 private:
   HttpFilterHandle& handle_;
@@ -1396,12 +1489,259 @@ private:
 class UpstreamResetConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view config_view) override {
+                                            std::string_view config_view) override {
     return std::make_unique<UpstreamResetFilterFactory>(std::string(config_view));
   }
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(UpstreamResetConfigFactory, "upstream_reset");
+
+// -----------------------------------------------------------------------------
+// HttpConfigCallout
+// -----------------------------------------------------------------------------
+
+class HttpConfigCalloutFilter : public HttpFilter {
+public:
+  HttpConfigCalloutFilter(HttpFilterHandle& handle, std::shared_ptr<std::atomic<bool>> callout_done)
+      : handle_(handle), callout_done_(std::move(callout_done)) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
+    if (callout_done_->load()) {
+      std::vector<HeaderView> h = {{"x-config-callout", "success"}};
+      handle_.sendLocalResponse(200, h, "", "");
+    } else {
+      std::vector<HeaderView> h = {{"x-config-callout", "pending"}};
+      handle_.sendLocalResponse(503, h, "", "");
+    }
+    return HeadersStatus::Stop;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
+    return HeadersStatus::Continue;
+  }
+  BodyStatus onResponseBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onResponseTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+  std::shared_ptr<std::atomic<bool>> callout_done_;
+};
+
+class HttpConfigCalloutFilterFactory : public HttpFilterFactory {
+public:
+  HttpConfigCalloutFilterFactory(std::shared_ptr<std::atomic<bool>> callout_done)
+      : callout_done_(std::move(callout_done)) {}
+
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<HttpConfigCalloutFilter>(handle, callout_done_);
+  }
+
+private:
+  std::shared_ptr<std::atomic<bool>> callout_done_;
+};
+
+class HttpConfigCalloutConfigFactory : public HttpFilterConfigFactory, public HttpCalloutCallback {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view config_view) override {
+    callout_done_ = std::make_shared<std::atomic<bool>>(false);
+    std::vector<HeaderView> h = {
+        {":path", "/config-init"}, {":method", "GET"}, {"host", "example.com"}};
+    handle.httpCallout(std::string(config_view), h, "", 1000, *this);
+    return std::make_unique<HttpConfigCalloutFilterFactory>(callout_done_);
+  }
+
+  void onHttpCalloutDone(HttpCalloutResult result, std::span<const HeaderView>,
+                         std::span<const BufferView>) override {
+    if (result == HttpCalloutResult::Success) {
+      callout_done_->store(true);
+    }
+  }
+
+private:
+  std::shared_ptr<std::atomic<bool>> callout_done_;
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(HttpConfigCalloutConfigFactory, "http_config_callout");
+
+// -----------------------------------------------------------------------------
+// HttpConfigStream
+// -----------------------------------------------------------------------------
+
+class HttpConfigStreamFilter : public HttpFilter {
+public:
+  HttpConfigStreamFilter(HttpFilterHandle& handle, std::shared_ptr<std::atomic<bool>> stream_done)
+      : handle_(handle), stream_done_(std::move(stream_done)) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
+    if (stream_done_->load()) {
+      std::vector<HeaderView> h = {{"x-config-stream", "success"}};
+      handle_.sendLocalResponse(200, h, "", "");
+    } else {
+      std::vector<HeaderView> h = {{"x-config-stream", "pending"}};
+      handle_.sendLocalResponse(503, h, "", "");
+    }
+    return HeadersStatus::Stop;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
+    return HeadersStatus::Continue;
+  }
+  BodyStatus onResponseBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onResponseTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+  std::shared_ptr<std::atomic<bool>> stream_done_;
+};
+
+class HttpConfigStreamFilterFactory : public HttpFilterFactory {
+public:
+  HttpConfigStreamFilterFactory(std::shared_ptr<std::atomic<bool>> stream_done)
+      : stream_done_(std::move(stream_done)) {}
+
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<HttpConfigStreamFilter>(handle, stream_done_);
+  }
+
+private:
+  std::shared_ptr<std::atomic<bool>> stream_done_;
+};
+
+class HttpConfigStreamConfigFactory : public HttpFilterConfigFactory, public HttpStreamCallback {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view config_view) override {
+    stream_done_ = std::make_shared<std::atomic<bool>>(false);
+    std::vector<HeaderView> h = {
+        {":path", "/stream-init"}, {":method", "GET"}, {"host", "example.com"}};
+    handle.startHttpStream(std::string(config_view), h, "", true, 5000, *this);
+    return std::make_unique<HttpConfigStreamFilterFactory>(stream_done_);
+  }
+
+  void onHttpStreamHeaders(uint64_t, std::span<const HeaderView>, bool) override {}
+  void onHttpStreamData(uint64_t, std::span<const BufferView>, bool) override {}
+  void onHttpStreamTrailers(uint64_t, std::span<const HeaderView>) override {}
+  void onHttpStreamComplete(uint64_t) override { stream_done_->store(true); }
+  void onHttpStreamReset(uint64_t, HttpStreamResetReason) override {}
+
+private:
+  std::shared_ptr<std::atomic<bool>> stream_done_;
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(HttpConfigStreamConfigFactory, "http_config_stream");
+
+// -----------------------------------------------------------------------------
+// ListMetadataCallbacks
+// -----------------------------------------------------------------------------
+
+class ListMetadataCallbacksFilter : public HttpFilter {
+public:
+  ListMetadataCallbacksFilter(HttpFilterHandle& handle) : handle_(handle) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
+    // Build a number list: [10.0, 20.0, 30.0]
+    handle_.addMetadataList("ns", "numbers", 10.0);
+    handle_.addMetadataList("ns", "numbers", 20.0);
+    handle_.addMetadataList("ns", "numbers", 30.0);
+    // Build a string list: ["hello", "world"]
+    handle_.addMetadataList("ns", "strings", "hello");
+    handle_.addMetadataList("ns", "strings", "world");
+    // Build a bool list: [true, false]
+    handle_.addMetadataList("ns", "bools", true);
+    handle_.addMetadataList("ns", "bools", false);
+    return HeadersStatus::Continue;
+  }
+
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
+    // Expose number list via response headers.
+    auto num_size = handle_.getMetadataListSize("ns", "numbers");
+    assert(num_size.has_value());
+    headers.set("x-list-num-size", std::to_string(*num_size));
+    for (size_t i = 0; i < *num_size; i++) {
+      auto val = handle_.getMetadataListNumber("ns", "numbers", i);
+      assert(val.has_value());
+      headers.set("x-list-num-" + std::to_string(i), std::to_string(static_cast<int>(*val)));
+    }
+    // Expose string list via response headers.
+    auto str_size = handle_.getMetadataListSize("ns", "strings");
+    assert(str_size.has_value());
+    headers.set("x-list-str-size", std::to_string(*str_size));
+    for (size_t i = 0; i < *str_size; i++) {
+      auto val = handle_.getMetadataListString("ns", "strings", i);
+      assert(val.has_value());
+      headers.set("x-list-str-" + std::to_string(i), std::string(*val));
+    }
+    // Expose bool list via response headers.
+    auto bool_size = handle_.getMetadataListSize("ns", "bools");
+    assert(bool_size.has_value());
+    headers.set("x-list-bool-size", std::to_string(*bool_size));
+    for (size_t i = 0; i < *bool_size; i++) {
+      auto val = handle_.getMetadataListBool("ns", "bools", i);
+      assert(val.has_value());
+      headers.set("x-list-bool-" + std::to_string(i), *val ? "true" : "false");
+    }
+    return HeadersStatus::Continue;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  BodyStatus onResponseBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onResponseTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+};
+
+class ListMetadataCallbacksFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<ListMetadataCallbacksFilter>(handle);
+  }
+};
+
+class ListMetadataCallbacksConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<ListMetadataCallbacksFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(ListMetadataCallbacksConfigFactory, "list_metadata_callbacks");
 
 } // namespace DynamicModules
 } // namespace Envoy

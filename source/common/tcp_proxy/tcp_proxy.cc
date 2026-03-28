@@ -831,6 +831,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   Upstream::HostConstSharedPtr host =
       Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(cluster.chooseHost(this));
   if (host) {
+    // Track attempted hosts for access logging
+    getStreamInfo().upstreamInfo()->addUpstreamHostAttempted(host);
     generic_conn_pool_ = factory->createGenericConnPool(
         host, cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
         upstream_decoder_filter_callbacks_, getStreamInfo());
@@ -1123,12 +1125,9 @@ Network::FilterStatus Filter::onNewConnection() {
     idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection")) {
-      // Start the idle timer immediately so that if no response is received from the upstream,
-      // the downstream connection will time out.
-      resetIdleTimer();
-    }
+    // Start the idle timer immediately so that if no response is received from the upstream,
+    // the downstream connection will time out.
+    resetIdleTimer();
   }
 
   // Set UUID for the connection. This is used for logging and tracing.

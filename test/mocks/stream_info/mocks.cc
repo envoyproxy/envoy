@@ -25,6 +25,7 @@ MockUpstreamInfo::MockUpstreamInfo()
   }));
   ON_CALL(*this, setUpstreamConnectionId(_)).WillByDefault(Invoke([this](uint64_t id) {
     upstream_connection_id_ = id;
+    upstream_connection_ids_attempted_.push_back(id);
   }));
   ON_CALL(*this, upstreamConnectionId()).WillByDefault(ReturnPointee(&upstream_connection_id_));
   ON_CALL(*this, setUpstreamInterfaceName(_))
@@ -83,6 +84,13 @@ MockUpstreamInfo::MockUpstreamInfo()
   ON_CALL(*this, upstreamDetectedCloseType()).WillByDefault(Invoke([this]() {
     return upstream_detected_close_type_;
   }));
+  ON_CALL(*this, addUpstreamHostAttempted(_))
+      .WillByDefault(Invoke([this](Upstream::HostDescriptionConstSharedPtr host) {
+        upstream_hosts_attempted_.push_back(host);
+      }));
+  ON_CALL(*this, upstreamHostsAttempted()).WillByDefault(ReturnRef(upstream_hosts_attempted_));
+  ON_CALL(*this, upstreamConnectionIdsAttempted())
+      .WillByDefault(ReturnRef(upstream_connection_ids_attempted_));
 }
 
 MockUpstreamInfo::~MockUpstreamInfo() = default;
@@ -230,7 +238,13 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
         upstream_cluster_info_ = std::move(cluster_info);
       }));
-  ON_CALL(*this, upstreamClusterInfo()).WillByDefault(ReturnPointee(&upstream_cluster_info_));
+  ON_CALL(*this, upstreamClusterInfo())
+      .WillByDefault(Invoke([this]() -> OptRef<const Upstream::ClusterInfo> {
+        return makeOptRefFromPtr<const Upstream::ClusterInfo>(upstream_cluster_info_.get());
+      }));
+  ON_CALL(*this, upstreamClusterInfoSharedPtr())
+      .WillByDefault(Invoke(
+          [this]() -> Upstream::ClusterInfoConstSharedPtr { return upstream_cluster_info_; }));
   ON_CALL(*this, addCustomFlag(_)).WillByDefault(Invoke([this](absl::string_view flag) {
     if (stream_flags_.empty()) {
       stream_flags_.append(flag);
@@ -242,7 +256,18 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, customFlags()).WillByDefault(Invoke([this]() {
     return absl::string_view(stream_flags_);
   }));
-  ON_CALL(*this, virtualHost()).WillByDefault(ReturnPointee(&virtual_host_));
+  ON_CALL(*this, route()).WillByDefault(Invoke([this]() -> OptRef<const Router::Route> {
+    return makeOptRefFromPtr<const Router::Route>(route_.get());
+  }));
+  ON_CALL(*this, routeSharedPtr()).WillByDefault(Invoke([this]() -> Router::RouteConstSharedPtr {
+    return route_;
+  }));
+  ON_CALL(*this, virtualHost()).WillByDefault(Invoke([this]() -> OptRef<const Router::VirtualHost> {
+    return makeOptRefFromPtr<const Router::VirtualHost>(virtual_host_.get());
+  }));
+  ON_CALL(*this, virtualHostSharedPtr())
+      .WillByDefault(
+          Invoke([this]() -> Router::VirtualHostConstSharedPtr { return virtual_host_; }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

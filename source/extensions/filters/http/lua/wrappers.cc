@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/lua/wrappers.h"
 
+#include "envoy/registry/registry.h"
+
 #include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
@@ -451,9 +453,34 @@ int FilterStateWrapper::luaGet(lua_State* state) {
   return 0;
 }
 
+int FilterStateWrapper::luaSet(lua_State* state) {
+  const char* object_key = luaL_checkstring(state, 2);
+  const char* factory_key = luaL_checkstring(state, 3);
+  const char* payload = luaL_checkstring(state, 4);
+
+  const auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(factory_key);
+  if (factory == nullptr) {
+    luaL_error(state, "'%s' does not have an object factory", factory_key);
+    return 0;
+  }
+
+  auto object = factory->createFromBytes(payload);
+  if (object == nullptr) {
+    luaL_error(state, "failed to create an object '%s' from value '%s'", object_key, payload);
+    return 0;
+  }
+
+  streamInfo().filterState()->setData(object_key, std::move(object),
+                                      StreamInfo::FilterState::StateType::ReadOnly,
+                                      StreamInfo::FilterState::LifeSpan::FilterChain,
+                                      StreamInfo::StreamSharingMayImpactPooling::None);
+  return 0;
+}
+
 const Protobuf::Struct& VirtualHostWrapper::getMetadata() const {
-  const auto& virtual_host = stream_info_.virtualHost();
-  if (virtual_host == nullptr) {
+  const auto virtual_host = stream_info_.virtualHost();
+  if (!virtual_host) {
     return Protobuf::Struct::default_instance();
   }
 
@@ -478,8 +505,8 @@ int VirtualHostWrapper::luaMetadata(lua_State* state) {
 }
 
 const Protobuf::Struct& RouteWrapper::getMetadata() const {
-  const auto& route = stream_info_.route();
-  if (route == nullptr) {
+  const auto route = stream_info_.route();
+  if (!route) {
     return Protobuf::Struct::default_instance();
   }
 

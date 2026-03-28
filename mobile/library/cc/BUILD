@@ -9,6 +9,16 @@ licenses(["notice"])  # Apache 2
 envoy_mobile_package()
 
 envoy_cc_library(
+    name = "network_change_monitor_interface",
+    srcs = [
+        "network_change_monitor.h",
+    ],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+envoy_cc_library(
     name = "engine_builder_lib",
     srcs = [
         "engine_builder.cc",
@@ -80,6 +90,7 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        ":network_change_monitor_interface",
         "//library/common:engine_types_lib",
         "//library/common:internal_engine_lib_no_stamp",
         "//library/common/api:c_types",
