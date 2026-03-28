@@ -257,7 +257,7 @@ Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionR
 
 void Filter::populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,
                                  Http::RequestHeaderMap& headers) {
-  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
+  const auto route = decoder_callbacks_->route();
   if (!route || !route->routeEntry()) {
     return;
   }
@@ -297,7 +297,7 @@ void Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_polic
   }
 }
 
-VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route) {
+VhRateLimitOptions Filter::getVirtualHostRateLimitOption(OptRef<const Router::Route> route) {
   if (route->routeEntry()->includeVirtualHostRateLimits()) {
     vh_rate_limits_ = VhRateLimitOptions::Include;
   } else {

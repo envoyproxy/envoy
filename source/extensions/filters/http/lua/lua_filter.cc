@@ -107,7 +107,7 @@ void parseOptionsFromTable(lua_State* state, int index,
 }
 
 const Protobuf::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
-  if (callbacks->route() == nullptr) {
+  if (!callbacks->route()) {
     return Protobuf::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->metadata();

@@ -195,7 +195,7 @@ private:
   void populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                            std::vector<RateLimit::Descriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
-  VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
+  VhRateLimitOptions getVirtualHostRateLimitOption(OptRef<const Router::Route> route);
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   Filters::Common::LocalRateLimit::LocalRateLimiter::Result
   requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);
