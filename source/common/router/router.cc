@@ -997,38 +997,34 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   const bool retry_enabled = retry_state_ && retry_state_->enabled();
   const bool redirect_enabled = route_entry_ && route_entry_->internalRedirectPolicy().enabled();
-  const bool is_redirect_only = redirect_enabled && !retry_enabled;
   const uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
 
-  bool buffering = retry_enabled || redirect_enabled;
+  bool buffering = (retry_enabled || redirect_enabled) && (!request_buffer_overflowed_);
 
   // Check if we would exceed buffer limits, regardless of current buffering state
   // This ensures error details are set even if retry state was cleared due to upstream reset.
   const bool would_exceed_buffer =
       (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
 
-  // Handle retry buffer overflow, excluding redirect-only scenarios.
-  // For redirect scenarios, buffer overflow should only affect redirect processing, not initial
-  // request.
-  if (would_exceed_buffer && retry_enabled && !is_redirect_only && !request_buffer_overflowed_) {
+  // Handle buffer overflow.
+  if (buffering && would_exceed_buffer && !request_buffer_overflowed_) {
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. "
               "Giving up on buffering.",
               getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
-
     cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
-    ENVOY_LOG(debug, "retry or shadow overflow: retry_state_ reset, buffering set to false");
+    ENVOY_LOG(debug, "retry or redirect buffer overflow: skipping buffering");
     buffering = false;
     active_shadow_policies_.clear();
+    request_buffer_overflowed_ = true;
 
     // Only send local reply and cleanup if we're in a retry waiting state (no active upstream
     // requests). If there are active upstream requests, let the normal upstream failure handling
     // take precedence.
     if (upstream_requests_.empty()) {
-      request_buffer_overflowed_ = true;
-      ENVOY_LOG(debug,
-                "retry or shadow overflow: No upstream requests, resetting and calling cleanup()");
+      ENVOY_LOG(debug, "retry or redirect buffer overflow: No upstream requests, resetting and "
+                       "calling cleanup()");
       resetAll();
       cleanup();
       callbacks_->streamInfo().setResponseCodeDetails(
@@ -1039,23 +1035,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
           StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     } else {
-      ENVOY_LOG(debug, "retry or shadow overflow: Upstream requests exist, deferring to normal "
-                       "upstream failure handling");
+      ENVOY_LOG(debug,
+                "retry or redirect buffer overflow: Upstream requests exist, deferring to normal "
+                "upstream failure handling");
     }
-  }
-
-  // Handle redirect-only buffer overflow when retry/shadow is not active.
-  // For redirect scenarios, buffer overflow should only affect redirect processing, not initial
-  // request.
-  if (would_exceed_buffer && is_redirect_only && !request_buffer_overflowed_) {
-    ENVOY_LOG(debug,
-              "The request payload has at least {} bytes data which exceeds buffer limit {}. "
-              "Marking request as buffer overflowed to cancel internal redirects.",
-              getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
-
-    // Set the flag to cancel internal redirect processing, but allow the request to proceed
-    // normally.
-    request_buffer_overflowed_ = true;
   }
 
   for (auto* shadow_stream : shadow_streams_) {
@@ -1448,13 +1431,6 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::CoreResponseFlag respo
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   callbacks_->streamInfo().setResponseFlag(response_flags);
-
-  // Check if buffer overflow occurred and override error details accordingly
-  if (request_buffer_overflowed_) {
-    code = Http::Code::InsufficientStorage;
-    body = "exceeded request buffer limit while retrying upstream";
-    details = StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit;
-  }
 
   // This will destroy any created retry timers.
   cleanup();
@@ -2028,8 +2004,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   const uint64_t status_code = Http::Utility::getResponseStatus(headers);
 
   // Redirects are not supported for streaming requests yet.
-  if (downstream_end_stream_ && (!request_buffer_overflowed_ || !callbacks_->decodingBuffer()) &&
-      location != nullptr &&
+  if (downstream_end_stream_ && (!request_buffer_overflowed_) && location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, headers, *location,
                                                status_code) &&
       callbacks_->recreateStream(&headers)) {
