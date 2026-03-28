@@ -14,16 +14,19 @@
 /// # Usage
 ///
 /// ```
-/// # use envoy_proxy_dynamic_modules_rust_sdk::*;
-/// # struct MyFilter;
-/// # impl MyFilter { fn new() -> Self { MyFilter } }
-/// # impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MyFilter {}
-/// # struct MyFilterConfig;
-/// # impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MyFilterConfig {
-/// fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-///   Box::new(CatchUnwind::new(MyFilter::new()))
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// struct MyFilter;
+///
+/// impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MyFilter {}
+///
+/// struct MyFilterConfig;
+///
+/// impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MyFilterConfig {
+///   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+///     Box::new(CatchUnwind::new(MyFilter))
+///   }
 /// }
-/// # }
 /// ```
 pub struct CatchUnwind<F> {
   filter: Option<F>,

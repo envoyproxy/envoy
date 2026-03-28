@@ -1570,11 +1570,12 @@ pub trait EnvoyHttpFilter {
   /// buffer requirements of other filters in the chain. For example:
   ///
   /// ```
-  /// # use envoy_proxy_dynamic_modules_rust_sdk::*;
-  /// # let mut envoy_filter = MockEnvoyHttpFilter::default();
-  /// # envoy_filter.expect_get_buffer_limit().return_const(0u64);
-  /// # envoy_filter.expect_set_buffer_limit().return_const(());
-  /// # let desired_limit: u64 = 1024;
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  ///
+  /// let mut envoy_filter = MockEnvoyHttpFilter::default();
+  /// envoy_filter.expect_get_buffer_limit().return_const(0u64);
+  /// envoy_filter.expect_set_buffer_limit().return_const(());
+  /// let desired_limit: u64 = 1024;
   /// if desired_limit > envoy_filter.get_buffer_limit() {
   ///   envoy_filter.set_buffer_limit(desired_limit);
   /// }

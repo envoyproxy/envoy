@@ -550,31 +550,82 @@ macro_rules! declare_network_filter_init_functions {
 ///
 /// HTTP only:
 /// ```
-/// # use envoy_proxy_dynamic_modules_rust_sdk::*;
-/// # fn my_program_init() -> bool { true }
-/// # fn my_new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
-/// #   _: &mut EC, _: &str, _: &[u8],
-/// # ) -> Option<Box<dyn HttpFilterConfig<EHF>>> { None }
-/// declare_all_init_functions!(my_program_init,
-///     http: my_new_http_filter_config_fn,
-/// );
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// declare_all_init_functions!(my_program_init, http: my_new_http_filter_config_fn);
+///
+/// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
+///   _envoy_filter_config: &mut EC,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
+///   Some(Box::new(MyHttpFilterConfig {}))
+/// }
+///
+/// struct MyHttpFilterConfig {}
+///
+/// impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MyHttpFilterConfig {}
 /// ```
 ///
 /// Network + UDP Listener:
 /// ```
-/// # use envoy_proxy_dynamic_modules_rust_sdk::*;
-/// # fn my_program_init() -> bool { true }
-/// # fn my_new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
-/// #   _: &mut EC, _: &str, _: &[u8],
-/// # ) -> Option<Box<dyn NetworkFilterConfig<ENF>>> { None }
-/// # fn my_new_udp_listener_filter_config_fn<
-/// #   EC: EnvoyUdpListenerFilterConfig,
-/// #   ELF: EnvoyUdpListenerFilter,
-/// # >(_: &mut EC, _: &str, _: &[u8]) -> Option<Box<dyn UdpListenerFilterConfig<ELF>>> { None }
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
 /// declare_all_init_functions!(my_program_init,
-///     network: my_new_network_filter_config_fn,
-///     udp_listener: my_new_udp_listener_filter_config_fn,
+///   network: my_new_network_filter_config_fn,
+///   udp_listener: my_new_udp_listener_filter_config_fn,
 /// );
+///
+/// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
+///   _envoy_filter_config: &mut EC,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn NetworkFilterConfig<ENF>>> {
+///   Some(Box::new(MyNetworkFilterConfig {}))
+/// }
+///
+/// struct MyNetworkFilterConfig {}
+///
+/// impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for MyNetworkFilterConfig {
+///   fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+///     Box::new(MyNetworkFilter {})
+///   }
+/// }
+///
+/// struct MyNetworkFilter {}
+///
+/// impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for MyNetworkFilter {}
+///
+/// fn my_new_udp_listener_filter_config_fn<
+///   EC: EnvoyUdpListenerFilterConfig,
+///   ELF: EnvoyUdpListenerFilter,
+/// >(
+///   _envoy_filter_config: &mut EC,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn UdpListenerFilterConfig<ELF>>> {
+///   Some(Box::new(MyUdpListenerFilterConfig {}))
+/// }
+///
+/// struct MyUdpListenerFilterConfig {}
+///
+/// impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilterConfig<ELF> for MyUdpListenerFilterConfig {
+///   fn new_udp_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn UdpListenerFilter<ELF>> {
+///     Box::new(MyUdpListenerFilter {})
+///   }
+/// }
+///
+/// struct MyUdpListenerFilter {}
+///
+/// impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilter<ELF> for MyUdpListenerFilter {}
 /// ```
 #[macro_export]
 macro_rules! declare_all_init_functions {
