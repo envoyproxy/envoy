@@ -81,6 +81,12 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
 
 ### 1.3 Inside ActiveTcpListener Constructor
 
+**Key Points:**
+- `ActiveTcpListener` passes itself (`*this`) as the callback handler to `TcpListenerImpl`
+- This establishes the callback relationship: when OS signals new connections, `TcpListenerImpl` will invoke `ActiveTcpListener`'s methods
+- The `connection_balancer_` is notified so it can route connections to this worker
+- Socket is stored but not yet enabled - that happens in the next step
+
 **Constructor call chain:**
 
 ```cpp
@@ -144,6 +150,20 @@ Network::ListenerPtr ConnectionHandlerImpl::createListener(
 
 ### 2.1 File Event Registration
 
+**This is where the listener socket connects to the OS event loop:**
+
+**What Happens:**
+- Listen socket's file descriptor is registered with the event loop (epoll on Linux, kqueue on BSD/macOS)
+- A lambda callback is registered that will be invoked when the socket is readable
+- **Level-triggered** mode means the event stays active until all pending connections are accepted
+- The callback captures `TcpListenerImpl` and calls its `onSocketEvent()` method
+
+**Why This Matters:**
+- This is the bridge between OS-level networking and Envoy's C++ code
+- When a client connects, the OS places the connection in the accept queue
+- The listen socket becomes readable, triggering the event loop
+- Event loop invokes the lambda, which processes the connection
+
 **Inside `TcpListenerImpl` constructor:**
 
 ```cpp
@@ -200,6 +220,18 @@ void TcpListenerImpl::enable() {
 
 ### 3.1 Event Loop Wakes Up
 
+**This is the critical path from client connection to Envoy processing:**
+
+**The Journey:**
+1. **Client side**: Application calls `connect()`, sends TCP SYN
+2. **Network**: SYN packet traverses network to server
+3. **Server kernel**: Receives SYN, responds with SYN-ACK, completes 3-way handshake
+4. **Kernel accept queue**: Completed connection is placed in queue waiting for `accept()`
+5. **Event notification**: Listen socket is marked readable in kernel
+6. **Event loop wakeup**: `epoll_wait()` or `kevent()` returns with the readable socket
+7. **Callback invocation**: Dispatcher invokes the registered lambda from section 2.1
+8. **Accept processing**: `TcpListenerImpl::onSocketEvent()` runs to accept the connection
+
 **Timeline:**
 
 1. **Client initiates TCP connection:** SYN packet arrives, kernel completes handshake
@@ -208,6 +240,28 @@ void TcpListenerImpl::enable() {
 4. **Dispatcher invokes callback:** Calls the registered lambda from section 2.1
 
 ### 3.2 TcpListenerImpl::onSocketEvent()
+
+**This method accepts connections from the OS and applies admission control:**
+
+**Batch Processing:**
+- Accepts multiple connections per event (up to `max_connections_to_accept_per_socket_event_`)
+- This batching improves throughput under high connection load
+- Prevents one listener from starving other event loop work
+
+**Admission Control Layers:**
+1. **Global connection limit**: Checks total connections across all listeners
+2. **Overload detection**: Checks if Envoy is under memory/CPU pressure
+3. **Load shedding**: Random rejection based on overload state
+4. **Per-listener limit**: Checked later in `ActiveTcpListener::onAccept()`
+
+**Connection Acceptance:**
+- Only connections passing all checks reach `onAccept()`
+- Rejected connections are immediately closed at the OS level
+- Statistics are updated for rejections: `GlobalCxLimit`, `OverloadAction`
+
+**Result:**
+- Successfully accepted sockets are passed to `ActiveTcpListener::onAccept()` as `AcceptedSocket` objects
+- These sockets are ready for listener filter processing
 
 **Code flow:**
 
@@ -437,6 +491,19 @@ void ActiveTcpListener::resumeListening() {
 
 ### 5.1 Connection Posted to Different Worker
 
+**Why Connection Balancing:**
+- Distributes connections evenly across workers for optimal CPU utilization
+- Supports `use_original_dst` listener option for transparent proxy scenarios
+- Enables exact load balancing strategies to prevent worker imbalance
+- Important when using `SO_REUSEPORT` - kernel may not distribute evenly
+
+**How Cross-Worker Transfer Works:**
+- Unix domain sockets with `SCM_RIGHTS` allow passing file descriptors between processes/threads
+- Socket wrapper is created on source worker
+- Posted as a task to target worker's dispatcher queue
+- Target worker extracts socket and continues processing
+- Original worker releases all references to the socket
+
 **Scenario:** Connection is accepted on worker A but should be processed by worker B
 
 **Steps:**
@@ -477,6 +544,28 @@ void ActiveTcpListener::resumeListening() {
 ## 6. Config Update Path
 
 ### 6.1 Filter Chain Update Without Full Listener Drain
+
+**Why This Optimization Matters:**
+- Traditional listener updates require closing the socket and draining all connections
+- Filter-chain-only updates can be applied without touching the listen socket
+- Dramatically reduces disruption during configuration rollouts
+- Existing connections continue on old filter chains, new connections use updated chains
+
+**Requirements for In-Place Update:**
+- Listen socket address unchanged
+- Socket options unchanged (SO_REUSEPORT, SO_REUSEADDR, etc.)
+- Listener filters unchanged
+- Only filter chains and their network filters change
+
+**What Gets Updated:**
+- `FilterChainImpl` objects are rebuilt with new filter factories
+- `FilterChainManagerImpl` matching trie is rebuilt with new chains
+- Transport socket factories are recreated with new TLS certs/config
+
+**What Stays Unchanged:**
+- Listen socket remains open and accepting
+- Worker thread `ActiveTcpListener` instances remain alive
+- Active connections continue with old filter chains
 
 **Scenario:** LDS update changes only filter chains, not listener socket
 

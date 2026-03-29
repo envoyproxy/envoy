@@ -9,6 +9,29 @@
 
 This is the **network-layer** (L4) filter manager, distinct from the HTTP-layer `Http::FilterManager`. Network filters operate on raw `Buffer::Instance` data, not parsed HTTP headers.
 
+**What is a Network Filter?**
+
+Network filters operate at Layer 4 (TCP/UDP), processing raw bytes before any protocol parsing:
+
+**Common Network Filters:**
+- **HTTP Connection Manager**: Parses HTTP and creates HTTP filter chain
+- **TCP Proxy**: Proxies raw TCP streams to upstream
+- **Redis Proxy**: Parses Redis protocol, provides connection pooling
+- **MySQL Proxy**: Parses MySQL protocol, provides query routing
+- **Mongo Proxy**: Parses MongoDB protocol, provides sharding
+- **TLS Inspector (listener filter)**: Extracts SNI before connection is established
+
+**Why Network Filters?**
+- **Protocol agnostic**: Connection layer doesn't need to know about HTTP, Redis, etc.
+- **Composability**: Can stack filters (rate limit → protocol parser → proxy)
+- **Early decision making**: Can reject connections before expensive parsing
+- **Resource management**: Can limit connections based on raw metrics
+
+**Network Filter vs HTTP Filter:**
+- **Network Filter**: Sees raw bytes, operates at connection level
+- **HTTP Filter**: Sees parsed HTTP (headers, body), operates at request level
+- HTTP Connection Manager is a network filter that creates HTTP filters internally
+
 ## Class Hierarchy
 
 ```mermaid
@@ -54,6 +77,32 @@ classDiagram
 ```
 
 ## Filter Chain Ordering
+
+**This diagram shows how network filters process data in both directions:**
+
+**Read Filters (Downstream → Envoy):**
+- Execute in **forward order**: First filter added gets first look at data
+- Each filter can inspect, modify, or buffer data
+- Filter A might do rate limiting
+- Filter B might parse protocol (HTTP Connection Manager)
+- Filter C might do application-specific logic
+- Data flows: Network → A → B → C → Application
+
+**Write Filters (Envoy → Downstream):**
+- Execute in **reverse order**: Last filter added gets first look at response
+- Symmetric with read filters for layering
+- Filter C might add metadata
+- Filter B might encode protocol
+- Filter A might compress data
+- Data flows: Application → C → B → A → Network
+
+**Why Reverse Order for Writes?**
+- **Symmetry**: Filter that unwraps on read can wrap on write
+- **Layering**: Matches OSI model (application → transport)
+- **Example**:
+  - Filter A: Encryption - decrypts on read, encrypts on write
+  - Filter B: Compression - decompresses on read, compresses on write
+  - Processing: Read: encrypted → compressed → plain | Write: plain → compressed → encrypted
 
 ```mermaid
 flowchart LR

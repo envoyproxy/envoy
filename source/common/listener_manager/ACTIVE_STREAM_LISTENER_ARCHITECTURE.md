@@ -8,6 +8,18 @@ The Active Stream Listener subsystem manages the lifecycle of incoming TCP conne
 
 ## Architecture Overview
 
+### High-Level Flow
+
+**This diagram shows how a TCP connection flows through Envoy's listener architecture:**
+
+- **Listener Layer**: The OS socket listener receives incoming TCP connections from clients
+- **Stream Listener Base**: Three layered base classes manage the progression from raw socket to established connection
+  - `ActiveListenerImplBase`: Holds listener statistics and configuration
+  - `ActiveStreamListenerBase`: Manages sockets during the listener filter phase
+  - `OwnedActiveStreamListenerBase`: Groups connections by their filter chain for efficient management
+- **Socket Processing**: Newly accepted sockets undergo listener filter processing (TLS inspection, protocol detection)
+- **Connection Management**: After passing filters, connections are organized by filter chain and managed throughout their lifetime
+
 ```mermaid
 graph TB
     subgraph "Listener Layer"
@@ -132,6 +144,39 @@ classDiagram
 
 ### Complete Flow
 
+**This sequence diagram shows the complete journey of a TCP connection from acceptance to active processing:**
+
+**Socket Acceptance Phase:**
+- Operating system signals a new TCP connection is available
+- Network listener accepts the socket from the OS
+- `ActiveStreamListenerBase` creates an `ActiveTcpSocket` wrapper to manage the socket
+- The socket enters the listener filter processing phase
+
+**Filter Chain Processing Phase:**
+- Listener filters (like TLS Inspector, Proxy Protocol parser) are created and chained together
+- Each filter examines the connection to extract metadata (SNI, ALPN, source IP, etc.)
+- Filters can return three statuses:
+  - **Continue**: Move to next filter immediately
+  - **StopIteration**: Need more data - socket is added to waiting list with timeout
+  - **Close**: Reject this connection
+- If filters time out, behavior depends on `continue_on_listener_filters_timeout` setting
+
+**Connection Establishment Phase:**
+- Once filters complete successfully, `newConnection()` is called
+- The appropriate filter chain is matched based on collected metadata
+- An `ActiveTcpConnection` is created and added to the connection tracking map
+- Network filters are initialized and the connection begins processing data
+
+**Active Connection Phase:**
+- Connection processes requests through its network filter chain
+- Statistics are updated for active connections
+
+**Connection Termination Phase:**
+- Connection close event triggers `removeConnection()`
+- Connection is removed from tracking structures
+- Access logs are emitted with final connection statistics
+- Resources are scheduled for deferred deletion
+
 ```mermaid
 sequenceDiagram
     participant OS as Operating System
@@ -201,6 +246,26 @@ sequenceDiagram
 
 ## 3. ActiveTcpSocket State Machine
 
+**This state machine tracks an ActiveTcpSocket's lifecycle from creation through listener filter processing:**
+
+**Key States:**
+- **Created**: Socket accepted from OS, wrapper object created, StreamInfo initialized
+- **FilterProcessing**: Listener filter chain execution begins
+- **FilterIterating**: Walking through the filter list, each filter examines the connection
+- **NeedMoreData**: A filter needs additional network data before making a decision (e.g., waiting for TLS ClientHello)
+- **Waiting**: Socket is in the waiting list with an active timeout timer
+- **Timeout**: Timer expired before filters completed
+- **FilterPassed**: All filters approved the connection - ready to become active
+- **FilterFailed**: A filter rejected the connection or timeout behavior says to close
+- **Connected**: Promoted to ActiveTcpConnection, begins normal request processing
+- **Closed**: Connection rejected, resources cleaned up
+
+**Critical Decision Points:**
+- When a filter returns `StopIteration`, socket enters waiting state with timer
+- On timeout, `continue_on_listener_filters_timeout` config determines whether to proceed or reject
+- Filter rejection immediately moves to close state
+- Successful completion promotes the socket to a full connection
+
 ```mermaid
 stateDiagram-v2
     [*] --> Created: Socket accepted
@@ -258,6 +323,41 @@ stateDiagram-v2
 ## 4. Listener Filter Processing
 
 ### Filter Chain Execution
+
+**This flowchart details the listener filter chain execution logic:**
+
+**Initial Phase:**
+- Socket is accepted and `ActiveTcpSocket` is created
+- Filter chain creation is attempted - if it fails (e.g., due to missing ECDS config), socket is closed immediately
+- Filter iterator is initialized to the beginning of the filter list
+
+**Filter Iteration Loop:**
+- Each filter is invoked sequentially
+- Filter can return three statuses:
+  - **Continue**: Proceed to next filter
+  - **StopIteration**: Socket needs more data - add to waiting list, start timer
+  - **Close**: Reject connection immediately
+
+**Waiting State:**
+- When a filter returns `StopIteration`, socket is added to `sockets_` list
+- Timer is started with duration from `listener_filters_timeout` config (typically 15 seconds)
+- Socket waits for:
+  - More network data arriving (filter can resume)
+  - Timeout expiration
+
+**Timeout Handling:**
+- If `continue_on_listener_filters_timeout` is **true**: Continue with remaining filters (may match less specific filter chain)
+- If `continue_on_listener_filters_timeout` is **false**: Reject connection and close socket
+
+**Success Path:**
+- All filters pass: Call `newConnection()` to find matching filter chain
+- Socket is promoted to `ActiveTcpConnection`
+- Listener filter instances are destroyed (no longer needed)
+
+**Failure Path:**
+- Filter rejection or timeout-based closure
+- Access logs are emitted with connection metadata
+- Socket is closed and resources cleaned up
 
 ```mermaid
 flowchart TD
@@ -322,6 +422,29 @@ flowchart TD
 ## 5. Connection Management by Filter Chain
 
 ### ActiveConnections Container
+
+**This diagram shows how connections are organized by their matched filter chain:**
+
+**Why Group by Filter Chain:**
+- Enables efficient draining when filter chains are updated
+- All connections using a specific filter chain can be found and closed together
+- Supports filter-chain-only updates without full listener restart
+
+**Structure:**
+- `OwnedActiveStreamListenerBase` maintains a map: `connections_by_context_`
+- Key: pointer to `FilterChain` instance
+- Value: `ActiveConnections` container holding all connections for that filter chain
+
+**Example Scenario:**
+- Filter Chain A: TLS connections to `api.example.com` - has 3 active connections
+- Filter Chain B: TLS connections to `*.example.com` - has 2 active connections
+- Filter Chain C: Raw TCP connections - has 1 active connection
+- When Filter Chain B is updated, only those 2 connections need to be drained
+
+**Lookup Performance:**
+- Map lookup is O(1) using filter chain pointer as key
+- Each `ActiveConnections` container uses a linked list for O(1) insertion/removal
+- Connection removal can happen at any time without invalidating iterators
 
 ```mermaid
 graph TB
@@ -392,6 +515,34 @@ sequenceDiagram
 ## 6. Filter Chain Draining
 
 ### Drain Process
+
+**This flowchart shows how filter chains are gracefully removed during configuration updates:**
+
+**When Draining Occurs:**
+- Configuration update removes or modifies a filter chain
+- The old filter chain needs to be gracefully shut down
+- Existing connections on that chain should complete their work before closing
+
+**Drain Sequence:**
+1. `onFilterChainDraining()` is called with list of filter chains to drain
+2. `is_deleting_` flag is temporarily set to prevent concurrent modifications
+3. For each draining filter chain:
+   - Find its `ActiveConnections` container in the map
+   - Schedule graceful close for all connections in that chain
+   - Connections close with `FlushWrite` - complete pending writes before closing
+4. Remove the filter chain entry from `connections_by_context_` map
+5. Schedule deferred deletion of `ActiveConnections` object
+
+**Graceful Close:**
+- Connections are not forcibly terminated
+- Pending response data is written before closing
+- Gives applications time to complete in-flight requests
+- Drain timer (configurable, default 600s) determines maximum drain time
+
+**Why This Matters:**
+- Allows zero-downtime filter chain updates
+- Minimizes disruption to active connections
+- Supports gradual rollout of configuration changes
 
 ```mermaid
 flowchart TD

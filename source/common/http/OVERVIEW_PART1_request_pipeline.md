@@ -19,6 +19,57 @@
 
 ## 1. High-Level Architecture
 
+**This diagram shows the complete HTTP request/response pipeline through Envoy:**
+
+**Downstream Path (Client Request → Envoy):**
+
+**1. Network Layer → HTTP Layer Transition:**
+- Raw TCP/QUIC bytes arrive on network connection
+- `ConnectionManagerImpl` is a **Network::ReadFilter** - bridges network and HTTP layers
+- It's the entry point from network layer into HTTP processing
+
+**2. Protocol Detection & Codec Creation:**
+- `ConnectionManagerUtility` sniffs first bytes to detect protocol (HTTP/1.1, HTTP/2, HTTP/3)
+- Creates appropriate codec: `Http1::ServerConnection`, `Http2::ServerConnection`, or `Http3::ServerConnection`
+- Codec parses raw bytes into HTTP semantic elements (headers, data, trailers)
+
+**3. Stream Creation (Per Request):**
+- Codec creates `ActiveStream` for each HTTP request
+- One connection can have multiple concurrent streams (HTTP/2, HTTP/3)
+- HTTP/1.1 has one stream per connection at a time
+
+**4. Filter Chain Execution:**
+- `DownstreamFilterManager` owns the HTTP filter chain
+- Filters execute in order: A → B → C → Router
+- Each filter can:
+  - **Inspect**: Read headers/data
+  - **Modify**: Change headers, body, trailers
+  - **Halt**: Stop for async operations (database lookup, external auth)
+  - **Generate**: Create local response (auth failure, rate limit)
+
+**Upstream Path (Envoy → Backend):**
+
+**5. Routing & Connection Pool:**
+- Router filter determines upstream cluster based on routing rules
+- Connection pool manages pooled connections to upstream hosts
+- Pools are protocol-specific: HTTP/1.1, HTTP/2, HTTP/3, or Grid (mixed)
+
+**6. CodecClient & Upstream Connection:**
+- `CodecClient` wraps upstream connection with codec
+- Sends HTTP request to upstream server
+- Manages request/response correlation
+
+**Response Path (Reverse):**
+- Response flows back through same components in reverse
+- Upstream → CodecClient → Pool → Router → Filter C → B → A → Codec → Client
+- Encoder filters process response (reverse order from decoder)
+
+**Key Design Points:**
+- **Separation of concerns**: Network layer, protocol layer, application layer
+- **Protocol abstraction**: Filters don't care about HTTP/1 vs HTTP/2 vs HTTP/3
+- **Bidirectional filter chain**: Decoder filters for requests, encoder filters for responses
+- **Async support**: Filters can pause processing for async operations
+
 ```mermaid
 graph TB
     subgraph "Downstream (Client)"
@@ -106,6 +157,71 @@ mindmap
 ---
 
 ## 3. End-to-End Request Flow
+
+**This sequence diagram traces a complete HTTP request from client bytes to upstream response:**
+
+**Phase 1: Connection & Protocol Setup (Steps 1-3):**
+- Client sends raw TCP bytes (HTTP request)
+- `ConnectionManagerImpl` receives bytes as network filter
+- `ConnectionManagerUtility::autoCreateCodec()` examines first bytes:
+  - HTTP/1.1: Looks for `GET`, `POST`, etc.
+  - HTTP/2: Looks for connection preface (`PRI * HTTP/2.0`)
+  - HTTP/3: Uses QUIC stream types
+- Appropriate server codec is created and stored
+
+**Phase 2: Stream Creation (Steps 4-6):**
+- Codec parses request and calls `newStream()`
+- `ConnectionManagerImpl` creates `ActiveStream` for this request
+- `ActiveStream` creates `DownstreamFilterManager` for filter chain execution
+- Request tracking begins (timing, metrics)
+
+**Phase 3: Header Processing (Steps 7-13):**
+- Codec calls `decodeHeaders()` with parsed headers
+- `ConnectionManagerUtility` performs header mutations:
+  - Add `x-forwarded-for`, `x-envoy-*` headers
+  - Sanitize headers for security
+  - Set request ID for tracing
+- Filter chain begins: A → B → C → Router
+- Filter B returns `StopIteration` (e.g., waiting for rate limit check)
+- Eventually `continueDecoding()` is called to resume
+
+**Phase 4: Routing & Upstream Selection (Steps 14-16):**
+- Router filter matches route based on headers (path, host, method)
+- Selects upstream cluster
+- Applies load balancing to choose specific host
+- Gets connection from pool (may create new connection)
+
+**Phase 5: Upstream Request (Steps 17-18):**
+- Request sent to upstream backend
+- Connection pool manages connection lifecycle
+- Request queued if no connection available
+
+**Phase 6: Response Processing (Steps 19-26):**
+- Upstream responds with headers
+- Response flows through encoder filters (reverse order): Router → C → B → A
+- Each encoder filter can modify response
+- Codec encodes response back to wire format
+- Bytes sent to client
+
+**Key Behavioral Notes:**
+
+**Async Filter Operations:**
+- When filter returns `StopIteration`, request processing pauses
+- Filter performs async work (auth check, rate limit, etc.)
+- Filter calls `continueDecoding()` or `continueEncoding()` when ready
+- Processing resumes from where it stopped
+
+**Header Mutations:**
+- Happen before filter chain (request) and after filter chain (response)
+- Add operational headers: request ID, trace context, proxy info
+- Remove internal headers before sending to client
+- Normalize headers for consistency
+
+**Connection Pooling Benefits:**
+- Reuses connections → reduces latency and overhead
+- HTTP/2 multiplexing → multiple requests on one connection
+- Connection limits prevent resource exhaustion
+- Health checking ensures connections are valid
 
 ```mermaid
 sequenceDiagram

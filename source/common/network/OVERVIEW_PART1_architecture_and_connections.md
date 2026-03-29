@@ -21,6 +21,34 @@
 
 ## 1. High-Level Architecture
 
+**This diagram shows the complete network layer architecture from client connections to upstream servers:**
+
+**Downstream Path (Client → Envoy):**
+- **Listeners**: Accept incoming connections (TCP, UDP, QUIC)
+  - `TcpListenerImpl` uses `accept()` to get new connections
+  - `UdpListenerImpl` uses `recvmsg()` for datagrams
+- **Listener Filters**: Pre-connection inspection (TLS Inspector extracts SNI, Proxy Protocol parser, etc.)
+- **Server Connections**: Accepted downstream connections wrapped in `ServerConnectionImpl`
+
+**Connection Layer (Core Functionality):**
+- **FilterManagerImpl**: Executes network filter chain (TCP Proxy, HTTP Connection Manager, etc.)
+- **TransportSocket**: Handles encryption/decryption layer
+  - TLS transport for encrypted connections
+  - Raw buffer for plaintext
+  - QUIC transport for HTTP/3
+- **IoHandle**: Platform-specific I/O operations on file descriptors
+
+**Upstream Path (Envoy → Backend):**
+- **Client Connections**: Envoy-initiated connections wrapped in `ClientConnectionImpl`
+- **Happy Eyeballs**: RFC 8305 implementation for dual-stack IPv4/IPv6 racing
+- **Same Transport/IO layers**: Reuses encryption and I/O infrastructure
+
+**Key Design Principles:**
+- Connection abstraction hides transport details from filters
+- Same filter chain infrastructure for downstream and upstream
+- Transport sockets are pluggable (TLS, raw, QUIC, etc.)
+- Event-driven I/O with dispatcher integration
+
 ```mermaid
 flowchart TB
     subgraph Downstream
@@ -119,6 +147,38 @@ mindmap
 ---
 
 ## 3. Connection Hierarchy
+
+**This class hierarchy shows how connections are structured in Envoy:**
+
+**Base Classes:**
+- **ConnectionImplBase**: Provides common functionality
+  - Connection ID generation and tracking
+  - Connection callback management (connect, close, etc.)
+  - Delayed close timer for graceful shutdown
+  - Dispatcher integration for event loop
+
+- **ConnectionImpl**: Adds full connection functionality
+  - **Filter chain management**: Read and write filters
+  - **Transport socket integration**: TLS or raw buffers
+  - **I/O buffers**: Read and write buffers with watermarks
+  - **Data transfer**: `write()` for sending, `onReadReady()` for receiving
+  - **Backpressure**: High/low watermark notifications
+
+**Concrete Implementations:**
+- **ServerConnectionImpl**: For accepted downstream connections
+  - Created by listener after `accept()`
+  - May have transport connect timeout (for TLS handshake)
+
+- **ClientConnectionImpl**: For initiated upstream connections
+  - Created when connecting to upstream server
+  - Has `connect()` method to initiate connection
+  - Tracks connection addresses and stream info
+
+**Why This Hierarchy:**
+- Common code in base classes prevents duplication
+- Server vs Client differences are minimal (mainly initiation direction)
+- Both use identical filter chain and transport infrastructure
+- Polymorphism allows treating all connections uniformly
 
 ```mermaid
 classDiagram

@@ -20,6 +20,42 @@
 
 ## 1. High-Level Architecture
 
+**This diagram shows the complete listener architecture from configuration to active connections:**
+
+**Configuration Sources:**
+- **Bootstrap Config**: Static listeners defined in bootstrap YAML, loaded at startup
+- **LDS API**: Dynamic listeners from xDS control plane, updated during runtime
+
+**Main Thread Components (single instance):**
+- **ListenerManagerImpl**: Top-level orchestrator managing all listeners across their lifecycle
+  - Tracks listeners in three states: warming, active, draining
+  - Coordinates listener updates and removals
+  - Dispatches listeners to worker threads
+- **ListenerImpl**: Per-listener configuration holder
+  - Contains filter chain manager for connection routing
+  - Stores socket factory for creating/distributing sockets
+  - Manages listener-specific resources
+- **FilterChainManagerImpl**: Matching engine using nested trie for fast filter chain lookup
+- **ListenSocketFactoryImpl**: Creates listen sockets and distributes them to workers
+- **DrainingFilterChainsManager**: Manages graceful removal of old filter chains
+
+**Worker Thread Layer (multiple instances):**
+- Each worker thread runs independently with its own event loop
+- Workers handle disjoint sets of connections - no shared connection state
+- Number of workers typically matches CPU core count
+
+**Per-Worker Components:**
+- **ActiveTcpListener**: Accepts TCP connections on this worker's event loop
+- **ActiveTcpSocket**: Manages newly accepted sockets through listener filter processing
+- **ActiveConnections**: Groups connections by filter chain for efficient management
+- **ActiveTcpConnection**: Represents an established connection processing requests
+
+**Key Design Principles:**
+- Main thread handles configuration, workers handle connections
+- Workers are independent - enables lock-free connection processing
+- Filter chains are matched once per connection using fast trie structure
+- Connections are grouped by filter chain to enable efficient draining
+
 ```mermaid
 flowchart TB
     subgraph Config["Configuration Sources"]
@@ -85,6 +121,36 @@ mindmap
 ---
 
 ## 3. End-to-End Flow: Config to Connection
+
+**This sequence traces a listener from configuration through to accepting its first connection:**
+
+**Configuration Phase (Steps 1-6):**
+- Config source (Bootstrap or LDS) provides listener proto configuration
+- `ListenerManagerImpl` creates `ListenerImpl` from proto
+- `ListenerImpl` builds `FilterChainManagerImpl` which parses all filter chains and constructs the matching trie
+- Listener initialization begins (may wait for RDS route config if referenced)
+- Upon completion, listener transitions from warming to active state
+
+**Worker Distribution (Steps 7-11):**
+- Active listener is dispatched to all worker threads
+- Each worker's `ConnectionHandlerImpl` creates its own `ActiveTcpListener` instance
+- `ActiveTcpListener` registers listen socket with OS event loop
+- Listener is now ready to accept connections on all workers
+
+**Connection Accept (Steps 12-20):**
+- OS signals new connection available
+- `ActiveTcpListener` accepts socket and creates `ActiveTcpSocket` wrapper
+- Listener filters run to extract connection metadata (SNI, ALPN, etc.)
+- `FilterChainManagerImpl::findFilterChain()` walks matching trie to find best match
+- Matched `FilterChainImpl` provides transport socket and network filter factories
+- `newActiveConnection()` creates the connection with full network filter chain
+- Connection is ready to process application data
+
+**Why This Multi-Stage Process:**
+- Separation between config parsing (main thread) and connection handling (workers)
+- Enables parallel connection acceptance across workers
+- Filter chain matching is fast (trie walk) vs expensive (config parsing)
+- Resources are allocated progressively - config → socket → connection
 
 ```mermaid
 sequenceDiagram
@@ -153,6 +219,38 @@ mindmap
 ```
 
 ### Add vs Update Decision
+
+**This flowchart shows how ListenerManagerImpl decides how to apply a configuration update:**
+
+**Decision Flow:**
+1. **New listener?**
+   - If listener name doesn't exist: Create new `ListenerImpl`, add to warming list
+
+2. **Same socket configuration?**
+   - Compare: address, port, socket options (SO_REUSEPORT, etc.)
+   - If unchanged: **In-place filter chain update** - fastest path, no connection disruption
+   - If changed: **Full listener replacement** - old listener drains, new listener created
+
+**In-Place Filter Chain Update:**
+- Reuses existing listen socket - no rebind needed
+- Listener filters unchanged
+- Only network filter chains are rebuilt
+- Old filter chains → `DrainingFilterChainsManager`
+- New connections immediately use new filter chains
+- Existing connections continue on old chains until drain timeout
+
+**Full Listener Replacement:**
+- Old listener moves to `draining_listeners_` list
+- New listener created from scratch in `warming_listeners_`
+- Old listener stops accepting new connections
+- After drain timer expires, old listener and all its connections are closed
+- More disruptive but required when socket config changes
+
+**Why This Matters:**
+- Minimizes disruption during configuration updates
+- Certificate rotation can often use in-place update
+- Adding/removing filter chains is zero-downtime
+- Socket option changes require full drain (rare)
 
 ```mermaid
 flowchart TD

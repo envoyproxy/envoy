@@ -24,6 +24,26 @@
 
 A listener can have multiple filter chains, each with different matching criteria and different network filters. When a connection is accepted, `FilterChainManagerImpl` selects the best-matching chain based on connection metadata (populated by listener filters).
 
+**Why Multiple Filter Chains:**
+- **Multi-protocol support**: Same listener can handle HTTPS, HTTP/2, and raw TCP
+- **Virtual hosting**: Route connections by SNI (Server Name Indication) without terminating TLS
+- **Client segmentation**: Apply different policies based on source IP ranges
+- **Flexible routing**: Match on any combination of: port, IP, SNI, protocol, ALPN, source
+
+**How Matching Works:**
+- Listener filters extract connection metadata before filter chain matching
+- Examples: TLS Inspector extracts SNI and ALPN, Original Dst finds true destination
+- Metadata is used to walk a nested trie structure for fast O(log n) matching
+- Most specific match wins (exact before wildcard, longest prefix before shorter)
+
+**Example Scenario in Diagram:**
+- **tls-api chain**: Exact SNI match `api.example.com` + TLS → HTTP Connection Manager
+- **tls-web chain**: Wildcard SNI `*.example.com` + TLS → HTTP Connection Manager
+- **plaintext chain**: No TLS (raw_buffer) → TCP Proxy
+- **default chain**: Catch-all for anything not matched above → TCP Proxy
+
+When `api.example.com` connection arrives with TLS, it matches **tls-api** (most specific).
+
 ```mermaid
 flowchart TD
     subgraph ListenerConfig["Listener Config"]
@@ -74,6 +94,29 @@ classDiagram
 
 Criteria are evaluated in strict order. At each level, the most specific match wins:
 
+**Matching Strategy:**
+- **Hierarchical**: Each level narrows the candidate filter chains
+- **Priority-based**: Earlier criteria are matched first (destination before source)
+- **Most specific wins**: Exact match beats wildcard, longest prefix beats shorter prefix
+- **Fast**: Trie-based data structures enable O(log n) lookups for IP ranges
+
+**Why This Order:**
+1. **Destination first**: Where the client is connecting to (port, IP, SNI)
+2. **Protocol negotiation**: Transport and application protocols
+3. **Source last**: Who is connecting (useful for ACLs and segmentation)
+
+**Practical Example:**
+- Connection to `api.example.com:443` from `192.168.1.5:54321`
+- TLS with ALPN `h2` (HTTP/2)
+- Matching walks: port 443 → dest IP → SNI api.example.com → TLS → h2 → source 192.168.0.0/16
+- Result: Most specific chain matching all these criteria
+
+**Performance:**
+- Destination IP and Source IP use **LcTrie** (Level-Compressed Trie) for fast prefix matching
+- SNI uses hash map with exact and wildcard support
+- Port, protocol, ALPN use simple hash maps
+- Overall complexity: O(log n) for trie levels + O(1) for hash maps
+
 ```mermaid
 flowchart TD
     Start["Accepted Connection"] --> P1["1. Destination Port<br/>(exact match)"]
@@ -108,6 +151,43 @@ flowchart TD
 
 The internal matching structure is a deeply nested map/trie. Each level narrows the candidate set:
 
+**How Nested Matching Works:**
+- Start at root with all possible filter chains
+- At each level, match one criterion and descend into matched subtree
+- Each level has fewer candidates than the previous level
+- Leaf nodes contain the actual `FilterChainImpl` pointer
+
+**Example Walk Through Diagram:**
+
+**Level 1 - Destination Port:**
+- Split by port 443 and "any port"
+- Incoming connection to port 443 → descend into `dst_port=443` branch
+
+**Level 2 - Destination IP:**
+- Under port 443, split by IP prefix `10.0.0.0/8` and "any IP"
+- Incoming dest IP `10.1.2.3` matches `10.0.0.0/8` → descend
+
+**Level 3 - SNI:**
+- Under port 443 + IP 10.0.0.0/8, split by SNI
+- Three options: exact `api.example.com`, wildcard `*.example.com`, any SNI
+- Incoming SNI `api.example.com` → exact match descends
+
+**Level 4 - Transport Protocol:**
+- Under exact SNI match, split by transport
+- Options: `tls` or `raw_buffer`
+- TLS connection → descend into `transport=tls`
+
+**Level 5 - ALPN:**
+- Under TLS, split by ALPN protocol
+- Options: `h2` (HTTP/2), `http/1.1`, any ALPN
+- Connection negotiated HTTP/2 → select `chain-tls-h2`
+
+**Key Benefits:**
+- **Fast**: Each level is O(1) map lookup or O(log n) trie lookup
+- **Flexible**: Can match any combination of criteria
+- **Memory efficient**: Shared prefixes in trie reduce memory usage
+- **Extensible**: New matching criteria can be added as new trie levels
+
 ```mermaid
 flowchart TD
     Root["Root"] --> DstPort443["dst_port=443"]
@@ -131,6 +211,32 @@ flowchart TD
 ---
 
 ## 5. SNI Matching — Exact and Wildcard
+
+**SNI (Server Name Indication) matching enables virtual hosting without terminating TLS:**
+
+**Why SNI Matching Matters:**
+- Allows multiple services on same IP:port with different filter chains
+- TLS Inspector extracts SNI from ClientHello without decrypting payload
+- Enables routing before TLS termination (SNI-based routing)
+- Critical for multi-tenant systems and API gateways
+
+**Matching Precedence:**
+1. **Exact match**: `api.example.com` - highest priority
+2. **Wildcard match**: `*.example.com` - medium priority
+3. **Empty/catch-all**: Matches connections without SNI or unmatched SNI - lowest priority
+
+**Wildcard Rules:**
+- Only leading wildcard `*.` supported: `*.example.com`
+- Matches exactly one subdomain level: `*.example.com` matches `api.example.com` but NOT `v1.api.example.com`
+- Not supported: `api.*.com`, `*.*.example.com`, `*example.com`
+
+**Example:**
+- Connection with SNI `api.example.com`:
+  - Exact match exists → use exact match chain (highest priority)
+- Connection with SNI `web.example.com`:
+  - No exact match → check wildcard `*.example.com` → matches
+- Connection with SNI `other.com` or no SNI:
+  - No exact or wildcard match → use empty catch-all if configured
 
 ```mermaid
 flowchart TD

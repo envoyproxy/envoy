@@ -6,6 +6,28 @@
 
 ## 1. Block Diagram
 
+**This high-level block diagram shows the complete listener architecture across threads:**
+
+**Main Thread Components:**
+- **LDS API**: Receives dynamic listener configuration from xDS control plane
+- **ListenerManagerImpl**: Top-level orchestrator managing listener lifecycle (warming → active → draining)
+- **ListenerImpl**: Per-listener configuration holder with filter chain manager and socket factory
+- **ConnectionHandlerImpl (main)**: Coordinates dispatching listeners to worker threads
+
+**Worker Thread Components (one set per worker):**
+- **WorkerImpl**: Worker thread event loop that receives listener tasks from main thread
+- **ConnectionHandlerImpl**: Per-worker handler managing active listeners
+- **ActiveTcpListener**: Handles TCP accept events on this worker's event loop
+- **ActiveTcpSocket**: Manages newly accepted sockets through listener filter phase
+- **Network::Connection**: Established connection processing network filters
+- **FilterChain**: Matched filter chain providing network filters for the connection
+
+**Key Flow:**
+- Configuration flows from LDS → ListenerManager → ListenerImpl
+- Listeners are dispatched from main thread to all workers
+- Each worker independently accepts connections on its own event loop
+- No connection state is shared between workers - each worker fully owns its connections
+
 ```mermaid
 flowchart TB
     subgraph MainThread["Main Thread"]
@@ -132,6 +154,42 @@ classDiagram
 
 ## 3. TCP Connection Accept Sequence Diagram
 
+**This sequence shows the detailed flow of accepting and establishing a TCP connection:**
+
+**Connection Arrival:**
+- Client initiates TCP connection (SYN packet)
+- OS completes TCP handshake and places connection in accept queue
+- Socket becomes readable, triggering event loop callback
+
+**Accept and Validation:**
+- `ActiveTcpListener::onAccept()` is called with the new socket
+- Connection limits are checked (global and per-listener)
+- Connection balancing logic determines if this worker should handle the connection
+
+**Connection Balancing Decision:**
+- If **rebalancing needed**: Socket is posted to target worker's queue
+- If **accepting locally**: Continue with filter processing on current worker
+
+**Listener Filter Processing:**
+- `ActiveTcpSocket` is created to manage the socket
+- Listener filter chain is created (TLS Inspector, Proxy Protocol, Original Dst, etc.)
+- Each filter runs in sequence, can return:
+  - **Continue**: Next filter
+  - **StopIteration**: Wait for more data
+  - Filters extract metadata: SNI, ALPN, transport protocol, source IP
+
+**Filter Chain Matching:**
+- After filters complete, `newConnection()` is called
+- `FilterChainManagerImpl` walks matching trie based on collected metadata
+- Matches on: destination port → IP → SNI → transport protocol → ALPN → source filters
+- Returns the best matching `FilterChain` or default
+
+**Connection Establishment:**
+- Server connection is created with matched transport socket (TLS or raw)
+- Network filter chain is built from the matched `FilterChain`
+- Each network filter factory creates its filter instance (HTTP Connection Manager, TCP Proxy, etc.)
+- Connection is now established and ready to process application data
+
 ```mermaid
 sequenceDiagram
     participant Client as TCP Client
@@ -173,6 +231,38 @@ sequenceDiagram
 
 ## 4. Listener Startup Sequence Diagram
 
+**This sequence shows how a listener is created and distributed to worker threads:**
+
+**Configuration Phase (Main Thread):**
+- LDS xDS receives new listener configuration from control plane (or bootstrap config at startup)
+- `ListenerManagerImpl::addOrUpdateListener()` is called with the proto config
+- New `ListenerImpl` is created, which:
+  - Parses filter chain configuration
+  - Builds `FilterChainManagerImpl` with matching trie
+  - Creates `ListenSocketFactory` for socket creation/distribution
+
+**Warming Phase:**
+- Listener is placed in `warming_listeners_` list
+- Asynchronous initialization begins (may wait for RDS if routes are referenced)
+- Once all dependencies are ready, listener is marked as warmed
+
+**Worker Distribution:**
+- Warmed listener moves to `active_listeners_` list
+- `addListenerToWorker()` sends listener to each worker thread via dispatcher post
+- Each worker receives the listener config independently
+
+**Worker Thread Activation:**
+- Worker's `ConnectionHandlerImpl::addListener()` is called
+- `ActiveTcpListener` instance is created for this worker
+- Listen socket is bound (or shared socket is obtained from socket factory)
+- Socket file descriptor is registered with worker's event loop
+- Listener begins accepting connections on this worker
+
+**Result:**
+- Each worker now has its own `ActiveTcpListener` instance
+- All workers can accept connections in parallel
+- No shared state between workers - fully independent connection handling
+
 ```mermaid
 sequenceDiagram
     participant LDS as LDS xDS
@@ -198,6 +288,42 @@ sequenceDiagram
 ---
 
 ## 5. Listener Removal / Drain Sequence Diagram
+
+**This sequence shows the graceful shutdown process when a listener is removed:**
+
+**Removal Trigger:**
+- LDS xDS signals that a listener should be removed (not in updated config)
+- `ListenerManagerImpl::removeListener()` is called with listener name
+
+**Drain Initiation (Main Thread):**
+- Listener is moved from `active_listeners_` to `draining_listeners_` list
+- Drain timer is started (default 600 seconds, configurable via `--drain-time-s`)
+- `stopListener()` messages are posted to all worker threads
+
+**Worker Thread Shutdown:**
+- Each worker's `ConnectionHandlerImpl::stopListeners()` is called
+- Worker's `ActiveTcpListener::shutdownListener()` is invoked
+- Listen socket is removed from event loop (stops accepting new connections)
+- `listener_.reset()` destroys the `TcpListenerImpl` - no more accepts possible
+
+**Drain Period:**
+- **New connections**: Rejected (listener no longer accepting)
+- **Existing connections**: Continue processing normally
+- Connections remain active until:
+  - They naturally complete and close
+  - Drain timer expires (forced close)
+
+**Cleanup Phase:**
+- When drain timer expires, `removeListener()` is called on all workers
+- `ConnectionHandlerImpl::removeListeners()` destroys the `ActiveTcpListener`
+- All remaining connections are force-closed
+- Connection resources are cleaned up
+- Listener is removed from `draining_listeners_` list
+
+**Graceful Shutdown Benefits:**
+- In-flight requests can complete
+- Clients have time to establish connections elsewhere
+- Reduces client-visible errors during configuration updates
 
 ```mermaid
 sequenceDiagram

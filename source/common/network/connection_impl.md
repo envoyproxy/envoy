@@ -65,6 +65,45 @@ classDiagram
 
 ## Connection Lifecycle
 
+**This state machine shows the complete lifecycle of a TCP connection:**
+
+**States Explained:**
+
+**Open (Active State):**
+- Connection is fully established and bidirectional
+- Both sending and receiving data
+- Filters are actively processing
+- Most connections spend majority of time here
+
+**HalfClosedLocal (Envoy sent FIN):**
+- Envoy called `write()` with `end_stream=true`
+- TCP FIN sent to peer (no more data from Envoy)
+- Still receiving data from peer
+- Waiting for peer to close their side
+
+**HalfClosedRemote (Peer sent FIN):**
+- Received FIN from peer (peer finished sending)
+- Envoy can still send data
+- Common when client sends request and waits for response
+- Envoy closes after sending full response
+
+**Closing (Shutdown in Progress):**
+- `close()` was explicitly called
+- Delayed close timer may be active (flush pending writes)
+- Not accepting new data
+- Waiting for clean shutdown
+
+**Closed (Terminal State):**
+- Connection fully terminated
+- Resources released
+- Object scheduled for deferred deletion
+- Cannot be reopened
+
+**Half-Close vs Full-Close:**
+- **Half-close** enables efficient request/response patterns (HTTP)
+- **Full-close** happens when either side calls `close()` or error occurs
+- Half-close is graceful, full-close may be abrupt
+
 ```mermaid
 stateDiagram-v2
     [*] --> Open : connection created
@@ -78,6 +117,41 @@ stateDiagram-v2
 ```
 
 ## Data Read Flow
+
+**This sequence shows how data flows from the network into the application:**
+
+**Step-by-Step Process:**
+
+1. **OS Kernel**: Data arrives on socket, kernel buffers it
+2. **Event Notification**: Socket becomes readable, event loop wakes up
+3. **IoHandle**: Receives file event, calls ConnectionImpl
+4. **ConnectionImpl::onFileEvent()**: Handles read event
+5. **TransportSocket::doRead()**: Reads and potentially decrypts data
+   - For TLS: Reads encrypted data, decrypts, returns plaintext
+   - For raw: Directly reads into read buffer
+6. **FilterManagerImpl::onRead()**: Passes data to filter chain
+7. **ReadFilter::onData()**: Each filter processes data in sequence
+   - Can return **Continue** (pass to next filter)
+   - Can return **StopIteration** (pause, resume later)
+   - Filter may consume, modify, or buffer data
+
+**Transport Socket Role:**
+- Abstracts encryption/decryption from filters
+- Filters always see plaintext, regardless of transport
+- TLS handshake happens transparently
+- Application code doesn't need to know about encryption
+
+**Filter Chain Execution:**
+- Filters execute in registration order
+- First filter gets first look at data
+- Last filter (often HTTP Connection Manager or TCP Proxy) handles final processing
+- Filters can stop chain (buffering, async operations)
+
+**Backpressure:**
+- If read buffer grows too large, `readDisable()` is called
+- Stops reading from socket until buffer drains
+- Prevents memory exhaustion
+- Automatically resumes when buffer drops below low watermark
 
 ```mermaid
 sequenceDiagram

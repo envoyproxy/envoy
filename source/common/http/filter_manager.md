@@ -63,6 +63,39 @@ classDiagram
 
 ## Filter Chain Ordering
 
+**This diagram shows the bidirectional nature of HTTP filter chains:**
+
+**Decoder Filters (Request Path):**
+- Process requests from client to upstream
+- Execute in **forward order**: A → B → C → Router
+- Each filter sees request before the next
+- Last filter (Router) sends request upstream
+
+**Encoder Filters (Response Path):**
+- Process responses from upstream to client
+- Execute in **reverse order**: C → B → A
+- Response flows back through same filters
+- Allows filter to modify both request and response
+
+**Why Reverse Order for Encoding:**
+- **Symmetry**: Filter A that added header on request can remove it on response
+- **Layering**: Inner filters (closer to upstream) process first on response
+- **Example**:
+  - Filter A adds auth header on request
+  - Filter A removes auth header from response (don't leak to client)
+
+**Single Filter Handling Both:**
+A filter can implement both `StreamDecoderFilter` and `StreamEncoderFilter`:
+- `decodeHeaders()` sees request headers
+- `encodeHeaders()` sees response headers
+- Can correlate request/response (e.g., timing, logging)
+- Router filter does both: routes request, receives response
+
+**Filter Types:**
+- **Decoder-only**: Only processes requests (e.g., routing metadata extractor)
+- **Encoder-only**: Only processes responses (e.g., response compression)
+- **Both**: Most common - process request and response (e.g., auth, rate limit, logging)
+
 ```mermaid
 flowchart LR
     subgraph Decoder ["Decoder Filters (A → B → C → Router)"]
@@ -84,6 +117,54 @@ flowchart LR
 ## Filter Iteration State Machine
 
 Each `ActiveStreamFilterBase` has its own `IterationState` that controls whether the chain continues after the filter returns.
+
+**Filter Return Statuses:**
+
+**Continue:**
+- Default state - filter is done processing
+- Filter chain immediately proceeds to next filter
+- Use when no async work needed
+
+**StopIteration:**
+- Filter needs to pause processing
+- Chain stops, but filter doesn't buffer data
+- **Use cases:**
+  - Waiting for async callback (external auth, rate limit)
+  - Need more data to make decision
+  - Performing database lookup
+- Filter must call `continueDecoding()` or `continueEncoding()` to resume
+
+**StopAllIterationAndBuffer:**
+- Chain stops AND downstream data is buffered
+- Filter will receive all data before being called again
+- **Use cases:**
+  - Need complete request body to process (content transformation)
+  - Computing hash of entire body
+  - Request validation requiring full body
+- **Warning**: Can use significant memory for large requests
+- Resume with `continueDecoding()`
+
+**StopAllIterationAndWatermark:**
+- Chain stops AND applies backpressure
+- Stops reading from downstream when high watermark hit
+- **Use cases:**
+  - Streaming large request body to external service
+  - Rate limiting based on upstream capacity
+  - Protecting against memory exhaustion
+- Resume with `continueDecoding()`
+
+**State Transitions:**
+- Filter starts in `Continue` state
+- Returns status code from each filter method
+- FilterManager updates state and decides whether to continue chain
+- `continue*()` methods transition back to `Continue` state
+
+**Example Flow:**
+1. Filter A: `decodeHeaders()` returns `Continue` → proceed to B
+2. Filter B: `decodeHeaders()` returns `StopIteration` → stop chain
+3. [Filter B performs async auth check...]
+4. Filter B: calls `continueDecoding()` → resume with Filter C
+5. Filter C: `decodeHeaders()` returns `Continue` → proceed to Router
 
 ```mermaid
 stateDiagram-v2

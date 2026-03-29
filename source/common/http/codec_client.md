@@ -8,6 +8,36 @@
 
 `CodecClient` is Envoy's **upstream HTTP client** abstraction. It wraps a single `Network::Connection` with an HTTP codec on top (HTTP/1.1, HTTP/2, or HTTP/3) and presents a uniform stream-creation API to the connection pool layer. The pool creates one `CodecClient` per upstream TCP/QUIC connection.
 
+**What Does CodecClient Do?**
+
+Think of CodecClient as the "HTTP-aware wrapper" for upstream connections:
+
+**Key Responsibilities:**
+- **Connection + Codec pairing**: Owns network connection and HTTP codec
+- **Stream creation**: `newStream()` creates request/response pairs
+- **Request tracking**: Maintains list of active requests (`active_requests_`)
+- **Protocol abstraction**: Same API for HTTP/1.1, HTTP/2, HTTP/3
+- **Connection lifecycle**: Handles connect timeouts, goaway, close
+- **Pool integration**: Notifies pool when connection is ready for reuse
+
+**How It Works:**
+```
+Connection Pool
+    ↓ creates
+CodecClient (this class)
+    ↓ owns
+Network::ClientConnection (TCP/QUIC socket)
+    ↓ owns
+Http::ClientCodec (HTTP/1, HTTP/2, or HTTP/3)
+```
+
+**Why CodecClient?**
+- **Separation of concerns**: Network layer doesn't know about HTTP
+- **Reusable connections**: One CodecClient can serve multiple requests (HTTP/2, HTTP/3)
+- **Uniform interface**: Router doesn't care about protocol version
+- **Connection pooling**: Pools manage CodecClients, not raw connections
+- **Graceful degradation**: Handles protocol errors without leaking resources
+
 ## Class Hierarchy
 
 ```mermaid
@@ -81,6 +111,54 @@ classDiagram
 ```
 
 ## Connection Lifecycle
+
+**This state machine shows CodecClient's lifecycle from creation to deletion:**
+
+**States Explained:**
+
+**Connecting:**
+- `CodecClient` constructed with network connection
+- Network connection is initiating TCP handshake
+- `connect_timer_` is armed (typically 5-10 seconds)
+- Waiting for `Network::ConnectionEvent::Connected`
+
+**Connected:**
+- TCP handshake complete (and TLS handshake if applicable)
+- Connection is idle, no requests yet
+- Ready to create streams via `newStream()`
+- Connect timer is cancelled
+
+**Active:**
+- One or more requests in flight (tracked in `active_requests_`)
+- HTTP/1.1: Only one request at a time (serial)
+- HTTP/2: Multiple concurrent streams (multiplexing)
+- HTTP/3: Multiple concurrent streams on QUIC
+- Can transition back to Connected when all requests complete
+
+**GoingAway:**
+- Received GOAWAY frame from upstream (HTTP/2, HTTP/3)
+- No new requests allowed
+- Existing requests continue to completion
+- Pool will create new connection for future requests
+- Transitions to Closed when all active requests drain
+
+**Closed:**
+- Connection terminated (graceful or error)
+- All active requests are reset/failed
+- Notifies pool that connection is unusable
+- Scheduled for deferred deletion
+
+**ConnectTimeout:**
+- Connect timer fired before connection established
+- Usually indicates network issue or unreachable host
+- Connection is immediately closed
+- Pool marks host as unhealthy
+
+**Key Transitions:**
+- **Connected → Active**: First `newStream()` call
+- **Active → Connected**: Last active request completes
+- **Connected → GoingAway**: Upstream sends GOAWAY
+- **Any state → Closed**: Error, explicit close, or remote close
 
 ```mermaid
 stateDiagram-v2

@@ -53,6 +53,18 @@
 
 **When:** Control plane sends listener config update via xDS
 
+**Why LDS Updates Matter:**
+- Enables zero-downtime configuration changes
+- Supports gradual rollouts and A/B testing
+- Allows certificate rotation without restart
+- Enables dynamic filter chain updates
+
+**Update Decision Logic:**
+The code makes intelligent decisions about how to apply updates:
+- **No-op**: Config hash unchanged → skip update entirely
+- **In-place filter chain update**: Socket config unchanged → update filter chains without draining connections
+- **Full listener update**: Socket config changed → drain old listener, create new one
+
 **Code Path:**
 
 - `LdsApiImpl::onConfigUpdate()` receives listener proto from xDS server
@@ -277,6 +289,18 @@
 
 **Timing:** At listener configuration time, NOT at connection time
 
+**Why Factories:**
+- **Performance**: Parsing and validating filter config is expensive
+- **Memory**: Shared configuration reduces per-connection memory overhead
+- **Consistency**: All connections on a filter chain use identical configuration
+- **Hot reload**: New filter chain can be created while old one continues serving
+
+**Factory Pattern Benefits:**
+- Config is parsed once, validated once, stored once
+- Factory callback is lightweight - just captures shared pointers to config
+- Each connection gets its own filter instance with unique per-connection state
+- Filter instances can be created/destroyed rapidly without config overhead
+
 **Code Path:**
 
 - During `ListenerImpl::buildFilterChains()` (config time)
@@ -332,6 +356,18 @@
 **Timing:** At connection establishment time, NOT at config time
 
 **Once per connection** - filters are NOT reused across connections
+
+**Why Per-Connection Instances:**
+- **Isolation**: Each connection needs independent state (buffers, codec state, upstream connections)
+- **Thread safety**: No locks needed if filters aren't shared
+- **Memory management**: Filter lifecycle tied to connection lifecycle - automatic cleanup
+- **Debugging**: Connection-specific filters make debugging easier (no shared state to untangle)
+
+**Performance Considerations:**
+- Filter creation is fast because heavy config parsing was done at factory creation time
+- Modern allocators efficiently handle frequent small allocations
+- Memory overhead is acceptable given isolation and safety benefits
+- Filters are destroyed immediately when connection closes - no lingering resources
 
 ### 5.2 Network Filter Instance Creation
 
@@ -407,6 +443,12 @@
 ### 6.1 Filter-Chain-Only Update Trigger
 
 **When:** LDS update changes only filter chains, not listener socket config
+
+**Why Filter Chain Draining:**
+- **Zero-downtime updates**: New connections use new config immediately
+- **Graceful migration**: Existing connections complete on old config
+- **Minimal disruption**: Only affected filter chains are drained, not entire listener
+- **Predictable behavior**: Drain timeout provides upper bound on migration time
 
 **Detection:**
 
