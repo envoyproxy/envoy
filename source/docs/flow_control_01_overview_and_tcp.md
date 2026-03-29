@@ -15,7 +15,7 @@ thrashing — rapidly toggling between paused and resumed states as data straddl
 
 The callback contract:
 - `onAboveWriteBufferHighWatermark()` — buffer exceeded the limit; pause the source
-- `onBelowWriteBufferLowWatermark()` — buffer drained sufficiently; resume the source
+- `onBelowWriteBufferLowWatermark()` — buffer drained sufficiently; resume the source 
 
 ```mermaid
 flowchart LR
