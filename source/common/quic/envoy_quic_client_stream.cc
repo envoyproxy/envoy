@@ -174,7 +174,9 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 
   ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
-  if (fin) {
+  const bool headers_only = fin_received() && highest_received_byte_offset() == NumBytesConsumed();
+  const bool end_stream = fin || headers_only;
+  if (end_stream) {
     end_stream_decoded_ = true;
   }
   saw_regular_headers_ = false;
@@ -215,7 +217,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
     // request
     if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
-      decoder->decodeHeaders(std::move(headers), fin);
+      decoder->decodeHeaders(std::move(headers), end_stream);
     } else {
       onResponseDecoderDead();
     }
@@ -243,7 +245,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   } else if (!is_special_1xx) {
     if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
       decoder->decodeHeaders(std::move(headers),
-                             /*end_stream=*/fin);
+                             /*end_stream=*/end_stream);
     } else {
       onResponseDecoderDead();
     }
