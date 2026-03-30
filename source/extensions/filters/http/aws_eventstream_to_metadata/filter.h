@@ -88,7 +88,7 @@ private:
    * Process the buffered data to find complete EventStream messages and extract metadata.
    * @param end_stream whether this is the last chunk of data.
    */
-  void processBuffer(bool end_stream);
+  void processBuffer();
 
   /**
    * Process a single complete EventStream message.
