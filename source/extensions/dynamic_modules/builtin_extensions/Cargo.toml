@@ -16,7 +16,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 url = "2"
 
 # Pin time to a version compatible with stable Rust.
-time = ">=0.3.0, <0.3.37"
+time = ">=0.3.0, <0.3.48"
 
 [lib]
 name = "envoy_dynamic_modules_builtin_extensions"
