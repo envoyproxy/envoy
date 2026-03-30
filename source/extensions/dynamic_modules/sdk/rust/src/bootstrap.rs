@@ -726,6 +726,7 @@ struct EnvoyBootstrapExtensionFileWatcherImpl {
   config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
 }
 
+// SAFETY: The raw pointer is only used on the main thread, matching Envoy's threading model.
 unsafe impl Send for EnvoyBootstrapExtensionFileWatcherImpl {}
 unsafe impl Sync for EnvoyBootstrapExtensionFileWatcherImpl {}
 
@@ -773,7 +774,7 @@ impl EnvoyBootstrapExtensionFileWatcher for EnvoyBootstrapExtensionFileWatcherRe
   // Non-owning refs are only used inside on_file_changed callbacks for identity matching.
   // Adding watches from within a callback is not supported.
   fn add_watch(&self, _path: &str, _events: u32) -> bool {
-    false
+    panic!("add_watch cannot be called from within an on_file_changed callback");
   }
 }
 

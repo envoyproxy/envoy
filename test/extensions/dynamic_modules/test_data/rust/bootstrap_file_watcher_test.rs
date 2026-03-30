@@ -149,9 +149,7 @@ impl BootstrapExtensionConfig for FileWatcherTestConfig {
       "Watcher id must match the single watcher we created"
     );
 
-    // Envoy's inotify implementation watches at the directory level and passes the filename.
-    // Match using contains() to handle both full paths and basename-only callbacks.
-    if path.contains(&self.path_a) || self.path_a.contains(path) {
+    if path == self.path_a {
       let count = self.file_a_count.fetch_add(1, Ordering::SeqCst) + 1;
       envoy_log_info!(
         "file_a changed: path={}, events=0x{:x}, count={}",
@@ -159,7 +157,7 @@ impl BootstrapExtensionConfig for FileWatcherTestConfig {
         events,
         count
       );
-    } else if path.contains(&self.path_b) || self.path_b.contains(path) {
+    } else if path == self.path_b {
       let count = self.file_b_count.fetch_add(1, Ordering::SeqCst) + 1;
       envoy_log_info!(
         "file_b changed: path={}, events=0x{:x}, count={}",
