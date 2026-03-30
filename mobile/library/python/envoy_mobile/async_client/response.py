@@ -4,9 +4,9 @@ import asyncio
 import json
 from typing import Any, Dict, List, Optional, Union
 
-from library.python.envoy_engine import EnvoyError
+from ..envoy_engine import EnvoyError
 from .executor import Executor
-import library.python.envoy_engine as envoy_engine
+from .. import envoy_engine
 
 
 # ClientResponseError is a catch-all for any error that occurs during the request/response lifecycle
