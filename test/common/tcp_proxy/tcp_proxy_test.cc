@@ -387,6 +387,9 @@ TEST_P(TcpProxyTest, UpstreamRemoteCloseWithRstPropagation) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::AbortReset));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_TRUE(
+      filter_->getStreamInfo().hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset));
 }
 
 // Test that upstream LocalClose still uses FlushWrite (FIN).
