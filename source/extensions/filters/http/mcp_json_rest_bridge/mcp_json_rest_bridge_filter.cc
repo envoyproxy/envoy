@@ -107,6 +107,8 @@ int getResponseCode(Http::ResponseHeaderMapOptConstRef response_headers) {
 
 bool validateRequestMcpVersion(absl::string_view method,
                                Http::RequestHeaderMapOptConstRef request_headers) {
+  static const absl::NoDestructor<Http::LowerCaseString> mcp_protocol_version_header(
+      McpConstants::MCP_PROTOCOL_VERSION_HEADER);
   // The initialize request is not expected to have MCP protocol version header.
   // So we will not check the protocol version for this request.
   if (method == McpConstants::Methods::INITIALIZE) {
@@ -116,8 +118,7 @@ bool validateRequestMcpVersion(absl::string_view method,
   // version is 2025-03-26.
   absl::string_view protocol_version = McpConstants::DEFAULT_PROTOCOL_VERSION;
   if (request_headers.has_value()) {
-    auto headers =
-        request_headers->get(Http::LowerCaseString(McpConstants::MCP_PROTOCOL_VERSION_HEADER));
+    auto headers = request_headers->get(*mcp_protocol_version_header);
     if (!headers.empty()) {
       protocol_version = headers[0]->value().getStringView();
     }
