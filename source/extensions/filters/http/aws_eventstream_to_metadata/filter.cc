@@ -76,7 +76,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 
   if (data.length() > 0) {
     buffer_.add(data);
-    processBuffer(end_stream);
+    processBuffer();
   }
 
   // Finalize rules at end of stream or when processing stopped early
@@ -95,19 +95,7 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Filter::processBuffer(bool /*end_stream*/) {
-  // Check buffer size limit
-  const uint32_t max_size = config_->maxBufferSize();
-  if (max_size > 0 && buffer_.length() > max_size) {
-    ENVOY_LOG(warn,
-              "EventStream buffer exceeds max_buffer_size ({} bytes). Discarding {} bytes of "
-              "buffered data.",
-              max_size, buffer_.length());
-    config_->stats().buffer_too_large_.inc();
-    buffer_.drain(buffer_.length());
-    return;
-  }
-
+void Filter::processBuffer() {
   // Linearize buffer to get contiguous memory for string_view.
   const uint64_t length = buffer_.length();
   absl::string_view buffer_view(static_cast<const char*>(buffer_.linearize(length)), length);
@@ -144,6 +132,20 @@ void Filter::processBuffer(bool /*end_stream*/) {
 
   // Drain processed bytes from the front of the buffer.
   buffer_.drain(length - buffer_view.size());
+
+  // Check buffer size limit on the remaining incomplete data. Complete messages have already been
+  // consumed and drained above, so the size guard only applies to bytes that cannot be parsed yet.
+  // This avoids discarding a large chunk that contains many valid frames the kernel delivered at
+  // once.
+  const uint32_t max_size = config_->maxBufferSize();
+  if (max_size > 0 && buffer_.length() > max_size) {
+    ENVOY_LOG(warn,
+              "EventStream buffer exceeds max_buffer_size ({} bytes). Discarding {} bytes of "
+              "incomplete buffered data.",
+              max_size, buffer_.length());
+    config_->stats().buffer_too_large_.inc();
+    buffer_.drain(buffer_.length());
+  }
 }
 
 bool Filter::processMessage(absl::string_view payload) {
