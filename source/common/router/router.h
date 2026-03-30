@@ -467,7 +467,7 @@ public:
     return transport_socket_options_;
   }
 
-  absl::optional<OverrideHost> overrideHostToSelect() const override {
+  OptRef<const OverrideHost> overrideHostToSelect() const override {
     if (is_retry_) {
       return {};
     }

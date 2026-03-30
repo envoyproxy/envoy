@@ -260,8 +260,10 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # set_metadata extension
 /*/extensions/filters/http/set_metadata @aguinet @mattklein123
 # Formatters
-/*/extensions/formatter/metadata @cpakulski @ravenblackx @nezdolik
 /*/extensions/formatter/cel @kyessenov @zirain
+/*/extensions/formatter/file_content @ggreenway @wbpcode
+/*/extensions/formatter/generic_secret @ggreenway @wbpcode
+/*/extensions/formatter/metadata @cpakulski @ravenblackx @nezdolik
 /*/extensions/formatter/xfcc_value @wbpcode @vikaschoudhary16
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @mattklein123
@@ -424,6 +426,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/matching/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/transport_sockets/tls/cert_validator/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/upstreams/http/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/tracers/dynamic_modules @agrawroh @mathetake @wbpcode
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 

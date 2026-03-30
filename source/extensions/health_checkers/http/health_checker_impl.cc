@@ -419,6 +419,11 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   request_in_flight_ = false;
 
+  // Store the raw HTTP response code on the host for HDS metadata reporting.
+  if (response_headers_ != nullptr) {
+    host_->setLastHealthCheckHttpStatus(Http::Utility::getResponseStatus(*response_headers_));
+  }
+
   switch (healthCheckResult()) {
   case HealthCheckResult::Succeeded:
     handleSuccess(false);
