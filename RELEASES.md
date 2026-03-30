@@ -29,14 +29,26 @@ of stable releases backport them to the remaining supported stable releases.
 ### Backports
 
 All other security and reliability fixes can be nominated for backporting to stable releases
-by Envoy maintainers, Envoy security team, the change author, or members of the Envoy community
-by adding the `backport/review` or `backport/approved` label (this can be done using [repokitteh]'s
-`/backport` command). Changes nominated by the change author and/or members of the Envoy community
-are evaluated for backporting on a case-by-case basis, and require approval from either the release
-manager of stable release, Envoy maintainers, or Envoy security team. Once approved, those fixes
-are backported from the `main` branch to all supported stable branches by the maintainers of
-stable releases. New stable versions from non-critical security fixes are released on a regular
-schedule, initially aiming for the bi-weekly releases.
+by adding the `backport/review` label (this can be done using [repokitteh]'s `/backport` command
+on PRs).
+
+Only security and reliability fixes are backported, so please consider this before proposing a
+backport.
+
+Envoy release maintainers will try to review and include any pending proposed backports prior to
+patch releases. Backports can also be proposed directly, by raising a PR against the relevant
+release branch, eg `release/v1.37`.
+
+When raising a backport, please raise against **all** affected branches.
+
+Backport PRs should pick specific commits from the `main` branch, and should be kept as specific
+commits while tracking the upstream release branch, before landing.
+
+For this reason, change should be managed using rebase rather than merge, and if adjustments are
+required they should be squashed into the relevant commit.
+
+Release branches are published as part of the security schedule described below, and immediately
+prior to a `main` release.
 
 ### Release management
 
