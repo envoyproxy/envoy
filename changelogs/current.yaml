@@ -324,6 +324,11 @@ new_features:
     operators to configure the timer interval (``timer_interval``, minimum 1s, default 10s) and
     the memory release threshold (``max_unfreed_memory_bytes``, default 100MB) passed to
     ``tcmalloc::MallocExtension::ReleaseMemoryToSystem()``.
+- area: dns_resolver
+  change: |
+    Added :ref:`HickoryDnsResolverConfig
+    <envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig>`, a new DNS
+    resolver using the `Hickory DNS <https://github.com/hickory-dns/hickory-dns>`_ library.
 - area: dynamic_modules
   change: |
     Added :ref:`tracer <envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer>`

@@ -366,6 +366,7 @@ proto_library(
         "//envoy/extensions/network/dns_resolver/apple/v3:pkg",
         "//envoy/extensions/network/dns_resolver/cares/v3:pkg",
         "//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg",
+        "//envoy/extensions/network/dns_resolver/hickory/v3:pkg",
         "//envoy/extensions/network/socket_interface/v3:pkg",
         "//envoy/extensions/outlier_detection_monitors/common/v3:pkg",
         "//envoy/extensions/outlier_detection_monitors/consecutive_errors/v3:pkg",
