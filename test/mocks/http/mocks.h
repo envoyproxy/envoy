@@ -93,7 +93,8 @@ public:
   MOCK_METHOD(void, resetStream,
               (Http::StreamResetReason reset_reason, absl::string_view transport_failure_reason));
   MOCK_METHOD(const Router::RouteEntry::UpgradeMap*, upgradeMap, ());
-  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
+  MOCK_METHOD(OptRef<const Upstream::ClusterInfo>, clusterInfo, ());
+  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfoSharedPtr, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback& cb));
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
@@ -256,7 +257,8 @@ public:
   MOCK_METHOD(void, resetStream,
               (Http::StreamResetReason reset_reason, absl::string_view transport_failure_reason));
   MOCK_METHOD(void, resetIdleTimer, ());
-  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
+  MOCK_METHOD(OptRef<const Upstream::ClusterInfo>, clusterInfo, ());
+  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfoSharedPtr, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
   MOCK_METHOD(uint64_t, streamId, (), (const));
@@ -358,7 +360,8 @@ public:
   MOCK_METHOD(void, resetStream,
               (Http::StreamResetReason reset_reason, absl::string_view transport_failure_reason));
   MOCK_METHOD(void, resetIdleTimer, ());
-  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
+  MOCK_METHOD(OptRef<const Upstream::ClusterInfo>, clusterInfo, ());
+  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfoSharedPtr, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(bool, canRequestRouteConfigUpdate, ());
   MOCK_METHOD(uint64_t, streamId, (), (const));

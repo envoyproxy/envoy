@@ -554,7 +554,12 @@ public:
       IS_ENVOY_BUG("Not implemented. Unexpected call to resetStream()");
     };
     Router::RouteConstSharedPtr route() override { return route_; }
-    Upstream::ClusterInfoConstSharedPtr clusterInfo() override {
+    OptRef<const Upstream::ClusterInfo> clusterInfo() override {
+      const auto info =
+          parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())->info();
+      return makeOptRefFromPtr<const Upstream::ClusterInfo>(info.get());
+    }
+    Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() override {
       return parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())
           ->info();
     }

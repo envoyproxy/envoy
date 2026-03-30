@@ -74,7 +74,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, NoRoute) {
 TEST_F(GrpcHttp1BridgeFilterTest, NoCluster) {
   initialize();
   protocol_ = Http::Protocol::Http2;
-  ON_CALL(decoder_callbacks_, clusterInfo()).WillByDefault(Return(nullptr));
+  decoder_callbacks_.cluster_info_ = nullptr;
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},

@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/stats/allocator.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/tag.h"
 
@@ -56,7 +55,7 @@ private:
 // This necessitates a custom comparator and hasher, using the StatNamePtr's
 // own StatNamePtrHash and StatNamePtrCompare operators.
 //
-// This is used by AllocatorImpl for counters, gauges, and text-readouts, and
+// This is used by Allocator for counters, gauges, and text-readouts, and
 // is also used by thread_local_store.h for histograms.
 template <class StatType>
 using StatSet = absl::flat_hash_set<StatType*, MetricHelper::Hash, MetricHelper::Compare>;

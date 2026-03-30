@@ -1,4 +1,4 @@
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -17,13 +17,14 @@
 #include "source/common/stats/symbol_table.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Stats {
 
-const char AllocatorImpl::DecrementToZeroSyncPoint[] = "decrement-zero";
+const char Allocator::DecrementToZeroSyncPoint[] = "decrement-zero";
 
-AllocatorImpl::~AllocatorImpl() {
+Allocator::~Allocator() {
   ASSERT(counters_.empty());
   ASSERT(gauges_.empty());
 
@@ -48,7 +49,7 @@ AllocatorImpl::~AllocatorImpl() {
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
-void AllocatorImpl::debugPrint() {
+void Allocator::debugPrint() {
   Thread::LockGuard lock(mutex_);
   for (Counter* counter : counters_) {
     ENVOY_LOG_MISC(info, "counter: {}", symbolTable().toString(counter->statName()));
@@ -69,7 +70,7 @@ void AllocatorImpl::debugPrint() {
 // shared_ptr.
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
-  StatsSharedImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+  StatsSharedImpl(StatName name, Allocator& alloc, StatName tag_extracted_name,
                   const StatNameTagVector& stat_name_tags)
       : MetricImpl<BaseClass>(name, tag_extracted_name, stat_name_tags, alloc.symbolTable()),
         alloc_(alloc) {}
@@ -105,7 +106,7 @@ public:
     Thread::LockGuard lock(alloc_.mutex_);
     ASSERT(ref_count_ >= 1);
     if (--ref_count_ == 0) {
-      alloc_.sync().syncPoint(AllocatorImpl::DecrementToZeroSyncPoint);
+      alloc_.sync().syncPoint(Allocator::DecrementToZeroSyncPoint);
       removeFromSetLockHeld();
       return true;
     }
@@ -121,7 +122,7 @@ public:
   virtual void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) PURE;
 
 protected:
-  AllocatorImpl& alloc_;
+  Allocator& alloc_;
 
   // ref_count_ can be incremented as an atomic, without taking a new lock, as
   // the critical 0->1 transition occurs in makeCounter and makeGauge, which
@@ -139,7 +140,7 @@ protected:
 
 class CounterImpl : public StatsSharedImpl<Counter> {
 public:
-  CounterImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+  CounterImpl(StatName name, Allocator& alloc, StatName tag_extracted_name,
               const StatNameTagVector& stat_name_tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
@@ -169,7 +170,7 @@ private:
 
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
-  GaugeImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+  GaugeImpl(StatName name, Allocator& alloc, StatName tag_extracted_name,
             const StatNameTagVector& stat_name_tags, ImportMode import_mode)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {
     switch (import_mode) {
@@ -270,7 +271,7 @@ private:
 
 class TextReadoutImpl : public StatsSharedImpl<TextReadout> {
 public:
-  TextReadoutImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+  TextReadoutImpl(StatName name, Allocator& alloc, StatName tag_extracted_name,
                   const StatNameTagVector& stat_name_tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
@@ -297,8 +298,8 @@ private:
   std::string value_ ABSL_GUARDED_BY(mutex_);
 };
 
-CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracted_name,
-                                            const StatNameTagVector& stat_name_tags) {
+CounterSharedPtr Allocator::makeCounter(StatName name, StatName tag_extracted_name,
+                                        const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
@@ -316,9 +317,9 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracte
   return counter;
 }
 
-GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_name,
-                                        const StatNameTagVector& stat_name_tags,
-                                        Gauge::ImportMode import_mode) {
+GaugeSharedPtr Allocator::makeGauge(StatName name, StatName tag_extracted_name,
+                                    const StatNameTagVector& stat_name_tags,
+                                    Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(text_readouts_.find(name) == text_readouts_.end());
@@ -337,8 +338,8 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
   return gauge;
 }
 
-TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_extracted_name,
-                                                    const StatNameTagVector& stat_name_tags) {
+TextReadoutSharedPtr Allocator::makeTextReadout(StatName name, StatName tag_extracted_name,
+                                                const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
   ASSERT(gauges_.find(name) == gauges_.end());
@@ -357,7 +358,7 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
   return text_readout;
 }
 
-bool AllocatorImpl::isMutexLockedForTest() {
+bool Allocator::isMutexLockedForTest() {
   bool locked = mutex_.tryLock();
   if (locked) {
     mutex_.unlock();
@@ -365,12 +366,12 @@ bool AllocatorImpl::isMutexLockedForTest() {
   return !locked;
 }
 
-Counter* AllocatorImpl::makeCounterInternal(StatName name, StatName tag_extracted_name,
-                                            const StatNameTagVector& stat_name_tags) {
+Counter* Allocator::makeCounterInternal(StatName name, StatName tag_extracted_name,
+                                        const StatNameTagVector& stat_name_tags) {
   return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags);
 }
 
-void AllocatorImpl::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
+void Allocator::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   Thread::LockGuard lock(mutex_);
   if (f_size != nullptr) {
     f_size(counters_.size());
@@ -380,7 +381,7 @@ void AllocatorImpl::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const 
   }
 }
 
-void AllocatorImpl::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
+void Allocator::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
   Thread::LockGuard lock(mutex_);
   if (f_size != nullptr) {
     f_size(gauges_.size());
@@ -390,7 +391,7 @@ void AllocatorImpl::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
   }
 }
 
-void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
+void Allocator::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
   Thread::LockGuard lock(mutex_);
   if (f_size != nullptr) {
     f_size(text_readouts_.size());
@@ -400,7 +401,7 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
   }
 }
 
-void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
+void Allocator::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   if (sink_predicates_ != nullptr) {
     Thread::LockGuard lock(mutex_);
     f_size(sinked_counters_.size());
@@ -412,7 +413,7 @@ void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) 
   }
 }
 
-void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
+void Allocator::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
   if (sink_predicates_ != nullptr) {
     Thread::LockGuard lock(mutex_);
     f_size(sinked_gauges_.size());
@@ -428,7 +429,7 @@ void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) cons
   }
 }
 
-void AllocatorImpl::forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
+void Allocator::forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
   if (sink_predicates_ != nullptr) {
     Thread::LockGuard lock(mutex_);
     f_size(sinked_text_readouts_.size());
@@ -440,7 +441,7 @@ void AllocatorImpl::forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> 
   }
 }
 
-void AllocatorImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) {
+void Allocator::setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) {
   Thread::LockGuard lock(mutex_);
   ASSERT(sink_predicates_ == nullptr);
   sink_predicates_ = std::move(sink_predicates);
@@ -467,7 +468,7 @@ void AllocatorImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_pre
   }
 }
 
-void AllocatorImpl::markCounterForDeletion(const CounterSharedPtr& counter) {
+void Allocator::markCounterForDeletion(const CounterSharedPtr& counter) {
   Thread::LockGuard lock(mutex_);
   auto iter = counters_.find(counter->statName());
   if (iter == counters_.end()) {
@@ -475,13 +476,14 @@ void AllocatorImpl::markCounterForDeletion(const CounterSharedPtr& counter) {
     return;
   }
   ASSERT(counter.get() == *iter);
-  // Duplicates are ASSERTed in ~AllocatorImpl.
+  // Duplicates are ASSERTed in ~Allocator. These might occur if there was
+  // a race bug in reference counting, causing a stat to be double-deleted.
   deleted_counters_.emplace_back(*iter);
   counters_.erase(iter);
   sinked_counters_.erase(counter.get());
 }
 
-void AllocatorImpl::markGaugeForDeletion(const GaugeSharedPtr& gauge) {
+void Allocator::markGaugeForDeletion(const GaugeSharedPtr& gauge) {
   Thread::LockGuard lock(mutex_);
   auto iter = gauges_.find(gauge->statName());
   if (iter == gauges_.end()) {
@@ -489,13 +491,13 @@ void AllocatorImpl::markGaugeForDeletion(const GaugeSharedPtr& gauge) {
     return;
   }
   ASSERT(gauge.get() == *iter);
-  // Duplicates are ASSERTed in ~AllocatorImpl.
+  // Duplicates are ASSERTed in ~Allocator.
   deleted_gauges_.emplace_back(*iter);
   gauges_.erase(iter);
   sinked_gauges_.erase(gauge.get());
 }
 
-void AllocatorImpl::markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout) {
+void Allocator::markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout) {
   Thread::LockGuard lock(mutex_);
   auto iter = text_readouts_.find(text_readout->statName());
   if (iter == text_readouts_.end()) {
@@ -503,7 +505,7 @@ void AllocatorImpl::markTextReadoutForDeletion(const TextReadoutSharedPtr& text_
     return;
   }
   ASSERT(text_readout.get() == *iter);
-  // Duplicates are ASSERTed in ~AllocatorImpl.
+  // Duplicates are ASSERTed in ~Allocator.
   deleted_text_readouts_.emplace_back(*iter);
   text_readouts_.erase(iter);
   sinked_text_readouts_.erase(text_readout.get());

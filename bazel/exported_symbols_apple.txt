@@ -1,3 +1,4 @@
 _lua*
 _envoyGo*
 _envoy_dynamic_module_callback_*
+_*_envoy_dynamic_module_on_*
