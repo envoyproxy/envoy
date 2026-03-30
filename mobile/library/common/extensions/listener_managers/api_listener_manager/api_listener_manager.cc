@@ -54,7 +54,6 @@ void ApiListenerWorker::initializeStats(Stats::Scope& scope) {
 
 void ApiListenerWorker::stop() {
   if (thread_) {
-    BACKTRACE_LOG();
     dispatcher_->exit();
     thread_->join();
     thread_.reset();
@@ -163,7 +162,6 @@ void ApiListenerManagerImpl::stopListeners(StopListenersType,
 
 void ApiListenerManagerImpl::stopWorkers() {
   if (worker_started_.load()) {
-    BACKTRACE_LOG();
     worker_->stop();
   }
 }
