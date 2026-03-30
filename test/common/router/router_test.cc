@@ -4107,7 +4107,7 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
   Buffer::OwnedImpl body("t");
   router_->decodeData(body, false);
   Buffer::OwnedImpl body2("t");
-  // Ensure the second chunk also isn't buffered and triggers the retry logic again.
+  // Ensure subsequent chunks after overflow are also not buffered.
   router_->decodeData(body2, false);
   EXPECT_EQ(1U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
@@ -4131,7 +4131,7 @@ TEST_F(RouterTest, EnableRedirectAndRetryButNoRetryWithBodyLimit) {
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
-  // Enable redirects also. This feature will not be used but will affects buffer logic.
+  // Enable redirects also. This feature will not be used but will affect buffer logic.
   enableRedirects(3);
 
   // Set a per route body limit which disallows any buffering.
@@ -4145,7 +4145,7 @@ TEST_F(RouterTest, EnableRedirectAndRetryButNoRetryWithBodyLimit) {
   Buffer::OwnedImpl body("t");
   router_->decodeData(body, false);
   Buffer::OwnedImpl body2("t");
-  // Ensure the second chunk also isn't buffered and triggers the retry logic again.
+  // Ensure subsequent chunks after overflow are also not buffered.
   router_->decodeData(body2, false);
   EXPECT_EQ(1U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
@@ -5256,9 +5256,15 @@ TEST_F(RouterTest, InternalRedirectWithRequestBodyBufferOverflow) {
   Buffer::OwnedImpl response_data("1234567890");
   response_decoder_->decodeData(response_data, false);
 
-  // In production, the HCM recreateStream would have called this.
   router_->onDestroy();
   EXPECT_FALSE(callbacks_.streamInfo().filterState()->hasDataWithName("num_internal_redirects"));
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
 }
 
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {

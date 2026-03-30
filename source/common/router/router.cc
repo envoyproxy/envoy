@@ -1007,7 +1007,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
 
   // Handle buffer overflow.
-  if (buffering && would_exceed_buffer && !request_buffer_overflowed_) {
+  if (buffering && would_exceed_buffer) {
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. "
               "Giving up on buffering.",
