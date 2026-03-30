@@ -39,7 +39,7 @@ Envoy release maintainers will try to review and include any pending proposed ba
 patch releases. Backports can also be proposed directly, by raising a PR against the relevant
 release branch, eg `release/v1.37`.
 
-When raising a backport, please raise against **all** affected branches.
+When raising a backport, please raise against **all** supported branches, that are affected.
 
 Backport PRs should pick specific commits from the `main` branch, and should be kept as specific
 commits while tracking the upstream release branch, before landing.
