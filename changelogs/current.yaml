@@ -317,6 +317,12 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: server
+  change: |
+    Added ``--fine-grain-log-levels`` CLI flag for per-file log verbosity
+    control when fine-grain logging is enabled. Accepts a comma-separated
+    list of ``glob-pattern:log-level`` pairs. Requires
+    ``--enable-fine-grain-logging``.
 - area: overload_manager
   change: |
     Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed

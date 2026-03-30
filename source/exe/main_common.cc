@@ -8,6 +8,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 
 #include "source/common/common/compiler_requirements.h"
+#include "source/common/common/fine_grain_logger.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/perf_annotation.h"
 #include "source/common/common/thread.h"
@@ -70,6 +71,14 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
   logging_context_ = std::make_unique<Logger::Context>(
       options_.logLevel(), options_.logFormat(), restarter_->logLock(), options_.logFormatEscaped(),
       options_.mode() == Server::Mode::Validate ? false : options_.enableFineGrainLogging());
+  if (options_.enableFineGrainLogging() && !options_.fineGrainLogLevels().empty()) {
+    std::vector<std::pair<absl::string_view, int>> glob_levels;
+    glob_levels.reserve(options_.fineGrainLogLevels().size());
+    for (const auto& [glob, level] : options_.fineGrainLogLevels()) {
+      glob_levels.emplace_back(glob, static_cast<int>(level));
+    }
+    getFineGrainLogContext().updateVerbositySetting(glob_levels);
+  }
   init(time_system, listener_hooks, std::move(random_generator), std::move(process_context),
        createFunction());
 }

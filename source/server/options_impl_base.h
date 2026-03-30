@@ -137,6 +137,10 @@ public:
   bool logFormatSet() const override { return log_format_set_; }
   bool logFormatEscaped() const override { return log_format_escaped_; }
   bool enableFineGrainLogging() const override { return enable_fine_grain_logging_; }
+  const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
+  fineGrainLogLevels() const override {
+    return fine_grain_log_levels_;
+  }
   const std::string& logPath() const override { return log_path_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
@@ -199,6 +203,7 @@ private:
   spdlog::level::level_enum log_level_{spdlog::level::info};
   std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string component_log_level_str_;
+  std::vector<std::pair<std::string, spdlog::level::level_enum>> fine_grain_log_levels_;
   std::string log_format_{Logger::Logger::DEFAULT_LOG_FORMAT};
   bool log_format_set_{false};
   bool log_format_escaped_{false};

@@ -197,6 +197,9 @@ message CommandLineOptions {
   // See :option:`--enable-fine-grain-logging` for details.
   bool enable_fine_grain_logging = 34;
 
+  // See :option:`--fine-grain-log-levels` for details.
+  string fine_grain_log_levels = 43;
+
   // See :option:`--socket-path` for details.
   string socket_path = 35;
 
