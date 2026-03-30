@@ -1,8 +1,5 @@
 #pragma once
 
-#include "envoy/config/core/v3/substitution_format_string.pb.h"
-#include "envoy/config/core/v3/substitution_format_string.pb.validate.h"
-#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 
@@ -14,29 +11,20 @@ namespace Matching {
 namespace Actions {
 namespace FormatString {
 
-class ActionImpl : public Matcher::ActionBase<envoy::config::core::v3::SubstitutionFormatString,
-                                              Server::Configuration::FilterChainBaseAction> {
-public:
-  ActionImpl(Formatter::FormatterConstSharedPtr formatter) : formatter_(std::move(formatter)) {}
-  const Network::FilterChain*
-  get(const Server::Configuration::FilterChainsByName& filter_chains_by_name,
-      const StreamInfo::StreamInfo& info) const override;
-
-private:
-  const Formatter::FormatterConstSharedPtr formatter_;
+// A `StringReturningAction` factory is registered for `SubstitutionFormatString`
+// and for `Protobuf::StringValue` configuration types.
+struct StringReturningActionFactoryContext {
+  // A ServerFactoryContext is necessary to initialize a SubstitutionFormatString.
+  Server::Configuration::ServerFactoryContext& server_factory_context_;
 };
 
+class StringReturningAction : public Matcher::Action {
+public:
+  virtual std::string string(const StreamInfo::StreamInfo& stream_info) const PURE;
+};
+
+// A `FilterChainBaseAction` factory is registered for `SubstitutionFormatString`.
 using FilterChainActionFactoryContext = Server::Configuration::ServerFactoryContext;
-class ActionFactory : public Matcher::ActionFactory<FilterChainActionFactoryContext> {
-public:
-  std::string name() const override { return "envoy.matching.actions.format_string"; }
-  Matcher::ActionConstSharedPtr
-  createAction(const Protobuf::Message& proto_config, FilterChainActionFactoryContext& context,
-               ProtobufMessage::ValidationVisitor& validator) override;
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::core::v3::SubstitutionFormatString>();
-  }
-};
 
 } // namespace FormatString
 } // namespace Actions
