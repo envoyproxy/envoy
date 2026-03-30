@@ -1886,6 +1886,17 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
+  //
+  // Strip upstream hop-by-hop Keep-Alive header before applying user-configured response headers.
+  // This ensures that Keep-Alive headers added via response_headers_to_add are preserved, since
+  // HCM sanitization (mutateResponseHeaders) will skip removing Keep-Alive when this flag is on.
+  // Only relevant for HTTP/1.x downstream connections.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_keepalive")) {
+    const auto protocol = callbacks_->streamInfo().protocol();
+    if (protocol.has_value() && *protocol <= Http::Protocol::Http11) {
+      headers->removeKeepAlive();
+    }
+  }
   const Formatter::Context formatter_context(downstream_headers_, headers.get(), {}, {}, {},
                                              &callbacks_->activeSpan());
   route_entry_->finalizeResponseHeaders(*headers, formatter_context, callbacks_->streamInfo());

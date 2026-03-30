@@ -153,6 +153,12 @@ bug_fixes:
 - area: http
   change: |
     Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.
+- area: http
+  change: |
+    Allow ``Keep-Alive`` response headers added via ``response_headers_to_add`` to be preserved instead
+    of being stripped by HCM sanitization. Upstream ``Keep-Alive`` headers are now stripped in the router
+    before user-configured response headers are applied, so user-added ``Keep-Alive`` headers survive.
+    Protected by runtime guard ``envoy.reloadable_features.preserve_downstream_keepalive``.
 - area: load_report
   change: |
     Fixed a race condition during load-report shutdown with the ADS stream by introducing proper cleanup
