@@ -57,8 +57,8 @@ protected:
 
   // Creates a selector AND stores the factory as a member so the selector's references
   // (cert_contexts_, etc.) don't dangle.
-  Ssl::TlsCertificateSelectorPtr createSelector() {
-    auto factory = create(defaultConfig());
+  Ssl::TlsCertificateSelectorPtr createSelector(const std::string& config = "") {
+    auto factory = create(config.empty() ? defaultConfig() : config);
     EXPECT_TRUE(factory.ok());
     selector_factory_ = std::move(factory.value());
     return selector_factory_->create(selector_context_);
@@ -256,6 +256,57 @@ TEST_F(FilterStateTest, CacheHitOnSecondCall) {
   auto result2 = selector->selectTlsContext(hello, nullptr);
   EXPECT_EQ(result2.status, Ssl::SelectionResult::SelectionStatus::Success);
   EXPECT_EQ(result2.selected_ctx, ctx1);
+}
+
+TEST_F(FilterStateTest, ContextCreationFailureReturnsFailed) {
+  // Override the mock config to cause DynamicContext creation to fail while PEM parsing succeeds.
+  // Setting provides_ciphers_and_curves=false with an empty cipher suite string causes
+  // ServerContextImpl (via ContextImpl) to fail during SSL_CTX cipher initialization.
+  Ssl::HandshakerCapabilities caps;
+  caps.provides_ciphers_and_curves = false;
+  caps.provides_sigalgs = true;
+  std::string bad_ciphers = "";
+  EXPECT_CALL(server_context_, capabilities()).WillRepeatedly(Return(caps));
+  EXPECT_CALL(server_context_, cipherSuites()).WillRepeatedly(ReturnRef(bad_ciphers));
+
+  auto selector = createSelector();
+
+  setupSsl();
+  setFilterStatePem(readTestFile("servercert.pem"), readTestFile("serverkey.pem"));
+
+  auto hello = buildClientHello();
+  auto result = selector->selectTlsContext(hello, nullptr);
+  // PEM parses OK but context creation fails due to invalid cipher config.
+  EXPECT_EQ(result.status, Ssl::SelectionResult::SelectionStatus::Failed);
+}
+
+TEST_F(FilterStateTest, CacheEvictionWithMaxSize) {
+  const std::string config_yaml = R"EOF(
+    certificate_mapper:
+      name: sni
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+        default_value: fallback
+    max_cache_size: 1
+  )EOF";
+  auto selector = createSelector(config_yaml);
+
+  setupSsl();
+  setFilterStatePem(readTestFile("servercert.pem"), readTestFile("serverkey.pem"));
+
+  // First call with default SNI ("fallback") — creates and caches a context.
+  auto hello1 = buildClientHello();
+  auto result1 = selector->selectTlsContext(hello1, nullptr);
+  EXPECT_EQ(result1.status, Ssl::SelectionResult::SelectionStatus::Success);
+  const auto* ctx1 = result1.selected_ctx;
+
+  // Set SNI to a different name to trigger a cache miss and eviction.
+  SSL_set_tlsext_host_name(ssl_.get(), "other.example.com");
+  auto hello2 = buildClientHello();
+  auto result2 = selector->selectTlsContext(hello2, nullptr);
+  EXPECT_EQ(result2.status, Ssl::SelectionResult::SelectionStatus::Success);
+  // New context should be created (different name), old one evicted (max_cache_size=1).
+  EXPECT_NE(result2.selected_ctx, ctx1);
 }
 
 // --- onConfigUpdate tests ---
