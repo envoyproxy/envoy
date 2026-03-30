@@ -848,7 +848,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
       allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
+  if (!upstream_requests_.front()->acceptHeadersFromRouter(end_stream)) {
+    return false;
+  }
   // Start the shadow streams.
   for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
     const auto& shadow_policy = shadow_policy_wrapper.get();
@@ -2308,8 +2310,10 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_requests_.front()->acceptHeadersFromRouter(
-      !callbacks_->decodingBuffer() && !downstream_trailers_ && downstream_end_stream_);
+  if (!upstream_requests_.front()->acceptHeadersFromRouter(
+          !callbacks_->decodingBuffer() && !downstream_trailers_ && downstream_end_stream_)) {
+    return;
+  }
   // It's possible we got immediately reset which means the upstream request we just
   // added to the front of the list might have been removed, so we need to check to make
   // sure we don't send data on the wrong request.

@@ -178,7 +178,7 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
       }));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false));
-  upstream_request_->acceptHeadersFromRouter(false);
+  EXPECT_TRUE(upstream_request_->acceptHeadersFromRouter(false));
 
   EXPECT_CALL(router_filter_interface_.callbacks_, resetStream(_, _));
   filter->callbacks_->resetStream();
@@ -199,7 +199,7 @@ TEST_F(UpstreamRequestTest, ConnectionPoolLatencyTime) {
         return nullptr;
       }));
 
-  upstream_request_->acceptHeadersFromRouter(false);
+  EXPECT_TRUE(upstream_request_->acceptHeadersFromRouter(false));
   const StreamInfo::UpstreamTiming& timing =
       upstream_request_->streamInfo().upstreamInfo()->upstreamTiming();
   ASSERT_TRUE(timing.connectionPoolCallbackLatency().has_value());
@@ -291,7 +291,7 @@ TEST_F(UpstreamRequestTest, OnHostSelectedCallbackInvoked) {
   initialize();
 
   EXPECT_CALL(*conn_pool_, newStream(_));
-  upstream_request_->acceptHeadersFromRouter(false);
+  EXPECT_TRUE(upstream_request_->acceptHeadersFromRouter(false));
 
   EXPECT_TRUE(filter->on_host_selected_called_);
   EXPECT_EQ(filter->last_host_, host_);
@@ -313,7 +313,7 @@ TEST_F(UpstreamRequestTest, OnHostSelectedRejectionViaSendLocalReply) {
   EXPECT_CALL(*conn_pool_, newStream(_)).Times(0);
   EXPECT_CALL(router_filter_interface_.callbacks_,
               sendLocalReply(Http::Code::Forbidden, _, _, _, _));
-  upstream_request_->acceptHeadersFromRouter(false);
+  EXPECT_FALSE(upstream_request_->acceptHeadersFromRouter(false));
 
   EXPECT_TRUE(filter->on_host_selected_called_);
 }
@@ -337,7 +337,7 @@ TEST_F(UpstreamRequestTest, OnHostSelectedMultipleCallbacksStopsAfterSendLocalRe
   EXPECT_CALL(*conn_pool_, newStream(_)).Times(0);
   EXPECT_CALL(router_filter_interface_.callbacks_,
               sendLocalReply(Http::Code::Forbidden, _, _, _, _));
-  upstream_request_->acceptHeadersFromRouter(false);
+  EXPECT_FALSE(upstream_request_->acceptHeadersFromRouter(false));
 
   EXPECT_TRUE(filter1->on_host_selected_called_);
   EXPECT_FALSE(filter2->on_host_selected_called_);

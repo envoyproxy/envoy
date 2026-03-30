@@ -78,6 +78,21 @@ public:
   bool isAborted() {
     return state().decoder_filter_chain_aborted_ || state().saw_downstream_reset_;
   }
+  // Notifies all upstream callbacks that a host has been selected, returning true if the request
+  // was aborted by one of them.
+  bool notifyHostSelected() {
+    // host is guaranteed non-null: createConnPool() returns nullptr when the host is null,
+    // and the caller checks for that before creating the UpstreamRequest.
+    Upstream::HostDescriptionConstSharedPtr host = upstream_request_.conn_pool_->host();
+    ASSERT(host != nullptr);
+    for (auto* callback : upstream_request_.upstream_callbacks_) {
+      callback->onHostSelected(host);
+      if (isAborted()) {
+        return true;
+      }
+    }
+    return false;
+  }
   UpstreamRequest& upstream_request_;
 };
 
@@ -397,7 +412,7 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
   parent_.onUpstreamHostSelected(host, pool_success);
 }
 
-void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
+bool UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   ASSERT(!router_sent_end_stream_);
   router_sent_end_stream_ = end_stream;
 
@@ -425,18 +440,15 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
     }
   }
 
-  // Allow upstream HTTP filters to inspect the selected host before the connection is initiated.
+  // Kick off creation of the upstream connection immediately upon receiving headers. In future it
+  // may be possible for upstream HTTP filters to delay this, or influence connection creation, but
+  // for now optimize for minimal latency and fetch the connection as soon as possible. As a first
+  // step in that direction, upstream HTTP filters can inspect the selected host and abort the
+  // request before the connection is initiated.
   auto* upstream_fm = static_cast<UpstreamFilterManager*>(filter_manager_.get());
-  // host is guaranteed non-null: createConnPool() returns nullptr when the host is null,
-  // and the caller checks for that before creating the UpstreamRequest.
-  Upstream::HostDescriptionConstSharedPtr host = conn_pool_->host();
-  ASSERT(host != nullptr);
-  for (auto* callback : upstream_callbacks_) {
-    callback->onHostSelected(host);
-    if (upstream_fm->isAborted()) {
-      ENVOY_LOG(debug, "upstream request aborted during onHostSelected");
-      return;
-    }
+  if (upstream_fm->notifyHostSelected()) {
+    ENVOY_LOG(debug, "upstream request aborted during onHostSelected");
+    return false;
   }
 
   conn_pool_->newStream(this);
@@ -469,6 +481,7 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   filter_manager_->requestHeadersInitialized();
   filter_manager_->streamInfo().setRequestHeaders(*parent_.downstreamHeaders());
   filter_manager_->decodeHeaders(*parent_.downstreamHeaders(), end_stream);
+  return true;
 }
 
 void UpstreamRequest::acceptDataFromRouter(Buffer::Instance& data, bool end_stream) {
