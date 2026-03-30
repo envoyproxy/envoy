@@ -65,18 +65,34 @@ protected:
   }
 
   // Set up an SSL object with ex_data pointing to mock TransportSocketCallbacks.
-  void setupSslWithFilterState(const StreamInfo::FilterStateSharedPtr& filter_state) {
+  // Uses the mock's own filter_state_ (returned by its default ON_CALL) so that
+  // the filter state lookup works reliably in both debug and optimized builds.
+  void setupSsl() {
     ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
     ssl_.reset(SSL_new(ssl_ctx_.get()));
 
-    // Mock chain: callbacks -> connection -> streamInfo -> filterState
+    // Mock chain: callbacks -> connection -> streamInfo
+    // filterState() uses MockStreamInfo's default ON_CALL which returns filter_state_.
     EXPECT_CALL(mock_callbacks_, connection()).WillRepeatedly(ReturnRef(mock_connection_));
     EXPECT_CALL(mock_connection_, streamInfo()).WillRepeatedly(ReturnRef(mock_stream_info_));
-    EXPECT_CALL(mock_stream_info_, filterState()).WillRepeatedly(ReturnRef(filter_state));
 
     // Store the mock callbacks as ex_data on the SSL object (same as SslSocket does).
     SSL_set_ex_data(ssl_.get(), ContextImpl::sslSocketIndex(),
                     static_cast<Network::TransportSocketCallbacks*>(&mock_callbacks_));
+  }
+
+  // Set PEM data in the mock's own filter state.
+  void setFilterStatePem(const std::string& cert_pem, const std::string& key_pem,
+                         const std::string& cert_key = "envoy.tls.certificate.cert_chain",
+                         const std::string& key_key = "envoy.tls.certificate.private_key") {
+    mock_stream_info_.filter_state_->setData(cert_key,
+                                             std::make_shared<Router::StringAccessorImpl>(cert_pem),
+                                             StreamInfo::FilterState::StateType::ReadOnly,
+                                             StreamInfo::FilterState::LifeSpan::Connection);
+    mock_stream_info_.filter_state_->setData(key_key,
+                                             std::make_shared<Router::StringAccessorImpl>(key_pem),
+                                             StreamInfo::FilterState::StateType::ReadOnly,
+                                             StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   // Build a minimal SSL_CLIENT_HELLO from our SSL object.
@@ -179,10 +195,8 @@ TEST_F(FilterStateTest, NoCallbacksReturnsFailed) {
 TEST_F(FilterStateTest, NoFilterStateReturnsFailed) {
   auto selector = createSelector();
 
-  // Set up SSL with filter state that has NO cert PEM.
-  auto filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  setupSslWithFilterState(filter_state);
+  // Set up SSL but don't add any cert PEM to filter state.
+  setupSsl();
 
   auto hello = buildClientHello();
   auto result = selector->selectTlsContext(hello, nullptr);
@@ -192,14 +206,12 @@ TEST_F(FilterStateTest, NoFilterStateReturnsFailed) {
 TEST_F(FilterStateTest, MissingPrivateKeyReturnsFailed) {
   auto selector = createSelector();
 
-  auto filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  // Set cert but not key.
-  filter_state->setData("envoy.tls.certificate.cert_chain",
-                        std::make_shared<Router::StringAccessorImpl>("some-cert-pem"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
-  setupSslWithFilterState(filter_state);
+  // Set cert but not key in the mock's filter state.
+  setupSsl();
+  mock_stream_info_.filter_state_->setData(
+      "envoy.tls.certificate.cert_chain",
+      std::make_shared<Router::StringAccessorImpl>("some-cert-pem"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 
   auto hello = buildClientHello();
   auto result = selector->selectTlsContext(hello, nullptr);
@@ -209,17 +221,8 @@ TEST_F(FilterStateTest, MissingPrivateKeyReturnsFailed) {
 TEST_F(FilterStateTest, InvalidPemReturnsFailed) {
   auto selector = createSelector();
 
-  auto filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData("envoy.tls.certificate.cert_chain",
-                        std::make_shared<Router::StringAccessorImpl>("not-valid-pem"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData("envoy.tls.certificate.private_key",
-                        std::make_shared<Router::StringAccessorImpl>("not-valid-pem"),
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
-  setupSslWithFilterState(filter_state);
+  setupSsl();
+  setFilterStatePem("not-valid-pem", "not-valid-pem");
 
   auto hello = buildClientHello();
   auto result = selector->selectTlsContext(hello, nullptr);
@@ -229,18 +232,8 @@ TEST_F(FilterStateTest, InvalidPemReturnsFailed) {
 TEST_F(FilterStateTest, ValidPemReturnsSuccess) {
   auto selector = createSelector();
 
-  const std::string cert_pem = readTestFile("servercert.pem");
-  const std::string key_pem = readTestFile("serverkey.pem");
-
-  auto filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.tls.certificate.cert_chain", std::make_shared<Router::StringAccessorImpl>(cert_pem),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.tls.certificate.private_key", std::make_shared<Router::StringAccessorImpl>(key_pem),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-  setupSslWithFilterState(filter_state);
+  setupSsl();
+  setFilterStatePem(readTestFile("servercert.pem"), readTestFile("serverkey.pem"));
 
   auto hello = buildClientHello();
   auto result = selector->selectTlsContext(hello, nullptr);
@@ -252,18 +245,8 @@ TEST_F(FilterStateTest, ValidPemReturnsSuccess) {
 TEST_F(FilterStateTest, CacheHitOnSecondCall) {
   auto selector = createSelector();
 
-  const std::string cert_pem = readTestFile("servercert.pem");
-  const std::string key_pem = readTestFile("serverkey.pem");
-
-  auto filter_state =
-      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.tls.certificate.cert_chain", std::make_shared<Router::StringAccessorImpl>(cert_pem),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state->setData(
-      "envoy.tls.certificate.private_key", std::make_shared<Router::StringAccessorImpl>(key_pem),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
-  setupSslWithFilterState(filter_state);
+  setupSsl();
+  setFilterStatePem(readTestFile("servercert.pem"), readTestFile("serverkey.pem"));
 
   auto hello = buildClientHello();
   auto result1 = selector->selectTlsContext(hello, nullptr);
