@@ -395,8 +395,8 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamRstPropagationThroughTunnel) {
 // Verify that upstream RST through tunneled CONNECT does NOT propagate as downstream RST
 // when the HTTP guard is explicitly disabled.
 TEST_P(ConnectTerminationIntegrationTest, UpstreamRstNotPropagatedWithoutHttpGuard) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.map_http_stream_reset_to_tcp_rst", "false");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.map_http_stream_reset_to_tcp_rst",
+                                    "false");
   initialize();
 
   setUpConnection();
