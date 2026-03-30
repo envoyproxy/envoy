@@ -345,10 +345,6 @@ public:
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
 
   // Stats::Store
-  /*std::vector<CounterSharedPtr> counters() const override {
-    Thread::LockGuard lock(lock_);
-    return store_.counters();
-    }*/
   std::vector<GaugeSharedPtr> gauges() const override {
     Thread::LockGuard lock(lock_);
     return store_.gauges();
@@ -539,14 +535,6 @@ public:
   OptRef<Stats::ParentHistogram> histogram(const std::string& name) {
     return TestUtility::findHistogramMainThread(statStore(), name);
   }
-
-  // std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
-
-  // std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
-
-  // std::vector<Stats::ParentHistogramSharedPtr> histograms() override {
-  //   return statStore().histograms();
-  // }
 
   // ListenerHooks
   void onWorkerListenerAdded() override;

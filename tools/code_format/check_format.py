@@ -396,6 +396,12 @@ class FormatChecker:
     def allow_listed_for_raw_try(self, file_path):
         return file_path in self.config.paths["raw_try"]["include"]
 
+    def allow_listed_for_stats_shared_ptr(self, file_path):
+        return True
+#        return (file_path.startswith("./test/common/stats/") or
+#                file_path.startswith("./source/common/stats/") or
+#                file_path.startswith("./envoy/stats/"))
+
     def deny_listed_for_exceptions(self, file_path):
         # Returns if this file is deny listed for exceptions.
         # Header files are strongly discouraged from throwing exceptions, both for
@@ -732,6 +738,13 @@ class FormatChecker:
             report_error("The MOCK_METHODn() macros should not be used, use MOCK_METHOD() instead")
         if self.config.re["for_each_n"].search(line):
             report_error("std::for_each_n should not be used, use an alternative for loop instead")
+
+        if not self.allow_listed_for_stats_shared_ptr(file_path) and (
+            "CounterSharedPtr" in line or
+            "GaugeSharedPtr" in line or
+            "TextReadoutSharedPtr" in line or
+            "HistogramSharedPtr" in line):
+            report_error("Don't take shared references to stats, except in the stats system")
 
         if not self.allow_listed_for_serialize_as_string(file_path) and "SerializeAsString" in line:
             # The MessageLite::SerializeAsString doesn't generate deterministic serialization,

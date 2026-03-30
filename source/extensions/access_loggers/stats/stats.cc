@@ -64,15 +64,6 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  /*  struct State {
-    State(Stats::Gauge& gauge, uint64_t value) : gauge_(gauge), value_(value) {}
-
-    //Stats::GaugeSharedPtr gauge_
-    OptRef<Stats::Gauge> gauge_;
-
-    uint64_t value_;
-    };*/
-
   Stats::ScopeSharedPtr scope_;
 
   // The map key holds a raw pointer to the gauge. The value holds a ref-counted pointer to ensure

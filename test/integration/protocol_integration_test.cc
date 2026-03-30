@@ -1059,10 +1059,10 @@ TEST_P(ProtocolIntegrationTest, Retry) {
     ASSERT_TRUE(counter.has_value());
     EXPECT_EQ(1L, counter->value());
   }
-  EXPECT_FALSE(test_server_
-                   ->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(),
-                                          ".dropped_headers_with_underscores"))
-                   .has_value());
+  EXPECT_TRUE(TestUtility::findCounterMainThread(
+                  stats, absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(),
+                                      ".dropped_headers_with_underscores"))
+                  .has_value());
 
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_headers_size");
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rs_headers_size");

@@ -643,7 +643,6 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   addStandardFilter();
   initialize();
-  // std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);

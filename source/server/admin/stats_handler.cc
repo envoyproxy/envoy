@@ -185,9 +185,6 @@ void StatsHandler::prometheusRender(Stats::Store& stats,
                                     const Http::RequestHeaderMap& request_headers,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response) {
-  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-      params.prometheus_text_readouts_ ? stats.textReadouts()
-                                       : std::vector<Stats::TextReadoutSharedPtr>();
   std::vector<Stats::Counter*> counters = Stats::Utility::countersMainThread(stats);
   std::vector<Stats::Gauge*> gauges = Stats::Utility::gaugesMainThread(stats);
   std::vector<Stats::ParentHistogram*> histograms = Stats::Utility::histogramsMainThread(stats);

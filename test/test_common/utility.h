@@ -213,7 +213,7 @@ public:
    * Find a gauge in a stats store.
    * @param store supplies the stats store.
    * @param name supplies the name to search for.
-   * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
+   * @return the gauge or nullptr if there is none.
    */
   static OptRef<Stats::Gauge> findGaugeMainThread(Stats::Store& store, const std::string& name);
 
