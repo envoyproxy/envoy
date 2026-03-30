@@ -45,7 +45,7 @@ public:
             registry_->registerObserver(observer_);
           }));
     }
-    connectivity_manager_ = std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_);
+    connectivity_manager_ = std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_);
     ON_CALL(*dns_cache_manager_, lookUpCacheByName(_)).WillByDefault(Return(dns_cache_));
     // Toggle network to reset network state.
     connectivity_manager_->setPreferredNetwork(1);
