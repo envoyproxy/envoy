@@ -31,8 +31,7 @@ absl::optional<Api::IoError::IoErrorCode> checkForConnectionReset() {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
     const uint32_t err = ERR_peek_error();
-    if (ERR_GET_LIB(err) == ERR_LIB_SYS &&
-        ERR_GET_REASON(err) == SOCKET_ERROR_CONNRESET) {
+    if (ERR_GET_LIB(err) == ERR_LIB_SYS && ERR_GET_REASON(err) == SOCKET_ERROR_CONNRESET) {
       return Api::IoError::IoErrorCode::ConnectionReset;
     }
   }

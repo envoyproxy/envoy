@@ -7996,8 +7996,7 @@ TEST_P(SslSocketTest, TlsConnectionResetDetection) {
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       transport_socket_factory_context;
-  ON_CALL(transport_socket_factory_context.server_context_, api())
-      .WillByDefault(ReturnRef(*api_));
+  ON_CALL(transport_socket_factory_context.server_context_, api()).WillByDefault(ReturnRef(*api_));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
