@@ -15,6 +15,7 @@
 #include "library/common/network/network_types.h"
 #include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
+#include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 
 namespace Envoy {
 namespace {
@@ -88,7 +89,8 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
       logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
       thread_priority_(thread_priority), high_watermark_(high_watermark),
-      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
+      main_dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
+      request_dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
       disable_dns_refresh_on_network_change_(disable_dns_refresh_on_network_change),
       enable_logger_(enable_logger) {
   ExtensionRegistry::registerFactories();
@@ -111,42 +113,43 @@ envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
                                            EnvoyStreamCallbacks&& stream_callbacks,
                                            bool explicit_flow_control) {
-  return dispatcher_->post(
-      [&, stream, stream_callbacks = std::move(stream_callbacks), explicit_flow_control]() mutable {
-        http_client_->startStream(stream, std::move(stream_callbacks), explicit_flow_control);
-      });
+  return request_dispatcher_->post([this, stream, stream_callbacks = std::move(stream_callbacks),
+                                    explicit_flow_control]() mutable {
+    http_client_->startStream(stream, std::move(stream_callbacks), explicit_flow_control);
+  });
 }
 
 envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
                                            bool end_stream, bool idempotent) {
-  return dispatcher_->post(
+  return request_dispatcher_->post(
       [this, stream, headers = std::move(headers), end_stream, idempotent]() mutable {
         http_client_->sendHeaders(stream, std::move(headers), end_stream, idempotent);
       });
-  return ENVOY_SUCCESS;
 }
 
 envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_read) {
-  return dispatcher_->post(
-      [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
+  return request_dispatcher_->post([this, stream, bytes_to_read]() {
+    http_client_->readData(stream, bytes_to_read);
+  });
 }
 
 envoy_status_t InternalEngine::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer,
                                         bool end_stream) {
-  return dispatcher_->post([&, stream, buffer = std::move(buffer), end_stream]() mutable {
-    http_client_->sendData(stream, std::move(buffer), end_stream);
-  });
+  return request_dispatcher_->post(
+      [this, stream, buffer = std::move(buffer), end_stream]() mutable {
+        http_client_->sendData(stream, std::move(buffer), end_stream);
+      });
 }
 
 envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream,
                                             Http::RequestTrailerMapPtr trailers) {
-  return dispatcher_->post([&, stream, trailers = std::move(trailers)]() mutable {
+  return request_dispatcher_->post([this, stream, trailers = std::move(trailers)]() mutable {
     http_client_->sendTrailers(stream, std::move(trailers));
   });
 }
 
 envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
-  return dispatcher_->post([&, stream]() { http_client_->cancelStream(stream); });
+  return request_dispatcher_->post([this, stream]() { http_client_->cancelStream(stream); });
 }
 
 // This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
@@ -227,7 +230,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
           Network::DefaultNetworkChangeCallback cb =
               [this](envoy_netconf_t current_configuration_key) {
-                dispatcher_->post([this, current_configuration_key]() {
+                main_dispatcher_->post([this, current_configuration_key]() {
                   if (connectivity_manager_->getConfigurationKey() != current_configuration_key) {
                     // The default network has changed to a different one.
                     return;
@@ -261,17 +264,19 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           // on-the-fly without risking contention on system with lots of threads.
           // It also comes with ease of programming.
           stat_name_set_ = client_scope_->symbolTable().makeSet("pulse");
-          auto api_listener = server_->listenerManager().apiListener()->get().createHttpApiListener(
-              server_->dispatcher());
-          ASSERT(api_listener != nullptr);
-          http_client_ = std::make_unique<Http::Client>(
-              std::move(api_listener), *dispatcher_, server_->serverFactoryContext().scope(),
-              server_->api().randomGenerator(), high_watermark_);
-          dispatcher_->drain(server_->dispatcher());
+          main_dispatcher_->drain(server_->dispatcher());
           engine_running_.Notify();
           callbacks_->on_engine_running_();
         });
   } // mutex_
+  startup_callback_handler_ = main_common->server()->lifecycleNotifier().registerCallback(
+      Envoy::Server::ServerLifecycleNotifier::Stage::Startup, [this]() -> void {
+        ASSERT(Thread::MainThread::isMainOrTestThread());
+        auto* api_mgr = dynamic_cast<Server::ApiListenerManagerImpl*>(&server_->listenerManager());
+        ASSERT(api_mgr != nullptr);
+        http_client_ = &api_mgr->httpClient();
+        request_dispatcher_->drain(api_mgr->httpClientDispatcher());
+      });
 
   // The main run loop must run without holding the mutex, so that the destructor can acquire it.
   bool run_success = main_common->run();
@@ -321,17 +326,16 @@ envoy_status_t InternalEngine::terminate() {
     }
 
     ASSERT(event_dispatcher_);
-    ASSERT(dispatcher_);
-
-    // We must destroy the Http::ApiListener in the main thread.
-    dispatcher_->post([this]() { http_client_->shutdownApiListener(); });
+    ASSERT(main_dispatcher_);
 
     // Exit the event loop and finish up in Engine::run(...)
     if (thread_factory_->currentPthreadId() == main_thread_->pthreadId()) {
       // TODO(goaway): figure out some way to support this.
       PANIC("Terminating the engine from its own main thread is currently unsupported.");
     } else {
-      dispatcher_->terminate();
+      server_->listenerManager().stopListeners(Server::ListenerManager::StopListenersType::All,
+                                               Network::ExtraShutdownListenerOptions{});
+      main_dispatcher_->terminate();
     }
   } // lock(_mutex)
 
@@ -351,13 +355,13 @@ InternalEngine::~InternalEngine() {
 }
 
 envoy_status_t InternalEngine::setProxySettings(absl::string_view hostname, const uint16_t port) {
-  return dispatcher_->post([&, host = std::string(hostname), port]() -> void {
+  return main_dispatcher_->post([&, host = std::string(hostname), port]() -> void {
     connectivity_manager_->setProxySettings(Network::ProxySettings::parseHostAndPort(host, port));
   });
 }
 
 envoy_status_t InternalEngine::resetConnectivityState() {
-  return dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
+  return main_dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
 }
 
 void InternalEngine::onDefaultNetworkAvailable() {
@@ -368,7 +372,7 @@ void InternalEngine::onDefaultNetworkAvailable() {
 void InternalEngine::onDefaultNetworkChangeEvent(const int network_type) {
   ENVOY_LOG_MISC(trace, "Calling the default network change event callback");
 
-  dispatcher_->post([&, network_type]() -> void {
+  main_dispatcher_->post([&, network_type]() -> void {
     Network::Address::InstanceConstSharedPtr local_addr = probeAndGetLocalAddr(AF_INET6);
     const bool has_ipv6_connectivity = local_addr != nullptr;
     if (local_addr == nullptr) {
@@ -395,7 +399,7 @@ void InternalEngine::onDefaultNetworkChangeEvent(const int network_type) {
 // default.
 void InternalEngine::onDefaultNetworkChanged(int network) {
   ENVOY_LOG_MISC(trace, "Calling the default network changed callback");
-  dispatcher_->post([&, network]() -> void {
+  main_dispatcher_->post([&, network]() -> void {
     handleNetworkChange(network, probeAndGetLocalAddr(AF_INET6) != nullptr);
   });
 }
@@ -427,7 +431,7 @@ void InternalEngine::purgeActiveNetworkListAndroid(const std::vector<int64_t>& a
 
 void InternalEngine::onDefaultNetworkUnavailable() {
   ENVOY_LOG_MISC(trace, "Calling the default network unavailable callback");
-  dispatcher_->post([&]() -> void { connectivity_manager_->dnsCache()->stop(); });
+  main_dispatcher_->post([&]() -> void { connectivity_manager_->dnsCache()->stop(); });
 }
 
 void InternalEngine::handleNetworkChange(const int network_type, const bool has_ipv6_connectivity) {
@@ -480,7 +484,7 @@ void InternalEngine::resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity
 
 envoy_status_t InternalEngine::recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
                                                 uint64_t count) {
-  return dispatcher_->post(
+  return main_dispatcher_->post(
       [&, name = Stats::Utility::sanitizeStatsName(elements), tags, count]() -> void {
         ENVOY_LOG(trace, "[pulse.{}] recordCounterInc", name);
         Stats::StatNameTagVector tags_vctr =
@@ -490,7 +494,7 @@ envoy_status_t InternalEngine::recordCounterInc(absl::string_view elements, envo
       });
 }
 
-Event::ProvisionalDispatcher& InternalEngine::dispatcher() const { return *dispatcher_; }
+Event::ProvisionalDispatcher& InternalEngine::dispatcher() const { return *main_dispatcher_; }
 
 Thread::PosixThreadFactory& InternalEngine::threadFactory() const { return *thread_factory_; }
 
@@ -540,7 +544,7 @@ std::string InternalEngine::dumpStats() {
 
   std::string stats;
   absl::Notification stats_received;
-  if (dispatcher_->post([&]() -> void {
+  if (main_dispatcher_->post([&]() -> void {
         Envoy::Buffer::OwnedImpl instance;
         handlerStats(server_->stats(), instance);
         stats = instance.toString();
@@ -553,13 +557,14 @@ std::string InternalEngine::dumpStats() {
 }
 
 Upstream::ClusterManager& InternalEngine::getClusterManager() {
-  ASSERT(dispatcher_->isThreadSafe(),
+  ASSERT(main_dispatcher_->isThreadSafe(),
          "getClusterManager must be called from the dispatcher's context");
   return server_->clusterManager();
 }
 
 Stats::Store& InternalEngine::getStatsStore() {
-  ASSERT(dispatcher_->isThreadSafe(), "getStatsStore must be called from the dispatcher's context");
+  ASSERT(main_dispatcher_->isThreadSafe(),
+         "getStatsStore must be called from the dispatcher's context");
   return server_->stats();
 }
 

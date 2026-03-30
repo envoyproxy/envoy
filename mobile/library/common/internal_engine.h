@@ -247,14 +247,16 @@ private:
   Assert::ActionRegistrationPtr bug_handler_registration_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
-  Http::ClientPtr http_client_;
+  Http::Client* http_client_{nullptr};
   Network::ConnectivityManagerImplSharedPtr connectivity_manager_;
-  Event::ProvisionalDispatcherPtr dispatcher_;
+  Event::ProvisionalDispatcherPtr main_dispatcher_;
+  Event::ProvisionalDispatcherPtr request_dispatcher_;
   // Used by the cerr logger to ensure logs don't overwrite each other.
   absl::Mutex log_mutex_;
   Logger::EventTrackingDelegatePtr log_delegate_ptr_{};
   Server::Instance* server_{};
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
+  Server::ServerLifecycleNotifier::HandlePtr startup_callback_handler_;
   // main_thread_ should be destroyed first, hence it is the last member variable. Objects with
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
   Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.

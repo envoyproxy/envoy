@@ -1741,6 +1741,9 @@ TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
 // doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChanged) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+  if (getCodecType() == Http::CodecType::HTTP3) {
+    builder_.setDisableDnsRefreshOnNetworkChange(true);
+  }
   initialize();
   internalEngine()->onDefaultNetworkChanged(1);
   basicTest();
@@ -1753,6 +1756,9 @@ TEST_P(ClientIntegrationTest, OnNetworkChanged) {
 // doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChangeEvent) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+  if (getCodecType() == Http::CodecType::HTTP3) {
+    builder_.setDisableDnsRefreshOnNetworkChange(true);
+  }
   initialize();
   int network = 0;
   network |= static_cast<int>(NetworkType::WWAN);
@@ -1766,13 +1772,33 @@ TEST_P(ClientIntegrationTest, OnNetworkChangeEvent) {
 
 class MockSendOsSysCalls : public Api::OsSysCallsImpl {
 public:
+  MockSendOsSysCalls() {
+    ON_CALL(*this, send(_, _, _, _))
+        .WillByDefault([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+          int target = target_fd_.load();
+          if (fail_send_.load() && (target == -1 || socket == target)) {
+            bool expected = true;
+            if (fail_send_.compare_exchange_strong(expected, false)) {
+              return Api::SysCallSizeResult{-1, SOCKET_ERROR_NOBUFS};
+            }
+          }
+          return Api::OsSysCallsImpl::send(socket, buffer, length, flags);
+        });
+  }
+
   MOCK_METHOD(Api::SysCallSizeResult, send,
               (os_fd_t socket, void* buffer, size_t length, int flags), (override));
+
+  std::atomic<bool> fail_send_{false};
+  std::atomic<int> target_fd_{-1};
 };
 
 // Tests that a transient write error due to no space available on the socket
 // does not cause the stream to error out when using HTTP/3.
 TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
+  testing::NiceMock<MockSendOsSysCalls> sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
+
   initialize();
   if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
@@ -1786,9 +1812,10 @@ TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
       .WillOnce(Invoke([&](Network::ConnectionSocket& socket, int /* network */) {
         fd = socket.ioHandle().fdDoNotUse();
       }));
+  Http::TestRequestHeaderMapImpl request_headers(default_request_headers_);
+  request_headers.addCopy(AutonomousStream::CLOSE_AFTER_RESPONSE, "true");
   // Sending headers should be fine.
-  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
-                       false);
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(request_headers), false);
 
   // Sending data should trigger the write error but not crash.
   stream_->sendData(std::make_unique<Buffer::OwnedImpl>("request body"));
@@ -1796,13 +1823,9 @@ TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
   // Wait for the upstream connection to be created and introduce a transient SOCKET_ERROR_NOBUFS
   // write error.
   ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
-  MockSendOsSysCalls sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
-  EXPECT_CALL(sys_calls, send(fd, _, _, _))
-      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOBUFS}))
-      .WillRepeatedly(Invoke([&](os_fd_t socket, void* buffer, size_t length, int flags) {
-        return injector.latched().send(socket, buffer, length, flags);
-      }));
+  uint64_t initial_destroy = getCounterValue("cluster.base.upstream_cx_destroy");
+  sys_calls.target_fd_.store(fd);
+  sys_calls.fail_send_.store(true);
 
   // Complete the request.
   stream_->close(Http::Utility::createRequestTrailerMapPtr());
@@ -1812,6 +1835,11 @@ TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
   ASSERT_EQ(cc_.on_error_calls_, 0);
   ASSERT_EQ(cc_.on_complete_calls_, 1);
   EXPECT_EQ(cc_.status_, "200");
+
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_destroy", initial_destroy + 1));
+
+  // Join background threads before local injector and mocks are destroyed to fix TSAN data races.
+  TearDown();
 }
 
 } // namespace
