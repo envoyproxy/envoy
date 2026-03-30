@@ -453,3 +453,8 @@ zope-interface==8.2 \
     --hash=sha256:dfc4f44e8de2ff4eba20af4f0a3ca42d3c43ab24a08e49ccd8558b7a4185b466 \
     --hash=sha256:f777e68c76208503609c83ca021a6864902b646530a1a39abb9ed310d1100664
     # via gevent
+httpx==0.28.1
+anyio==4.8.0
+httpcore==1.0.7
+h11==0.14.0
+sniffio==1.3.1

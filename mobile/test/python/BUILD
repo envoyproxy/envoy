@@ -26,3 +26,13 @@ py_test(
         "//library/python:envoy_mobile_lib",
     ],
 )
+
+py_test(
+    name = "httpx_transport_test",
+    srcs = ["test_httpx_transport.py"],
+    main = "test_httpx_transport.py",
+    deps = [
+        "//library/python:envoy_mobile_lib",
+        "@mobile_pip3//httpx",
+    ],
+)
