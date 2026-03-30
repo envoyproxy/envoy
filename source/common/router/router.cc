@@ -468,7 +468,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   stats_.rq_total_.inc();
 
   // Determine if there is a route entry or a direct response for the request.
-  route_ = callbacks_->route();
+  route_ = callbacks_->routeSharedPtr();
   if (!route_) {
     stats_.no_route_.inc();
     ENVOY_STREAM_LOG(debug, "no route match for URL '{}'", *callbacks_, headers.getPathValue());

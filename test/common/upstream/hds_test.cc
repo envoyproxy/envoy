@@ -1288,5 +1288,82 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenUpdate) {
   }
 }
 
+// Test that sendResponse includes health_metadata with http_status_code
+// when setHealthCheckMetadata has been called on a host.
+TEST_F(HdsTest, TestSendResponseWithHealthMetadata) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createSimpleMessage());
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Return(connection_));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
+
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Set the HTTP response code on the host to simulate a health check result.
+  auto& host = hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  host->setLastHealthCheckHttpStatus(200);
+
+  // Send Response
+  auto msg = hds_delegate_->sendResponse();
+
+  // Verify health_metadata contains the HTTP status code in the legacy flat list.
+  const auto& endpoint_health = msg.endpoint_health_response().endpoints_health(0);
+  ASSERT_TRUE(endpoint_health.has_health_metadata());
+  const auto& fields = endpoint_health.health_metadata().fields();
+  auto it = fields.find("http_status_code");
+  ASSERT_NE(it, fields.end());
+  EXPECT_EQ(it->second.number_value(), 200.0);
+
+  // Also verify the structured (cluster-based) response.
+  const auto& cluster_endpoint =
+      msg.endpoint_health_response().cluster_endpoints_health(0).locality_endpoints_health(0);
+  const auto& structured_endpoint = cluster_endpoint.endpoints_health(0);
+  ASSERT_TRUE(structured_endpoint.has_health_metadata());
+  EXPECT_EQ(structured_endpoint.health_metadata().fields().at("http_status_code").number_value(),
+            200.0);
+}
+
+// Test that sendResponse does not include health_metadata when no metadata
+// has been set on the host (default empty Struct).
+TEST_F(HdsTest, TestSendResponseNoHealthMetadataByDefault) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createSimpleMessage());
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Return(connection_));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
+
+  // Process message (do NOT set any health metadata on host)
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Send Response
+  auto msg = hds_delegate_->sendResponse();
+
+  // Verify health_metadata is absent when no metadata has been set.
+  EXPECT_FALSE(msg.endpoint_health_response().endpoints_health(0).has_health_metadata());
+}
+
 } // namespace Upstream
 } // namespace Envoy

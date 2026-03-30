@@ -67,7 +67,7 @@ void CorsFilter::initializeCorsPolicies() {
   // route configuration will be ignored.
   if (policies_.empty()) {
     const auto route = decoder_callbacks_->route();
-    ASSERT(route != nullptr);
+    ASSERT(route.has_value());
     ASSERT(route->routeEntry() != nullptr);
 
     if (auto* typed_cfg = route->routeEntry()->corsPolicy(); typed_cfg != nullptr) {
@@ -83,8 +83,7 @@ void CorsFilter::initializeCorsPolicies() {
 // This handles the CORS preflight request as described in
 // https://www.w3.org/TR/cors/#resource-preflight-requests
 Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  if (decoder_callbacks_->route() == nullptr ||
-      decoder_callbacks_->route()->routeEntry() == nullptr) {
+  if (!decoder_callbacks_->route() || decoder_callbacks_->route()->routeEntry() == nullptr) {
     return Http::FilterHeadersStatus::Continue;
   }
 

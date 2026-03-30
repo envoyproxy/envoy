@@ -19,7 +19,7 @@ fn test_header_callbacks_filter_on_request_headers() {
   envoy_filter
     .expect_get_request_header_value()
     .withf(|name| name == "single")
-    .returning(|_| Some(EnvoyBuffer::new("value")))
+    .returning(|_| Some(EnvoyBuffer::new(b"value")))
     .once();
 
   envoy_filter
@@ -32,8 +32,8 @@ fn test_header_callbacks_filter_on_request_headers() {
     .expect_get_request_header_values()
     .withf(|name| name == "multi")
     .returning(|_| {
-      let value1 = EnvoyBuffer::new("value1");
-      let value2 = EnvoyBuffer::new("value2");
+      let value1 = EnvoyBuffer::new(b"value1");
+      let value2 = EnvoyBuffer::new(b"value2");
       vec![value1, value2]
     })
     .once();
@@ -53,7 +53,7 @@ fn test_header_callbacks_filter_on_request_headers() {
   envoy_filter
     .expect_get_request_header_value()
     .withf(|name| name == "new")
-    .returning(|_| Some(EnvoyBuffer::new("value")))
+    .returning(|_| Some(EnvoyBuffer::new(b"value")))
     .once();
 
   envoy_filter
@@ -72,9 +72,9 @@ fn test_header_callbacks_filter_on_request_headers() {
     .expect_get_request_header_values()
     .withf(|name| name == "multi")
     .returning(|_| {
-      let value1 = EnvoyBuffer::new("value1");
-      let value2 = EnvoyBuffer::new("value2");
-      let value3 = EnvoyBuffer::new("value3");
+      let value1 = EnvoyBuffer::new(b"value1");
+      let value2 = EnvoyBuffer::new(b"value2");
+      let value3 = EnvoyBuffer::new(b"value3");
       vec![value1, value2, value3]
     })
     .once();
@@ -82,11 +82,11 @@ fn test_header_callbacks_filter_on_request_headers() {
   envoy_filter
     .expect_get_request_headers()
     .returning(|| {
-      let single = (EnvoyBuffer::new("single"), EnvoyBuffer::new("value"));
-      let multi1 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value1"));
-      let multi2 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value2"));
-      let new = (EnvoyBuffer::new("new"), EnvoyBuffer::new("value"));
-      let multi3 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value3"));
+      let single = (EnvoyBuffer::new(b"single"), EnvoyBuffer::new(b"value"));
+      let multi1 = (EnvoyBuffer::new(b"multi"), EnvoyBuffer::new(b"value1"));
+      let multi2 = (EnvoyBuffer::new(b"multi"), EnvoyBuffer::new(b"value2"));
+      let new = (EnvoyBuffer::new(b"new"), EnvoyBuffer::new(b"value"));
+      let multi3 = (EnvoyBuffer::new(b"multi"), EnvoyBuffer::new(b"value3"));
       vec![single, multi1, multi2, new, multi3]
     })
     .once();
@@ -100,7 +100,7 @@ fn test_header_callbacks_filter_on_request_headers() {
   envoy_filter
     .expect_get_attribute_string()
     .withf(|id| *id == abi::envoy_dynamic_module_type_attribute_id::SourceAddress)
-    .returning(|_| Some(EnvoyBuffer::new("1.1.1.1:1234")))
+    .returning(|_| Some(EnvoyBuffer::new(b"1.1.1.1:1234")))
     .once();
 
   envoy_filter
@@ -306,7 +306,7 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
         && ns == "metadata"
         && key == "route_key"
     })
-    .returning(|_, _, _| Some(EnvoyBuffer::new("route")))
+    .returning(|_, _, _| Some(EnvoyBuffer::new(b"route")))
     .once();
   envoy_filter
     .expect_get_metadata_string()
@@ -315,7 +315,7 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
         && ns == "metadata"
         && key == "cluster_key"
     })
-    .returning(|_, _, _| Some(EnvoyBuffer::new("cluster")))
+    .returning(|_, _, _| Some(EnvoyBuffer::new(b"cluster")))
     .once();
   envoy_filter
     .expect_get_metadata_string()
@@ -324,7 +324,7 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
         && ns == "metadata"
         && key == "host_key"
     })
-    .returning(|_, _, _| Some(EnvoyBuffer::new("host")))
+    .returning(|_, _, _| Some(EnvoyBuffer::new(b"host")))
     .once();
   assert_eq!(
     f.on_request_headers(&mut envoy_filter, false),
@@ -345,7 +345,7 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
   envoy_filter
     .expect_get_metadata_string()
     .withf(|_, ns, key| ns == "ns_req_body" && key == "key")
-    .returning(|_, _, _| Some(EnvoyBuffer::new("value")))
+    .returning(|_, _, _| Some(EnvoyBuffer::new(b"value")))
     .once();
   envoy_filter
     .expect_get_metadata_number()
@@ -397,7 +397,7 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
   envoy_filter
     .expect_get_metadata_string()
     .withf(|_, ns, key| ns == "ns_res_body" && key == "key")
-    .returning(|_, _, _| Some(EnvoyBuffer::new("value")))
+    .returning(|_, _, _| Some(EnvoyBuffer::new(b"value")))
     .once();
   envoy_filter
     .expect_get_metadata_number()
@@ -458,9 +458,9 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
     .withf(|_, ns| ns == "ns_keys_test")
     .returning(|_, _| {
       Some(vec![
-        EnvoyBuffer::new("k1"),
-        EnvoyBuffer::new("k2"),
-        EnvoyBuffer::new("k3"),
+        EnvoyBuffer::new(b"k1"),
+        EnvoyBuffer::new(b"k2"),
+        EnvoyBuffer::new(b"k3"),
       ])
     })
     .once();
@@ -475,9 +475,9 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
     .expect_get_metadata_namespaces()
     .returning(|_| {
       Some(vec![
-        EnvoyBuffer::new("ns_keys_test"),
-        EnvoyBuffer::new("ns_res_body_bool"),
-        EnvoyBuffer::new("ns_res_body"),
+        EnvoyBuffer::new(b"ns_keys_test"),
+        EnvoyBuffer::new(b"ns_res_body_bool"),
+        EnvoyBuffer::new(b"ns_res_body"),
       ])
     })
     .once();
@@ -534,12 +534,12 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
   envoy_filter
     .expect_get_metadata_list_string()
     .withf(|_, ns, key, idx| ns == "ns_list" && key == "str_list_key" && *idx == 0)
-    .returning(|_, _, _, _| Some(EnvoyBuffer::new("hello")))
+    .returning(|_, _, _, _| Some(EnvoyBuffer::new(b"hello")))
     .once();
   envoy_filter
     .expect_get_metadata_list_string()
     .withf(|_, ns, key, idx| ns == "ns_list" && key == "str_list_key" && *idx == 1)
-    .returning(|_, _, _, _| Some(EnvoyBuffer::new("world")))
+    .returning(|_, _, _, _| Some(EnvoyBuffer::new(b"world")))
     .once();
 
   // List metadata expectations: bool list.
