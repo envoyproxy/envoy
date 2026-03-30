@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/bandwidth_share/fair_token_bucket_impl.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
@@ -15,8 +16,12 @@ Client::~Client() { bucket_->clientDestroyed(*this); }
 
 Bucket::Bucket(uint64_t max_tokens, TimeSource& time_source,
                std::chrono::milliseconds fill_interval)
-    : time_source_(time_source), fill_interval_(fill_interval), max_tokens_(max_tokens),
-      nanoseconds_per_token_(1000000000 / max_tokens) {}
+    : time_source_(time_source), fill_interval_(fill_interval), max_tokens_(max_tokens) {
+  ASSERT(max_tokens_ < std::numeric_limits<uint64_t>::max() / 1000000000UL);
+  ASSERT(max_tokens_ > 0);
+  ASSERT(fill_interval_ >= std::chrono::milliseconds(10));
+  ASSERT(fill_interval_ <= std::chrono::milliseconds(1000));
+}
 
 std::shared_ptr<Bucket> Bucket::create(uint64_t max_tokens, TimeSource& time_source,
                                        std::chrono::milliseconds fill_interval) {
@@ -62,6 +67,7 @@ void Bucket::clientDrained(Client& client) {
   if (!client.known_limited_) {
     return;
   }
+  client.known_limited_ = false;
   draining_tenants_.emplace_back(time_source_.monotonicTime() + fill_interval_,
                                  client.tenant_name_);
 }
@@ -72,12 +78,14 @@ uint64_t Bucket::tokensInBucket() {
   MonotonicTime now = time_source_.monotonicTime();
   // Move empty timestamp forward if necessary so bucket is not more than full.
   empty_at_ = std::max(empty_at_, now - std::chrono::seconds{1});
-  std::chrono::nanoseconds fill_duration =
+  std::chrono::nanoseconds fill_duration_nanos =
       std::chrono::duration_cast<std::chrono::nanoseconds>(now - empty_at_);
-  return fill_duration.count() / nanoseconds_per_token_.count();
+  return fill_duration_nanos.count() * max_tokens_ / 1000000000UL;
 }
 
-void Bucket::consumeTokens(uint64_t tokens) { empty_at_ += nanoseconds_per_token_ * tokens; }
+void Bucket::consumeTokens(uint64_t tokens) {
+  empty_at_ += std::chrono::nanoseconds{tokens * 1000000000UL / max_tokens_};
+}
 
 uint64_t Bucket::requestTokens(Client& client, uint64_t want_tokens) {
   Thread::LockGuard lock(mutex_);
