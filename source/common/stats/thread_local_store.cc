@@ -437,7 +437,7 @@ ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatNam
     : scope_id_(parent.next_scope_id_++), parent_(parent), evictable_(evictable), limits_(limits),
       scope_matcher_(std::move(scope_matcher)), prefix_(prefix, parent.alloc_.symbolTable()),
       central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {
-  // parent_.ensureOverflowStats(limits_);
+  parent_.ensureOverflowStats(limits_);
 }
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
@@ -1305,6 +1305,8 @@ void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatName
   }
 }
 
+// TODO(#44162): remove this code, and clean up the code depending on
+// counters_overflow_, etc.
 void ThreadLocalStoreImpl::ensureOverflowStats(const ScopeStatsLimitSettings& limits) {
   const bool need_counter_overflow_stat = limits.max_counters != 0;
   const bool need_gauge_overflow_stat = limits.max_gauges != 0;
@@ -1314,25 +1316,21 @@ void ThreadLocalStoreImpl::ensureOverflowStats(const ScopeStatsLimitSettings& li
     return;
   }
 
-  // Thread::LockGuard lock(lock_);
-  ScopeSharedPtr root = rootScope();
-  if (need_counter_overflow_stat && !counters_overflow_.has_value()) {
+  Thread::LockGuard lock(lock_);
+  if (need_counter_overflow_stat && counters_overflow_ == nullptr) {
     StatNamePool pool(symbolTable());
-    // StatName name = ;
-    // counters_overflow_ = alloc_.makeCounter(name, name, {});
-    counters_overflow_ = root->counterFromStatName(pool.add("server.stats_overflow.counter"));
+    StatName name = pool.add("server.stats_overflow.counter");
+    counters_overflow_ = alloc_.makeCounter(name, name, {});
   }
-  if (need_gauge_overflow_stat && !gauges_overflow_.has_value()) {
+  if (need_gauge_overflow_stat && gauges_overflow_ == nullptr) {
     StatNamePool pool(symbolTable());
-    // StatName name = pool.add("server.stats_overflow.gauge");
-    // gauges_overflow_ = alloc_.makeCounter(name, name, {});
-    gauges_overflow_ = root->counterFromStatName(pool.add("server.stats_overflow.gauge"));
+    StatName name = pool.add("server.stats_overflow.gauge");
+    gauges_overflow_ = alloc_.makeCounter(name, name, {});
   }
-  if (need_histogram_overflow_stat && !histograms_overflow_.has_value()) {
+  if (need_histogram_overflow_stat && histograms_overflow_ == nullptr) {
     StatNamePool pool(symbolTable());
-    // StatName name = pool.add("server.stats_overflow.histogram");
-    // histograms_overflow_ = alloc_.makeCounter(name, name, {});
-    histograms_overflow_ = root->counterFromStatName(pool.add("server.stats_overflow.histogram"));
+    StatName name = pool.add("server.stats_overflow.histogram");
+    histograms_overflow_ = alloc_.makeCounter(name, name, {});
   }
 }
 

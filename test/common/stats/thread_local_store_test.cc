@@ -500,18 +500,16 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   tls_.shutdownThread();
 }
 
-#if 0
 TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  ScopeSharedPtr scope = store_->createScope("scope.", true); //, {1, 1, 1});
-
-  /*
-  EXPECT_EQ(0, TestUtility::findCounterMainThread(*store_, "server.stats_overflow.counter")->value());
+  ScopeSharedPtr scope = store_->createScope("scope.", true, {1, 1, 1});
+  EXPECT_EQ(0,
+            TestUtility::findCounterMainThread(*store_, "server.stats_overflow.counter")->value());
   EXPECT_EQ(0, TestUtility::findCounterMainThread(*store_, "server.stats_overflow.gauge")->value());
-  EXPECT_EQ(0, TestUtility::findCounterMainThread(*store_, "server.stats_overflow.histogram")->value());
-  */
+  EXPECT_EQ(
+      0, TestUtility::findCounterMainThread(*store_, "server.stats_overflow.histogram")->value());
 
   {
     Counter& c1 = scope->counterFromString("c1");
@@ -576,7 +574,6 @@ TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
-#endif
 
 TEST_F(StatsThreadLocalStoreTest, ForEach) {
   auto collect_scopes = [this]() -> std::vector<std::string> {

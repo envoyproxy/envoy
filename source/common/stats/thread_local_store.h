@@ -642,9 +642,10 @@ private:
   // cleanup, which would otherwise entail a post() per histogram per thread.
   std::vector<uint64_t> histograms_to_cleanup_ ABSL_GUARDED_BY(hist_mutex_);
 
-  OptRef<Counter> counters_overflow_;
-  OptRef<Counter> gauges_overflow_;
-  OptRef<Counter> histograms_overflow_;
+  // TODO(#44162): remove these.
+  CounterSharedPtr counters_overflow_;
+  CounterSharedPtr gauges_overflow_;
+  CounterSharedPtr histograms_overflow_;
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;
