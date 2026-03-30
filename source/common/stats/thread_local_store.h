@@ -176,10 +176,33 @@ public:
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
-  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Counter>& fn) const override {
+    bool cont = true;
+    forEachCounter(nullptr, [fn, &cont](Counter& counter) { cont = cont && fn(counter); });
+    return cont;
+  }
+
+  bool iterate(const IterateFn<Gauge>& fn) const override {
+    bool cont = true;
+    forEachGauge(nullptr, [fn, &cont](Gauge& gauge) { cont = cont && fn(gauge); });
+    return cont;
+  }
+
+  bool iterate(const IterateFn<Histogram>& fn) const override {
+    bool cont = true;
+    forEachHistogram(nullptr, [fn, &cont](ParentHistogram& histogram) {
+      // Note: up-cases to Histogram, annoyingly.
+      cont = cont && fn(histogram);
+    });
+    return cont;
+  }
+
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    bool cont = true;
+    forEachTextReadout(nullptr,
+                       [fn, &cont](TextReadout& text_readout) { cont = cont && fn(text_readout); });
+    return cont;
+  }
 
   // std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
@@ -543,15 +566,6 @@ private:
 
   bool iterateScopesLockHeld(const std::function<bool(const ScopeImplSharedPtr&)> fn) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-
-  // The Store versions of iterate cover all the scopes in the store.
-  template <class StatFn> bool iterHelper(StatFn fn) const {
-    return iterateScopes([this, fn](const ScopeImplSharedPtr& scope)
-                             ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
-                               assertLocked(*scope);
-                               return scope->iterateLockHeld(fn);
-                             });
-  }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopesFromCaches();
