@@ -227,7 +227,7 @@ TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/28053.
 // Verify that when a header-only response arrives (FIN on the QUIC stream frame),
-// decodeHeaders is called with end_stream=true even if QUICHE's OnInitialHeadersComplete
+// decodeHeaders is called with end_stream=true even if QUICHE OnInitialHeadersComplete
 // passes fin=false. The fix uses fin_received() to properly detect end-of-stream.
 TEST_F(EnvoyQuicClientStreamTest, HeaderOnlyResponseSetsEndStreamCorrectly) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
