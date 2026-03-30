@@ -613,7 +613,6 @@ void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, boo
 
 void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
   ASSERT(dispatcher_.isThreadSafe());
-  ENVOY_LOG(debug, "[S{}] Client::readData called for {} bytes", stream, bytes_to_read);
   // This is allowed for closed streams, else we could never send data up after
   // the FIN was received.
   Client::DirectStreamSharedPtr direct_stream =
@@ -623,8 +622,6 @@ void Client::readData(envoy_stream_t stream, size_t bytes_to_read) {
   // except silently swallow this.
   if (direct_stream) {
     direct_stream->callbacks_->resumeData(bytes_to_read);
-  } else {
-    ENVOY_LOG(debug, "[S{}] Client::readData dropping because stream not found", stream);
   }
 }
 

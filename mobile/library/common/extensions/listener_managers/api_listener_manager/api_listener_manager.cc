@@ -97,7 +97,7 @@ ApiListenerManagerImpl::~ApiListenerManagerImpl() { stopWorkers(); }
 absl::StatusOr<bool>
 ApiListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                             const std::string&, bool added_via_api) {
-
+  ENVOY_LOG(debug, "Creating API listener manager");
   std::string name;
   if (!config.name().empty()) {
     name = config.name();

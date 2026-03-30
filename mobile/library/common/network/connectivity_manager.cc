@@ -633,7 +633,7 @@ ConnectivityManagerImplSharedPtr ConnectivityManagerFactory::get() {
         Envoy::Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl
             cache_manager_factory{context_};
         auto cache = cache_manager_factory.get()->lookUpCacheByName(BaseDnsCache);
-        ASSERT(cache != nullptr, "BaseDnsCache must not be null during PostInit!");
+        ASSERT(cache != nullptr, "BaseDnsCache should be registered before PostInit.");
         return std::make_shared<ConnectivityManagerImpl>(
             context_.serverFactoryContext().clusterManager(), cache);
       });
