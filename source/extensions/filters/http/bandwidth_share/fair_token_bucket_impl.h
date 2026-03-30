@@ -112,7 +112,7 @@ struct TenantHashEq {
 
 /**
  * A thread-safe wrapper class for TokenBucket interface which, when near
- * the limit, distributes tokens weightedly among the set of tenants that
+ * the limit, distributes tokens (weighted) among the set of tenants that
  * requested tokens.
  *
  * When not near the limit, tokens are given directly to clients without
