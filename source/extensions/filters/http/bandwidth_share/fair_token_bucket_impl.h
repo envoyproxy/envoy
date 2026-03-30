@@ -64,7 +64,9 @@ class Bucket;
 class Client : public TokenBucket {
 public:
   Client(std::shared_ptr<Bucket> bucket, absl::string_view tenant_name, uint32_t tenant_weight)
-      : tenant_name_(tenant_name), tenant_weight_(tenant_weight), bucket_(std::move(bucket)) {}
+      : tenant_name_(tenant_name), tenant_weight_(tenant_weight), bucket_(std::move(bucket)) {
+    ASSERT(tenant_weight > 0);
+  }
   ~Client() override;
   uint64_t consume(uint64_t tokens, bool allow_partial = true) override;
   uint64_t consume(uint64_t tokens, bool allow_partial,
