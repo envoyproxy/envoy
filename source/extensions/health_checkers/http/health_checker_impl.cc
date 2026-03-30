@@ -59,7 +59,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
     Server::Configuration::HealthCheckerFactoryContext& context,
     HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, context.mainThreadDispatcher(), context.runtime(),
-                            context.api().randomGenerator(), std::move(event_logger)),
+                            context.api().randomGenerator(), std::move(event_logger),
+                            context.hostHealthMapper(), context.statPrefix()),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       method_(getMethod(config.http_health_check().method())),
       response_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(

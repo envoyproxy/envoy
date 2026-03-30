@@ -35,6 +35,12 @@ public:
   MOCK_METHOD(void, setEventLogger, (Upstream::HealthCheckEventLoggerPtr));
   MOCK_METHOD(Server::Configuration::ServerFactoryContext&, serverFactoryContext, ());
 
+  HealthCheckerFactoryContext::HostHealthMapper hostHealthMapper() override {
+    return host_health_mapper_;
+  }
+
+  const std::string& statPrefix() const override { return stat_prefix_; }
+
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     if (!event_logger_) {
       event_logger_ = std::make_unique<testing::NiceMock<Upstream::MockHealthCheckEventLogger>>();
@@ -50,6 +56,9 @@ public:
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   std::unique_ptr<testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>> event_logger_;
   testing::NiceMock<MockServerFactoryContext> server_context_;
+  HealthCheckerFactoryContext::HostHealthMapper host_health_mapper_{
+      [](Upstream::Host& host) -> Upstream::HostHealth& { return host; }};
+  std::string stat_prefix_;
 };
 
 } // namespace Configuration

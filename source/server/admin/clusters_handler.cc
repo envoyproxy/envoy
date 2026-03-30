@@ -198,6 +198,19 @@ void ClustersHandler::writeClustersAsJson(const absl::optional<const re2::RE2>& 
         HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
 #undef SET_HEALTH_FLAG
 
+        // Add per-checker health info when multiple health checkers are configured.
+        const auto health_checker = cluster.healthChecker();
+        if (health_checker.has_value()) {
+          auto per_checker_info = health_checker->perCheckerStatus(*host);
+          for (const auto& info : per_checker_info) {
+            auto& per_checker = *health_status.add_per_checker_health_statuses();
+            per_checker.set_name(info.stat_prefix);
+            per_checker.set_failed_active_health_check(info.failed);
+            per_checker.set_failed_active_degraded_check(info.degraded);
+            per_checker.set_pending_active_hc(info.pending);
+          }
+        }
+
         double success_rate = host->outlierDetector().successRate(
             Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);
         if (success_rate >= 0.0) {
@@ -268,6 +281,21 @@ void ClustersHandler::writeClustersAsText(const absl::optional<const re2::RE2>& 
             fmt::format("{}::{}::hostname::{}\n", cluster_name, host_address, host->hostname()));
         response.add(fmt::format("{}::{}::health_flags::{}\n", cluster_name, host_address,
                                  Upstream::HostUtility::healthFlagsToString(*host)));
+
+        // Per-checker health info when multiple health checkers are configured.
+        const auto health_checker = cluster.healthChecker();
+        if (health_checker.has_value()) {
+          auto per_checker_info = health_checker->perCheckerStatus(*host);
+          for (const auto& info : per_checker_info) {
+            response.add(fmt::format("{}::{}::health_check[{}]::failed_active_hc::{}\n",
+                                     cluster_name, host_address, info.stat_prefix, info.failed));
+            response.add(fmt::format("{}::{}::health_check[{}]::degraded_active_hc::{}\n",
+                                     cluster_name, host_address, info.stat_prefix, info.degraded));
+            response.add(fmt::format("{}::{}::health_check[{}]::pending_active_hc::{}\n",
+                                     cluster_name, host_address, info.stat_prefix, info.pending));
+          }
+        }
+
         response.add(
             fmt::format("{}::{}::weight::{}\n", cluster_name, host_address, host->weight()));
         response.add(fmt::format("{}::{}::region::{}\n", cluster_name, host_address,

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "envoy/upstream/health_checker.h"
 
 #include "gmock/gmock.h"
@@ -14,6 +16,7 @@ public:
 
   MOCK_METHOD(void, addHostCheckCompleteCb, (HostStatusCb callback));
   MOCK_METHOD(void, start, ());
+  MOCK_METHOD(std::vector<PerCheckerStatus>, perCheckerStatus, (const Host& host), (const));
 
   void runCallbacks(Upstream::HostSharedPtr host, HealthTransition changed_state,
                     HealthState current_check_result) {

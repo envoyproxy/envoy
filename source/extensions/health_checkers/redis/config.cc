@@ -32,7 +32,7 @@ Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthCh
       getRedisHealthCheckConfig(config, context.messageValidationVisitor()),
       context.mainThreadDispatcher(), context.runtime(), context.eventLogger(), context.api(),
       NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_, aws_iam_config,
-      aws_iam_authenticator_);
+      aws_iam_authenticator_, context.hostHealthMapper(), context.statPrefix());
 };
 
 /**

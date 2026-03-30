@@ -567,6 +567,37 @@ TEST(TagExtractorTest, ExtAuthzTagExtractors) {
                          {grpc_cluster, ext_authz_prefix});
 }
 
+TEST(TagExtractorTest, HealthCheckPrefixTagExtractors) {
+  const auto& tag_names = Config::TagNames::get();
+
+  Tag cluster_tag;
+  cluster_tag.name_ = tag_names.CLUSTER_NAME;
+  cluster_tag.value_ = "my_cluster";
+
+  DefaultTagRegexTester regex_tester;
+
+  // Health check with stat_prefix
+  Tag hc_prefix;
+  hc_prefix.name_ = tag_names.HEALTH_CHECK_PREFIX;
+  hc_prefix.value_ = "hc_http";
+  regex_tester.testRegex("cluster.my_cluster.health_check.hc_http.attempt",
+                         "cluster.health_check.attempt", {cluster_tag, hc_prefix});
+  regex_tester.testRegex("cluster.my_cluster.health_check.hc_http.success",
+                         "cluster.health_check.success", {cluster_tag, hc_prefix});
+
+  // Health check with auto-indexed stat_prefix (numeric index)
+  Tag hc_index;
+  hc_index.name_ = tag_names.HEALTH_CHECK_PREFIX;
+  hc_index.value_ = "0";
+  regex_tester.testRegex("cluster.my_cluster.health_check.0.attempt",
+                         "cluster.health_check.attempt", {cluster_tag, hc_index});
+
+  // Health check without stat_prefix should NOT match the health_check_prefix extractor.
+  // The stat name should only have the cluster tag extracted.
+  regex_tester.testRegex("cluster.my_cluster.health_check.attempt", "cluster.health_check.attempt",
+                         {cluster_tag});
+}
+
 TEST(TagExtractorTest, ExtractRegexPrefix) {
   TagExtractorPtr tag_extractor; // Keep tag_extractor in this scope to prolong prefix lifetime.
   auto extractRegexPrefix = [&tag_extractor](const std::string& regex) -> absl::string_view {

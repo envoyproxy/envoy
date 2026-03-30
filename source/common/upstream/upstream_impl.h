@@ -1180,6 +1180,9 @@ public:
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
+  OptRef<const HealthChecker> healthChecker() const override {
+    return makeOptRefFromPtr(health_checker_.get());
+  }
   ClusterInfoConstSharedPtr info() const override { return info_; }
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }

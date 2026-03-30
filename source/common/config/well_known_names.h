@@ -165,6 +165,8 @@ public:
   const std::string ROUTE = "envoy.route";
   // Stats prefix for the ext_authz HTTP filter
   const std::string EXT_AUTHZ_PREFIX = "envoy.ext_authz_prefix";
+  // Stats prefix for health checkers (when stat_prefix is set)
+  const std::string HEALTH_CHECK_PREFIX = "envoy.health_check_prefix";
   // Listener manager worker id
   const std::string WORKER_ID = "envoy.worker_id";
   // Stats prefix for the Thrift Proxy network filter

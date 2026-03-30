@@ -8,6 +8,7 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/upstream/health_checker_group.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -131,14 +132,35 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   auto& server_context = context.serverFactoryContext();
 
   if (!cluster.health_checks().empty()) {
-    // TODO(htuch): Need to support multiple health checks in v2.
-    if (cluster.health_checks().size() != 1) {
-      return absl::InvalidArgumentError("Multiple health checks not supported");
-    } else {
+    if (cluster.health_checks().size() == 1) {
+      // Single health check: store directly without wrapper overhead.
       auto checker_or_error = HealthCheckerFactory::create(cluster.health_checks()[0],
                                                            *new_cluster_pair.first, server_context);
       RETURN_IF_NOT_OK_REF(checker_or_error.status());
       new_cluster_pair.first->setHealthChecker(checker_or_error.value());
+    } else {
+      // Multiple health checks: wrap in a HealthCheckerGroup that aggregates results.
+      // All health checks must pass for a host to be considered healthy.
+      auto group = std::make_shared<HealthCheckerGroup>();
+      for (uint32_t i = 0; i < static_cast<uint32_t>(cluster.health_checks().size()); i++) {
+        // Each checker gets a host health provider lambda that routes health flag
+        // operations through the group's per-checker proxy, enabling independent
+        // per-checker state tracking with correct aggregate flag computation.
+        auto provider = [group, i](Host& host) -> HostHealth& {
+          return group->getOrCreateHostHealth(i, host);
+        };
+        // When stat_prefix is not set, auto-assign the checker's index so that each one has unique
+        // stats.
+        const auto& hc_config = cluster.health_checks()[i];
+        const std::string effective_stat_prefix =
+            hc_config.stat_prefix().empty() ? std::to_string(i) : hc_config.stat_prefix();
+        auto checker_or_error =
+            HealthCheckerFactory::create(hc_config, *new_cluster_pair.first, server_context,
+                                         std::move(provider), effective_stat_prefix);
+        RETURN_IF_NOT_OK_REF(checker_or_error.status());
+        group->addChecker(checker_or_error.value(), effective_stat_prefix);
+      }
+      new_cluster_pair.first->setHealthChecker(group);
     }
   }
 

@@ -46,9 +46,12 @@ DECLARE_FACTORY(TcpHealthCheckerFactory);
  */
 class TcpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  TcpHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
-                       Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                       Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+  TcpHealthCheckerImpl(
+      const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
+      Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
+      HealthCheckEventLoggerPtr&& event_logger,
+      Server::Configuration::HealthCheckerFactoryContext::HostHealthMapper host_health_mapper = {},
+      const std::string& stat_prefix = "");
 
 private:
   struct TcpActiveHealthCheckSession;

@@ -223,6 +223,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "health_checker_group_lib",
+    srcs = ["health_checker_group.cc"],
+    hdrs = ["health_checker_group.h"],
+    deps = [
+        "//envoy/upstream:health_checker_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
@@ -515,6 +526,7 @@ envoy_cc_library(
     srcs = ["cluster_factory_impl.cc"],
     deps = [
         ":cluster_factory_includes",
+        ":health_checker_group_lib",
         ":health_checker_lib",
         ":upstream_includes",
         "//envoy/event:dispatcher_interface",

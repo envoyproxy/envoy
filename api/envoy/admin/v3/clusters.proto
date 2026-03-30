@@ -153,7 +153,7 @@ message HostStatus {
 }
 
 // Health status for a host.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message HostHealthStatus {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.HostHealthStatus";
@@ -192,4 +192,23 @@ message HostHealthStatus {
   //
   // [#comment:TODO(mrice32): pipe through remaining EDS health status possibilities.]
   config.core.v3.HealthStatus eds_health_status = 3;
+
+  // Per-checker health status when multiple health checkers are configured.
+  // Empty when only a single health checker is configured.
+  repeated PerCheckerHealthStatus per_checker_health_statuses = 10;
+}
+
+// Per health checker health status when multiple health checkers are configured.
+message PerCheckerHealthStatus {
+  // The name identifying this health checker.
+  string name = 1;
+
+  // Whether this health checker considers the host failed.
+  bool failed_active_health_check = 2;
+
+  // Whether this health checker considers the host degraded.
+  bool failed_active_degraded_check = 3;
+
+  // Whether this health checker is still awaiting the first check for this host.
+  bool pending_active_hc = 4;
 }

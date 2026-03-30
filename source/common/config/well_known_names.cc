@@ -159,6 +159,10 @@ TagNameValues::TagNameValues() {
   // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
   addTokenized(EXT_AUTHZ_PREFIX, "http.*.ext_authz.$.**");
 
+  // Extract health_check stat_prefix field
+  // cluster.[<cluster>.]health_check.[<health_check_prefix>.]<stat>
+  addTokenized(HEALTH_CHECK_PREFIX, "cluster.*.health_check.$.*.**");
+
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 

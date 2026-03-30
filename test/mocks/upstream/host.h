@@ -216,6 +216,11 @@ public:
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
   MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
+  MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory,
+              (const Network::Address::InstanceConstSharedPtr& dest_address,
+               const envoy::config::core::v3::Metadata* metadata,
+               Network::TransportSocketOptionsConstSharedPtr transport_socket_options),
+              (const));
 
   bool disable_active_health_check_ = false;
 };
@@ -230,12 +235,6 @@ public:
         std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), *symbol_table_);
     return locality_zone_stat_name_->statName();
   }
-
-  MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory,
-              (const Network::Address::InstanceConstSharedPtr& dest_address,
-               const envoy::config::core::v3::Metadata* metadata,
-               Network::TransportSocketOptionsConstSharedPtr transport_socket_options),
-              (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
   Network::UpstreamTransportSocketFactoryPtr socket_factory_;

@@ -48,10 +48,14 @@ const std::string& HealthCheckerFactory::getHostname(const HostSharedPtr& host,
   return cluster->name();
 }
 
-absl::StatusOr<HealthCheckerSharedPtr>
-HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_check_config,
-                             Upstream::Cluster& cluster,
-                             Server::Configuration::ServerFactoryContext& server_context) {
+absl::StatusOr<HealthCheckerSharedPtr> HealthCheckerFactory::create(
+    const envoy::config::core::v3::HealthCheck& health_check_config, Upstream::Cluster& cluster,
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::HealthCheckerFactoryContext::HostHealthMapper host_health_mapper,
+    const std::string& stat_prefix) {
+  // Use the explicitly passed stat_prefix if non-empty, otherwise fall back to the config value.
+  const std::string& effective_stat_prefix =
+      stat_prefix.empty() ? health_check_config.stat_prefix() : stat_prefix;
   Server::Configuration::CustomHealthCheckerFactory* factory = nullptr;
 
   switch (health_check_config.health_checker_case()) {
@@ -81,7 +85,8 @@ HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_
   }
 
   std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
-      new HealthCheckerFactoryContextImpl(cluster, server_context));
+      new HealthCheckerFactoryContextImpl(cluster, server_context, std::move(host_health_mapper),
+                                          effective_stat_prefix));
 
   if (!health_check_config.event_log_path().empty() /* deprecated */ ||
       !health_check_config.event_logger().empty()) {

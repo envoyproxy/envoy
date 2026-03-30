@@ -63,7 +63,7 @@ message HealthStatusSet {
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
 
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -440,4 +440,12 @@ message HealthCheck {
   // the cluster's :ref:`transport socket <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>`
   // will be used for health check socket configuration.
   google.protobuf.Struct transport_socket_match_criteria = 23;
+
+  // An optional stat prefix for health check metrics. When set, health check stats are emitted
+  // under ``health_check.<stat_prefix>.<stat_name>`` instead of ``health_check.<stat_name>``.
+  // This is useful when multiple health checkers are configured on the same cluster and you want
+  // to distinguish their metrics. When multiple health checkers are configured and this field
+  // is left empty, the health checker's index in the health_checks array will be used as the
+  // prefix automatically.
+  string stat_prefix = 27;
 }

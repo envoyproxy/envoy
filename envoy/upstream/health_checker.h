@@ -55,6 +55,25 @@ public:
    * Start cyclic health checking based on the provided settings and the type of health checker.
    */
   virtual void start() PURE;
+
+  /**
+   * Per-checker health information for a given host, used for admin observability
+   * when multiple health checkers are configured.
+   */
+  struct PerCheckerStatus {
+    std::string stat_prefix;
+    bool failed{false};
+    bool degraded{false};
+    bool pending{false};
+  };
+
+  /**
+   * Returns per-checker health details for a host. Only meaningful when multiple
+   * health checkers are configured (HealthCheckerGroup). Returns empty vector for
+   * single-checker configurations.
+   * @param host the host to query.
+   */
+  virtual std::vector<PerCheckerStatus> perCheckerStatus(const Host& host) const PURE;
 };
 
 using HealthCheckerSharedPtr = std::shared_ptr<HealthChecker>;

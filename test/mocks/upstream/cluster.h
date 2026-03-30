@@ -18,6 +18,7 @@ public:
 
   // Upstream::Cluster
   MOCK_METHOD(HealthChecker*, healthChecker, ());
+  MOCK_METHOD(OptRef<const HealthChecker>, healthChecker, (), (const));
   MOCK_METHOD(ClusterInfoConstSharedPtr, info, (), (const));
   MOCK_METHOD(Outlier::Detector*, outlierDetector, ());
   MOCK_METHOD(const Outlier::Detector*, outlierDetector, (), (const));

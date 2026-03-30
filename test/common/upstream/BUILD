@@ -298,6 +298,18 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "health_checker_group_test",
+    srcs = [
+        "health_checker_group_test.cc",
+    ],
+    deps = [
+        "//source/common/upstream:health_checker_group_lib",
+        "//test/mocks/upstream:health_checker_mocks",
+        "//test/mocks/upstream:host_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = [
         "health_checker_impl_test.cc",

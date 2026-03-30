@@ -22,12 +22,14 @@ using namespace Envoy::Extensions::NetworkFilters::ThriftProxy;
  */
 class ThriftHealthChecker : public Upstream::HealthCheckerImplBase {
 public:
-  ThriftHealthChecker(const Upstream::Cluster& cluster,
-                      const envoy::config::core::v3::HealthCheck& config,
-                      const envoy::extensions::health_checkers::thrift::v3::Thrift& thrift_config,
-                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                      Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
-                      ClientFactory& client_factory);
+  ThriftHealthChecker(
+      const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
+      const envoy::extensions::health_checkers::thrift::v3::Thrift& thrift_config,
+      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+      Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
+      ClientFactory& client_factory,
+      Server::Configuration::HealthCheckerFactoryContext::HostHealthMapper host_health_mapper = {},
+      const std::string& stat_prefix = "");
 
 protected:
   envoy::data::core::v3::HealthCheckerType healthCheckerType() const override {

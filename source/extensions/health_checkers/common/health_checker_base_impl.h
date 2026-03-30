@@ -7,6 +7,7 @@
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/health_checker_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/type/matcher/string.pb.h"
 #include "envoy/upstream/health_checker.h"
@@ -48,6 +49,7 @@ public:
   // Upstream::HealthChecker
   void addHostCheckCompleteCb(HostStatusCb callback) override { callbacks_.push_back(callback); }
   void start() override;
+  std::vector<PerCheckerStatus> perCheckerStatus(const Host&) const override { return {}; }
   std::shared_ptr<const Network::TransportSocketOptionsImpl> transportSocketOptions() const {
     return transport_socket_options_;
   }
@@ -56,6 +58,8 @@ public:
   }
 
 protected:
+  HostHealth& getHostState(const HostSharedPtr& host) { return host_health_mapper_(*host); }
+
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
   public:
     ~ActiveHealthCheckSession() override;
@@ -85,6 +89,10 @@ protected:
     void onInitialInterval();
 
     HealthCheckerImplBase& parent_;
+    // Health flag operations are routed through this interface. For single-checker
+    // configs, this references the host directly. For multi-checker configs wrapped
+    // by a HealthCheckerGroup, this references a per-checker proxy with local flag storage.
+    HostHealth& host_state_;
     Event::TimerPtr interval_timer_;
     Event::TimerPtr timeout_timer_;
     uint32_t num_unhealthy_{};
@@ -95,9 +103,12 @@ protected:
 
   using ActiveHealthCheckSessionPtr = std::unique_ptr<ActiveHealthCheckSession>;
 
-  HealthCheckerImplBase(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
-                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+  HealthCheckerImplBase(
+      const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
+      Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
+      HealthCheckEventLoggerPtr&& event_logger,
+      Server::Configuration::HealthCheckerFactoryContext::HostHealthMapper host_health_mapper = {},
+      const std::string& stat_prefix = "");
   ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
@@ -132,7 +143,7 @@ private:
   void addHosts(const HostVector& hosts);
   void decHealthy();
   void decDegraded();
-  HealthCheckerStats generateStats(Stats::Scope& scope);
+  HealthCheckerStats generateStats(Stats::Scope& scope, const std::string& stat_prefix);
   void incHealthy();
   void incDegraded();
   std::chrono::milliseconds interval(HealthState state, HealthTransition changed_state) const;
@@ -162,6 +173,8 @@ private:
   const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
   const MetadataConstSharedPtr transport_socket_match_metadata_;
   const Common::CallbackHandlePtr member_update_cb_;
+  Server::Configuration::HealthCheckerFactoryContext::HostHealthMapper host_health_mapper_{
+      [](Host& host) -> HostHealth& { return host; }};
   bool started_{false};
 };
 

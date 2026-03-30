@@ -47,18 +47,20 @@ Upstream::HealthCheckerSharedPtr GrpcHealthCheckerFactory::createCustomHealthChe
     Server::Configuration::HealthCheckerFactoryContext& context) {
   return std::make_shared<ProdGrpcHealthCheckerImpl>(
       context.cluster(), config, context.mainThreadDispatcher(), context.runtime(),
-      context.api().randomGenerator(), context.eventLogger());
+      context.api().randomGenerator(), context.eventLogger(), context.hostHealthMapper(),
+      context.statPrefix());
 }
 
 REGISTER_FACTORY(GrpcHealthCheckerFactory, Server::Configuration::CustomHealthCheckerFactory);
 
-GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
-                                             const envoy::config::core::v3::HealthCheck& config,
-                                             Event::Dispatcher& dispatcher,
-                                             Runtime::Loader& runtime,
-                                             Random::RandomGenerator& random,
-                                             HealthCheckEventLoggerPtr&& event_logger)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(
+    const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
+    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
+    HealthCheckEventLoggerPtr&& event_logger,
+    Server::Configuration::HealthCheckerFactoryContext::HostHealthMapper host_health_mapper,
+    const std::string& stat_prefix)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger),
+                            std::move(host_health_mapper), stat_prefix),
       random_generator_(random),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")),

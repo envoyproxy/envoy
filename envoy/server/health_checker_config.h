@@ -64,6 +64,24 @@ public:
    * @param event_logger the health check event logger.
    */
   virtual void setEventLogger(Upstream::HealthCheckEventLoggerPtr event_logger) PURE;
+
+  /**
+   * Maps from a `Host` to the correct `HostHealth` to use for health checking purposes.
+   * When a single health check is configured, this will normally return the input value.
+   * When multiple health checks are configured, an alternate object is returned.
+   */
+  using HostHealthMapper = std::function<Upstream::HostHealth&(Upstream::Host&)>;
+
+  /**
+   * @return the host health provider for this health checker.
+   */
+  virtual HostHealthMapper hostHealthMapper() PURE;
+
+  /**
+   * @return the effective stat prefix for this health checker's metrics.
+   * When non-empty, stats are emitted under "health_check.<stat_prefix>.<stat_name>".
+   */
+  virtual const std::string& statPrefix() const PURE;
 };
 
 /**

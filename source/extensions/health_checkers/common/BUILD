@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["health_checker_base_impl.cc"],
     hdrs = ["health_checker_base_impl.h"],
     deps = [
+        "//envoy/server:health_checker_config_interface",
         "//envoy/upstream:health_checker_interface",
         "//source/common/router:router_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
