@@ -1284,6 +1284,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
                                            "propagate_upstream_rst_through_tunneled_tcp_proxy")) {
           ENVOY_CONN_LOG(trace, "TCP:onUpstreamEvent(): propagating upstream RST to downstream",
                          read_callbacks_->connection());
+          getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset);
           read_callbacks_->connection().close(Network::ConnectionCloseType::AbortReset);
         } else {
           read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
