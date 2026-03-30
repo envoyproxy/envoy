@@ -192,6 +192,12 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
   // Add healthchecks to cluster
   for (auto& health_check : cluster_health_check.health_checks()) {
     cluster_config.add_health_checks()->MergeFrom(health_check);
+    // gRPC health checking requires HTTP/2. Enable it on the cluster so that
+    // ClusterInfo gets the HTTP2 feature flag and the gRPC health checker
+    // passes validation.
+    if (health_check.has_grpc_health_check()) {
+      cluster_config.mutable_http2_protocol_options();
+    }
   }
 
   // Add transport_socket_match to cluster for use in host connections.
