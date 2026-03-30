@@ -41,6 +41,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    proceeds without consulting the server.
 // 7. At any point above, if the server closes the gRPC stream with an error, then the data plane
 //    returns a ``500`` error to the client, unless the filter was configured to ignore errors.
+// 8. If a data chunk is empty (size is zero) and end_of_stream is false, the data plane will
+//    not create and send a gRPC message to the service.
 //
 // In other words, the process is a request/response conversation, but using a gRPC stream to make
 // it easier for the server to maintain state.
