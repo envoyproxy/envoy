@@ -228,7 +228,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Success) {
 
   EXPECT_TRUE(TestUtility::buffersEqual(Buffer::OwnedImpl(tcp_client->data()), response_bytes_));
 
-  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
+  OptRef<Stats::Counter> counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
   int upstream_idx = getExpectedUpstreamIdx(false);
   counter = test_server_->counter(
@@ -277,7 +277,7 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
 
   EXPECT_TRUE(TestUtility::buffersEqual(Buffer::OwnedImpl(tcp_client->data()), response_bytes_));
 
-  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
+  OptRef<Stats::Counter> counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
   int upstream_idx = getExpectedUpstreamIdx(false);
   counter = test_server_->counter(
@@ -325,7 +325,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Exception) {
 
   EXPECT_TRUE(TestUtility::buffersEqual(Buffer::OwnedImpl(tcp_client->data()), response_bytes_));
 
-  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
+  OptRef<Stats::Counter> counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
   int upstream_idx = getExpectedUpstreamIdx(false);
   counter = test_server_->counter(
@@ -355,7 +355,7 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
 
   test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
 
-  Stats::CounterSharedPtr counter =
+  OptRef<Stats::Counter> counter =
       test_server_->counter("thrift.thrift_stats.cx_destroy_remote_with_active_rq");
   EXPECT_EQ(1U, counter->value());
 }
@@ -379,7 +379,7 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyCloseWithUpstream) {
 
   test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
 
-  Stats::CounterSharedPtr counter =
+  OptRef<Stats::Counter> counter =
       test_server_->counter("thrift.thrift_stats.cx_destroy_remote_with_active_rq");
   EXPECT_EQ(1U, counter->value());
 }
@@ -409,7 +409,7 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyUpstreamClose) {
 
   EXPECT_THAT(tcp_client->data(), HasSubstr("connection failure"));
 
-  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
+  OptRef<Stats::Counter> counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
   int upstream_idx = getExpectedUpstreamIdx(false);
   counter = test_server_->counter(
@@ -436,7 +436,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
 
   tcp_client->close();
 
-  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_oneway");
+  OptRef<Stats::Counter> counter = test_server_->counter("thrift.thrift_stats.request_oneway");
   EXPECT_EQ(1U, counter->value());
 }
 
@@ -455,7 +455,7 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClose) {
   Buffer::OwnedImpl upstream_request(data);
   EXPECT_EQ(request_bytes_.toString(), upstream_request.toString());
 
-  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_oneway");
+  OptRef<Stats::Counter> counter = test_server_->counter("thrift.thrift_stats.request_oneway");
   EXPECT_EQ(1U, counter->value());
 }
 
@@ -476,7 +476,7 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
 
   test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
 
-  Stats::CounterSharedPtr counter =
+  OptRef<Stats::Counter> counter =
       test_server_->counter("thrift.thrift_stats.cx_destroy_remote_with_active_rq");
   EXPECT_EQ(1U, counter->value());
 }

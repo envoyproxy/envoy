@@ -327,8 +327,9 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsCounterDefineAndIncrement) {
                 static_cast<void*>(filter.get()), counter_id, 5));
 
   // Verify the counter value.
-  auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.test_counter");
-  ASSERT_NE(nullptr, counter);
+  OptRef<Stats::Counter> counter =
+      TestUtility::findCounterMainThread(stats_, "dynamicmodulescustom.test_counter");
+  ASSERT_TRUE(counter.has_value());
   EXPECT_EQ(5, counter->value());
 }
 

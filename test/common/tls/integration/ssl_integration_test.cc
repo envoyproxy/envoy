@@ -78,7 +78,7 @@ TEST_P(SslIntegrationTest, UnknownSslAlert) {
   }
 
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
-  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  // OptRef<Stats::Counter> counter = test_server_->counter(counter_name);
   test_server_->waitForCounterGe(counter_name, 1);
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
@@ -292,8 +292,8 @@ TEST_P(SslIntegrationTest, TestServerCipherPreference) {
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
 
   const std::string counter_name = listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256");
-  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
-  EXPECT_EQ(1, test_server_->counter(counter_name)->value());
+  OptRef<Stats::Counter> counter = test_server_->counter(counter_name);
+  EXPECT_EQ(1, counter->value());
 }
 
 // Test client preference of cipher suites. Same server preference is followed as in the previous.
@@ -311,8 +311,8 @@ TEST_P(SslIntegrationTest, ClientCipherPreference) {
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
 
   const std::string counter_name = listenerStatPrefix("ssl.ciphers.ECDHE-RSA-AES256-GCM-SHA384");
-  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
-  EXPECT_EQ(1, test_server_->counter(counter_name)->value());
+  OptRef<Stats::Counter> counter = test_server_->counter(counter_name);
+  EXPECT_EQ(1, counter->value());
 }
 
 // This test must be here vs integration_admin_test so that it tests a server with loaded certs.
@@ -831,7 +831,7 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
       makeRawHttpConnection(makeSslClientConnection(rsaOnlyClientOptions()), absl::nullopt);
   EXPECT_FALSE(codec_client->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
-  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  OptRef<Stats::Counter> counter = test_server_->counter(counter_name);
   test_server_->waitForCounterGe(counter_name, 1);
   EXPECT_EQ(1U, counter->value());
   counter->reset();
@@ -900,7 +900,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaClientEcdsaOnly) {
       makeRawHttpConnection(makeSslClientConnection(ecdsaOnlyClientOptions()), absl::nullopt)
           ->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
-  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  OptRef<Stats::Counter> counter = test_server_->counter(counter_name);
   test_server_->waitForCounterGe(counter_name, 1);
   EXPECT_EQ(1U, counter->value());
   counter->reset();

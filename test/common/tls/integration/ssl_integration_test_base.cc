@@ -61,7 +61,8 @@ SslIntegrationTestBase::makeSslClientConnection(const ClientSslTransportOptions&
 
 void SslIntegrationTestBase::checkStats() {
   const uint32_t expected_handshakes = debug_with_s_client_ ? 2 : 1;
-  Stats::CounterSharedPtr counter = test_server_->counter(listenerStatPrefix("ssl.handshake"));
+  OptRef<Stats::Counter> counter = test_server_->counter(listenerStatPrefix("ssl.handshake"));
+  ASSERT_TRUE(counter.has_value());
   EXPECT_EQ(expected_handshakes, counter->value());
   counter->reset();
 }

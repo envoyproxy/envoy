@@ -207,7 +207,7 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::Counter* the counter or nullptr if there is none.
    */
-  static Stats::Counter* findCounter(Stats::Store& store, const std::string& name);
+  static OptRef<Stats::Counter> findCounterMainThread(Stats::Store& store, const std::string& name);
 
   /**
    * Find a gauge in a stats store.
@@ -215,7 +215,20 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
    */
-  static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
+  static OptRef<Stats::Gauge> findGaugeMainThread(Stats::Store& store, const std::string& name);
+
+  static OptRef<Stats::TextReadout> findTextReadoutMainThread(Stats::Store& store,
+                                                              const std::string& name);
+
+  static Stats::Counter* findCounter(Stats::Store& store, const std::string& name) {
+    OptRef<Stats::Counter> counter = findCounterMainThread(store, name);
+    return counter.has_value() ? counter.ptr() : nullptr;
+  }
+
+  static Stats::Gauge* findGauge(Stats::Store& store, const std::string& name) {
+    OptRef<Stats::Gauge> gauge = findGaugeMainThread(store, name);
+    return gauge.has_value() ? gauge.ptr() : nullptr;
+  }
 
   /**
    * Find a histogram in a stats store.
@@ -223,8 +236,12 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::ParentHistogramSharedPtr the histogram or nullptr if there is none.
    */
-  static Stats::ParentHistogramSharedPtr findHistogram(Stats::Store& store,
-                                                       const std::string& name);
+  static OptRef<Stats::ParentHistogram> findHistogramMainThread(Stats::Store& store,
+                                                                const std::string& name);
+  static Stats::ParentHistogram* findHistogram(Stats::Store& store, const std::string& name) {
+    OptRef<Stats::ParentHistogram> histogram = findHistogramMainThread(store, name);
+    return histogram.has_value() ? histogram.ptr() : nullptr;
+  }
 
   /**
    * Wait for a counter to == a given value.
@@ -256,7 +273,8 @@ public:
   static AssertionResult
   waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
                    Event::TestTimeSystem& time_system,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                   Event::Dispatcher* dispatcher = nullptr);
 
   /**
    * Wait for a proactive resource usage in the overload manager to be == a given value.
@@ -288,7 +306,8 @@ public:
   static AssertionResult
   waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
                  Event::TestTimeSystem& time_system,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                 Event::Dispatcher* dispatcher = nullptr);
 
   /**
    * Wait for a gauge to == a given value.
@@ -303,7 +322,8 @@ public:
   static AssertionResult
   waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
                  Event::TestTimeSystem& time_system,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                 Event::Dispatcher* dispatcher = nullptr);
 
   /**
    * Wait for a gauge to be destroyed.
@@ -367,7 +387,10 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::TextReadoutSharedPtr the readout or nullptr if there is none.
    */
-  static Stats::TextReadoutSharedPtr findTextReadout(Stats::Store& store, const std::string& name);
+  static Stats::TextReadout* findTextReadout(Stats::Store& store, const std::string& name) {
+    OptRef<Stats::TextReadout> text_readout = findTextReadoutMainThread(store, name);
+    return text_readout.has_value() ? text_readout.ptr() : nullptr;
+  }
 
   /**
    * Convert a string list of IP addresses into a list of network addresses usable for DNS

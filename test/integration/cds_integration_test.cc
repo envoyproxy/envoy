@@ -242,7 +242,7 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   initialize();
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
   test_server_->waitForCounterExists("cluster.cluster_1.upstream_cx_total");
-  Stats::CounterSharedPtr cx_counter = test_server_->counter("cluster.cluster_1.upstream_cx_total");
+  OptRef<Stats::Counter> cx_counter = test_server_->counter("cluster.cluster_1.upstream_cx_total");
   // Confirm no upstream connection is attempted so far.
   EXPECT_EQ(0, cx_counter->value());
 
@@ -316,7 +316,7 @@ TEST_P(DeferredCreationClusterStatsTest,
   initializeDeferredCreationTest(/*enable_deferred_creation_stats=*/true);
 
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 0);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_1.upstream_cx_total").has_value());
 
   sendRequestToClusterAndWaitForResponse();
   // cluster_1 trafficStats updated.
@@ -337,11 +337,12 @@ TEST_P(DeferredCreationClusterStatsTest,
   // Now the cluster_1 stats are gone, as well as the lazy init wrapper.
   test_server_->waitForCounterNonexistent("cluster.cluster_1.upstream_cx_total",
                                           TestUtility::DefaultTimeout);
-  EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized"), nullptr);
+  EXPECT_FALSE(
+      test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized").has_value());
 
   // No cluster_2 traffic stats.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.initialized")->value(), 0);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), nullptr);
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_2.upstream_cx_total").has_value());
 }
 
 // Test that Non-DeferredCreationTrafficStats gets created and updated correctly.
@@ -378,7 +379,7 @@ TEST_P(DeferredCreationClusterStatsTest,
        DeferredCreationTrafficStatsWithClusterCreateDeleteRecreate) {
   initializeDeferredCreationTest(/*enable_deferred_creation_stats=*/true);
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 0);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_1.upstream_cx_total").has_value());
 
   sendRequestToClusterAndWaitForResponse();
   // cluster_1 trafficStats updated.
@@ -391,18 +392,19 @@ TEST_P(DeferredCreationClusterStatsTest,
   EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
   // No cluster_2 traffic stats.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.initialized")->value(), 0);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), nullptr);
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_2.upstream_cx_total").has_value());
   // Now the cluster_1 stats are gone, as well as the lazy init wrapper.
   test_server_->waitForCounterNonexistent("cluster.cluster_1.upstream_cx_total",
                                           TestUtility::DefaultTimeout);
-  EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized"), nullptr);
+  EXPECT_FALSE(
+      test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized").has_value());
   // Now add cluster1 back.
   updateCluster();
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
   // Now the cluster_1.ClusterTrafficStats.initialized gauge is 0, since it didn't see previous
   // stats.
   EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.initialized")->value(), 0);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_1.upstream_cx_total").has_value());
 
   // cluster_1 traffic stats created, due to the above http request.
   sendRequestToClusterAndWaitForResponse();

@@ -118,7 +118,7 @@ TEST_P(ProxyProtoIntegrationTest, V2RouterRequestAndResponseWithBodyNoBufferV6) 
 
   // Verify stats (with tags for proxy protocol version, but no stat prefix).
   const auto found_counter = test_server_->counter("proxy_proto.versions.v2.found");
-  ASSERT_NE(found_counter.get(), nullptr);
+  ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(found_counter->value(), 1UL);
   EXPECT_EQ(found_counter->tagExtractedName(), "proxy_proto.found");
   EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
@@ -405,7 +405,7 @@ TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V1Disallowed) {
   // Verify stats (with tags for proxy protocol version and stat prefix).
   const auto found_counter =
       test_server_->counter("proxy_proto.test_stat_prefix.versions.v1.found");
-  ASSERT_NE(found_counter.get(), nullptr);
+  ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(found_counter->value(), 1UL);
   EXPECT_EQ(found_counter->tagExtractedName(), "proxy_proto.found");
   EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{
@@ -415,7 +415,7 @@ TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V1Disallowed) {
 
   const auto disallowed_counter =
       test_server_->counter("proxy_proto.test_stat_prefix.versions.v1.disallowed");
-  ASSERT_NE(disallowed_counter.get(), nullptr);
+  ASSERT_TRUE(disallowed_counter.has_value());
   EXPECT_EQ(disallowed_counter->value(), 1UL);
   EXPECT_EQ(disallowed_counter->tagExtractedName(), "proxy_proto.disallowed");
   EXPECT_THAT(disallowed_counter->tags(), IsSupersetOf(Stats::TagVector{
@@ -441,7 +441,7 @@ TEST_P(ProxyProtoDisallowedVersionsIntegrationTest, V2Error) {
   // Verify stats (with tags for proxy protocol version and stat prefix).
   const auto found_counter =
       test_server_->counter("proxy_proto.test_stat_prefix.versions.v2.error");
-  ASSERT_NE(found_counter.get(), nullptr);
+  ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(found_counter->value(), 1UL);
   EXPECT_EQ(found_counter->tagExtractedName(), "proxy_proto.error");
   EXPECT_THAT(found_counter->tags(), IsSupersetOf(Stats::TagVector{

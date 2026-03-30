@@ -928,7 +928,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
   }
   EXPECT_EQ(tag_extracted_counter_map, MetricMap{});
 
-  for (const Stats::GaugeSharedPtr& gauge : test_server_->gauges()) {
+  for (Stats::Gauge* gauge : Stats::Utility::gaugesMainThread(test_server_->statStore())) {
     test_name_against_mapping(tag_extracted_gauge_map, *gauge);
   }
   EXPECT_EQ(tag_extracted_gauge_map, MetricMap{});

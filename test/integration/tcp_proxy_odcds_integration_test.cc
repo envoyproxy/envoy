@@ -100,12 +100,11 @@ public:
         timeout_counter->value() == timeout) {
       return ::testing::AssertionSuccess();
     } else {
-      auto to_string = [](Stats::CounterSharedPtr& counter) {
-        if (counter == nullptr) {
-          return absl::StrCat("not exist");
-        } else {
+      auto to_string = [](OptRef<Stats::Counter> counter) -> std::string {
+        if (counter.has_value()) {
           return absl::StrCat(counter->value());
         }
+        return "not exist";
       };
       return ::testing::AssertionFailure()
              << fmt::format("success {} vs {}, missing {} vs {}, timeout {} vs {}", success,

@@ -1759,9 +1759,9 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsCounterDefineAndIncrement) {
                                                                       nullptr, 0, 5));
 
   // Verify the counter value via stats store.
-  auto counter =
-      TestUtility::findCounter(factory_context_.store_, "dynamicmodulescustom.test_counter");
-  ASSERT_NE(nullptr, counter);
+  auto counter = TestUtility::findCounterMainThread(factory_context_.store_,
+                                                    "dynamicmodulescustom.test_counter");
+  ASSERT_TRUE(counter.has_value());
   EXPECT_EQ(5, counter->value());
 
   // Increment again.

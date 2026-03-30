@@ -188,8 +188,8 @@ public:
     cleanup();
 
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
-    EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
-    EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+    EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.over_limit").has_value());
+    EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
   }
 
   FakeHttpConnectionPtr fake_ratelimit_connection_;
@@ -282,8 +282,8 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
   cleanup();
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.over_limit").has_value());
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimit) {
@@ -300,9 +300,9 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
 
   cleanup();
 
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.ok").has_value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
@@ -328,9 +328,9 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
 
   cleanup();
 
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.ok").has_value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 TEST_P(RatelimitIntegrationTest, Error) {
@@ -342,8 +342,8 @@ TEST_P(RatelimitIntegrationTest, Error) {
   waitForSuccessfulUpstreamResponse(0);
   cleanup();
 
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.ok").has_value());
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.over_limit").has_value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.error")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.failure_mode_allowed")->value());
 }
@@ -409,10 +409,11 @@ TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
   waitForFailedUpstreamResponse(500, 0);
   cleanup();
 
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.ok").has_value());
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.over_limit").has_value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.error")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.failure_mode_allowed"));
+  EXPECT_FALSE(
+      test_server_->counter("cluster.cluster_0.ratelimit.failure_mode_allowed").has_value());
 }
 
 TEST_P(RatelimitIntegrationTest, PerDescriptorXRateLimitHeadersEnabled) {
@@ -453,8 +454,8 @@ TEST_P(RatelimitIntegrationTest, PerDescriptorXRateLimitHeadersEnabled) {
   cleanup();
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.over_limit").has_value());
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
@@ -491,8 +492,8 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
   cleanup();
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.over_limit").has_value());
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders) {
@@ -529,9 +530,9 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders)
 
   cleanup();
 
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.ok").has_value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeadersButPerDescriptorDisabled) {
@@ -559,8 +560,8 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeadersButPerDe
   cleanup();
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.over_limit").has_value());
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 TEST_P(RatelimitFilterHeadersEnabledIntegrationTest,
@@ -589,9 +590,9 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest,
 
   cleanup();
 
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.ok").has_value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 TEST_P(RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
@@ -609,9 +610,9 @@ TEST_P(RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
 
   cleanup();
 
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.ok").has_value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimitAndOK) {
@@ -643,7 +644,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitAndOK) {
 
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimitResponseHeadersToAdd) {
@@ -662,9 +663,9 @@ TEST_P(RatelimitIntegrationTest, OverLimitResponseHeadersToAdd) {
               ContainsHeader("x-global-ratelimit-service", "rate_limit_service"));
   cleanup();
 
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.ok").has_value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+  EXPECT_FALSE(test_server_->counter("cluster.cluster_0.ratelimit.error").has_value());
 }
 
 } // namespace

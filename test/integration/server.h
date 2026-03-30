@@ -524,29 +524,29 @@ public:
         statStore(), name, sample_count, time_system_, server().dispatcher(), timeout));
   }
 
-  Stats::CounterSharedPtr counter(const std::string& name) override {
+  OptRef<Stats::Counter> counter(const std::string& name) override {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
-    return TestUtility::findCounter(statStore(), name);
+    return TestUtility::findCounterMainThread(statStore(), name);
   }
 
-  Stats::GaugeSharedPtr gauge(const std::string& name) override {
+  OptRef<Stats::Gauge> gauge(const std::string& name) override {
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
-    return TestUtility::findGauge(statStore(), name);
+    return TestUtility::findGaugeMainThread(statStore(), name);
   }
 
-  Stats::ParentHistogramSharedPtr histogram(const std::string& name) {
-    return TestUtility::findHistogram(statStore(), name);
+  OptRef<Stats::ParentHistogram> histogram(const std::string& name) {
+    return TestUtility::findHistogramMainThread(statStore(), name);
   }
 
   // std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
 
-  std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
+  // std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
 
-  std::vector<Stats::ParentHistogramSharedPtr> histograms() override {
-    return statStore().histograms();
-  }
+  // std::vector<Stats::ParentHistogramSharedPtr> histograms() override {
+  //   return statStore().histograms();
+  // }
 
   // ListenerHooks
   void onWorkerListenerAdded() override;
