@@ -84,7 +84,6 @@ py_library(
     visibility = ["//visibility:public"],
 )
 
-# 2. Revert the library so srcs ONLY contains .py files
 py_library(
     name = "envoy_mobile_lib",
     srcs = glob(["envoy_mobile/**/*.py"]),
@@ -102,7 +101,10 @@ py_package(
     deps = [":envoy_mobile_lib"],
 )
 
-# 3. Explicitly pass the rules into the wheel's deps
+# Example command for building an optimized wheel:
+# bazel build -c opt --strip=always \
+#   //library/python:envoy_mobile_wheel \
+#   --//library/python:python_platform="manylinux2014_x86_64" \
 py_wheel(
     name = "envoy_mobile_wheel",
     abi = abi_tag(),
