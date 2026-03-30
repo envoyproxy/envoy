@@ -241,7 +241,11 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
     ENVOY_LOG(debug, "max streams overflow");
     onPoolFailure(client.real_host_description_, absl::string_view(),
                   ConnectionPool::PoolFailureReason::Overflow, context);
-    traffic_stats.upstream_rq_pending_overflow_.inc();
+    traffic_stats.upstream_rq_active_overflow_.inc();
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.upstream_rq_active_overflow_counter")) {
+      traffic_stats.upstream_rq_pending_overflow_.inc();
+    }
     return;
   }
   ENVOY_CONN_LOG(debug, "creating stream", client);

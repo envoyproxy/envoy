@@ -59,7 +59,8 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakersWithOutlierDetection) {
   EXPECT_EQ("503", response->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
 
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_active_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 0);
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.outlier_detection.ejections_enforced_total")
                 ->value(),
@@ -105,7 +106,8 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntime) {
   EXPECT_EQ("503", response->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
 
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_active_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 0);
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.outlier_detection.ejections_enforced_total")
                 ->value(),
@@ -173,7 +175,8 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntimeProto) {
   EXPECT_EQ("503", response->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
 
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_active_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 0);
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.outlier_detection.ejections_enforced_total")
                 ->value(),

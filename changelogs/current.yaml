@@ -129,6 +129,15 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: conn_pool
+  change: |
+    Added new ``upstream_rq_active_overflow`` counter incremented when a request is rejected
+    due to the ``max_requests`` circuit breaker being exhausted in ``attachStreamToClient()``.
+    Previously this condition incorrectly incremented ``upstream_rq_pending_overflow``, making
+    it impossible to distinguish pending queue saturation from active request saturation via
+    metrics alone. The new counter is now the authoritative signal for this path by default;
+    set runtime flag ``envoy.reloadable_features.upstream_rq_active_overflow_counter`` to
+    ``false`` to restore the previous behavior of incrementing both counters.
 - area: hot_restart
   change: |
     Fixed hot restart for listeners with a network namespace in the address. Previously, socket

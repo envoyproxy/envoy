@@ -6,6 +6,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -688,6 +689,46 @@ TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
 
   // Clean up.
   closeStream();
+}
+
+// Test that when max_active_requests circuit breaker fires in attachStreamToClient(),
+// upstream_rq_active_overflow is incremented and upstream_rq_pending_overflow is not
+// (runtime flag enabled by default).
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflow) {
+  // Create a client with one active stream, then close that stream so the client is Ready.
+  newActiveClientAndStream();
+  closeStream();
+  EXPECT_EQ(ActiveClient::State::Ready, clients_.back()->state());
+
+  // Now set max active requests to 0 to trigger the circuit breaker.
+  cluster_->resetResourceManager(1024, 1024, 0, 1, 1);
+
+  // Attempt a new stream: finds the Ready client, calls attachStreamToClient(), overflows.
+  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _));
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_active_overflow_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
+}
+
+// Test legacy behavior: when the runtime flag is disabled, both upstream_rq_active_overflow
+// and upstream_rq_pending_overflow are incremented for the max_active_requests path.
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflowLegacy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.upstream_rq_active_overflow_counter", "false"}});
+
+  newActiveClientAndStream();
+  closeStream();
+  EXPECT_EQ(ActiveClient::State::Ready, clients_.back()->state());
+
+  cluster_->resetResourceManager(1024, 1024, 0, 1, 1);
+
+  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _));
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_active_overflow_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
 }
 
 } // namespace ConnectionPool
