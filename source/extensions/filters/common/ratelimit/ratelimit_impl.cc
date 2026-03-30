@@ -46,10 +46,9 @@ void GrpcClientImpl::detach() {
 void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitRequest& request,
                                    const std::string& domain,
                                    const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                                   uint32_t hits_addend, uint32_t hits_subtrahend) {
+                                   uint32_t hits_addend) {
   request.set_domain(domain);
   request.set_hits_addend(hits_addend);
-  request.set_hits_subtrahend(hits_subtrahend);
   for (const Envoy::RateLimit::Descriptor& descriptor : descriptors) {
     ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), trace,
                         "adding ratelimit descriptor: {}", descriptor.toString());
@@ -70,8 +69,8 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
     if (descriptor.hits_addend_.has_value()) {
       new_descriptor->mutable_hits_addend()->set_value(descriptor.hits_addend_.value());
     }
-    if (descriptor.hits_subtrahend_.has_value()) {
-      new_descriptor->mutable_hits_subtrahend()->set_value(descriptor.hits_subtrahend_.value());
+    if (descriptor.is_negative_hits_) {
+      new_descriptor->set_is_negative_hits(true);
     }
   }
 }
@@ -79,7 +78,7 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                            Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
-                           uint32_t hits_addend, uint32_t hits_subtrahend) {
+                           uint32_t hits_addend) {
   // The client should only be used for one outstanding request at a time,
   // so we assert that there is no existing request or callback.
   ASSERT(callbacks_ == nullptr);
@@ -87,7 +86,7 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   request_ = nullptr;
 
   envoy::service::ratelimit::v3::RateLimitRequest request;
-  createRequest(request, domain, descriptors, hits_addend, hits_subtrahend);
+  createRequest(request, domain, descriptors, hits_addend);
 
   auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
       Http::AsyncClient::ParentContext{&stream_info});

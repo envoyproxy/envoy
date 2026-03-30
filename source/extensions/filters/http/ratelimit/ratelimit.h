@@ -268,7 +268,6 @@ private:
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
   double getHitAddend();
-  double getHitSubtrahend();
   void initializeVirtualHostRateLimitOption(const Router::RouteEntry* route_entry);
   std::string getDomain();
 

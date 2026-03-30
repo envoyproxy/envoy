@@ -49,18 +49,9 @@ message RateLimitRequest {
 
   // Rate limit requests can optionally specify the number of hits a request adds to the matched
   // limit. If the value is not set in the message, a request increases the matched limit by 1.
-  // Only one of ``hits_addend`` or ``hits_subtrahend`` may be specified.
   // This value can be overridden by setting filter state value ``envoy.ratelimit.hits_addend``
   // to the desired number. Invalid number (< 0) or number will be ignored.
   uint32 hits_addend = 3;
-
-  // Rate limit requests can optionally specify the number of hits a request subtracts from the
-  // matched limit. If the value is not set in the message, no hits are subtracted.
-  // This is the inverse of ``hits_addend`` and can be used to refill previously consumed
-  // rate limit tokens. Only one of ``hits_addend`` or ``hits_subtrahend`` may be specified.
-  // This value can be overridden by setting filter state value
-  // ``envoy.ratelimit.hits_subtrahend`` to the desired number. Invalid number (< 0) will be ignored.
-  uint32 hits_subtrahend = 4;
 }
 
 // A response from a ShouldRateLimit call.

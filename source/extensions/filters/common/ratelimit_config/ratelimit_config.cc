@@ -45,39 +45,7 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
           absl::InvalidArgumentError("hits_addend must contain either a format or a number");
       return;
     }
-  }
-
-  if (config.has_hits_addend() && config.has_hits_subtrahend()) {
-    creation_status =
-        absl::InvalidArgumentError("only one of hits_addend or hits_subtrahend can be specified");
-    return;
-  }
-
-  if (config.has_hits_subtrahend()) {
-    if (!config.hits_subtrahend().format().empty()) {
-      // Ensure only format or number is set.
-      if (config.hits_subtrahend().has_number()) {
-        creation_status =
-            absl::InvalidArgumentError("hits_subtrahend must contain either a format or a number");
-        return;
-      }
-
-      auto providers_or_error =
-          Formatter::SubstitutionFormatParser::parse(config.hits_subtrahend().format());
-      SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
-      if (providers_or_error->size() != 1) {
-        creation_status = absl::InvalidArgumentError(
-            "hits_subtrahend format must contain exactly one substitution");
-        return;
-      }
-      hits_subtrahend_provider_ = std::move(providers_or_error.value()[0]);
-    } else if (config.hits_subtrahend().has_number()) {
-      hits_subtrahend_ = config.hits_subtrahend().number().value();
-    } else {
-      creation_status =
-          absl::InvalidArgumentError("hits_subtrahend must contain either a format or a number");
-      return;
-    }
+    is_negative_hits_ = config.hits_addend().is_negative_hits();
   }
 
   if (config.has_stage() || !config.disable_key().empty()) {
@@ -255,40 +223,8 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
     descriptor.hits_addend_ = hits_addend_.value();
   }
 
-  // Populate hits_subtrahend if set.
-  if (hits_subtrahend_provider_ != nullptr) {
-    const Protobuf::Value hits_subtrahend_value =
-        hits_subtrahend_provider_->formatValue({&headers}, stream_info);
-
-    double hits_subtrahend = 0;
-    bool success = true;
-
-    if (hits_subtrahend_value.has_number_value()) {
-      hits_subtrahend = hits_subtrahend_value.number_value();
-    } else if (hits_subtrahend_value.has_string_value()) {
-      // Attempt to parse the string as a double.
-      success = absl::SimpleAtod(hits_subtrahend_value.string_value(), &hits_subtrahend);
-    } else {
-      // Only number and string values are allowed.
-      success = false;
-    }
-
-    // Check value range.
-    if (hits_subtrahend < 0 || hits_subtrahend > MAX_HITS_ADDEND) {
-      success = false;
-    }
-
-    if (success) {
-      descriptor.hits_subtrahend_ = static_cast<uint64_t>(hits_subtrahend);
-    } else {
-      ENVOY_LOG_EVERY_POW_2(warn, "Invalid hits_subtrahend: {}",
-                            hits_subtrahend_value.DebugString());
-      return;
-    }
-
-  } else if (hits_subtrahend_.has_value()) {
-    descriptor.hits_subtrahend_ = hits_subtrahend_.value();
-  }
+  // Populate is_negative.
+  descriptor.is_negative_hits_ = is_negative_hits_;
 
   // Populate enable_x_rate_limit_headers.
   descriptor.x_ratelimit_option_ = x_ratelimit_option_;

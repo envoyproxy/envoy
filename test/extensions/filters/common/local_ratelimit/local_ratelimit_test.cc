@@ -706,84 +706,75 @@ TEST_F(LocalRateLimiterDescriptorImplTest, NullDefaultTokenBucket) {
   EXPECT_FALSE(no_match_result.token_bucket_context);
 }
 
-// Verify hits_subtrahend refunds tokens back to the descriptor bucket, capped at max.
-TEST_F(LocalRateLimiterDescriptorImplTest, HitsSubtrahendRefundsTokens) {
+// Verify is_negative refunds tokens back to the descriptor bucket, capped at max.
+TEST_F(LocalRateLimiterDescriptorImplTest, IsNegativeRefundsTokens) {
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 5, 5, "2s"),
                             *descriptors_.Add());
   initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 8, 8);
 
-  // Start with 5 tokens in the descriptor bucket.
-  // Consume 2, refund 1 => net consumption = 1 => 5 - 2 + 1 = 4 tokens remaining.
+  // First consume 2 tokens normally.
   std::vector<RateLimit::Descriptor> descriptors;
   descriptors.push_back(descriptor_[0]);
   descriptors[0].hits_addend_ = 2;
-  descriptors[0].hits_subtrahend_ = 1;
 
   auto result = rate_limiter_->requestAllowed(descriptors);
   EXPECT_TRUE(result.allowed);
-  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 4);
+  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 3);
 
-  // Consume 2, refund 1 => 4 - 2 + 1 = 3 tokens remaining.
+  // Now refund 1 token using is_negative.
+  descriptors[0].hits_addend_ = 1;
+  descriptors[0].is_negative_hits_ = true;
+
   result = rate_limiter_->requestAllowed(descriptors);
   EXPECT_TRUE(result.allowed);
-  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 3);
+  // 3 + 1 (refund) = 4 tokens remaining. No tokens consumed when is_negative_hits is set.
+  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 4);
 }
 
-// Verify hits_subtrahend refund is capped at max bucket size.
-TEST_F(LocalRateLimiterDescriptorImplTest, HitsSubtrahendCappedAtMax) {
+// Verify is_negative refund is capped at max bucket size.
+TEST_F(LocalRateLimiterDescriptorImplTest, IsNegativeCappedAtMax) {
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 3, 3, "2s"),
                             *descriptors_.Add());
   initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 8, 8);
 
   // Start with 3 tokens in the descriptor bucket.
-  // Consume 1, refund 10 => should cap at max (3), so 3 - 1 + min(10, 1) = 3 tokens remaining.
+  // Refill 10 with is_negative => should cap at max (3), so 3 tokens remaining.
   std::vector<RateLimit::Descriptor> descriptors;
   descriptors.push_back(descriptor_[0]);
-  descriptors[0].hits_addend_ = 1;
-  descriptors[0].hits_subtrahend_ = 10;
+  descriptors[0].hits_addend_ = 10;
+  descriptors[0].is_negative_hits_ = true;
 
   auto result = rate_limiter_->requestAllowed(descriptors);
   EXPECT_TRUE(result.allowed);
-  // After consume: 3 - 1 = 2 tokens, then refund capped at headroom (3 - 2 = 1): 2 + 1 = 3.
+  // Refill is capped at max bucket size (3), so tokens remain at 3.
   EXPECT_EQ(result.token_bucket_context->remainingTokens(), 3);
 }
 
-// Verify hits_subtrahend with zero value is a no-op.
-TEST_F(LocalRateLimiterDescriptorImplTest, HitsSubtrahendZeroIsNoop) {
+// Verify is_negative with hits_addend refills tokens without consuming.
+TEST_F(LocalRateLimiterDescriptorImplTest, IsNegativeRefillsTokens) {
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 3, 3, "2s"),
                             *descriptors_.Add());
   initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 8, 8);
 
-  std::vector<RateLimit::Descriptor> descriptors;
-  descriptors.push_back(descriptor_[0]);
-  descriptors[0].hits_subtrahend_ = 0;
+  // First consume 2 tokens normally to bring bucket to 1.
+  std::vector<RateLimit::Descriptor> consume_descriptors;
+  consume_descriptors.push_back(descriptor_[0]);
+  consume_descriptors[0].hits_addend_ = 2;
 
-  // 3 -> 2 tokens (consume 1, refund 0).
-  auto result = rate_limiter_->requestAllowed(descriptors);
+  auto result = rate_limiter_->requestAllowed(consume_descriptors);
   EXPECT_TRUE(result.allowed);
+  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 1);
+
+  // Now refill 1 token using is_negative. No tokens consumed.
+  std::vector<RateLimit::Descriptor> refill_descriptors;
+  refill_descriptors.push_back(descriptor_[0]);
+  refill_descriptors[0].hits_addend_ = 1;
+  refill_descriptors[0].is_negative_hits_ = true;
+
+  result = rate_limiter_->requestAllowed(refill_descriptors);
+  EXPECT_TRUE(result.allowed);
+  // 1 + 1 (refill) = 2 tokens remaining.
   EXPECT_EQ(result.token_bucket_context->remainingTokens(), 2);
-}
-
-// Verify hits_subtrahend alone (without hits_addend) still consumes 1 token and refunds.
-TEST_F(LocalRateLimiterDescriptorImplTest, HitsSubtrahendWithoutHitsAddend) {
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 3, 3, "2s"),
-                            *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 8, 8);
-
-  std::vector<RateLimit::Descriptor> descriptors;
-  descriptors.push_back(descriptor_[0]);
-  // No hits_addend_ set, defaults to consuming 1 token. Refund 1 => net 0.
-  descriptors[0].hits_subtrahend_ = 1;
-
-  // 3 -> 2 (consume 1) -> 3 (refund 1) = 3 tokens remaining.
-  auto result = rate_limiter_->requestAllowed(descriptors);
-  EXPECT_TRUE(result.allowed);
-  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 3);
-
-  // Repeated calls should keep bucket at 3 (net zero consumption).
-  result = rate_limiter_->requestAllowed(descriptors);
-  EXPECT_TRUE(result.allowed);
-  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 3);
 }
 
 } // Namespace LocalRateLimit

@@ -28,7 +28,7 @@ public:
               (RequestCallbacks & callbacks, const std::string& domain,
                const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
-               uint32_t hits_addend, uint32_t hits_subtrahend));
+               uint32_t hits_addend));
 };
 
 } // namespace RateLimit

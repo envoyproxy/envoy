@@ -206,17 +206,16 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
 
   // See if the request is forbidden by any of the matched descriptors.
   for (const auto& match_result : matched_results) {
-    if (!match_result.token_bucket->consume(
-            share_factor, match_result.request_descriptor.get().hits_addend_.value_or(1))) {
+    if (match_result.request_descriptor.get().is_negative_hits_ &&
+        match_result.request_descriptor.get().hits_addend_.has_value()) {
+      // Negative addend means refill tokens instead of consuming.
+      match_result.token_bucket->refill(match_result.request_descriptor.get().hits_addend_.value());
+    } else if (!match_result.token_bucket->consume(
+                   share_factor, match_result.request_descriptor.get().hits_addend_.value_or(1))) {
       // If the request is forbidden by a descriptor, return the result and the descriptor
       // token bucket.
       return {false, std::shared_ptr<TokenBucketContext>(match_result.token_bucket),
               match_result.request_descriptor.get().x_ratelimit_option_};
-    }
-    // Refill tokens back if hits_subtrahend is set, capped at max bucket size.
-    if (match_result.request_descriptor.get().hits_subtrahend_.has_value()) {
-      match_result.token_bucket->refill(
-          match_result.request_descriptor.get().hits_subtrahend_.value());
     }
     ENVOY_LOG(trace,
               "request allowed by descriptor with fill rate: {}, maxToken: {}, remainingToken {}",

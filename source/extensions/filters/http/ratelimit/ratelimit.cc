@@ -23,7 +23,6 @@ namespace RateLimitFilter {
 
 namespace {
 constexpr absl::string_view HitsAddendFilterStateKey = "envoy.ratelimit.hits_addend";
-constexpr absl::string_view HitsSubtrahendFilterStateKey = "envoy.ratelimit.hits_subtrahend";
 
 class HitsAddendObjectFactory : public StreamInfo::FilterState::ObjectFactory {
 public:
@@ -38,21 +37,7 @@ public:
   }
 };
 
-class HitsSubtrahendObjectFactory : public StreamInfo::FilterState::ObjectFactory {
-public:
-  std::string name() const override { return std::string(HitsSubtrahendFilterStateKey); }
-  std::unique_ptr<StreamInfo::FilterState::Object>
-  createFromBytes(absl::string_view data) const override {
-    uint32_t hits_subtrahend = 0;
-    if (absl::SimpleAtoi(data, &hits_subtrahend)) {
-      return std::make_unique<StreamInfo::UInt32AccessorImpl>(hits_subtrahend);
-    }
-    return nullptr;
-  }
-};
-
 REGISTER_FACTORY(HitsAddendObjectFactory, StreamInfo::FilterState::ObjectFactory);
-REGISTER_FACTORY(HitsSubtrahendObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 } // namespace
 
@@ -78,7 +63,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     state_ = State::Calling;
     initiating_call_ = true;
     client_->limit(*this, getDomain(), descriptors_, callbacks_->activeSpan(),
-                   callbacks_->streamInfo(), getHitAddend(), getHitSubtrahend());
+                   callbacks_->streamInfo(), getHitAddend());
     initiating_call_ = false;
   }
 }
@@ -147,17 +132,6 @@ double Filter::getHitAddend() {
     hits_addend = hits_addend_filter_state->value();
   }
   return hits_addend;
-}
-
-double Filter::getHitSubtrahend() {
-  const StreamInfo::UInt32Accessor* hits_subtrahend_filter_state =
-      callbacks_->streamInfo().filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
-          HitsSubtrahendFilterStateKey);
-  double hits_subtrahend = 0;
-  if (hits_subtrahend_filter_state != nullptr) {
-    hits_subtrahend = hits_subtrahend_filter_state->value();
-  }
-  return hits_subtrahend;
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
@@ -233,7 +207,7 @@ void Filter::onDestroy() {
           std::make_shared<OnStreamDoneCallBack>(shared_client);
       callback->keepAlive();
       callback->client().limit(*callback, getDomain(), descriptors, Tracing::NullSpan::instance(),
-                               callbacks_->streamInfo(), getHitAddend(), getHitSubtrahend());
+                               callbacks_->streamInfo(), getHitAddend());
       // If the limit() call fails directly then the detach() will be no-op.
       shared_client->detach();
     }

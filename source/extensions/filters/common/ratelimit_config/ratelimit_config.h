@@ -35,8 +35,7 @@ private:
   const Envoy::RateLimit::XRateLimitOption x_ratelimit_option_{};
   Formatter::FormatterProviderPtr hits_addend_provider_;
   absl::optional<uint64_t> hits_addend_;
-  Formatter::FormatterProviderPtr hits_subtrahend_provider_;
-  absl::optional<uint64_t> hits_subtrahend_;
+  bool is_negative_hits_ = false;
   std::vector<Envoy::RateLimit::DescriptorProducerPtr> actions_;
 };
 
