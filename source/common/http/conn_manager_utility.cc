@@ -587,27 +587,28 @@ void applyForwardClientCertConfig(
       return;
     } else {
       std::vector<std::string> client_cert_details;
-      const auto uri_sans_local_cert = connection.ssl()->uriSanLocalCertificate();
+      const absl::Span<const std::string> uri_sans_local_cert =
+          connection.ssl()->uriSanLocalCertificate();
       if (!uri_sans_local_cert.empty()) {
         for (const std::string& uri : uri_sans_local_cert) {
           client_cert_details.push_back(absl::StrCat("By=", uri));
         }
       }
-      const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
+      const std::string& cert_digest = connection.ssl()->sha256PeerCertificateDigest();
       if (!cert_digest.empty()) {
         client_cert_details.push_back(absl::StrCat("Hash=", cert_digest));
       }
       for (const auto& detail : set_current_client_cert_details) {
         switch (detail) {
         case ClientCertDetailsType::Cert: {
-          const std::string peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
+          const std::string& peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
           if (!peer_cert.empty()) {
             client_cert_details.push_back(absl::StrCat("Cert=\"", peer_cert, "\""));
           }
           break;
         }
         case ClientCertDetailsType::Chain: {
-          const std::string peer_chain =
+          const std::string& peer_chain =
               connection.ssl()->urlEncodedPemEncodedPeerCertificateChain();
           if (!peer_chain.empty()) {
             client_cert_details.push_back(absl::StrCat("Chain=\"", peer_chain, "\""));
@@ -621,7 +622,7 @@ void applyForwardClientCertConfig(
           break;
         case ClientCertDetailsType::URI: {
           // The "URI" key still exists even if the URI is empty.
-          const auto sans = connection.ssl()->uriSanPeerCertificate();
+          const absl::Span<const std::string> sans = connection.ssl()->uriSanPeerCertificate();
           if (!sans.empty()) {
             for (const std::string& uri : sans) {
               client_cert_details.push_back(absl::StrCat("URI=", uri));
@@ -632,7 +633,7 @@ void applyForwardClientCertConfig(
           break;
         }
         case ClientCertDetailsType::DNS: {
-          auto dns_sans = connection.ssl()->dnsSansPeerCertificate();
+          const absl::Span<const std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
           if (!dns_sans.empty()) {
             for (const std::string& dns : dns_sans) {
               client_cert_details.push_back(absl::StrCat("DNS=", dns));
