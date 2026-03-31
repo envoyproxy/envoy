@@ -168,33 +168,21 @@ class AsyncEnvoyClientTransport(httpx.AsyncBaseTransport):
         # 2. Support for Generators: If the user provides a generator as the
         #    request content, we consume it one chunk at a time.
         #
-        # Envoy's stream API requires us to signal the 'end_stream' on either
-        # `send_headers` (if there's no body) or `send_data/close` (if there is).
-        previous_chunk = None
-        has_body = False
-        async for chunk in request.stream:
-            if not has_body:
-                # We've found the first chunk, so we know a body exists.
-                # We now send the headers with `end_stream=False`.
-                has_body = True
-                previous_chunk = chunk
-                stream.send_headers(envoy_headers, False)
-            else:
-                # We've found a subsequent chunk. We send the *previous* chunk
-                # now, knowing it's not the last one (`end_stream=False`).
-                # We stay one chunk behind so we can correctly identify the
-                # absolute final chunk for the `stream.close()` call.
-                stream.send_data(previous_chunk, False)
-                previous_chunk = chunk
+        # Simplified Request Logic:
+        # 1. Always send headers first with `end_stream=False`.
+        # 2. Stream all chunks from `request.stream` with `end_stream=False`.
+        # 3. Finalize by sending an empty string with `end_stream=True` (via `stream.close(b"")`).
 
-        if has_body:
-            # We've reached the end of the stream. We send the final chunk
-            # using `stream.close()`, which signals `end_stream=True` to Envoy.
-            stream.close(previous_chunk)
-        else:
-            # The `request.stream` was empty, meaning there is no body.
-            # We send headers immediately with `end_stream=True`.
-            stream.send_headers(envoy_headers, True)
+        # Start by sending the request headers.
+        stream.send_headers(envoy_headers, False)
+
+        # Iterate through the request stream and send all data chunks.
+        async for chunk in request.stream:
+            stream.send_data(chunk, False)
+
+        # Finalize the request. Sending an empty string with `stream.close()`
+        # signals `end_stream=True` to Envoy, completing the request side of the stream.
+        stream.close(b"")
 
         # Wait for headers
         try:
