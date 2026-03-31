@@ -1,10 +1,11 @@
 #pragma once
 
-#include "envoy/common/hashable.h"
-#include "source/common/router/string_accessor_impl.h"
-
 #include <optional>
 #include <string_view>
+
+#include "envoy/common/hashable.h"
+
+#include "source/common/router/string_accessor_impl.h"
 
 namespace Istio {
 namespace Common {

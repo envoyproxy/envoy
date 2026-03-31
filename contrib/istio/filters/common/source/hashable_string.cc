@@ -1,12 +1,12 @@
 #include "contrib/istio/filters/common/source/hashable_string.h"
 
+#include <memory>
+#include <string>
+
 #include "envoy/registry/registry.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/hash.h"
-
-#include <memory>
-#include <string>
 
 namespace Istio {
 namespace Common {

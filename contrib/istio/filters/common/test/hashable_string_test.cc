@@ -1,16 +1,18 @@
-#include "contrib/istio/filters/common/source/hashable_string.h"
+#include <memory>
+#include <vector>
 
 #include "envoy/common/hashable.h"
-#include "gmock/gmock.h"
-#include "google/protobuf/repeated_field.h"
-#include "gtest/gtest.h"
+
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
+
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
-#include <memory>
-#include <vector>
+#include "contrib/istio/filters/common/source/hashable_string.h"
+#include "gmock/gmock.h"
+#include "google/protobuf/repeated_field.h"
+#include "gtest/gtest.h"
 
 namespace Istio {
 namespace Common {
