@@ -5,7 +5,6 @@
 #include "source/extensions/access_loggers/stats/stats.h"
 
 #include "test/mocks/server/factory_context.h"
-
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -20,28 +19,49 @@ namespace AccessLoggers {
 namespace StatsAccessLog {
 
 // --- Joiner Key ---
-class JoinerKey {
+class GaugeKeyUsingJoiner {
 public:
-  JoinerKey(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
-            Stats::SymbolTable& symbolTable)
-      : joiner_storage_(Stats::StatName(), stat_name, tags, symbolTable) {}
+  GaugeKeyUsingJoiner(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef borrowed_tags,
+                      Stats::SymbolTable& symbolTable)
+      : stat_name_(stat_name),
+        joiner_storage_(Stats::StatName(), stat_name, borrowed_tags, symbolTable),
+        borrowed_tags_(borrowed_tags) {}
 
-  JoinerKey(JoinerKey&&) noexcept = default;
-  JoinerKey& operator=(JoinerKey&&) noexcept = default;
+  GaugeKeyUsingJoiner(GaugeKeyUsingJoiner&&) noexcept = default;
+  GaugeKeyUsingJoiner& operator=(GaugeKeyUsingJoiner&&) noexcept = default;
 
-  JoinerKey(const JoinerKey&) = delete;
-  JoinerKey& operator=(const JoinerKey&) = delete;
+  GaugeKeyUsingJoiner(const GaugeKeyUsingJoiner&) = delete;
+  GaugeKeyUsingJoiner& operator=(const GaugeKeyUsingJoiner&) = delete;
 
-  Stats::StatName joinedName() const { return joiner_storage_.nameWithTags(); }
+  void makeOwned() {
+    if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
+      owned_tags_.emplace(borrowed_tags_.value());
+      borrowed_tags_ = absl::nullopt;
+    }
+  }
 
-  bool operator==(const JoinerKey& rhs) const { return joinedName() == rhs.joinedName(); }
+  Stats::StatNameTagVectorOptConstRef tags() const {
+    if (owned_tags_.has_value()) {
+      return std::cref(owned_tags_.value());
+    }
+    return borrowed_tags_;
+  }
 
-  template <typename H> friend H AbslHashValue(H h, const JoinerKey& key) {
+  Stats::StatName statName() const { return stat_name_; }
+
+  bool operator==(const GaugeKeyUsingJoiner& rhs) const { return joinedName() == rhs.joinedName(); }
+
+  template <typename H> friend H AbslHashValue(H h, const GaugeKeyUsingJoiner& key) {
     return H::combine(std::move(h), key.joinedName());
   }
 
+  Stats::StatName joinedName() const { return joiner_storage_.nameWithTags(); }
+
 private:
+  Stats::StatName stat_name_;
   Stats::TagUtility::TagStatNameJoiner joiner_storage_;
+  absl::optional<Stats::StatNameTagVector> owned_tags_;
+  Stats::StatNameTagVectorOptConstRef borrowed_tags_{absl::nullopt};
 };
 
 // --- Joiner-based AccessLogState ---
@@ -55,7 +75,7 @@ public:
     if (value == 0)
       return;
 
-    JoinerKey key{stat_name, tags, logger_->scope().symbolTable()};
+    GaugeKeyUsingJoiner key{stat_name, tags, logger_->scope().symbolTable()};
     auto it = inflight_gauges_.find(key);
     if (it == inflight_gauges_.end()) {
       auto [new_it, inserted] =
@@ -71,7 +91,7 @@ public:
     if (value == 0)
       return;
 
-    JoinerKey key{stat_name, tags, logger_->scope().symbolTable()};
+    GaugeKeyUsingJoiner key{stat_name, tags, logger_->scope().symbolTable()};
     auto it = inflight_gauges_.find(key);
     if (it != inflight_gauges_.end()) {
       it->second.value_ -= value;
@@ -94,9 +114,8 @@ private:
     Stats::Gauge::ImportMode import_mode_;
     std::vector<Stats::StatNameDynamicStorage> tags_storage_;
   };
-  absl::node_hash_map<JoinerKey, InflightGaugeNew> inflight_gauges_;
+  absl::node_hash_map<GaugeKeyUsingJoiner, InflightGaugeNew> inflight_gauges_;
 };
-
 
 // --- Shared Setup ---
 struct SharedBencherSetup {

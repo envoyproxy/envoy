@@ -53,7 +53,6 @@ envoy_cc_benchmark_binary(
     srcs = [
         "speed_test.cc",
     ],
-
     rbe_pool = "6gig",
     deps = [
         "//source/common/stats:thread_local_store_lib",
