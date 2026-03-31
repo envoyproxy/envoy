@@ -243,7 +243,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
                   ConnectionPool::PoolFailureReason::Overflow, context);
     traffic_stats.upstream_rq_active_overflow_.inc();
     if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.upstream_rq_active_overflow_counter")) {
+            "envoy.reloadable_features.skip_pending_overflow_count_on_active_rq")) {
       traffic_stats.upstream_rq_pending_overflow_.inc();
     }
     return;

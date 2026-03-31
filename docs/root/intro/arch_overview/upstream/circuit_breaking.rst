@@ -37,7 +37,7 @@ configure and code each application independently. Envoy supports various types 
   :ref:`upstream_rq_active_overflow <config_cluster_manager_cluster_stats>` counter for the cluster
   will increment. By default, the legacy :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>`
   counter is no longer incremented for this path; set the runtime flag
-  ``envoy.reloadable_features.upstream_rq_active_overflow_counter`` to ``false`` to restore the
+  ``envoy.reloadable_features.skip_pending_overflow_count_on_active_rq`` to ``false`` to restore the
   previous behavior of incrementing both counters.
 * **Cluster maximum active retries**: The maximum number of retries that can be outstanding to all
   hosts in a cluster at any given time. In general we recommend using :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`; however, if static circuit breaking is preferred it should aggressively circuit break

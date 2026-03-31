@@ -716,7 +716,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflow) {
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflowLegacy) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.upstream_rq_active_overflow_counter", "false"}});
+      {{"envoy.reloadable_features.skip_pending_overflow_count_on_active_rq", "false"}});
 
   newActiveClientAndStream();
   closeStream();

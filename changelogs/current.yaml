@@ -136,8 +136,8 @@ bug_fixes:
     Previously this condition incorrectly incremented ``upstream_rq_pending_overflow``, making
     it impossible to distinguish pending queue saturation from active request saturation via
     metrics alone. The new counter is now the authoritative signal for this path by default;
-    set runtime flag ``envoy.reloadable_features.upstream_rq_active_overflow_counter`` to
-    ``false`` to restore the previous behavior of incrementing both counters.
+    set runtime flag ``envoy.reloadable_features.skip_pending_overflow_count_on_active_rq`` to
+    ``false`` to restore the previous behavior of incrementing ``upstream_rq_pending_overflow`` on both code paths.
 - area: hot_restart
   change: |
     Fixed hot restart for listeners with a network namespace in the address. Previously, socket
