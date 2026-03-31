@@ -37,7 +37,7 @@ public:
     ON_CALL(*conn_pool_, host()).WillByDefault(Return(host_));
     upstream_request_ =
         std::make_unique<UpstreamRequest>(router_filter_interface_, std::move(conn_pool), false,
-                                          true, false /*enable_tcp_tunneling*/);
+                                          true, false /*enable_tcp_tunneling*/, 1);
   }
   Http::FilterFactoryCb createDecoderFilterFactoryCb(Http::StreamDecoderFilterSharedPtr filter) {
     return [filter](Http::FilterChainFactoryCallbacks& callbacks) {

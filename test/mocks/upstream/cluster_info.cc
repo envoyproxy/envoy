@@ -74,7 +74,7 @@ MockClusterInfo::MockClusterInfo()
       resource_manager_(new Upstream::ResourceManagerImpl(
           runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
           std::numeric_limits<uint64_t>::max(), circuit_breakers_stats_, absl::nullopt,
-          absl::nullopt)),
+          absl::nullopt, false)),
       upstream_local_address_selector_(
           std::make_shared<NiceMock<MockUpstreamLocalAddressSelector>>(source_address_)),
       stats_scope_(stats_store_.createScope("test_scope")) {
@@ -130,6 +130,9 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
+  ON_CALL(*this, admissionControl(_))
+      .WillByDefault(Invoke(
+          [this](ResourcePriority) -> OptRef<AdmissionControl> { return admission_control_; }));
   ON_CALL(*this, upstreamConfig())
       .WillByDefault(
           Invoke([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {

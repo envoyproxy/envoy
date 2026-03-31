@@ -15,9 +15,11 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/time.h"
+#include "envoy/config/cluster/v3/circuit_breaker.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
@@ -58,6 +60,7 @@
 #include "source/common/orca/orca_load_metrics.h"
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/upstream/admission_control_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/locality_pool.h"
 #include "source/common/upstream/resource_manager_impl.h"
@@ -674,7 +677,7 @@ using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
  */
 class PrioritySetImpl : public PrioritySet {
 public:
-  PrioritySetImpl() : batch_update_(false) {}
+  PrioritySetImpl() = default;
   // From PrioritySet
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addMemberUpdateCb(MemberUpdateCb callback) const override {
@@ -739,7 +742,7 @@ private:
       member_update_cb_helper_;
   mutable Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
-  bool batch_update_ : 1;
+  bool batch_update_ : 1 {};
 
   // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
   // that have been added/removed throughout the batch update, and ensures that we properly manage
@@ -907,6 +910,7 @@ public:
     return name_;
   }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
+  OptRef<AdmissionControl> admissionControl(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   DeferredCreationCompatibleClusterTrafficStats& trafficStats() const override {
     return traffic_stats_;
@@ -1031,16 +1035,20 @@ private:
   struct ResourceManagers {
     ResourceManagers(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name, Stats::Scope& stats_scope,
-                     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names);
-    absl::StatusOr<ResourceManagerImplPtr>
+                     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names,
+                     ProtobufMessage::ValidationVisitor& validation_visitor);
+    absl::StatusOr<std::pair<ResourceManagerImplPtr, AdmissionControlImplSharedPtr>>
     load(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
          const std::string& cluster_name, Stats::Scope& stats_scope,
-         const envoy::config::core::v3::RoutingPriority& priority);
+         const envoy::config::core::v3::RoutingPriority& priority,
+         ProtobufMessage::ValidationVisitor& validation_visitor);
 
+    using AdmissionControls = std::array<AdmissionControlImplSharedPtr, NumResourcePriorities>;
     using Managers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
 
-    Managers managers_;
     const ClusterCircuitBreakersStatNames& circuit_breakers_stat_names_;
+    AdmissionControls controls_;
+    Managers managers_;
   };
 
   struct OptionalClusterStats {

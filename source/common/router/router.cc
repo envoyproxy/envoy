@@ -809,9 +809,24 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
+  OptRef<Upstream::AttemptStreamAdmissionController> controller;
+  if (auto cluster_controller = cluster_->admissionControl(route_entry_->priority());
+      cluster_controller.has_value()) {
+    attempt_controller_ =
+        cluster_controller->attempt()->createStreamAdmissionController(*requestStreamInfo());
+    controller = *attempt_controller_;
+  }
+
+  if (attempt_controller_ != nullptr && !attempt_controller_->isInitialAttemptAdmitted()) {
+    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                               "Initial Attempt Rejected by Attempt Controller", nullptr,
+                               absl::nullopt, attempt_controller_->initialAttemptDetails());
+    return false;
+  }
+
   retry_state_ = createRetryState(*getEffectiveRetryPolicy(), headers, *cluster_, request_vcluster_,
                                   route_stats_context_, config_->factory_context_,
-                                  callbacks_->dispatcher(), route_entry_->priority());
+                                  callbacks_->dispatcher(), route_entry_->priority(), controller);
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys. Also the method CONNECT doesn't support shadowing.
@@ -846,7 +861,10 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
       !transport_socket_options_ || !transport_socket_options_->http11ProxyInfo().has_value();
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
-      allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
+      allow_multiplexed_upstream_half_close_ /*enable_half_close*/, attempt_count_);
+  if (attempt_controller_) {
+    attempt_controller_->onTryStarted(attempt_count_);
+  }
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
   // Start the shadow streams.
@@ -1289,6 +1307,9 @@ void Filter::onResponseTimeout() {
       chargeUpstreamAbort(timeout_response_code_, false, *upstream_request);
     }
     upstream_request->resetStream();
+    if (attempt_controller_) {
+      attempt_controller_->onTryAborted(upstream_request->attemptNumber());
+    }
   }
 
   onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout,
@@ -1357,6 +1378,9 @@ void Filter::onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Cou
   }
 
   upstream_request.resetStream();
+  if (attempt_controller_) {
+    attempt_controller_->onTryAborted(upstream_request.attemptNumber());
+  }
 
   updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, upstream_request,
                          absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
@@ -1375,6 +1399,9 @@ void Filter::onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Cou
 
 void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.resetStream();
+  if (attempt_controller_) {
+    attempt_controller_->onTryAborted(upstream_request.attemptNumber());
+  }
 
   if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request, TimeoutRetry::No)) {
     return;
@@ -1550,6 +1577,10 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                            absl::nullopt);
   }
 
+  if (attempt_controller_) {
+    attempt_controller_->onTryAborted(upstream_request.attemptNumber());
+  }
+
   if (maybeRetryReset(reset_reason, upstream_request, TimeoutRetry::No)) {
     return;
   }
@@ -1671,6 +1702,10 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
   final_upstream_request_ = &upstream_request;
   resetOtherUpstreams(upstream_request);
 
+  if (attempt_controller_) {
+    attempt_controller_->onTrySucceeded(upstream_request.attemptNumber());
+  }
+
   // Don't send retries after 100-Continue has been sent on. Arguably we could attempt to do a
   // retry, assume the next upstream would also send an 100-Continue and swallow the second one
   // but it's sketchy (as the subsequent upstream might not send a 100-Continue) and not worth
@@ -1684,6 +1719,9 @@ void Filter::resetAll() {
   while (!upstream_requests_.empty()) {
     auto request_ptr = upstream_requests_.back()->removeFromList(upstream_requests_);
     request_ptr->resetStream();
+    if (attempt_controller_) {
+      attempt_controller_->onTryAborted(request_ptr->attemptNumber());
+    }
     callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
   }
 }
@@ -1697,6 +1735,9 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
         upstream_requests_.back()->removeFromList(upstream_requests_);
     if (upstream_request_tmp.get() != &upstream_request) {
       upstream_request_tmp->resetStream();
+      if (attempt_controller_) {
+        attempt_controller_->onTryAborted(upstream_request_tmp->attemptNumber());
+      }
       // TODO: per-host stat for hedge abandoned.
       // TODO: cluster stat for hedge abandoned.
     } else {
@@ -1880,6 +1921,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   callbacks_->streamInfo().setResponseCode(response_code);
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
+  if (attempt_controller_) {
+    attempt_controller_->onTrySucceeded(upstream_request.attemptNumber());
+  }
   // Make sure that for request hedging, we end up with the correct final upstream info.
   callbacks_->streamInfo().setUpstreamInfo(final_upstream_request_->streamInfo().upstreamInfo());
   resetOtherUpstreams(upstream_request);
@@ -1965,6 +2009,9 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
       return;
     }
     upstream_request.resetStream();
+  }
+  if (attempt_controller_) {
+    attempt_controller_->onSuccessfulTryFinished();
   }
   Event::Dispatcher& dispatcher = callbacks_->dispatcher();
   std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -2281,7 +2328,10 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
   }
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
-      allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
+      allow_multiplexed_upstream_half_close_ /*enable_half_close*/, attempt_count_);
+  if (attempt_controller_) {
+    attempt_controller_->onTryStarted(upstream_request->attemptNumber());
+  }
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
@@ -2447,15 +2497,16 @@ const Router::RetryPolicy* Filter::getEffectiveRetryPolicy() const {
   return retry_policy;
 }
 
-RetryStatePtr
-ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                             const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                             RouteStatsContextOptRef route_stats_context,
-                             Server::Configuration::CommonFactoryContext& context,
-                             Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
+RetryStatePtr ProdFilter::createRetryState(
+    const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
+    const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
+    RouteStatsContextOptRef route_stats_context,
+    Server::Configuration::CommonFactoryContext& context, Event::Dispatcher& dispatcher,
+    Upstream::ResourcePriority priority,
+    OptRef<Upstream::AttemptStreamAdmissionController> attempt_admission_controller) {
   std::unique_ptr<RetryStateImpl> retry_state =
       RetryStateImpl::create(policy, request_headers, cluster, vcluster, route_stats_context,
-                             context, dispatcher, priority);
+                             context, dispatcher, priority, attempt_admission_controller);
   if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the buffer limit to 0 so that we don't retry or

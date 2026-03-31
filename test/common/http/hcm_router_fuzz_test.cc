@@ -45,12 +45,12 @@ public:
     return StreamDecoderFilterSharedPtr{fuzz_filter};
   }
   // Filter
-  Router::RetryStatePtr createRetryState(const Router::RetryPolicy&, RequestHeaderMap&,
-                                         const Upstream::ClusterInfo&,
-                                         const Router::VirtualCluster*,
-                                         Router::RouteStatsContextOptRef,
-                                         Server::Configuration::CommonFactoryContext&,
-                                         Event::Dispatcher&, Upstream::ResourcePriority) override {
+  Router::RetryStatePtr
+  createRetryState(const Router::RetryPolicy&, RequestHeaderMap&, const Upstream::ClusterInfo&,
+                   const Router::VirtualCluster*, Router::RouteStatsContextOptRef,
+                   Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
+                   Upstream::ResourcePriority,
+                   OptRef<Upstream::AttemptStreamAdmissionController>) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<Router::MockRetryState>();
 

@@ -32,7 +32,8 @@ public:
          const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
          RouteStatsContextOptRef route_stats_context,
          Server::Configuration::CommonFactoryContext& context, Event::Dispatcher& dispatcher,
-         Upstream::ResourcePriority priority);
+         Upstream::ResourcePriority priority,
+         OptRef<Upstream::AttemptStreamAdmissionController> attempt_admission_controller);
   ~RetryStateImpl() override;
 
   /**
@@ -105,7 +106,8 @@ private:
                  RouteStatsContextOptRef route_stats_context,
                  Server::Configuration::CommonFactoryContext& context,
                  Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority,
-                 bool auto_configured_for_http3);
+                 bool auto_configured_for_http3,
+                 OptRef<Upstream::AttemptStreamAdmissionController> attempt_admission_controller);
 
   void enableBackoffTimer();
   void resetRetry();
@@ -116,7 +118,8 @@ private:
   RetryDecision wouldRetryFromReset(const Http::StreamResetReason reset_reason,
                                     Http3Used http3_used, bool& disable_http3,
                                     bool upstream_request_started);
-  RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback);
+  RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback,
+                          bool abort_previous_on_retry);
 
   const Upstream::ClusterInfo& cluster_;
   const VirtualCluster* vcluster_;
@@ -136,6 +139,11 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{};
+  // This may be unset if no attempt admission controller extensions are configured.
+  // If this is set, then we defer to the attempt admission controller in lieu of the circuit
+  // breakers.
+  OptRef<Upstream::AttemptStreamAdmissionController> attempt_admission_controller_;
+  uint32_t attempt_number_{1};
 
   // Keep small members (bools, enums and int32s) at the end of class, to reduce alignment overhead.
   uint32_t retry_on_{};

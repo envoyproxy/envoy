@@ -411,7 +411,7 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
         *this, upstream_callbacks_, *decoder_filter_callbacks_, config_, downstream_info_);
     RouterUpstreamRequestPtr upstream_request = std::make_unique<RouterUpstreamRequest>(
         *combined_upstream_, std::move(generic_conn_pool_), /*can_send_early_data_=*/false,
-        /*can_use_http3_=*/true, true /*enable_tcp_tunneling*/);
+        /*can_use_http3_=*/true, true /*enable_tcp_tunneling*/, 1);
     combined_upstream_->setRouterUpstreamRequest(std::move(upstream_request));
     combined_upstream_->newStream(callbacks);
     return;
