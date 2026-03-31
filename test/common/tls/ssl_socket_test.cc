@@ -41,6 +41,7 @@
 #include "test/common/tls/test_data/san_multiple_dns_1_cert_info.h"
 #include "test/common/tls/test_data/san_multiple_dns_cert_info.h"
 #include "test/common/tls/test_data/san_uri_cert_info.h"
+#include "test/common/tls/test_data/selfsigned_cert_info.h"
 #include "test/common/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
 #include "test/common/tls/test_private_key_method_provider.h"
 #include "test/mocks/buffer/mocks.h"
@@ -1587,7 +1588,8 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestSelfSigned) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options.setExpectEmptyPeerCertificateIssuer());
+  testUtil(test_options.setExpectedSerialNumber(TEST_SELFSIGNED_CERT_SERIAL)
+               .setExpectEmptyPeerCertificateIssuer());
 }
 
 TEST_P(SslSocketTest, GetCertDigestsInvalidFiles) {
