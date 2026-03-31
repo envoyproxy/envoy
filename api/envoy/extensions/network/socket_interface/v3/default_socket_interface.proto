@@ -5,6 +5,7 @@ package envoy.extensions.network.socket_interface.v3;
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.network.socket_interface.v3";
 option java_outer_classname = "DefaultSocketInterfaceProto";
@@ -14,33 +15,71 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Default socket interface configuration]
 
-// Configuration for default socket interface that relies on OS dependent syscall to create
+// Configuration for the default socket interface that relies on OS-dependent syscalls to create
 // sockets.
+// [#next-free-field: 2]
 message DefaultSocketInterface {
-  // io_uring options. io_uring is only valid in Linux with at least kernel version 5.11. Otherwise,
-  // Envoy will fall back to use the default socket API. If not set then io_uring will not be
-  // enabled.
+  // Options for ``io_uring``-based socket I/O. ``io_uring`` is only supported on Linux with
+  // kernel version 5.11 or later. On unsupported platforms, Envoy falls back to the default
+  // socket API.
+  //
+  // .. note::
+  //
+  //   If not set, ``io_uring`` will not be enabled and the standard epoll-based I/O path
+  //   is used.
   IoUringOptions io_uring_options = 1;
 }
 
+// Configuration for ``io_uring``-based asynchronous I/O.
+//
+// Each worker thread creates its own ``io_uring`` instance during initialization. Operations
+// are submitted to the submission queue (SQ) and completions are reaped from the completion
+// queue (CQ) via an eventfd integrated with the worker's event loop.
+//
+// .. warning::
+//
+//   ``io_uring`` support is experimental. Performance characteristics depend heavily on
+//   kernel version. Kernels 5.19+ provide significant optimizations (cooperative task
+//   running, single-issuer mode) that are automatically enabled when available.
+//
+// [#next-free-field: 7]
 message IoUringOptions {
-  // The size for io_uring submission queues (SQ). io_uring is built with a fixed size in each
-  // thread during configuration, and each io_uring operation creates a submission queue
-  // entry (SQE). The default is 1000.
-  google.protobuf.UInt32Value io_uring_size = 1;
+  // The number of entries in the ``io_uring`` submission queue (SQ). Each in-flight I/O
+  // operation requires one SQE. The completion queue (CQ) is sized at ``2x`` this value
+  // to provide overflow headroom. If not specified, defaults to 1000.
+  google.protobuf.UInt32Value io_uring_size = 1 [(validate.rules).uint32 = {gte: 16}];
 
-  // Enable io_uring submission queue polling (SQPOLL). io_uring SQPOLL mode polls all SQEs in the
-  // SQ in the kernel thread. io_uring SQPOLL mode may reduce latency and increase CPU usage as a
-  // cost. The default is false.
+  // Enables ``io_uring`` submission queue polling (``SQPOLL``). When enabled, a dedicated
+  // kernel thread polls the SQ for new entries, eliminating the ``io_uring_enter()`` syscall
+  // on submission. This may reduce latency at the cost of increased CPU usage.
+  // If not specified, defaults to false.
   bool enable_submission_queue_polling = 2;
 
-  // The size of an io_uring socket's read buffer. Each io_uring read operation will allocate a
-  // buffer of the given size. If the given buffer is too small, the socket will have read multiple
-  // times for all the data. The default is 8192.
-  google.protobuf.UInt32Value read_buffer_size = 3;
+  // The size in bytes of the buffer allocated for each ``io_uring`` read operation. If the
+  // buffer is too small for the incoming data, multiple read operations are needed.
+  // If not specified, defaults to 16384.
+  google.protobuf.UInt32Value read_buffer_size = 3 [(validate.rules).uint32 = {gte: 1024}];
 
-  // The write timeout of an io_uring socket on closing in ms. io_uring writes and closes
-  // asynchronously. If the remote stops reading, the io_uring write operation may never complete.
-  // The operation is canceled and the socket is closed after the timeout. The default is 1000.
+  // The timeout in milliseconds to wait for pending write operations to complete when closing
+  // a socket. ``io_uring`` writes are asynchronous; if the remote peer stops reading, a write
+  // may never complete. After this timeout, pending writes are canceled and the socket is
+  // closed. If not specified, defaults to 1000.
   google.protobuf.UInt32Value write_timeout_ms = 4;
+
+  // The high watermark in bytes for the write buffer. When the amount of pending write data
+  // exceeds this threshold, the socket tracks that backpressure has been reached. A debug log
+  // is emitted when the threshold is crossed in either direction.
+  // If not specified, defaults to 131072 (128 KiB).
+  google.protobuf.UInt32Value write_high_watermark_bytes = 5 [(validate.rules).uint32 = {gte: 4096}];
+
+  // The low watermark in bytes for the write buffer. After the buffer exceeded
+  // ``write_high_watermark_bytes``, the backpressure state is cleared once the pending write
+  // data drops below this value.
+  // If not specified, defaults to 16384 (16 KiB).
+  //
+  // .. note::
+  //
+  //   This value must be less than ``write_high_watermark_bytes``. If misconfigured, it is
+  //   clamped to ``write_high_watermark_bytes / 2``.
+  google.protobuf.UInt32Value write_low_watermark_bytes = 6 [(validate.rules).uint32 = {gte: 1024}];
 }

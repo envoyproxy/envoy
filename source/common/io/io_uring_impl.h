@@ -40,18 +40,27 @@ public:
                              Request* user_data) override;
   IoUringResult prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
                               off_t offset, Request* user_data) override;
+  IoUringResult prepareRecv(os_fd_t fd, void* buf, uint32_t len, int flags,
+                            Request* user_data) override;
+  IoUringResult prepareSend(os_fd_t fd, const void* buf, uint32_t len, int flags,
+                            Request* user_data) override;
   IoUringResult prepareClose(os_fd_t fd, Request* user_data) override;
   IoUringResult prepareCancel(Request* cancelling_user_data, Request* user_data) override;
   IoUringResult prepareShutdown(os_fd_t fd, int how, Request* user_data) override;
   IoUringResult submit() override;
   void injectCompletion(os_fd_t fd, Request* user_data, int32_t result) override;
   void removeInjectedCompletion(os_fd_t fd) override;
+  uint64_t cqOverflowCount() const override { return cq_overflow_count_; }
 
 private:
+  // Checks for CQ overflow and logs a warning. Returns true if overflow was detected.
+  bool checkCqOverflow();
+
   struct io_uring ring_ {};
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
   std::list<InjectedCompletion> injected_completions_;
+  uint64_t cq_overflow_count_{0};
 };
 
 } // namespace Io

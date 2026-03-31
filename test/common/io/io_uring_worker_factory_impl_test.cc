@@ -29,7 +29,7 @@ public:
 };
 
 TEST_F(IoUringWorkerFactoryImplTest, Basic) {
-  IoUringWorkerFactoryImpl factory(2, false, 8192, 1000, context_.threadLocal());
+  IoUringWorkerFactoryImpl factory(2, false, 8192, 1000, 131072, 16384, context_.threadLocal());
   EXPECT_TRUE(factory.currentThreadRegistered());
   auto dispatcher = api_->allocateDispatcher("test_thread");
   factory.onWorkerThreadInitialized();

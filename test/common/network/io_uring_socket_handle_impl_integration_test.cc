@@ -44,8 +44,8 @@ public:
       instance_.registerThread(*second_dispatcher_, false);
     }
 
-    io_uring_worker_factory_ =
-        std::make_unique<Io::IoUringWorkerFactoryImpl>(10, false, 8192, 1000, instance_);
+    io_uring_worker_factory_ = std::make_unique<Io::IoUringWorkerFactoryImpl>(
+        10, false, 8192, 1000, 131072, 16384, instance_);
     io_uring_worker_factory_->onWorkerThreadInitialized();
 
     // Create the thread after the io_uring worker has been initialized, otherwise the dispatcher

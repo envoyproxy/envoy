@@ -173,13 +173,20 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
       config, context.messageValidationVisitor());
   if (message.has_io_uring_options() && Io::isIoUringSupported()) {
     const auto& options = message.io_uring_options();
+    const uint32_t write_high_watermark =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_high_watermark_bytes, 131072);
+    uint32_t write_low_watermark =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_low_watermark_bytes, 16384);
+    if (write_low_watermark >= write_high_watermark) {
+      write_low_watermark = write_high_watermark / 2;
+    }
     std::shared_ptr<Io::IoUringWorkerFactoryImpl> io_uring_worker_factory =
         std::make_shared<Io::IoUringWorkerFactoryImpl>(
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, io_uring_size, 1000),
             options.enable_submission_queue_polling(),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, read_buffer_size, 8192),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_timeout_ms, 1000),
-            context.threadLocal());
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, read_buffer_size, 16384),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_timeout_ms, 1000), write_high_watermark,
+            write_low_watermark, context.threadLocal());
     io_uring_worker_factory_ = io_uring_worker_factory;
 
     return std::make_unique<DefaultSocketInterfaceExtension>(*this, io_uring_worker_factory);

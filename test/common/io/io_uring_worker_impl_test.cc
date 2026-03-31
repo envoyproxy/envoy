@@ -34,7 +34,7 @@ public:
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
-      : IoUringWorkerImpl(std::move(io_uring_instance), 8192, 1000, dispatcher) {}
+      : IoUringWorkerImpl(std::move(io_uring_instance), 8192, 1000, 131072, 16384, dispatcher) {}
 
   IoUringSocket& addTestSocket(os_fd_t fd) {
     return addSocket(std::make_unique<IoUringSocketTestImpl>(fd, *this));
@@ -484,7 +484,7 @@ TEST(IoUringWorkerImplTest, CloseDetected) {
         EXPECT_EQ(events, Event::FileReadyType::Closed);
         return absl::OkStatus();
       },
-      0, true);
+      0, 131072, 16384, true);
   socket.enableRead();
   socket.disableRead();
 
@@ -515,7 +515,7 @@ TEST(IoUringWorkerImplTest, AvoidDuplicatedCloseRequest) {
         EXPECT_EQ(events, Event::FileReadyType::Closed);
         return absl::OkStatus();
       },
-      0, true);
+      0, 131072, 16384, true);
 
   Request* close_req = nullptr;
   EXPECT_CALL(mock_io_uring, prepareClose(_, _))
@@ -538,7 +538,8 @@ TEST(IoUringWorkerImplTest, NoOnWriteCallingBackInShutdownWriteSocketInjection) 
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                            Event::FileReadyType::Read));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
-  IoUringServerSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false);
+  IoUringServerSocket socket(
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 131072, 16384, false);
 
   // Shutdown and then shutdown completes.
   EXPECT_CALL(mock_io_uring, submit());
@@ -563,7 +564,8 @@ TEST(IoUringWorkerImplTest, NoOnWriteCallingBackInCloseAfterShutdownWriteSocketI
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                            Event::FileReadyType::Read));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
-  IoUringServerSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false);
+  IoUringServerSocket socket(
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 131072, 16384, false);
 
   // Shutdown and then close.
   EXPECT_CALL(mock_io_uring, submit());
@@ -640,7 +642,8 @@ TEST(IoUringWorkerImplTest, NoOnConnectCallingBackInClosing) {
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
                                            Event::FileReadyType::Read));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
-  IoUringClientSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false);
+  IoUringClientSocket socket(
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 131072, 16384, false);
 
   auto addr = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
   EXPECT_CALL(mock_io_uring, submit()).Times(3);
@@ -664,6 +667,73 @@ TEST(IoUringWorkerImplTest, NoOnConnectCallingBackInClosing) {
   delete static_cast<Request*>(close_req);
 }
 
+TEST(IoUringWorkerImplTest, WriteWatermarkTracking) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  // Use small watermarks (high=64, low=16) for easy testing.
+  IoUringServerSocket socket(
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 64, 16, false);
+
+  // Write 100 bytes to exceed the 64-byte high watermark.
+  std::string data(100, 'x');
+  Buffer::OwnedImpl buf;
+  buf.add(data);
+
+  Request* write_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareWritev(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  socket.write(buf);
+
+  // Simulate a write completion that drains 90 bytes, leaving 10 bytes (below low watermark 16).
+  // The remaining 10 bytes trigger another write submission.
+  Request* write_req2 = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareWritev(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req2), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  socket.onWrite(write_req, 90, false);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete write_req;
+  delete write_req2;
+}
+
+TEST(IoUringWorkerImplTest, WriteSlicesWatermarkTracking) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  // Use 64 bytes for high watermark and 16 bytes for low watermark via direct construction.
+  IoUringServerSocket socket(
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 64, 16, false);
+
+  std::string data(100, 'y');
+  Buffer::RawSlice slice;
+  slice.mem_ = data.data();
+  slice.len_ = data.size();
+
+  EXPECT_CALL(mock_io_uring, prepareWritev(_, _, _, _, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Ok));
+  EXPECT_CALL(mock_io_uring, submit());
+
+  uint64_t written = socket.write(&slice, 1);
+  EXPECT_EQ(100, written);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
+
 TEST(IoUringWorkerImplTest, NoEnableReadOnConnectError) {
   Event::MockDispatcher dispatcher;
   IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
@@ -675,7 +745,8 @@ TEST(IoUringWorkerImplTest, NoEnableReadOnConnectError) {
       .WillOnce(
           DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
-  IoUringClientSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false);
+  IoUringClientSocket socket(
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 131072, 16384, false);
 
   auto addr = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
   EXPECT_CALL(mock_io_uring, submit());
