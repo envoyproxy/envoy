@@ -16,21 +16,21 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/network/dns_resolver/hickory/v3;hickoryv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Hickory DNS resolver]
+// [#protodoc-title: Hickory DNS Resolver]
 // [#extension: envoy.network.dns_resolver.hickory]
 
 // Configuration for DNS-over-TLS (DoT) servers.
 message DnsOverTlsConfig {
-  // DNS-over-TLS server addresses. The port should typically be 853.
+  // The list of DNS-over-TLS server addresses. The port should typically be 853.
   repeated config.core.v3.Address servers = 1;
 
-  // The SNI hostname to use for TLS verification. Required when servers are specified.
+  // The SNI hostname to use for TLS verification. Required when ``servers`` are specified.
   string tls_server_name = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // Configuration for DNS-over-HTTPS (DoH) servers.
 message DnsOverHttpsConfig {
-  // DNS-over-HTTPS endpoint URLs (e.g., ``https://dns.google/dns-query``).
+  // The list of DNS-over-HTTPS endpoint URLs (e.g., ``https://dns.google/dns-query``).
   repeated string server_urls = 1 [(validate.rules).repeated = {items {string {min_len: 1}}}];
 }
 
@@ -43,7 +43,7 @@ message DnsOverHttpsConfig {
 // [#next-free-field: 10]
 message HickoryDnsResolverConfig {
   // A list of DNS resolver addresses for standard UDP/TCP resolution.
-  // If not specified and ``use_system_config`` is not explicitly set to false, the system
+  // If not specified and ``use_system_config`` is not explicitly set to ``false``, the system
   // configuration (``/etc/resolv.conf`` on Unix) will be used.
   repeated config.core.v3.Address resolvers = 1;
 
@@ -55,40 +55,40 @@ message HickoryDnsResolverConfig {
   // HTTPS to the configured endpoints.
   DnsOverHttpsConfig dns_over_https = 3;
 
-  // Enable ``DNSSEC`` validation for DNS responses. When enabled, the resolver will validate
+  // Enables ``DNSSEC`` validation for DNS responses. When enabled, the resolver will validate
   // ``DNSSEC`` signatures and reject responses that fail validation.
   //
-  // Defaults to false.
+  // Defaults to ``false``.
   bool enable_dnssec = 4;
 
   // Maximum number of entries in the DNS response cache. The cache uses an LRU eviction
-  // policy and supports negative caching (caching of NXDOMAIN/NODATA responses).
+  // policy and supports negative caching (caching of ``NXDOMAIN``/``NODATA`` responses).
   //
-  // Defaults to 1024.
+  // Defaults to ``1024``.
   google.protobuf.UInt32Value cache_size = 5;
 
   // Number of threads in the ``Tokio`` runtime used for asynchronous DNS resolution.
   // Each resolver instance runs its own ``Tokio`` runtime.
   //
-  // Defaults to 2. Maximum is 16.
+  // Defaults to ``2``. Maximum is ``16``.
   google.protobuf.UInt32Value num_resolver_threads = 6 [(validate.rules).uint32 = {lte: 16 gte: 1}];
 
-  // If true, read the system DNS configuration (``/etc/resolv.conf`` on Unix) for name server
+  // If ``true``, read the system DNS configuration (``/etc/resolv.conf`` on Unix) for name server
   // addresses and search domains. When ``resolvers`` are also specified, they take precedence
   // over the system configuration.
   //
-  // If not specified, defaults to true when no ``resolvers``, ``dns_over_tls``, or
+  // If not specified, defaults to ``true`` when no ``resolvers``, ``dns_over_tls``, or
   // ``dns_over_https`` are configured.
   google.protobuf.BoolValue use_system_config = 7;
 
   // Timeout for each individual DNS query attempt.
   //
-  // Defaults to 5 seconds.
+  // Defaults to ``5`` seconds.
   google.protobuf.Duration query_timeout = 8 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // Maximum number of query attempts before the resolver gives up. Each attempt may use
   // a different name server.
   //
-  // Defaults to 3.
+  // Defaults to ``3``.
   google.protobuf.UInt32Value query_tries = 9 [(validate.rules).uint32 = {gte: 1}];
 }
