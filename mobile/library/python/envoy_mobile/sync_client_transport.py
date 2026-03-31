@@ -74,7 +74,9 @@ class SyncResponseHandler:
 
         for key, value in headers.items():
             if not key.startswith(":"):
-                self.headers[key] = value[0] if isinstance(value, list) and len(value) == 1 else value
+                self.headers[key] = (
+                    value[0] if isinstance(value, list) and len(value) == 1 else value
+                )
 
         self.headers_event.set()
 

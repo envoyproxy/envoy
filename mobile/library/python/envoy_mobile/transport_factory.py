@@ -20,7 +20,9 @@ class EnvoyTransportFactory:
     _lock = threading.Lock()
 
     @classmethod
-    def get_shared_engine(cls, builder: Optional[envoy_engine.EngineBuilder] = None) -> envoy_engine.Engine:
+    def get_shared_engine(
+        cls, builder: Optional[envoy_engine.EngineBuilder] = None
+    ) -> envoy_engine.Engine:
         """Get the shared Envoy Engine instance, initializing it if necessary.
 
         Args:
@@ -39,14 +41,16 @@ class EnvoyTransportFactory:
                 # Use default builder if none provided
                 if builder is None:
                     builder = envoy_engine.EngineBuilder()
-                
+
                 # Build and start the engine
                 cls._engine = builder.build()
-            
+
             return cls._engine
 
     @classmethod
-    def get_async_transport(cls, builder: Optional[envoy_engine.EngineBuilder] = None) -> AsyncEnvoyClientTransport:
+    def get_async_transport(
+        cls, builder: Optional[envoy_engine.EngineBuilder] = None
+    ) -> AsyncEnvoyClientTransport:
         """Create an AsyncEnvoyClientTransport using the shared engine.
 
         Args:
@@ -59,7 +63,9 @@ class EnvoyTransportFactory:
         return AsyncEnvoyClientTransport(engine)
 
     @classmethod
-    def get_sync_transport(cls, builder: Optional[envoy_engine.EngineBuilder] = None) -> EnvoyClientTransport:
+    def get_sync_transport(
+        cls, builder: Optional[envoy_engine.EngineBuilder] = None
+    ) -> EnvoyClientTransport:
         """Create an EnvoyClientTransport using the shared engine.
 
         Args:

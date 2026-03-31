@@ -24,11 +24,13 @@ from envoy_mobile import (
     EnvoyClientTransport,
 )
 
+
 # Define these for use in tests since we mocked the module.
 class MockEnvoyError:
     def __init__(self):
         self.error_code = 0
         self.message = ""
+
 
 mock_envoy_engine.EnvoyError = MockEnvoyError
 
@@ -73,7 +75,7 @@ class TestEnvoyClientTransport(unittest.TestCase):
         end_stream = self.mock_stream.send_headers.call_args[0][1]
         self.assertEqual(sent_headers[":method"], "GET")
         self.assertFalse(end_stream)
-        
+
         # Verify the stream was closed with empty data.
         self.mock_stream.close.assert_called_once_with(b"")
 
@@ -96,6 +98,7 @@ class TestEnvoyClientTransport(unittest.TestCase):
 
     def test_handle_request_streaming(self):
         """Verify that request bodies are streamed to Envoy chunk-by-chunk."""
+
         def stream_generator():
             yield b"chunk1"
             yield b"chunk2"
@@ -116,10 +119,12 @@ class TestEnvoyClientTransport(unittest.TestCase):
 
         # Verify call sequence: headers, chunk1, chunk2, close.
         self.mock_stream.send_headers.assert_called_once_with(unittest.mock.ANY, False)
-        self.mock_stream.send_data.assert_has_calls([
-            call(b"chunk1", False),
-            call(b"chunk2", False),
-        ])
+        self.mock_stream.send_data.assert_has_calls(
+            [
+                call(b"chunk1", False),
+                call(b"chunk2", False),
+            ]
+        )
         self.mock_stream.close.assert_called_once_with(b"")
 
 
@@ -180,6 +185,7 @@ class TestAsyncEnvoyClientTransport(unittest.IsolatedAsyncioTestCase):
 
     async def test_handle_async_request_streaming(self):
         """Verify asynchronous request body streaming."""
+
         async def stream_generator():
             yield b"chunk1"
             yield b"chunk2"
@@ -200,14 +206,17 @@ class TestAsyncEnvoyClientTransport(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
 
         self.mock_stream.send_headers.assert_called_once_with(unittest.mock.ANY, False)
-        self.mock_stream.send_data.assert_has_calls([
-            call(b"chunk1", False),
-            call(b"chunk2", False),
-        ])
+        self.mock_stream.send_data.assert_has_calls(
+            [
+                call(b"chunk1", False),
+                call(b"chunk2", False),
+            ]
+        )
         self.mock_stream.close.assert_called_once_with(b"")
 
 
 from envoy_mobile.async_client.executor import AsyncioExecutor
+
 
 class TestAsyncioExecutor(unittest.TestCase):
     """Tests for the AsyncioExecutor thread-safety wrapper."""
@@ -216,7 +225,7 @@ class TestAsyncioExecutor(unittest.TestCase):
         """Ensure that the executor fails if used without an active loop."""
         # Instantiate without a running event loop.
         executor = AsyncioExecutor(loop=None)
-        
+
         def my_func():
             pass
 
@@ -224,6 +233,7 @@ class TestAsyncioExecutor(unittest.TestCase):
         # Invoking the wrapped function should raise RuntimeError to protect thread-safety.
         with self.assertRaises(RuntimeError):
             wrapped()
+
 
 if __name__ == "__main__":
     unittest.main()

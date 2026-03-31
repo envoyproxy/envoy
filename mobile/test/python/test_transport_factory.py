@@ -34,7 +34,7 @@ class TestEnvoyTransportFactory(unittest.TestCase):
         # Verify same instance returned
         self.assertEqual(engine1, engine2)
         self.assertEqual(engine1, mock_engine)
-        
+
         # Verify build was only called once
         mock_builder.build.assert_called_once()
 
@@ -51,7 +51,7 @@ class TestEnvoyTransportFactory(unittest.TestCase):
         # Verify they use the same engine instance
         self.assertEqual(async_transport._engine, mock_engine)
         self.assertEqual(sync_transport._engine, mock_engine)
-        
+
         # Verify build was only called once
         mock_builder.build.assert_called_once()
 
