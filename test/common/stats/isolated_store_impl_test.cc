@@ -322,10 +322,24 @@ TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
 TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
   NullCounterImpl& c = store_->nullCounter();
   c.inc();
+  c.markUnused();
   EXPECT_EQ(0, c.value());
+  EXPECT_FALSE(c.hidden());
   NullGaugeImpl& g = store_->nullGauge();
   g.inc();
+  g.setParentValue(0);
+  g.markUnused();
   EXPECT_EQ(0, g.value());
+  EXPECT_FALSE(g.hidden());
+  CounterSharedPtr null_counter(new NullCounterImpl(store_->symbolTable()));
+  GaugeSharedPtr null_gauge(new NullGaugeImpl(store_->symbolTable()));
+  TextReadoutSharedPtr null_text_readout(new NullTextReadoutImpl(store_->symbolTable()));
+  null_text_readout->set("");
+  EXPECT_EQ("", null_text_readout->value());
+  EXPECT_FALSE(null_text_readout->used());
+  EXPECT_FALSE(null_text_readout->hidden());
+  null_text_readout->markUnused();
+  EXPECT_EQ(1, null_text_readout->use_count());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {

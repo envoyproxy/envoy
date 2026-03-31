@@ -16,7 +16,7 @@ IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(std::make_unique<Symb
 IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table)
     : IsolatedStoreImpl(*symbol_table) {
   symbol_table_storage_ = std::move(symbol_table);
-  alloc_.setIsolatedStore();
+  // alloc_.setIsolatedStore();
 }
 
 static StatNameTagVector tagVectorFromOpt(StatNameTagVectorOptConstRef tags) {

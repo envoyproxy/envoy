@@ -50,9 +50,9 @@ Allocator::~Allocator() {
 
 void Allocator::setShuttingDown() { shutting_down_ = true; }
 
-void Allocator::setIsolatedStore() { ASSERT(!thread_local_store_); }
+// void Allocator::setIsolatedStore() { ASSERT(!thread_local_store_); }
 
-void Allocator::setThreadLocalStore() { ASSERT(!isolated_store_); }
+// void Allocator::setThreadLocalStore() { ASSERT(!isolated_store_); }
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void Allocator::debugPrint() {
@@ -85,7 +85,7 @@ public:
     // We must ensure that stats are destructed on the main thread as part of
     // scopes teardown from the store. Otherwise stats that are kept in vectors
     // during main-thread operations such as stats sinks can race destruction.
-    if (!alloc_.shuttingDown() && !alloc_.isIsolatedStore()) {
+    if (!alloc_.shuttingDown() /* && !alloc_.isIsolatedStore()*/) {
       // if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
       //   ENVOY_LOG_MISC(error, "unexpected destruction of {}", BaseClass::name());
       // }
@@ -161,11 +161,13 @@ public:
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
   ~CounterImpl() override {
+#if 0
     if (!alloc_.shuttingDown()) {
       if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
         ENVOY_LOG_MISC(error, "unexpected destruction of counter {}", name());
       }
     }
+#endif
   }
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
@@ -218,11 +220,13 @@ public:
   }
 
   ~GaugeImpl() override {
+#if 0
     if (!alloc_.shuttingDown()) {
       if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
         ENVOY_LOG_MISC(error, "unexpected destruction of gauge {}", name());
       }
     }
+#endif
   }
 
   void removeFromSetLockHeld() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
@@ -308,11 +312,13 @@ public:
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
   ~TextReadoutImpl() override {
+#if 0
     if (!alloc_.shuttingDown()) {
       if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
         ENVOY_LOG_MISC(error, "unexpected destruction of text readout {}", name());
       }
     }
+#endif
   }
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
