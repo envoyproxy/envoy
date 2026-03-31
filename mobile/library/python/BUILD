@@ -93,7 +93,10 @@ py_library(
     ],
     imports = ["."],
     visibility = ["//visibility:public"],
-    deps = [":async_client"],
+    deps = [
+        ":async_client",
+        "@mobile_pip3//httpx",
+    ],
 )
 
 py_package(

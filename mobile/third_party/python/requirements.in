@@ -1,4 +1,5 @@
 gevent
+httpx
 mypy
 pytest
 pytest-asyncio
