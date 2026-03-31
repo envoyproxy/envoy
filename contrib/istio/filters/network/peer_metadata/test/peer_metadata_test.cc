@@ -73,8 +73,6 @@ Config configWithBaggageKey(absl::string_view baggage_key) {
 
 class PeerMetadataFilterTest : public ::testing::Test {
 public:
-  PeerMetadataFilterTest() {}
-
   void populateNodeMetadata(absl::string_view workload_name, absl::string_view workload_type,
                             absl::string_view service_name, absl::string_view service_version,
                             absl::string_view ns, absl::string_view cluster) {
@@ -315,8 +313,8 @@ std::string encodePeerMetadataHeaderOnly(const PeerMetadataHeader& header) {
 }
 
 std::string encodeMetadataOnly(absl::string_view baggage, absl::string_view identity) {
-  std::unique_ptr<::Istio::Common::WorkloadMetadataObject> metadata =
-      ::Istio::Common::convertBaggageToWorkloadMetadata(baggage, identity);
+  std::unique_ptr<Istio::Common::WorkloadMetadataObject> metadata =
+      Istio::Common::convertBaggageToWorkloadMetadata(baggage, identity);
   Protobuf::Struct data = convertWorkloadMetadataToStruct(*metadata);
   Protobuf::Any wrapped;
   wrapped.PackFrom(data);
@@ -332,8 +330,6 @@ std::string encodePeerMetadata(absl::string_view baggage, absl::string_view iden
 
 class PeerMetadataUpstreamFilterTest : public ::testing::Test {
 public:
-  PeerMetadataUpstreamFilterTest() {}
-
   void initialize() {
     ON_CALL(callbacks_.connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
     ON_CALL(Const(callbacks_.connection_), streamInfo()).WillByDefault(ReturnRef(stream_info_));
@@ -350,11 +346,11 @@ public:
     return upstream_host_->cluster_.metadata_;
   }
 
-  absl::optional<::Istio::Common::WorkloadMetadataObject> peerInfoFromFilterState() const {
+  absl::optional<Istio::Common::WorkloadMetadataObject> peerInfoFromFilterState() const {
     const auto& filter_state = stream_info_.filterState();
     const auto* cel_state =
         filter_state.getDataReadOnly<Extensions::Filters::Common::Expr::CelState>(
-            ::Istio::Common::UpstreamPeer);
+            Istio::Common::UpstreamPeer);
     if (!cel_state) {
       return absl::nullopt;
     }
@@ -364,8 +360,8 @@ public:
       return absl::nullopt;
     }
 
-    std::unique_ptr<::Istio::Common::WorkloadMetadataObject> peer_info =
-        ::Istio::Common::convertStructToWorkloadMetadata(obj);
+    std::unique_ptr<Istio::Common::WorkloadMetadataObject> peer_info =
+        Istio::Common::convertStructToWorkloadMetadata(obj);
     if (!peer_info) {
       return absl::nullopt;
     }

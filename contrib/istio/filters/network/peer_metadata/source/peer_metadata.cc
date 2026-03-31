@@ -189,7 +189,7 @@ void Filter::propagateNoPeerMetadata() {
   write_callbacks_->injectWriteDataToFilterChain(buffer, false);
 }
 
-UpstreamFilter::UpstreamFilter() {}
+UpstreamFilter::UpstreamFilter() = default;
 
 Network::FilterStatus UpstreamFilter::onData(Buffer::Instance& buffer, bool end_stream) {
   ENVOY_LOG(trace, "Read {} bytes from the upstream connection", buffer.length());
