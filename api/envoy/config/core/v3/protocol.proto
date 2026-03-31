@@ -779,8 +779,6 @@ message Http2ProtocolOptions {
   // If not set, it defaults to false.
   // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
   // obs-text = %x80-FF
-  // [#comment: TODO Unify this knob and default value for H1/H2/H3 and move
-  // this configuration to HttpProtocolOptions.]
   google.protobuf.BoolValue disallow_obs_text = 20;
 }
 
@@ -840,8 +838,6 @@ message Http3ProtocolOptions {
   // If not set, it defaults to true for alignment with current behavior.
   // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
   // obs-text = %x80-FF
-  // [#comment: TODO Unify this knob and default value for H1/H2/H3 and move
-  // this configuration to HttpProtocolOptions]
   google.protobuf.BoolValue disallow_obs_text = 9;
 }
 
