@@ -13,11 +13,13 @@ from .envoy_engine import (
 from .async_client.client import AsyncClient
 from .async_client_transport import AsyncEnvoyClientTransport
 from .sync_client_transport import EnvoyClientTransport
+from .transport_factory import EnvoyTransportFactory
 
 __all__ = [
     "AsyncClient",
     "AsyncEnvoyClientTransport",
     "EnvoyClientTransport",
+    "EnvoyTransportFactory",
     "Engine",
     "EngineBuilder",
     "EnvoyError",

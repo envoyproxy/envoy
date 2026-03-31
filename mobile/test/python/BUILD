@@ -37,3 +37,13 @@ py_test(
         requirement("httpx"),
     ],
 )
+
+py_test(
+    name = "transport_factory_test",
+    srcs = ["test_transport_factory.py"],
+    main = "test_transport_factory.py",
+    deps = [
+        "//library/python:envoy_mobile_lib",
+        requirement("httpx"),
+    ],
+)
