@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.peer_metadata.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.peer_metadata.v3";
+option java_outer_classname = "PeerMetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/network/peer_metadata/v3;peer_metadatav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Peer metadata network filter]
+//
+// Peer metadata network filter for extracting and propagating peer telemetry
+// attributes from HBONE CONNECT response headers.
+// [#extension: envoy.filters.network.peer_metadata]
+
+// Configuration for the downstream network filter installed in the
+// connect_originate or inner_connect_originate filter chains. It extracts
+// peer metadata from TCP Proxy filter state (baggage header from HBONE CONNECT
+// response) and injects it as a data preamble to be consumed by the upstream
+// filter.
+message Config {
+  // Filter state key under which the baggage value encoding the proxy workload
+  // is stored. The upstream filter that populates the baggage header in the
+  // HBONE request should use the same key.
+  string baggage_key = 1;
+}
+
+// Configuration for the upstream network filter installed in service clusters
+// that communicate over HBONE. It consumes and removes the metadata preamble
+// injected by the downstream filter and populates filter state for use by
+// Istio telemetry filters.
+message UpstreamConfig {
+}
