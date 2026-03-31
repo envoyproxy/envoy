@@ -44,3 +44,17 @@ envoy_cc_library(
         "@envoy_api//contrib/envoy/extensions/filters/common/workload_discovery/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "hashable_string_lib",
+    srcs = ["hashable_string.cc"],
+    hdrs = ["hashable_string.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/common:hashable_interface",
+        "//envoy/registry",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:hash_lib",
+        "//source/common/router:string_accessor_lib",
+    ],
+)
