@@ -91,7 +91,8 @@ BandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats
 
 // BandwidthLimiter members
 
-Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap&, bool) {
+Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap&,
+                                                          bool end_stream) {
   const auto& config = getConfig();
 
   if (config.enabled() && (config.enableMode() & BandwidthLimit::REQUEST)) {
@@ -120,6 +121,9 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
         },
         const_cast<FilterConfig*>(&config)->timeSource(), decoder_callbacks_->dispatcher(),
         decoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
+    if (!end_stream) {
+      return Http::FilterHeadersStatus::StopIteration;
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -128,7 +132,6 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
 Http::FilterDataStatus BandwidthLimiter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (request_limiter_ != nullptr) {
     const auto& config = getConfig();
-
     if (!request_latency_) {
       request_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
           config.stats().request_transfer_duration_,
@@ -157,7 +160,8 @@ Http::FilterTrailersStatus BandwidthLimiter::decodeTrailers(Http::RequestTrailer
   return Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMap&, bool) {
+Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMap&,
+                                                          bool end_stream) {
   auto& config = getConfig();
 
   if (config.enabled() && (config.enableMode() & BandwidthLimit::RESPONSE)) {
@@ -187,6 +191,9 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
         },
         const_cast<FilterConfig*>(&config)->timeSource(), encoder_callbacks_->dispatcher(),
         encoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
+    if (!end_stream) {
+      return Http::FilterHeadersStatus::StopIteration;
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;
