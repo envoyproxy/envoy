@@ -369,6 +369,11 @@ std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
 #endif
 }
 
+EngineBuilder& EngineBuilder::setUseWorkerThread(bool use_worker_thread) {
+  use_worker_thread_ = use_worker_thread;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
   addNativeFilter("envoy.filters.http.platform_bridge", nativeNameToConfig(name));
   return *this;
@@ -1120,6 +1125,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #endif // ENVOY_MOBILE_XDS
 
   envoy::config::listener::v3::ApiListenerManager api;
+  if (!use_worker_thread_) {
+    api.set_threading_model(envoy::config::listener::v3::ApiListenerManager::MainThreadOnly);
+  } else {
+    api.set_threading_model(
+        envoy::config::listener::v3::ApiListenerManager::StandaloneWorkerThread);
+  }
   auto* listener_manager = bootstrap->mutable_listener_manager();
   listener_manager->mutable_typed_config()->PackFrom(api);
   listener_manager->set_name("envoy.listener_manager_impl.api");
@@ -1128,10 +1139,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine = absl::IgnoreLeak(
-      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_, high_watermark_,
-                         disable_dns_refresh_on_network_change_, enable_logger_));
+  InternalEngine* envoy_engine = absl::IgnoreLeak(new InternalEngine(
+      std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+      network_thread_priority_, high_watermark_, disable_dns_refresh_on_network_change_,
+      enable_logger_, use_worker_thread_));
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

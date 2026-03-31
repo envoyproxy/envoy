@@ -62,12 +62,13 @@ protected:
 
 class ClientIntegrationTest
     : public BaseClientIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http::CodecType>> {
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http::CodecType, bool>> {
 public:
   static void SetUpTestCase() { test_key_value_store_ = std::make_shared<TestKeyValueStore>(); }
   static void TearDownTestCase() { test_key_value_store_.reset(); }
 
   Http::CodecType getCodecType() { return std::get<1>(GetParam()); }
+  bool getUseWorkerThread() { return std::get<2>(GetParam()); }
 
   ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/std::get<0>(GetParam())) {
     // For server TLS
@@ -85,6 +86,7 @@ public:
   }
 
   void initialize() override {
+    builder_.setUseWorkerThread(getUseWorkerThread());
     // Integration test starts upstreams before Envoy which can cause a data race.
     builder_.enableLogger(false);
     builder_.setLogLevel(Logger::Logger::trace);
@@ -193,13 +195,14 @@ public:
   }
 
   static std::string testParamsToString(
-      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http::CodecType>>
+      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http::CodecType, bool>>
           params) {
     return fmt::format(
-        "{}_{}",
+        "{}_{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
-        protocolToString(std::get<1>(params.param)));
+        protocolToString(std::get<1>(params.param)),
+        std::get<2>(params.param) ? "WorkerThreadOn" : "WorkerThreadOff");
   }
 
 protected:
@@ -217,7 +220,8 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersions, ClientIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::ValuesIn({Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                                        Http::CodecType::HTTP3})),
+                                        Http::CodecType::HTTP3}),
+                     testing::Bool()),
     ClientIntegrationTest::testParamsToString);
 
 void ClientIntegrationTest::basicTest() {

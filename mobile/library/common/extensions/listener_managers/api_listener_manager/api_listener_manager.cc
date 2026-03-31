@@ -88,10 +88,15 @@ void ApiListenerWorker::threadRoutine(OptRef<GuardDog> guard_dog, const std::fun
   watch_dog_.reset();
 }
 
-ApiListenerManagerImpl::ApiListenerManagerImpl(Instance& server)
-    : server_(server), worker_(std::make_unique<ApiListenerWorker>(server)) {}
+ApiListenerManagerImpl::ApiListenerManagerImpl(Instance& server, bool use_worker_thread)
+    : server_(server),
+      worker_(use_worker_thread ? std::make_unique<ApiListenerWorker>(server) : nullptr) {}
 
-ApiListenerManagerImpl::~ApiListenerManagerImpl() { stopWorkers(); }
+ApiListenerManagerImpl::~ApiListenerManagerImpl() {
+  if (worker_) {
+    stopWorkers();
+  }
+}
 
 absl::StatusOr<bool>
 ApiListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
@@ -138,6 +143,13 @@ ApiListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::L
 
 absl::Status ApiListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
                                                   std::function<void()> callback) {
+  if (!worker_) {
+    if (callback) {
+      callback();
+    }
+    return absl::OkStatus();
+  }
+
   if (worker_started_.exchange(true)) {
     return absl::OkStatus();
   }

@@ -157,6 +157,7 @@ public:
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
   EngineBuilder& enableHttp3(bool http3_on);
+  EngineBuilder& setUseWorkerThread(bool use_worker_thread);
   EngineBuilder& addQuicConnectionOption(std::string option);
   EngineBuilder& addQuicClientConnectionOption(std::string option);
   // Deprecated, use addQuicConnectionOption() instead.
@@ -373,7 +374,8 @@ private:
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
   absl::optional<Protobuf::Struct> node_metadata_ = absl::nullopt;
   bool enable_stats_collection_ = true;
-  bool enable_network_change_monitor_ = false;
+  bool use_worker_thread_{false};
+  bool enable_network_change_monitor_{false};
 #ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif // ENVOY_MOBILE_XDS

@@ -4,6 +4,7 @@
 
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/config/listener/v3/listener.pb.validate.h"
 
 #include "source/server/listener_manager_factory.h"
 
@@ -50,7 +51,7 @@ private:
  */
 class ApiListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
-  explicit ApiListenerManagerImpl(Instance& server);
+  explicit ApiListenerManagerImpl(Instance& server, bool use_worker_thread = false);
   ~ApiListenerManagerImpl() override;
 
   // Server::ListenerManager
@@ -78,9 +79,15 @@ public:
     return std::make_unique<ListenerUpdateCallbacksNopHandle>();
   }
 
-  Http::Client& httpClient() { return worker_->httpClient(); }
+  Http::Client& httpClient() {
+    ASSERT(worker_ != nullptr, "httpClient() called when worker_ is null!");
+    return worker_->httpClient();
+  }
 
-  Event::Dispatcher& httpClientDispatcher() { return worker_->dispatcher(); }
+  Event::Dispatcher& httpClientDispatcher() {
+    ASSERT(worker_ != nullptr, "httpClientDispatcher() called when worker_ is null!");
+    return worker_->dispatcher();
+  }
 
 private:
   struct ListenerUpdateCallbacksNopHandle : public ListenerUpdateCallbacksHandle {};
@@ -94,10 +101,16 @@ private:
 class ApiListenerManagerFactoryImpl : public ListenerManagerFactory {
 public:
   std::unique_ptr<ListenerManager>
-  createListenerManager(const Protobuf::Message&, Instance& server,
-                        std::unique_ptr<ListenerComponentFactory>&&,
-                        WorkerFactory&, bool, Quic::QuicStatNames&) override {
-    return std::make_unique<ApiListenerManagerImpl>(server);
+  createListenerManager(const Protobuf::Message& config, Instance& server,
+                        std::unique_ptr<ListenerComponentFactory>&&, WorkerFactory&, bool,
+                        Quic::QuicStatNames&) override {
+    const auto& api_config =
+        MessageUtil::downcastAndValidate<const envoy::config::listener::v3::ApiListenerManager&>(
+            config, server.messageValidationContext().staticValidationVisitor());
+    bool use_worker_thread =
+        (api_config.threading_model() ==
+         envoy::config::listener::v3::ApiListenerManager::StandaloneWorkerThread);
+    return std::make_unique<ApiListenerManagerImpl>(server, use_worker_thread);
   }
   std::string name() const override { return "envoy.listener_manager_impl.api"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
