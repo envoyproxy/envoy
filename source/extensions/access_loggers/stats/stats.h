@@ -35,6 +35,7 @@ public:
 
   GaugeKey(const GaugeKey&) = delete;
   GaugeKey& operator=(const GaugeKey&) = delete;
+
   GaugeKey(GaugeKey&&) = default;
   GaugeKey& operator=(GaugeKey&&) = default;
 

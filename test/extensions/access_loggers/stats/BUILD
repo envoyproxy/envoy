@@ -50,7 +50,10 @@ envoy_extension_cc_test(
 
 envoy_cc_benchmark_binary(
     name = "stats_speed_test",
-    srcs = ["stats_speed_test.cc"],
+    srcs = [
+        "joiner_state.h",
+        "speed_test.cc",
+    ],
     rbe_pool = "6gig",
     deps = [
         "//source/common/stats:thread_local_store_lib",

@@ -449,11 +449,8 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
              op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
-      // Using LifeSpan::Request binds the state to the duration of the stream (HTTP) or session
-      // (TCP). For pure TCP connections (L4), the "request" scope corresponds to the connection
-      // session itself (as there is no multiplexing). When the stream or session terminates,
-      // FilterState is destroyed, triggering AccessLogState cleanup. This mechanism works uniformly
-      // whether the access log is configured at the L4 or L7 filter level.
+      // TODO(TAOXUY): Create a new PR that adds test coverage around any corner cases of which
+      // level should be used, and adds this comment or an updated version.
       filter_state.setData(
           AccessLogState::key(), std::make_shared<AccessLogState>(shared_from_this()),
           StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
