@@ -1,3 +1,4 @@
+load("@mobile_pip3//:requirements.bzl, "requirement")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 licenses(["notice"])  # Apache 2
@@ -33,6 +34,6 @@ py_test(
     main = "test_httpx_transport.py",
     deps = [
         "//library/python:envoy_mobile_lib",
-        "@mobile_pip3//httpx",
+        requirement("httpx"),
     ],
 )
