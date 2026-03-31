@@ -132,6 +132,8 @@ private:
   // protected by locks.
   mutable Thread::MutexBasicLockable mutex_;
 
+  std::atomic<bool> shutting_down_{false};
+
   StatSet<Counter> counters_ ABSL_GUARDED_BY(mutex_);
   StatSet<Gauge> gauges_ ABSL_GUARDED_BY(mutex_);
   StatSet<TextReadout> text_readouts_ ABSL_GUARDED_BY(mutex_);
@@ -160,7 +162,6 @@ private:
   std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(mutex_);
   std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(mutex_);
 
-  std::atomic<bool> shutting_down_{false};
   // std::atomic<bool> isolated_store_{false};
   // std::atomic<bool> thread_local_store_{false};
 };

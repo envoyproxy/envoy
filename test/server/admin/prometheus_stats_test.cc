@@ -92,19 +92,18 @@ protected:
   }
 
   using MockHistogram = NiceMock<Stats::MockParentHistogram>;
-  void addHistogram(MockHistogram* histogram) {
-    histogram_storage_.emplace_back(histogram);
-    histograms_.push_back(histogram_storage_.back().get());
-  }
 
-  // Returns an allocated histogram pointer.
-  MockHistogram* makeHistogram(const std::string& name, Stats::StatNameTagVector cluster_tags) {
-    auto histogram = new NiceMock<Stats::MockParentHistogram>;
-    histogram->name_ = baseName(name, cluster_tags);
-    histogram->setTagExtractedName(name);
-    histogram->setTags(cluster_tags);
-    histogram->used_ = true;
-    histogram->hidden_ = false;
+  // Creates a histogram and adds it to the histograms vector to pass to the Prometheus rendering
+  // functions.
+  MockHistogram& makeHistogram(const std::string& name, Stats::StatNameTagVector cluster_tags) {
+    histogram_storage_.push_back(std::make_unique<MockHistogram>());
+    MockHistogram& histogram = *histogram_storage_.back();
+    histograms_.push_back(&histogram);
+    histogram.name_ = baseName(name, cluster_tags);
+    histogram.setTagExtractedName(name);
+    histogram.setTags(cluster_tags);
+    histogram.used_ = true;
+    histogram.hidden_ = false;
     return histogram;
   }
 
@@ -257,10 +256,8 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
-
-  addHistogram(histogram);
+  MockHistogram& histogram = makeHistogram("histogram1", {});
+  ON_CALL(histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
@@ -301,10 +298,9 @@ TEST_F(PrometheusStatsFormatterTest, SummaryWithNoValuesAndNoTags) {
   HistogramWrapper h1_interval;
   Stats::HistogramStatisticsImpl h1_interval_statistics(h1_interval.getHistogram());
 
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, intervalStatistics()).WillByDefault(ReturnRef(h1_interval_statistics));
+  MockHistogram& histogram = makeHistogram("histogram1", {});
+  ON_CALL(histogram, intervalStatistics()).WillByDefault(ReturnRef(h1_interval_statistics));
 
-  addHistogram(histogram);
   StatsParams params = StatsParams();
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
   Buffer::OwnedImpl response;
@@ -387,10 +383,8 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(
       h1_cumulative.getHistogram(), Stats::Histogram::Unit::Unspecified, buckets);
 
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
-
-  addHistogram(histogram);
+  MockHistogram& histogram = makeHistogram("histogram1", {});
+  ON_CALL(histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
@@ -427,10 +421,8 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram(),
                                                           Stats::Histogram::Unit::Percent, buckets);
 
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
-
-  addHistogram(histogram);
+  MockHistogram& histogram = makeHistogram("histogram1", {});
+  ON_CALL(histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
@@ -462,10 +454,8 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
 
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
-
-  addHistogram(histogram);
+  MockHistogram& histogram = makeHistogram("histogram1", {});
+  ON_CALL(histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
@@ -525,12 +515,11 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 =
+  MockHistogram& histogram1 =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
                                                         {makeStat("key2"), makeStat("value2")}});
-  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  addHistogram(histogram1);
-  EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  histogram1.unit_ = Stats::Histogram::Unit::Milliseconds;
+  EXPECT_CALL(histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
@@ -651,11 +640,9 @@ TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
     addGauge("cluster.upstream_rq_active", tags);
 
     for (const char* hist_name : {"cluster.upstream_rq_time", "cluster.upstream_response_time"}) {
-      auto histogram1 = makeHistogram(hist_name, tags);
-      histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-      addHistogram(histogram1);
-      EXPECT_CALL(*histogram1, cumulativeStatistics())
-          .WillOnce(ReturnRef(h1_cumulative_statistics));
+      MockHistogram& histogram1 = makeHistogram(hist_name, tags);
+      histogram1.unit_ = Stats::Histogram::Unit::Milliseconds;
+      EXPECT_CALL(histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
     }
   }
 
@@ -836,12 +823,11 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 =
+  MockHistogram& histogram1 =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
                                                         {makeStat("key2"), makeStat("value2")}});
-  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  addHistogram(histogram1);
-  EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  histogram1.unit_ = Stats::Histogram::Unit::Milliseconds;
+  EXPECT_CALL(histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   StatsParams params;
@@ -939,17 +925,16 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 =
+  MockHistogram& histogram1 =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
                                                         {makeStat("key2"), makeStat("value2")}});
-  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  histogram1->used_ = false;
-  addHistogram(histogram1);
+  histogram1.unit_ = Stats::Histogram::Unit::Milliseconds;
+  histogram1.used_ = false;
   StatsParams params;
 
   {
     params.used_only_ = true;
-    EXPECT_CALL(*histogram1, cumulativeStatistics()).Times(0);
+    EXPECT_CALL(histogram1, cumulativeStatistics()).Times(0);
 
     Buffer::OwnedImpl response;
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
@@ -960,7 +945,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
 
   {
     params.used_only_ = false;
-    EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+    EXPECT_CALL(histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
     Buffer::OwnedImpl response;
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
@@ -987,11 +972,10 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 =
+  MockHistogram& histogram1 =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
                                                         {makeStat("key2"), makeStat("value2")}});
-  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  addHistogram(histogram1);
+  histogram1.unit_ = Stats::Histogram::Unit::Milliseconds;
 
   const std::string expected_output =
       R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
@@ -1162,11 +1146,10 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithHistogram) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram =
+  MockHistogram& histogram =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("cluster"), makeStat("test_1")}});
-  histogram->unit_ = Stats::Histogram::Unit::Milliseconds;
-  addHistogram(histogram);
-  EXPECT_CALL(*histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
+  EXPECT_CALL(histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
@@ -1223,10 +1206,10 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithHistogramPercent) {
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram(),
                                                           Stats::Histogram::Unit::Percent, buckets);
 
-  auto histogram = makeHistogram("percent_histogram", {{makeStat("cluster"), makeStat("test_1")}});
-  histogram->unit_ = Stats::Histogram::Unit::Percent;
-  addHistogram(histogram);
-  EXPECT_CALL(*histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  MockHistogram& histogram =
+      makeHistogram("percent_histogram", {{makeStat("cluster"), makeStat("test_1")}});
+  histogram.unit_ = Stats::Histogram::Unit::Percent;
+  EXPECT_CALL(histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
@@ -1266,10 +1249,9 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithSummary) {
   h1_interval.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_interval_statistics(h1_interval.getHistogram());
 
-  auto histogram =
+  MockHistogram& histogram =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("cluster"), makeStat("test_1")}});
-  addHistogram(histogram);
-  EXPECT_CALL(*histogram, intervalStatistics()).WillOnce(ReturnRef(h1_interval_statistics));
+  EXPECT_CALL(histogram, intervalStatistics()).WillOnce(ReturnRef(h1_interval_statistics));
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
@@ -1549,10 +1531,9 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithNativeHistogram) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram =
+  MockHistogram& histogram =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("cluster"), makeStat("test_1")}});
-  histogram->unit_ = Stats::Histogram::Unit::Milliseconds;
-  addHistogram(histogram);
+  histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
 
   // Set up detailed buckets that will be returned by detailedTotalBuckets().
   // These are used to determine the data range for schema selection.
@@ -1563,10 +1544,10 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithNativeHistogram) {
       {100.0, 50.0, 1}, // [100, 150): 1 sample
   };
 
-  EXPECT_CALL(*histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
-  EXPECT_CALL(*histogram, detailedTotalBuckets()).WillOnce(testing::Return(detailed_buckets));
+  EXPECT_CALL(histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  EXPECT_CALL(histogram, detailedTotalBuckets()).WillOnce(testing::Return(detailed_buckets));
 
-  EXPECT_CALL(*histogram, cumulativeCountLessThanOrEqualToValue(testing::_))
+  EXPECT_CALL(histogram, cumulativeCountLessThanOrEqualToValue(testing::_))
       .WillRepeatedly([](double value) -> uint64_t {
         if (value < 0.0) {
           return 0; // Nothing below 0
@@ -1648,14 +1629,13 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithNativeHistogramEmptyBucke
   HistogramWrapper h1_cumulative;
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram =
+  MockHistogram& histogram =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("cluster"), makeStat("test_1")}});
-  addHistogram(histogram);
 
   // Empty detailed buckets
   std::vector<Stats::ParentHistogram::Bucket> detailed_buckets = {};
 
-  EXPECT_CALL(*histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  EXPECT_CALL(histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
