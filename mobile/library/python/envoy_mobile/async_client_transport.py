@@ -159,21 +159,41 @@ class AsyncEnvoyClientTransport(httpx.AsyncBaseTransport):
             explicit_flow_control=True,
         )
 
-        # Send request
-        first_chunk = None
+        # --- Send Request ---
+        #
+        # In httpx, the request body is accessed via `request.stream`, which provides
+        # an asynchronous iterator over the body chunks. This is crucial for:
+        # 1. Memory Efficiency: We don't load the entire body into memory, which
+        #    is essential for large file uploads.
+        # 2. Support for Generators: If the user provides a generator as the
+        #    request content, we consume it one chunk at a time.
+        #
+        # Envoy's stream API requires us to signal the 'end_stream' on either
+        # `send_headers` (if there's no body) or `send_data/close` (if there is).
+        previous_chunk = None
         has_body = False
         async for chunk in request.stream:
             if not has_body:
+                # We've found the first chunk, so we know a body exists.
+                # We now send the headers with `end_stream=False`.
                 has_body = True
-                first_chunk = chunk
+                previous_chunk = chunk
                 stream.send_headers(envoy_headers, False)
             else:
-                stream.send_data(first_chunk, False)
-                first_chunk = chunk
+                # We've found a subsequent chunk. We send the *previous* chunk
+                # now, knowing it's not the last one (`end_stream=False`).
+                # We stay one chunk behind so we can correctly identify the
+                # absolute final chunk for the `stream.close()` call.
+                stream.send_data(previous_chunk, False)
+                previous_chunk = chunk
 
         if has_body:
-            stream.close(first_chunk)
+            # We've reached the end of the stream. We send the final chunk
+            # using `stream.close()`, which signals `end_stream=True` to Envoy.
+            stream.close(previous_chunk)
         else:
+            # The `request.stream` was empty, meaning there is no body.
+            # We send headers immediately with `end_stream=True`.
             stream.send_headers(envoy_headers, True)
 
         # Wait for headers
