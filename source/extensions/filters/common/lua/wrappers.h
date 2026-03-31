@@ -221,14 +221,16 @@ private:
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaIssuerPeerCertificate);
 
   /**
-   * Returns the SHA-256 digest of the issuer certificate in the peer certificate chain. Returns
-   * empty string if there is no peer certificate chain or no issuer certificate.
+   * Returns the SHA-256 digest of the second certificate in the validated peer certificate chain
+   * (i.e., the certificate that directly signed the peer leaf certificate). Returns empty string
+   * if the validated chain contains fewer than two certificates.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaSha256PeerCertificateIssuerDigest);
 
   /**
-   * Returns the serial number of the issuer certificate in the peer certificate chain. Returns
-   * empty string if there is no peer certificate chain or no issuer certificate.
+   * Returns the serial number of the second certificate in the validated peer certificate chain
+   * (i.e., the certificate that directly signed the peer leaf certificate). Returns empty string
+   * if the validated chain contains fewer than two certificates.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaSerialNumberPeerCertificateIssuer);
 
