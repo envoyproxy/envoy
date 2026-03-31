@@ -308,6 +308,10 @@ bug_fixes:
     Fixed a bug where dynamic module filter may result in a incomplete body being sent to upstream
     or downstream when some filters before or after the dynamic module filter in the chain
     buffered the body and the dynamic module filter did not.
+- area: io_socket
+  change: |
+    Fixed an issue where a userspace IO socket could fail to drain the write buffer of a connection
+    when the peer had closed for reads, causing the connection to remain open indefinitely.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
