@@ -1033,5 +1033,56 @@ TEST_P(LoadStatsIntegrationTest, EndpointLevelStatsReportingSuccessAndFailure) {
   cleanupLoadStatsConnection();
 }
 
+
+// Validate that load reports are sent when only a successful request occurs within the interval.
+TEST_P(LoadStatsIntegrationTest, ReportLoadForNonZeroStatsSuccessOnly) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.report_load_for_non_zero_stats", "true");
+  initialize();
+
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+
+  requestLoadStatsResponse({"cluster_0"});
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+
+  sendAndReceiveUpstream(0, 200);
+
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 1, 0, 0, 1)}));
+
+  // In the next interval, there are no new requests, but the previous success should not prevent a report.
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 0, 0)}));
+
+  cleanupLoadStatsConnection();
+}
+
+// Validate that load reports are sent when only a custom metric is present.
+TEST_P(LoadStatsIntegrationTest, ReportLoadForNonZeroStatsCustomMetricOnly) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.report_load_for_non_zero_stats", "true");
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster_0->add_lrs_report_endpoint_metrics("cpu_utilization");
+  });
+  initialize();
+
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+
+  requestLoadStatsResponse({"cluster_0"});
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+
+  sendAndReceiveUpstream(0, 200, true);
+
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStatsWithCustomMetrics("winter", 1, 0, 0, 1)}));
+
+  // In the next interval, there are no new requests, but the custom metric from the previous response exists.
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 0, 0)}));
+
+  cleanupLoadStatsConnection();
+}
+
 } // namespace
 } // namespace Envoy

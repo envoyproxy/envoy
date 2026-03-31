@@ -165,22 +165,28 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
                 }
               }
             }
-          }
-        }
+          \
+                  }
 
-        bool should_send_locality_stats = rq_issued != 0;
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
-                                           "report_load_when_rq_active_is_non_zero")) {
-          // If rq_active is non-zero, we should send the locality stats even if
-          // rq_issued is zero (no new requests have been issued in this poll
-          // window). This is needed to report long-lived connections/requests (e.g., when
-          // web-sockets are used).
-          should_send_locality_stats = should_send_locality_stats || (rq_active != 0);
-        }
+                  bool should_send_locality_stats;
+                  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_load_for_non_zero_stats")) {
+                    should_send_locality_stats = rq_success != 0 || rq_error != 0 || rq_active != 0 || rq_issued != 0 || !load_metrics.empty();
+                  } else {
+                    should_send_locality_stats = rq_issued != 0;
+                    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
+                                                       "report_load_when_rq_active_is_non_zero")) {
+                      // If rq_active is non-zero, we should send the locality stats even if
+                      // rq_issued is zero (no new requests have been issued in this poll
+                      // window). This is needed to report long-lived connections/requests (e.g., when
+                      // web-sockets are used).
+                      should_send_locality_stats = should_send_locality_stats || (rq_active != 0);
+                    }
+                  }
 
-        if (should_send_locality_stats) {
-          locality_stats.set_total_successful_requests(rq_success);
-          locality_stats.set_total_error_requests(rq_error);
+                  if (should_send_locality_stats) {
+                    locality_stats.set_total_successful_requests(rq_success);
+                    locality_stats.set_total_error_requests(rq_error);
+
           locality_stats.set_total_requests_in_progress(rq_active);
           locality_stats.set_total_issued_requests(rq_issued);
           for (const auto& metric : load_metrics) {
