@@ -373,7 +373,8 @@ TEST_F(KafkaStatsSinkTest, ProduceFailureLogged) {
   auto* producer_ptr = mock_producer.get();
 
   EXPECT_CALL(*producer_ptr, produce(std::string("test-topic"), _, _, _, _, _, _, _, _, _))
-      .WillOnce(Return(RdKafka::ERR__QUEUE_FULL));
+      .WillOnce(Return(RdKafka::ERR__QUEUE_FULL))
+      .WillOnce(Return(RdKafka::ERR_NO_ERROR));
   EXPECT_CALL(*producer_ptr, poll(_)).Times(testing::AtLeast(1));
 
   KafkaStatsSink sink(std::move(mock_producer), "test-topic", 0, KafkaMetricsFlusher(true, true));
