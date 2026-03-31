@@ -586,6 +586,26 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamDetectedCloseType) {
 // Verifies that upstream RST is propagated to downstream as RST (default behavior).
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
 TEST_P(TcpProxyIntegrationTest, UpstreamRstPropagation) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_DETECTED_CLOSE_TYPE%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
   enableHalfClose(false);
   initialize();
 
@@ -602,6 +622,9 @@ TEST_P(TcpProxyIntegrationTest, UpstreamRstPropagation) {
 
   // Downstream should receive RST (disconnect without half-close).
   tcp_client->waitForDisconnect();
+
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_THAT(log_result, testing::Eq("RemoteReset"));
 }
 #endif
 
