@@ -9,6 +9,7 @@
 #include "envoy/stats/sink.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/json/json_streamer.h"
 
 #include "io/prometheus/client/metrics.pb.h"
 #include "librdkafka/rdkafkacpp.h"
@@ -34,24 +35,16 @@ private:
   std::vector<std::string> flushProtobuf(Stats::MetricSnapshot& snapshot,
                                          uint32_t batch_size) const;
 
-  void flushCounterJson(std::string& output,
-                        const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
-                        int64_t snapshot_time_ms, bool& first) const;
-  void flushGaugeJson(std::string& output, const Stats::Gauge& gauge, int64_t snapshot_time_ms,
-                      bool& first) const;
-  void flushHistogramJson(std::string& output, const Stats::ParentHistogram& histogram,
-                          int64_t snapshot_time_ms, bool& first) const;
-
-  void appendMetricName(std::string& output, const Stats::Metric& metric) const;
-  void appendTags(std::string& output, const Stats::Metric& metric) const;
+  void addMetricCommonFields(Json::StringStreamer::Map& map, const Stats::Metric& metric,
+                             int64_t snapshot_time_ms) const;
 
   void populateMetricsFamily(io::prometheus::client::MetricFamily& family,
                              io::prometheus::client::MetricType type, int64_t snapshot_time_ms,
                              const Stats::Metric& metric) const;
 
-  const bool report_counters_as_deltas_;
-  const bool emit_tags_as_labels_;
-  const SerializationFormat format_;
+  const bool report_counters_as_deltas_{};
+  const bool emit_tags_as_labels_{};
+  const SerializationFormat format_{};
 };
 
 class KafkaStatsSink : public Stats::Sink, private Logger::Loggable<Logger::Id::kafka> {
@@ -69,7 +62,7 @@ private:
 
   std::unique_ptr<RdKafka::Producer> producer_;
   const std::string topic_;
-  const uint32_t batch_size_;
+  const uint32_t batch_size_{};
   const KafkaMetricsFlusher flusher_;
 };
 

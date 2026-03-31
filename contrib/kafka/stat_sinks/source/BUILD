@@ -20,6 +20,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/json:json_streamer_lib",
         "@envoy_api//envoy/service/metrics/v3:pkg_cc_proto",
     ],
 )

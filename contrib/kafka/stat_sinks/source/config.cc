@@ -35,10 +35,8 @@ KafkaStatsSinkFactory::createStatsSink(const Protobuf::Message& config,
     return absl::InvalidArgumentError(absl::StrCat("Failed to set Kafka broker list: ", errstr));
   }
 
-  uint32_t linger_ms = sink_config.buffer_flush_timeout_ms();
-  if (linger_ms == 0) {
-    linger_ms = 500;
-  }
+  const uint32_t linger_ms =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, buffer_flush_timeout_ms, 500);
   if (utils.setConfProperty(*conf, "linger.ms", std::to_string(linger_ms), errstr) !=
       RdKafka::Conf::CONF_OK) {
     return absl::InvalidArgumentError(absl::StrCat("Failed to set linger.ms: ", errstr));
@@ -65,7 +63,10 @@ KafkaStatsSinkFactory::createStatsSink(const Protobuf::Message& config,
     format = SerializationFormat::Protobuf;
   }
 
-  KafkaMetricsFlusher flusher(report_counters_as_deltas, sink_config.emit_tags_as_labels(), format);
+  const bool emit_tags_as_labels =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_labels, true);
+
+  KafkaMetricsFlusher flusher(report_counters_as_deltas, emit_tags_as_labels, format);
 
   return std::make_unique<KafkaStatsSink>(std::move(producer), sink_config.topic(),
                                           sink_config.batch_size(), std::move(flusher));

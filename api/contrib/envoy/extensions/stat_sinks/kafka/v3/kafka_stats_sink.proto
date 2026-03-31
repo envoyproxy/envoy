@@ -52,7 +52,7 @@ message KafkaStatsSinkConfig {
   // If true, tag-extracted metric names are used and tags are emitted as
   // separate labels/JSON fields. If false, the full metric name (including tag
   // values) is used. Defaults to true.
-  bool emit_tags_as_labels = 5;
+  google.protobuf.BoolValue emit_tags_as_labels = 5;
 
   // Additional librdkafka producer configuration properties as key-value pairs.
   // These are passed directly to librdkafka and can be used to configure
@@ -62,8 +62,8 @@ message KafkaStatsSinkConfig {
   map<string, string> producer_config = 6;
 
   // Maximum time in milliseconds to buffer messages before forcing a produce.
-  // Maps to librdkafka's ``linger.ms``. Defaults to 500ms.
-  uint32 buffer_flush_timeout_ms = 7 [(validate.rules).uint32 = {gte: 0}];
+  // Maps to librdkafka's ``linger.ms``. If not set, defaults to 500ms.
+  google.protobuf.UInt32Value buffer_flush_timeout_ms = 7;
 
   // Serialization format for metric messages produced to Kafka.
   // Defaults to JSON.

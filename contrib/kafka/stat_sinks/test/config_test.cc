@@ -45,6 +45,11 @@ TEST(KafkaStatsSinkFactoryTest, ConfigProtoDefaultsToJson) {
   EXPECT_EQ(envoy::extensions::stat_sinks::kafka::v3::JSON, config.format());
 }
 
+TEST(KafkaStatsSinkFactoryTest, EmitTagsAsLabelsDefaultsToUnset) {
+  envoy::extensions::stat_sinks::kafka::v3::KafkaStatsSinkConfig config;
+  EXPECT_FALSE(config.has_emit_tags_as_labels());
+}
+
 } // namespace
 } // namespace Kafka
 } // namespace StatSinks

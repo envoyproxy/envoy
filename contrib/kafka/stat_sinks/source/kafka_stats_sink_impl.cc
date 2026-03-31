@@ -11,28 +11,6 @@ namespace Extensions {
 namespace StatSinks {
 namespace Kafka {
 
-namespace {
-
-void jsonEscape(std::string& output, const std::string& input) {
-  for (char c : input) {
-    switch (c) {
-    case '"':
-      output += "\\\"";
-      break;
-    case '\\':
-      output += "\\\\";
-      break;
-    case '\n':
-      output += "\\n";
-      break;
-    default:
-      output += c;
-    }
-  }
-}
-
-} // namespace
-
 // KafkaMetricsFlusher
 
 std::vector<std::string> KafkaMetricsFlusher::flush(Stats::MetricSnapshot& snapshot,
@@ -45,6 +23,59 @@ std::vector<std::string> KafkaMetricsFlusher::flush(Stats::MetricSnapshot& snaps
 
 // --- JSON serialization ---
 
+void KafkaMetricsFlusher::addMetricCommonFields(Json::StringStreamer::Map& map,
+                                                const Stats::Metric& metric,
+                                                int64_t snapshot_time_ms) const {
+  if (emit_tags_as_labels_) {
+    map.addKey("name");
+    map.addString(metric.tagExtractedName());
+
+    const auto& tags = metric.tags();
+    if (!tags.empty()) {
+      map.addKey("tags");
+      auto tags_map = map.addMap();
+      for (const auto& tag : tags) {
+        tags_map->addKey(tag.name_);
+        tags_map->addString(tag.value_);
+      }
+    }
+  } else {
+    map.addKey("name");
+    map.addString(metric.name());
+  }
+
+  map.addKey("timestamp_ms");
+  map.addNumber(snapshot_time_ms);
+}
+
+namespace {
+
+constexpr size_t kInitialJsonBatchCapacity = 4096;
+
+struct JsonBatch {
+  std::string output;
+  std::unique_ptr<Json::StringStreamer> streamer;
+  Json::StringStreamer::MapPtr root_map;
+  Json::StringStreamer::ArrayPtr metrics_array;
+
+  JsonBatch() {
+    output.reserve(kInitialJsonBatchCapacity);
+    streamer = std::make_unique<Json::StringStreamer>(output);
+    root_map = streamer->makeRootMap();
+    root_map->addKey("metrics");
+    metrics_array = root_map->addArray();
+  }
+
+  std::string finalize() {
+    metrics_array.reset();
+    root_map.reset();
+    streamer.reset();
+    return std::move(output);
+  }
+};
+
+} // namespace
+
 std::vector<std::string> KafkaMetricsFlusher::flushJson(Stats::MetricSnapshot& snapshot,
                                                         uint32_t batch_size) const {
   std::vector<std::string> messages;
@@ -53,26 +84,32 @@ std::vector<std::string> KafkaMetricsFlusher::flushJson(Stats::MetricSnapshot& s
                                  .count();
 
   uint32_t metric_count = 0;
-  std::string current_batch;
-  current_batch.reserve(4096);
-  current_batch += "{\"metrics\":[";
-  bool first = true;
+  auto batch = std::make_unique<JsonBatch>();
 
   auto maybe_flush_batch = [&]() {
     if (batch_size > 0 && metric_count >= batch_size) {
-      current_batch += "]}";
-      messages.push_back(std::move(current_batch));
-      current_batch.clear();
-      current_batch.reserve(4096);
-      current_batch += "{\"metrics\":[";
+      messages.push_back(batch->finalize());
+      batch = std::make_unique<JsonBatch>();
       metric_count = 0;
-      first = true;
     }
   };
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      flushCounterJson(current_batch, counter, snapshot_time_ms, first);
+      auto entry = batch->metrics_array->addMap();
+      entry->addKey("type");
+      entry->addString("counter");
+      addMetricCommonFields(*entry, counter.counter_.get(), snapshot_time_ms);
+      if (report_counters_as_deltas_) {
+        entry->addKey("value");
+        entry->addNumber(counter.delta_);
+        entry->addKey("delta");
+        entry->addBool(true);
+      } else {
+        entry->addKey("value");
+        entry->addNumber(counter.counter_.get().value());
+      }
+      entry.reset();
       metric_count++;
       maybe_flush_batch();
     }
@@ -80,7 +117,13 @@ std::vector<std::string> KafkaMetricsFlusher::flushJson(Stats::MetricSnapshot& s
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      flushGaugeJson(current_batch, gauge.get(), snapshot_time_ms, first);
+      auto entry = batch->metrics_array->addMap();
+      entry->addKey("type");
+      entry->addString("gauge");
+      addMetricCommonFields(*entry, gauge.get(), snapshot_time_ms);
+      entry->addKey("value");
+      entry->addNumber(gauge.get().value());
+      entry.reset();
       metric_count++;
       maybe_flush_batch();
     }
@@ -88,116 +131,52 @@ std::vector<std::string> KafkaMetricsFlusher::flushJson(Stats::MetricSnapshot& s
 
   for (const auto& histogram : snapshot.histograms()) {
     if (histogram.get().used()) {
-      flushHistogramJson(current_batch, histogram.get(), snapshot_time_ms, first);
+      const Stats::HistogramStatistics& hist_stats = histogram.get().intervalStatistics();
+      auto entry = batch->metrics_array->addMap();
+      entry->addKey("type");
+      entry->addString("histogram");
+      addMetricCommonFields(*entry, histogram.get(), snapshot_time_ms);
+
+      entry->addKey("sample_count");
+      entry->addNumber(hist_stats.sampleCount());
+      entry->addKey("sample_sum");
+      entry->addNumber(hist_stats.sampleSum());
+
+      {
+        entry->addKey("buckets");
+        auto buckets_arr = entry->addArray();
+        for (size_t i = 0; i < hist_stats.supportedBuckets().size(); i++) {
+          auto bucket = buckets_arr->addMap();
+          bucket->addKey("upper_bound");
+          bucket->addNumber(hist_stats.supportedBuckets()[i]);
+          bucket->addKey("cumulative_count");
+          bucket->addNumber(hist_stats.computedBuckets()[i]);
+        }
+      }
+
+      {
+        entry->addKey("quantiles");
+        auto quantiles_arr = entry->addArray();
+        for (size_t i = 0; i < hist_stats.supportedQuantiles().size(); i++) {
+          auto quantile = quantiles_arr->addMap();
+          quantile->addKey("quantile");
+          quantile->addNumber(hist_stats.supportedQuantiles()[i]);
+          quantile->addKey("value");
+          quantile->addNumber(hist_stats.computedQuantiles()[i]);
+        }
+      }
+
+      entry.reset();
       metric_count++;
       maybe_flush_batch();
     }
   }
 
   if (metric_count > 0 || messages.empty()) {
-    current_batch += "]}";
-    messages.push_back(std::move(current_batch));
+    messages.push_back(batch->finalize());
   }
 
   return messages;
-}
-
-void KafkaMetricsFlusher::flushCounterJson(
-    std::string& output, const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
-    int64_t snapshot_time_ms, bool& first) const {
-  if (!first) {
-    output += ',';
-  }
-  first = false;
-
-  output += "{\"type\":\"counter\"";
-  appendMetricName(output, counter_snapshot.counter_.get());
-  appendTags(output, counter_snapshot.counter_.get());
-
-  if (report_counters_as_deltas_) {
-    output += ",\"value\":";
-    output += std::to_string(counter_snapshot.delta_);
-    output += ",\"delta\":true";
-  } else {
-    output += ",\"value\":";
-    output += std::to_string(counter_snapshot.counter_.get().value());
-  }
-
-  output += ",\"timestamp_ms\":";
-  output += std::to_string(snapshot_time_ms);
-  output += '}';
-}
-
-void KafkaMetricsFlusher::flushGaugeJson(std::string& output, const Stats::Gauge& gauge,
-                                         int64_t snapshot_time_ms, bool& first) const {
-  if (!first) {
-    output += ',';
-  }
-  first = false;
-
-  output += "{\"type\":\"gauge\"";
-  appendMetricName(output, gauge);
-  appendTags(output, gauge);
-
-  output += ",\"value\":";
-  output += std::to_string(gauge.value());
-  output += ",\"timestamp_ms\":";
-  output += std::to_string(snapshot_time_ms);
-  output += '}';
-}
-
-void KafkaMetricsFlusher::flushHistogramJson(std::string& output,
-                                             const Stats::ParentHistogram& histogram,
-                                             int64_t snapshot_time_ms, bool& first) const {
-  if (!first) {
-    output += ',';
-  }
-  first = false;
-
-  const Stats::HistogramStatistics& hist_stats = histogram.intervalStatistics();
-
-  output += "{\"type\":\"histogram\"";
-  appendMetricName(output, histogram);
-  appendTags(output, histogram);
-
-  output += ",\"sample_count\":";
-  output += std::to_string(hist_stats.sampleCount());
-  output += ",\"sample_sum\":";
-  output += std::to_string(hist_stats.sampleSum());
-
-  output += ",\"buckets\":[";
-  bool first_bucket = true;
-  for (size_t i = 0; i < hist_stats.supportedBuckets().size(); i++) {
-    if (!first_bucket) {
-      output += ',';
-    }
-    first_bucket = false;
-    output += "{\"upper_bound\":";
-    output += std::to_string(hist_stats.supportedBuckets()[i]);
-    output += ",\"cumulative_count\":";
-    output += std::to_string(hist_stats.computedBuckets()[i]);
-    output += '}';
-  }
-  output += ']';
-
-  output += ",\"quantiles\":[";
-  bool first_quantile = true;
-  for (size_t i = 0; i < hist_stats.supportedQuantiles().size(); i++) {
-    if (!first_quantile) {
-      output += ',';
-    }
-    first_quantile = false;
-    output += "{\"quantile\":";
-    output += std::to_string(hist_stats.supportedQuantiles()[i]);
-    output += ",\"value\":";
-    output += std::to_string(hist_stats.computedQuantiles()[i]);
-    output += '}';
-  }
-  output += ']';
-
-  output += ",\"timestamp_ms\":";
-  output += std::to_string(snapshot_time_ms);
-  output += '}';
 }
 
 // --- Protobuf serialization ---
@@ -293,40 +272,6 @@ std::vector<std::string> KafkaMetricsFlusher::flushProtobuf(Stats::MetricSnapsho
   return messages;
 }
 
-void KafkaMetricsFlusher::appendMetricName(std::string& output, const Stats::Metric& metric) const {
-  output += ",\"name\":\"";
-  if (emit_tags_as_labels_) {
-    jsonEscape(output, metric.tagExtractedName());
-  } else {
-    jsonEscape(output, metric.name());
-  }
-  output += '"';
-}
-
-void KafkaMetricsFlusher::appendTags(std::string& output, const Stats::Metric& metric) const {
-  if (!emit_tags_as_labels_) {
-    return;
-  }
-  const auto& tags = metric.tags();
-  if (tags.empty()) {
-    return;
-  }
-  output += ",\"tags\":{";
-  bool first_tag = true;
-  for (const auto& tag : tags) {
-    if (!first_tag) {
-      output += ',';
-    }
-    first_tag = false;
-    output += '"';
-    jsonEscape(output, tag.name_);
-    output += "\":\"";
-    jsonEscape(output, tag.value_);
-    output += '"';
-  }
-  output += '}';
-}
-
 // KafkaStatsSink
 
 KafkaStatsSink::KafkaStatsSink(std::unique_ptr<RdKafka::Producer> producer,
@@ -350,17 +295,30 @@ void KafkaStatsSink::flush(Stats::MetricSnapshot& snapshot) {
 }
 
 void KafkaStatsSink::produce(const std::string& message) {
-  RdKafka::ErrorCode ec = producer_->produce(
-      topic_, RdKafka::Topic::PARTITION_UA, RdKafka::Producer::RK_MSG_COPY,
-      const_cast<char*>(message.data()), message.size(), nullptr, 0, 0, nullptr, nullptr);
+  constexpr int kMaxQueueFullRetries = 3;
+  RdKafka::ErrorCode ec = RdKafka::ERR_NO_ERROR;
 
-  if (ec != RdKafka::ERR_NO_ERROR) {
-    ENVOY_LOG(warn, "Failed to produce metrics to Kafka topic '{}': {}", topic_,
-              RdKafka::err2str(ec));
-    if (ec == RdKafka::ERR__QUEUE_FULL) {
-      producer_->poll(100);
+  for (int attempt = 0; attempt < kMaxQueueFullRetries; ++attempt) {
+    // const_cast is safe: RK_MSG_COPY makes librdkafka copy the data before returning.
+    ec = producer_->produce(topic_, RdKafka::Topic::PARTITION_UA,
+                            RdKafka::Producer::RK_MSG_COPY,
+                            const_cast<char*>(message.data()), message.size(), nullptr, 0, 0,
+                            nullptr, nullptr);
+    if (ec == RdKafka::ERR_NO_ERROR) {
+      return;
     }
+    if (ec != RdKafka::ERR__QUEUE_FULL) {
+      ENVOY_LOG(warn, "Failed to produce metrics to Kafka topic '{}': {}", topic_,
+                RdKafka::err2str(ec));
+      return;
+    }
+    // Poll to run delivery callbacks and free queue space before retrying.
+    producer_->poll(100);
   }
+
+  ENVOY_LOG(warn,
+            "Dropping metrics batch for Kafka topic '{}': producer queue full after {} retries",
+            topic_, kMaxQueueFullRetries);
 }
 
 } // namespace Kafka
