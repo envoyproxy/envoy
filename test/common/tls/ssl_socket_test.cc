@@ -1473,7 +1473,7 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestLeafOnly) {
 }
 
 // Verify that validatedPeerIssuer() returns the correct issuer even when the client sends a
-// chain containing a decoy CA that did not sign the leaf. OpenSSL's X509_verify_cert re-orders
+// chain containing a decoy CA that did not sign the leaf. BoringSSL's X509_verify_cert re-orders
 // the chain correctly, so validated_chain_[1] is the actual issuer (Intermediate CA), not the
 // decoy (Root CA).
 //
