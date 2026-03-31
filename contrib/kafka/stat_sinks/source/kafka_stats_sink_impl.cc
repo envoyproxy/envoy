@@ -300,8 +300,7 @@ void KafkaStatsSink::produce(const std::string& message) {
 
   for (int attempt = 0; attempt < kMaxQueueFullRetries; ++attempt) {
     // const_cast is safe: RK_MSG_COPY makes librdkafka copy the data before returning.
-    ec = producer_->produce(topic_, RdKafka::Topic::PARTITION_UA,
-                            RdKafka::Producer::RK_MSG_COPY,
+    ec = producer_->produce(topic_, RdKafka::Topic::PARTITION_UA, RdKafka::Producer::RK_MSG_COPY,
                             const_cast<char*>(message.data()), message.size(), nullptr, 0, 0,
                             nullptr, nullptr);
     if (ec == RdKafka::ERR_NO_ERROR) {
