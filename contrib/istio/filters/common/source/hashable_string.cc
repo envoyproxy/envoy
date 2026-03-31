@@ -14,7 +14,8 @@
 namespace Istio { // NOLINT(namespace-envoy)
 namespace Common {
 
-HashableString::HashableString(absl::string_view value) : Envoy::Router::StringAccessorImpl(value) {}
+HashableString::HashableString(absl::string_view value)
+    : Envoy::Router::StringAccessorImpl(value) {}
 
 absl::optional<uint64_t> HashableString::hash() const {
   return Envoy::HashUtil::xxHash64(asString());
