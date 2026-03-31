@@ -937,6 +937,12 @@ case $CI_TARGET in
         ;;
 
     verify-distroless)
+        DISTROLESS_TEST_TARGET="${DISTROLESS_TEST_TARGET:-distroless-dev}"
+        distroless_user="$(docker inspect --format '{{.Config.User}}' envoyproxy/envoy:"${DISTROLESS_TEST_TARGET}")"
+        if [[ "$distroless_user" == 0 ]]; then
+            echo "FAIL: Distroless container uses the root user" >&2
+            exit 1
+        fi
         docker build -f ci/Dockerfile-distroless-testing --target=envoy-distroless -t distroless-testing .
         docker run --rm distroless-testing
         docker build -f ci/Dockerfile-distroless-testing --target=envoy-contrib-distroless -t distroless-contrib-testing .
