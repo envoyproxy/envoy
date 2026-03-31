@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.mcp_json_rest_bridge.v3;
 
+import "google/protobuf/wrappers.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -98,6 +100,8 @@ message McpJsonRestBridge {
 
 // Configuration for the server metadata.
 message ServerInfo {
+  // [#not-implemented-hide:]
+  // [#comment:TODO(guoyilin42): Implement supported_protocol_versions]
   // Lists the MCP protocol versions supported by this MCP endpoint.
   //
   // - If provided: The extension enforces version negotiation according to the MCP specification:
@@ -108,8 +112,19 @@ message ServerInfo {
   // Example values: ["2025-11-25", "2025-06-18"]
   repeated string supported_protocol_versions = 1;
 
+  // [#not-implemented-hide:]
+  // [#comment:TODO(guoyilin42): Implement description]
   // Optional description of the server.
   string description = 2;
+
+  // The fallback protocol version to use if the client does not provide the ``mcp-protocol-version`` header.
+  //
+  // - If provided: The extension uses this version as the fallback protocol version.
+  // - If not provided: The extension uses the fallback protocol version defined in the latest MCP
+  //   specification. For example, the current latest 2025-11-25 specification designates "2025-03-26"
+  //   as the fallback protocol version.
+  //   See https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#protocol-version-header
+  google.protobuf.StringValue fallback_protocol_version = 3;
 }
 
 // Configuration for the MCP tool capability of the server.
@@ -117,6 +132,8 @@ message ServerToolConfig {
   // List of MCP tools configurations.
   repeated ToolConfig tools = 1;
 
+  // [#not-implemented-hide:]
+  // [#comment:TODO(guoyilin42): Implement list_changed]
   // Whether this server supports notifications for changes to the tool list.
   bool list_changed = 2;
 

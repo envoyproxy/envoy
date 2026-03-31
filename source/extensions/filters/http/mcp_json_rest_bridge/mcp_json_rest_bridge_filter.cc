@@ -7,6 +7,7 @@
 #include "envoy/http/header_map.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
 
@@ -30,13 +31,13 @@ using ::nlohmann::json;
 namespace McpConstants = Envoy::Extensions::Filters::Common::Mcp::McpConstants;
 
 bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
-  static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> kSupportedMcpVersions({
+  static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> supported_mcp_versions({
       McpConstants::LATEST_SUPPORTED_MCP_VERSION,
-      McpConstants::DEFAULT_PROTOCOL_VERSION,
+      McpConstants::FALLBACK_PROTOCOL_VERSION,
       McpConstants::MCP_VERSION_2024_11_05,
       McpConstants::MCP_VERSION_2025_06_18,
   });
-  return kSupportedMcpVersions->contains(protocol_version);
+  return supported_mcp_versions->contains(protocol_version);
 }
 
 absl::StatusOr<json> getSessionId(const json& json_rpc) {
@@ -106,7 +107,8 @@ int getResponseCode(Http::ResponseHeaderMapOptConstRef response_headers) {
 }
 
 bool validateRequestMcpVersion(absl::string_view method,
-                               Http::RequestHeaderMapOptConstRef request_headers) {
+                               Http::RequestHeaderMapOptConstRef request_headers,
+                               absl::string_view fallback_protocol_version) {
   static const absl::NoDestructor<Http::LowerCaseString> mcp_protocol_version_header(
       McpConstants::MCP_PROTOCOL_VERSION_HEADER);
   // The initialize request is not expected to have MCP protocol version header.
@@ -114,9 +116,7 @@ bool validateRequestMcpVersion(absl::string_view method,
   if (method == McpConstants::Methods::INITIALIZE) {
     return true;
   }
-  // If MCP protocol version header is not provided, the default protocol
-  // version is 2025-03-26.
-  absl::string_view protocol_version = McpConstants::DEFAULT_PROTOCOL_VERSION;
+  absl::string_view protocol_version = fallback_protocol_version;
   if (request_headers.has_value()) {
     auto headers = request_headers->get(*mcp_protocol_version_header);
     if (!headers.empty()) {
@@ -131,7 +131,9 @@ bool validateRequestMcpVersion(absl::string_view method,
 McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
         proto_config)
-    : proto_config_(proto_config) {
+    : proto_config_(proto_config), fallback_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                       proto_config_.server_info(), fallback_protocol_version,
+                                       std::string(McpConstants::FALLBACK_PROTOCOL_VERSION))) {
   for (const auto& tool : proto_config.tool_config().tools()) {
     tool_to_http_rule_[tool.name()] = tool.http_rule();
   }
@@ -289,7 +291,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
   }
 
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
-  if (!validateRequestMcpVersion(method, request_headers)) {
+  if (!validateRequestMcpVersion(method, request_headers, config_->fallbackProtocolVersion())) {
     sendErrorResponse(Http::Code::BadRequest,
                       "mcp_json_rest_bridge_filter_unsupported_protocol_version",
                       generateErrorJsonResponse(-32602, "Unsupported protocol version").dump());

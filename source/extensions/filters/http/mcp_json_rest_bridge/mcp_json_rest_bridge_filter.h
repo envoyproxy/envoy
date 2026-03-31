@@ -38,11 +38,14 @@ public:
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getToolsListHttpRule() const;
 
+  const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
+
 private:
   absl::flat_hash_map<std::string,
                       envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
       tool_to_http_rule_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
+  std::string fallback_protocol_version_;
 };
 
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
