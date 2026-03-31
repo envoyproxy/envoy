@@ -287,6 +287,15 @@ public:
     return expected_issuer_peer_certificate_serial_;
   }
 
+  TestUtilOptions& setExpectEmptyPeerCertificateIssuer() {
+    expect_empty_peer_certificate_issuer_ = true;
+    return *this;
+  }
+
+  bool expectEmptyPeerCertificateIssuer() const {
+    return expect_empty_peer_certificate_issuer_;
+  }
+
   TestUtilOptions& setExpectedPeerSubject(const std::string& expected_peer_subject) {
     expected_peer_subject_ = expected_peer_subject;
     return *this;
@@ -422,6 +431,7 @@ private:
   bool expect_no_cert_{false};
   bool expect_no_cert_chain_{false};
   bool expect_private_key_method_{false};
+  bool expect_empty_peer_certificate_issuer_{false};
   NiceMock<Runtime::MockLoader> runtime_;
   Network::ConnectionEvent expected_server_close_event_{Network::ConnectionEvent::RemoteClose};
   std::string expected_sha256_digest_;
@@ -664,6 +674,10 @@ void testUtil(const TestUtilOptions& options) {
                   server_connection->ssl()->serialNumberPeerCertificateIssuer());
         EXPECT_EQ(options.expectedSerialNumberPeerCertificateIssuer(),
                   server_connection->ssl()->serialNumberPeerCertificateIssuer());
+      }
+      if (options.expectEmptyPeerCertificateIssuer()) {
+        EXPECT_EQ("", server_connection->ssl()->sha256PeerCertificateIssuerDigest());
+        EXPECT_EQ("", server_connection->ssl()->serialNumberPeerCertificateIssuer());
       }
       if (!options.expectedPeerSubject().empty()) {
         EXPECT_EQ(options.expectedPeerSubject(),
@@ -1491,6 +1505,89 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestDecoyInChain) {
   testUtil(test_options.setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
                .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
                .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
+}
+
+// Verify that sha256PeerCertificateIssuerDigest() and serialNumberPeerCertificateIssuer()
+// return empty strings when mTLS is not configured (no client certificate).
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestNonMtls) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: false
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectNoCert().setExpectNoCertChain().setExpectEmptyPeerCertificateIssuer());
+}
+
+// Verify that sha256PeerCertificateIssuerDigest() and serialNumberPeerCertificateIssuer()
+// return empty strings when the client certificate is not trusted (ACCEPT_UNTRUSTED).
+// The validated chain is empty, so no issuer is available.
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestUntrusted) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"
+      trust_chain_verification: ACCEPT_UNTRUSTED
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectEmptyPeerCertificateIssuer());
+}
+
+// Verify that sha256PeerCertificateIssuerDigest() and serialNumberPeerCertificateIssuer()
+// return empty strings for a self-signed client certificate. The validated chain has only
+// one entry (the self-signed cert itself), so there is no issuer certificate.
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestSelfSigned) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectEmptyPeerCertificateIssuer());
 }
 
 TEST_P(SslSocketTest, GetCertDigestsInvalidFiles) {
