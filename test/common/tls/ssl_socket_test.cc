@@ -1425,7 +1425,7 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
 }
 
 // Verify that validatedPeerIssuer() returns the correct issuer when the client sends only a
-// leaf certificate with no intermediate chain. OpenSSL's X509_verify_cert builds the validated
+// leaf certificate with no intermediate chain. BoringSSL's X509_verify_cert builds the validated
 // chain using the trust store, so validated_chain_[1] is the CA that signed the leaf.
 TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestLeafOnly) {
   // no_san_cert.pem contains a single leaf cert signed directly by ca_cert.pem (Root CA).
