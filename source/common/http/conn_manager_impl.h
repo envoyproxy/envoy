@@ -312,7 +312,8 @@ private:
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
-    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+    OptRef<const Router::Route> route(const Router::RouteCallback& cb) override;
+    Router::RouteConstSharedPtr routeSharedPtr(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
     void refreshRouteCluster() override;
     void requestRouteConfigUpdate(
