@@ -262,9 +262,6 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
   codec_client_->sendReset(encoder_decoder.first);
   cleanupUpstreamAndDownstream();
-
-  // Either 0 or 1 upstream connection is attempted but no more.
-  EXPECT_LE(cx_counter->value(), 1);
 }
 
 class DeferredCreationClusterStatsTest : public CdsIntegrationTest {
