@@ -32,7 +32,6 @@ using ::testing::Return;
 TEST(OrcaLoadReportHandlerTest, GetUtilizationFromOrcaReport_ApplicationUtilization) {
   xds::data::orca::v3::OrcaLoadReport report;
   report.set_application_utilization(0.5);
-  report.mutable_named_metrics()->insert({"foo", 0.3});
   report.set_cpu_utilization(0.6);
   EXPECT_EQ(OrcaLoadReportHandler::getUtilizationFromOrcaReport(report, {"named_metrics.foo"}),
             0.5);

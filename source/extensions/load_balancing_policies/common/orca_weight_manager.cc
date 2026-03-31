@@ -35,18 +35,18 @@ OrcaLoadReportHandler::OrcaLoadReportHandler(const OrcaWeightManagerConfig& conf
 double OrcaLoadReportHandler::getUtilizationFromOrcaReport(
     const OrcaLoadReportProto& orca_load_report,
     const std::vector<std::string>& metric_names_for_computing_utilization) {
-  // If application_utilization is valid, use it as the utilization metric.
-  double utilization = orca_load_report.application_utilization();
-  if (utilization > 0) {
-    return utilization;
-  }
-  // Otherwise, find the most constrained utilization metric.
-  utilization =
+  // Find the most constrained utilization metric in `metric_names_for_computing_utilization`.
+  double utilization =
       Envoy::Orca::getMaxUtilization(metric_names_for_computing_utilization, orca_load_report);
   if (utilization > 0) {
     return utilization;
   }
-  // If utilization is <= 0, use cpu_utilization.
+  // If named metrics are not available, use `application_utilization` as the utilization metric.
+  utilization = orca_load_report.application_utilization();
+  if (utilization > 0) {
+    return utilization;
+  }
+  // If utilization is <= 0, use `cpu_utilization` as the utilization metric.
   return orca_load_report.cpu_utilization();
 }
 
