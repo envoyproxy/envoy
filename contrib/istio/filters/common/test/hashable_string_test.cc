@@ -3,6 +3,7 @@
 
 #include "envoy/common/hashable.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -11,7 +12,6 @@
 
 #include "contrib/istio/filters/common/source/hashable_string.h"
 #include "gmock/gmock.h"
-#include "google/protobuf/repeated_field.h"
 #include "gtest/gtest.h"
 
 namespace Istio {

@@ -8,12 +8,15 @@
 
 #include "source/common/common/hash.h"
 
-namespace Istio {
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+
+namespace Istio { // NOLINT(namespace-envoy)
 namespace Common {
 
-HashableString::HashableString(std::string_view value) : Envoy::Router::StringAccessorImpl(value) {}
+HashableString::HashableString(absl::string_view value) : Envoy::Router::StringAccessorImpl(value) {}
 
-std::optional<uint64_t> HashableString::hash() const {
+absl::optional<uint64_t> HashableString::hash() const {
   return Envoy::HashUtil::xxHash64(asString());
 }
 
@@ -25,7 +28,7 @@ public:
   std::string name() const override { return "istio.hashable_string"; }
 
   std::unique_ptr<Envoy::StreamInfo::FilterState::Object>
-  createFromBytes(std::string_view data) const override {
+  createFromBytes(absl::string_view data) const override {
     return std::make_unique<HashableString>(data);
   }
 };
