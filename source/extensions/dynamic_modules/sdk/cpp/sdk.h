@@ -2,13 +2,15 @@
 
 #include <cassert>
 #include <cstddef>
+#include <format>
+#include <functional>
+#include <map>
 #include <memory>
+#include <optional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
-
-#include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
-#include "absl/types/span.h"
 
 namespace Envoy {
 namespace DynamicModules {
@@ -25,7 +27,7 @@ public:
    * Constructs a BufferView from a string_view.
    * @param data The string view to construct from.
    */
-  BufferView(absl::string_view data) : data_(data.data()), length_(data.size()) {}
+  BufferView(std::string_view data) : data_(data.data()), length_(data.size()) {}
   BufferView(const char* data, size_t length) : data_(data), length_(length) {}
   /**
    * Default constructor.
@@ -36,7 +38,7 @@ public:
    * Returns the buffer as a string_view.
    * @return The buffer contents as a string_view.
    */
-  absl::string_view toStringView() const { return {data_, length_}; }
+  std::string_view toStringView() const { return {data_, length_}; }
 
   size_t size() const { return length_; }
   const char* data() const { return data_; }
@@ -57,7 +59,7 @@ public:
    * @param key The header key.
    * @param value The header value.
    */
-  HeaderView(absl::string_view key, absl::string_view value)
+  HeaderView(std::string_view key, std::string_view value)
       : key_data_(key.data()), key_length_(key.size()), value_data_(value.data()),
         value_length_(value.size()) {}
   HeaderView(const char* key_data, size_t key_length, const char* value_data, size_t value_length)
@@ -72,13 +74,13 @@ public:
    * Returns the header key as a string_view.
    * @return The header key.
    */
-  absl::string_view key() const { return {key_data_, key_length_}; }
+  std::string_view key() const { return {key_data_, key_length_}; }
 
   /**
    * Returns the header value as a string_view.
    * @return The header value.
    */
-  absl::string_view value() const { return {value_data_, value_length_}; }
+  std::string_view value() const { return {value_data_, value_length_}; }
 
   const char* keyData() const { return key_data_; }
   size_t keyLength() const { return key_length_; }
@@ -119,7 +121,7 @@ public:
    * Appends data to the buffer.
    * @param data The data to append.
    */
-  virtual void append(absl::string_view data) = 0;
+  virtual void append(std::string_view data) = 0;
 };
 
 /** HeaderMap interface */
@@ -132,14 +134,14 @@ public:
    * @param key The header key to look up.
    * @return Vector of string views containing all values for the key.
    */
-  virtual std::vector<absl::string_view> get(absl::string_view key) const = 0;
+  virtual std::vector<std::string_view> get(std::string_view key) const = 0;
 
   /**
    * Returns the first value for a given header key.
    * @param key The header key to look up.
    * @return The first header value, or empty if not found.
    */
-  virtual absl::string_view getOne(absl::string_view key) const = 0;
+  virtual std::string_view getOne(std::string_view key) const = 0;
 
   /**
    * Returns all headers.
@@ -158,20 +160,20 @@ public:
    * @param key The header key.
    * @param value The header value.
    */
-  virtual void set(absl::string_view key, absl::string_view value) = 0;
+  virtual void set(std::string_view key, std::string_view value) = 0;
 
   /**
    * Adds a header key-value pair (appends to existing).
    * @param key The header key.
    * @param value The header value.
    */
-  virtual void add(absl::string_view key, absl::string_view value) = 0;
+  virtual void add(std::string_view key, std::string_view value) = 0;
 
   /**
    * Removes all headers with the given key.
    * @param key The header key to remove.
    */
-  virtual void remove(absl::string_view key) = 0;
+  virtual void remove(std::string_view key) = 0;
 };
 
 /** Attribute IDs */
@@ -267,8 +269,8 @@ public:
    * @param headers Span of response headers.
    * @param body_chunks Span of response body chunks.
    */
-  virtual void onHttpCalloutDone(HttpCalloutResult result, absl::Span<const HeaderView> headers,
-                                 absl::Span<const BufferView> body_chunks) = 0;
+  virtual void onHttpCalloutDone(HttpCalloutResult result, std::span<const HeaderView> headers,
+                                 std::span<const BufferView> body_chunks) = 0;
 };
 
 enum class HttpStreamResetReason : uint32_t {
@@ -292,7 +294,7 @@ public:
    * @param headers The response headers.
    * @param end_stream Indicates if this is the end of the stream.
    */
-  virtual void onHttpStreamHeaders(uint64_t stream_id, absl::Span<const HeaderView> headers,
+  virtual void onHttpStreamHeaders(uint64_t stream_id, std::span<const HeaderView> headers,
                                    bool end_stream) = 0;
 
   /**
@@ -301,7 +303,7 @@ public:
    * @param body The response body chunks.
    * @param end_stream Indicates if this is the end of the stream.
    */
-  virtual void onHttpStreamData(uint64_t stream_id, absl::Span<const BufferView> body,
+  virtual void onHttpStreamData(uint64_t stream_id, std::span<const BufferView> body,
                                 bool end_stream) = 0;
 
   /**
@@ -309,7 +311,7 @@ public:
    * @param stream_id The ID of the stream.
    * @param trailers The response trailers.
    */
-  virtual void onHttpStreamTrailers(uint64_t stream_id, absl::Span<const HeaderView> trailers) = 0;
+  virtual void onHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) = 0;
 
   /**
    * Called when the stream is complete.
@@ -369,8 +371,8 @@ public:
    * @param key The metadata key.
    * @return Pair of string view and bool indicating if value was found.
    */
-  virtual absl::optional<absl::string_view> getMetadataString(absl::string_view ns,
-                                                              absl::string_view key) = 0;
+  virtual std::optional<std::string_view> getMetadataString(std::string_view ns,
+                                                            std::string_view key) = 0;
 
   /**
    * Retrieves a numeric metadata value by namespace and key.
@@ -378,7 +380,7 @@ public:
    * @param key The metadata key.
    * @return Pair of double and bool indicating if value was found.
    */
-  virtual absl::optional<double> getMetadataNumber(absl::string_view ns, absl::string_view key) = 0;
+  virtual std::optional<double> getMetadataNumber(std::string_view ns, std::string_view key) = 0;
 
   /**
    * Retrieves a bool metadata value by namespace and key.
@@ -386,20 +388,20 @@ public:
    * @param key The metadata key.
    * @return The bool value if found, otherwise nullopt.
    */
-  virtual absl::optional<bool> getMetadataBool(absl::string_view ns, absl::string_view key) = 0;
+  virtual std::optional<bool> getMetadataBool(std::string_view ns, std::string_view key) = 0;
 
   /**
    * Retrieves all keys in a metadata namespace.
    * @param ns The metadata namespace.
    * @return Vector of key strings.
    */
-  virtual std::vector<absl::string_view> getMetadataKeys(absl::string_view ns) = 0;
+  virtual std::vector<std::string_view> getMetadataKeys(std::string_view ns) = 0;
 
   /**
    * Retrieves all namespace names in the metadata.
    * @return Vector of namespace name strings.
    */
-  virtual std::vector<absl::string_view> getMetadataNamespaces() = 0;
+  virtual std::vector<std::string_view> getMetadataNamespaces() = 0;
 
   /**
    * Sets a string metadata value.
@@ -407,8 +409,7 @@ public:
    * @param key The metadata key.
    * @param value The string value to set.
    */
-  virtual void setMetadata(absl::string_view ns, absl::string_view key,
-                           absl::string_view value) = 0;
+  virtual void setMetadata(std::string_view ns, std::string_view key, std::string_view value) = 0;
 
   /**
    * Sets a numeric metadata value.
@@ -416,7 +417,7 @@ public:
    * @param key The metadata key.
    * @param value The numeric value to set.
    */
-  virtual void setMetadata(absl::string_view ns, absl::string_view key, double value) = 0;
+  virtual void setMetadata(std::string_view ns, std::string_view key, double value) = 0;
 
   /**
    * Sets a bool metadata value.
@@ -424,47 +425,128 @@ public:
    * @param key The metadata key.
    * @param value The bool value to set.
    */
-  virtual void setMetadata(absl::string_view ns, absl::string_view key, bool value) = 0;
+  virtual void setMetadata(std::string_view ns, std::string_view key, bool value) = 0;
 
   // Prevent const char* from implicitly converting to bool instead of string_view.
-  void setMetadata(absl::string_view ns, absl::string_view key, const char* value) {
-    setMetadata(ns, key, absl::string_view(value));
+  void setMetadata(std::string_view ns, std::string_view key, const char* value) {
+    setMetadata(ns, key, std::string_view(value));
   }
+
+  /**
+   * Appends a numeric value to the dynamic metadata list stored under the given namespace and key.
+   * If the key does not exist, a new list is created. Returns false if the key exists but is not a
+   * list, or if the metadata is not accessible.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The number to append.
+   * @return true if the operation is successful, false otherwise.
+   */
+  virtual bool addMetadataList(std::string_view ns, std::string_view key, double value) = 0;
+
+  /**
+   * Appends a string value to the dynamic metadata list stored under the given namespace and key.
+   * If the key does not exist, a new list is created. Returns false if the key exists but is not a
+   * list, or if the metadata is not accessible.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The string to append.
+   * @return true if the operation is successful, false otherwise.
+   */
+  virtual bool addMetadataList(std::string_view ns, std::string_view key,
+                               std::string_view value) = 0;
+
+  // Prevent const char* from implicitly converting to bool instead of string_view.
+  bool addMetadataList(std::string_view ns, std::string_view key, const char* value) {
+    return addMetadataList(ns, key, std::string_view(value));
+  }
+
+  /**
+   * Appends a bool value to the dynamic metadata list stored under the given namespace and key.
+   * If the key does not exist, a new list is created. Returns false if the key exists but is not a
+   * list, or if the metadata is not accessible.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param value The bool to append.
+   * @return true if the operation is successful, false otherwise.
+   */
+  virtual bool addMetadataList(std::string_view ns, std::string_view key, bool value) = 0;
+
+  /**
+   * Returns the number of elements in the metadata list stored under the given namespace and key.
+   * Returns nullopt if the metadata is not accessible, the namespace or key does not exist, or the
+   * value is not a list.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   */
+  virtual std::optional<size_t> getMetadataListSize(std::string_view ns, std::string_view key) = 0;
+
+  /**
+   * Returns the number element at the given index in the metadata list stored under the given
+   * namespace and key. Returns nullopt if the metadata is not accessible, the namespace or key does
+   * not exist, the value is not a list, the index is out of range, or the element is not a number.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param index The zero-based index.
+   */
+  virtual std::optional<double> getMetadataListNumber(std::string_view ns, std::string_view key,
+                                                      size_t index) = 0;
+
+  /**
+   * Returns the string element at the given index in the metadata list stored under the given
+   * namespace and key. Returns nullopt if the metadata is not accessible, the namespace or key does
+   * not exist, the value is not a list, the index is out of range, or the element is not a string.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param index The zero-based index.
+   */
+  virtual std::optional<std::string_view>
+  getMetadataListString(std::string_view ns, std::string_view key, size_t index) = 0;
+
+  /**
+   * Returns the bool element at the given index in the metadata list stored under the given
+   * namespace and key. Returns nullopt if the metadata is not accessible, the namespace or key does
+   * not exist, the value is not a list, the index is out of range, or the element is not a bool.
+   * @param ns The metadata namespace.
+   * @param key The metadata key.
+   * @param index The zero-based index.
+   */
+  virtual std::optional<bool> getMetadataListBool(std::string_view ns, std::string_view key,
+                                                  size_t index) = 0;
 
   /**
    * Retrieves the serialized filter state value of the stream.
    * @param key The filter state key.
    * @return The filter state value if found, otherwise empty.
    */
-  virtual absl::optional<absl::string_view> getFilterState(absl::string_view key) = 0;
+  virtual std::optional<std::string_view> getFilterState(std::string_view key) = 0;
 
   /**
    * Sets the serialized filter state value of the stream.
    * @param key The filter state key.
    * @param value The filter state value.
    */
-  virtual void setFilterState(absl::string_view key, absl::string_view value) = 0;
+  virtual void setFilterState(std::string_view key, std::string_view value) = 0;
 
   /**
    * Retrieves a string attribute value.
    * @param id The attribute ID.
    * @return Pair of string view and bool indicating if attribute was found.
    */
-  virtual absl::optional<absl::string_view> getAttributeString(AttributeID id) = 0;
+  virtual std::optional<std::string_view> getAttributeString(AttributeID id) = 0;
 
   /**
    * Retrieves a numeric attribute value.
    * @param id The attribute ID.
    * @return Pair of double and bool indicating if attribute was found.
    */
-  virtual absl::optional<uint64_t> getAttributeNumber(AttributeID id) = 0;
+  virtual std::optional<uint64_t> getAttributeNumber(AttributeID id) = 0;
 
   /**
    * Retrieves a boolean attribute value.
    * @param id The attribute ID.
    * @return The bool value if found, otherwise nullopt.
    */
-  virtual absl::optional<bool> getAttributeBool(AttributeID id) = 0;
+  virtual std::optional<bool> getAttributeBool(AttributeID id) = 0;
 
   /**
    * Sends a local response with status code, body, and detail.
@@ -472,34 +554,34 @@ public:
    * @param body The response body.
    * @param detail The response detail.
    */
-  virtual void sendLocalResponse(uint32_t status, absl::Span<const HeaderView> headers,
-                                 absl::string_view body, absl::string_view detail) = 0;
+  virtual void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
+                                 std::string_view body, std::string_view detail) = 0;
 
   /**
    * Sends response headers. This is used for streaming local replies.
    * @param headers The response headers.
    * @param end_stream Indicates if this is the end of the stream.
    */
-  virtual void sendResponseHeaders(absl::Span<const HeaderView> headers, bool end_stream) = 0;
+  virtual void sendResponseHeaders(std::span<const HeaderView> headers, bool end_stream) = 0;
 
   /**
    * Sends response data. This is used for streaming local replies.
    * @param body The response body data.
    * @param end_stream Indicates if this is the end of the stream.
    */
-  virtual void sendResponseData(absl::string_view body, bool end_stream) = 0;
+  virtual void sendResponseData(std::string_view body, bool end_stream) = 0;
 
   /**
    * Sends response trailers. This is used for streaming local replies.
    * @param trailers The response trailers.
    */
-  virtual void sendResponseTrailers(absl::Span<const HeaderView> trailers) = 0;
+  virtual void sendResponseTrailers(std::span<const HeaderView> trailers) = 0;
 
   /**
    * Adds a custom flag to the current request context.
    * @param flag The custom flag to add.
    */
-  virtual void addCustomFlag(absl::string_view flag) = 0;
+  virtual void addCustomFlag(std::string_view flag) = 0;
 
   /**
    * Continues processing the current request.
@@ -515,6 +597,15 @@ public:
    * Clear route cache to force re-evaluation of route.
    */
   virtual void clearRouteCache() = 0;
+
+  /**
+   * Clear only the cluster selection for the current route without clearing the entire route cache.
+   *
+   * This is a subset of clearRouteCache(). Use this when a filter modifies headers that affect
+   * cluster selection but not the route itself. This is more efficient than clearing the entire
+   * route cache.
+   */
+  virtual void refreshRouteCluster() = 0;
 
   /**
    * Returns reference to request headers.
@@ -611,8 +702,8 @@ public:
    * @return HttpCalloutInitResult and callout ID pair.
    */
   virtual std::pair<HttpCalloutInitResult, uint64_t>
-  httpCallout(absl::string_view cluster, absl::Span<const HeaderView> headers,
-              absl::string_view body, uint64_t timeout_ms, HttpCalloutCallback& cb) = 0;
+  httpCallout(std::string_view cluster, std::span<const HeaderView> headers, std::string_view body,
+              uint64_t timeout_ms, HttpCalloutCallback& cb) = 0;
 
   /**
    * Starts a new HTTP stream to an external service.
@@ -626,8 +717,8 @@ public:
    * @return HttpCalloutInitResult and stream ID pair.
    */
   virtual std::pair<HttpCalloutInitResult, uint64_t>
-  startHttpStream(absl::string_view cluster, absl::Span<const HeaderView> headers,
-                  absl::string_view body, bool end_of_stream, uint64_t timeout_ms,
+  startHttpStream(std::string_view cluster, std::span<const HeaderView> headers,
+                  std::string_view body, bool end_of_stream, uint64_t timeout_ms,
                   HttpStreamCallback& cb) = 0;
 
   /**
@@ -637,7 +728,7 @@ public:
    * @param end_of_stream Whether this is the end of the stream.
    * @return True if successful, false otherwise.
    */
-  virtual bool sendHttpStreamData(uint64_t stream_id, absl::string_view body,
+  virtual bool sendHttpStreamData(uint64_t stream_id, std::string_view body,
                                   bool end_of_stream) = 0;
 
   /**
@@ -646,8 +737,7 @@ public:
    * @param trailers The trailers to send.
    * @return True if successful, false otherwise.
    */
-  virtual bool sendHttpStreamTrailers(uint64_t stream_id,
-                                      absl::Span<const HeaderView> trailers) = 0;
+  virtual bool sendHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) = 0;
 
   /**
    * Resets an existing HTTP stream.
@@ -674,7 +764,7 @@ public:
    * @return MetricsResult indicating success or failure.
    */
   virtual MetricsResult recordHistogramValue(MetricID id, uint64_t value,
-                                             absl::Span<const BufferView> tags_values = {}) = 0;
+                                             std::span<const BufferView> tags_values = {}) = 0;
 
   /**
    * Sets a gauge value with optional tags.
@@ -684,7 +774,7 @@ public:
    * @return MetricsResult indicating success or failure.
    */
   virtual MetricsResult setGaugeValue(MetricID id, uint64_t value,
-                                      absl::Span<const BufferView> tags_values = {}) = 0;
+                                      std::span<const BufferView> tags_values = {}) = 0;
 
   /**
    * Increments a gauge value with optional tags.
@@ -694,7 +784,7 @@ public:
    * @return MetricsResult indicating success or failure.
    */
   virtual MetricsResult incrementGaugeValue(MetricID id, uint64_t value,
-                                            absl::Span<const BufferView> tags_values = {}) = 0;
+                                            std::span<const BufferView> tags_values = {}) = 0;
 
   /**
    * Decrements a gauge value with optional tags.
@@ -704,7 +794,7 @@ public:
    * @return MetricsResult indicating success or failure.
    */
   virtual MetricsResult decrementGaugeValue(MetricID id, uint64_t value,
-                                            absl::Span<const BufferView> tags_values = {}) = 0;
+                                            std::span<const BufferView> tags_values = {}) = 0;
 
   /**
    * Increments a counter value with optional tags.
@@ -714,7 +804,7 @@ public:
    * @return MetricsResult indicating success or failure.
    */
   virtual MetricsResult incrementCounterValue(MetricID id, uint64_t value,
-                                              absl::Span<const BufferView> tags_values = {}) = 0;
+                                              std::span<const BufferView> tags_values = {}) = 0;
 
   /**
    * Checks if logging is enabled for the given log level.
@@ -728,7 +818,7 @@ public:
    * @param level The log level.
    * @param message The message to log.
    */
-  virtual void log(LogLevel level, absl::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message) = 0;
 };
 
 class HttpFilterConfigHandle {
@@ -742,7 +832,7 @@ public:
    * @return Pair of MetricID and MetricsResult indicating success or failure.
    */
   virtual std::pair<MetricID, MetricsResult>
-  defineHistogram(absl::string_view name, absl::Span<const BufferView> tags_keys = {}) = 0;
+  defineHistogram(std::string_view name, std::span<const BufferView> tags_keys = {}) = 0;
 
   /**
    * Defines a gauge metric with a name and optional tag keys.
@@ -751,7 +841,7 @@ public:
    * @return Pair of MetricID and MetricsResult indicating success or failure.
    */
   virtual std::pair<MetricID, MetricsResult>
-  defineGauge(absl::string_view name, absl::Span<const BufferView> tags_keys = {}) = 0;
+  defineGauge(std::string_view name, std::span<const BufferView> tags_keys = {}) = 0;
 
   /**
    * Defines a counter metric with a name and optional tag keys.
@@ -760,7 +850,7 @@ public:
    * @return Pair of MetricID and MetricsResult indicating success or failure.
    */
   virtual std::pair<MetricID, MetricsResult>
-  defineCounter(absl::string_view name, absl::Span<const BufferView> tags_keys = {}) = 0;
+  defineCounter(std::string_view name, std::span<const BufferView> tags_keys = {}) = 0;
 
   /**
    * Checks if logging is enabled for the given log level.
@@ -774,7 +864,7 @@ public:
    * @param level The log level.
    * @param message The message to log.
    */
-  virtual void log(LogLevel level, absl::string_view message) = 0;
+  virtual void log(LogLevel level, std::string_view message) = 0;
 
   /**
    * Initiates a one-shot HTTP callout to a cluster. The response will be delivered via
@@ -787,8 +877,8 @@ public:
    * @return HttpCalloutInitResult and callout ID pair.
    */
   virtual std::pair<HttpCalloutInitResult, uint64_t>
-  httpCallout(absl::string_view cluster, absl::Span<const HeaderView> headers,
-              absl::string_view body, uint64_t timeout_ms, HttpCalloutCallback& cb) = 0;
+  httpCallout(std::string_view cluster, std::span<const HeaderView> headers, std::string_view body,
+              uint64_t timeout_ms, HttpCalloutCallback& cb) = 0;
 
   /**
    * Starts a streamable HTTP callout to a cluster. Stream events will be delivered via
@@ -802,8 +892,8 @@ public:
    * @return HttpCalloutInitResult and stream ID pair.
    */
   virtual std::pair<HttpCalloutInitResult, uint64_t>
-  startHttpStream(absl::string_view cluster, absl::Span<const HeaderView> headers,
-                  absl::string_view body, bool end_of_stream, uint64_t timeout_ms,
+  startHttpStream(std::string_view cluster, std::span<const HeaderView> headers,
+                  std::string_view body, bool end_of_stream, uint64_t timeout_ms,
                   HttpStreamCallback& cb) = 0;
 
   /**
@@ -813,7 +903,7 @@ public:
    * @param end_of_stream If true, this is the last data chunk.
    * @return True if successful, false if the stream is not found.
    */
-  virtual bool sendHttpStreamData(uint64_t stream_id, absl::string_view body,
+  virtual bool sendHttpStreamData(uint64_t stream_id, std::string_view body,
                                   bool end_of_stream) = 0;
 
   /**
@@ -822,14 +912,20 @@ public:
    * @param trailers The trailers to send.
    * @return True if successful, false if the stream is not found.
    */
-  virtual bool sendHttpStreamTrailers(uint64_t stream_id,
-                                      absl::Span<const HeaderView> trailers) = 0;
+  virtual bool sendHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) = 0;
 
   /**
    * Resets an active stream started via startHttpStream.
    * @param stream_id The stream handle returned from startHttpStream.
    */
   virtual void resetHttpStream(uint64_t stream_id) = 0;
+
+  /**
+   * Returns a scheduler for deferred task execution. This can only be called on config loading
+   * event and then the returned Scheduler can be used in other threads.
+   * @return Unique pointer to Scheduler instance.
+   */
+  virtual std::shared_ptr<Scheduler> getScheduler() = 0;
 };
 
 /**
@@ -942,7 +1038,7 @@ public:
    * @return Unique pointer to a new HttpFilterFactory instance.
    */
   virtual std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                                    absl::string_view config_view) = 0;
+                                                    std::string_view config_view) = 0;
 
   /**
    * Creates route-specific configuration from unparsed config data.
@@ -951,7 +1047,7 @@ public:
    * @return Unique pointer to a new RouteSpecificConfig instance.
    */
   virtual std::unique_ptr<RouteSpecificConfig>
-  createPerRoute([[maybe_unused]] absl::string_view config_view) {
+  createPerRoute([[maybe_unused]] std::string_view config_view) {
     return nullptr;
   }
 };
@@ -986,16 +1082,16 @@ std::string readWholeResponseBody(HttpFilterHandle& handle);
 
 class HttpFilterConfigFactoryRegistry {
 public:
-  static const absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr>& getRegistry();
+  static const std::map<std::string_view, HttpFilterConfigFactoryPtr>& getRegistry();
 
 private:
-  static absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr>& getMutableRegistry();
+  static std::map<std::string_view, HttpFilterConfigFactoryPtr>& getMutableRegistry();
   friend class HttpFilterConfigFactoryRegister;
 };
 
 class HttpFilterConfigFactoryRegister {
 public:
-  HttpFilterConfigFactoryRegister(absl::string_view name, HttpFilterConfigFactoryPtr factory);
+  HttpFilterConfigFactoryRegister(std::string_view name, HttpFilterConfigFactoryPtr factory);
   ~HttpFilterConfigFactoryRegister();
 
 private:

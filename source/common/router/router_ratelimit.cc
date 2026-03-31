@@ -48,11 +48,12 @@ bool MatchInputRateLimitDescriptor::populateDescriptor(RateLimit::DescriptorEntr
   Http::Matching::HttpMatchingDataImpl data(info);
   data.onRequestHeaders(headers);
   auto result = data_input_->get(data);
-  if (!absl::holds_alternative<std::string>(result.data_)) {
+  auto string_data = result.stringData();
+  if (!string_data) {
     return false;
   }
-  if (absl::string_view str = absl::get<std::string>(result.data_); !str.empty()) {
-    descriptor_entry = {descriptor_key_, std::string(str)};
+  if (!string_data->empty()) {
+    descriptor_entry = {descriptor_key_, std::string(*string_data)};
   }
   return true;
 }
@@ -93,10 +94,11 @@ bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
 bool DestinationClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                   const std::string&, const Http::RequestHeaderMap&,
                                                   const StreamInfo::StreamInfo& info) const {
-  if (info.route() == nullptr || info.route()->routeEntry() == nullptr) {
+  const auto route = info.route();
+  if (!route || route->routeEntry() == nullptr) {
     return false;
   }
-  descriptor_entry = {"destination_cluster", info.route()->routeEntry()->clusterName()};
+  descriptor_entry = {"destination_cluster", route->routeEntry()->clusterName()};
   return true;
 }
 
@@ -205,9 +207,11 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   case envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC:
     metadata_source = &info.dynamicMetadata();
     break;
-  case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
-    metadata_source = &info.route()->metadata();
+  case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY: {
+    const auto route = info.route();
+    metadata_source = route ? &route->metadata() : nullptr;
     break;
+  }
   }
 
   const std::string metadata_string_value =

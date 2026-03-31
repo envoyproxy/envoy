@@ -208,7 +208,6 @@ build:compile-time-options --config=boringssl-fips
 build:compile-time-options --define=log_debug_assert_in_release=enabled
 build:compile-time-options --define=path_normalization_by_default=true
 build:compile-time-options --define=deprecated_features=disabled
-build:compile-time-options --define=tcmalloc=gperftools
 build:compile-time-options --define=uhv=enabled
 # gRPC has a lot of deprecated-enum-enum-conversion warnings with C++20
 build:compile-time-options --copt=-Wno-error=deprecated-enum-enum-conversion
@@ -223,18 +222,18 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 common:fips-common --test_tag_filters=-nofips
 common:fips-common --build_tag_filters=-nofips
-common:fips-common --//bazel:fips=True
+common:fips-common --@envoy//bazel:fips=True
 
 # BoringSSL FIPS
 common:boringssl-fips --config=fips-common
-common:boringssl-fips --//bazel:ssl=@boringssl_fips//:ssl
-common:boringssl-fips --//bazel:crypto=@boringssl_fips//:crypto
+common:boringssl-fips --@envoy//bazel:ssl=@boringssl_fips//:ssl
+common:boringssl-fips --@envoy//bazel:crypto=@boringssl_fips//:crypto
 
 # AWS-LC FIPS
 common:aws-lc-fips --config=fips-common
-common:aws-lc-fips --//bazel:ssl=@aws_lc//:ssl
-common:aws-lc-fips --//bazel:crypto=@aws_lc//:crypto
-common:aws-lc-fips --//bazel:http3=False
+common:aws-lc-fips --@envoy//bazel:ssl=@aws_lc//:ssl
+common:aws-lc-fips --@envoy//bazel:crypto=@aws_lc//:crypto
+common:aws-lc-fips --@envoy//bazel:http3=False
 
 
 #############################################################################
@@ -266,7 +265,7 @@ build:asan-common --build_tag_filters=-no_san
 build:asan-common --test_tag_filters=-no_san
 build:asan-common --copt -fsanitize=address,undefined
 build:asan-common --linkopt -fsanitize=address,undefined
-# vptr and function sanitizer are enabled in asan if it is set up via bazel/setup_clang.sh.
+# vptr and function sanitizer are enabled in asan when using --config=clang.
 build:asan-common --copt -fno-sanitize=vptr,function
 build:asan-common --linkopt -fno-sanitize=vptr,function
 build:asan-common --copt -DADDRESS_SANITIZER=1

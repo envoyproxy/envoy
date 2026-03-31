@@ -27,42 +27,23 @@ namespace Common {
 
 class StreamRateLimiterTest : public testing::Test {
 public:
-  void setUpTest(uint16_t limit_kbps, uint16_t fill_interval,
-                 std::shared_ptr<TokenBucket> token_bucket = nullptr) {
-    EXPECT_CALL(decoder_callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
-    EXPECT_CALL(decoder_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
-
-    limiter_ = std::make_unique<StreamRateLimiter>(
-        limit_kbps, decoder_callbacks_.bufferLimit(),
-        [this] { decoder_callbacks_.onDecoderFilterAboveWriteBufferHighWatermark(); },
-        [this] { decoder_callbacks_.onDecoderFilterBelowWriteBufferLowWatermark(); },
-        [this](Buffer::Instance& data, bool end_stream) {
-          decoder_callbacks_.injectDecodedDataToFilterChain(data, end_stream);
-        },
-        [this] { decoder_callbacks_.continueDecoding(); },
-        [](uint64_t /*len*/, bool, std::chrono::milliseconds) {
-          // config->stats().decode_allowed_size_.set(len);
-        },
-        time_system_, decoder_callbacks_.dispatcher_, decoder_callbacks_.scope(), token_bucket,
-        std::chrono::milliseconds(fill_interval));
-  }
-
   void setUpTest(uint16_t limit_kbps) {
     EXPECT_CALL(decoder_callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
     EXPECT_CALL(decoder_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
 
     limiter_ = std::make_unique<StreamRateLimiter>(
-        limit_kbps, decoder_callbacks_.bufferLimit(),
+        decoder_callbacks_.bufferLimit(),
         [this] { decoder_callbacks_.onDecoderFilterAboveWriteBufferHighWatermark(); },
         [this] { decoder_callbacks_.onDecoderFilterBelowWriteBufferLowWatermark(); },
         [this](Buffer::Instance& data, bool end_stream) {
           decoder_callbacks_.injectDecodedDataToFilterChain(data, end_stream);
         },
         [this] { decoder_callbacks_.continueDecoding(); },
-        [](uint64_t /*len*/, bool, std::chrono::milliseconds) {
+        [](uint64_t /*len*/, uint64_t /*buffered*/, std::chrono::milliseconds) {
           // config->stats().decode_allowed_size_.set(len);
         },
-        time_system_, decoder_callbacks_.dispatcher_, decoder_callbacks_.scope());
+        decoder_callbacks_.dispatcher_, decoder_callbacks_.scope(),
+        StreamRateLimiter::simpleTokenBucket(limit_kbps, time_system_));
   }
 
   uint64_t fillInterval() { return limiter_->fill_interval_.count(); }

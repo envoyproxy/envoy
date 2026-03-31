@@ -193,6 +193,8 @@ ENOENT
 ENV
 EOF
 EOS
+EPOLLHUP
+EPOLLOUT
 EQ
 ERANGE
 EV
@@ -426,6 +428,7 @@ Prereq
 QDCOUNT
 QPACK
 QUIC
+QUICHE
 QoS
 qat
 qatzip
@@ -667,6 +670,7 @@ bulkstring
 bulkstrings
 bursty
 bytecode
+bytearray
 bytestream
 bytestring
 cacert
@@ -840,6 +844,7 @@ evbuffers
 evconnlistener
 evented
 eventfd
+eventstream
 evwatch
 exe
 execlp
@@ -864,6 +869,7 @@ filenames
 fileno
 filepath
 filesystem
+fingerprint
 firefox
 fixdate
 fixup
@@ -983,6 +989,7 @@ iteratively
 javascript
 jitter
 jittered
+jemalloc
 joinable
 js
 kafka
@@ -1545,6 +1552,7 @@ unref
 unreferenced
 unzigzag
 upcasts
+upsert
 upstreams
 uptime
 upvalue
@@ -1662,6 +1670,7 @@ cpuacct.usage
 cpufreq
 effective_cpus
 cpus
+shrinker
 ja3
 ja4
 jsonl

@@ -42,8 +42,12 @@ public:
   ApiListenerOptRef apiListener() override {
     return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
   }
+  ListenerUpdateCallbacksHandlePtr addListenerUpdateCallbacks(ListenerUpdateCallbacks&) override {
+    return std::make_unique<ListenerUpdateCallbacksNopHandle>();
+  }
 
 private:
+  struct ListenerUpdateCallbacksNopHandle : public ListenerUpdateCallbacksHandle {};
   Instance& server_;
   ApiListenerPtr api_listener_;
 };

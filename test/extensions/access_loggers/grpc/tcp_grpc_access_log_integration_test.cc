@@ -11,6 +11,7 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
@@ -606,7 +607,7 @@ tcp_logs:
         tls_cipher_suite:
           value: 49199
         tls_sni_hostname: sni
-        ja3_fingerprint: "ecaf91d232e224038f510cb81aa08b94"
+        ja3_fingerprint: "258098c50651a607e22864521af69746"
         local_certificate_properties:
           subject_alt_name:
             uri: "spiffe://lyft.com/backend-team"
@@ -677,8 +678,8 @@ tcp_logs:
       tls_properties:
         tls_sni_hostname: sni
     connection_properties:
-      received_bytes: 138
-      sent_bytes: 138
+      received_bytes: 147
+      sent_bytes: 147
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -730,10 +731,10 @@ tcp_logs:
           address: {}
       tls_properties:
         tls_sni_hostname: sni
-        ja3_fingerprint: "ecaf91d232e224038f510cb81aa08b94"
+        ja3_fingerprint: "258098c50651a607e22864521af69746"
     connection_properties:
-      received_bytes: 138
-      sent_bytes: 138
+      received_bytes: 147
+      sent_bytes: 147
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
@@ -783,10 +784,10 @@ tcp_logs:
         socket_address:
           address: {}
       tls_properties:
-        ja3_fingerprint: "71d1f47d1125ac53c3c6a4863c087cfe"
+        ja3_fingerprint: "c68cd85633d6847f599328eb2df750b7"
     connection_properties:
-      received_bytes: 126
-      sent_bytes: 126
+      received_bytes: 135
+      sent_bytes: 135
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),

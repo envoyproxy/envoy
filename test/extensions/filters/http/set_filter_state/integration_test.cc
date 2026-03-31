@@ -61,11 +61,11 @@ public:
 
     auto config = std::make_shared<Filters::Common::SetFilterState::Config>(
         proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-        generic_context);
+        generic_context, proto_config.clear_route_cache());
     auto filter = std::make_shared<SetFilterState>(config);
-    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-    filter->setDecoderFilterCallbacks(decoder_callbacks);
-    EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(info_));
+
+    filter->setDecoderFilterCallbacks(decoder_callbacks_);
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(info_));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers_, true));
   }
 
@@ -77,22 +77,20 @@ public:
     TestUtility::loadFromYaml(filter_yaml_config, filter_proto_config);
     auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
         filter_proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-        generic_context);
+        generic_context, filter_proto_config.clear_route_cache());
 
     envoy::extensions::filters::http::set_filter_state::v3::Config route_proto_config;
     TestUtility::loadFromYaml(per_route_yaml_config, route_proto_config);
     Filters::Common::SetFilterState::Config route_config(
         route_proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-        generic_context);
+        generic_context, route_proto_config.clear_route_cache());
 
-    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-
-    EXPECT_CALL(decoder_callbacks, perFilterConfigs())
+    EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
         .WillOnce(testing::Invoke(
             [&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
     auto filter = std::make_shared<SetFilterState>(filter_config);
-    filter->setDecoderFilterCallbacks(decoder_callbacks);
-    EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(info_));
+    filter->setDecoderFilterCallbacks(decoder_callbacks_);
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(info_));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers_, true));
 
     // Test the factory method.
@@ -111,6 +109,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::TestRequestHeaderMapImpl headers_{{"test-header", "test-value"}};
   NiceMock<StreamInfo::MockStreamInfo> info_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 };
 
 TEST_F(SetMetadataIntegrationTest, FromHeader) {
@@ -182,6 +181,27 @@ TEST_F(SetMetadataIntegrationTest, FromHeaderIpAddress) {
       text_format_source:
         inline_string: "%REQ(client-ip)%"
   )EOF";
+  runFilter(yaml_config);
+  const auto* ip_address =
+      info_.filterState()->getDataReadOnly<Network::Address::InstanceAccessor>("envoy.client.ip");
+  ASSERT_NE(nullptr, ip_address);
+  EXPECT_EQ(ip_address->serializeAsString(), "127.0.0.1:0");
+}
+
+TEST_F(SetMetadataIntegrationTest, ClearRouteCache) {
+  headers_ = Http::TestRequestHeaderMapImpl{{"client-ip", "127.0.0.1"}};
+  const std::string yaml_config = R"EOF(
+  on_request_headers:
+  - object_key: envoy.client.ip
+    factory_key: envoy.network.ip
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(client-ip)%"
+  clear_route_cache: true
+  )EOF";
+
+  EXPECT_CALL(decoder_callbacks_, downstreamCallbacks()).Times(2);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   runFilter(yaml_config);
   const auto* ip_address =
       info_.filterState()->getDataReadOnly<Network::Address::InstanceAccessor>("envoy.client.ip");

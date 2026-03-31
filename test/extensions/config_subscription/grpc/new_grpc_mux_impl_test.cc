@@ -360,14 +360,16 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
       .WillOnce(Invoke(grpc_stream_retry_timer_cb));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
 
-  // initial_resource_versions should contain client side all resource:version info
-  // if xds_failover isn't used.
+  // initial_resource_versions should contain client side all resource:version info.
   if (using_xds_failover_) {
     // The test suite doesn't invoke the grpc-stream/xds-failover discovery
     // response path, and so the failover isn't aware that the test suite
-    // passed a valid response back to the mux. Thus, the xds-failover will not set
-    // the flag that triggers the initial-resource-versions population.
-    expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x", "y"}});
+    // passed a valid response back to the mux. However, the xds-failover will now set
+    // the flag that triggers the initial-resource-versions population even if it
+    // was never connected to a source.
+    expectSendMessage({.type_url = type_url,
+                       .resource_names_subscribe = {"x", "y"},
+                       .initial_resource_versions = {{"x", "2000"}, {"y", "3000"}}});
   } else {
     expectSendMessage({.type_url = type_url,
                        .resource_names_subscribe = {"x", "y"},
@@ -457,13 +459,15 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
       .WillOnce(Invoke(grpc_stream_retry_timer_cb));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // initial_resource_versions should contain client side all resource:version info, and no
-  // added resources because this is a wildcard request, if xds_failover isn't used.
+  // added resources because this is a wildcard request.
   if (using_xds_failover_) {
     // The test suite doesn't invoke the grpc-stream/xds-failover discovery
     // response path, and so the failover isn't aware that the test suite
-    // passed a valid response back to the mux. Thus, the xds-failover will not set
-    // the flag that triggers the initial-resource-versions population.
-    expectSendMessage({.type_url = type_url});
+    // passed a valid response back to the mux. However, the xds-failover will now set
+    // the flag that triggers the initial-resource-versions population even if it
+    // was never connected to a source.
+    expectSendMessage(
+        {.type_url = type_url, .initial_resource_versions = {{"x", "1000"}, {"y", "2000"}}});
   } else {
     expectSendMessage(
         {.type_url = type_url, .initial_resource_versions = {{"x", "1000"}, {"y", "2000"}}});
@@ -1062,6 +1066,14 @@ TEST_P(NewGrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                      .async_stream = &async_stream_});
 }
 
+// A temp test to increase coverage. The test will be modified once the
+// implementation will be added.
+TEST_P(NewGrpcMuxImplTest, LrsCoverageIncrease) {
+  setup();
+  EXPECT_EQ(grpc_mux_->loadStatsReporter(), nullptr);
+  EXPECT_EQ(grpc_mux_->maybeCreateLoadStatsReporter(), nullptr);
+}
+
 TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
   auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
       "envoy.config_mux.new_grpc_mux_factory");
@@ -1076,7 +1088,7 @@ TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
                                random, scope, ads_config, local_info, nullptr, nullptr,
-                               absl::nullopt, absl::nullopt),
+                               absl::nullopt, absl::nullopt, nullptr),
                EnvoyException);
 }
 

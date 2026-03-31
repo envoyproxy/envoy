@@ -174,6 +174,47 @@ TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksWithUpstreamFilter) {
   runHeaderCallbacksTest(true);
 }
 
+TEST_P(DynamicModulesIntegrationTest, StructConfig) {
+  if (GetParam() != "go") {
+    // The struct config test is only for Golang filter because it's easy to verify.
+    return;
+  }
+
+  initializeFilter("http_struct_config", R"({"dog":"cat"})", "",
+                   "type.googleapis.com/google.protobuf.Struct");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"foo", "bar"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder_decoder.first, 10, false);
+  codec_client_->sendTrailers(encoder_decoder.first, request_trailers);
+
+  waitForNextUpstreamRequest();
+  // Verify that the headers/trailers are added as expected.
+  EXPECT_EQ(
+      "cat",
+      upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(10, false);
+  upstream_request_->encodeTrailers(response_trailers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify the proxied request was received upstream, as expected.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(10U, upstream_request_->bodyLength());
+}
+
 TEST_P(DynamicModulesIntegrationTest, BytesConfig) {
   initializeFilter("header_callbacks", "ZG9nOmNhdA==" /* echo -n "dog:cat" | base64 */, "",
                    "type.googleapis.com/google.protobuf.BytesValue");
@@ -976,6 +1017,53 @@ TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
   } else {
     EXPECT_EQ(current_limit, 65536);
   }
+}
+
+TEST_P(DynamicModulesIntegrationTest, ListMetadataCallbacks) {
+  initializeFilter("list_metadata_callbacks");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  // Verify number list (3 elements: 10, 20, 30).
+  auto num_size = response->headers().get(Http::LowerCaseString("x-list-num-size"));
+  ASSERT_FALSE(num_size.empty());
+  EXPECT_EQ("3", num_size[0]->value().getStringView());
+  auto num_0 = response->headers().get(Http::LowerCaseString("x-list-num-0"));
+  ASSERT_FALSE(num_0.empty());
+  EXPECT_EQ("10", num_0[0]->value().getStringView());
+  auto num_1 = response->headers().get(Http::LowerCaseString("x-list-num-1"));
+  ASSERT_FALSE(num_1.empty());
+  EXPECT_EQ("20", num_1[0]->value().getStringView());
+  auto num_2 = response->headers().get(Http::LowerCaseString("x-list-num-2"));
+  ASSERT_FALSE(num_2.empty());
+  EXPECT_EQ("30", num_2[0]->value().getStringView());
+
+  // Verify string list (2 elements: "hello", "world").
+  auto str_size = response->headers().get(Http::LowerCaseString("x-list-str-size"));
+  ASSERT_FALSE(str_size.empty());
+  EXPECT_EQ("2", str_size[0]->value().getStringView());
+  auto str_0 = response->headers().get(Http::LowerCaseString("x-list-str-0"));
+  ASSERT_FALSE(str_0.empty());
+  EXPECT_EQ("hello", str_0[0]->value().getStringView());
+  auto str_1 = response->headers().get(Http::LowerCaseString("x-list-str-1"));
+  ASSERT_FALSE(str_1.empty());
+  EXPECT_EQ("world", str_1[0]->value().getStringView());
+
+  // Verify bool list (2 elements: true, false).
+  auto bool_size = response->headers().get(Http::LowerCaseString("x-list-bool-size"));
+  ASSERT_FALSE(bool_size.empty());
+  EXPECT_EQ("2", bool_size[0]->value().getStringView());
+  auto bool_0 = response->headers().get(Http::LowerCaseString("x-list-bool-0"));
+  ASSERT_FALSE(bool_0.empty());
+  EXPECT_EQ("true", bool_0[0]->value().getStringView());
+  auto bool_1 = response->headers().get(Http::LowerCaseString("x-list-bool-1"));
+  ASSERT_FALSE(bool_1.empty());
+  EXPECT_EQ("false", bool_1[0]->value().getStringView());
 }
 
 } // namespace Envoy

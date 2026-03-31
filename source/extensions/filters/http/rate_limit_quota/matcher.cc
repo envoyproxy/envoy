@@ -37,15 +37,15 @@ RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataI
       // Create `DataInput` factory callback from the config.
       Matcher::DataInputFactoryCb<Http::HttpMatchingData> data_input_cb =
           input_factory_ptr->createDataInput(builder_method.custom_value());
-      auto result = data_input_cb()->get(data);
+      auto input = data_input_cb()->get(data);
+      auto result = input.stringData();
       // If result has data.
-      if (absl::holds_alternative<absl::monostate>(result.data_)) {
+      if (!result) {
         return absl::InternalError("Failed to generate the id from custom value config.");
       }
-      const std::string& str = absl::get<std::string>(result.data_);
-      if (!str.empty()) {
+      if (!result->empty()) {
         // Build the bucket id from the matched result.
-        bucket_id.mutable_bucket()->insert({bucket_id_key, str});
+        bucket_id.mutable_bucket()->insert({bucket_id_key, std::string(*result)});
       }
       break;
     }

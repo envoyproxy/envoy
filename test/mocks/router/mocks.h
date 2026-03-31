@@ -76,6 +76,7 @@ public:
                const Http::ResponseHeaderMap& response_headers,
                const StreamInfo::StreamInfo& stream_info, std::string& body_out),
               (const));
+  MOCK_METHOD(absl::string_view, responseContentType, (), (const));
 };
 
 class TestCorsPolicy : public CorsPolicy {
@@ -546,7 +547,8 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
-  MOCK_METHOD(const VirtualHostConstSharedPtr&, virtualHost, (), (const));
+  MOCK_METHOD(const VirtualHost&, virtualHost, (), (const));
+  MOCK_METHOD(VirtualHostConstSharedPtr, virtualHostSharedPtr, (), (const));
 
   // Router::RouteEntry
   MOCK_METHOD(const std::string&, clusterName, (), (const));
@@ -611,8 +613,6 @@ public:
   std::string route_name_{"fake_route_name"};
   std::shared_ptr<testing::NiceMock<MockVirtualHost>> virtual_host_ =
       std::make_shared<testing::NiceMock<MockVirtualHost>>();
-  // Same with virtual_host_ but this could be returned as VirtualHostConstSharedPtr reference.
-  VirtualHostConstSharedPtr virtual_host_copy_ = virtual_host_;
 };
 
 class MockConfig : public Config {

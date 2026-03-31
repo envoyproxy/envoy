@@ -882,7 +882,10 @@ class FormatChecker:
 
     def check_source_path(self, file_path):
         error_messages = []
-        if self.run_code_validation:
+        # This dynamic module SDK will be built into a shared library which we prefer to use
+        # standard library rather then the absl equivalents. We simply skip the content check
+        # for this directory to avoid false positives.
+        if self.run_code_validation and "dynamic_modules/sdk/cpp" not in file_path:
             error_messages = self.check_file_contents(file_path, self.check_source_line)
         if file_path.endswith((".cc", ".h")):
             error_messages += self.check_namespace(file_path)
@@ -1047,6 +1050,7 @@ class FormatChecker:
         self.config.buildifier_path
         self.config.buildozer_path
         self.check_visibility()
+        self.run_rustfmt()
         # We first run formatting on non-BUILD files, since the BUILD file format
         # requires analysis of srcs/hdrs in the BUILD file, and we don't want these
         # to be rewritten by other multiprocessing pooled processes.
@@ -1089,6 +1093,28 @@ class FormatChecker:
         except subprocess.CalledProcessError as e:
             if (e.returncode != 0 and e.returncode != 1):
                 self.error_messages.append("Failed to check visibility with command %s" % command)
+
+    def run_rustfmt(self):
+        # Run bazel
+        command = "bazel run @rules_rust//:rustfmt"
+        try:
+            subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
+        except subprocess.CalledProcessError as e:
+            self.error_messages.append(
+                f"ERROR: something went wrong while executing: {e.cmd}\n{e.output.decode()}")
+            return
+        if self.args.operation_type == "check":
+            try:
+                diff = subprocess.check_output(
+                    "git diff --name-only -- '*.rs'", shell=True,
+                    stderr=subprocess.STDOUT).strip().decode()
+                if diff:
+                    self.error_messages.append(
+                        f"ERROR: rustfmt diff detected. Please run 'bazel run @rules_rust//:rustfmt':\n{diff}"
+                    )
+            except subprocess.CalledProcessError as e:
+                self.error_messages.append(
+                    f"ERROR: git diff failed: {e.output.decode()}")
 
     def included_for_memcpy(self, file_path):
         return file_path in self.config.paths["memcpy"]["include"]

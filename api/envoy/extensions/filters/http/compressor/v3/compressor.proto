@@ -62,14 +62,25 @@ message Compressor {
   }
 
   // Configuration for filter behavior on the response direction.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message ResponseDirectionConfig {
     CommonDirectionConfig common_config = 1;
 
     // When this field is ``true``, disables compression when the response contains an ``ETag`` header.
     // When this field is ``false``, the filter will preserve weak ``ETag`` values and remove those that
-    // require strong validation.
+    // require strong validation (unless ``weaken_etag_on_compress`` is set).
+    // When both ``disable_on_etag_header`` and ``weaken_etag_on_compress`` are ``true``,
+    // ``weaken_etag_on_compress`` takes precedence (compression is applied and the ETag is weakened).
     bool disable_on_etag_header = 2;
+
+    // When this field is ``true`` and the filter compresses a response that contains a strong
+    // ``ETag``, the filter will weaken the ETag by prepending ``W/`` to its value instead of
+    // removing it. This allows caching and conditional requests to work while indicating the
+    // response body was modified by compression. When ``false`` (default), strong ETags are
+    // removed when compression is applied. When both ``weaken_etag_on_compress`` and
+    // ``disable_on_etag_header`` are ``true``, this field takes precedence so that compression
+    // is applied and the ETag is weakened, supporting gradual rollout to clients and servers.
+    bool weaken_etag_on_compress = 6;
 
     // When this field is ``true``, removes ``Accept-Encoding`` from the request headers before dispatching
     // the request to the upstream so that responses do not get compressed before reaching the filter.

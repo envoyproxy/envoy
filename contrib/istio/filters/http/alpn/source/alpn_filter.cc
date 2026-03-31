@@ -41,7 +41,7 @@ Http::Protocol AlpnFilterConfig::getHttpProtocol(
 }
 
 Http::FilterHeadersStatus AlpnFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
+  const auto route = decoder_callbacks_->route();
   const Router::RouteEntry* route_entry;
   if (!route || !(route_entry = route->routeEntry())) {
     ENVOY_LOG(debug, "cannot find route entry");

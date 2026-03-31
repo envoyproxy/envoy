@@ -23,15 +23,9 @@ CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
         return std::move(compiled_expr.value());
       }()) {}
 
-Matcher::MatchResult CelInputMatcher::match(const MatchingDataType& input) {
+Matcher::MatchResult CelInputMatcher::match(const DataInputGetResult& input) {
   Protobuf::Arena arena;
-  if (auto* ptr = absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&input);
-      ptr != nullptr) {
-    CelMatchData* cel_data = dynamic_cast<CelMatchData*>((*ptr).get());
-    // CEL matching data should also not be nullptr since any errors should
-    // have been thrown by the CEL library already.
-    ASSERT(cel_data != nullptr);
-
+  if (auto cel_data = input.customData<CelMatchData>(); cel_data) {
     auto eval_result = compiled_expr_.evaluate(*cel_data->activation_, &arena);
     if (eval_result.ok() && eval_result.value().IsBool()) {
       if (eval_result.value().BoolOrDie()) {
