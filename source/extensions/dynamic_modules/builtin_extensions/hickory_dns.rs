@@ -6,6 +6,7 @@
 //! to Envoy's dispatcher thread via the dynamic module ABI.
 
 use envoy_proxy_dynamic_modules_rust_sdk::*;
+use std::fmt::Write;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -147,24 +148,36 @@ impl DnsResolverConfig for HickoryDnsResolverConfigImpl {
 type TokioResolver =
   hickory_resolver::Resolver<hickory_resolver::name_server::TokioConnectionProvider>;
 
-struct HickoryDnsResolverImpl {
-  runtime: Option<tokio::runtime::Runtime>,
-  resolver: Arc<TokioResolver>,
+// Compile-time verification that TokioResolver implements Send + Sync.
+// This lets the compiler auto-derive Send + Sync for SharedResolverState and
+// HickoryDnsResolverImpl, avoiding the need for unsafe impl blocks.
+const _: () = {
+  fn _assert_send_sync<T: Send + Sync>() {}
+  fn _check() {
+    _assert_send_sync::<TokioResolver>();
+  }
+};
+
+/// Shared state accessed by both the resolver and spawned Tokio tasks. Bundled
+/// into a single Arc so that each `resolve()` call performs one atomic
+/// increment instead of three.
+struct SharedResolverState {
+  resolver: TokioResolver,
   envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
-  /// Set to true during drop to prevent spawned tasks from calling back into C++.
-  shutting_down: Arc<AtomicBool>,
+  shutting_down: AtomicBool,
 }
 
-// SAFETY: All fields are Arc-wrapped or owned and thread-safe.
-unsafe impl Send for HickoryDnsResolverImpl {}
-unsafe impl Sync for HickoryDnsResolverImpl {}
+struct HickoryDnsResolverImpl {
+  runtime: Option<tokio::runtime::Runtime>,
+  shared: Arc<SharedResolverState>,
+}
 
 impl Drop for HickoryDnsResolverImpl {
   fn drop(&mut self) {
     // Signal all spawned tasks to skip the callback. This must happen before
     // shutting down the runtime so that tasks completing during shutdown do not
     // attempt to call into the C++ resolver which is being destroyed.
-    self.shutting_down.store(true, Ordering::Release);
+    self.shared.shutting_down.store(true, Ordering::Release);
 
     if let Some(rt) = self.runtime.take() {
       rt.shutdown_timeout(std::time::Duration::from_secs(5));
@@ -185,9 +198,11 @@ impl HickoryDnsResolverImpl {
 
     HickoryDnsResolverImpl {
       runtime: Some(runtime),
-      resolver: Arc::new(resolver),
-      envoy_callback,
-      shutting_down: Arc::new(AtomicBool::new(false)),
+      shared: Arc::new(SharedResolverState {
+        resolver,
+        envoy_callback,
+        shutting_down: AtomicBool::new(false),
+      }),
     }
   }
 }
@@ -283,28 +298,26 @@ impl DnsResolverInstance for HickoryDnsResolverImpl {
     query_id: u64,
   ) -> Option<Box<dyn DnsActiveQuery>> {
     let cancelled = Arc::new(AtomicBool::new(false));
-    let resolver = Arc::clone(&self.resolver);
-    let envoy_callback = Arc::clone(&self.envoy_callback);
+    let shared = Arc::clone(&self.shared);
     let dns_name_owned = dns_name.to_string();
     let cancelled_clone = Arc::clone(&cancelled);
-    let shutting_down = Arc::clone(&self.shutting_down);
 
     // The runtime is always available during normal operation. It is only taken
     // during Drop, after which resolve() cannot be called.
     let runtime = self.runtime.as_ref().expect("runtime unavailable");
 
     runtime.spawn(async move {
-      let result = perform_lookup(&resolver, &dns_name_owned, lookup_family).await;
+      let result = perform_lookup(&shared.resolver, &dns_name_owned, lookup_family).await;
 
       // Check both per-query cancellation and resolver-level shutdown. The shutdown
       // flag prevents calling back into the C++ resolver during destruction.
-      if cancelled_clone.load(Ordering::Acquire) || shutting_down.load(Ordering::Acquire) {
+      if cancelled_clone.load(Ordering::Acquire) || shared.shutting_down.load(Ordering::Acquire) {
         return;
       }
 
       match result {
         Ok(addresses) => {
-          envoy_callback.resolve_complete(
+          shared.envoy_callback.resolve_complete(
             query_id,
             DnsResolutionStatus::Completed,
             "resolved",
@@ -312,7 +325,12 @@ impl DnsResolverInstance for HickoryDnsResolverImpl {
           );
         },
         Err(details) => {
-          envoy_callback.resolve_complete(query_id, DnsResolutionStatus::Failure, &details, &[]);
+          shared.envoy_callback.resolve_complete(
+            query_id,
+            DnsResolutionStatus::Failure,
+            &details,
+            &[],
+          );
         },
       }
     });
@@ -321,7 +339,7 @@ impl DnsResolverInstance for HickoryDnsResolverImpl {
   }
 
   fn reset_networking(&self) {
-    self.resolver.clear_cache();
+    self.shared.resolver.clear_cache();
   }
 }
 
@@ -338,16 +356,14 @@ async fn perform_lookup(
     return Ok(resolve_ip_address_directly(ip, lookup_family));
   }
 
-  let mut addresses = Vec::new();
-
-  let lookup_a = matches!(
+  let need_a = matches!(
     lookup_family,
     DnsLookupFamily::V4Only
       | DnsLookupFamily::Auto
       | DnsLookupFamily::V4Preferred
       | DnsLookupFamily::All
   );
-  let lookup_aaaa = matches!(
+  let need_aaaa = matches!(
     lookup_family,
     DnsLookupFamily::V6Only
       | DnsLookupFamily::Auto
@@ -355,49 +371,113 @@ async fn perform_lookup(
       | DnsLookupFamily::All
   );
 
-  let mut errors = Vec::new();
+  let mut addresses = Vec::with_capacity(4);
+  let mut error_msg: Option<String> = None;
 
-  if lookup_a {
-    match resolver.lookup(dns_name, RecordType::A).await {
-      Ok(response) => {
-        for record in response.records() {
-          if let Some(a) = record.data().as_a() {
-            addresses.push(DnsAddress {
-              address: format!("{}:0", a.0),
-              ttl_seconds: record.ttl(),
-            });
-          }
-        }
-      },
-      Err(e) => errors.push(format!("A lookup failed: {e}")),
-    }
-  }
-
-  if lookup_aaaa {
-    match resolver.lookup(dns_name, RecordType::AAAA).await {
-      Ok(response) => {
-        for record in response.records() {
-          if let Some(aaaa) = record.data().as_aaaa() {
-            addresses.push(DnsAddress {
-              address: format!("[{}]:0", aaaa.0),
-              ttl_seconds: record.ttl(),
-            });
-          }
-        }
-      },
-      Err(e) => errors.push(format!("AAAA lookup failed: {e}")),
-    }
+  if need_a && need_aaaa {
+    // Issue both lookups concurrently to halve dual-stack query latency.
+    let (a_result, aaaa_result) = tokio::join!(
+      resolver.lookup(dns_name, RecordType::A),
+      resolver.lookup(dns_name, RecordType::AAAA)
+    );
+    collect_a_records(a_result, &mut addresses, &mut error_msg);
+    collect_aaaa_records(aaaa_result, &mut addresses, &mut error_msg);
+  } else if need_a {
+    collect_a_records(
+      resolver.lookup(dns_name, RecordType::A).await,
+      &mut addresses,
+      &mut error_msg,
+    );
+  } else {
+    collect_aaaa_records(
+      resolver.lookup(dns_name, RecordType::AAAA).await,
+      &mut addresses,
+      &mut error_msg,
+    );
   }
 
   if lookup_family == DnsLookupFamily::V4Preferred {
     addresses.sort_by_key(|a| u8::from(a.address.starts_with('[')));
   }
 
-  if addresses.is_empty() && !errors.is_empty() {
-    return Err(errors.join("; "));
+  if addresses.is_empty() {
+    if let Some(err) = error_msg {
+      return Err(err);
+    }
   }
 
   Ok(addresses)
+}
+
+/// Extract A records from a lookup result into the addresses vector.
+fn collect_a_records(
+  result: Result<hickory_resolver::lookup::Lookup, hickory_resolver::ResolveError>,
+  addresses: &mut Vec<DnsAddress>,
+  error_msg: &mut Option<String>,
+) {
+  match result {
+    Ok(response) => {
+      for record in response.records() {
+        if let Some(a) = record.data().as_a() {
+          addresses.push(DnsAddress {
+            address: format_ipv4_address(a.0),
+            ttl_seconds: record.ttl(),
+          });
+        }
+      }
+    },
+    Err(e) => append_lookup_error(error_msg, "A", &e),
+  }
+}
+
+/// Extract AAAA records from a lookup result into the addresses vector.
+fn collect_aaaa_records(
+  result: Result<hickory_resolver::lookup::Lookup, hickory_resolver::ResolveError>,
+  addresses: &mut Vec<DnsAddress>,
+  error_msg: &mut Option<String>,
+) {
+  match result {
+    Ok(response) => {
+      for record in response.records() {
+        if let Some(aaaa) = record.data().as_aaaa() {
+          addresses.push(DnsAddress {
+            address: format_ipv6_address(aaaa.0),
+            ttl_seconds: record.ttl(),
+          });
+        }
+      }
+    },
+    Err(e) => append_lookup_error(error_msg, "AAAA", &e),
+  }
+}
+
+fn append_lookup_error(
+  error_msg: &mut Option<String>,
+  record_type: &str,
+  error: &hickory_resolver::ResolveError,
+) {
+  let msg = format!("{record_type} lookup failed: {error}");
+  match error_msg {
+    Some(existing) => {
+      existing.push_str("; ");
+      existing.push_str(&msg);
+    },
+    None => *error_msg = Some(msg),
+  }
+}
+
+fn format_ipv4_address(addr: std::net::Ipv4Addr) -> String {
+  // Max IPv4 "255.255.255.255:0" = 17 bytes.
+  let mut buf = String::with_capacity(21);
+  write!(buf, "{addr}:0").unwrap();
+  buf
+}
+
+fn format_ipv6_address(addr: std::net::Ipv6Addr) -> String {
+  // Max IPv6 "[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]:0" = 43 bytes.
+  let mut buf = String::with_capacity(47);
+  write!(buf, "[{addr}]:0").unwrap();
+  buf
 }
 
 /// Handles the case where the DNS name is already an IP address by returning it
@@ -415,8 +495,8 @@ fn resolve_ip_address_directly(
     return Vec::new();
   }
   let address = match ip {
-    std::net::IpAddr::V4(v4) => format!("{v4}:0"),
-    std::net::IpAddr::V6(v6) => format!("[{v6}]:0"),
+    std::net::IpAddr::V4(v4) => format_ipv4_address(v4),
+    std::net::IpAddr::V6(v6) => format_ipv6_address(v6),
   };
   vec![DnsAddress {
     address,
