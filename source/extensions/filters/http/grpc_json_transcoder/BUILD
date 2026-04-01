@@ -13,10 +13,10 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "json_transcoder_filter_lib",
-    srcs = ["json_transcoder_filter.cc"],
+    name = "filter_config_lib",
+    srcs = ["filter_config.cc"],
     hdrs = [
-        "json_transcoder_filter.h",
+        "filter_config.h",
         "stats.h",
     ],
     external_deps = [
@@ -26,15 +26,33 @@ envoy_cc_library(
         "api_httpbody_protos",
     ],
     deps = [
+        "//envoy/router:router_interface",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf",
+        "@com_google_googleapis//google/api:http_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "json_transcoder_filter_lib",
+    srcs = ["json_transcoder_filter.cc"],
+    hdrs = ["json_transcoder_filter.h"],
+    external_deps = [
+        "grpc_transcoding",
+        "api_httpbody_protos",
+    ],
+    deps = [
+        ":filter_config_lib",
         ":http_body_utils_lib",
         ":transcoder_input_stream_lib",
         "//envoy/http:filter_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "//source/common/runtime:runtime_features_lib",
-        "@com_google_googleapis//google/api:http_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )
