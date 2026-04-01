@@ -1,0 +1,9 @@
+# proto-file: src/foo/bar.proto
+# proto-message: pgv.example.foo.Bars
+
+bar_none {
+  value: 5
+}
+bar_one {
+  value: 3
+}

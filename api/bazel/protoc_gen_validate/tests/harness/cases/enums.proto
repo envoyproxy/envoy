@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package tests.harness.cases;
+option go_package = "github.com/envoyproxy/protoc-gen-validate/tests/harness/cases/go;cases";
+import "validate/validate.proto";
+import "tests/harness/cases/other_package/embed.proto";
+import "tests/harness/cases/yet_another_package/embed.proto";
+import "tests/harness/cases/sort/sort.proto";
+
+enum TestEnum {
+    ZERO = 0;
+    ONE  = 1;
+    TWO  = 2;
+}
+
+enum TestEnumAlias {
+    option allow_alias = true;
+
+    A = 0;
+    B = 1;
+    C = 2;
+
+    ALPHA = 0;
+    BETA  = 1;
+    GAMMA = 2;
+}
+
+message EnumNone { TestEnum val = 1; }
+
+message EnumConst { TestEnum val = 1 [(validate.rules).enum.const = 2];}
+message EnumAliasConst { TestEnumAlias val = 1 [(validate.rules).enum.const = 2];}
+
+message EnumDefined { TestEnum val = 1 [(validate.rules).enum.defined_only = true];}
+message EnumAliasDefined { TestEnumAlias val = 1 [(validate.rules).enum.defined_only = true];}
+
+message EnumIn      { TestEnum val = 1 [(validate.rules).enum = { in: [0, 2]}];}
+message EnumAliasIn { TestEnumAlias val = 1 [(validate.rules).enum = { in: [0, 2]}];}
+
+message EnumNotIn      { TestEnum val = 1 [(validate.rules).enum = { not_in: [1]}];}
+message EnumAliasNotIn { TestEnumAlias val = 1 [(validate.rules).enum = { not_in: [1]}]; }
+
+message EnumExternal { other_package.Embed.Enumerated val = 1 [(validate.rules).enum.defined_only = true]; }
+message EnumExternal2 { other_package.Embed.DoubleEmbed.DoubleEnumerated val = 1 [(validate.rules).enum.defined_only = true]; }
+message EnumExternal3 {
+    other_package.Embed.FooNumber foo = 1 [(validate.rules).enum = { in: [0, 2] }];
+    yet_another_package.Embed.BarNumber bar = 2 [(validate.rules).enum = { not_in: [1] }];
+}
+message EnumExternal4 {
+    sort.Direction sort_direction = 1 [(validate.rules).enum.const = 1];
+}
+
+message RepeatedEnumDefined { repeated TestEnum val = 1 [(validate.rules).repeated.items.enum.defined_only = true]; }
+message RepeatedExternalEnumDefined { repeated other_package.Embed.Enumerated val = 1 [(validate.rules).repeated.items.enum.defined_only = true]; }
+message RepeatedYetAnotherExternalEnumDefined { repeated yet_another_package.Embed.Enumerated val = 1 [(validate.rules).repeated.items.enum.defined_only = true]; }
+message RepeatedEnumExternal {
+    repeated other_package.Embed.FooNumber foo = 1 [(validate.rules).repeated.items.enum = { in: [0, 2] }];
+    repeated yet_another_package.Embed.BarNumber bar = 2 [(validate.rules).repeated.items.enum = { not_in: [1] }];
+}
+
+message MapEnumDefined { map<string, TestEnum> val = 1 [(validate.rules).map.values.enum.defined_only = true]; }
+message MapExternalEnumDefined { map<string, other_package.Embed.Enumerated> val = 1 [(validate.rules).map.values.enum.defined_only = true]; }
+
+message EnumInsideOneOf {
+    oneof foo {
+        TestEnum val = 1 [(validate.rules).enum.defined_only = true];
+    }
+
+    oneof bar {
+        TestEnum val2 = 2 [(validate.rules).enum = {defined_only : true not_in : 0}];
+    }
+}

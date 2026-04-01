@@ -1,0 +1,10 @@
+# Requirements for linting, building, and uploading the PGV python package to PyPI.
+# The package's own requirements are in python/setup.cfg (and also in python/requirements.in).
+flake8==7.3.0
+isort==6.1.0
+build==1.3.0
+twine==6.2.0
+wheel==0.45.1
+setuptools==80.9.0
+protobuf==6.32.1
+setuptools_scm[toml]>=6.2

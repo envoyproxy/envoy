@@ -1,0 +1,43 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "cc",
+    srcs = [
+        "any.go",
+        "bytes.go",
+        "const.go",
+        "duration.go",
+        "enum.go",
+        "file.go",
+        "in.go",
+        "known.go",
+        "ltgt.go",
+        "map.go",
+        "message.go",
+        "msg.go",
+        "none.go",
+        "num.go",
+        "register.go",
+        "repeated.go",
+        "string.go",
+        "timestamp.go",
+        "wrapper.go",
+    ],
+    importpath = "github.com/envoyproxy/protoc-gen-validate/templates/cc",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//templates/shared",
+        "@com_github_iancoleman_strcase//:strcase",
+        "@com_github_lyft_protoc_gen_star_v2//:protoc-gen-star",
+        "@com_github_lyft_protoc_gen_star_v2//lang/go",
+        "@org_golang_google_protobuf//types/known/durationpb",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":cc",
+    deprecation = "Use :cc instead of :go_default_library.  Details about the new naming convention: https://github.com/bazelbuild/bazel-gazelle/pull/863",
+    visibility = ["//visibility:public"],
+)

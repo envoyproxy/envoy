@@ -1,0 +1,7 @@
+# These must be the same as the requirements listed in
+# install_requires section of setup.cfg. A test checks for this.
+# See requirements_test.py for more context.
+validate-email>=1.3
+Jinja2>=2.11.1
+protobuf>=5.27.0
+astunparse>=1.6.3; python_version<"3.10"
