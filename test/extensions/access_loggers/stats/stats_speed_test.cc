@@ -21,11 +21,10 @@ namespace StatsAccessLog {
 // --- Joiner Key ---
 class GaugeKeyUsingJoiner {
 public:
-  GaugeKeyUsingJoiner(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef borrowed_tags,
+  GaugeKeyUsingJoiner(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
                       Stats::SymbolTable& symbolTable)
       : stat_name_(stat_name),
-        joiner_storage_(Stats::StatName(), stat_name, borrowed_tags, symbolTable),
-        borrowed_tags_(borrowed_tags) {}
+        joiner_storage_(Stats::StatName(), stat_name, tags, symbolTable) {}
 
   GaugeKeyUsingJoiner(GaugeKeyUsingJoiner&&) noexcept = default;
   GaugeKeyUsingJoiner& operator=(GaugeKeyUsingJoiner&&) noexcept = default;
@@ -33,19 +32,6 @@ public:
   GaugeKeyUsingJoiner(const GaugeKeyUsingJoiner&) = delete;
   GaugeKeyUsingJoiner& operator=(const GaugeKeyUsingJoiner&) = delete;
 
-  void makeOwned() {
-    if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
-      owned_tags_.emplace(borrowed_tags_.value());
-      borrowed_tags_ = absl::nullopt;
-    }
-  }
-
-  Stats::StatNameTagVectorOptConstRef tags() const {
-    if (owned_tags_.has_value()) {
-      return std::cref(owned_tags_.value());
-    }
-    return borrowed_tags_;
-  }
 
   Stats::StatName statName() const { return stat_name_; }
 
@@ -60,8 +46,6 @@ public:
 private:
   Stats::StatName stat_name_;
   Stats::TagUtility::TagStatNameJoiner joiner_storage_;
-  absl::optional<Stats::StatNameTagVector> owned_tags_;
-  Stats::StatNameTagVectorOptConstRef borrowed_tags_{absl::nullopt};
 };
 
 // --- Joiner-based AccessLogState ---
