@@ -15,7 +15,6 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-
 #ifdef ENVOY_SSL_OPENSSL
 void CertCompression::registerBrotli(SSL_CTX*) {}
 void CertCompression::registerZlib(SSL_CTX*) {}
