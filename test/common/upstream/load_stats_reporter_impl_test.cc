@@ -610,8 +610,8 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
   response_timer_cb_();
 }
 
-
-// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load report is sent if only rq_success is non-zero.
+// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
+// report is sent if only rq_success is non-zero.
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
@@ -664,7 +664,8 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
   response_timer_cb_();
 }
 
-// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load report is sent if only rq_error is non-zero.
+// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
+// report is sent if only rq_error is non-zero.
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
@@ -717,7 +718,8 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
   response_timer_cb_();
 }
 
-// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load report is sent if only custom metrics are present.
+// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
+// report is sent if only custom metrics are present.
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
@@ -771,7 +773,8 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
   response_timer_cb_();
 }
 
-// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is false, a load report is NOT sent if only rq_success is non-zero.
+// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is false, a load
+// report is NOT sent if only rq_success is non-zero.
 TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(

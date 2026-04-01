@@ -21,14 +21,16 @@ namespace Upstream {
  * The frequency of reports is determined by the load_reporting_interval in the LoadStatsResponse.
  *
  * By default, if no runtime flags are set, load reports for a locality are sent only if the
- * sum of `rq_total_` latched values for hosts in the locality is non-zero during the reporting interval.
+ * sum of `rq_total_` latched values for hosts in the locality is non-zero during the reporting
+ * interval.
  *
  * The following runtime features control the behavior of the load reporter:
  * - envoy.reloadable_features.report_load_when_rq_active_is_non_zero: If true, load reports
- *   for a locality are sent if the sum of `rq_active_` values for hosts in the locality is non-zero,
- *   even if no new requests were issued in the interval.
+ *   for a locality are sent if the sum of `rq_active_` values for hosts in the locality is
+ * non-zero, even if no new requests were issued in the interval.
  * - envoy.reloadable_features.report_load_for_non_zero_stats: If true, load reports for a
- *   locality are sent if any of the following conditions are met for the sum of host stats in that locality:
+ *   locality are sent if any of the following conditions are met for the sum of host stats in that
+ * locality:
  *     - Latched `rq_success_` is non-zero.
  *     - Latched `rq_error_` is non-zero.
  *     - Current `rq_active_` is non-zero.
