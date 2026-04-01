@@ -2154,9 +2154,8 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   // Merge histograms again and validate that both h1 and h2 are used.
   store_->mergeHistograms([]() -> void {});
 
-  for (const ParentHistogramSharedPtr& histogram : Utility::histogramsMainThread(*store_)) {
-    EXPECT_TRUE(histogram->used());
-  }
+  store_->forEachHistogram(
+      nullptr, [](Stats::ParentHistogram& histogram) { EXPECT_TRUE(histogram.used()); });
 }
 
 TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
