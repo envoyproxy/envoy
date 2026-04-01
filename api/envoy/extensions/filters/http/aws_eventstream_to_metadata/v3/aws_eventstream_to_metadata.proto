@@ -4,8 +4,6 @@ package envoy.extensions.filters.http.aws_eventstream_to_metadata.v3;
 
 import "envoy/config/core/v3/extension.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -52,15 +50,6 @@ message AwsEventstreamToMetadata {
     // [#extension-category: envoy.content_parsers]
     config.core.v3.TypedExtensionConfig content_parser = 1
         [(validate.rules).message = {required: true}];
-
-    // Maximum size in bytes for buffered data before it's considered invalid
-    // and discarded. This protects against unbounded memory growth from malicious
-    // or malformed streams.
-    //
-    // Default is 1048576 bytes (1MB), which is sufficient for most legitimate messages.
-    // Set to 0 to disable the limit (not recommended for production).
-    // Maximum allowed value is 26214400 bytes (25MB, slightly larger than AWS max payload of 24MB).
-    google.protobuf.UInt32Value max_buffer_size = 2 [(validate.rules).uint32 = {lte: 26214400}];
   }
 
   // Rules for processing AWS EventStream response streams.

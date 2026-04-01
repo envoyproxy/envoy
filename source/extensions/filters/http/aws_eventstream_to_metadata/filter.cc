@@ -45,9 +45,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::aws_eventstre
       })),
       stats_(generateStats(
           fmt::format("aws_eventstream_to_metadata.resp.{}", parser_factory_->statsPrefix()),
-          context.scope())),
-      max_buffer_size_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.response_rules(), max_buffer_size, 1048576)) {}
+          context.scope())) {}
 
 Filter::Filter(std::shared_ptr<FilterConfig> config)
     : config_(std::move(config)), parser_(config_->parserFactory().createParser()) {}
@@ -132,20 +130,6 @@ void Filter::processBuffer() {
 
   // Drain processed bytes from the front of the buffer.
   buffer_.drain(length - buffer_view.size());
-
-  // Check buffer size limit on the remaining incomplete data. Complete messages have already been
-  // consumed and drained above, so the size guard only applies to bytes that cannot be parsed yet.
-  // This avoids discarding a large chunk that contains many valid frames the kernel delivered at
-  // once.
-  const uint32_t max_size = config_->maxBufferSize();
-  if (max_size > 0 && buffer_.length() > max_size) {
-    ENVOY_LOG(warn,
-              "EventStream buffer exceeds max_buffer_size ({} bytes). Discarding {} bytes of "
-              "incomplete buffered data.",
-              max_size, buffer_.length());
-    config_->stats().buffer_too_large_.inc();
-    buffer_.drain(buffer_.length());
-  }
 }
 
 bool Filter::processMessage(absl::string_view payload) {

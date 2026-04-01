@@ -311,87 +311,6 @@ TEST_F(AwsEventstreamToMetadataFilterTest, TrailersFinalizesRules) {
   EXPECT_EQ(1, findCounter("aws_eventstream_to_metadata.resp.json.metadata_from_fallback"));
 }
 
-TEST_F(AwsEventstreamToMetadataFilterTest, BufferTooLargeOnIncompleteData) {
-  const std::string config_with_small_buffer = R"EOF(
-  response_rules:
-    content_parser:
-      name: envoy.content_parsers.json
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
-        rules:
-          - rule:
-              selectors:
-                - key: "usage"
-                - key: "total_tokens"
-              on_present:
-                metadata_namespace: "envoy.lb"
-                key: "tokens"
-                type: NUMBER
-    max_buffer_size: 20
-  )EOF";
-
-  setupFilter(config_with_small_buffer);
-
-  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
-                                          {"content-type", "application/vnd.amazon.eventstream"}};
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
-
-  // Build a valid prelude that claims total_length=200, but only send 30 bytes.
-  // The parser sees a valid prelude CRC, returns "incomplete" (need more data),
-  // and leaves 30 bytes in the buffer — exceeding the 20-byte limit.
-  std::string incomplete_msg = buildEventstreamMessage(std::string(180, 'x'));
-  incomplete_msg.resize(30); // Truncate to 30 bytes (valid prelude, incomplete message)
-  Buffer::OwnedImpl data(incomplete_msg);
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, false));
-
-  // Buffer too large counter should be incremented
-  EXPECT_EQ(1, findCounter("aws_eventstream_to_metadata.resp.json.buffer_too_large"));
-  // No metadata should be added since buffer was discarded
-  EXPECT_EQ(0, findCounter("aws_eventstream_to_metadata.resp.json.metadata_added"));
-}
-
-// Verify that a large buffer containing complete messages is processed, not discarded.
-TEST_F(AwsEventstreamToMetadataFilterTest, LargeBufferWithCompleteMessagesNotDiscarded) {
-  const std::string config_with_small_buffer = R"EOF(
-  response_rules:
-    content_parser:
-      name: envoy.content_parsers.json
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
-        rules:
-          - rule:
-              selectors:
-                - key: "usage"
-                - key: "total_tokens"
-              on_present:
-                metadata_namespace: "envoy.lb"
-                key: "tokens"
-                type: NUMBER
-    max_buffer_size: 20
-  )EOF";
-
-  setupFilter(config_with_small_buffer);
-
-  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
-                                          {"content-type", "application/vnd.amazon.eventstream"}};
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
-
-  // Send a complete message that exceeds the buffer limit. The parse loop should consume
-  // and drain it before the size guard checks the (now-empty) residual buffer.
-  Buffer::OwnedImpl data(buildEventstreamMessage(R"({"usage": {"total_tokens": 100}})"));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
-
-  // Size guard should NOT fire — the complete message was consumed and drained.
-  EXPECT_EQ(0, findCounter("aws_eventstream_to_metadata.resp.json.buffer_too_large"));
-  // Metadata should be extracted successfully.
-  EXPECT_EQ(1, findCounter("aws_eventstream_to_metadata.resp.json.metadata_added"));
-
-  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at("envoy.lb");
-  EXPECT_EQ(100, metadata.fields().at("tokens").number_value());
-}
-
 TEST_F(AwsEventstreamToMetadataFilterTest, EventStreamParseError) {
   Http::TestResponseHeaderMapImpl headers{{":status", "200"},
                                           {"content-type", "application/vnd.amazon.eventstream"}};
@@ -706,41 +625,6 @@ TEST_F(AwsEventstreamToMetadataFilterTest, EndStreamFinalizesFallback) {
 
   // Fallback should be applied at end of stream
   EXPECT_EQ(1, findCounter("aws_eventstream_to_metadata.resp.json.metadata_from_fallback"));
-  EXPECT_EQ(1, findCounter("aws_eventstream_to_metadata.resp.json.metadata_added"));
-}
-
-// Test that max_buffer_size of 0 means unlimited (no limit check).
-TEST_F(AwsEventstreamToMetadataFilterTest, ZeroMaxBufferSizeIsUnlimited) {
-  const std::string config_no_limit = R"EOF(
-  response_rules:
-    content_parser:
-      name: envoy.content_parsers.json
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
-        rules:
-          - rule:
-              selectors:
-                - key: "usage"
-                - key: "total_tokens"
-              on_present:
-                metadata_namespace: "envoy.lb"
-                key: "tokens"
-                type: NUMBER
-    max_buffer_size: 0
-  )EOF";
-
-  setupFilter(config_no_limit);
-
-  Http::TestResponseHeaderMapImpl headers{{":status", "200"},
-                                          {"content-type", "application/vnd.amazon.eventstream"}};
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
-
-  // Even large data should be processed without buffer_too_large error
-  Buffer::OwnedImpl data(buildEventstreamMessage(R"({"usage": {"total_tokens": 100}})"));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
-
-  EXPECT_EQ(0, findCounter("aws_eventstream_to_metadata.resp.json.buffer_too_large"));
   EXPECT_EQ(1, findCounter("aws_eventstream_to_metadata.resp.json.metadata_added"));
 }
 

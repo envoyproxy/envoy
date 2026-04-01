@@ -99,34 +99,6 @@ TEST(AwsEventstreamToMetadataConfigTest, EmptyConfig) {
       EnvoyException, "Proto constraint validation failed.*value is required");
 }
 
-TEST(AwsEventstreamToMetadataConfigTest, CustomMaxBufferSize) {
-  const std::string yaml = R"EOF(
-  response_rules:
-    content_parser:
-      name: envoy.content_parsers.json
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
-        rules:
-          - rule:
-              selectors:
-                - key: "usage"
-              on_present:
-                metadata_namespace: "envoy.lb"
-                key: "tokens"
-    max_buffer_size: 2097152
-  )EOF";
-
-  envoy::extensions::filters::http::aws_eventstream_to_metadata::v3::AwsEventstreamToMetadata
-      proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-
-  AwsEventstreamToMetadataConfig factory;
-  auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  EXPECT_TRUE(cb_or.ok());
-}
-
 } // namespace
 } // namespace AwsEventstreamToMetadata
 } // namespace HttpFilters
