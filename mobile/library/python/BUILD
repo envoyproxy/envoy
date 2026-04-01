@@ -46,8 +46,8 @@ pybind_library(
         "//library/cc:engine_builder_lib",
         "//library/cc:envoy_engine_cc_lib_no_stamp",
         "//library/common:engine_types_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/http:header_map_lib",
+        "@envoy//source/common/buffer:buffer_lib",
+        "@envoy//source/common/http:header_map_lib",
     ],
 )
 
