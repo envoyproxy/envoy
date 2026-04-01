@@ -9,6 +9,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/orca/orca_load_metrics.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/status/status.h"
 #include "xds/data/orca/v3/orca_load_report.pb.h"
@@ -35,16 +36,31 @@ OrcaLoadReportHandler::OrcaLoadReportHandler(const OrcaWeightManagerConfig& conf
 double OrcaLoadReportHandler::getUtilizationFromOrcaReport(
     const OrcaLoadReportProto& orca_load_report,
     const std::vector<std::string>& metric_names_for_computing_utilization) {
-  // Find the most constrained utilization metric in `metric_names_for_computing_utilization`.
-  double utilization =
-      Envoy::Orca::getMaxUtilization(metric_names_for_computing_utilization, orca_load_report);
-  if (utilization > 0) {
-    return utilization;
-  }
-  // If named metrics are not available, use `application_utilization` as the utilization metric.
-  utilization = orca_load_report.application_utilization();
-  if (utilization > 0) {
-    return utilization;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.orca_weight_manager_use_named_metrics_first")) {
+    // Find the most constrained utilization metric in `metric_names_for_computing_utilization`.
+    double utilization =
+        Envoy::Orca::getMaxUtilization(metric_names_for_computing_utilization, orca_load_report);
+    if (utilization > 0) {
+      return utilization;
+    }
+    // If named metrics are not available, use `application_utilization` as the utilization metric.
+    utilization = orca_load_report.application_utilization();
+    if (utilization > 0) {
+      return utilization;
+    }
+  } else {
+    // If application_utilization is valid, use it as the utilization metric.
+    double utilization = orca_load_report.application_utilization();
+    if (utilization > 0) {
+      return utilization;
+    }
+    // Otherwise, find the most constrained utilization metric.
+    utilization =
+        Envoy::Orca::getMaxUtilization(metric_names_for_computing_utilization, orca_load_report);
+    if (utilization > 0) {
+      return utilization;
+    }
   }
   // If utilization is <= 0, use `cpu_utilization` as the utilization metric.
   return orca_load_report.cpu_utilization();

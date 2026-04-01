@@ -117,6 +117,7 @@ envoy_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
