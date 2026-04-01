@@ -4,6 +4,8 @@
 
 #include "source/common/network/utility.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -93,9 +95,15 @@ void HickoryPendingResolution::cancel(CancelReason) {
 
 // -- HickoryDnsResolver -------------------------------------------------------
 
+HickoryDnsResolverStats HickoryDnsResolver::generateHickoryDnsResolverStats(Stats::Scope& scope) {
+  return {ALL_HICKORY_DNS_RESOLVER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
+}
+
 HickoryDnsResolver::HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config,
-                                       Event::Dispatcher& dispatcher)
-    : config_(std::move(config)), dispatcher_(dispatcher) {
+                                       Event::Dispatcher& dispatcher, Stats::Scope& root_scope)
+    : config_(std::move(config)), dispatcher_(dispatcher),
+      scope_(root_scope.createScope("dns.hickory.")),
+      stats_(generateHickoryDnsResolverStats(*scope_)) {
   resolver_module_ptr_ =
       config_->on_dns_resolver_new_(config_->in_module_config_, static_cast<const void*>(this));
   ASSERT(resolver_module_ptr_ != nullptr);
@@ -113,8 +121,10 @@ HickoryDnsResolver::~HickoryDnsResolver() {
 
   // Step 3: Free Rust-side query objects for all remaining pending queries, and delete
   // the C++ pending resolution objects. Already-cancelled queries have their Rust-side
-  // objects freed by the cancel() call, so only free non-cancelled ones.
+  // objects freed by the cancel() call, so only free non-cancelled ones. Decrement the
+  // pending_resolutions gauge for each query since their callbacks will never arrive.
   for (auto& [id, pending] : pending_queries_) {
+    stats_.pending_resolutions_.dec();
     if (!pending->cancelled_) {
       // Safe: on_dns_resolve_cancel_ does not dereference the resolver pointer.
       config_->on_dns_resolve_cancel_(resolver_module_ptr_, pending->query_module_ptr_);
@@ -143,7 +153,9 @@ HickoryDnsResolver::toLookupFamily(DnsLookupFamily dns_lookup_family) {
 
 ActiveDnsQuery* HickoryDnsResolver::resolve(const std::string& dns_name,
                                             DnsLookupFamily dns_lookup_family, ResolveCb callback) {
-  ENVOY_LOG(trace, "resolving [{}] via Hickory DNS", dns_name);
+  ENVOY_LOG(debug, "resolving [{}] via Hickory DNS", dns_name);
+
+  stats_.pending_resolutions_.inc();
 
   const uint64_t query_id = next_query_id_++;
   auto* pending = new HickoryPendingResolution(*this, std::move(callback), query_id, dns_name);
@@ -175,8 +187,11 @@ void HickoryDnsResolver::onResolveComplete(uint64_t query_id,
   HickoryPendingResolution* pending = it->second;
   pending_queries_.erase(it);
 
+  stats_.resolve_total_.inc();
+  stats_.pending_resolutions_.dec();
+
   if (pending->cancelled_) {
-    ENVOY_LOG(trace, "dropping cancelled query [{}]", pending->dns_name_);
+    ENVOY_LOG(debug, "dropping cancelled query [{}]", pending->dns_name_);
     delete pending;
     return;
   }
@@ -185,8 +200,13 @@ void HickoryDnsResolver::onResolveComplete(uint64_t query_id,
                                 ? ResolutionStatus::Completed
                                 : ResolutionStatus::Failure;
 
-  ENVOY_LOG(trace, "Hickory DNS resolution complete for [{}]: status={}", pending->dns_name_,
-            static_cast<int>(envoy_status));
+  if (envoy_status == ResolutionStatus::Failure) {
+    chargeGetAddrInfoErrorStats(details);
+    ENVOY_LOG(debug, "Hickory DNS resolution failed for [{}]: {}", pending->dns_name_, details);
+  } else {
+    ENVOY_LOG(debug, "Hickory DNS resolution complete for [{}]: {} address(es)", pending->dns_name_,
+              response.size());
+  }
 
   // Free the Rust-side query object. The cancel ABI function takes ownership and drops it.
   // Calling cancel on an already-completed query is harmless (it only sets the AtomicBool).
@@ -197,16 +217,28 @@ void HickoryDnsResolver::onResolveComplete(uint64_t query_id,
   delete pending;
 }
 
+void HickoryDnsResolver::chargeGetAddrInfoErrorStats(absl::string_view details) {
+  // The detail string from the Hickory Rust module contains identifiable patterns from the
+  // underlying hickory-resolver library that allow categorizing the error.
+  if (absl::StrContains(details, "no record")) {
+    stats_.not_found_.inc();
+  } else if (absl::StrContains(details, "timed out") || absl::StrContains(details, "timeout")) {
+    stats_.timeouts_.inc();
+  } else {
+    stats_.get_addr_failure_.inc();
+  }
+}
+
 // -- HickoryDnsResolverFactory ------------------------------------------------
 
 absl::StatusOr<DnsResolverSharedPtr> HickoryDnsResolverFactory::createDnsResolver(
-    Event::Dispatcher& dispatcher, Api::Api&,
+    Event::Dispatcher& dispatcher, Api::Api& api,
     const envoy::config::core::v3::TypedExtensionConfig& typed_config) const {
   envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig proto_config;
   RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_config.typed_config(), proto_config));
 
   auto config = HickoryDnsResolverConfig::create(proto_config);
-  return std::make_shared<HickoryDnsResolver>(std::move(config), dispatcher);
+  return std::make_shared<HickoryDnsResolver>(std::move(config), dispatcher, api.rootScope());
 }
 
 REGISTER_FACTORY(HickoryDnsResolverFactory, DnsResolverFactory);
