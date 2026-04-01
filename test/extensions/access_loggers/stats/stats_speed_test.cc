@@ -18,66 +18,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace StatsAccessLog {
 
-// --- Joiner-based AccessLogState ---
-class AccessLogStateUsingJoiner {
-public:
-  AccessLogStateUsingJoiner(std::shared_ptr<StatsAccessLog> logger) : logger_(logger) {}
-
-  void addInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
-                        Stats::Gauge::ImportMode import_mode, uint64_t value,
-                        std::vector<Stats::StatNameDynamicStorage> tags_storage) {
-    if (value == 0)
-      return;
-
-    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
-                                                logger_->scope().symbolTable());
-    Stats::StatName joined_name = joiner.nameWithTags();
-    auto it = inflight_gauges_.find(joined_name);
-    if (it == inflight_gauges_.end()) {
-      auto [new_it, inserted] = inflight_gauges_.try_emplace(
-          joined_name, 0, import_mode, std::move(tags_storage), std::move(joiner));
-      it = new_it;
-    }
-    it->second.value_ += value;
-    logger_->scope().gaugeFromStatName(joined_name, import_mode).add(value);
-  }
-
-  void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
-                           Stats::Gauge::ImportMode import_mode, uint64_t value) {
-    if (value == 0)
-      return;
-
-    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
-                                                logger_->scope().symbolTable());
-    Stats::StatName joined_name = joiner.nameWithTags();
-    auto it = inflight_gauges_.find(joined_name);
-    if (it != inflight_gauges_.end()) {
-      it->second.value_ -= value;
-      logger_->scope().gaugeFromStatName(joined_name, import_mode).sub(value);
-      if (it->second.value_ == 0) {
-        inflight_gauges_.erase(it);
-      }
-    }
-  }
-
-  size_t mapSize() const { return inflight_gauges_.size(); }
-
-private:
-  std::shared_ptr<StatsAccessLog> logger_;
-  struct InflightGaugeNew {
-    InflightGaugeNew(uint64_t value, Stats::Gauge::ImportMode import_mode,
-                     std::vector<Stats::StatNameDynamicStorage> tags_storage,
-                     Stats::TagUtility::TagStatNameJoiner&& joiner)
-        : value_(value), import_mode_(import_mode), tags_storage_(std::move(tags_storage)),
-          joiner_(std::move(joiner)) {}
-    uint64_t value_;
-    Stats::Gauge::ImportMode import_mode_;
-    std::vector<Stats::StatNameDynamicStorage> tags_storage_;
-    Stats::TagUtility::TagStatNameJoiner joiner_;
-  };
-  absl::node_hash_map<Stats::StatName, InflightGaugeNew> inflight_gauges_;
-};
-
 // --- Shared Setup ---
 struct SharedBencherSetup {
   SharedBencherSetup() : pool(store.symbolTable()) {
@@ -158,18 +98,6 @@ static void BM_AccessLogState(benchmark::State& state) {
   runBenchmark(state, setup, *access_log_state);
 }
 BENCHMARK(BM_AccessLogState)
-    ->Args({/*tag_count=*/3, /*length_selector=*/0})
-    ->Args({/*tag_count=*/10, /*length_selector=*/0})
-    ->Args({/*tag_count=*/3, /*length_selector=*/1})
-    ->Args({/*tag_count=*/10, /*length_selector=*/1});
-
-// --- Joiner Benchmark ---
-static void BM_AccessLogStateUsingJoiner(benchmark::State& state) {
-  SharedBencherSetup setup;
-  AccessLogStateUsingJoiner access_log_state(setup.logger_);
-  runBenchmark(state, setup, access_log_state);
-}
-BENCHMARK(BM_AccessLogStateUsingJoiner)
     ->Args({/*tag_count=*/3, /*length_selector=*/0})
     ->Args({/*tag_count=*/10, /*length_selector=*/0})
     ->Args({/*tag_count=*/3, /*length_selector=*/1})

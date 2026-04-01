@@ -12,7 +12,7 @@
 #include "source/extensions/access_loggers/common/access_log_base.h"
 #include "source/extensions/matching/actions/transform_stat/transform_stat.h"
 
-#include "absl/container/node_hash_map.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -146,7 +146,7 @@ private:
     Stats::TagUtility::TagStatNameJoiner joiner_;
   };
 
-  absl::node_hash_map<Stats::StatName, InflightGauge> inflight_gauges_;
+  absl::flat_hash_map<Stats::StatName, InflightGauge> inflight_gauges_;
 };
 
 } // namespace StatsAccessLog
