@@ -23,15 +23,13 @@ class GaugeKeyUsingJoiner {
 public:
   GaugeKeyUsingJoiner(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
                       Stats::SymbolTable& symbolTable)
-      : stat_name_(stat_name),
-        joiner_storage_(Stats::StatName(), stat_name, tags, symbolTable) {}
+      : stat_name_(stat_name), joiner_storage_(Stats::StatName(), stat_name, tags, symbolTable) {}
 
   GaugeKeyUsingJoiner(GaugeKeyUsingJoiner&&) noexcept = default;
   GaugeKeyUsingJoiner& operator=(GaugeKeyUsingJoiner&&) noexcept = default;
 
   GaugeKeyUsingJoiner(const GaugeKeyUsingJoiner&) = delete;
   GaugeKeyUsingJoiner& operator=(const GaugeKeyUsingJoiner&) = delete;
-
 
   Stats::StatName statName() const { return stat_name_; }
 
