@@ -48,7 +48,7 @@ message Scope {
   // The stats scope prefix.
   string prefix = 3;
 
-  // The scope name, which acts as a differentiator for shared scopes if prefix and config are identical.
+  // The scope name, required for shared scopes.
   // If empty, no sharing will happen.
   string name = 4;
 }
