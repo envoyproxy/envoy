@@ -206,8 +206,8 @@ uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
   uint64_t* gauge_value_ptr = &gauge_value;
   absl::Notification gauge_value_set;
   internalEngine()->dispatcher().post([&] {
-    OptRef<Stats::Gauge> gauge = TestUtility::findGaugeMainThread(
-        internalEngine()->getStatsStore(), name);
+    OptRef<Stats::Gauge> gauge =
+        TestUtility::findGaugeMainThread(internalEngine()->getStatsStore(), name);
     if (gauge.has_value()) {
       *gauge_value_ptr = gauge->value();
     }
