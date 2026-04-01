@@ -101,12 +101,17 @@ void Filter::encodeComplete() {
 }
 
 void Filter::onMatchCallback(const Matcher::Action& action) {
+  resolvePerRouteConfig();
   if (match_tree_ != nullptr) {
     ENVOY_LOG(error, "Inline match tree is provided and the onMatchCallback should never be called "
                      "from the ExtensionWithMatcher");
 
     return;
   }
+  // this is unnecessary actually because the match tree should be nullptr if we reached here, we
+  // just want to be defensive here to make sure the match tree won't be evaluated after this
+  // callback is called.
+  match_tree_evaluated_ = true;
   handleAction(action);
 }
 
@@ -227,7 +232,7 @@ void Filter::handleAction(const Matcher::Action& action) {
 }
 
 void Filter::matchAndHandleActions() {
-  if (match_tree_evaluated_ || match_tree_ == nullptr) {
+  if (match_tree_evaluated_ || match_tree_ == nullptr || delegated_filter_ != nullptr) {
     return;
   }
 

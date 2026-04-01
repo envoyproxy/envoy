@@ -25,7 +25,7 @@ constexpr absl::string_view MatchedActionsFilterStateKey =
 class CompositePerRouteConfig : public Router::RouteSpecificFilterConfig {
 public:
   CompositePerRouteConfig(Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
-      : match_tree_(std::move(match_tree)) {};
+      : match_tree_(std::move(match_tree)) {}
   const Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>& matchTree() const {
     return match_tree_;
   }
@@ -217,7 +217,7 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   FilterStats& stats_;
   // Filter in the upstream filter chain.
-  bool is_upstream_;
+  bool is_upstream_{false};
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
   bool per_route_config_resolved_{false};
   bool match_tree_evaluated_{false};

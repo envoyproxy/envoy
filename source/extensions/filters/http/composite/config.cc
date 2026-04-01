@@ -21,8 +21,6 @@ public:
   }
 };
 
-using MatchingRequirements =
-    envoy::extensions::filters::common::dependency::v3::MatchingRequirements;
 absl::StatusOr<Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>>
 createMatcherTree(const xds::type::matcher::v3::Matcher& matcher_config,
                   Envoy::Http::Matching::HttpFilterActionContext& action_context) {

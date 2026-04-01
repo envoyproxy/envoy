@@ -621,12 +621,6 @@ TEST_P(CompositeFilterIntegrationTest, TestBasic) {
 }
 
 TEST_P(CompositeFilterIntegrationTest, TestResponseHeaders) {
-  // Response header matching is not supported with inline matchers: the match is evaluated in
-  // decodeHeaders before response headers are available, so the response header predicate always
-  // results in InsufficientData and the action never fires.
-  if (use_inline_matcher_) {
-    return;
-  }
   prependCompositeFilterResponseMatcher();
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
