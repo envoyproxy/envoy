@@ -1167,9 +1167,10 @@ TEST_F(DynamicModulesLoadBalancerTest, ShouldSelectAnotherHostInvalidPriority) {
 
 TEST_F(DynamicModulesLoadBalancerTest, OverrideHostPresent) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
+  Upstream::LoadBalancerContext::OverrideHost override_host{"10.0.0.1:8080", true};
   ON_CALL(context, overrideHostToSelect())
-      .WillByDefault(Return(
-          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.1:8080", true})));
+      .WillByDefault(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -1183,9 +1184,10 @@ TEST_F(DynamicModulesLoadBalancerTest, OverrideHostPresent) {
 
 TEST_F(DynamicModulesLoadBalancerTest, OverrideHostPresentNonStrict) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
+  Upstream::LoadBalancerContext::OverrideHost override_host{"10.0.0.2:9090", false};
   ON_CALL(context, overrideHostToSelect())
-      .WillByDefault(Return(
-          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.2:9090", false})));
+      .WillByDefault(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -1199,7 +1201,8 @@ TEST_F(DynamicModulesLoadBalancerTest, OverrideHostPresentNonStrict) {
 
 TEST_F(DynamicModulesLoadBalancerTest, OverrideHostNotSet) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
-  ON_CALL(context, overrideHostToSelect()).WillByDefault(Return(absl::nullopt));
+  ON_CALL(context, overrideHostToSelect())
+      .WillByDefault(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -1211,9 +1214,10 @@ TEST_F(DynamicModulesLoadBalancerTest, OverrideHostNotSet) {
 
 TEST_F(DynamicModulesLoadBalancerTest, OverrideHostNullOutputs) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
+  Upstream::LoadBalancerContext::OverrideHost override_host_null_test{"10.0.0.1:8080", true};
   ON_CALL(context, overrideHostToSelect())
       .WillByDefault(Return(
-          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.1:8080", true})));
+          OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_null_test)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 

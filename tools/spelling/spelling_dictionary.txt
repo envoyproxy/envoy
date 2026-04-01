@@ -193,6 +193,8 @@ ENOENT
 ENV
 EOF
 EOS
+EPOLLHUP
+EPOLLOUT
 EQ
 ERANGE
 EV
@@ -987,6 +989,7 @@ iteratively
 javascript
 jitter
 jittered
+jemalloc
 joinable
 js
 kafka

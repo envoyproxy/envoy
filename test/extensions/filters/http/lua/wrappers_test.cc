@@ -16,7 +16,6 @@
 
 using testing::Expectation;
 using testing::InSequence;
-using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -1787,7 +1786,7 @@ TEST_F(LuaRouteWrapperTest, GetFilterMetadataBasic) {
 
   // Set up the mock stream info to return the mock route.
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(stream_info, route()).WillByDefault(Return(route));
+  stream_info.route_ = route;
 
   // Set up wrapper with the mock stream info.
   Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
@@ -1820,7 +1819,7 @@ TEST_F(LuaRouteWrapperTest, GetMetadataNoMetadataUnderFilterName) {
 
   // Set up the mock stream info to return the mock route.
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(stream_info, route()).WillByDefault(Return(route));
+  stream_info.route_ = route;
 
   // Set up wrapper with the mock stream info.
   Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
@@ -1844,7 +1843,7 @@ TEST_F(LuaRouteWrapperTest, GetMetadataNoMetadataAtAll) {
 
   // Set up the mock stream info to return the mock route.
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(stream_info, route()).WillByDefault(Return(route));
+  stream_info.route_ = route;
 
   // Set up wrapper with the mock stream info.
   Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
