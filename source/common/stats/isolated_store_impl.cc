@@ -83,7 +83,7 @@ ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName name, bool,
 }
 
 ScopeSharedPtr IsolatedStoreImpl::makeScope(StatName name, StatsMatcherSharedPtr matcher) {
-  return std::make_shared<IsolatedScopeImpl>(name, *this, std::move(matcher));
+  return ScopeSharedPtr(new IsolatedScopeImpl(name, *this, std::move(matcher)));
 }
 
 } // namespace Stats

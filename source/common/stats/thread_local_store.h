@@ -294,6 +294,10 @@ private:
               StatsMatcherSharedPtr scope_matcher = nullptr);
     ~ScopeImpl() override;
 
+    void setCleanupCallback(std::function<void()> callback) override {
+      cleanup_callback_ = std::move(callback);
+    }
+
     // Stats::Scope
     Counter& counterFromStatNameWithTags(const StatName& name,
                                          StatNameTagVectorOptConstRef tags) override;
@@ -481,6 +485,7 @@ private:
   private:
     StatNameStorage prefix_;
     mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
+    std::function<void()> cleanup_callback_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {

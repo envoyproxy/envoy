@@ -546,6 +546,9 @@ new_features:
 - area: access_log
   change: |
     Added support for gauges in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
+- area: access_log
+  change: |
+    Supported the singleton stats scope in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
 - area: network
   change: |
     Added access logging support for network filters, similar to HTTP filters, by allowing network filters to

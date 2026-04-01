@@ -133,6 +133,16 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(scope_->findHistogram(nonexistent_name.statName()), absl::nullopt);
 }
 
+TEST_F(StatsIsolatedStoreImplTest, CleanupCallback) {
+  bool called = false;
+  {
+    IsolatedStoreImpl local_store(symbol_table_);
+    ScopeSharedPtr scope1 = local_store.rootScope()->createScope("scope1.");
+    scope1->setCleanupCallback([&called]() { called = true; });
+  }
+  EXPECT_TRUE(called);
+}
+
 TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
   ScopeSharedPtr scope1 = scope_->createScope("scope1");
   ScopeSharedPtr scope2 = scope1->scopeFromStatName(makeStatName("scope2"));

@@ -1,5 +1,6 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "test/integration/ads_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -277,6 +278,60 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   // After DownstreamEnd is logged, subtract should be skipped because Add didn't happen.
   // Gauge should still be 0.
   test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
+}
+
+TEST_P(StatsAccessLogIntegrationTest, SharedScope) {
+  const std::string config_yaml1 = R"EOF(
+              name: envoy.access_loggers.stats
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stats_scope:
+                  enable_sharing: true
+                  prefix: shared_scope_limits
+                  name: "shared_scope"
+                  config:
+                    max_counters: 1
+                counters:
+                  - stat:
+                      name: formatcounter1
+                    value_format: '%RESPONSE_CODE%'
+)EOF";
+
+  const std::string config_yaml2 = R"EOF(
+              name: envoy.access_loggers.stats
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stats_scope:
+                  enable_sharing: true
+                  prefix: shared_scope_limits
+                  name: "shared_scope"
+                  config:
+                    max_counters: 1
+                counters:
+                  - stat:
+                      name: formatcounter2
+                    value_format: '%RESPONSE_CODE%'
+)EOF";
+
+  init(std::vector<std::string>{config_yaml1, config_yaml2});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":authority", "envoyproxy.io"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"}};
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  // Since both access loggers share the same configuration, they should share the same scope.
+  // We expect the first counter to be incremented once (by the first access logger).
+  // The second counter (from the second logger) should be dropped because the scope limit is 1.
+  test_server_->waitForCounterEq("shared_scope_limits.formatcounter1", 200);
+
+  auto store_counter = test_server_->counter("shared_scope_limits.formatcounter2");
+  EXPECT_EQ(store_counter, nullptr);
 }
 
 } // namespace

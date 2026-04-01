@@ -144,6 +144,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Stats::Scope&, statsScope, ());
+  MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
 
   NiceMock<MockServerFactoryContext> server_context_;
