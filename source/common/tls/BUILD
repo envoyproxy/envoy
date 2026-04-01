@@ -183,10 +183,8 @@ envoy_cc_library(
     external_deps = ["ssl"],
     # TLS is core functionality.
     visibility = ["//visibility:public"],
-    deps = select({
-        "//bazel:using_openssl": [],
-        "//conditions:default": [":cert_compression_lib"],
-    }) + [
+    deps = [
+        ":cert_compression_lib",
         ":stats_lib",
         ":utility_lib",
         "//envoy/ssl:context_config_interface",
@@ -270,7 +268,6 @@ envoy_cc_library(
     name = "cert_compression_lib",
     srcs = ["cert_compression.cc"],
     hdrs = ["cert_compression.h"],
-    defines = ["ENVOY_ENABLE_CERT_COMPRESSION"],
     external_deps = ["ssl"],
     deps = [
         "//bazel:zlib",

@@ -298,17 +298,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cert_compression_test",
-    srcs = select({
-        "//bazel:using_openssl": [],
-        "//conditions:default": ["cert_compression_test.cc"],
-    }),
-    external_deps = [],
-    deps = select({
-        "//bazel:using_openssl": [],
-        "//conditions:default": [
-            "//source/common/tls:cert_compression_lib",
-        ],
-    }) + [
+    srcs = ["cert_compression_test.cc"],
+    external_deps = ["ssl"],
+    deps = [
+        "//source/common/tls:cert_compression_lib",
         "//test/test_common:logging_lib",
     ],
 )
