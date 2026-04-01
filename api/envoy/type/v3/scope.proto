@@ -42,7 +42,7 @@ message Scope {
   // The scope configuration.
   ScopeConfig config = 1;
 
-  // If set to true and `name` is not empty, the scope will be shared.
+  // If set to true and the ``name`` is not empty, the scope will be shared.
   bool enable_sharing = 2;
 
   // The stats scope prefix.
