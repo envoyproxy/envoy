@@ -316,7 +316,7 @@ message HttpConnectionManager {
     // The format for the header. When the :ref:`forward_client_cert_details
     // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
     // is APPEND_FORWARD and an existing XFCC header is present, the format of the existing header
-    // is used.  The configured format is used when there is no existing header value
+    // is used. The configured format is used when there is no existing header value
     // (APPEND_FORWARD with no prior XFCC header, or SANITIZE_SET which always replaces the value).
     ForwardClientCertFormat format = 7;
   }

@@ -42,7 +42,7 @@ public:
 private:
   const Http::ForwardClientCertType forward_client_cert_type_;
   const std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
-  const Http::ClientCertFormat client_cert_format_;
+  const Http::ClientCertFormat client_cert_format_{};
 };
 
 /**

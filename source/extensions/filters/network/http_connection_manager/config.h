@@ -319,7 +319,7 @@ private:
   const bool skip_xff_append_;
   const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
-  Http::ClientCertFormat forward_client_cert_format_;
+  Http::ClientCertFormat forward_client_cert_format_{};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   Config::ConfigProviderManager* scoped_routes_config_provider_manager_;
