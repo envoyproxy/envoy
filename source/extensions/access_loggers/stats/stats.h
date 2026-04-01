@@ -8,6 +8,7 @@
 
 #include "source/common/matcher/matcher.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/stats/tag_utility.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
 #include "source/extensions/matching/actions/transform_stat/transform_stat.h"
 
@@ -17,65 +18,6 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace StatsAccessLog {
-
-// GaugeKey serves as a lock-free map key composed of exactly the configuration
-// properties that define a fully resolved gauge metric.
-//
-// It preserves the raw components (base name + tags) allowing us to safely
-// re-create the gauge from the scope if it gets evicted while the request is in-flight.
-//
-// To avoid heap-allocating a new std::vector on every map lookup (which happens
-// on every single gauge increment/decrement), this key acts as a lightweight
-// zero-allocation "view" using `borrowed_tags_` during map lookups.
-// When the key actually needs to be safely persisted into the map, `makeOwned()`
-// is explicitly called to allocate and copy the tags into `owned_tags_`.
-class GaugeKey {
-public:
-  GaugeKey(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef borrowed_tags);
-
-  GaugeKey(const GaugeKey&) = delete;
-  GaugeKey& operator=(const GaugeKey&) = delete;
-
-  GaugeKey(GaugeKey&&) = default;
-  GaugeKey& operator=(GaugeKey&&) = default;
-
-  void makeOwned();
-
-  Stats::StatNameTagVectorOptConstRef tags() const;
-
-  Stats::StatName statName() const { return stat_name_; }
-
-  bool operator==(const GaugeKey& rhs) const;
-
-  template <typename H> friend H AbslHashValue(H h, const GaugeKey& key) {
-    // We hash the logical tag content to match operator== behavior, ignoring
-    // whether the tags are stored in owned_tags_ or borrowed_tags_. This ensures
-    // that two equal keys produce the same hash regardless of their storage representation.
-    Stats::StatNameTagVectorOptConstRef tags = key.tags();
-    if (tags.has_value()) {
-      h = H::combine(std::move(h), key.stat_name_, true);
-      for (const auto& tag : tags.value().get()) {
-        h = H::combine(std::move(h), tag.first, tag.second);
-      }
-      return h;
-    }
-    return H::combine(std::move(h), key.stat_name_, false);
-  }
-
-private:
-  // The backing store for `stat_name_` is the StatNamePool owned by the StatsAccessLog::Config,
-  // which has the same lifetime as the logger itself.
-  Stats::StatName stat_name_;
-
-  // The `StatName`s in `owned_tags_` (when present) represent dynamically generated tags.
-  // Their memory is backed by the Envoy stats store's SymbolTable. To ensure these dynamic tags
-  // are not freed prematurely and do not leak, their reference counts are kept alive by
-  // `StatNameDynamicStorage` instances stored alongside the gauge value in `InflightGauge`
-  // within the `AccessLogState`.
-  absl::optional<Stats::StatNameTagVector> owned_tags_;
-
-  Stats::StatNameTagVectorOptConstRef borrowed_tags_{absl::nullopt};
-};
 
 class StatsAccessLog : public AccessLoggers::Common::ImplBase,
                        public std::enable_shared_from_this<StatsAccessLog> {
@@ -193,12 +135,18 @@ private:
   std::shared_ptr<const StatsAccessLog> parent_;
 
   struct InflightGauge {
+    InflightGauge(uint64_t value, Stats::Gauge::ImportMode import_mode,
+                  std::vector<Stats::StatNameDynamicStorage> tags_storage,
+                  Stats::TagUtility::TagStatNameJoiner&& joiner)
+        : tags_storage_(std::move(tags_storage)), value_(value), import_mode_(import_mode),
+          joiner_(std::move(joiner)) {}
     std::vector<Stats::StatNameDynamicStorage> tags_storage_;
     uint64_t value_;
     Stats::Gauge::ImportMode import_mode_;
+    Stats::TagUtility::TagStatNameJoiner joiner_;
   };
 
-  absl::node_hash_map<GaugeKey, InflightGauge> inflight_gauges_;
+  absl::node_hash_map<Stats::StatName, InflightGauge> inflight_gauges_;
 };
 
 } // namespace StatsAccessLog
