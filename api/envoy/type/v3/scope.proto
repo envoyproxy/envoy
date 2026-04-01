@@ -52,4 +52,3 @@ message Scope {
   // If empty, no sharing will happen.
   string name = 4;
 }
-
