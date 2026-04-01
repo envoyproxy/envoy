@@ -11,6 +11,7 @@
 #include "source/common/tracing/tracer_impl.h"
 #include "source/extensions/filters/network/generic_proxy/interface/filter.h"
 #include "source/extensions/filters/network/generic_proxy/tracing.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -438,6 +439,9 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     completeAndSendLocalReply(Status(StatusCode::kUnavailable, "cluster_maintain_mode"), {});
     return;
   }
+
+  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+      downstreamConnection()->streamInfo().filterState());
 
   GenericUpstreamSharedPtr generic_upstream = generic_upstream_factory_->createGenericUpstream(
       *thread_local_cluster, this, const_cast<Network::Connection&>(*callbacks_->connection()),

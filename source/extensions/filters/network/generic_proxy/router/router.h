@@ -159,7 +159,9 @@ public:
   // Upstream::LoadBalancerContextBase
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   const Network::Connection* downstreamConnection() const override;
-
+  Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
+    return transport_socket_options_;
+  }
   // RequestFramesHandler
   void onRequestCommonFrame(RequestCommonFramePtr frame) override;
 
@@ -207,6 +209,7 @@ private:
   // changed in the future.
   UpstreamRequestPtr upstream_request_;
   Envoy::Event::TimerPtr timeout_timer_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
   DecoderFilterCallback* callbacks_{};
 
