@@ -125,7 +125,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
   EXPECT_EQ(4UL, Stats::Utility::countersMainThread(*store_).size());
-  EXPECT_EQ(2UL, store_->gauges().size());
+  EXPECT_EQ(2UL, Stats::Utility::gaugesMainThread(*store_).size());
 
   StatNameManagedStorage nonexistent_name("nonexistent", store_->symbolTable());
   EXPECT_EQ(scope_->findCounter(nonexistent_name.statName()), absl::nullopt);
@@ -191,8 +191,8 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
   EXPECT_EQ(4UL, Stats::Utility::countersMainThread(*store_).size());
-  EXPECT_EQ(2UL, store_->gauges().size());
-  EXPECT_EQ(2UL, store_->textReadouts().size());
+  EXPECT_EQ(2UL, Stats::Utility::gaugesMainThread(*store_).size());
+  EXPECT_EQ(2UL, Stats::Utility::textReadoutsMainThread(*store_).size());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, CounterWithTag) {

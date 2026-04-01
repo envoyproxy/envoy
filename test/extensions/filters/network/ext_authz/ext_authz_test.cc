@@ -62,9 +62,9 @@ public:
   }
 
   ~ExtAuthzFilterTest() override {
-    for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value()) << "guage name: " << gauge->name();
-    }
+    stats_store_.forEachGauge(nullptr, [](Stats::Gauge& gauge) {
+      EXPECT_EQ(0U, gauge.value()) << "guage name: " << gauge.name();
+    });
   }
 
   void expectOKWithOnData() {

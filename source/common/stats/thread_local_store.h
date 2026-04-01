@@ -205,9 +205,9 @@ public:
   }
 
   // std::vector<CounterSharedPtr> counters() const override;
-  std::vector<GaugeSharedPtr> gauges() const override;
+  /*std::vector<GaugeSharedPtr> gauges() const override;
   std::vector<TextReadoutSharedPtr> textReadouts() const override;
-  std::vector<ParentHistogramSharedPtr> histograms() const override;
+  std::vector<ParentHistogramSharedPtr> histograms() const override;*/
 
   void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;

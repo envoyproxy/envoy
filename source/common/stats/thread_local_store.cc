@@ -184,31 +184,31 @@ void ThreadLocalStoreImpl::addScope(std::shared_ptr<ScopeImpl>& new_scope) {
   scopes_[new_scope.get()] = std::weak_ptr<ScopeImpl>(new_scope);
 }
 
-std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
+/*std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
   forEachGauge([&ret](std::size_t size) { ret.reserve(size); },
                [&ret](Gauge& gauge) { ret.emplace_back(GaugeSharedPtr(&gauge)); });
   return ret;
-}
+  }*/
 
-std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
+/*std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<TextReadoutSharedPtr> ret;
   forEachTextReadout(
       [&ret](std::size_t size) { ret.reserve(size); },
       [&ret](TextReadout& text_readout) { ret.emplace_back(TextReadoutSharedPtr(&text_readout)); });
   return ret;
-}
+  }*/
 
-std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
+/*std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::vector<ParentHistogramSharedPtr> ret;
   forEachHistogram([&ret](std::size_t size) mutable { ret.reserve(size); },
                    [&ret](ParentHistogram& histogram) mutable {
                      ret.emplace_back(ParentHistogramSharedPtr(&histogram));
                    });
   return ret;
-}
+  }*/
 
 void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                                                ThreadLocal::Instance& tls) {

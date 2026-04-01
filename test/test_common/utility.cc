@@ -168,26 +168,6 @@ OptRef<StatType> findStatMainThread(Stats::Store& store, const std::string& name
 OptRef<Stats::Counter> TestUtility::findCounterMainThread(Stats::Store& store,
                                                           const std::string& name) {
   return findStatMainThread<Stats::Counter>(store, name);
-  /*
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-  OptRef<Stats::Counter> found;
-  store.forEachCounter(nullptr, [&found, &name](Stats::Counter& counter) {
-    if (!found.has_value() && counter.name() == name) {
-      found = counter;
-    }
-  });
-  return found;
-  */
-
-  /*
-  Stats::CounterSharedPtr ret;
-  store.forEachCounter(nullptr, [&ret, &name](Stats::Counter& counter) {
-    if (ret == nullptr && counter.name() == name) {
-      ret = &counter;
-    }
-  });
-  return ret;
-  */
 }
 
 OptRef<Stats::Gauge> TestUtility::findGaugeMainThread(Stats::Store& store,
@@ -215,57 +195,16 @@ OptRef<Stats::ParentHistogram> TestUtility::findHistogramMainThread(Stats::Store
   return parent_histogram;
 }
 
-/*
-Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
-                                                         const std::string& name) {
-  return findByName(store.textReadouts(), name);
+template <class StatType> std::string metricValue(OptRef<StatType>& stat) {
+  return stat.has_value() ? absl::StrCat(stat->value()) : "nil";
 }
-
-Stats::ParentHistogramSharedPtr TestUtility::findHistogram(Stats::Store& store,
-                                                           const std::string& name) {
-  return findByName(store.histograms(), name);
-}
-*/
-
-#if 0
-AssertionResult TestUtility::waitForCounterEq(
-    Stats::Store& store, const std::string& name,
-    uint64_t value, Event::TestTimeSystem& time_system,
-    std::chrono::milliseconds timeout,
-    Event::Dispatcher* dispatcher) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  OptRef<Stats::Counter> counter;
-  auto wait = [dispatcher, &time_system, &bound, timeout]() {
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-    if (dispatcher != nullptr) {
-      dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-    }
-    return timeout == std::chrono::milliseconds::zero() || bound.withinBound();
-  };
-
-  do {
-    counter = findStatMainThread<Stats::Counter>(store, name);
-  } while (!counter.has_value() && wait());
-
-  if (counter.has_value()) {
-    do {
-      if (counter->value() < value) {
-        return AssertionSuccess();
-      }
-    } while (wait());
-  }
-  return AssertionFailure() << fmt::format(
-             "timed out waiting for {} to be {}, current value {}", name, value,
-             counter.has_value() ? absl::StrCat(counter->value()) : "nil");
-}
-#endif
 
 template <class StatType>
-AssertionResult waitForStatMatchesCondition(Stats::Store& store, const std::string& name,
-                                            uint64_t value, Event::TestTimeSystem& time_system,
-                                            std::chrono::milliseconds timeout,
-                                            Event::Dispatcher* dispatcher,
-                                            std::function<bool(StatType&, uint64_t)> compare) {
+AssertionResult waitForStatMatchesCondition(
+    Stats::Store& store, const std::string& name, uint64_t value,
+    Event::TestTimeSystem& time_system, std::chrono::milliseconds timeout,
+    Event::Dispatcher* dispatcher, std::function<bool(StatType&, uint64_t)> compare,
+    std::function<std::string(OptRef<StatType>&)> value_to_string = metricValue<StatType>) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   OptRef<StatType> stat;
 
@@ -293,8 +232,7 @@ AssertionResult waitForStatMatchesCondition(Stats::Store& store, const std::stri
     } while (wait());
   }
   return AssertionFailure() << fmt::format("timed out waiting for {} to be {}, current value {}",
-                                           name, value,
-                                           stat.has_value() ? absl::StrCat(stat->value()) : "nil");
+                                           name, value, value_to_string(stat));
 }
 
 template <class StatType> bool isEq(StatType& stat, uint64_t value) {
@@ -335,95 +273,6 @@ AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::stri
                                                    dispatcher, isGe<Stats::Gauge>);
 }
 
-#if 0
-AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
-                                              uint64_t value, Event::TestTimeSystem& time_system,
-                                              std::chrono::milliseconds timeout,
-                                              Event::Dispatcher* dispatcher) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  OptRef<Stats::Counter> counter;
-  auto wait = [dispatcher, &time_system, &bound, timeout]() {
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-    if (dispatcher != nullptr) {
-      dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-    }
-    return timeout == std::chrono::milliseconds::zero() || bound.withinBound();
-  };
-
-  do {
-    counter = findCounterMainThread(store, name);
-  } while (!counter.has_value() && wait());
-
-  if (counter.has_value()) {
-    do {
-      if (counter->value() < value) {
-        return AssertionSuccess();
-      }
-    } while (wait());
-  }
-  return AssertionFailure() << fmt::format(
-             "timed out waiting for {} to be {}, current value {}", name, value,
-             counter.has_value() ? absl::StrCat(counter->value()) : "nil");
-}
-
-/*AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name,
-                                              uint64_t value, Event::TestTimeSystem& time_system,
-                                              std::chrono::milliseconds timeout,
-                                              Event::Dispatcher* dispatcher) {
-[  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  Stats::CounterSharedPtr counter;
-  do {
-    if (counter == nullptr) {
-      counter = findCounterMainThread(store, name);
-    }
-    if (counter != nullptr && counter->value() >= value) {
-      return AssertionSuccess();
-    }
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-  } while (timeout == std::chrono::milliseconds::zero() || bound.withinBound());
-  return AssertionFailure() << fmt::format("timed out waiting for {} to be >= {}", name, value);
-}
-*/
-#endif
-
-/*AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name,
-                                            uint64_t value, Event::TestTimeSystem& time_system,
-                                            std::chrono::milliseconds timeout,
-                                            Event::Dispatcher* dispatcher) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  Stats::GaugeSharedPtr gauge;
-  do {
-    if (gauge == nullptr) {
-      gauge = findGaugeMainThread(store, name);
-    }
-    if (gauge != nullptr && gauge->value() >= value) {
-      return AssertionSuccess();
-    }
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-  } while (timeout == std::chrono::milliseconds::zero() || bound.withinBound());
-  return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
-  }*/
-
-/*AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name,
-                                            uint64_t value, Event::TestTimeSystem& time_system,
-                                            std::chrono::milliseconds timeout) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      std::string current_value;
-      if (findGauge(store, name)) {
-        current_value = absl::StrCat(findGauge(store, name)->value());
-      } else {
-        current_value = "nil";
-      }
-      return AssertionFailure() << fmt::format(
-                 "timed out waiting for {} to be {}, current value {}", name, value, current_value);
-    }
-  }
-  return AssertionSuccess();
-  }*/
-
 AssertionResult TestUtility::waitForProactiveOverloadResourceUsageEq(
     Server::ThreadLocalOverloadState& overload_state,
     const Server::OverloadProactiveResourceName resource_name, int64_t expected_value,
@@ -459,24 +308,15 @@ AssertionResult TestUtility::waitForNumHistogramSamplesGe(Stats::Store& store,
                                                           Event::TestTimeSystem& time_system,
                                                           Event::Dispatcher& main_dispatcher,
                                                           std::chrono::milliseconds timeout) {
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (true) {
-    auto histo = findByName<Stats::ParentHistogramSharedPtr>(store.histograms(), name);
-    if (histo) {
-      uint64_t sample_count = readSampleCount(main_dispatcher, *histo);
-      if (sample_count >= min_sample_count_required) {
-        break;
-      }
-    }
-
-    time_system.advanceTimeWait(std::chrono::milliseconds(10));
-
-    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to have {} samples", name,
-                                               min_sample_count_required);
-    }
-  }
-  return AssertionSuccess();
+  return waitForStatMatchesCondition<Stats::Histogram>(
+      store, name, min_sample_count_required, time_system, timeout, nullptr,
+      [&main_dispatcher](Stats::Histogram& hist, uint64_t min_samples) -> bool {
+        auto parent = dynamic_cast<Stats::ParentHistogram*>(&hist);
+        ASSERT(parent != nullptr);
+        uint64_t sample_count = readSampleCount(main_dispatcher, *parent);
+        return sample_count >= min_samples;
+      },
+      [](OptRef<Stats::Histogram>&) -> std::string { return "histogram sample count"; });
 }
 
 AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
@@ -597,23 +437,22 @@ std::string TestUtility::convertTime(const std::string& input, const std::string
 }
 
 // static
-std::string TestUtility::nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges) {
-  // Returns all gauges that are 0 except the circuit_breaker remaining resource
-  // gauges which default to the resource max.
-  std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
+std::string TestUtility::nonZeroedGauges(Stats::Store& store) {
   std::string non_zero;
-  for (const Stats::GaugeSharedPtr& gauge : gauges) {
-    if (!std::regex_match(gauge->name(), omitted) && gauge->value() != 0) {
-      non_zero.append(fmt::format("{}: {}; ", gauge->name(), gauge->value()));
+  const std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
+
+  store.forEachGauge(nullptr, [&non_zero, omitted](Stats::Gauge& gauge) {
+    // Returns all gauges that are 0 except the circuit_breaker remaining resource
+    // gauges which default to the resource max.
+    if (!std::regex_match(gauge.name(), omitted) && gauge.value() != 0) {
+      non_zero.append(fmt::format("{}: {}; ", gauge.name(), gauge.value()));
     }
-  }
+  });
   return non_zero;
 }
 
 // static
-bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
-  return nonZeroedGauges(gauges).empty();
-}
+bool TestUtility::gaugesZeroed(Stats::Store& store) { return nonZeroedGauges(store).empty(); }
 
 // static
 bool TestUtility::gaugesZeroed(

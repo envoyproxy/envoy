@@ -134,7 +134,7 @@ private:
 class HistogramTest : public testing::Test {
 public:
   using Bucket = ParentHistogram::Bucket;
-  using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
+  using NameHistogramMap = std::map<std::string, ParentHistogram*>;
 
   HistogramTest()
       : pool_(symbol_table_), alloc_(symbol_table_),
@@ -149,9 +149,9 @@ public:
     tls_.shutdownThread();
   }
 
-  NameHistogramMap makeHistogramMap(const std::vector<ParentHistogramSharedPtr>& hist_list) {
+  NameHistogramMap makeHistogramMap(const std::vector<ParentHistogram*>& hist_list) {
     NameHistogramMap name_histogram_map;
-    for (const ParentHistogramSharedPtr& histogram : hist_list) {
+    for (ParentHistogram* histogram : hist_list) {
       // Exclude the scope part of the name.
       const std::vector<std::string>& split_vector = absl::StrSplit(histogram->name(), '.');
       name_histogram_map.insert(std::make_pair(split_vector.back(), histogram));
@@ -169,7 +169,7 @@ public:
 
     EXPECT_TRUE(merge_called);
 
-    std::vector<ParentHistogramSharedPtr> histogram_list = store_->histograms();
+    std::vector<ParentHistogram*> histogram_list = Utility::histogramsMainThread(*store_);
 
     HistogramWrapper hist1_cumulative;
     HistogramWrapper hist2_cumulative;
@@ -289,15 +289,15 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
   store_->deliverHistogramToSinks(h1, 100);
 
-  EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(1UL, Utility::countersMainThread(*store_).size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1"));
   EXPECT_EQ(1L, TestUtility::findCounter(*store_, "c1")->use_count());
-  EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(2L, store_->gauges().front().use_count());
-  EXPECT_EQ(1UL, store_->textReadouts().size());
-  EXPECT_EQ(&t1, store_->textReadouts().front().get()); // front() ok when size()==1
-  EXPECT_EQ(2L, store_->textReadouts().front().use_count());
+  EXPECT_EQ(1UL, Utility::gaugesMainThread(*store_).size());
+  EXPECT_EQ(&g1, Utility::gaugesMainThread(*store_).front()); // front() ok when size()==1
+  EXPECT_EQ(1L, Utility::gaugesMainThread(*store_).front()->use_count());
+  EXPECT_EQ(1UL, Utility::textReadoutsMainThread(*store_).size());
+  EXPECT_EQ(&t1, Utility::textReadoutsMainThread(*store_).front()); // front() ok when size()==1
+  EXPECT_EQ(1L, Utility::textReadoutsMainThread(*store_).front()->use_count());
 
   store_->shutdownThreading();
 }
@@ -338,30 +338,30 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   TextReadout& t1 = scope_.textReadoutFromString("t1");
   EXPECT_EQ(&t1, &scope_.textReadoutFromString("t1"));
 
-  EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(1UL, Utility::countersMainThread(*store_).size());
 
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1"));
   // EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1")).use_count());
-  EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(2L, store_->gauges().front().use_count());
-  EXPECT_EQ(1UL, store_->textReadouts().size());
-  EXPECT_EQ(&t1, store_->textReadouts().front().get()); // front() ok when size()==1
-  EXPECT_EQ(2UL, store_->textReadouts().front().use_count());
+  EXPECT_EQ(1UL, Utility::gaugesMainThread(*store_).size());
+  EXPECT_EQ(&g1, Utility::gaugesMainThread(*store_).front()); // front() ok when size()==1
+  EXPECT_EQ(1L, Utility::gaugesMainThread(*store_).front()->use_count());
+  EXPECT_EQ(1UL, Utility::textReadoutsMainThread(*store_).size());
+  EXPECT_EQ(&t1, Utility::textReadoutsMainThread(*store_).front()); // front() ok when size()==1
+  EXPECT_EQ(1UL, Utility::textReadoutsMainThread(*store_).front()->use_count());
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 
-  EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(1UL, Utility::countersMainThread(*store_).size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1"));
-  // EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
-  EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(2L, store_->gauges().front().use_count());
-  EXPECT_EQ(1UL, store_->textReadouts().size());
-  EXPECT_EQ(&t1, store_->textReadouts().front().get()); // front() ok when size()==1
-  EXPECT_EQ(2L, store_->textReadouts().front().use_count());
+  // EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1")->use_count());
+  EXPECT_EQ(1UL, Utility::gaugesMainThread(*store_).size());
+  EXPECT_EQ(&g1, Utility::gaugesMainThread(*store_).front()); // front() ok when size()==1
+  EXPECT_EQ(1L, Utility::gaugesMainThread(*store_).front()->use_count());
+  EXPECT_EQ(1UL, Utility::textReadoutsMainThread(*store_).size());
+  EXPECT_EQ(&t1, Utility::textReadoutsMainThread(*store_).front()); // front() ok when size()==1
+  EXPECT_EQ(1L, Utility::textReadoutsMainThread(*store_).front()->use_count());
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -463,7 +463,7 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   ScopeSharedPtr scope2 = store_->createScope("scope.");
   EXPECT_NE(scope1, scope2);
 
-  EXPECT_EQ(0, store_->histograms().size());
+  EXPECT_EQ(0, Utility::histogramsMainThread(*store_).size());
   EXPECT_EQ(0, numTlsHistograms());
 
   // However, stats created in the two same-named scopes will be the same objects.
@@ -480,16 +480,16 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   // histogram is kept alive by scope2.
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 100));
   histogram.recordValue(100);
-  EXPECT_EQ(1, store_->histograms().size());
+  EXPECT_EQ(1, Utility::histogramsMainThread(*store_).size());
   EXPECT_EQ(1, numTlsHistograms());
   scope1.reset();
-  EXPECT_EQ(1, store_->histograms().size());
+  EXPECT_EQ(1, Utility::histogramsMainThread(*store_).size());
   EXPECT_EQ(1, numTlsHistograms());
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 200));
   histogram.recordValue(200);
   EXPECT_EQ(&histogram, &scope2->histogramFromString("histogram", Histogram::Unit::Unspecified));
   scope2.reset();
-  EXPECT_EQ(0, store_->histograms().size());
+  EXPECT_EQ(0, Utility::histogramsMainThread(*store_).size());
   EXPECT_EQ(0, numTlsHistograms());
 
   tls_.shutdownGlobalThreading();
@@ -659,7 +659,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
 
   ScopeSharedPtr scope1 = store_->createScope("scope1.");
   scope1->counterFromString("c1");
-  EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(1UL, Utility::countersMainThread(*store_).size());
   CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
   EXPECT_EQ("scope1.c1", c1->name());
 
@@ -668,13 +668,13 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   scope1.reset();
   // The counter is gone from all scopes, but is still held in the local
   // variable c1. Hence, it will not be removed from the allocator or store.
-  EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(1UL, Utility::countersMainThread(*store_).size());
 
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
   // Removing the counter from the local variable, should now remove it from the
   // allocator.
-  EXPECT_EQ(0UL, Stats::Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(0UL, Utility::countersMainThread(*store_).size());
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
@@ -713,33 +713,33 @@ TEST_F(StatsThreadLocalStoreTest, Eviction) {
     EXPECT_EQ(&c1, &scope->counterFromString("c1"));
     EXPECT_FALSE(c1.used());
     EXPECT_EQ(1, c1.value());
-    EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
+    EXPECT_EQ(1UL, Utility::countersMainThread(*store_).size());
 
     EXPECT_EQ(&g1, &scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
     EXPECT_EQ(&g1, &scope1->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
     EXPECT_FALSE(g1.used());
     EXPECT_EQ(5, g1.value());
-    EXPECT_EQ(1UL, store_->gauges().size());
+    EXPECT_EQ(1UL, Utility::gaugesMainThread(*store_).size());
 
     EXPECT_EQ(&t1, &scope->textReadoutFromString("t1"));
     EXPECT_EQ(&t1, &scope1->textReadoutFromString("t1"));
     EXPECT_FALSE(t1.used());
     EXPECT_EQ("hello", t1.value());
-    EXPECT_EQ(1UL, store_->textReadouts().size());
+    EXPECT_EQ(1UL, Utility::textReadoutsMainThread(*store_).size());
 
     EXPECT_EQ(&h1, &scope->histogramFromString("h1", Histogram::Unit::Unspecified));
     EXPECT_EQ(&h1, &scope1->histogramFromString("h1", Histogram::Unit::Unspecified));
     EXPECT_FALSE(h1.used());
-    EXPECT_EQ(1UL, store_->histograms().size());
+    EXPECT_EQ(1UL, Utility::histogramsMainThread(*store_).size());
   }
 
   // Eviction removes here.
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   store_->evictUnused();
-  EXPECT_EQ(0UL, Stats::Utility::countersMainThread(*store_).size());
-  EXPECT_EQ(0UL, store_->gauges().size());
-  EXPECT_EQ(0UL, store_->textReadouts().size());
-  EXPECT_EQ(0UL, store_->histograms().size());
+  EXPECT_EQ(0UL, Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(0UL, Utility::gaugesMainThread(*store_).size());
+  EXPECT_EQ(0UL, Utility::textReadoutsMainThread(*store_).size());
+  EXPECT_EQ(0UL, Utility::histogramsMainThread(*store_).size());
 
   // Make sure no dangling data is on caches and it is safe to use the same metrics.
   {
@@ -782,7 +782,7 @@ TEST_F(StatsThreadLocalStoreTest, EvictionGaugesInterleavedOperations) {
   // Since we just used it (g1.add(10)), the first call will only mark it as unused.
   store_->evictUnused();
   EXPECT_FALSE(g1.used());
-  EXPECT_EQ(1UL, store_->gauges().size());
+  EXPECT_EQ(1UL, Utility::gaugesMainThread(*store_).size());
 
   // Second pass evicts from scope cache because it is now unused.
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
@@ -793,7 +793,7 @@ TEST_F(StatsThreadLocalStoreTest, EvictionGaugesInterleavedOperations) {
   EXPECT_FALSE(scope->findGauge(g1_name.statName()).has_value());
 
   // Verify still in store (allocator) due to held ref
-  EXPECT_EQ(1UL, store_->gauges().size());
+  EXPECT_EQ(1UL, Utility::gaugesMainThread(*store_).size());
 
   // 3. Interleaved PAIRED_ADD (add) on the held reference
   g1_ref->add(5);
@@ -875,7 +875,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(2UL, c2.value());
 
   // We should dedup when we fetch all counters to handle the overlapping case.
-  EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(1UL, Utility::countersMainThread(*store_).size());
 
   // Gauges should work the same way.
   Gauge& g1 = scope1->gaugeFromString("g", Gauge::ImportMode::Accumulate);
@@ -887,7 +887,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   g2.set(1);
   EXPECT_EQ(1UL, g1.value());
   EXPECT_EQ(1UL, g2.value());
-  EXPECT_EQ(1UL, store_->gauges().size());
+  EXPECT_EQ(1UL, Utility::gaugesMainThread(*store_).size());
 
   // TextReadouts should work just like gauges.
   TextReadout& t1 = scope1->textReadoutFromString("b");
@@ -900,19 +900,19 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   t2.set("goodbye");
   EXPECT_EQ("goodbye", t1.value());
   EXPECT_EQ("goodbye", t2.value());
-  EXPECT_EQ(1UL, store_->textReadouts().size());
+  EXPECT_EQ(1UL, Utility::textReadoutsMainThread(*store_).size());
 
   // Deleting scope 1 will call free but will be reference counted. It still leaves scope 2 valid.
   scope1.reset();
   c2.inc();
   EXPECT_EQ(3UL, c2.value());
-  EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(1UL, Utility::countersMainThread(*store_).size());
   g2.set(10);
   EXPECT_EQ(10UL, g2.value());
-  EXPECT_EQ(1UL, store_->gauges().size());
+  EXPECT_EQ(1UL, Utility::gaugesMainThread(*store_).size());
   t2.set("abc");
   EXPECT_EQ("abc", t2.value());
-  EXPECT_EQ(1UL, store_->textReadouts().size());
+  EXPECT_EQ(1UL, Utility::textReadoutsMainThread(*store_).size());
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
@@ -1118,8 +1118,8 @@ TEST_F(LookupWithStatNameTest, All) {
   ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
-  EXPECT_EQ(4UL, Stats::Utility::countersMainThread(*store_).size());
-  EXPECT_EQ(2UL, store_->gauges().size());
+  EXPECT_EQ(4UL, Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(2UL, Utility::gaugesMainThread(*store_).size());
 }
 
 TEST_F(LookupWithStatNameTest, NotFound) {
@@ -1763,16 +1763,16 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   Gauge& gauge = scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   Histogram& histogram = scope_.histogramFromString("h1", Histogram::Unit::Unspecified);
   TextReadout& textReadout = scope_.textReadoutFromString("t1");
-  ASSERT_EQ(1, Stats::Utility::countersMainThread(*store_).size()); // "c1".
-  EXPECT_TRUE(&counter == Stats::Utility::countersMainThread(*store_)[0] ||
-              &counter == Stats::Utility::countersMainThread(
+  ASSERT_EQ(1, Utility::countersMainThread(*store_).size()); // "c1".
+  EXPECT_TRUE(&counter == Utility::countersMainThread(*store_)[0] ||
+              &counter == Utility::countersMainThread(
                               *store_)[1]); // counters() order is non-deterministic.
-  ASSERT_EQ(1, store_->gauges().size());
-  EXPECT_EQ("g1", store_->gauges()[0]->name());
-  ASSERT_EQ(1, store_->histograms().size());
-  EXPECT_EQ("h1", store_->histograms()[0]->name());
-  ASSERT_EQ(1, store_->textReadouts().size());
-  EXPECT_EQ("t1", store_->textReadouts()[0]->name());
+  ASSERT_EQ(1, Utility::gaugesMainThread(*store_).size());
+  EXPECT_EQ("g1", Utility::gaugesMainThread(*store_)[0]->name());
+  ASSERT_EQ(1, Utility::histogramsMainThread(*store_).size());
+  EXPECT_EQ("h1", Utility::histogramsMainThread(*store_)[0]->name());
+  ASSERT_EQ(1, Utility::textReadoutsMainThread(*store_).size());
+  EXPECT_EQ("t1", Utility::textReadoutsMainThread(*store_)[0]->name());
 
   // Will effectively block all stats, and remove all the non-matching stats.
   envoy::config::metrics::v3::StatsConfig stats_config;
@@ -1782,10 +1782,10 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
       std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_, context_));
 
   // They can no longer be found.
-  EXPECT_EQ(0, Stats::Utility::countersMainThread(*store_).size());
-  EXPECT_EQ(0, store_->gauges().size());
-  EXPECT_EQ(0, store_->histograms().size());
-  EXPECT_EQ(0, store_->textReadouts().size());
+  EXPECT_EQ(0, Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(0, Utility::gaugesMainThread(*store_).size());
+  EXPECT_EQ(0, Utility::histogramsMainThread(*store_).size());
+  EXPECT_EQ(0, Utility::textReadoutsMainThread(*store_).size());
 
   // However, referencing the previously allocated stats will not crash.
   counter.inc();
@@ -1805,9 +1805,9 @@ TEST_F(StatsThreadLocalStoreTest, AskForRejectedStat) {
   Counter& counter = scope_.counterFromString("c1");
   Gauge& gauge = scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   TextReadout& text_readout = scope_.textReadoutFromString("t1");
-  ASSERT_EQ(1, Stats::Utility::countersMainThread(*store_).size()); // "c1".
-  ASSERT_EQ(1, store_->gauges().size());
-  ASSERT_EQ(1, store_->textReadouts().size());
+  ASSERT_EQ(1, Utility::countersMainThread(*store_).size()); // "c1".
+  ASSERT_EQ(1, Utility::gaugesMainThread(*store_).size());
+  ASSERT_EQ(1, Utility::textReadoutsMainThread(*store_).size());
 
   // Will effectively block all stats, and remove all the non-matching stats.
   envoy::config::metrics::v3::StatsConfig stats_config;
@@ -1817,9 +1817,9 @@ TEST_F(StatsThreadLocalStoreTest, AskForRejectedStat) {
       std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_, context_));
 
   // They can no longer be found.
-  EXPECT_EQ(0, Stats::Utility::countersMainThread(*store_).size());
-  EXPECT_EQ(0, store_->gauges().size());
-  EXPECT_EQ(0, store_->textReadouts().size());
+  EXPECT_EQ(0, Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(0, Utility::gaugesMainThread(*store_).size());
+  EXPECT_EQ(0, Utility::textReadoutsMainThread(*store_).size());
 
   // Ask for the rejected stats again by name.
   Counter& counter2 = scope_.counterFromString("c1");
@@ -1832,9 +1832,9 @@ TEST_F(StatsThreadLocalStoreTest, AskForRejectedStat) {
   EXPECT_EQ(&text_readout, &text_readout2);
 
   // Verify that new stats were not created.
-  EXPECT_EQ(0, Stats::Utility::countersMainThread(*store_).size());
-  EXPECT_EQ(0, store_->gauges().size());
-  EXPECT_EQ(0, store_->textReadouts().size());
+  EXPECT_EQ(0, Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(0, Utility::gaugesMainThread(*store_).size());
+  EXPECT_EQ(0, Utility::textReadoutsMainThread(*store_).size());
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
@@ -1983,60 +1983,11 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   ScopeSharedPtr scope1 = store.createScope("scope1.");
 }
 
-/*class ThreadLocalStoreThreadTest : public testing::Test {
- protected:
-  ThreadLocalStoreThreadTest() { store_.initializeThreading(*dispatcher_, tls_); }
-  ~ThreadLocalStoreThreadTest() {
-    tls_.shutdownGlobalThreading();
-    store_.shutdownThreading();
-    tls_.shutdownThread();
-  }
-
-  SymbolTableImpl symbol_table_;
-  Api::ApiPtr api_{Api::createApiForTest()};
-  Event::DispatcherPtr dispatcher_{api_->allocateDispatcher("test_thread")};
-  NiceMock<ThreadLocal::MockInstance> tls_;
-  Allocator alloc_{symbol_table_};
-  ThreadLocalStoreImpl store_{alloc_};
-  };
-*/
-
 class OneWorkerThread : public ThreadLocalRealThreadsMixin, public testing::Test {
 protected:
   static constexpr uint32_t NumThreads = 1;
   OneWorkerThread() : ThreadLocalRealThreadsMixin(NumThreads) {}
 };
-
-/*TEST_F(OneWorkerThread, ScopeDelete) {
-  CounterSharedPtr c1;
-  runOnMainBlocking([&]() {
-    ScopeSharedPtr scope1 = store_->createScope("scope1.");
-    scope1->counterFromString("c1");
-    EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
-    c1 = TestUtility::findCounter(*store_, "scope1.c1");
-    EXPECT_EQ("scope1.c1", c1->name());
-
-    scope1.reset();
-  });
-  // We expect the use-count to eventually go to 1 as the effect of
-  // resetting the scope and clearing out its caches reverberates through
-  // posts to the main thread.
-  for (int i = 0; i < 10 && c1.use_count() > 1; ++i) {
-    runOnMainBlocking([]() {});
-  }
-  EXPECT_EQ(1L, c1.use_count()); // one for the 'c1' variable, one for the scope.
-
-  // The counter is gone from all scopes, but is still held in the local
-  // variable c1. Hence, it will not be removed from the allocator or store.
-  EXPECT_EQ(1UL, Stats::Utility::countersMainThread(*store_).size());
-
-  runOnMainBlocking([&c1]() { c1.reset(); });
-  runOnMainBlocking([]() {});
-
-  // Removing the counter from the local variable, should now remove it from the
-  // allocator.
-  EXPECT_EQ(0UL, Stats::Utility::countersMainThread(*store_).size());
-  }*/
 
 // Histogram tests
 TEST_F(HistogramTest, BasicSingleHistogramMerge) {
@@ -2140,7 +2091,7 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
 
   EXPECT_EQ(2, validateMerge());
 
-  NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
+  NameHistogramMap name_histogram_map = makeHistogramMap(Utility::histogramsMainThread(*store_));
   EXPECT_EQ(h1_expected_summary,
             name_histogram_map["h1"]->cumulativeStatistics().quantileSummary());
   EXPECT_EQ(h2_expected_summary,
@@ -2171,7 +2122,7 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
       "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
       "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
-  NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
+  NameHistogramMap name_histogram_map = makeHistogramMap(Utility::histogramsMainThread(*store_));
   EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().quantileSummary());
   EXPECT_EQ(expected_bucket_summary,
             name_histogram_map["h1"]->cumulativeStatistics().bucketSummary());
@@ -2188,7 +2139,7 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
   h1.recordValue(1);
 
-  NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
+  NameHistogramMap name_histogram_map = makeHistogramMap(Utility::histogramsMainThread(*store_));
   EXPECT_FALSE(name_histogram_map["h1"]->used());
   EXPECT_FALSE(name_histogram_map["h2"]->used());
 
@@ -2203,7 +2154,7 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   // Merge histograms again and validate that both h1 and h2 are used.
   store_->mergeHistograms([]() -> void {});
 
-  for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
+  for (const ParentHistogramSharedPtr& histogram : Utility::histogramsMainThread(*store_)) {
     EXPECT_TRUE(histogram->used());
   }
 }
@@ -2212,8 +2163,8 @@ TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
   ScopeSharedPtr scope1 = store_->createScope("scope1.");
   Histogram& histogram = scope_.histogramFromString("histogram", Histogram::Unit::Unspecified);
   store_->mergeHistograms([]() -> void {});
-  ASSERT_EQ(1, store_->histograms().size());
-  ParentHistogramSharedPtr parent_histogram = store_->histograms()[0];
+  ASSERT_EQ(1, Utility::histogramsMainThread(*store_).size());
+  ParentHistogramSharedPtr parent_histogram = Utility::histogramsMainThread(*store_)[0];
   EXPECT_EQ("No recorded values", parent_histogram->bucketSummary());
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 10));
@@ -2553,7 +2504,7 @@ TEST_F(HistogramThreadTest, MakeHistogramsAndRecordValues) {
 
   mergeHistograms();
 
-  auto histograms = store_->histograms();
+  auto histograms = Utility::histogramsMainThread(*store_);
   ASSERT_EQ(1, histograms.size());
   ParentHistogramSharedPtr hist = histograms[0];
   EXPECT_THAT(hist->bucketSummary(),
@@ -2566,7 +2517,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   ScopeSharedPtr scope2 = store_->createScope("scope.");
   EXPECT_NE(scope1, scope2);
 
-  EXPECT_EQ(0, store_->histograms().size());
+  EXPECT_EQ(0, Utility::histogramsMainThread(*store_).size());
   EXPECT_EQ(0, numTlsHistograms());
 
   // Histograms created in the two same-named scopes will be the same objects.
@@ -2580,7 +2531,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
 
   // Verify that we have the expected number of TLS histograms since we accessed
   // the histogram on every thread.
-  std::vector<ParentHistogramSharedPtr> histograms = store_->histograms();
+  std::vector<ParentHistogram*> histograms = Utility::histogramsMainThread(*store_);
   ASSERT_EQ(1, histograms.size());
   EXPECT_EQ(NumThreads, numTlsHistograms());
 
@@ -2593,7 +2544,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   // The histogram was created in scope1, which can now be destroyed. But the
   // histogram is kept alive by scope2.
   scope1.reset();
-  histograms = store_->histograms();
+  histograms = Utility::histogramsMainThread(*store_);
   EXPECT_EQ(1, histograms.size());
   EXPECT_EQ(NumThreads, numTlsHistograms());
 
@@ -2620,7 +2571,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   runOnMainBlocking([]() {});
   runOnMainBlocking([]() {});
 
-  EXPECT_EQ(0, store_->histograms().size());
+  EXPECT_EQ(0, Utility::histogramsMainThread(*store_).size());
   EXPECT_EQ(0, numTlsHistograms());
 
   shutdownThreading();

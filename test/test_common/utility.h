@@ -234,7 +234,7 @@ public:
    * Find a histogram in a stats store.
    * @param store supplies the stats store.
    * @param name supplies the name to search for.
-   * @return Stats::ParentHistogramSharedPtr the histogram or nullptr if there is none.
+   * @return OptRef<Stats::ParentHistogram> the histogram
    */
   static OptRef<Stats::ParentHistogram> findHistogramMainThread(Stats::Store& store,
                                                                 const std::string& name);
@@ -385,7 +385,7 @@ public:
    * Find a readout in a stats store.
    * @param store supplies the stats store.
    * @param name supplies the name to search for.
-   * @return Stats::TextReadoutSharedPtr the readout or nullptr if there is none.
+   * @return Stats::TextReadout* the readout or nullptr if there is none.
    */
   static Stats::TextReadout* findTextReadout(Stats::Store& store, const std::string& name) {
     OptRef<Stats::TextReadout> text_readout = findTextReadoutMainThread(store, name);
@@ -661,14 +661,14 @@ public:
    * @param vector of gauges to check.
    * @return bool indicating that passed gauges not matching the omitted regex have a value of 0.
    */
-  static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges);
+  static bool gaugesZeroed(Stats::Store& store);
   static bool gaugesZeroed(
       const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges);
 
   /**
    * Returns the members of gauges that are not zero. Uses the same regex filter as gaugesZeroed().
    */
-  static std::string nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges);
+  static std::string nonZeroedGauges(Stats::Store& store);
 
   template <class MessageType> static inline MessageType anyConvert(const Protobuf::Any& message) {
     return MessageUtil::anyConvert<MessageType>(message);

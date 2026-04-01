@@ -79,24 +79,19 @@ public:
   virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
 
   /**
-   * @return a list of all known counters.
-   */
-  // virtual std::vector<CounterSharedPtr> counters() const PURE;
-
-  /**
    * @return a list of all known gauges.
    */
-  virtual std::vector<GaugeSharedPtr> gauges() const PURE;
+  // virtual std::vector<GaugeSharedPtr> gauges() const PURE;
 
   /**
    * @return a list of all known text readouts.
    */
-  virtual std::vector<TextReadoutSharedPtr> textReadouts() const PURE;
+  // virtual std::vector<TextReadoutSharedPtr> textReadouts() const PURE;
 
   /**
    * @return a list of all known histograms.
    */
-  virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
+  // virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
 
   /**
    * Iterate over all stats. Note, that implementations can potentially hold on

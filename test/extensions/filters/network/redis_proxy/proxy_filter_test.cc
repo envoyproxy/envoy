@@ -330,9 +330,7 @@ public:
 
   ~RedisProxyFilterTest() override {
     filter_.reset();
-    for (const Stats::GaugeSharedPtr& gauge : store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
-    }
+    store_.forEachGauge(nullptr, [](Stats::Gauge& gauge) { EXPECT_EQ(0U, gauge.value()); });
   }
 
   // Common::Redis::DecoderFactory

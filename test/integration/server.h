@@ -345,19 +345,6 @@ public:
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
 
   // Stats::Store
-  std::vector<GaugeSharedPtr> gauges() const override {
-    Thread::LockGuard lock(lock_);
-    return store_.gauges();
-  }
-  std::vector<ParentHistogramSharedPtr> histograms() const override {
-    Thread::LockGuard lock(lock_);
-    return store_.histograms();
-  }
-  std::vector<TextReadoutSharedPtr> textReadouts() const override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadouts();
-  }
-
   bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }

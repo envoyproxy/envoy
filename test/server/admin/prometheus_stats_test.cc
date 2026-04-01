@@ -1703,15 +1703,6 @@ public:
     store_->mergeHistograms([]() -> void {});
   }
 
-  Stats::ParentHistogramSharedPtr getParentHistogram(const std::string& name) {
-    for (const auto& histogram : store_->histograms()) {
-      if (histogram->name().find(name) != std::string::npos) {
-        return histogram;
-      }
-    }
-    return nullptr;
-  }
-
   // Decode delta-encoded positive bucket counts and return the total sample count.
   // In Prometheus native histograms, positive_delta values are delta-encoded:
   // delta[0] = count[0], delta[i] = count[i] - count[i-1] for i > 0.
@@ -1756,9 +1747,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithOnlyZeros) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_zeros");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_zeros");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -1804,9 +1796,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithZerosAndPositiveVal
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_mixed");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_mixed");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -1851,9 +1844,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithBoundaryValues) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_boundary");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_boundary");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -1926,9 +1920,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithWideRange) {
   recordValue(h1, 100000);
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_wide");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_wide");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -1979,9 +1974,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSchemaReduction) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_schema");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_schema");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   // Use small max_buckets to force schema reduction
   StatsParams params;
@@ -2035,9 +2031,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithPercent) {
   recordValue(h1, static_cast<uint64_t>(3.00 * Stats::Histogram::PercentScale));
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_percent_mixed");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_percent_mixed");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2184,9 +2181,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSparseDataAccuracy) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_sparse");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_sparse");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2258,9 +2256,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramDenseDataAccuracy) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_dense");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_dense");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2338,9 +2337,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramBucketIndexAccuracy) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_exact");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_exact");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2402,9 +2402,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramVerySparseData) {
   recordValue(h1, 1ULL << 60);
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_very_sparse");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_very_sparse");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2468,9 +2469,10 @@ TEST_F(RealHistogramNativePrometheusTest, TraditionalHistogramWithPercent) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_percent");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_percent");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   // Use default params (traditional/cumulative histogram, not native)
   StatsParams params;
@@ -2533,9 +2535,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramCumulativeAccuracy) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_cumulative");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_cumulative");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2638,9 +2641,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramNormalDistribution) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_normal");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_normal");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2733,9 +2737,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSchemaFallback) {
   recordValue(h1, 1000000000);
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_fallback");
-  ASSERT_NE(nullptr, parent_histogram);
-  histograms_.push_back(parent_histogram.get());
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_fallback");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;

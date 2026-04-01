@@ -397,10 +397,9 @@ class FormatChecker:
         return file_path in self.config.paths["raw_try"]["include"]
 
     def allow_listed_for_stats_shared_ptr(self, file_path):
-        return True
-#        return (file_path.startswith("./test/common/stats/") or
-#                file_path.startswith("./source/common/stats/") or
-#                file_path.startswith("./envoy/stats/"))
+        return (file_path.startswith("./test/common/stats/") or
+                file_path.startswith("./source/common/stats/") or
+                file_path.startswith("./envoy/stats/"))
 
     def deny_listed_for_exceptions(self, file_path):
         # Returns if this file is deny listed for exceptions.
