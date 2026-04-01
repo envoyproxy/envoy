@@ -26,6 +26,7 @@ static_resources:
           "@type": >-
             type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
           ping_interval: 2s
+          auto_close_connections: true
 
   # Listener that will route the downstream request to the reverse connection cluster
   - name: egress_listener

@@ -9,6 +9,7 @@
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -26,7 +27,16 @@ using testing::ReturnRef;
 
 class OpenTelemetryHttpTraceExporterTest : public testing::Test {
 public:
-  OpenTelemetryHttpTraceExporterTest() = default;
+  OpenTelemetryHttpTraceExporterTest() {
+    // Wire up a real API and dispatcher so that DataSourceProvider (used by the
+    // FILE_CONTENT formatter) can read files and set up file watching.
+    api_ = Api::createApiForTest();
+    dispatcher_ = api_->allocateDispatcher("test_thread");
+
+    ON_CALL(context_.server_factory_context_, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(*dispatcher_));
+    ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
 
   void setup(envoy::config::core::v3::HttpService http_service) {
     cluster_manager_.thread_local_cluster_.cluster_.info_->name_ = "my_o11y_backend";
@@ -36,11 +46,15 @@ public:
 
     cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
 
-    trace_exporter_ =
-        std::make_unique<OpenTelemetryHttpTraceExporter>(cluster_manager_, http_service);
+    auto headers_applicator = Http::HttpServiceHeadersApplicator::createOrThrow(
+        http_service, context_.server_factory_context_);
+    trace_exporter_ = std::make_unique<OpenTelemetryHttpTraceExporter>(
+        cluster_manager_, http_service, std::move(headers_applicator));
   }
 
 protected:
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   std::unique_ptr<OpenTelemetryHttpTraceExporter> trace_exporter_;
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
@@ -117,6 +131,69 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
 
   callback->onSuccess(request, std::move(msg));
   callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+}
+
+// Test that formatted value headers are evaluated and applied to the outgoing request.
+TEST_F(OpenTelemetryHttpTraceExporterTest, FormattedHeaders) {
+  const std::string token_path =
+      TestEnvironment::writeStringToFileForTest("otel_api_token.txt", "my-secret-token");
+  std::string yaml_string = fmt::format(R"EOF(
+  http_uri:
+    uri: "https://some-o11y.com/otlp/v1/traces"
+    cluster: "my_o11y_backend"
+    timeout: 0.250s
+  request_headers_to_add:
+  - header:
+      key: "authorization"
+      value: "Bearer %FILE_CONTENT({})%"
+  - header:
+      key: "x-static-header"
+      value: "static-value"
+  formatters:
+  - name: envoy.formatter.file_content
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent
+  )EOF",
+                                        token_path);
+
+  envoy::config::core::v3::HttpService http_service;
+  TestUtility::loadFromYaml(yaml_string, http_service);
+  setup(http_service);
+
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            // Formatted header should be evaluated.
+            EXPECT_EQ("Bearer my-secret-token", message->headers()
+                                                    .get(Http::LowerCaseString("authorization"))[0]
+                                                    ->value()
+                                                    .getStringView());
+
+            // Static header should also be present.
+            EXPECT_EQ("static-value", message->headers()
+                                          .get(Http::LowerCaseString("x-static-header"))[0]
+                                          ->value()
+                                          .getStringView());
+
+            return &request;
+          }));
+
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest
+      export_trace_service_request;
+  opentelemetry::proto::trace::v1::Span span;
+  span.set_name("test");
+  *export_trace_service_request.add_resource_spans()->add_scope_spans()->add_spans() = span;
+  EXPECT_TRUE(trace_exporter_->log(export_trace_service_request));
+
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  callback->onSuccess(request, std::move(msg));
 }
 
 // Test export is aborted when cluster is not found

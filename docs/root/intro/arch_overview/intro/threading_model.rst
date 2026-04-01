@@ -12,7 +12,7 @@ High-Level Overview
 
 .. note::
   Matt Klein wrote a `detailed blog post <https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310>`_
-  on the Envoy threading model. Though it is a bit old, it is still accurate anda great companion to this
+  on the Envoy threading model. Though it is a bit old, it is still accurate and a great companion to this
   document.
 
 At a high level, the threading model consists of three main components:

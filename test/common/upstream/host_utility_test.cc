@@ -169,7 +169,8 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
 
   {
     // No expected host.
-    EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+    EXPECT_CALL(context, overrideHostToSelect())
+        .WillOnce(Return(OptRef<const LoadBalancerContext::OverrideHost>()));
     auto host_map = std::make_shared<HostMap>();
     expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, &context), nullptr,
                   false);
@@ -181,7 +182,7 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
       // No host map.
       LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
       EXPECT_CALL(context, overrideHostToSelect())
-          .WillOnce(Return(absl::make_optional(override_host)));
+          .WillOnce(Return(OptRef<const LoadBalancerContext::OverrideHost>(override_host)));
       expect_helper(HostUtility::selectOverrideHost(nullptr, AllStatuses, &context), nullptr,
                     strict_mode);
     }
@@ -190,7 +191,7 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
       // The host map does not contain the expected host.
       LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
       EXPECT_CALL(context, overrideHostToSelect())
-          .WillOnce(Return(absl::make_optional(override_host)));
+          .WillOnce(Return(OptRef<const LoadBalancerContext::OverrideHost>(override_host)));
       auto host_map = std::make_shared<HostMap>();
       expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, &context), nullptr,
                     strict_mode);
@@ -202,7 +203,7 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
 
       LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
       EXPECT_CALL(context, overrideHostToSelect())
-          .WillRepeatedly(Return(absl::make_optional(override_host)));
+          .WillRepeatedly(Return(OptRef<const LoadBalancerContext::OverrideHost>(override_host)));
 
       auto host_map = std::make_shared<HostMap>();
       host_map->insert({"1.2.3.4", mock_host});
@@ -230,7 +231,7 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
 
       LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
       EXPECT_CALL(context, overrideHostToSelect())
-          .WillRepeatedly(Return(absl::make_optional(override_host)));
+          .WillRepeatedly(Return(OptRef<const LoadBalancerContext::OverrideHost>(override_host)));
 
       auto host_map = std::make_shared<HostMap>();
       host_map->insert({"1.2.3.4", mock_host});

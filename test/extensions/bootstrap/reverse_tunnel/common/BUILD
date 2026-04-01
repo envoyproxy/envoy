@@ -16,7 +16,10 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/network:connection_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
+        "//test/common/tls:mock_ssl_handshaker_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )
