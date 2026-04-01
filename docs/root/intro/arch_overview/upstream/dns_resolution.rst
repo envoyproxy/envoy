@@ -57,6 +57,18 @@ The Apple-based DNS resolver emits the following statistics rooted in the ``dns.
     socket_failure, Counter, Number of failed attempts to obtain a file descriptor to the socket to the DNS server
     timeout, Counter, Number of queries that resulted in a timeout
 
+The Hickory DNS resolver emits the following statistics rooted in the ``dns.hickory`` stats tree:
+
+  .. csv-table::
+    :header: Name, Type, Description
+    :widths: 1, 1, 2
+
+    resolve_total, Counter, Number of completed DNS queries
+    pending_resolutions, Gauge, Number of DNS queries currently in flight
+    not_found, Counter, Number of DNS queries that returned ``NXDOMAIN`` or ``NODATA`` responses
+    get_addr_failure, Counter, Number of general failures during DNS queries
+    timeouts, Counter, Number of DNS queries that resulted in a timeout
+
 .. note::
 
-   The Hickory DNS and getaddrinfo resolvers do not currently emit resolver-specific statistics.
+   The getaddrinfo resolver does not currently emit resolver-specific statistics.
