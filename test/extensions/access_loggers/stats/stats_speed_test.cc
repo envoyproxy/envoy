@@ -18,34 +18,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace StatsAccessLog {
 
-// --- Joiner Key ---
-class GaugeKeyUsingJoiner {
-public:
-  GaugeKeyUsingJoiner(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
-                      Stats::SymbolTable& symbolTable)
-      : stat_name_(stat_name), joiner_storage_(Stats::StatName(), stat_name, tags, symbolTable) {}
-
-  GaugeKeyUsingJoiner(GaugeKeyUsingJoiner&&) noexcept = default;
-  GaugeKeyUsingJoiner& operator=(GaugeKeyUsingJoiner&&) noexcept = default;
-
-  GaugeKeyUsingJoiner(const GaugeKeyUsingJoiner&) = delete;
-  GaugeKeyUsingJoiner& operator=(const GaugeKeyUsingJoiner&) = delete;
-
-  Stats::StatName statName() const { return stat_name_; }
-
-  bool operator==(const GaugeKeyUsingJoiner& rhs) const { return joinedName() == rhs.joinedName(); }
-
-  template <typename H> friend H AbslHashValue(H h, const GaugeKeyUsingJoiner& key) {
-    return H::combine(std::move(h), key.joinedName());
-  }
-
-  Stats::StatName joinedName() const { return joiner_storage_.nameWithTags(); }
-
-private:
-  Stats::StatName stat_name_;
-  Stats::TagUtility::TagStatNameJoiner joiner_storage_;
-};
-
 // --- Joiner-based AccessLogState ---
 class AccessLogStateUsingJoiner {
 public:
@@ -57,15 +29,17 @@ public:
     if (value == 0)
       return;
 
-    GaugeKeyUsingJoiner key{stat_name, tags, logger_->scope().symbolTable()};
-    auto it = inflight_gauges_.find(key);
+    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
+                                                logger_->scope().symbolTable());
+    Stats::StatName joined_name = joiner.nameWithTags();
+    auto it = inflight_gauges_.find(joined_name);
     if (it == inflight_gauges_.end()) {
-      auto [new_it, inserted] =
-          inflight_gauges_.try_emplace(std::move(key), 0, import_mode, std::move(tags_storage));
+      auto [new_it, inserted] = inflight_gauges_.try_emplace(
+          joined_name, 0, import_mode, std::move(tags_storage), std::move(joiner));
       it = new_it;
     }
     it->second.value_ += value;
-    logger_->scope().gaugeFromStatName(it->first.joinedName(), import_mode).add(value);
+    logger_->scope().gaugeFromStatName(joined_name, import_mode).add(value);
   }
 
   void removeInflightGauge(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef tags,
@@ -73,11 +47,13 @@ public:
     if (value == 0)
       return;
 
-    GaugeKeyUsingJoiner key{stat_name, tags, logger_->scope().symbolTable()};
-    auto it = inflight_gauges_.find(key);
+    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
+                                                logger_->scope().symbolTable());
+    Stats::StatName joined_name = joiner.nameWithTags();
+    auto it = inflight_gauges_.find(joined_name);
     if (it != inflight_gauges_.end()) {
       it->second.value_ -= value;
-      logger_->scope().gaugeFromStatName(it->first.joinedName(), import_mode).sub(value);
+      logger_->scope().gaugeFromStatName(joined_name, import_mode).sub(value);
       if (it->second.value_ == 0) {
         inflight_gauges_.erase(it);
       }
@@ -90,13 +66,16 @@ private:
   std::shared_ptr<StatsAccessLog> logger_;
   struct InflightGaugeNew {
     InflightGaugeNew(uint64_t value, Stats::Gauge::ImportMode import_mode,
-                     std::vector<Stats::StatNameDynamicStorage> tags_storage)
-        : value_(value), import_mode_(import_mode), tags_storage_(std::move(tags_storage)) {}
+                     std::vector<Stats::StatNameDynamicStorage> tags_storage,
+                     Stats::TagUtility::TagStatNameJoiner&& joiner)
+        : value_(value), import_mode_(import_mode), tags_storage_(std::move(tags_storage)),
+          joiner_(std::move(joiner)) {}
     uint64_t value_;
     Stats::Gauge::ImportMode import_mode_;
     std::vector<Stats::StatNameDynamicStorage> tags_storage_;
+    Stats::TagUtility::TagStatNameJoiner joiner_;
   };
-  absl::node_hash_map<GaugeKeyUsingJoiner, InflightGaugeNew> inflight_gauges_;
+  absl::node_hash_map<Stats::StatName, InflightGaugeNew> inflight_gauges_;
 };
 
 // --- Shared Setup ---
@@ -138,8 +117,22 @@ struct SharedBencherSetup {
 template <typename T>
 static void runBenchmark(benchmark::State& state, SharedBencherSetup& setup, T& access_log_state) {
   const size_t tag_count = state.range(0);
-  const char* const values[] = {"val1", "val2", "val3", "val4", "val5",
-                                "val6", "val7", "val8", "val9", "val10"};
+  const size_t length_selector = state.range(1);
+
+  const char* const short_values[] = {"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"};
+  const char* const long_values[] = {
+      "val_01234567890123456789012345678901234567890123456789012301",
+      "val_01234567890123456789012345678901234567890123456789012302",
+      "val_01234567890123456789012345678901234567890123456789012303",
+      "val_01234567890123456789012345678901234567890123456789012304",
+      "val_01234567890123456789012345678901234567890123456789012305",
+      "val_01234567890123456789012345678901234567890123456789012306",
+      "val_01234567890123456789012345678901234567890123456789012307",
+      "val_01234567890123456789012345678901234567890123456789012308",
+      "val_01234567890123456789012345678901234567890123456789012309",
+      "val_01234567890123456789012345678901234567890123456789012310"};
+  const char* const* values = (length_selector == 0) ? short_values : long_values;
+
   for (auto _ : state) { // NOLINT
     std::vector<Stats::StatNameDynamicStorage> loop_storage;
     Stats::StatNameTagVector loop_tags;
@@ -164,7 +157,11 @@ static void BM_AccessLogState(benchmark::State& state) {
   auto access_log_state = std::make_shared<AccessLogState>(setup.logger_);
   runBenchmark(state, setup, *access_log_state);
 }
-BENCHMARK(BM_AccessLogState)->Arg(1)->Arg(5)->Arg(10);
+BENCHMARK(BM_AccessLogState)
+    ->Args({/*tag_count=*/3, /*length_selector=*/0})
+    ->Args({/*tag_count=*/10, /*length_selector=*/0})
+    ->Args({/*tag_count=*/3, /*length_selector=*/1})
+    ->Args({/*tag_count=*/10, /*length_selector=*/1});
 
 // --- Joiner Benchmark ---
 static void BM_AccessLogStateUsingJoiner(benchmark::State& state) {
@@ -172,7 +169,11 @@ static void BM_AccessLogStateUsingJoiner(benchmark::State& state) {
   AccessLogStateUsingJoiner access_log_state(setup.logger_);
   runBenchmark(state, setup, access_log_state);
 }
-BENCHMARK(BM_AccessLogStateUsingJoiner)->Arg(1)->Arg(5)->Arg(10);
+BENCHMARK(BM_AccessLogStateUsingJoiner)
+    ->Args({/*tag_count=*/3, /*length_selector=*/0})
+    ->Args({/*tag_count=*/10, /*length_selector=*/0})
+    ->Args({/*tag_count=*/3, /*length_selector=*/1})
+    ->Args({/*tag_count=*/10, /*length_selector=*/1});
 
 } // namespace StatsAccessLog
 } // namespace AccessLoggers
