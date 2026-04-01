@@ -775,14 +775,15 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
   if (context_envoy_ptr == nullptr || address == nullptr || strict == nullptr) {
     return false;
   }
-  auto override_host = getContext(context_envoy_ptr)->overrideHostToSelect();
+  Envoy::OptRef<const Envoy::Upstream::LoadBalancerContext::OverrideHost> override_host =
+      getContext(context_envoy_ptr)->overrideHostToSelect();
   if (!override_host.has_value()) {
     return false;
   }
-  auto host_address = override_host.value().first;
+  const std::string& host_address = override_host->host;
   address->ptr = const_cast<char*>(host_address.data());
   address->length = host_address.size();
-  *strict = override_host.value().second;
+  *strict = override_host->strict;
   return true;
 }
 
@@ -1078,19 +1079,42 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
     envoy_dynamic_module_type_cluster_host_envoy_ptr host,
     envoy_dynamic_module_type_module_buffer details) {
   auto* lb = getLb(lb_envoy_ptr);
-  auto* context = getContext(context_envoy_ptr);
 
-  Envoy::Upstream::HostConstSharedPtr host_shared;
-  if (host != nullptr) {
-    host_shared = lb->handle()->cluster()->findHost(host);
-  }
-
+  // Copy the details string on the calling thread. The pointer is not valid after we return.
   std::string details_str;
   if (details.ptr != nullptr && details.length > 0) {
     details_str.assign(details.ptr, details.length);
   }
 
-  context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
+  auto cancelled = lb->activeAsyncCancelled();
+  auto* dispatcher = lb->activeAsyncDispatcher();
+
+  if (dispatcher != nullptr) {
+    // Post all work to the worker thread. The host lookup and context access must happen
+    // on the worker thread because the module may call this from a background thread.
+    // Keep the cluster alive via the handle's shared_ptr until the callback fires.
+    auto handle = lb->handle();
+    dispatcher->post([context_envoy_ptr, host, details_str = std::move(details_str),
+                      cancelled = std::move(cancelled), handle = std::move(handle)]() {
+      if (cancelled != nullptr && cancelled->load(std::memory_order_acquire)) {
+        return;
+      }
+      auto* context = getContext(context_envoy_ptr);
+      Envoy::Upstream::HostConstSharedPtr host_shared;
+      if (host != nullptr) {
+        host_shared = handle->cluster()->findHost(host);
+      }
+      context->onAsyncHostSelection(std::move(host_shared), std::string(details_str));
+    });
+  } else {
+    // No worker dispatcher. Complete inline on the calling thread.
+    auto* context = getContext(context_envoy_ptr);
+    Envoy::Upstream::HostConstSharedPtr host_shared;
+    if (host != nullptr) {
+      host_shared = lb->handle()->cluster()->findHost(host);
+    }
+    context->onAsyncHostSelection(std::move(host_shared), std::move(details_str));
+  }
 }
 
 // =============================================================================

@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/upstream/locality.h"
 
@@ -10,11 +11,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
-
-#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -57,10 +55,9 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
 
 absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleClusterConfig::create(
     const std::string& cluster_name, const std::string& cluster_config,
-    const std::string& metrics_namespace,
     Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope) {
-  auto config = std::shared_ptr<DynamicModuleClusterConfig>(new DynamicModuleClusterConfig(
-      cluster_name, cluster_config, metrics_namespace, std::move(module), stats_scope));
+  auto config = std::shared_ptr<DynamicModuleClusterConfig>(
+      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module), stats_scope));
 
   // Resolve all required function pointers from the dynamic module.
 #define RESOLVE_SYMBOL(name, type, member)                                                         \
@@ -142,9 +139,8 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
 
 DynamicModuleClusterConfig::DynamicModuleClusterConfig(
     const std::string& cluster_name, const std::string& cluster_config,
-    const std::string& metrics_namespace,
     Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope)
-    : stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
+    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")),
       stat_name_pool_(stats_scope_->symbolTable()), cluster_name_(cluster_name),
       cluster_config_(cluster_config), dynamic_module_(std::move(module)) {}
 
@@ -161,6 +157,12 @@ DynamicModuleClusterConfig::~DynamicModuleClusterConfig() {
 DynamicModuleClusterHandle::~DynamicModuleClusterHandle() {
   std::shared_ptr<DynamicModuleCluster> cluster = std::move(cluster_);
   cluster_.reset();
+  // Release lifecycle handles eagerly while the lifecycle notifier is still valid. When the
+  // dispatcher destructor clears pending callbacks, the cluster destructor would otherwise try to
+  // unregister from already-destroyed lifecycle notifier lists.
+  cluster->server_initialized_handle_.reset();
+  cluster->shutdown_handle_.reset();
+  cluster->drain_handle_.reset();
   Event::Dispatcher& dispatcher = cluster->dispatcher_;
   dispatcher.post([cluster = std::move(cluster)]() mutable { cluster.reset(); });
 }
@@ -620,6 +622,14 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
+  // Pre-capture the worker dispatcher and prepare the cancellation flag before calling into the
+  // module. The module's choose_host may spawn a background thread that calls
+  // async_host_selection_complete, which reads these fields. Setting them beforehand establishes
+  // a happens-before relationship via the thread::spawn synchronization in the module.
+  const auto* connection = context != nullptr ? context->downstreamConnection() : nullptr;
+  active_async_dispatcher_ = connection != nullptr ? &connection->dispatcher() : nullptr;
+  active_async_cancelled_ = std::make_shared<std::atomic<bool>>(false);
+
   envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
   handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context, &host_ptr,
@@ -629,9 +639,13 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     // Async pending: the module will call the completion callback later.
     auto cancelable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
         async_handle, in_module_lb_,
-        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_);
+        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_, active_async_cancelled_);
     return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
   }
+
+  // Synchronous result or no host. Clear the async state.
+  active_async_dispatcher_ = nullptr;
+  active_async_cancelled_ = nullptr;
 
   if (host_ptr == nullptr) {
     return {nullptr};
@@ -642,10 +656,17 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   return {host};
 }
 
-void DynamicModuleAsyncHostSelectionHandle::cancel() {
-  if (cancel_fn_ != nullptr) {
+DynamicModuleAsyncHostSelectionHandle::~DynamicModuleAsyncHostSelectionHandle() {
+  // Free the module-side async handle. The cancel function takes ownership of the handle and
+  // drops it, so this works for both cancellation and normal completion paths.
+  if (async_handle_ != nullptr && cancel_fn_ != nullptr) {
     cancel_fn_(in_module_lb_, async_handle_);
+    async_handle_ = nullptr;
   }
+}
+
+void DynamicModuleAsyncHostSelectionHandle::cancel() {
+  cancelled_->store(true, std::memory_order_release);
 }
 
 const Upstream::PrioritySet& DynamicModuleLoadBalancer::prioritySet() const {
@@ -724,26 +745,12 @@ DynamicModuleClusterFactory::createClusterWithConfig(
                                                   module_or_error.status().message()));
   }
 
-  // Use configured metrics namespace or fall back to the default.
-  const std::string metrics_namespace = module_config.metrics_namespace().empty()
-                                            ? std::string(DefaultMetricsNamespace)
-                                            : module_config.metrics_namespace();
-
   // Create the cluster configuration.
   auto config_or_error = DynamicModuleClusterConfig::create(
-      proto_config.cluster_name(), cluster_config_bytes, metrics_namespace,
-      std::move(module_or_error.value()), context.serverFactoryContext().serverScope());
+      proto_config.cluster_name(), cluster_config_bytes, std::move(module_or_error.value()),
+      context.serverFactoryContext().serverScope());
   if (!config_or_error.ok()) {
     return config_or_error.status();
-  }
-
-  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
-  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
-  // is added. This is the legacy behavior for backward compatibility.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
-    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
-        metrics_namespace);
   }
 
   // Create the cluster.
