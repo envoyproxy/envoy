@@ -87,8 +87,8 @@ public:
     for (auto upstream_http_filters_value : {false, true}) {
       for (auto delay_route_selection_value : {false, true}) {
         parameters.push_back({{"envoy.restart_features.upstream_http_filters_with_tcp_proxy",
-                               upstream_http_filters_value ? "true" : "false"}});
-        parameters.push_back({{"envoy.reloadable_features.tcp_proxy_delay_route_selection",
+                               upstream_http_filters_value ? "true" : "false"},
+                              {"envoy.reloadable_features.tcp_proxy_delay_route_selection",
                                delay_route_selection_value ? "true" : "false"}});
       }
     }
