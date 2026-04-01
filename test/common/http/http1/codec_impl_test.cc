@@ -1396,6 +1396,38 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
 }
 
+TEST_F(Http1ServerConnectionImplTest, RequestWithObsText) {
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  // obs-text is allowed by the codec, but should be flagged in stats.
+  // \x80 is obs-text.
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nFoo: bar\x80\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(1, store_.counter("http1.requests_with_obs_text").value());
+}
+
+TEST_F(Http1ServerConnectionImplTest, TrailerWithObsText) {
+  codec_settings_.enable_trailers_ = true;
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(_, false));
+  EXPECT_CALL(decoder, decodeTrailers_(_));
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n"
+                           "4\r\nbody\r\n0\r\n"
+                           "Foo: bar\x80\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(1, store_.counter("http1.requests_with_obs_text").value());
+}
+
 // Ensures that request headers with names containing the underscore character are allowed
 // when the option is set to allow.
 TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {

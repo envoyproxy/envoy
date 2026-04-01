@@ -53,10 +53,10 @@ HeaderUtility::GetAllOfHeaderAsStringResult
 HeaderUtility::getAllOfHeaderAsString(const HeaderMap::GetResult& header_value,
                                       absl::string_view separator) {
   GetAllOfHeaderAsStringResult result;
-  // In this case we concatenate all found headers using a delimiter before performing the
-  // final match. We use an InlinedVector of absl::string_view to invoke the optimized join
-  // algorithm. This requires a copying phase before we invoke join. The 3 used as the inline
-  // size has been arbitrarily chosen.
+  // In this case we concatenate all found headers using a delimiter before
+  // performing the final match. We use an InlinedVector of absl::string_view to
+  // invoke the optimized join algorithm. This requires a copying phase before
+  // we invoke join. The 3 used as the inline size has been arbitrarily chosen.
   // TODO(mattklein123): Do we need to normalize any whitespace here?
   absl::InlinedVector<absl::string_view, 3> string_view_vector;
   string_view_vector.reserve(header_value.size());
@@ -75,8 +75,8 @@ HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::Lowe
   const auto header_value = headers.get(key);
 
   if (header_value.empty()) {
-    // Empty for clarity. Avoid handling the empty case in the block below if the runtime feature
-    // is disabled.
+    // Empty for clarity. Avoid handling the empty case in the block below if
+    // the runtime feature is disabled.
   } else if (header_value.size() == 1) {
     result.result_ = header_value[0]->value().getStringView();
   } else {
@@ -136,11 +136,12 @@ bool HeaderUtility::headerNameIsValid(absl::string_view header_key) {
       return false;
     }
   }
-  // For all other header use HTTP/1 semantics. The only difference from HTTP/2 is that
-  // uppercase characters are allowed. This allows HTTP filters to add header with mixed
-  // case names. The HTTP/1 codec will send as is, as uppercase characters are allowed.
-  // However the HTTP/2 codec will NOT convert these to lowercase when serializing the
-  // header map, thus producing an invalid request.
+  // For all other header use HTTP/1 semantics. The only difference from HTTP/2
+  // is that uppercase characters are allowed. This allows HTTP filters to add
+  // header with mixed case names. The HTTP/1 codec will send as is, as
+  // uppercase characters are allowed. However the HTTP/2 codec will NOT convert
+  // these to lowercase when serializing the header map, thus producing an
+  // invalid request.
   // TODO(yanavlasov): make validation in HTTP/2 case stricter.
   bool is_valid = true;
   for (auto iter = header_key.begin(); iter != header_key.end() && is_valid; ++iter) {
@@ -155,11 +156,12 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
   // This function validates the authority header for both HTTP/1 and HTTP/2.
-  // Note the HTTP/1 spec allows "user-info@host:port" for the authority, whereas
-  // the HTTP/2 spec only allows "host:port". Thus, this function permits all the
-  // HTTP/2 valid characters (similar to oghttp2's implementation) and the "@" character.
-  // Once UHV is used, this function should be removed, and the HTTP/1 and HTTP/2
-  // authority validations should be different.
+  // Note the HTTP/1 spec allows "user-info@host:port" for the authority,
+  // whereas the HTTP/2 spec only allows "host:port". Thus, this function
+  // permits all the HTTP/2 valid characters (similar to oghttp2's
+  // implementation) and the "@" character. Once UHV is used, this function
+  // should be removed, and the HTTP/1 and HTTP/2 authority validations should
+  // be different.
   static constexpr char ValidAuthorityChars[] = {
       0 /* NUL  */, 0 /* SOH  */, 0 /* STX  */, 0 /* ETX  */,
       0 /* EOT  */, 0 /* ENQ  */, 0 /* ACK  */, 0 /* BEL  */,
@@ -251,8 +253,9 @@ bool HeaderUtility::isConnectUdpRequest(const RequestHeaderMap& headers) {
 }
 
 bool HeaderUtility::isConnectUdpResponse(const ResponseHeaderMap& headers) {
-  // In connect-udp case, Envoy will transform the H2 headers to H1 upgrade headers.
-  // A valid response should have SwitchingProtocol status and connect-udp upgrade.
+  // In connect-udp case, Envoy will transform the H2 headers to H1 upgrade
+  // headers. A valid response should have SwitchingProtocol status and
+  // connect-udp upgrade.
   return headers.Upgrade() && Utility::getResponseStatus(headers) == 101 &&
          absl::EqualsIgnoreCase(headers.getUpgradeValue(),
                                 Http::Headers::get().UpgradeValues.ConnectUdp);
@@ -266,7 +269,8 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMap* request_headers,
 }
 
 bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
-  // Per RFC 9298, the URI template must only contain ASCII characters in the range 0x21-0x7E.
+  // Per RFC 9298, the URI template must only contain ASCII characters in the
+  // range 0x21-0x7E.
   absl::string_view path = headers.getPathValue();
   for (char c : path) {
     unsigned char ascii_code = static_cast<unsigned char>(c);
@@ -289,8 +293,8 @@ bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
     return false;
   }
 
-  // Utility::PercentEncoding::decode never returns an empty string if the input argument is not
-  // empty.
+  // Utility::PercentEncoding::decode never returns an empty string if the input
+  // argument is not empty.
   std::string target_host = Utility::PercentEncoding::decode(path_split[4]);
   // Per RFC 9298, IPv6 Zone ID is not supported.
   if (target_host.find('%') != std::string::npos) {
@@ -313,9 +317,10 @@ bool HeaderUtility::rewriteAuthorityForConnectUdp(RequestHeaderMap& headers) {
 bool HeaderUtility::isCapsuleProtocol(const RequestOrResponseHeaderMap& headers) {
   Http::HeaderMap::GetResult capsule_protocol =
       headers.get(Envoy::Http::LowerCaseString("Capsule-Protocol"));
-  // When there are multiple Capsule-Protocol header entries, it returns false. RFC 9297 specifies
-  // that non-boolean value types must be ignored. If there are multiple header entries, the value
-  // type becomes a List so the header field must be ignored.
+  // When there are multiple Capsule-Protocol header entries, it returns false.
+  // RFC 9297 specifies that non-boolean value types must be ignored. If there
+  // are multiple header entries, the value type becomes a List so the header
+  // field must be ignored.
   if (capsule_protocol.size() != 1) {
     return false;
   }
@@ -354,7 +359,8 @@ void HeaderUtility::stripTrailingHostDot(RequestHeaderMap& headers) {
   }
   // If the dot is just before a colon, it must be preceding the port number.
   // IPv6 addresses may contain colons or dots, but the dot will never directly
-  // precede the colon, so this check should be sufficient to detect a trailing port number.
+  // precede the colon, so this check should be sufficient to detect a trailing
+  // port number.
   if (host[dot_index + 1] == ':') {
     headers.setHost(absl::StrCat(host.substr(0, dot_index), host.substr(dot_index + 1)));
   }
@@ -386,8 +392,8 @@ absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& head
     return absl::nullopt;
   }
   if (listener_port.has_value() && port != listener_port) {
-    // We would strip ports only if it is specified and they are the same, as local port of the
-    // listener.
+    // We would strip ports only if it is specified and they are the same, as
+    // local port of the listener.
     return absl::nullopt;
   }
   const absl::string_view host = original_host.substr(0, port_start);
@@ -454,8 +460,8 @@ HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
 
 bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
                                           const RequestOrResponseHeaderMap& headers) {
-  // HTTP/1.0 defaults to single-use connections. Make sure the connection will be closed unless
-  // Keep-Alive is present.
+  // HTTP/1.0 defaults to single-use connections. Make sure the connection will
+  // be closed unless Keep-Alive is present.
   if (protocol == Protocol::Http10 &&
       (!headers.Connection() ||
        !Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
@@ -493,12 +499,14 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
     }
     if (headers.Path() && !headers.Protocol()) {
-      // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+      // Path and Protocol header should only be present for CONNECT for upgrade
+      // style CONNECT.
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Protocol.get()));
     }
     if (!headers.Path() && headers.Protocol()) {
-      // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+      // Path and Protocol header should only be present for CONNECT for upgrade
+      // style CONNECT.
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
     }
@@ -536,8 +544,8 @@ Http::Status HeaderUtility::checkValidRequestHeaders(const Http::RequestHeaderMa
   });
 
   if (invalid_entry) {
-    // The header key may contain non-printable characters. Escape the key so that the error
-    // details can be safely presented.
+    // The header key may contain non-printable characters. Escape the key so
+    // that the error details can be safely presented.
     const absl::string_view key = invalid_entry->key().getStringView();
     uint64_t extra_length = JsonEscaper::extraSpace(key);
     const std::string escaped_key = JsonEscaper::escapeString(key, extra_length);
@@ -607,10 +615,10 @@ HeaderUtility::validateContentLength(absl::string_view header_value,
       continue;
     }
     if (new_value != content_length.value()) {
-      ENVOY_LOG_MISC(
-          debug,
-          "Parsed content length {} is inconsistent with previously detected content length {}",
-          new_value, content_length.value());
+      ENVOY_LOG_MISC(debug,
+                     "Parsed content length {} is inconsistent with previously "
+                     "detected content length {}",
+                     new_value, content_length.value());
       should_close_connection = !override_stream_error_on_invalid_http_message;
       return HeaderValidationResult::REJECT;
     }
@@ -649,9 +657,9 @@ std::string HeaderUtility::addEncodingToAcceptEncoding(absl::string_view accept_
     absl::string_view strippedEncoding =
         Http::HeaderUtility::getSemicolonDelimitedAttribute(contentEncoding);
     if (strippedEncoding != encoding) {
-      // Add back all content encodings back except for the content encoding that we want to
-      // add. For example, if content encoding is "gzip", this filters out encodings "gzip" and
-      // "gzip;q=0.6".
+      // Add back all content encodings back except for the content encoding
+      // that we want to add. For example, if content encoding is "gzip", this
+      // filters out encodings "gzip" and "gzip;q=0.6".
       newContentEncodings.push_back(contentEncoding);
     }
   }
@@ -672,6 +680,22 @@ bool HeaderUtility::isExtendedH2ConnectRequest(const Http::RequestHeaderMap& hea
 
 bool HeaderUtility::isPseudoHeader(absl::string_view header_name) {
   return !header_name.empty() && header_name[0] == ':';
+}
+
+void HeaderUtility::checkHeaderValueForObsText(absl::string_view header_value,
+                                               HeaderValidatorStats& stats) {
+  if (headerValueContainsObsText(header_value)) {
+    stats.incRequestsWithObsText();
+  }
+}
+
+bool HeaderUtility::headerValueContainsObsText(absl::string_view header_value) {
+  for (char c : header_value) {
+    if (static_cast<uint8_t>(c) >= 0x80) {
+      return true;
+    }
+  }
+  return false;
 }
 
 } // namespace Http

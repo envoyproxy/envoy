@@ -815,6 +815,7 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
   }
 
   absl::string_view header_value{data, length};
+  Http::HeaderUtility::checkHeaderValueForObsText(header_value, stats_);
   if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
     ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
     error_code_ = Http::Code::BadRequest;

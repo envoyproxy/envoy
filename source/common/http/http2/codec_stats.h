@@ -26,6 +26,7 @@ namespace Http2 {
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
+  COUNTER(requests_with_obs_text)                                                                  \
   COUNTER(rx_messaging_error)                                                                      \
   COUNTER(rx_reset)                                                                                \
   COUNTER(stream_refused_errors)                                                                   \
@@ -60,6 +61,7 @@ struct CodecStats : public ::Envoy::Http::HeaderValidatorStats {
     requests_rejected_with_underscores_in_headers_.inc();
   }
   void incMessagingError() override { rx_messaging_error_.inc(); }
+  void incRequestsWithObsText() override { requests_with_obs_text_.inc(); }
 
   ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };

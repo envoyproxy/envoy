@@ -2356,6 +2356,7 @@ Status ClientConnectionImpl::onBeginHeaders(int32_t stream_id) {
 
 int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
   ASSERT(connection_.state() == Network::Connection::State::Open);
+  Http::HeaderUtility::checkHeaderValueForObsText(value.getStringView(), stats_);
   return saveHeader(stream_id, std::move(name), std::move(value));
 }
 
@@ -2434,6 +2435,7 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
 }
 
 int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
+  Http::HeaderUtility::checkHeaderValueForObsText(value.getStringView(), stats_);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")) {
     StreamImpl* stream = getStreamUnchecked(stream_id);
     if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {

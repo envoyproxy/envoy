@@ -1464,5 +1464,20 @@ TEST(ValidateHeaders, ModifyAcceptEncodingHeader) {
   EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("", "one"), "one");
 }
 
+TEST(HeaderIsValidTest, HeaderValueContainsObsText) {
+  EXPECT_FALSE(HeaderUtility::headerValueContainsObsText("some-value"));
+  EXPECT_TRUE(HeaderUtility::headerValueContainsObsText("some-value\x80"));
+  EXPECT_TRUE(HeaderUtility::headerValueContainsObsText("some-value\xFF"));
+}
+
+TEST(HeaderIsValidTest, CheckHeaderValueForObsText) {
+  MockHeaderValidatorStats stats;
+  EXPECT_CALL(stats, incRequestsWithObsText());
+  HeaderUtility::checkHeaderValueForObsText("some-value\x80", stats);
+
+  EXPECT_CALL(stats, incRequestsWithObsText()).Times(0);
+  HeaderUtility::checkHeaderValueForObsText("some-value", stats);
+}
+
 } // namespace Http
 } // namespace Envoy

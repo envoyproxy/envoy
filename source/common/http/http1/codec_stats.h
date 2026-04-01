@@ -17,7 +17,8 @@ namespace Http1 {
   COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(metadata_not_supported_error)                                                            \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
-  COUNTER(response_flood)
+  COUNTER(response_flood)                                                                          \
+  COUNTER(requests_with_obs_text)
 
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
@@ -41,6 +42,7 @@ struct CodecStats : public ::Envoy::Http::HeaderValidatorStats {
   }
   // TODO(yanavlasov): add corresponding counter for H/1 codec.
   void incMessagingError() override {}
+  void incRequestsWithObsText() override { requests_with_obs_text_.inc(); }
 
   ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)
 };

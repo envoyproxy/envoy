@@ -139,6 +139,7 @@ public:
   validateHeader(absl::string_view header_name, absl::string_view header_value) override {
     bool override_stream_error_on_invalid_http_message =
         http3_options_.override_stream_error_on_invalid_http_message().value();
+    Http::HeaderUtility::checkHeaderValueForObsText(header_value, stats_);
     if (header_validator_.ValidateSingleHeader(header_name, header_value) !=
         http2::adapter::HeaderValidator::HEADER_OK) {
       close_connection_upon_invalid_header_ = !override_stream_error_on_invalid_http_message;

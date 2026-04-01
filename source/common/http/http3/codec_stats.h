@@ -21,7 +21,8 @@ namespace Http3 {
   COUNTER(metadata_not_supported_error)                                                            \
   COUNTER(quic_version_h3_29)                                                                      \
   COUNTER(quic_version_rfc_v1)                                                                     \
-  COUNTER(tx_flush_timeout)
+  COUNTER(tx_flush_timeout)                                                                        \
+  COUNTER(requests_with_obs_text)
 
 /**
  * Wrapper struct for the HTTP/3 codec stats. @see stats_macros.h
@@ -47,6 +48,7 @@ struct CodecStats : public ::Envoy::Http::HeaderValidatorStats {
   }
   // TODO(yanavlasov): add corresponding counter for H/3 codec.
   void incMessagingError() override {}
+  void incRequestsWithObsText() override { requests_with_obs_text_.inc(); }
 
   ALL_HTTP3_CODEC_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
