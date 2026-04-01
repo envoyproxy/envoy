@@ -78,7 +78,8 @@ public:
 
 AccessLogState::~AccessLogState() {
   for (const auto& p : inflight_gauges_) {
-    Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatName(p.first, p.second.import_mode_);
+    Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
+        p.first.statName(), p.first.tags(), p.second.import_mode_);
     gauge_stat.sub(p.second.value_);
   }
 }
@@ -91,18 +92,17 @@ void AccessLogState::addInflightGauge(Stats::StatName stat_name,
     return;
   }
 
-  Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
-                                              parent_->scope().symbolTable());
-  Stats::StatName joined_name = joiner.nameWithTags();
+  GaugeKey key{stat_name, tags};
 
-  auto it = inflight_gauges_.find(joined_name);
+  auto it = inflight_gauges_.find(key);
   if (it == inflight_gauges_.end()) {
-    auto [new_it, inserted] = inflight_gauges_.try_emplace(
-        joined_name, 0, import_mode, std::move(tags_storage), std::move(joiner));
+    key.makeOwned();
+    auto [new_it, inserted] = inflight_gauges_.emplace(
+        std::move(key), InflightGauge{std::move(tags_storage), 0, import_mode});
     it = new_it;
   }
   it->second.value_ += value;
-  parent_->scope().gaugeFromStatName(joined_name, import_mode).add(value);
+  parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
 }
 
 void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
@@ -112,13 +112,12 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
     return;
   }
 
-  Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name, tags,
-                                              parent_->scope().symbolTable());
-  Stats::StatName joined_name = joiner.nameWithTags();
+  GaugeKey key{stat_name, tags};
 
-  Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatName(joined_name, import_mode);
+  Stats::Gauge& gauge_stat =
+      parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
 
-  auto it = inflight_gauges_.find(joined_name);
+  auto it = inflight_gauges_.find(key);
   const bool was_found = (it != inflight_gauges_.end());
   if (was_found) {
     ENVOY_BUG(it->second.value_ >= value, "Connection gauge underflow in removeInflightGauge");
@@ -129,6 +128,37 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
     }
   }
   ASSERT(was_found);
+}
+
+GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef borrowed_tags)
+    : stat_name_(stat_name), borrowed_tags_(borrowed_tags) {}
+
+void GaugeKey::makeOwned() {
+  ASSERT(!(borrowed_tags_.has_value() && owned_tags_.has_value()),
+         "Both borrowed and owned tags are present in GaugeKey::makeOwned");
+  if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
+    owned_tags_ = borrowed_tags_.value().get();
+    borrowed_tags_ = absl::nullopt;
+  }
+}
+
+Stats::StatNameTagVectorOptConstRef GaugeKey::tags() const {
+  if (owned_tags_.has_value()) {
+    return std::cref(owned_tags_.value());
+  }
+  return borrowed_tags_;
+}
+
+bool GaugeKey::operator==(const GaugeKey& rhs) const {
+  if (stat_name_ != rhs.stat_name_) {
+    return false;
+  }
+  Stats::StatNameTagVectorOptConstRef lhs_tags = tags();
+  Stats::StatNameTagVectorOptConstRef rhs_tags = rhs.tags();
+  if (lhs_tags.has_value() != rhs_tags.has_value()) {
+    return false;
+  }
+  return !lhs_tags.has_value() || lhs_tags.value().get() == rhs_tags.value().get();
 }
 
 StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v3::Config& config,

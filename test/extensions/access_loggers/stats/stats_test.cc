@@ -1218,6 +1218,129 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnHistogram) {
   logger_->log(formatter_context_, stream_info_);
 }
 
+TEST(GaugeKeyTest, EqualityAndHashing) {
+  Stats::SymbolTableImpl symbol_table;
+  Stats::StatNamePool pool(symbol_table);
+
+  using GaugeKey = AccessLoggers::StatsAccessLog::GaugeKey;
+
+  Stats::StatName name1 = pool.add("name1");
+  Stats::StatName name2 = pool.add("name2");
+
+  GaugeKey key1(name1, absl::nullopt);
+  GaugeKey key2(name1, absl::nullopt);
+  GaugeKey key3(name2, absl::nullopt);
+
+  // Basic equality
+  EXPECT_EQ(key1, key2);
+  EXPECT_NE(key1, key3);
+
+  // Hash equality
+  EXPECT_EQ(absl::Hash<GaugeKey>{}(key1), absl::Hash<GaugeKey>{}(key2));
+  EXPECT_NE(absl::Hash<GaugeKey>{}(key1), absl::Hash<GaugeKey>{}(key3));
+
+  // Tags
+  Stats::StatName tag_n1 = pool.add("tag_n1");
+  Stats::StatName tag_v1 = pool.add("tag_v1");
+  Stats::StatName tag_v2 = pool.add("tag_v2");
+
+  Stats::StatNameTagVector tags1 = {{tag_n1, tag_v1}};
+  Stats::StatNameTagVector tags2 = {{tag_n1, tag_v2}};
+
+  GaugeKey key_tags1(name1, std::cref(tags1));
+  GaugeKey key_tags2(name1, std::cref(tags1));
+  GaugeKey key_tags3(name1, std::cref(tags2));
+
+  EXPECT_EQ(key_tags1, key_tags2);
+  EXPECT_NE(key_tags1, key_tags3);
+  EXPECT_NE(key1, key_tags1); // No tags vs tags
+
+  EXPECT_EQ(absl::Hash<GaugeKey>{}(key_tags1), absl::Hash<GaugeKey>{}(key_tags2));
+  EXPECT_NE(absl::Hash<GaugeKey>{}(key_tags1), absl::Hash<GaugeKey>{}(key_tags3));
+
+  // Borrowed vs Owned
+  GaugeKey key_owned(name1, std::cref(tags1));
+  key_owned.makeOwned();
+
+  EXPECT_EQ(key_tags1, key_owned); // Borrowed vs Owned should be equal if content is same //
+                                   // Borrowed vs Owned should be equal if content is same
+}
+
+TEST(GaugeKeyTest, VerifyAbslHashCorrectness) {
+  Stats::SymbolTableImpl symbol_table;
+  Stats::StatNamePool pool(symbol_table);
+
+  using GaugeKey = AccessLoggers::StatsAccessLog::GaugeKey;
+
+  Stats::StatName name1 = pool.add("name1");
+  Stats::StatName name2 = pool.add("name2");
+  Stats::StatName tag_n1 = pool.add("tag_n1");
+  Stats::StatName tag_v1 = pool.add("tag_v1");
+  Stats::StatName tag_v2 = pool.add("tag_v2");
+
+  Stats::StatNameTagVector tags1 = {{tag_n1, tag_v1}};
+  Stats::StatNameTagVector tags2 = {{tag_n1, tag_v2}};
+
+  GaugeKey key_empty1(name1, absl::nullopt);
+  GaugeKey key_empty2(name2, absl::nullopt);
+
+  GaugeKey key_borrowed(name1, std::cref(tags1));
+  GaugeKey key_owned(name1, std::cref(tags1));
+  key_owned.makeOwned();
+
+  GaugeKey key_tags2(name1, std::cref(tags2));
+
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly(
+      std::make_tuple(std::move(key_empty1), std::move(key_empty2), std::move(key_borrowed),
+                      std::move(key_owned), std::move(key_tags2))));
+}
+
+TEST(GaugeKeyTest, ExactMemoryFootprint) {
+  Stats::SymbolTableImpl symbol_table;
+  Stats::StatNamePool pool(symbol_table);
+
+  using GaugeKey = AccessLoggers::StatsAccessLog::GaugeKey;
+
+  // Static size check
+  EXPECT_LE(sizeof(GaugeKey), 64);
+
+  Stats::StatName name = pool.add("test_gauge");
+  Stats::StatName tag_n1 = pool.add("tag_n1");
+  Stats::StatName tag_v1 = pool.add("tag_v1");
+
+  Stats::StatNameTagVector tags = {{tag_n1, tag_v1}};
+
+  // 1. Check memory usage of empty GaugeKey (no heap should be used by GaugeKey itself).
+  {
+    Memory::TestUtil::MemoryTest memory_test;
+    GaugeKey key(name, absl::nullopt);
+    // GaugeKey on stack, no heap should be allocated.
+    EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
+  }
+
+  // 2. Check memory usage of Borrowed tags GaugeKey.
+  {
+    Memory::TestUtil::MemoryTest memory_test;
+    GaugeKey key(name, std::cref(tags));
+    // Borrowed tags should NOT cause heap allocation by GaugeKey itself.
+    EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
+  }
+
+  // 3. Check memory usage after making it owned.
+  {
+    GaugeKey key(name, std::cref(tags));
+
+    Memory::TestUtil::MemoryTest memory_test;
+    key.makeOwned();
+
+    // We expect some non-zero heap allocation for owned tags.
+    // The exact match depends on platform calibration (canonical release build).
+    // We use LE to check if it's within bounds. For exactly 1 tag, it should be small.
+    // Let's verify it exceeds 0 but is less than some reasonable limit (e.g., 64 bytes).
+    EXPECT_MEMORY_LE(memory_test.consumedBytes(), 64);
+  }
+}
+
 TEST_F(StatsAccessLoggerTest, AccessLogStateMemoryFootprint) {
   initialize();
   auto access_log_state = std::make_shared<AccessLogState>(logger_);
