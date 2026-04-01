@@ -91,6 +91,7 @@ envoy_cc_library(
         ":subscription_interface",
         "//envoy/common:backoff_strategy_interface",
         "//envoy/upstream:load_stats_reporter_interface",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@xds//xds/core/v3:pkg_cc_proto",
     ],

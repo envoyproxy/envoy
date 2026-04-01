@@ -621,6 +621,131 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionDeltaSubscriptio
       ->start({});
 }
 
+// Two delta-gRPC collection subscriptions with the same ApiConfigSource should
+// share a single gRPC mux (and therefore a single stream), avoiding redundant
+// connections (e.g. one per LEDS locality).
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux,
+       GrpcCollectionDeltaSubscriptionSharesMuxForIdenticalConfigSource) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.delta_grpc_mux_sharing", "true"}});
+
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
+  // grpcAsyncClientManager is called only once: the second subscription reuses
+  // the cached mux and never creates a new gRPC client.
+  EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
+  // First subscription: 2 mux timers + 1 init-fetch timer = 3.
+  // Second subscription: 1 init-fetch timer only (mux already exists).
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(4);
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+
+  auto sub1 = collectionSubscriptionFromUrl(
+      "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config);
+  sub1->start({});
+
+  NiceMock<MockSubscriptionCallbacks> callbacks2;
+  const auto locator2 = XdsResourceIdentifier::decodeUrl(
+                            "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/baz")
+                            .value();
+  auto sub2 =
+      THROW_OR_RETURN_VALUE(subscription_factory_.collectionSubscriptionFromUrl(
+                                locator2, config, "envoy.config.endpoint.v3.ClusterLoadAssignment",
+                                *stats_store_.rootScope(), callbacks2, resource_decoder_),
+                            SubscriptionPtr);
+  sub2->start({});
+}
+
+// When the runtime flag is disabled, each delta-gRPC collection subscription
+// should get its own mux even with identical ApiConfigSource.
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux,
+       GrpcCollectionDeltaSubscriptionNoSharingWhenFlagDisabled) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.delta_grpc_mux_sharing", "false"}});
+
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
+  // Both subscriptions create their own mux: grpcAsyncClientManager called twice.
+  EXPECT_CALL(cm_, grpcAsyncClientManager())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(cm_.async_client_manager_));
+  // Each subscription creates its own mux: 3 timers each = 6.
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(6);
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+
+  auto sub1 = collectionSubscriptionFromUrl(
+      "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config);
+  sub1->start({});
+
+  NiceMock<MockSubscriptionCallbacks> callbacks2;
+  const auto locator2 = XdsResourceIdentifier::decodeUrl(
+                            "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/baz")
+                            .value();
+  auto sub2 =
+      THROW_OR_RETURN_VALUE(subscription_factory_.collectionSubscriptionFromUrl(
+                                locator2, config, "envoy.config.endpoint.v3.ClusterLoadAssignment",
+                                *stats_store_.rootScope(), callbacks2, resource_decoder_),
+                            SubscriptionPtr);
+  sub2->start({});
+}
+
+// Two delta-gRPC collection subscriptions with different ApiConfigSource
+// (different clusters) should each get their own mux even with sharing enabled.
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux,
+       GrpcCollectionDeltaSubscriptionSeparateMuxForDifferentConfigSource) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.delta_grpc_mux_sharing", "true"}});
+
+  envoy::config::core::v3::ConfigSource config1;
+  auto* api1 = config1.mutable_api_config_source();
+  api1->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  api1->set_transport_api_version(envoy::config::core::v3::V3);
+  api1->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("cluster_a");
+
+  envoy::config::core::v3::ConfigSource config2;
+  auto* api2 = config2.mutable_api_config_source();
+  api2->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  api2->set_transport_api_version(envoy::config::core::v3::V3);
+  api2->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("cluster_b");
+
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("cluster_a");
+  primary_clusters.insert("cluster_b");
+  EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
+  // Two distinct ApiConfigSources → grpcAsyncClientManager called twice.
+  EXPECT_CALL(cm_, grpcAsyncClientManager())
+      .Times(2)
+      .WillRepeatedly(ReturnRef(cm_.async_client_manager_));
+  // Each subscription creates its own mux: 3 timers each = 6.
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(6);
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+
+  auto sub1 = collectionSubscriptionFromUrl(
+      "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config1);
+  sub1->start({});
+
+  NiceMock<MockSubscriptionCallbacks> callbacks2;
+  const auto locator2 = XdsResourceIdentifier::decodeUrl(
+                            "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/baz")
+                            .value();
+  auto sub2 =
+      THROW_OR_RETURN_VALUE(subscription_factory_.collectionSubscriptionFromUrl(
+                                locator2, config2, "envoy.config.endpoint.v3.ClusterLoadAssignment",
+                                *stats_store_.rootScope(), callbacks2, resource_decoder_),
+                            SubscriptionPtr);
+  sub2->start({});
+}
+
 // Validate that subscriptionOverAdsGrpcMux sends subscriptions over the given
 // mux, regardless of the value of the config.
 TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcOverAdsGrpcMuxSubscription) {
