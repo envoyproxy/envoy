@@ -17,8 +17,6 @@ The filter is configured with:
 
 * A **content parser** that specifies how to parse and extract values from message payloads (e.g., JSON parser)
 * **Rules** within the content parser that define selector paths and metadata actions
-* Configuration for the EventStream protocol (max buffer size)
-
 When a rule matches, the extracted value is written to the configured metadata namespace and key.
 The metadata can then be consumed from access logs, used by custom filters, exported to metrics systems, or
 attached to trace spans.
@@ -113,8 +111,6 @@ Complete Example
                   metadata_namespace: envoy.lb
                   key: tokens
                   type: NUMBER
-        max_buffer_size: 1048576  # 1MB (default)
-
 Key Configuration Options
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -143,18 +139,6 @@ When using ``envoy.content_parsers.json``, configure rules within the typed_conf
     - **on_missing**: Metadata to write when the selector path is not found.
     - **on_error**: Metadata to write when a parse error occurs.
 
-**response_rules.max_buffer_size**
-  Maximum size in bytes for incomplete (not yet parseable) buffered data before it is discarded.
-  The limit is evaluated **after** the filter has consumed all complete EventStream messages from the
-  buffer, so a single large read from the kernel that contains many valid frames will be processed
-  normally even if the total byte count momentarily exceeds this value. Only the residual bytes that
-  do not yet form a complete message are subject to the size check.
-
-  Default is 1048576 bytes (1 MB), which is sufficient for most legitimate messages.
-  Set to 0 to disable the limit (not recommended for production).
-  Maximum allowed value is 26214400 bytes (25 MB, slightly larger than the AWS EventStream
-  maximum payload size of 24 MB).
-
 Statistics
 ----------
 
@@ -172,7 +156,6 @@ comes from the owning HTTP connection manager, and ``<parser_prefix>`` comes fro
   resp.<parser_prefix>.empty_payload, Counter, Total number of EventStream messages with empty payloads
   resp.<parser_prefix>.parse_error, Counter, Total number of messages where the content parser failed to parse the payload
   resp.<parser_prefix>.preserved_existing_metadata, Counter, Total number of times metadata was not written due to preserve_existing_metadata_value being true
-  resp.<parser_prefix>.buffer_too_large, Counter, Total number of times buffered data exceeded max_buffer_size and was discarded
   resp.<parser_prefix>.eventstream_error, Counter, "Total number of EventStream protocol errors (CRC mismatch, invalid format)"
 
 AWS EventStream Protocol
@@ -188,10 +171,4 @@ The filter implements the `AWS EventStream specification <https://smithy.io/2.0/
 Security Considerations
 -----------------------
 
-* The ``max_buffer_size`` configuration (default: 1 MB) limits how much incomplete data the filter
-  will buffer while waiting for a full EventStream message. Because the check runs after all
-  complete messages have been consumed, it guards specifically against a slow or malicious upstream
-  that sends an unbounded partial message without ever completing it.
 * CRC validation protects against corrupt or tampered messages
-* For production deployments, it's recommended to keep ``max_buffer_size`` at a reasonable value
-* Setting ``max_buffer_size: 0`` disables the limit but is not recommended for untrusted upstream sources

@@ -33,7 +33,6 @@ namespace AwsEventstreamToMetadata {
   COUNTER(empty_payload)                                                                           \
   COUNTER(parse_error)                                                                             \
   COUNTER(preserved_existing_metadata)                                                             \
-  COUNTER(buffer_too_large)                                                                        \
   COUNTER(eventstream_error)
 
 /**
@@ -54,7 +53,6 @@ public:
 
   const AwsEventstreamToMetadataStats& stats() const { return stats_; }
   ContentParser::ParserFactory& parserFactory() { return *parser_factory_; }
-  uint32_t maxBufferSize() const { return max_buffer_size_; }
 
 private:
   static AwsEventstreamToMetadataStats generateStats(const std::string& prefix,
@@ -65,7 +63,6 @@ private:
 
   ContentParser::ParserFactoryPtr parser_factory_;
   const AwsEventstreamToMetadataStats stats_;
-  const uint32_t max_buffer_size_;
 };
 
 /**
