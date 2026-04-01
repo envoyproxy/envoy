@@ -399,7 +399,7 @@ protected:
 TEST_F(IsolatedStoreScopeMatcherTest, ScopeMatcherRejectsAllStatTypes) {
   // Create a scope whose matcher rejects everything prefixed "scope.rejected.".
   ScopeSharedPtr my_scope =
-      scope_->createScope("scope", false, {}, makePrefixMatcher("scope.rejected."));
+      scope_->createScope("scope", false, makePrefixMatcher("scope.rejected."));
 
   // Rejected counter returns null counter (empty name, value always 0).
   Counter& rejected_counter = my_scope->counterFromString("rejected.foo");
@@ -466,7 +466,7 @@ TEST_F(IsolatedStoreScopeMatcherTest, ScopeWithNoMatcherAcceptsAll) {
 TEST_F(IsolatedStoreScopeMatcherTest, ChildScopeInheritsMatcher) {
   // Parent matcher rejects full names starting with "parent.child.".
   ScopeSharedPtr parent_scope =
-      scope_->createScope("parent", false, {}, makePrefixMatcher("parent.child."));
+      scope_->createScope("parent", false, makePrefixMatcher("parent.child."));
 
   // Stats directly in parent are not rejected.
   Counter& parent_counter = parent_scope->counterFromString("direct");
@@ -494,11 +494,11 @@ TEST_F(IsolatedStoreScopeMatcherTest, ChildScopeInheritsMatcher) {
 TEST_F(IsolatedStoreScopeMatcherTest, ChildScopeOverridesMatcher) {
   // Parent rejects "parent.child.rejected_by_parent.".
   ScopeSharedPtr parent_scope = scope_->createScope(
-      "parent", false, {}, makePrefixMatcher("parent.child.rejected_by_parent."));
+      "parent", false, makePrefixMatcher("parent.child.rejected_by_parent."));
 
   // Child gets its own matcher that rejects "parent.child.rejected_by_child." instead.
   ScopeSharedPtr child_scope = parent_scope->createScope(
-      "child", false, {}, makePrefixMatcher("parent.child.rejected_by_child."));
+      "child", false, makePrefixMatcher("parent.child.rejected_by_child."));
 
   // "rejected_by_parent" prefix is NOT rejected — child's matcher replaced parent's.
   Counter& not_rejected = child_scope->counterFromString("rejected_by_parent.foo");

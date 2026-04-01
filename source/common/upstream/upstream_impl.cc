@@ -446,7 +446,7 @@ generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
       fmt::format("cluster.{}.", (!config.alt_stat_name().empty() && use_alt_stat_name)
                                      ? config.alt_stat_name()
                                      : config.name()),
-      false, {}, std::move(scope_matcher));
+      false, std::move(scope_matcher));
 }
 
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the
