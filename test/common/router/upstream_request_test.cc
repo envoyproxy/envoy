@@ -178,7 +178,7 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
       }));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false));
-  upstream_request_->acceptHeadersFromRouter(false);
+  EXPECT_TRUE(upstream_request_->acceptHeadersFromRouter(false));
 
   EXPECT_CALL(router_filter_interface_.callbacks_, resetStream(_, _));
   filter->callbacks_->resetStream();
@@ -199,7 +199,7 @@ TEST_F(UpstreamRequestTest, ConnectionPoolLatencyTime) {
         return nullptr;
       }));
 
-  upstream_request_->acceptHeadersFromRouter(false);
+  EXPECT_TRUE(upstream_request_->acceptHeadersFromRouter(false));
   const StreamInfo::UpstreamTiming& timing =
       upstream_request_->streamInfo().upstreamInfo()->upstreamTiming();
   ASSERT_TRUE(timing.connectionPoolCallbackLatency().has_value());
@@ -240,6 +240,107 @@ TEST_F(UpstreamRequestTest, TestSetStreamInfoFields) {
 TEST_F(UpstreamRequestTest, TestSetStreamInfoHost) {
   initialize();
   EXPECT_EQ(upstream_request_->streamInfo().upstreamInfo()->upstreamHost(), host_);
+}
+
+// A simple upstream filter that registers itself as an UpstreamCallbacks.
+class TestUpstreamFilter : public Http::StreamDecoderFilter, public Http::UpstreamCallbacks {
+public:
+  // Http::StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+    callbacks.upstreamCallbacks()->addUpstreamCallbacks(*this);
+  }
+  void onDestroy() override {}
+
+  // Http::UpstreamCallbacks
+  void onHostSelected(const Upstream::HostDescriptionConstSharedPtr& host) override {
+    on_host_selected_called_ = true;
+    last_host_ = host;
+    if (reject_connection_) {
+      callbacks_->sendLocalReply(Http::Code::Forbidden, "Connection rejected", nullptr,
+                                 absl::nullopt, "upstream_filter_rejection");
+    }
+  }
+  void onUpstreamConnectionEstablished() override {}
+
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
+  bool on_host_selected_called_{false};
+  bool reject_connection_{false};
+  Upstream::HostDescriptionConstSharedPtr last_host_;
+};
+
+TEST_F(UpstreamRequestTest, OnHostSelectedCallbackInvoked) {
+  auto filter = std::make_shared<TestUpstreamFilter>();
+
+  EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamDecoderFilter(filter);
+        callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+        return true;
+      }));
+
+  initialize();
+
+  EXPECT_CALL(*conn_pool_, newStream(_));
+  EXPECT_TRUE(upstream_request_->acceptHeadersFromRouter(false));
+
+  EXPECT_TRUE(filter->on_host_selected_called_);
+  EXPECT_EQ(filter->last_host_, host_);
+}
+
+TEST_F(UpstreamRequestTest, OnHostSelectedRejectionViaSendLocalReply) {
+  auto filter = std::make_shared<TestUpstreamFilter>();
+  filter->reject_connection_ = true;
+
+  EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamDecoderFilter(filter);
+        callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+        return true;
+      }));
+
+  initialize();
+
+  EXPECT_CALL(*conn_pool_, newStream(_)).Times(0);
+  EXPECT_CALL(router_filter_interface_.callbacks_,
+              sendLocalReply(Http::Code::Forbidden, _, _, _, _));
+  EXPECT_FALSE(upstream_request_->acceptHeadersFromRouter(false));
+
+  EXPECT_TRUE(filter->on_host_selected_called_);
+}
+
+TEST_F(UpstreamRequestTest, OnHostSelectedMultipleCallbacksStopsAfterSendLocalReply) {
+  auto filter1 = std::make_shared<TestUpstreamFilter>();
+  filter1->reject_connection_ = true; // First filter rejects via sendLocalReply
+
+  auto filter2 = std::make_shared<TestUpstreamFilter>();
+
+  EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamDecoderFilter(filter1);
+        callbacks.addStreamDecoderFilter(filter2);
+        callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+        return true;
+      }));
+
+  initialize();
+
+  EXPECT_CALL(*conn_pool_, newStream(_)).Times(0);
+  EXPECT_CALL(router_filter_interface_.callbacks_,
+              sendLocalReply(Http::Code::Forbidden, _, _, _, _));
+  EXPECT_FALSE(upstream_request_->acceptHeadersFromRouter(false));
+
+  EXPECT_TRUE(filter1->on_host_selected_called_);
+  EXPECT_FALSE(filter2->on_host_selected_called_);
 }
 
 } // namespace

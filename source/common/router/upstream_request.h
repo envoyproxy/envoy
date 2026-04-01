@@ -78,7 +78,8 @@ public:
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();
 
-  virtual void acceptHeadersFromRouter(bool end_stream);
+  // Returns false if the request was aborted during host selection (e.g. via sendLocalReply).
+  virtual bool acceptHeadersFromRouter(bool end_stream);
   virtual void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
   void acceptTrailersFromRouter(Http::RequestTrailerMap& trailers);
   void acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr);

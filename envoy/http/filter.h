@@ -212,6 +212,16 @@ class UpstreamCallbacks {
 public:
   virtual ~UpstreamCallbacks() = default;
 
+  // Called when a host has been selected for the upstream connection but BEFORE the connection
+  // is initiated. This allows upstream HTTP filters to inspect the selected host and reject
+  // the connection if needed (e.g., blocking private IP addresses).
+  //
+  // To reject the connection, the filter should call sendLocalReply() which will abort the
+  // upstream connection attempt.
+  //
+  // @param host the selected upstream host.
+  virtual void onHostSelected(const Upstream::HostDescriptionConstSharedPtr& host) PURE;
+
   // Called when the upstream connection is established and
   // UpstreamStreamFilterCallbacks::upstream should be available.
   //

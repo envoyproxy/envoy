@@ -579,7 +579,8 @@ public:
         *upstream_, std::move(generic_conn_pool));
     mock_router_upstream_request_ = mock_upst.get();
     upstream_->setRouterUpstreamRequest(std::move(mock_upst));
-    EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false));
+    EXPECT_CALL(*mock_router_upstream_request_, acceptHeadersFromRouter(false))
+        .WillOnce(Return(true));
     EXPECT_NO_THROW(tunnel_config_->serverFactoryContext());
     upstream_->newStream(*filter_);
   }
