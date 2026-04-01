@@ -236,7 +236,7 @@ public:
                             StatNameTagVector& tags) override;
   const TagVector& fixedTags() override { return tag_producer_->fixedTags(); };
 
-  void ensureOverflowStats(const ScopeStatsLimitSettings& limits);
+  void ensureOverflowStats();
 
 private:
   friend class ThreadLocalStoreTestingPeer;
@@ -290,7 +290,6 @@ private:
 
   struct ScopeImpl : public Scope {
     ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable,
-              const ScopeStatsLimitSettings& limits = {},
               StatsMatcherSharedPtr scope_matcher = nullptr);
     ~ScopeImpl() override;
 
@@ -305,10 +304,8 @@ private:
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                               const ScopeStatsLimitSettings& limits = {},
                                StatsMatcherSharedPtr matcher = nullptr) override;
     ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {},
                                      StatsMatcherSharedPtr matcher = nullptr) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
@@ -474,8 +471,6 @@ private:
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     const bool evictable_{};
-
-    const ScopeStatsLimitSettings limits_;
     StatsMatcherSharedPtr scope_matcher_;
 
   private:
@@ -615,10 +610,6 @@ private:
   // (e.g. when a scope is deleted), it is likely more efficient to batch their
   // cleanup, which would otherwise entail a post() per histogram per thread.
   std::vector<uint64_t> histograms_to_cleanup_ ABSL_GUARDED_BY(hist_mutex_);
-
-  CounterSharedPtr counters_overflow_;
-  CounterSharedPtr gauges_overflow_;
-  CounterSharedPtr histograms_overflow_;
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;
