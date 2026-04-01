@@ -10,7 +10,7 @@ namespace Common {
 
 using Envoy::Protobuf::util::MessageDifferencer;
 
-TEST(WorkloadMetadataObjectTest, SerializeAsString) {
+TEST(WorkloadMetadataObjectTest, AsString) {
   constexpr absl::string_view identity = "spiffe://cluster.local/ns/default/sa/default";
   WorkloadMetadataObject deploy("pod-foo-1234", "my-cluster", "default", "foo", "foo-service",
                                 "v1alpha3", "", "", WorkloadType::Deployment, identity, "", "");
