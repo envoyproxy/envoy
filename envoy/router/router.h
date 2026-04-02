@@ -501,6 +501,36 @@ public:
    * return how many times host selection should be reattempted during host selection.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  /**
+   * Callback type for refreshing the cluster on retry. Implementations receive the current
+   * request headers and stream info, and return a new route pointing to a different cluster,
+   * or nullptr if no cluster refresh is needed.
+   */
+  using ClusterRefreshFunction = std::function<RouteConstSharedPtr(
+      const Http::RequestHeaderMap& headers, StreamInfo::StreamInfo& stream_info)>;
+
+  /**
+   * Set a callback that will be invoked on retry to potentially select a different cluster.
+   * This is used by weighted cluster routes to redirect retries to untried clusters.
+   * @param callback the function to invoke on retry.
+   */
+  virtual void setClusterRefreshCallback(ClusterRefreshFunction callback) {
+    UNREFERENCED_PARAMETER(callback);
+  }
+
+  /**
+   * Called by the router during retry to check if the cluster should be refreshed.
+   * If a ClusterRefreshFunction was set and returns a non-null route, the router will
+   * use that route instead of the original one for the retry attempt.
+   * @param headers the downstream request headers.
+   * @param stream_info the stream info for the request.
+   * @return RouteConstSharedPtr a new route for the retry, or nullptr to use the original.
+   */
+  virtual RouteConstSharedPtr refreshClusterOnRetry(const Http::RequestHeaderMap&,
+                                                    StreamInfo::StreamInfo&) {
+    return nullptr;
+  }
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;
@@ -1170,6 +1200,15 @@ public:
    */
   virtual void refreshRouteCluster(const Http::RequestHeaderMap& headers,
                                    const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Returns a callback function for refreshing the cluster on retry, if applicable.
+   * Weighted cluster routes override this to provide a callback that selects a different
+   * cluster on retry. The returned callback is set on the RetryState so it can be invoked
+   * during retry processing.
+   * @return a ClusterRefreshFunction, or nullptr if cluster refresh on retry is not supported.
+   */
+  virtual RetryState::ClusterRefreshFunction clusterRefreshCallback() const { return nullptr; }
 };
 
 /**

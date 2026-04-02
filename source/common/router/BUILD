@@ -128,9 +128,13 @@ envoy_cc_library(
         ":metadatamatchcriteria_lib",
         ":per_filter_config_lib",
         "//envoy/router:cluster_specifier_plugin_interface",
+        "//envoy/router:router_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/config:well_known_names",
         "//source/common/http:hash_policy_lib",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/strings",
     ],
 )
 

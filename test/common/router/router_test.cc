@@ -7617,5 +7617,88 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
+// =============================================================================
+// Retry-aware weighted cluster tests
+// =============================================================================
+
+// Verify that doRetry calls refreshClusterOnRetry() on the retry state and uses
+// the returned route to switch clusters. The router doesn't know about weighted
+// clusters — it just calls the generic refreshClusterOnRetry() method.
+TEST_F(RouterTest, DoRetryCallsRefreshClusterOnRetryAndSwitchesCluster) {
+  // Create a mock route that refreshClusterOnRetry() will return.
+  auto retry_route = std::make_shared<NiceMock<MockRoute>>();
+  retry_route->route_entry_.cluster_name_ = "retry_cluster";
+  cm_.initializeThreadLocalClusters({"retry_cluster"});
+
+  ON_CALL(*router_->retry_state_, refreshClusterOnRetry(_, _))
+      .WillByDefault(Return(retry_route));
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  // Trigger a retry via reset.
+  router_->retry_state_->expectResetRetry();
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+
+  // Execute the retry callback — this should call refreshClusterOnRetry() and switch cluster.
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
+  router_->retry_state_->callback_();
+
+  // Verify that the route was switched to the retry route's cluster.
+  EXPECT_EQ("retry_cluster", router_->route()->routeEntry()->clusterName());
+
+  // Complete the retry with a successful response.
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Verify that when refreshClusterOnRetry() returns nullptr (the default),
+// normal retry proceeds without any disruption.
+TEST_F(RouterTest, DoRetryNormalRetryWhenRefreshClusterReturnsNull) {
+  // NiceMock default: refreshClusterOnRetry() returns nullptr — normal retry behavior.
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Trigger retry.
+  router_->retry_state_->expectResetRetry();
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+
+  // No clearRouteCache should be called — refreshClusterOnRetry returns nullptr.
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
+  router_->retry_state_->callback_();
+
+  // Cluster should remain the same.
+  EXPECT_EQ("fake_cluster", router_->route()->routeEntry()->clusterName());
+
+  // Complete the retry with a successful response.
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
 } // namespace Router
 } // namespace Envoy
