@@ -99,7 +99,7 @@ aws_c_auth_testdata:
   project_name: "aws-c-auth"
   project_desc: "C99 library implementation of AWS client-side authentication: standard credentials providers and signing"
   project_url: "https://github.com/awslabs/aws-c-auth"
-  release_date: "2026-01-05"
+  release_date: "2026-03-05"
   use_category:
   - test_only
   extensions:
