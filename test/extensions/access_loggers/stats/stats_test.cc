@@ -638,32 +638,52 @@ TEST_F(StatsAccessLoggerTest, GaugeSubtractBeforeAdd) {
 )EOF";
   initialize(yaml);
 
-  // Subtract without add -> crashes in debug mode due to missing inflight gauge, but passes in
-  // production since it's the last step
-  EXPECT_DEBUG_DEATH(
-      {
-        formatter_context_.setAccessLogType(
-            envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
-        EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate))
-            .Times(testing::AtLeast(1));
-        EXPECT_CALL(*gauge_, add(_)).Times(0);
-        EXPECT_CALL(*gauge_, sub(_)).Times(0);
-        logger_->log(formatter_context_, stream_info_);
-      },
-      "assert failure: was_found");
+  // Subtract without add -> logs instead of crashing
+  EXPECT_LOG_CONTAINS("error", "removeInflightGauge called without matching addInflightGauge", {
+    formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+    EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AtLeast(1));
+    EXPECT_CALL(*gauge_, add(_)).Times(0);
+    EXPECT_CALL(*gauge_, sub(_)).Times(0);
+    logger_->log(formatter_context_, stream_info_);
+  });
+}
 
-  // Case 4: Subtracting a gauge that was already removed -> crashes in debug mode due to missing
-  // inflight gauge, but passes in production
-  EXPECT_DEBUG_DEATH(
-      {
-        formatter_context_.setAccessLogType(
-            envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
-        EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate))
-            .Times(testing::AtLeast(1));
-        EXPECT_CALL(*gauge_, sub(_)).Times(0);
-        logger_->log(formatter_context_, stream_info_);
-      },
-      "assert failure: was_found");
+TEST_F(StatsAccessLoggerTest, GaugeMultipleSubAfterAdd) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 1
+        add_subtract:
+          add_log_type: DownstreamStart
+          sub_log_type: DownstreamEnd
+)EOF";
+  initialize(yaml);
+
+  // Trigger ADD
+  {
+    formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
+    EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AtLeast(1));
+    EXPECT_CALL(*gauge_, add(1));
+    logger_->log(formatter_context_, stream_info_);
+  }
+
+  // Trigger SUB (first time)
+  {
+    formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+    EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AtLeast(1));
+    EXPECT_CALL(*gauge_, sub(1));
+    logger_->log(formatter_context_, stream_info_);
+  }
+
+  // Trigger SUB (second time) -> throttled due to previous tests, so no log expected
+  {
+    formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+    EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AtLeast(1));
+    EXPECT_CALL(*gauge_, sub(_)).Times(0);
+    logger_->log(formatter_context_, stream_info_);
+  }
 }
 
 TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {

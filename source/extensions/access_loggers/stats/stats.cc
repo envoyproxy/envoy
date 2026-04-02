@@ -126,8 +126,10 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
     if (it->second.value_ == 0) {
       inflight_gauges_.erase(it);
     }
+  } else {
+    ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
+                            "removeInflightGauge called without matching addInflightGauge");
   }
-  ASSERT(was_found);
 }
 
 GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef borrowed_tags)
