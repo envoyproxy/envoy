@@ -224,8 +224,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/Linaro/uadk/archive/refs/tags/v{version}.tar.gz"],
     ),
     qatlib = dict(
-        version = "25.08.0",
-        sha256 = "786101683b4817ded72c8ea51204a190aa26e0b5ac8205ee199c7a9438138770",
+        version = "26.02.0",
+        sha256 = "7c68bf05f196153b1b1669a7d17e5bfba6253e7cafb69f67d30a0d17e7facecb",
         strip_prefix = "qatlib-{version}",
         urls = ["https://github.com/intel/qatlib/archive/refs/tags/{version}.tar.gz"],
     ),
