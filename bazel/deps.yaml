@@ -331,7 +331,7 @@ qatlib:
   project_name: "qatlib"
   project_desc: "Intel QuickAssist Technology Library"
   project_url: "https://github.com/intel/qatlib"
-  release_date: "2025-07-17"
+  release_date: "2026-02-06"
   use_category:
   - dataplane_ext
   extensions:
