@@ -120,7 +120,7 @@ buildtools:
   project_name: "Bazel build tools"
   project_desc: "Developer tools for working with Google's bazel buildtool."
   project_url: "https://github.com/bazelbuild/buildtools"
-  release_date: "2025-06-10"
+  release_date: "2026-01-30"
   use_category:
   - test_only
 

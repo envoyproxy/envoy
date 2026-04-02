@@ -40,8 +40,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
     ),
     buildtools = dict(
-        version = "8.2.1",
-        sha256 = "53119397bbce1cd7e4c590e117dcda343c2086199de62932106c80733526c261",
+        version = "8.5.1",
+        sha256 = "f3b800e9f6ca60bdef3709440f393348f7c18a29f30814288a7326285c80aab9",
         strip_prefix = "buildtools-{version}",
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
