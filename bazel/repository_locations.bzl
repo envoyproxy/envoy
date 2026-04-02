@@ -97,8 +97,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/awslabs/aws-c-auth/archive/refs/tags/v{version}.tar.gz"],
     ),
     liburing = dict(
-        version = "2.13",
-        sha256 = "618e34dbea408fc9e33d7c4babd746036dbdedf7fce2496b1178ced0f9b5b357",
+        version = "2.14",
+        sha256 = "5f80964108981c6ad979c735f0b4877d5f49914c2a062f8e88282f26bf61de0c",
         strip_prefix = "liburing-liburing-{version}",
         urls = ["https://github.com/axboe/liburing/archive/liburing-{version}.tar.gz"],
     ),
