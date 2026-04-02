@@ -7,6 +7,13 @@ OAuth2
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2>`
 
+The OAuth2 filter also defines a route-level config message,
+:ref:`OAuth2PerRoute <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2PerRoute>`,
+which may be attached to
+:ref:`Route.typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`.
+The route-level config carries a complete :ref:`OAuth2Config <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2Config>`
+and is intended to replace, not merge with, the filter-level config.
+
 The OAuth filter's flow involves:
 
 * An unauthenticated user arrives at myapp.com, and the oauth filter redirects them to the
@@ -228,6 +235,37 @@ can be defined in one shared file.
     - name: hmac
       generic_secret:
         secret: <Your hmac secret here>
+
+The following example shows how the route-level config message is attached:
+
+.. code-block:: yaml
+
+  typed_per_filter_config:
+    envoy.filters.http.oauth2:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2PerRoute
+      config:
+        token_endpoint:
+          cluster: oauth
+          uri: oauth.com/token
+          timeout: 3s
+        authorization_endpoint: https://oauth.com/oauth/authorize/
+        redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+        redirect_path_matcher:
+          path:
+            exact: /callback
+        signout_path:
+          path:
+            exact: /signout
+        credentials:
+          client_id: foo
+          token_secret:
+            name: token
+            sds_config:
+              path: "/etc/envoy/token-secret.yaml"
+          hmac_secret:
+            name: hmac
+            sds_config:
+              path: "/etc/envoy/hmac.yaml"
 
 
 Notes

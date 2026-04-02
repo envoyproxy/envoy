@@ -15,6 +15,7 @@
 #include "source/extensions/filters/http/oauth2/filter.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/test_runtime.h"
@@ -4549,6 +4550,49 @@ TEST_F(OAuth2Test, RequestIsUnchangedWhenPassThroughMatcherMatches) {
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_passthrough").value(), 1);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 0);
+}
+
+TEST_F(OAuth2Test, RouteSpecificConfigOverridesGlobalConfig) {
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config route_proto;
+  auto* endpoint = route_proto.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  route_proto.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  route_proto.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  route_proto.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  route_proto.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  auto* route_matcher = route_proto.add_pass_through_matcher();
+  route_matcher->set_name(":method");
+  route_matcher->mutable_string_match()->set_exact(Http::Headers::get().MethodValues.Get);
+  auto* credentials = route_proto.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  auto route_config = std::make_shared<FilterConfigPerRoute>(std::make_shared<FilterConfig>(
+      route_proto, factory_context_.server_factory_context_, secret_reader, scope_, "test."));
+
+  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/resource"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  // The global config would process this GET request, so these expectations verify that the
+  // route-specific pass-through matcher took precedence and short-circuited the OAuth flow.
+  EXPECT_CALL(*validator_, setParams(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _)).Times(0);
+  EXPECT_CALL(*oauth_client_, asyncRefreshAccessToken(_, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(scope_.counterFromString("test.oauth_passthrough").value(), 1);
 }
 
 // Verify cookie prefixes "__Secure-" and "__Host-" cause addition of the "Secure" attribute at

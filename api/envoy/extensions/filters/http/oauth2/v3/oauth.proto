@@ -294,8 +294,18 @@ message OAuth2Config {
   bool disable_token_encryption = 26;
 }
 
+// Per-route OAuth2 config.
+//
+// This message supplies an OAuth2Config for the matched route.
+// It overrides the filter-level config for requests matching the route.
+// If neither the global config nor a per-route config is specified, OAuth2 is disabled for the route.
+message OAuth2PerRoute {
+  // Full OAuth2 config for this route.
+  OAuth2Config config = 1 [(validate.rules).message = {required: true}];
+}
+
 // Filter config.
 message OAuth2 {
-  // Leave this empty to disable OAuth2 for a specific route, using per filter config.
+  // Global/default OAuth2 config for this filter.
   OAuth2Config config = 1;
 }
