@@ -345,7 +345,7 @@ qatzip:
   project_name: "qatzip"
   project_desc: "Intel QuickAssist Technology QATzip Library"
   project_url: "https://github.com/intel/qatzip"
-  release_date: "2025-04-25"
+  release_date: "2026-02-18"
   use_category:
   - dataplane_ext
   extensions:
