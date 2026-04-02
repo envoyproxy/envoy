@@ -25,12 +25,17 @@ public:
   MOCK_METHOD(IoUringResult, prepareWritev,
               (os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
                Request* user_data));
+  MOCK_METHOD(IoUringResult, prepareRecv,
+              (os_fd_t fd, void* buf, uint32_t len, int flags, Request* user_data));
+  MOCK_METHOD(IoUringResult, prepareSend,
+              (os_fd_t fd, const void* buf, uint32_t len, int flags, Request* user_data));
   MOCK_METHOD(IoUringResult, prepareClose, (os_fd_t fd, Request* user_data));
   MOCK_METHOD(IoUringResult, prepareCancel, (Request * cancelling_user_data, Request* user_data));
   MOCK_METHOD(IoUringResult, prepareShutdown, (os_fd_t fd, int how, Request* user_data));
   MOCK_METHOD(IoUringResult, submit, ());
   MOCK_METHOD(void, injectCompletion, (os_fd_t fd, Request* user_data, int32_t result));
   MOCK_METHOD(void, removeInjectedCompletion, (os_fd_t fd));
+  MOCK_METHOD(uint64_t, cqOverflowCount, (), (const));
 };
 
 class MockIoUringSocket : public IoUringSocket {

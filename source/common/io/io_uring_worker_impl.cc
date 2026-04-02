@@ -28,7 +28,6 @@ void IoUringSocketEntry::cleanup() {
 }
 
 void IoUringSocketEntry::injectCompletion(Request::RequestType type) {
-  // Avoid injecting the same completion type multiple times.
   if (injected_completions_ & static_cast<uint8_t>(type)) {
     ENVOY_LOG(trace,
               "ignore injected completion since there already has one, injected_completions_: {}, "
@@ -60,17 +59,21 @@ void IoUringSocketEntry::onRemoteClose() {
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                                      uint32_t read_buffer_size, uint32_t write_timeout_ms,
+                                     uint32_t write_high_watermark_bytes,
+                                     uint32_t write_low_watermark_bytes,
                                      Event::Dispatcher& dispatcher)
     : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling),
-                        read_buffer_size, write_timeout_ms, dispatcher) {}
+                        read_buffer_size, write_timeout_ms, write_high_watermark_bytes,
+                        write_low_watermark_bytes, dispatcher) {}
 
 IoUringWorkerImpl::IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size,
-                                     uint32_t write_timeout_ms, Event::Dispatcher& dispatcher)
+                                     uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
+                                     uint32_t write_low_watermark_bytes,
+                                     Event::Dispatcher& dispatcher)
     : io_uring_(std::move(io_uring)), read_buffer_size_(read_buffer_size),
-      write_timeout_ms_(write_timeout_ms), dispatcher_(dispatcher) {
+      write_timeout_ms_(write_timeout_ms), write_high_watermark_bytes_(write_high_watermark_bytes),
+      write_low_watermark_bytes_(write_low_watermark_bytes), dispatcher_(dispatcher) {
   const os_fd_t event_fd = io_uring_->registerEventfd();
-  // We only care about the read event of Eventfd, since we only receive the
-  // event here.
   file_event_ = dispatcher_.createFileEvent(
       event_fd,
       [this](uint32_t) {
@@ -104,7 +107,8 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Event::FileReadyCb
                                                   bool enable_close_event) {
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
-      fd, *this, std::move(cb), write_timeout_ms_, enable_close_event);
+      fd, *this, std::move(cb), write_timeout_ms_, write_high_watermark_bytes_,
+      write_low_watermark_bytes_, enable_close_event);
   socket->enableRead();
   return addSocket(std::move(socket));
 }
@@ -113,7 +117,8 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Buffer::Instance& 
                                                   Event::FileReadyCb cb, bool enable_close_event) {
   ENVOY_LOG(trace, "add server socket through existing socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(
-      fd, read_buf, *this, std::move(cb), write_timeout_ms_, enable_close_event);
+      fd, read_buf, *this, std::move(cb), write_timeout_ms_, write_high_watermark_bytes_,
+      write_low_watermark_bytes_, enable_close_event);
   socket->enableRead();
   return addSocket(std::move(socket));
 }
@@ -121,9 +126,9 @@ IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, Buffer::Instance& 
 IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, Event::FileReadyCb cb,
                                                   bool enable_close_event) {
   ENVOY_LOG(trace, "add client socket, fd = {}", fd);
-  // The client socket should not be read enabled until it is connected.
   std::unique_ptr<IoUringClientSocket> socket = std::make_unique<IoUringClientSocket>(
-      fd, *this, std::move(cb), write_timeout_ms_, enable_close_event);
+      fd, *this, std::move(cb), write_timeout_ms_, write_high_watermark_bytes_,
+      write_low_watermark_bytes_, enable_close_event);
   return addSocket(std::move(socket));
 }
 
@@ -143,7 +148,6 @@ IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
 
   auto res = io_uring_->prepareConnect(socket.fd(), address, req);
   if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareConnect(socket.fd(), address, req);
     RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare connect");
@@ -159,7 +163,6 @@ Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket) {
 
   auto res = io_uring_->prepareReadv(socket.fd(), req->iov_.get(), 1, 0, req);
   if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareReadv(socket.fd(), req->iov_.get(), 1, 0, req);
     RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare readv");
@@ -176,7 +179,6 @@ Request* IoUringWorkerImpl::submitWriteRequest(IoUringSocket& socket,
 
   auto res = io_uring_->prepareWritev(socket.fd(), req->iov_.get(), slices.size(), 0, req);
   if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareWritev(socket.fd(), req->iov_.get(), slices.size(), 0, req);
     RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare writev");
@@ -192,7 +194,6 @@ Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
 
   auto res = io_uring_->prepareClose(socket.fd(), req);
   if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareClose(socket.fd(), req);
     RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare close");
@@ -209,7 +210,6 @@ Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* 
 
   auto res = io_uring_->prepareCancel(request_to_cancel, req);
   if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareCancel(request_to_cancel, req);
     RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare cancel");
@@ -226,17 +226,15 @@ Request* IoUringWorkerImpl::submitShutdownRequest(IoUringSocket& socket, int how
 
   auto res = io_uring_->prepareShutdown(socket.fd(), how, req);
   if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
     res = io_uring_->prepareShutdown(socket.fd(), how, req);
-    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare cancel");
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare shutdown");
   }
   submit();
   return req;
 }
 
 IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {
-  // Remove all the injection completion for this socket.
   io_uring_->removeInjectedCompletion(socket.fd());
   return socket.removeFromList(sockets_);
 }
@@ -308,15 +306,22 @@ void IoUringWorkerImpl::submit() {
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          Event::FileReadyCb cb, uint32_t write_timeout_ms,
+                                         uint32_t write_high_watermark_bytes,
+                                         uint32_t write_low_watermark_bytes,
                                          bool enable_close_event)
     : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event),
-      write_timeout_ms_(write_timeout_ms) {}
+      write_timeout_ms_(write_timeout_ms), write_high_watermark_bytes_(write_high_watermark_bytes),
+      write_low_watermark_bytes_(write_low_watermark_bytes) {}
 
 IoUringServerSocket::IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf,
                                          IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                                         uint32_t write_timeout_ms, bool enable_close_event)
+                                         uint32_t write_timeout_ms,
+                                         uint32_t write_high_watermark_bytes,
+                                         uint32_t write_low_watermark_bytes,
+                                         bool enable_close_event)
     : IoUringSocketEntry(fd, parent, std::move(cb), enable_close_event),
-      write_timeout_ms_(write_timeout_ms) {
+      write_timeout_ms_(write_timeout_ms), write_high_watermark_bytes_(write_high_watermark_bytes),
+      write_low_watermark_bytes_(write_low_watermark_bytes) {
   read_buf_.move(read_buf);
 }
 
@@ -332,7 +337,6 @@ void IoUringServerSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
   IoUringSocketEntry::close(keep_fd_open, cb);
   keep_fd_open_ = keep_fd_open;
 
-  // Delay close until read request and write (or shutdown) request are drained.
   if (read_req_ == nullptr && write_or_shutdown_req_ == nullptr) {
     closeInternal();
     return;
@@ -362,7 +366,6 @@ void IoUringServerSocket::enableRead() {
   IoUringSocketEntry::enableRead();
   ENVOY_LOG(trace, "enable read, fd = {}", fd_);
 
-  // Continue processing read buffer remained by the previous read.
   if (read_buf_.length() > 0 || read_error_.has_value()) {
     ENVOY_LOG(trace, "continue reading from socket, fd = {}, size = {}", fd_, read_buf_.length());
     injectCompletion(Request::RequestType::Read);
@@ -378,11 +381,9 @@ void IoUringServerSocket::write(Buffer::Instance& data) {
   ENVOY_LOG(trace, "write, buffer size = {}, fd = {}", data.length(), fd_);
   ASSERT(!shutdown_.has_value());
 
-  // We need to reset the drain trackers, since the write and close is async in
-  // the iouring. When the write is actually finished the above layer may already
-  // release the drain trackers.
   write_buf_.move(data, data.length(), true);
 
+  checkWriteWatermarks();
   submitWriteOrShutdownRequest();
 }
 
@@ -396,6 +397,7 @@ uint64_t IoUringServerSocket::write(const Buffer::RawSlice* slices, uint64_t num
     bytes_written += slices[i].len_;
   }
 
+  checkWriteWatermarks();
   submitWriteOrShutdownRequest();
   return bytes_written;
 }
@@ -448,8 +450,6 @@ void IoUringServerSocket::onReadCompleted(int32_t result) {
   ENVOY_LOG(trace, "after read from socket, fd = {}, remain = {}", fd_, read_buf_.length());
 }
 
-// TODO(zhxie): concern submit multiple read requests or submit read request in advance to improve
-// performance in the next iteration.
 void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onRead(req, result, injected);
 
@@ -458,7 +458,6 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
             result, fd_, injected, static_cast<int>(status_), enable_close_event_);
   if (!injected) {
     read_req_ = nullptr;
-    // If the socket is going to close, discard all results.
     if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_cancel_req_ == nullptr &&
         write_or_shutdown_cancel_req_ == nullptr) {
       if (result > 0 && keep_fd_open_) {
@@ -469,7 +468,6 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     }
   }
 
-  // Move read data from request to buffer or store the error.
   if (result > 0) {
     moveReadDataToBuffer(req, result);
   } else {
@@ -478,12 +476,10 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     }
   }
 
-  // Discard calling back since the socket is not ready or closed.
   if (status_ == Initialized || status_ == Closed) {
     return;
   }
 
-  // If the socket is enabled and there are bytes to read, notify the handler.
   if (status_ == ReadEnabled) {
     if (read_buf_.length() > 0) {
       onReadCompleted(static_cast<int32_t>(read_buf_.length()));
@@ -491,12 +487,6 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       onReadCompleted(read_error_.value());
       read_error_.reset();
     }
-    // Handle remote closed at last.
-    // Depending on the event listened to, calling different event back to handle remote closed.
-    // * events & (Read | Closed): Callback Closed,
-    // * events & (Read)         : Callback Read,
-    // * events & (Closed)       : Callback Closed,
-    // * ...else                 : Callback Write.
     if (read_error_.has_value() && read_error_ == 0 && !enable_close_event_) {
       ENVOY_LOG(trace, "read remote closed from socket, fd = {}", fd_);
       onReadCompleted(read_error_.value());
@@ -505,7 +495,6 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     }
   }
 
-  // If `enable_close_event_` is true, then deliver the remote close as close event.
   if (read_error_.has_value() && read_error_ == 0) {
     if (enable_close_event_) {
       ENVOY_LOG(trace,
@@ -517,9 +506,6 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       read_error_.reset();
       return;
     } else {
-      // In this case, the closed event isn't listened and the status is disabled.
-      // It means we can't raise the closed or read event. So we only can raise the
-      // write event.
       ENVOY_LOG(trace,
                 "remote closed and close event disabled, raise the write event, fd = "
                 "{}, result = {}",
@@ -531,19 +517,12 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     }
   }
 
-  // The socket may be not readable during handler onRead callback, check it again here.
   if (status_ == ReadEnabled) {
-    // If the read error is zero, it means remote close, then needn't new request.
     if (!read_error_.has_value() || read_error_.value() != 0) {
-      // Submit a read request for the next read.
       submitReadRequest();
     }
   } else if (status_ == ReadDisabled) {
-    // Since error in a disabled socket will not be handled by the handler, stop submit read
-    // request if there is any error.
     if (!read_error_.has_value()) {
-      // Submit a read request for monitoring the remote close event, otherwise there is no
-      // way to know the connection is closed by the remote.
       submitReadRequest();
     }
   }
@@ -565,12 +544,9 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     write_or_shutdown_req_ = nullptr;
   }
 
-  // Notify the handler directly since it is an injected request.
   if (injected) {
     ENVOY_LOG(trace,
               "there is a inject event, and same time we have regular write request, fd = {}", fd_);
-    // There is case where write injection may come after shutdown or close which should be ignored
-    // since the I/O handle or connection may be released after closing.
     if (!shutdown_.has_value() && status_ != Closed) {
       onWriteCompleted(result);
     }
@@ -580,8 +556,8 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
   if (result > 0) {
     write_buf_.drain(result);
     ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
+    checkWriteWatermarks();
   } else {
-    // Drain all write buf since the write failed.
     write_buf_.drain(write_buf_.length());
     if (!shutdown_.has_value() && status_ != Closed) {
       status_ = RemoteClosed;
@@ -642,13 +618,27 @@ void IoUringServerSocket::submitWriteOrShutdownRequest() {
   }
 }
 
+void IoUringServerSocket::checkWriteWatermarks() {
+  if (!above_write_high_watermark_ && write_buf_.length() > write_high_watermark_bytes_) {
+    above_write_high_watermark_ = true;
+    ENVOY_LOG(debug, "write buffer above high watermark ({} > {}), fd = {}", write_buf_.length(),
+              write_high_watermark_bytes_, fd_);
+  } else if (above_write_high_watermark_ && write_buf_.length() < write_low_watermark_bytes_) {
+    above_write_high_watermark_ = false;
+    ENVOY_LOG(debug, "write buffer below low watermark ({} < {}), fd = {}", write_buf_.length(),
+              write_low_watermark_bytes_, fd_);
+  }
+}
+
 IoUringClientSocket::IoUringClientSocket(os_fd_t fd, IoUringWorkerImpl& parent,
                                          Event::FileReadyCb cb, uint32_t write_timeout_ms,
+                                         uint32_t write_high_watermark_bytes,
+                                         uint32_t write_low_watermark_bytes,
                                          bool enable_close_event)
-    : IoUringServerSocket(fd, parent, cb, write_timeout_ms, enable_close_event) {}
+    : IoUringServerSocket(fd, parent, cb, write_timeout_ms, write_high_watermark_bytes,
+                          write_low_watermark_bytes, enable_close_event) {}
 
 void IoUringClientSocket::connect(const Network::Address::InstanceConstSharedPtr& address) {
-  // Reuse read request since there is no read on connecting and connect is cancellable.
   ASSERT(read_req_ == nullptr);
   read_req_ = parent_.submitConnectRequest(*this, address);
 }
@@ -660,8 +650,6 @@ void IoUringClientSocket::onConnect(Request* req, int32_t result, bool injected)
             injected, static_cast<int>(status_));
 
   read_req_ = nullptr;
-  // Socket may be closed on connecting like binding error. In this situation we may not callback
-  // on connecting completion.
   if (status_ == Closed) {
     if (write_or_shutdown_req_ == nullptr && read_cancel_req_ == nullptr &&
         write_or_shutdown_cancel_req_ == nullptr) {
@@ -673,8 +661,6 @@ void IoUringClientSocket::onConnect(Request* req, int32_t result, bool injected)
   if (result == 0) {
     enableRead();
   }
-  // Calls parent injectCompletion() directly since we want to send connect result back to the IO
-  // handle.
   parent_.injectCompletion(*this, Request::RequestType::Write, result);
 }
 

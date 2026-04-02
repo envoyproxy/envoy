@@ -32,8 +32,10 @@ class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger:
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                     uint32_t read_buffer_size, uint32_t write_timeout_ms,
+                    uint32_t write_high_watermark_bytes, uint32_t write_low_watermark_bytes,
                     Event::Dispatcher& dispatcher);
   IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size, uint32_t write_timeout_ms,
+                    uint32_t write_high_watermark_bytes, uint32_t write_low_watermark_bytes,
                     Event::Dispatcher& dispatcher);
   ~IoUringWorkerImpl() override;
 
@@ -55,34 +57,24 @@ public:
 
   Event::Dispatcher& dispatcher() override;
 
-  // Remove a socket from this worker.
   IoUringSocketEntryPtr removeSocket(IoUringSocketEntry& socket);
-
-  // Inject a request completion into the iouring instance for a specific socket.
   void injectCompletion(IoUringSocket& socket, Request::RequestType type, int32_t result);
 
-  // Return the number of sockets in this worker.
   uint32_t getNumOfSockets() const override { return sockets_.size(); }
 
 protected:
-  // Add a socket to the worker.
   IoUringSocketEntry& addSocket(IoUringSocketEntryPtr&& socket);
   void onFileEvent();
   void submit();
 
-  // The iouring instance.
   IoUringPtr io_uring_;
   const uint32_t read_buffer_size_;
   const uint32_t write_timeout_ms_;
-  // The dispatcher of this worker is running on.
+  const uint32_t write_high_watermark_bytes_;
+  const uint32_t write_low_watermark_bytes_;
   Event::Dispatcher& dispatcher_;
-  // The file event of iouring's eventfd.
   Event::FileEventPtr file_event_{nullptr};
-  // All the sockets in this worker.
   std::list<IoUringSocketEntryPtr> sockets_;
-  // This is used to mark whether delay submit is enabled.
-  // The IoUringWorker will delay the submit the requests which are submitted in request completion
-  // callback.
   bool delay_submit_{false};
 };
 
@@ -153,9 +145,6 @@ public:
   void setFileReadyCb(Event::FileReadyCb cb) override { cb_ = std::move(cb); }
 
 protected:
-  /**
-   * For the socket to remove itself from the IoUringWorker and defer deletion.
-   */
   void cleanup();
   void onReadCompleted();
   void onWriteCompleted();
@@ -163,18 +152,11 @@ protected:
 
   os_fd_t fd_{INVALID_SOCKET};
   IoUringWorkerImpl& parent_;
-  // This records already injected completion request type to
-  // avoid duplicated injections.
   uint8_t injected_completions_{0};
-  // The current status of socket.
   IoUringSocketStatus status_{Initialized};
-  // Deliver the remote close as file read event or file close event.
   bool enable_close_event_{false};
-  // The callback will be invoked when close request is done.
   IoUringSocketOnClosedCb on_closed_cb_{nullptr};
-  // This object stores the data get from read request.
   OptRef<ReadParam> read_param_;
-  // This object stores the data get from write request.
   OptRef<WriteParam> write_param_;
 
   Event::FileReadyCb cb_;
@@ -183,9 +165,12 @@ protected:
 class IoUringServerSocket : public IoUringSocketEntry {
 public:
   IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                      uint32_t write_timeout_ms, bool enable_close_event);
+                      uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
+                      uint32_t write_low_watermark_bytes, bool enable_close_event);
   IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf, IoUringWorkerImpl& parent,
-                      Event::FileReadyCb cb, uint32_t write_timeout_ms, bool enable_close_event);
+                      Event::FileReadyCb cb, uint32_t write_timeout_ms,
+                      uint32_t write_high_watermark_bytes, uint32_t write_low_watermark_bytes,
+                      bool enable_close_event);
   ~IoUringServerSocket() override;
 
   // IoUringSocket
@@ -204,44 +189,24 @@ public:
   Buffer::OwnedImpl& getReadBuffer() { return read_buf_; }
 
 protected:
-  // Since the write of IoUringSocket is async, there may have write request is on the fly when
-  // close the socket. This timeout is setting for a time to wait the write request done.
   const uint32_t write_timeout_ms_;
-  // For read. iouring socket will read sequentially in the order of buf_ and read_error_. Unless
-  // the buf_ is empty, the read_error_ will not be past to the handler. There is an exception that
-  // when enable_close_event_ is set, the remote close read_error_(0) will always be past to the
-  // handler.
+  const uint32_t write_high_watermark_bytes_;
+  const uint32_t write_low_watermark_bytes_;
+
   Request* read_req_{};
-  // TODO (soulxu): Add water mark here.
   Buffer::OwnedImpl read_buf_;
   absl::optional<int32_t> read_error_;
 
-  // TODO (soulxu): We need water mark for write buffer.
-  // The upper layer will think the buffer released when the data copy into this write buffer.
-  // This leads to the `IntegrationTest.TestFloodUpstreamErrors` timeout, since the http layer
-  // always think the response is write successful, so flood protection is never kicked.
-  //
-  // For write. iouring socket will write sequentially in the order of write_buf_ and shutdown_
-  // Unless the write_buf_ is empty, the shutdown operation will not be performed.
   Buffer::OwnedImpl write_buf_;
-  // shutdown_ has 3 states. A absl::nullopt indicates the socket has not been shutdown, a false
-  // value represents the socket wants to be shutdown but the shutdown has not been performed or
-  // completed, and a true value means the socket has been shutdown.
   absl::optional<bool> shutdown_{};
-  // If there is in progress write_or_shutdown_req_ during closing, a write timeout timer may be
-  // setup to cancel the write_or_shutdown_req_, either a write request or a shutdown request. So
-  // we can make sure all SQEs bounding to the iouring socket is completed and the socket can be
-  // closed successfully.
   Request* write_or_shutdown_req_{nullptr};
   Event::TimerPtr write_timeout_timer_{nullptr};
-  // Whether keep the fd open when close the IoUringSocket.
   bool keep_fd_open_{false};
-  // This is used for tracking the read's cancel request.
   Request* read_cancel_req_{nullptr};
-  // This is used for tracking the write or shutdown's cancel request.
   Request* write_or_shutdown_cancel_req_{nullptr};
-  // This is used for tracking the close request.
   Request* close_req_{nullptr};
+  // Tracks write buffer backpressure state for future upstream read throttling.
+  bool above_write_high_watermark_{false};
 
   void closeInternal();
   void submitReadRequest();
@@ -249,12 +214,14 @@ protected:
   void moveReadDataToBuffer(Request* req, size_t data_length);
   void onReadCompleted(int32_t result);
   void onWriteCompleted(int32_t result);
+  void checkWriteWatermarks();
 };
 
 class IoUringClientSocket : public IoUringServerSocket {
 public:
   IoUringClientSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                      uint32_t write_timeout_ms, bool enable_close_event);
+                      uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
+                      uint32_t write_low_watermark_bytes, bool enable_close_event);
 
   void connect(const Network::Address::InstanceConstSharedPtr& address) override;
   void onConnect(Request* req, int32_t result, bool injected) override;
