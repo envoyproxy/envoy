@@ -150,14 +150,6 @@ bool ThreadLocalStoreImpl::slowRejects(StatsMatcher::FastResult fast_reject_resu
   return stats_matcher_->slowRejects(fast_reject_result, stat_name);
 }
 
-/*std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
-  // Handle de-dup due to overlapping scopes.
-  std::vector<CounterSharedPtr> ret;
-  forEachCounter([&ret](std::size_t size) { ret.reserve(size); },
-                 [&ret](Counter& counter) { ret.emplace_back(CounterSharedPtr(&counter)); });
-  return ret;
-  }*/
-
 ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name, bool evictable,
                                                             const ScopeStatsLimitSettings& limits,
                                                             StatsMatcherSharedPtr matcher) {
@@ -183,32 +175,6 @@ void ThreadLocalStoreImpl::addScope(std::shared_ptr<ScopeImpl>& new_scope) {
   Thread::LockGuard lock(lock_);
   scopes_[new_scope.get()] = std::weak_ptr<ScopeImpl>(new_scope);
 }
-
-/*std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
-  // Handle de-dup due to overlapping scopes.
-  std::vector<GaugeSharedPtr> ret;
-  forEachGauge([&ret](std::size_t size) { ret.reserve(size); },
-               [&ret](Gauge& gauge) { ret.emplace_back(GaugeSharedPtr(&gauge)); });
-  return ret;
-  }*/
-
-/*std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
-  // Handle de-dup due to overlapping scopes.
-  std::vector<TextReadoutSharedPtr> ret;
-  forEachTextReadout(
-      [&ret](std::size_t size) { ret.reserve(size); },
-      [&ret](TextReadout& text_readout) { ret.emplace_back(TextReadoutSharedPtr(&text_readout)); });
-  return ret;
-  }*/
-
-/*std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
-  std::vector<ParentHistogramSharedPtr> ret;
-  forEachHistogram([&ret](std::size_t size) mutable { ret.reserve(size); },
-                   [&ret](ParentHistogram& histogram) mutable {
-                     ret.emplace_back(ParentHistogramSharedPtr(&histogram));
-                   });
-  return ret;
-  }*/
 
 void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                                                ThreadLocal::Instance& tls) {
@@ -381,8 +347,10 @@ void ThreadLocalStoreImpl::clearScopesFromCaches() {
     // this. Once this occurs, if a new scope is deleted, a new post will be
     // required.
     auto scope_ids = std::make_shared<std::vector<uint64_t>>();
-    // Capture all the central cache entries for scopes we're deleting. These will be freed after
-    // all threads have completed.
+
+    // Capture all the central cache entries for scopes we're deleting. These
+    // will be freed explicitly after all threads have completed, in the main
+    // thread.
     auto central_caches = std::make_shared<std::vector<CentralCacheEntrySharedPtr>>();
     {
       Thread::LockGuard lock(lock_);
@@ -400,16 +368,16 @@ void ThreadLocalStoreImpl::clearScopesFromCaches() {
           absl::MutexLock lock(tls_mutex.get());
           tls_cache->eraseScopes(*scope_ids, *tls_cache_entries);
         },
-        [central_caches, tls_cache_entries /*, this*/]() {
+        [central_caches, tls_cache_entries]() {
+          // Runs in the main thread after the worker threads are done
+          // populating these lists. We clear the memory held by the
+          // captured containers here. This is because both the captured
+          // references to the containers may still be held by the worker
+          // threads. We want to make sure all stats are removed from the
+          // allocator in the main thread to avoid racing stats sink iteration
+          // in the MetricSnapshotImpl constructor.
           central_caches->clear();
           tls_cache_entries->clear();
-          /* Holds onto central_caches until all tls caches are clear */
-          /*
-          if (!shutting_down_) {
-            main_thread_dispatcher_->post([central_caches = std::move(central_caches),
-                                           tls_cache_entries = std::move(tls_cache_entries)]() {});
-          }
-          */
         });
   }
 }
@@ -1203,7 +1171,7 @@ void ThreadLocalStoreImpl::evictUnused() {
                            });
           }
         },
-        [evicted_metrics /*, this*/]() {
+        [evicted_metrics]() {
           // main_thread_dispatcher_->post([evicted_metrics = std::move(evicted_metrics)]() {
           // We want to delete stale stats on the main thread since stat
           // destructors lock the stats allocator. Note that we might have
@@ -1222,7 +1190,6 @@ void ThreadLocalStoreImpl::evictUnused() {
                     "deleted stale {} counters, {} gauges, {} text readouts, {} histograms from "
                     "{} scopes",
                     counters, gauges, readouts, histograms, scopes);
-          //});
         });
   }
 }
@@ -1305,8 +1272,6 @@ void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatName
   }
 }
 
-// TODO(#44162): remove this code, and clean up the code depending on
-// counters_overflow_, etc.
 void ThreadLocalStoreImpl::ensureOverflowStats(const ScopeStatsLimitSettings& limits) {
   const bool need_counter_overflow_stat = limits.max_counters != 0;
   const bool need_gauge_overflow_stat = limits.max_gauges != 0;

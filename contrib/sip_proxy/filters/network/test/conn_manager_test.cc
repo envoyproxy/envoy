@@ -1,7 +1,6 @@
 #include <memory>
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/stats/utility.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/network/mocks.h"
@@ -58,9 +57,7 @@ public:
     // Destroy any existing filter first.
     filter_ = nullptr;
 
-    for (Stats::Counter* counter : Stats::Utility::countersMainThread(store_)) {
-      counter->reset();
-    }
+    store_.forEachCounter(nullptr, [](Stats::Counter& counter) { counter.reset(); });
 
     if (yaml.empty()) {
       proto_config_.set_stat_prefix("test");

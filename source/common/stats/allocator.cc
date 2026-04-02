@@ -50,10 +50,6 @@ Allocator::~Allocator() {
 
 void Allocator::setShuttingDown() { shutting_down_ = true; }
 
-// void Allocator::setIsolatedStore() { ASSERT(!thread_local_store_); }
-
-// void Allocator::setThreadLocalStore() { ASSERT(!isolated_store_); }
-
 #ifndef ENVOY_CONFIG_COVERAGE
 void Allocator::debugPrint() {
   Thread::LockGuard lock(mutex_);
@@ -85,10 +81,7 @@ public:
     // We must ensure that stats are destructed on the main thread as part of
     // scopes teardown from the store. Otherwise stats that are kept in vectors
     // during main-thread operations such as stats sinks can race destruction.
-    if (!alloc_.shuttingDown() /* && !alloc_.isIsolatedStore()*/) {
-      // if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
-      //   ENVOY_LOG_MISC(error, "unexpected destruction of {}", BaseClass::name());
-      // }
+    if (!alloc_.shuttingDown()) {
       ASSERT_IS_MAIN_OR_TEST_THREAD();
     }
 
@@ -160,16 +153,6 @@ public:
               const StatNameTagVector& stat_name_tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
-  ~CounterImpl() override {
-#if 0
-    if (!alloc_.shuttingDown()) {
-      if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
-        ENVOY_LOG_MISC(error, "unexpected destruction of counter {}", name());
-      }
-    }
-#endif
-  }
-
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.counters_.erase(statName());
     ASSERT(count == 1);
@@ -217,16 +200,6 @@ public:
       flags_ |= Flags::LogicAccumulate;
       break;
     }
-  }
-
-  ~GaugeImpl() override {
-#if 0
-    if (!alloc_.shuttingDown()) {
-      if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
-        ENVOY_LOG_MISC(error, "unexpected destruction of gauge {}", name());
-      }
-    }
-#endif
   }
 
   void removeFromSetLockHeld() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
@@ -310,16 +283,6 @@ public:
   TextReadoutImpl(StatName name, Allocator& alloc, StatName tag_extracted_name,
                   const StatNameTagVector& stat_name_tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
-
-  ~TextReadoutImpl() override {
-#if 0
-    if (!alloc_.shuttingDown()) {
-      if (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()) {
-        ENVOY_LOG_MISC(error, "unexpected destruction of text readout {}", name());
-      }
-    }
-#endif
-  }
 
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.text_readouts_.erase(statName());

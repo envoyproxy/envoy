@@ -4,7 +4,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
@@ -61,9 +60,7 @@ public:
     // Destroy any existing filter first.
     filter_ = nullptr;
 
-    for (Stats::Counter* counter : Stats::Utility::countersMainThread(store_)) {
-      counter->reset();
-    }
+    store_.forEachCounter(nullptr, [](Stats::Counter& counter) { counter.reset(); });
 
     if (yaml.empty()) {
       proto_config_.set_stat_prefix("test");

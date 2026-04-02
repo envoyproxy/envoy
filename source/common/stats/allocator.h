@@ -107,14 +107,11 @@ public:
   void markGaugeForDeletion(const GaugeSharedPtr& gauge);
   void markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout);
 
+  // Indicate that the server is shutting down. This is used for disabling debug
+  // assertions that stats are only destroyed on the main thread. During
+  // destruction we do not need that guarantee.
   void setShuttingDown();
   bool shuttingDown() const { return shutting_down_; }
-
-  // void setIsolatedStore();
-  // void setThreadLocalStore();
-
-  // bool isIsolatedStore() const { return isolated_store_; }
-  // bool isThreadLocalStore() const { return thread_local_store_; }
 
 protected:
   virtual Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
@@ -161,9 +158,6 @@ private:
   std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(mutex_);
   std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(mutex_);
   std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(mutex_);
-
-  // std::atomic<bool> isolated_store_{false};
-  // std::atomic<bool> thread_local_store_{false};
 };
 
 } // namespace Stats

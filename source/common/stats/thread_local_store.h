@@ -204,11 +204,6 @@ public:
     return cont;
   }
 
-  // std::vector<CounterSharedPtr> counters() const override;
-  /*std::vector<GaugeSharedPtr> gauges() const override;
-  std::vector<TextReadoutSharedPtr> textReadouts() const override;
-  std::vector<ParentHistogramSharedPtr> histograms() const override;*/
-
   void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
@@ -301,10 +296,6 @@ private:
   struct CentralCacheEntry : public RefcountHelper {
     explicit CentralCacheEntry(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
     ~CentralCacheEntry();
-
-    bool empty() const {
-      return counters_.empty() && gauges_.empty() && histograms_.empty() && text_readouts_.empty();
-    }
 
     StatNameHashMap<CounterSharedPtr> counters_;
     StatNameHashMap<GaugeSharedPtr> gauges_;
@@ -474,6 +465,10 @@ private:
       return central_cache_;
     }
 
+    // Detaches the central cache from the scope, and returns it to the
+    // caller. This enables the ScopeImpl to be deleted from any thread,
+    // but guarantee that the stats held by the scope are only removed
+    // from the main thread.
     CentralCacheEntrySharedPtr releaseCentralCacheLockHeld()
         ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
       CentralCacheEntrySharedPtr central_cache = std::move(central_cache_);
@@ -519,6 +514,11 @@ private:
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     TlsCacheEntry& insertScope(uint64_t scope_id);
+
+    // Erases the scopes identified by indices provided in scope_ids. the TLS
+    // cache entries for the scopes are transferred into tls_cache_entries. The
+    // caller must ensure only one thread at a time calls eraseScopes, to avoid
+    // racing the write to tls_cache_entries.
     void eraseScopes(const std::vector<uint64_t>& scope_ids,
                      std::vector<TlsCacheEntry>& tls_cache_entries);
     void eraseHistograms(const std::vector<uint64_t>& histograms);
@@ -642,7 +642,6 @@ private:
   // cleanup, which would otherwise entail a post() per histogram per thread.
   std::vector<uint64_t> histograms_to_cleanup_ ABSL_GUARDED_BY(hist_mutex_);
 
-  // TODO(#44162): remove these.
   CounterSharedPtr counters_overflow_;
   CounterSharedPtr gauges_overflow_;
   CounterSharedPtr histograms_overflow_;
