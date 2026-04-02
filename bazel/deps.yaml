@@ -211,7 +211,7 @@ benchmark:
   project_name: "Benchmark"
   project_desc: "Library to benchmark code snippets"
   project_url: "https://github.com/google/benchmark"
-  release_date: "2025-05-19"
+  release_date: "2026-01-21"
   use_category:
   - test_only
   license: "Apache-2.0"
