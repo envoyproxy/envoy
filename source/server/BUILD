@@ -443,6 +443,7 @@ envoy_cc_library(
         "//source/common/version:version_lib",
         "//source/server/admin:admin_lib",
         "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
