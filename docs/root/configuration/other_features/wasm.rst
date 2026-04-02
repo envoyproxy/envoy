@@ -23,4 +23,5 @@ Wasm runtime emits the following statistics:
   :widths: 1, 1, 2
 
   wasm.<runtime>.created, Counter, Total number of execution instances created
+  wasm.<runtime>.crashed, Counter, Total number of VM crashes (runtime errors)
   wasm.<runtime>.active, Gauge, Number of active execution instances
