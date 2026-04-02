@@ -85,8 +85,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/abseil/abseil-cpp/archive/{version}.tar.gz"],
     ),
     shellcheck = dict(
-        version = "0.4.0",
-        sha256 = "cef935ea1088d2b45c5bc3630f8178c91ba367b071af2bfdcd16c042c5efe8ae",
+        version = "0.5.1",
+        sha256 = "b8e8c1216702b1895020cf53a44f8f51fd68371e0ca2593de261b8cf10529069",
         strip_prefix = "rules_shellcheck-{version}",
         urls = ["https://github.com/aignas/rules_shellcheck/archive/{version}.tar.gz"],
     ),
