@@ -467,8 +467,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_java/releases/download/{version}/rules_java-{version}.tar.gz"],
     ),
     rules_python = dict(
-        version = "1.7.0",
-        sha256 = "f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da",
+        version = "1.9.0",
+        sha256 = "098ba13578e796c00c853a2161f382647f32eb9a77099e1c88bc5299333d0d6e",
         strip_prefix = "rules_python-{version}",
         urls = ["https://github.com/bazelbuild/rules_python/archive/{version}.tar.gz"],
     ),
