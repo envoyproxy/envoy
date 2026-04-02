@@ -4,7 +4,6 @@
 # are allowed for any otherwise correctly spelled word.
 
 Allshard
-Datapoint
 FLUSHALL
 NUMPAT
 PUBSUB
@@ -13,7 +12,6 @@ SLOWLOG
 addrlen
 attr
 defragmentation
-dp
 evictable
 flushdb
 itr
@@ -98,6 +96,7 @@ CEL
 CWND
 DLE
 DPE
+dp
 DSR
 DSS
 EBADF
@@ -196,6 +195,8 @@ ENOENT
 ENV
 EOF
 EOS
+EPOLLHUP
+EPOLLOUT
 EQ
 ERANGE
 EV
@@ -990,6 +991,7 @@ iteratively
 javascript
 jitter
 jittered
+jemalloc
 joinable
 js
 kafka

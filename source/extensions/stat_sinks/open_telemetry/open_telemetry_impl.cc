@@ -22,8 +22,7 @@ using HistogramDataPoint = opentelemetry::proto::metrics::v1::HistogramDataPoint
 using KeyValue = opentelemetry::proto::common::v1::KeyValue;
 
 MetricAggregator::AggregationResult MetricAggregator::releaseResult() {
-  return {std::move(gauge_data_), std::move(counter_data_),  std::move(histogram_data_),
-          snapshot_time_ns_,      cumulative_start_time_ns_, delta_start_time_ns_};
+  return {std::move(gauge_data_), std::move(counter_data_), std::move(histogram_data_)};
 }
 
 void MetricAggregator::addGauge(absl::string_view metric_name, uint64_t value,
@@ -227,13 +226,13 @@ void RequestStreamer::addHistogram(absl::string_view name,
 
 void RequestStreamer::addAggregationResult(MetricAggregator::AggregationResult&& metrics) {
   for (const auto& [key, value] : metrics.gauge_data_) {
-    addGauge(key.name(), value, key.sorted_attributes());
+    addGauge(key.name(), value, key.sortedAttributes());
   }
   for (const auto& [key, value] : metrics.counter_data_) {
-    addCounter(key.name(), value, value, key.sorted_attributes());
+    addCounter(key.name(), value, value, key.sortedAttributes());
   }
   for (const auto& [key, value] : metrics.histogram_data_) {
-    addHistogram(key.name(), value, key.sorted_attributes());
+    addHistogram(key.name(), value, key.sortedAttributes());
   }
 }
 
@@ -444,8 +443,7 @@ void OtlpMetricsFlusherImpl::flush(
     return;
   }
 
-  MetricAggregator aggregator(snapshot_time, delta_start_time_ns, cumulative_start_time_ns,
-                              counter_temporality_, histogram_temporality_);
+  MetricAggregator aggregator(counter_temporality_, histogram_temporality_);
   sinkMetrics(snapshot, aggregator);
   streamer.addAggregationResult(aggregator.releaseResult());
   streamer.send();

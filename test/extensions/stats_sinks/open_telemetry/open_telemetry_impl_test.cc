@@ -1481,8 +1481,7 @@ public:
   using AggregationTemporality = opentelemetry::proto::metrics::v1::AggregationTemporality;
 
   void setupAggregator(AggregationTemporality counter_temp, AggregationTemporality hist_temp) {
-    metric_aggregator_ =
-        std::make_unique<MetricAggregator>(1000, 500, 200, counter_temp, hist_temp);
+    metric_aggregator_ = std::make_unique<MetricAggregator>(counter_temp, hist_temp);
   }
 
   class CustomMockHistogramStatistics : public Stats::HistogramStatistics {
@@ -1568,7 +1567,6 @@ TEST_F(MetricAggregatorTests, GaugeAggregation) {
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.gauge_data_.size(), 5);
-
   EXPECT_EQ(getGaugeValue(metrics, "metric1", attr1), 40); // Aggregated
   EXPECT_EQ(getGaugeValue(metrics, "metric2", attr1), 20);
   EXPECT_EQ(getGaugeValue(metrics, "metric1", attr2), 50);
@@ -1591,7 +1589,6 @@ TEST_F(MetricAggregatorTests, CounterAggregationDelta) {
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.counter_data_.size(), 3);
-
   EXPECT_EQ(getCounterValue(metrics, "metric1", attr1), 25); // 5 + 20 (delta)
   EXPECT_EQ(getCounterValue(metrics, "metric2", attr1), 15);
   EXPECT_EQ(getCounterValue(metrics, "metric1", attr2), 10);
@@ -1611,7 +1608,6 @@ TEST_F(MetricAggregatorTests, CounterAggregationCumulative) {
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.counter_data_.size(), 3);
-
   EXPECT_EQ(getCounterValue(metrics, "metric1", attr1), 35); // 10 + 25 (value)
   EXPECT_EQ(getCounterValue(metrics, "metric2", attr1), 20);
   EXPECT_EQ(getCounterValue(metrics, "metric1", attr2), 15);
@@ -1630,8 +1626,7 @@ TEST_F(MetricAggregatorTests, CounterAggregationDifferentTagOrders) {
   metric_aggregator_->addCounter("metric_perm", /*value=*/2, /*delta=*/2, attr2);
 
   auto metrics = metric_aggregator_->releaseResult();
-  EXPECT_EQ(metrics.counter_data_.size(),
-            1); // Group into ONE counter name in releasing! Wait, ReleaseResult returns a map!
+  EXPECT_EQ(metrics.counter_data_.size(), 1);
   EXPECT_EQ(getCounterValue(metrics, "metric_perm", attr1), 3); // 1 + 2 = 3
 }
 

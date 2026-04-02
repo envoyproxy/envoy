@@ -70,18 +70,14 @@ public:
     AttributesVector sorted_attributes_;
   };
 
-  explicit MetricAggregator(int64_t snapshot_time_ns, int64_t delta_start_time_ns,
-                            int64_t cumulative_start_time_ns,
-                            AggregationTemporality counter_temporality,
+  explicit MetricAggregator(AggregationTemporality counter_temporality,
                             AggregationTemporality histogram_temporality)
-      : snapshot_time_ns_(snapshot_time_ns), delta_start_time_ns_(delta_start_time_ns),
-        cumulative_start_time_ns_(cumulative_start_time_ns),
-        counter_temporality_(counter_temporality), histogram_temporality_(histogram_temporality) {}
+      : counter_temporality_(counter_temporality), histogram_temporality_(histogram_temporality) {}
 
   class MetricKey {
   public:
-    MetricKey(absl::string_view name, SortedAttributesVector sorted_attributes)
-        : name_(name), sorted_attributes_(std::move(sorted_attributes)) {}
+    MetricKey(absl::string_view name, SortedAttributesVector&& sortedAttributes)
+        : name_(name), sorted_attributes_(std::move(sortedAttributes)) {}
 
     bool operator==(const MetricKey& other) const {
       return name_ == other.name_ && sorted_attributes_ == other.sorted_attributes_;
@@ -92,11 +88,11 @@ public:
     }
 
     absl::string_view name() const { return name_; }
-    const SortedAttributesVector& sorted_attributes() const { return sorted_attributes_; }
+    const SortedAttributesVector& sortedAttributes() const { return sorted_attributes_; }
 
   private:
-    std::string name_;
-    SortedAttributesVector sorted_attributes_;
+    const std::string name_;
+    const SortedAttributesVector sorted_attributes_;
   };
 
   // MetricViewKey is a temporary view of MetricKey that does not own the name or attributes.
@@ -106,8 +102,8 @@ public:
   // memory to create a `MetricKey` just to search the map.
   class MetricViewKey {
   public:
-    MetricViewKey(absl::string_view name, const SortedAttributesVector& sorted_attributes)
-        : name_(name), sorted_attributes_(sorted_attributes) {}
+    MetricViewKey(absl::string_view name, const SortedAttributesVector& sortedAttributes)
+        : name_(name), sorted_attributes_(sortedAttributes) {}
 
     bool operator==(const MetricViewKey& other) const {
       return name_ == other.name_ && sorted_attributes_ == other.sorted_attributes_;
@@ -118,7 +114,7 @@ public:
     }
 
     absl::string_view name() const { return name_; }
-    const SortedAttributesVector& sorted_attributes() const { return sorted_attributes_; }
+    const SortedAttributesVector& sortedAttributes() const { return sorted_attributes_; }
 
   private:
     absl::string_view name_;
@@ -139,11 +135,11 @@ public:
     bool operator()(const MetricKey& a, const MetricKey& b) const { return a == b; }
 
     bool operator()(const MetricKey& a, const MetricViewKey& b) const {
-      return a.name() == b.name() && a.sorted_attributes() == b.sorted_attributes();
+      return a.name() == b.name() && a.sortedAttributes() == b.sortedAttributes();
     }
 
     bool operator()(const MetricViewKey& a, const MetricKey& b) const {
-      return a.name() == b.name() && a.sorted_attributes() == b.sorted_attributes();
+      return a.name() == b.name() && a.sortedAttributes() == b.sortedAttributes();
     }
   };
 
@@ -163,12 +159,6 @@ public:
     absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> gauge_data_;
     absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> counter_data_;
     absl::flat_hash_map<MetricKey, CustomHistogram, MetricKeyHash, MetricKeyEqual> histogram_data_;
-    // Timestamp for the snapshot.
-    int64_t snapshot_time_ns_;
-    // Start time for cumulative metrics.
-    int64_t cumulative_start_time_ns_;
-    // Start time for delta metrics.
-    int64_t delta_start_time_ns_;
   };
 
   AggregationResult releaseResult();
@@ -188,10 +178,6 @@ public:
                     SortedAttributesVector attributes);
 
 private:
-  const int64_t snapshot_time_ns_;
-  const int64_t delta_start_time_ns_;
-  const int64_t cumulative_start_time_ns_;
-
   absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> gauge_data_;
   absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> counter_data_;
   absl::flat_hash_map<MetricKey, CustomHistogram, MetricKeyHash, MetricKeyEqual> histogram_data_;
