@@ -230,8 +230,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/intel/qatlib/archive/refs/tags/{version}.tar.gz"],
     ),
     qatzip = dict(
-        version = "1.3.1",
-        sha256 = "75e6e57f49da739d0a509220263e9dabb30b1e8c94be11c809aecc0adf4ee2dc",
+        version = "1.3.2",
+        sha256 = "36cf711dbe8027d1cdf420e87a70ed4394383cd2443dc6465bc8210594206756",
         strip_prefix = "QATzip-{version}",
         urls = ["https://github.com/intel/QATzip/archive/v{version}.tar.gz"],
     ),
