@@ -1,6 +1,3 @@
-// Minimal BER helpers for LDAP message inspection.
-// Only what we need for StartTLS detection - no generic ASN.1 stuff.
-
 #pragma once
 
 #include <cstdint>
@@ -21,7 +18,6 @@ constexpr size_t kMaxInspectBufferSize = 16 * 1024;
 constexpr uint8_t kBerTagSequence = 0x30;
 constexpr uint8_t kBerTagInteger = 0x02;
 constexpr uint8_t kBerTagContext0 = 0x80;
-constexpr uint8_t kBerTagExtendedRequest = 0x77;
 constexpr uint8_t kLdapExtendedRequestTag = 0x77;
 
 // StartTLS OID "1.3.6.1.4.1.1466.20037" as ASCII bytes

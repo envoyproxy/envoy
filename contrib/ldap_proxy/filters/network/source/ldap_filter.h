@@ -1,9 +1,3 @@
-// LDAP proxy filter - handles StartTLS upgrades transparently.
-//
-// Two modes:
-//   ON_DEMAND: client initiates StartTLS -> we negotiate with upstream, upgrade both
-//   ALWAYS: we proactively send StartTLS to upstream on first data, downstream stays plain
-
 #pragma once
 
 #include <chrono>
@@ -81,7 +75,6 @@ public:
 private:
   bool isDownstreamTls() const;
   void closeConnection();
-  void sendStartTlsSuccessResponse();
   void sendUpstreamStartTlsRequest();
   bool handleUpstreamStartTlsResponse(Buffer::Instance& data);
   void completeTlsSwitch();

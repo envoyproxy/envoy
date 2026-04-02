@@ -3,15 +3,11 @@
 LDAP proxy
 ==========
 
-The LDAP proxy filter handles StartTLS upgrades transparently between an LDAP client (downstream)
-and an LDAP server (upstream). It inspects the LDAP byte stream to detect StartTLS Extended
-Requests and coordinates TLS negotiation on both sides of the connection using Envoy's existing
-:ref:`StartTLS transport socket <extension_envoy.transport_sockets.starttls>`.
-
-The filter works as an L4 proxy — it does not interpret LDAP message semantics beyond what is
-needed for StartTLS detection. After TLS is established (or if the first message is a regular
-LDAP operation), the filter transitions to passthrough mode and forwards all data without
-inspection.
+The LDAP proxy filter decodes the wire protocol between an LDAP client
+(downstream) and an LDAP server (upstream) to detect StartTLS Extended Requests
+(OID ``1.3.6.1.4.1.1466.20037``, RFC 4511). When a StartTLS negotiation
+succeeds, the filter switches the connection's transport sockets from cleartext
+to TLS and then enters passthrough mode.
 
 .. attention::
 
@@ -21,65 +17,70 @@ inspection.
 Operating modes
 ---------------
 
-The filter supports two modes of operation:
+The filter supports two ``upstream_starttls_mode`` values:
 
-* **ON_DEMAND** (default): The filter waits for the client to send a StartTLS Extended Request.
-  When detected, it forwards the request upstream, waits for a success response, upgrades the
-  upstream connection to TLS, sends the success response back to the client, and then upgrades
-  the downstream connection to TLS.
+.. csv-table::
+  :header: Mode, Description
+  :widths: 1, 3
 
-* **ALWAYS**: The filter proactively sends a StartTLS request to the upstream server as soon as
-  the first downstream data arrives. The downstream connection stays plaintext while the upstream
-  is encrypted. This is useful when the LDAP client does not support StartTLS but the upstream
-  server requires encryption.
+  ``ON_DEMAND``, "The filter waits for the downstream client to send a StartTLS
+  Extended Request. When detected, it forwards the request to the upstream server,
+  waits for a success response, upgrades **both** the upstream and downstream
+  connections to TLS, and then enters passthrough mode."
+  ``ALWAYS``, "On the very first downstream data, the filter proactively sends a
+  StartTLS request to the upstream server. Once the upstream agrees, only the
+  **upstream** side is upgraded to TLS; the downstream side stays plaintext. This
+  is useful when clients cannot or should not perform StartTLS themselves."
+
+After the TLS transition (or if a plaintext operation is detected in ON_DEMAND
+mode), the filter moves to **passthrough** and no longer inspects traffic.
 
 Configuration
 -------------
 
-The LDAP proxy filter should be chained with the TCP proxy and configured with the StartTLS
-transport socket:
+The LDAP proxy filter should be chained with the TCP proxy filter. An upstream
+``starttls`` transport socket is required so that the connection can transition
+from cleartext to TLS after the StartTLS handshake.
 
-.. code-block:: yaml
+ALWAYS mode
+~~~~~~~~~~~
 
-  filter_chains:
-  - filters:
-    - name: envoy.filters.network.ldap_proxy
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.ldap_proxy.v3alpha.LdapProxy
-        stat_prefix: ldap
-        upstream_starttls_mode: ON_DEMAND
-    - name: envoy.tcp_proxy
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-        stat_prefix: tcp
-        cluster: ldap_cluster
-  transport_socket:
-    name: envoy.transport_sockets.starttls
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
-      cleartext_socket_config: {}
-      tls_socket_config:
-        common_tls_context:
-          tls_certificates:
-          - certificate_chain: { filename: "/certs/server.crt" }
-            private_key: { filename: "/certs/server.key" }
+In ALWAYS mode the filter proactively sends StartTLS to the upstream on the
+first downstream data. No downstream transport socket is needed because the
+client-facing connection stays plaintext:
+
+.. literalinclude:: _include/ldap-proxy-always.yaml
+   :language: yaml
+   :linenos:
+   :caption: :download:`ldap-proxy-always.yaml <_include/ldap-proxy-always.yaml>`
+
+ON_DEMAND mode
+~~~~~~~~~~~~~~
+
+In ON_DEMAND mode a downstream ``starttls`` transport socket is also needed so
+that Envoy can upgrade the client-facing connection to TLS after the negotiation:
+
+.. literalinclude:: _include/ldap-proxy-on-demand.yaml
+   :language: yaml
+   :linenos:
+   :caption: :download:`ldap-proxy-on-demand.yaml <_include/ldap-proxy-on-demand.yaml>`
 
 .. _config_network_filters_ldap_proxy_stats:
 
 Statistics
 ----------
 
-Every configured LDAP proxy filter has statistics rooted at ``ldap.<stat_prefix>.`` with the
-following statistics:
+Every configured LDAP proxy filter has statistics rooted at
+*ldap.<stat_prefix>.* with the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description
-  :widths: 2, 1, 2
+  :widths: 2, 1, 3
 
-  starttls_req_total, Counter, Total number of StartTLS Extended Requests initiated
-  starttls_rsp_total, Counter, Total number of StartTLS Extended Responses received
-  starttls_rsp_success, Counter, Number of successful StartTLS responses (resultCode=0)
-  starttls_rsp_error, Counter, Number of failed StartTLS responses (non-zero resultCode or parse/timeout errors)
-  decoder_error, Counter, Number of protocol parsing errors
-  protocol_violation, Counter, Number of pipeline violations (data sent after StartTLS before TLS handshake completes)
-  starttls_op_time, Histogram, "Time taken for StartTLS operation from request to completion, in milliseconds"
+  starttls_req_total, Counter, Total number of StartTLS requests initiated (by client in ON_DEMAND or by filter in ALWAYS)
+  starttls_rsp_total, Counter, Total number of upstream StartTLS responses received
+  starttls_rsp_success, Counter, Number of successful upstream StartTLS responses (resultCode=0)
+  starttls_rsp_error, Counter, "Number of failed upstream StartTLS responses (parse error, msgID mismatch, non-zero resultCode, or timeout)"
+  decoder_error, Counter, Number of BER decoding errors or internal protocol errors that caused connection closure
+  protocol_violation, Counter, Number of pipeline violations (data received during StartTLS negotiation)
+  starttls_op_time, Histogram, "Time in milliseconds for the full StartTLS operation, from request sent to TLS transition complete"

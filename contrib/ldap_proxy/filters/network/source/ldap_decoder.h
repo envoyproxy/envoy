@@ -1,6 +1,3 @@
-// LDAP message decoder - looks for StartTLS requests and protocol violations.
-// Intentionally limited in scope. We only parse enough to detect StartTLS.
-
 #pragma once
 
 #include <cstdint>

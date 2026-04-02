@@ -31,7 +31,7 @@ Network::FilterStatus LdapFilter::onNewConnection() {
   ENVOY_CONN_LOG(trace, "ldap_proxy: new connection, upstream_starttls={}",
                  read_callbacks_->connection(), upstream_starttls_);
 
-  if (isDownstreamTls()) {
+  if (isDownstreamTls() && !upstream_starttls_) {
     ENVOY_CONN_LOG(debug, "ldap_proxy: downstream is TLS, bypassing inspection",
                    read_callbacks_->connection());
     state_ = FilterState::Passthrough;
@@ -257,18 +257,6 @@ void LdapFilter::onEvent(Network::ConnectionEvent event) {
       }
     }
   }
-}
-
-void LdapFilter::sendStartTlsSuccessResponse() {
-  auto response = createStartTlsSuccessResponse(pending_starttls_msg_id_);
-
-  Buffer::OwnedImpl response_buffer;
-  response_buffer.add(response.data(), response.size());
-
-  ENVOY_CONN_LOG(debug, "ldap_proxy: sending StartTLS success to downstream, msgID={}",
-                 read_callbacks_->connection(), pending_starttls_msg_id_);
-
-  read_callbacks_->connection().write(response_buffer, false);
 }
 
 void LdapFilter::sendUpstreamStartTlsRequest() {

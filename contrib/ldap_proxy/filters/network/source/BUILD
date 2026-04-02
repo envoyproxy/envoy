@@ -1,4 +1,3 @@
-load("//bazel:envoy_build_system.bzl", "envoy_contrib_package")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",

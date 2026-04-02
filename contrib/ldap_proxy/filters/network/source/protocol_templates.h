@@ -1,6 +1,3 @@
-// Pre-baked LDAP response templates.
-// We use static byte arrays instead of building ASN.1 dynamically.
-
 #pragma once
 
 #include <array>
@@ -46,43 +43,6 @@ inline std::vector<uint8_t> encodeBerInteger(uint32_t value) {
   result.insert(result.end(), value_bytes.begin(), value_bytes.end());
   return result;
 }
-
-// Static templates - these get the messageID patched in at runtime
-// 
-// StartTLS success with OID in responseName
-constexpr std::array<uint8_t, 38> kStartTlsSuccessTemplate = {
-    0x30, 0x24,
-    0x02, 0x01, 0x01,       // msgID placeholder
-    0x78, 0x1f,
-    0x0a, 0x01, 0x00,       // resultCode = 0
-    0x04, 0x00,
-    0x04, 0x00,
-    0x8a, 0x16,
-    0x31, 0x2e, 0x33, 0x2e, 0x36, 0x2e, 0x31, 0x2e,
-    0x34, 0x2e, 0x31, 0x2e, 0x31, 0x34, 0x36, 0x36,
-    0x2e, 0x32, 0x30, 0x30, 0x33, 0x37
-};
-constexpr size_t kStartTlsSuccessMsgIdOffset = 4;
-
-constexpr std::array<uint8_t, 14> kConfidentialityRequiredTemplate = {
-    0x30, 0x0c,
-    0x02, 0x01, 0x01,
-    0x78, 0x07,
-    0x0a, 0x01, 0x0d,       // resultCode = 13
-    0x04, 0x00,
-    0x04, 0x00
-};
-constexpr size_t kConfidentialityRequiredMsgIdOffset = 4;
-
-constexpr std::array<uint8_t, 14> kProtocolErrorTemplate = {
-    0x30, 0x0c,
-    0x02, 0x01, 0x01,
-    0x78, 0x07,
-    0x0a, 0x01, 0x02,       // resultCode = 2
-    0x04, 0x00,
-    0x04, 0x00
-};
-constexpr size_t kProtocolErrorMsgIdOffset = 4;
 
 // Response bodies (without outer SEQUENCE and messageID)
 constexpr std::array<uint8_t, 33> kStartTlsSuccessBody = {

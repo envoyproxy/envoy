@@ -1,5 +1,3 @@
-// Config factory for LDAP proxy filter
-
 #pragma once
 
 #include "source/extensions/filters/network/common/factory_base.h"
