@@ -190,6 +190,12 @@ int QuicServerTransportSocketFactory::processSessionTicket(SSL* ssl, uint8_t* ke
   // QuicServerTransportSocketFactory always creates ServerContextImpl.
   auto server_ctx =
       std::static_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
+  // Session ticket keys may have been removed by an SDS update after this
+  // connection was created. Unlike TCP TLS where each connection pins its own
+  // ServerContextImpl, QUIC reads the current ssl_ctx_ which may have empty keys.
+  if (!server_ctx->hasSessionTicketKeys()) {
+    return 0;
+  }
   return server_ctx->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
 }
 

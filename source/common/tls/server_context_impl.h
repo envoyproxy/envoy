@@ -72,6 +72,7 @@ public:
 
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                            HMAC_CTX* hmac_ctx, int encrypt);
+  bool hasSessionTicketKeys() const { return !session_ticket_keys_.empty(); }
 
 protected:
   ServerContextImpl(
