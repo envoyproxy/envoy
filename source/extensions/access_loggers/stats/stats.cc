@@ -127,8 +127,10 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
       inflight_gauges_.erase(it);
     }
   } else {
-    ENVOY_LOG_MISC(error, "Stats access logger gauge paired subtract was skipped due to no "
-                          "corresponding add, possibly due to misconfigured events");
+    ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
+                            "Stats access logger gauge paired subtract was skipped due to no "
+                            "corresponding add, possibly due to misconfigured events: {}",
+                            parent_->scope().symbolTable().toString(stat_name));
   }
 }
 

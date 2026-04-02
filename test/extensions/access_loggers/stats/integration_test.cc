@@ -230,6 +230,9 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
 }
 
 TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    return; // Skip for IPv6 due to log throttling in periodic logs as IPv4 and IPv6 run in the same process.
+  }
   const std::string config_yaml = R"EOF(
               name: envoy.access_loggers.stats
               filter:
@@ -263,7 +266,7 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   // would crash during test teardown.
   EXPECT_LOG_CONTAINS("error",
                       "Stats access logger gauge paired subtract was skipped due to no "
-                      "corresponding add, possibly due to misconfigured events",
+                      "corresponding add, possibly due to misconfigured events: active_requests",
                       {
                         init(config_yaml, /*autonomous_upstream=*/false,
                              /*flush_access_log_on_new_request=*/true);
