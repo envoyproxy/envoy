@@ -5482,7 +5482,8 @@ TEST_F(RouterTest, InternalRedirectNotBlockedByBufferFilterDoubleCount) {
       .WillOnce(ReturnRef(toCopy));
 
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
-  // If overflow is incorrectly detected, redirect processing is skipped and recreateStream() is not called.
+  // If overflow is incorrectly detected, redirect processing is skipped and recreateStream() is not
+  // called.
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
