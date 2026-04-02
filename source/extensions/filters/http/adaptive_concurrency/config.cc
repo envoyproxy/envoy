@@ -40,11 +40,30 @@ Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactory(
   };
 }
 
+absl::StatusOr<Http::FilterFactoryCb>
+AdaptiveConcurrencyFilterFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency& config,
+    const std::string& stats_prefix, DualInfo info,
+    Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(config, stats_prefix, context, info.scope);
+}
+
+Envoy::Http::FilterFactoryCb
+AdaptiveConcurrencyFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency& config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context) {
+  return createFilterFactory(config, stats_prefix, context, context.scope());
+}
+
 /**
  * Static registration for the adaptive_concurrency filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(AdaptiveConcurrencyFilterFactory,
-                 Server::Configuration::NamedHttpFilterConfigFactory);
+LEGACY_REGISTER_FACTORY(AdaptiveConcurrencyFilterFactory,
+                        Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.filters.http.adaptive_concurrency");
+LEGACY_REGISTER_FACTORY(UpstreamAdaptiveConcurrencyFilterFactory,
+                        Server::Configuration::UpstreamHttpFilterConfigFactory,
+                        "envoy.filters.http.adaptive_concurrency");
 
 } // namespace AdaptiveConcurrency
 } // namespace HttpFilters
