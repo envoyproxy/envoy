@@ -2040,5 +2040,75 @@ TEST_P(QuicHttpIntegrationTest, QuicListenerFilterReceivesFirstPacketWithCmsg) {
   EXPECT_GT(std::stoi(metrics.at(2)), 0);
 }
 
+TEST_P(QuicHttpIntegrationTest, SessionTicketResumptionWithStaticKeys) {
+  concurrency_ = 1;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_session_ticket_support",
+                                    "true");
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ts = bootstrap.mutable_static_resources()
+                   ->mutable_listeners(0)
+                   ->mutable_filter_chains(0)
+                   ->mutable_transport_socket();
+    auto quic_transport_socket_config = MessageUtil::anyConvert<
+        envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
+        *ts->mutable_typed_config());
+    auto* keys = quic_transport_socket_config.mutable_downstream_tls_context()
+                     ->mutable_session_ticket_keys();
+    // Session ticket keys must be exactly 80 bytes.
+    keys->add_keys()->set_filename(
+        TestEnvironment::runfilesPath("test/common/tls/test_data/ticket_key_a"));
+    ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+  });
+
+  initialize();
+
+  // First connection: full handshake.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EnvoyQuicClientSession* quic_session1 =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_FALSE(quic_session1->IsResumption());
+  codec_client_->close();
+
+  // Second connection: should resume via session ticket.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EnvoyQuicClientSession* quic_session2 =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_TRUE(quic_session2->IsResumption());
+  codec_client_->close();
+}
+
+TEST_P(QuicHttpIntegrationTest, NoSessionTicketResumptionWithoutKeys) {
+  concurrency_ = 1;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_session_ticket_support",
+                                    "true");
+  // No session_ticket_keys configured — tickets should be disabled.
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  codec_client_->close();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_FALSE(quic_session->IsResumption());
+  codec_client_->close();
+}
+
 } // namespace Quic
 } // namespace Envoy

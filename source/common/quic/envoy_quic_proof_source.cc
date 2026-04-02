@@ -4,6 +4,7 @@
 
 #include "envoy/ssl/tls_certificate_config.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
@@ -127,6 +128,7 @@ int EnvoyQuicProofSource::ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t
   auto* factory = static_cast<const QuicServerTransportSocketFactory*>(
       SSL_get_ex_data(ssl, transportSocketFactoryExDataIndex()));
   if (factory == nullptr) {
+    IS_ENVOY_BUG("QUIC session ticket callback invoked without transport socket factory");
     return 0;
   }
   return factory->processSessionTicket(ssl, key_name, iv, ctx, hmac_ctx, encrypt);

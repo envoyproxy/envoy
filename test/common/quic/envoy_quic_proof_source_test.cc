@@ -374,7 +374,7 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailAlgorithmMismatch) {
       std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
 }
 
-TEST_F(EnvoyQuicProofSourceTest, FilterChainExDataIndex) {
+TEST_F(EnvoyQuicProofSourceTest, TransportSocketFactoryExDataIndex) {
   // transportSocketFactoryExDataIndex() should return a valid (non-negative) index and be stable.
   int index = EnvoyQuicProofSource::transportSocketFactoryExDataIndex();
   EXPECT_GE(index, 0);
@@ -403,16 +403,17 @@ TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxWithSessionTicketSupportDisabled) {
   proof_source_.OnNewSslCtx(ssl_ctx.get());
 }
 
-// Verify that ticketKeyCallback returns 0 when no filter chain is stored in
-// SSL ex_data (the null-pointer early-return path).
-TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackNullFilterChain) {
+// Verify that ticketKeyCallback returns 0 and fires ENVOY_BUG when no transport socket
+// factory is stored in SSL ex_data.
+TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackNullTransportSocketFactory) {
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
   ASSERT_NE(ssl_ctx, nullptr);
   bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
   ASSERT_NE(ssl, nullptr);
-  // No ex_data set → SSL_get_ex_data returns nullptr for the transport socket factory index.
-  EXPECT_EQ(
-      0, EnvoyQuicProofSource::ticketKeyCallback(ssl.get(), nullptr, nullptr, nullptr, nullptr, 0));
+  // No ex_data set → triggers ENVOY_BUG and returns 0.
+  EXPECT_ENVOY_BUG(EXPECT_EQ(0, EnvoyQuicProofSource::ticketKeyCallback(ssl.get(), nullptr, nullptr,
+                                                                        nullptr, nullptr, 0)),
+                   "QUIC session ticket callback invoked without transport socket factory");
 }
 
 // Verify that ticketKeyCallback delegates to the transport socket factory's
