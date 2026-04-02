@@ -1296,7 +1296,7 @@ rules_rust:
   project_name: "Bazel rust rules"
   project_desc: "Bazel rust rules (used by Wasm)"
   project_url: "https://github.com/bazelbuild/rules_rust"
-  release_date: "2025-12-10"
+  release_date: "2026-02-26"
   use_category:
   - controlplane
   - dataplane_core
