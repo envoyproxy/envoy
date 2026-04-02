@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.ldap_proxy.v3alpha;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.ldap_proxy.v3alpha";
+option java_outer_classname = "LdapProxyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/network/ldap_proxy/v3alpha";
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: LDAP proxy]
+// LDAP proxy :ref:`configuration overview <config_network_filters_ldap_proxy>`.
+// [#extension: envoy.filters.network.ldap_proxy]
+
+enum StartTlsMode {
+  // The filter waits for the downstream client to send a StartTLS Extended Request
+  // (OID 1.3.6.1.4.1.1466.20037). When detected, the filter forwards the request to the
+  // upstream server. On success, both the upstream and downstream connections are upgraded
+  // to TLS, and the filter transitions to passthrough mode.
+  ON_DEMAND = 0;
+
+  // The filter proactively sends a StartTLS Extended Request to the upstream server as
+  // soon as the first downstream data arrives. Only the upstream connection is upgraded
+  // to TLS; the downstream connection remains plaintext. This is useful when clients
+  // cannot perform StartTLS themselves but the upstream server requires encryption.
+  ALWAYS = 1;
+}
+
+// [#next-free-field: 3]
+message LdapProxy {
+  // The prefix to use when emitting statistics, e.g. ``ldap.<stat_prefix>.starttls_req_total``.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Controls when the filter initiates StartTLS with the upstream server.
+  StartTlsMode upstream_starttls_mode = 2;
+}

@@ -1,0 +1,55 @@
+static_resources:
+  listeners:
+  - name: ldap_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10389
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.ldap_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.ldap_proxy.v3alpha.LdapProxy
+          stat_prefix: ldap
+          upstream_starttls_mode: ON_DEMAND
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: ldap_tcp
+          cluster: ldap_backend
+      transport_socket:
+        name: envoy.transport_sockets.starttls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
+          cleartext_socket_config: {}
+          tls_socket_config:
+            common_tls_context:
+              tls_certificates:
+              - certificate_chain:
+                  filename: /etc/envoy/certs/server.crt
+                private_key:
+                  filename: /etc/envoy/certs/server.key
+  clusters:
+  - name: ldap_backend
+    type: STRICT_DNS
+    load_assignment:
+      cluster_name: ldap_backend
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 389
+    transport_socket:
+      name: envoy.transport_sockets.starttls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig
+        cleartext_socket_config: {}
+        tls_socket_config:
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: /etc/envoy/certs/client.crt
+              private_key:
+                filename: /etc/envoy/certs/client.key

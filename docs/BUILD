@@ -23,6 +23,8 @@ filegroup(
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
             "root/configuration/http/http_filters/_include/geoip-filter.yaml",
             "root/configuration/listeners/network_filters/_include/geoip-network-filter.yaml",
+            "root/configuration/listeners/network_filters/_include/ldap-proxy-always.yaml",
+            "root/configuration/listeners/network_filters/_include/ldap-proxy-on-demand.yaml",
             "root/configuration/http/http_filters/_include/http-cache-configuration-fs.yaml",
             "root/configuration/http/http_filters/_include/http-cache-v2-configuration-fs.yaml",
             "root/configuration/other_features/_include/dlb.yaml",
@@ -51,6 +53,8 @@ filegroup(
     srcs = [
         "root/configuration/http/http_filters/_include/checksum_filter.yaml",
         "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
+        "root/configuration/listeners/network_filters/_include/ldap-proxy-always.yaml",
+        "root/configuration/listeners/network_filters/_include/ldap-proxy-on-demand.yaml",
     ] + select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": glob(["root/_configs/go/*.yaml"]),
