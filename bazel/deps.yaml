@@ -406,7 +406,7 @@ libmaxminddb:
   project_name: "maxmind_libmaxminddb"
   project_desc: "C library for reading MaxMind DB files"
   project_url: "https://github.com/maxmind/libmaxminddb"
-  release_date: "2025-01-10"
+  release_date: "2026-03-05"
   use_category:
   - dataplane_ext
   extensions:
