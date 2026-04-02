@@ -139,7 +139,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
     stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
     // Keep the parent root to ensure the metadata_matching_criteria will not become
     // dangling pointer once the parent downstream request is gone.
-    parent_route_ = options.parent_context.stream_info->route();
+    parent_route_ = options.parent_context.stream_info->routeSharedPtr();
     if (parent_route_ != nullptr) {
       const auto* route_entry = parent_route_->routeEntry();
       if (route_entry != nullptr) {

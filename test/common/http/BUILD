@@ -336,6 +336,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:inputs_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
@@ -434,6 +435,18 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "http_service_headers_test",
+    srcs = ["http_service_headers_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/http:http_service_headers_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
