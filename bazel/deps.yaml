@@ -1406,7 +1406,7 @@ zlib_ng:
   project_name: "zlib-ng"
   project_desc: "zlib fork (higher performance)"
   project_url: "https://github.com/zlib-ng/zlib-ng"
-  release_date: "2025-12-02"
+  release_date: "2026-02-03"
   use_category:
   - controlplane
   - dataplane_core

@@ -354,8 +354,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/facebook/zstd/archive/v{version}.tar.gz"],
     ),
     zlib_ng = dict(
-        version = "2.3.2",
-        sha256 = "6a0561b50b8f5f6434a6a9e667a67026f2b2064a1ffa959c6b2dae320161c2a8",
+        version = "2.3.3",
+        sha256 = "f9c65aa9c852eb8255b636fd9f07ce1c406f061ec19a2e7d508b318ca0c907d1",
         strip_prefix = "zlib-ng-{version}",
         urls = ["https://github.com/zlib-ng/zlib-ng/archive/{version}.tar.gz"],
     ),
