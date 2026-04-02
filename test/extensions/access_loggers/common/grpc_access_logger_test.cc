@@ -115,6 +115,19 @@ private:
     num_clears_++;
   }
 
+  uint32_t countLogEntries() const override {
+    uint32_t count = 0;
+    if (message_.fields().contains(MOCK_HTTP_LOG_FIELD_NAME)) {
+      count +=
+          static_cast<uint32_t>(message_.fields().at(MOCK_HTTP_LOG_FIELD_NAME).number_value());
+    }
+    if (message_.fields().contains(MOCK_TCP_LOG_FIELD_NAME)) {
+      count +=
+          static_cast<uint32_t>(message_.fields().at(MOCK_TCP_LOG_FIELD_NAME).number_value());
+    }
+    return count;
+  }
+
   int num_inits_ = 0;
   int num_clears_ = 0;
 };
@@ -217,6 +230,12 @@ TEST_F(StreamingGrpcAccessLogTest, BasicFlow) {
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_dropped")->value());
   EXPECT_EQ(2,
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
+  EXPECT_EQ(
+      3, TestUtility::findCounter(stats_store_, "mock_access_log_prefix.grpc_entries_flushed")
+             ->value());
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_,
+                                        "mock_access_log_prefix.grpc_entries_flush_failed")
+                   ->value());
 }
 
 TEST_F(StreamingGrpcAccessLogTest, WatermarksOverrun) {
@@ -264,6 +283,14 @@ TEST_F(StreamingGrpcAccessLogTest, WatermarksOverrun) {
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
   EXPECT_EQ(1,
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_dropped")->value());
+  // The buffered entry failed to flush twice (two above-watermark attempts), then succeeded twice
+  // (once for the stored entry, once for the new entry).
+  EXPECT_EQ(
+      2, TestUtility::findCounter(stats_store_, "mock_access_log_prefix.grpc_entries_flushed")
+             ->value());
+  EXPECT_EQ(2, TestUtility::findCounter(stats_store_,
+                                        "mock_access_log_prefix.grpc_entries_flush_failed")
+                   ->value());
 }
 
 // Test that stream failure is handled correctly.
@@ -280,6 +307,12 @@ TEST_F(StreamingGrpcAccessLogTest, StreamFailure) {
           }));
   logger_->log(mockHttpEntry());
   EXPECT_EQ(1, logger_->numInits());
+  EXPECT_EQ(
+      0, TestUtility::findCounter(stats_store_, "mock_access_log_prefix.grpc_entries_flushed")
+             ->value());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_,
+                                        "mock_access_log_prefix.grpc_entries_flush_failed")
+                   ->value());
 }
 
 TEST_F(StreamingGrpcAccessLogTest, StreamFailureAndRetry) {
@@ -351,6 +384,59 @@ TEST_F(StreamingGrpcAccessLogTest, Flushing) {
   // Flush on empty message does nothing.
   EXPECT_CALL(*timer_, enableTimer(FlushInterval, _));
   timer_->invokeCallback();
+}
+
+// Test that grpc_entries_flushed counts individual entries across batches.
+TEST_F(StreamingGrpcAccessLogTest, GrpcEntriesFlushedCounter) {
+  // Buffer large enough to hold 3 entries before flushing.
+  const int max_buffer_size = 3 * mockHttpEntry().ByteSizeLong();
+  initLogger(FlushInterval, max_buffer_size);
+
+  MockAccessLogStream stream;
+  AccessLogCallbacks* callbacks;
+  expectStreamStart(stream, &callbacks);
+
+  // Batch 3 HTTP entries, expect them flushed together.
+  expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 3);
+  logger_->log(mockHttpEntry());
+  logger_->log(mockHttpEntry());
+  logger_->log(mockHttpEntry());
+  EXPECT_EQ(
+      3, TestUtility::findCounter(stats_store_, "mock_access_log_prefix.grpc_entries_flushed")
+             ->value());
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_,
+                                        "mock_access_log_prefix.grpc_entries_flush_failed")
+                   ->value());
+
+  // One more entry flushed individually.
+  expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 1);
+  Protobuf::Struct big_entry = mockHttpEntry();
+  const std::string big_key(max_buffer_size, 'a');
+  big_entry.mutable_fields()->insert({big_key, Protobuf::Value()});
+  logger_->log(std::move(big_entry));
+  EXPECT_EQ(
+      4, TestUtility::findCounter(stats_store_, "mock_access_log_prefix.grpc_entries_flushed")
+             ->value());
+}
+
+// Test that grpc_entries_flush_failed counts entries when stream creation fails.
+TEST_F(StreamingGrpcAccessLogTest, GrpcEntriesFlushFailedOnStreamCreationFailure) {
+  initLogger(FlushInterval, 0);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+      .WillOnce(
+          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) {
+            callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
+            return nullptr;
+          }));
+  logger_->log(mockHttpEntry());
+  EXPECT_EQ(
+      0, TestUtility::findCounter(stats_store_, "mock_access_log_prefix.grpc_entries_flushed")
+             ->value());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_,
+                                        "mock_access_log_prefix.grpc_entries_flush_failed")
+                   ->value());
 }
 
 class UnaryGrpcAccessLogTest : public testing::Test {

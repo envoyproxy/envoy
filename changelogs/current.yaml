@@ -361,6 +361,16 @@ new_features:
     and added brotli and zlib to TCP TLS. Controlled by runtime flag
     ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
     When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
+- area: access_log
+  change: |
+    Added two new counters to the :ref:`gRPC access log statistics <config_access_log_stats>`:
+    ``grpc_entries_flushed`` tracks the number of log entries successfully submitted to the gRPC
+    stream, and ``grpc_entries_flush_failed`` tracks entries in batches where the gRPC send failed
+    (stream creation failure or stream above write buffer high-watermark). These complement the
+    existing ``logs_written``/``logs_dropped`` buffer-level counters and provide visibility into
+    whether logs are actually being delivered to the gRPC endpoint. Also fixed a bug in the streaming
+    gRPC client where a stream creation failure incorrectly returned ``true`` from ``log()``,
+    preventing ``grpc_entries_flush_failed`` from being incremented.
 - area: dynamic_modules
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
