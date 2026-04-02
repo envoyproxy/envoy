@@ -79,11 +79,10 @@ constexpr absl::string_view BaseDnsCache = "base_dns_cache";
 // The number of faults allowed on a newly-established connection before switching socket mode.
 constexpr unsigned int InitialFaultThreshold = 1;
 
-ConnectivityManagerImpl::ConnectivityManagerImpl(
-    Upstream::ClusterManager& cluster_manager,
-    Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache)
+ConnectivityManagerImpl::ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
+                                                 DnsCacheManagerSharedPtr dns_cache_manager)
     : cluster_manager_(cluster_manager), quic_observer_registry_factory_(*this),
-      dns_cache_(dns_cache) {
+      dns_cache_manager_(dns_cache_manager) {
   initializeNetworkStates();
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.mobile_use_network_observer_registry")) {
@@ -215,7 +214,9 @@ void ConnectivityManagerImpl::reportNetworkUsage(envoy_netconf_t configuration_k
 }
 
 void RefreshDnsWithPostDrainHandler::refreshDnsAndDrainHosts() {
-  if (!dns_cache_) {
+  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache =
+      dns_cache_manager_->lookUpCacheByName(BaseDnsCache);
+  if (!dns_cache) {
     // There may not be a DNS cache during initialization, but if one is available, it should always
     // exist by the time this handler is instantiated from the NetworkConfigurationFilter.
     ENVOY_LOG_EVENT(warn, "netconf_dns_cache_missing", "{}", std::string(BaseDnsCache));
@@ -223,15 +224,15 @@ void RefreshDnsWithPostDrainHandler::refreshDnsAndDrainHosts() {
   }
   if (dns_callbacks_handle_ == nullptr) {
     // Register callbacks once, on demand, using the handler as a sentinel.
-    dns_callbacks_handle_ = dns_cache_->addUpdateCallbacks(*this);
+    dns_callbacks_handle_ = dns_cache->addUpdateCallbacks(*this);
   }
-  dns_cache_->iterateHostMap(
+  dns_cache->iterateHostMap(
       [&](absl::string_view host,
           const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
         hosts_to_drain_.emplace(host);
       });
 
-  dns_cache_->forceRefreshHosts();
+  dns_cache->forceRefreshHosts();
 }
 
 void RefreshDnsWithPostDrainHandler::onDnsResolutionComplete(
@@ -261,7 +262,7 @@ void ConnectivityManagerImpl::setDrainPostDnsRefreshEnabled(bool enabled) {
     dns_refresh_handler_ = nullptr;
   } else if (!dns_refresh_handler_) {
     dns_refresh_handler_ =
-        std::make_unique<RefreshDnsWithPostDrainHandler>(dns_cache_, cluster_manager_);
+        std::make_unique<RefreshDnsWithPostDrainHandler>(dns_cache_manager_, cluster_manager_);
   }
 }
 
@@ -301,7 +302,11 @@ void ConnectivityManagerImpl::doRefreshDns(envoy_netconf_t configuration_key,
 }
 
 Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ConnectivityManagerImpl::dnsCache() {
-  return dns_cache_;
+  auto cache = dns_cache_manager_->lookUpCacheByName(BaseDnsCache);
+  if (!cache) {
+    ENVOY_LOG_EVENT(warn, "netconf_dns_cache_missing", "{}", std::string(BaseDnsCache));
+  }
+  return cache;
 }
 
 void ConnectivityManagerImpl::resetConnectivityState() {
@@ -632,10 +637,9 @@ ConnectivityManagerImplSharedPtr ConnectivityManagerFactory::get() {
       SINGLETON_MANAGER_REGISTERED_NAME(connectivity_manager), [this] {
         Envoy::Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl
             cache_manager_factory{context_};
-        auto cache = cache_manager_factory.get()->lookUpCacheByName(BaseDnsCache);
-        ASSERT(cache != nullptr, "BaseDnsCache should be registered before PostInit.");
+
         return std::make_shared<ConnectivityManagerImpl>(
-            context_.serverFactoryContext().clusterManager(), cache);
+            context_.serverFactoryContext().clusterManager(), cache_manager_factory.get());
       });
 }
 

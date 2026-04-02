@@ -206,10 +206,9 @@ class RefreshDnsWithPostDrainHandler
     : public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks,
       public Logger::Loggable<Logger::Id::upstream> {
 public:
-  RefreshDnsWithPostDrainHandler(
-      Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache,
-      Upstream::ClusterManager& cluster_manager)
-      : dns_cache_(std::move(dns_cache)), cluster_manager_(cluster_manager) {}
+  RefreshDnsWithPostDrainHandler(DnsCacheManagerSharedPtr dns_cache_manager,
+                                 Upstream::ClusterManager& cluster_manager)
+      : dns_cache_manager_(std::move(dns_cache_manager)), cluster_manager_(cluster_manager) {}
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
   absl::Status onDnsHostAddOrUpdate(
@@ -227,7 +226,7 @@ public:
   void refreshDnsAndDrainHosts();
 
 private:
-  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
+  DnsCacheManagerSharedPtr dns_cache_manager_;
   Upstream::ClusterManager& cluster_manager_;
   absl::flat_hash_set<std::string> hosts_to_drain_;
   Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
@@ -250,7 +249,7 @@ public:
   envoy_netconf_t setPreferredNetwork(int network);
 
   ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
-                          Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache);
+                          DnsCacheManagerSharedPtr dns_cache_manager);
 
   // ConnectivityManager
   std::vector<InterfacePair> enumerateV4Interfaces() override;
@@ -308,7 +307,7 @@ private:
   Quic::EnvoyMobileQuicNetworkObserverRegistryFactory quic_observer_registry_factory_;
   // nullptr if draining hosts after refreshing DNS is disabled via setDrainPostDnsRefreshEnabled().
   std::unique_ptr<RefreshDnsWithPostDrainHandler> dns_refresh_handler_;
-  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
+  DnsCacheManagerSharedPtr dns_cache_manager_;
   ProxySettingsConstSharedPtr proxy_settings_;
   DefaultNetworkState network_state_ ABSL_GUARDED_BY(network_mutex_){
       1, 0, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode};
