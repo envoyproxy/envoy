@@ -31,6 +31,8 @@ public:
   absl::Span<const std::string> uriSanPeerCertificate() const override { return {}; }
   const std::string& serialNumberPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& issuerPeerCertificate() const override { return EMPTY_STRING; }
+  const std::string& sha256PeerCertificateIssuerDigest() const override { return EMPTY_STRING; }
+  const std::string& serialNumberPeerCertificateIssuer() const override { return EMPTY_STRING; }
   const std::string& subjectPeerCertificate() const override { return EMPTY_STRING; }
   Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override {
     return absl::nullopt;

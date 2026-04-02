@@ -7,7 +7,6 @@
 #include "source/common/tls/cert_validator/san_matcher.h"
 
 #include "absl/strings/str_replace.h"
-#include "openssl/err.h"
 #include "openssl/safestack.h"
 #include "openssl/x509v3.h"
 #include "utility.h"
@@ -145,12 +144,7 @@ const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
         if (!cert) {
           return std::string{};
         }
-
-        std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
-        unsigned int n;
-        X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
-        RELEASE_ASSERT(n == computed_hash.size(), "");
-        return Hex::encode(computed_hash);
+        return Utility::getSha256DigestFromCertificate(*cert);
       });
 }
 
@@ -163,11 +157,7 @@ absl::Span<const std::string> ConnectionInfoImplBase::sha256PeerCertificateChain
         }
 
         return Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
-          std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
-          unsigned int n;
-          X509_digest(&cert, EVP_sha256(), computed_hash.data(), &n);
-          RELEASE_ASSERT(n == computed_hash.size(), "");
-          return Hex::encode(computed_hash);
+          return Utility::getSha256DigestFromCertificate(cert);
         });
       });
 }
@@ -179,12 +169,7 @@ const std::string& ConnectionInfoImplBase::sha1PeerCertificateDigest() const {
         if (!cert) {
           return std::string{};
         }
-
-        std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
-        unsigned int n;
-        X509_digest(cert.get(), EVP_sha1(), computed_hash.data(), &n);
-        RELEASE_ASSERT(n == computed_hash.size(), "");
-        return Hex::encode(computed_hash);
+        return Utility::getSha1DigestFromCertificate(*cert);
       });
 }
 
@@ -197,11 +182,7 @@ absl::Span<const std::string> ConnectionInfoImplBase::sha1PeerCertificateChainDi
         }
 
         return Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
-          std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
-          unsigned int n;
-          X509_digest(&cert, EVP_sha1(), computed_hash.data(), &n);
-          RELEASE_ASSERT(n == computed_hash.size(), "");
-          return Hex::encode(computed_hash);
+          return Utility::getSha1DigestFromCertificate(cert);
         });
       });
 }
@@ -430,6 +411,28 @@ const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
     }
     return Utility::getIssuerFromCertificate(*cert);
   });
+}
+
+const std::string& ConnectionInfoImplBase::sha256PeerCertificateIssuerDigest() const {
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::Sha256PeerCertificateIssuerDigest, [this](SSL*) -> std::string {
+        X509* issuer = validatedPeerIssuer();
+        if (!issuer) {
+          return std::string{};
+        }
+        return Utility::getSha256DigestFromCertificate(*issuer);
+      });
+}
+
+const std::string& ConnectionInfoImplBase::serialNumberPeerCertificateIssuer() const {
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::SerialNumberPeerCertificateIssuer, [this](SSL*) -> std::string {
+        X509* issuer = validatedPeerIssuer();
+        if (!issuer) {
+          return std::string{};
+        }
+        return Utility::getSerialNumberFromCertificate(*issuer);
+      });
 }
 
 const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {

@@ -531,6 +531,7 @@ ValidationResults ContextImpl::customVerifyCertChain(
       absl::NullSafeStringView(host_name));
   if (result.status != ValidationResults::ValidationStatus::Pending) {
     extended_socket_info->setCertificateValidationStatus(result.detailed_status);
+    extended_socket_info->setValidatedCertChain(std::move(result.validated_chain));
     extended_socket_info->onCertificateValidationCompleted(
         result.status == ValidationResults::ValidationStatus::Successful, false);
   }

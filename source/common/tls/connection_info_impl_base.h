@@ -27,6 +27,8 @@ public:
   const std::string& serialNumberPeerCertificate() const override;
   absl::Span<const std::string> serialNumbersPeerCertificates() const override;
   const std::string& issuerPeerCertificate() const override;
+  const std::string& sha256PeerCertificateIssuerDigest() const override;
+  const std::string& serialNumberPeerCertificateIssuer() const override;
   const std::string& subjectPeerCertificate() const override;
   Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override;
   const std::string& subjectLocalCertificate() const override;
@@ -58,6 +60,10 @@ public:
 
   virtual SSL* ssl() const PURE;
 
+  // Returns the direct issuer cert from the validated chain, or nullptr if unavailable.
+  // Subclasses that store the validated chain should override this.
+  virtual X509* validatedPeerIssuer() const { return nullptr; }
+
 private:
   // Enum values should be the name of the calling function, but capitalized.
   enum class CachedValueTag : uint8_t {
@@ -75,6 +81,8 @@ private:
     SerialNumberPeerCertificate,
     SerialNumbersPeerCertificates,
     IssuerPeerCertificate,
+    Sha256PeerCertificateIssuerDigest,
+    SerialNumberPeerCertificateIssuer,
     SubjectPeerCertificate,
     ParsedSubjectPeerCertificate,
     SubjectLocalCertificate,
