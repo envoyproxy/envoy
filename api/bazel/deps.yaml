@@ -89,7 +89,7 @@ opentelemetry_proto:
   project_name: "OpenTelemetry Proto"
   project_desc: "Language Independent Interface Types For OpenTelemetry"
   project_url: "https://github.com/open-telemetry/opentelemetry-proto"
-  release_date: "2025-10-31"
+  release_date: "2026-03-09"
   use_category:
   - api
   license: "Apache-2.0"
