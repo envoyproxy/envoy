@@ -134,7 +134,11 @@ bug_fixes:
     Fixed a bug where the router could double-count an already buffered request body
     when request decoding resumed from the shared request buffer, causing retries
     or internal redirects to be abandoned unexpectedly.
-
+- area: router
+  change: |
+    Fixed a crash in scoped RDS when on-demand update is triggered for a scope that uses inline
+    ``route_configuration`` instead of ``route_configuration_name``. The null RDS provider dereference
+    is now guarded and the on-demand callback returns false for inline-config scopes.
 - area: hot_restart
   change: |
     Fixed hot restart for listeners with a network namespace in the address. Previously, socket
