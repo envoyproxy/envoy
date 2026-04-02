@@ -22,6 +22,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/network:transport_socket_options_lib",
         "//source/extensions/transport_sockets/starttls:config",
+        "//source/extensions/transport_sockets/starttls:starttls_socket_factory_lib",
         "//test/mocks/network:network_mocks",
         "@envoy_api//envoy/extensions/transport_sockets/starttls/v3:pkg_cc_proto",
     ],
@@ -71,5 +72,6 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/starttls:config",
         "//test/integration:integration_lib",
         "//test/test_common:registry_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/starttls/v3:pkg_cc_proto",
     ],
 )

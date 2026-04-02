@@ -1,6 +1,8 @@
 #include "source/extensions/transport_sockets/starttls/config.h"
 
-#include "source/extensions/transport_sockets/starttls/starttls_socket.h"
+#include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.validate.h"
+
+#include "source/extensions/transport_sockets/starttls/starttls_socket_factory.h"
 
 namespace Envoy {
 namespace Extensions {
