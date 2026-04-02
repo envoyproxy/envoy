@@ -11,7 +11,7 @@ com_envoyproxy_protoc_gen_validate:
   project_name: "protoc-gen-validate (PGV)"
   project_desc: "protoc plugin to generate polyglot message validators"
   project_url: "https://github.com/bufbuild/protoc-gen-validate"
-  release_date: "2025-12-04"
+  release_date: "2026-02-18"
   use_category:
   - api
   implied_untracked_deps:
@@ -89,7 +89,7 @@ opentelemetry_proto:
   project_name: "OpenTelemetry Proto"
   project_desc: "Language Independent Interface Types For OpenTelemetry"
   project_url: "https://github.com/open-telemetry/opentelemetry-proto"
-  release_date: "2025-10-31"
+  release_date: "2026-03-09"
   use_category:
   - api
   license: "Apache-2.0"

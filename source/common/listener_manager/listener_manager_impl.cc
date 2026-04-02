@@ -202,7 +202,6 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
       return absl::InvalidArgumentError(fmt::format("UDP listener filter: {} is configured with "
                                                     "unsupported dynamic configuration",
                                                     proto_config.name()));
-      return ret;
     }
     // Now see if there is a factory that will accept the config.
     auto& factory =

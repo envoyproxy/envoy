@@ -146,7 +146,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // Http::StreamFilterCallbacks
   OptRef<const Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
-  Router::RouteConstSharedPtr route() override;
+  OptRef<const Router::Route> route() override;
+  Router::RouteConstSharedPtr routeSharedPtr() override;
   void resetStream(Http::StreamResetReason reset_reason,
                    absl::string_view transport_failure_reason) override;
   OptRef<const Upstream::ClusterInfo> clusterInfo() override;
@@ -195,7 +196,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     return saved_response_metadata_.get();
   }
 
-  Router::RouteConstSharedPtr getRoute() const;
+  Router::RouteConstSharedPtr getRouteSharedPtr() const;
+  OptRef<const Router::Route> getRoute() const;
 
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
@@ -299,7 +301,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
   Buffer::BufferMemoryAccountSharedPtr account() const override;
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
-  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
   bool shouldLoadShed() const override;
   void sendGoAwayAndClose(bool graceful = false) override;
 
@@ -1139,7 +1141,7 @@ private:
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
       std::make_shared<Network::Socket::Options>();
-  std::pair<std::string, bool> upstream_override_host_;
+  Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
 
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
