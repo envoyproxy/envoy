@@ -998,7 +998,7 @@ opentelemetry_cpp:
   project_name: "OpenTelemetry"
   project_desc: "Observability framework and toolkit designed to create and manage telemetry data such as traces, metrics, and logs."
   project_url: "https://opentelemetry.io"
-  release_date: "2025-11-21"
+  release_date: "2026-03-20"
   use_category:
   - observability_ext
   extensions:
