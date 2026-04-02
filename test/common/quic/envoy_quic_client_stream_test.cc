@@ -212,13 +212,39 @@ TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
 
   quic_stream_->setFlushTimeout(std::chrono::milliseconds(100)); // No-op
 
-  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
+  // With the fix for https://github.com/envoyproxy/envoy/issues/28053, FIN on the QUIC stream
+  // frame is properly detected via fin_received(), so decodeHeaders receives end_stream=true
+  // directly, without an extra empty-body decodeData call.
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
         EXPECT_EQ("200", headers->getStatusValue());
       }));
-  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
   std::string payload = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
   quic::QuicStreamFrame frame(stream_id_, true, 0, payload);
+  quic_stream_->OnStreamFrame(frame);
+  EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/28053.
+// Verify that when a header-only response arrives (FIN on the QUIC stream frame),
+// decodeHeaders is called with end_stream=true even if QUICHE OnInitialHeadersComplete
+// passes fin=false. The fix uses fin_received() to properly detect end-of-stream.
+TEST_F(EnvoyQuicClientStreamTest, HeaderOnlyResponseSetsEndStreamCorrectly) {
+  const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
+  EXPECT_TRUE(result.ok());
+  quic_stream_->encodeData(request_body_, true);
+
+  // Receive a header-only response (FIN set on stream frame).
+  // decodeHeaders should be called with end_stream=true.
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
+        EXPECT_EQ("200", headers->getStatusValue());
+      }));
+  // No decodeData call expected - end_stream is signaled via decodeHeaders.
+  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
+
+  std::string payload = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
+  quic::QuicStreamFrame frame(stream_id_, /*fin=*/true, 0, payload);
   quic_stream_->OnStreamFrame(frame);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 }
