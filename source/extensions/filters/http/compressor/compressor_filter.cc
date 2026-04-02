@@ -12,6 +12,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -35,6 +36,11 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
     request_content_encoding_handle(Http::CustomHeaders::get().ContentEncoding);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     response_content_encoding_handle(Http::CustomHeaders::get().ContentEncoding);
+
+// True when the ETag uses the weak form (RFC 7232): ``W/`` prefix, case-insensitive on ``W``.
+bool isWeakEtag(absl::string_view value) {
+  return value.length() >= 2 && (value[0] == 'w' || value[0] == 'W') && value[1] == '/';
+}
 
 // Default minimum length of an upstream response that allows compression.
 const uint64_t DefaultMinimumContentLength = 30;
@@ -139,6 +145,7 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().disable_on_etag_header()
               : proto_config.disable_on_etag_header()),
+      weaken_etag_on_compress_(proto_config.response_direction_config().weaken_etag_on_compress()),
       remove_accept_encoding_header_(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().remove_accept_encoding_header()
@@ -353,7 +360,11 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
       isResponseCodeCompressible(headers, config);
   if (!end_stream && isAcceptEncodingAllowed(isEnabledAndContentLengthBigEnough, headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
-    sanitizeEtagHeader(headers);
+    if (config.weakenEtagOnCompress()) {
+      weakenEtagHeader(headers);
+    } else {
+      sanitizeEtagHeader(headers);
+    }
     headers.removeContentLength();
     headers.setInline(response_content_encoding_handle.handle(), getContentEncoding());
     config.stats().compressed_.inc();
@@ -438,7 +449,11 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeadersWithStatusHeader(
     return Http::FilterHeadersStatus::Continue;
   }
 
-  sanitizeEtagHeader(headers);
+  if (config.weakenEtagOnCompress()) {
+    weakenEtagHeader(headers);
+  } else {
+    sanitizeEtagHeader(headers);
+  }
   std::string content_length = std::string(headers.getContentLengthValue());
   headers.removeContentLength();
   headers.setInline(response_content_encoding_handle.handle(), getContentEncoding());
@@ -719,8 +734,13 @@ bool CompressorFilter::checkIsEtagAllowedLogResponseStats(Http::ResponseHeaderMa
 }
 
 bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
-  return !(config_->responseDirectionConfig().disableOnEtagHeader() &&
-           headers.getInline(etag_handle.handle()));
+  const auto& config = config_->responseDirectionConfig();
+  // When both disable_on_etag_header and weaken_etag_on_compress are true, the new field
+  // takes precedence so compression is applied and the ETag is weakened.
+  if (config.weakenEtagOnCompress()) {
+    return true;
+  }
+  return !(config.disableOnEtagHeader() && headers.getInline(etag_handle.handle()));
 }
 
 bool CompressorFilterConfig::ResponseDirectionConfig::areAllResponseCodesCompressible() const {
@@ -820,8 +840,18 @@ void CompressorFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* etag = headers.getInline(etag_handle.handle());
   if (etag != nullptr) {
     absl::string_view value(etag->value().getStringView());
-    if (value.length() > 2 && !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
+    if (!isWeakEtag(value)) {
       headers.removeInline(etag_handle.handle());
+    }
+  }
+}
+
+void CompressorFilter::weakenEtagHeader(Http::ResponseHeaderMap& headers) {
+  const Http::HeaderEntry* etag = headers.getInline(etag_handle.handle());
+  if (etag != nullptr) {
+    absl::string_view value(etag->value().getStringView());
+    if (!isWeakEtag(value)) {
+      headers.setInline(etag_handle.handle(), absl::StrCat("W/", value));
     }
   }
 }

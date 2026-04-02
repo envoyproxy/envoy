@@ -1043,6 +1043,20 @@ envoy.formatter.cel:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.cel.v3.Cel
+envoy.formatter.file_content:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.file_content.v3.FileContent
+envoy.formatter.generic_secret:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.formatter.generic_secret.v3.GenericSecret
 envoy.formatter.metadata:
   categories:
   - envoy.formatter
@@ -1478,6 +1492,13 @@ envoy.tls.cert_validator.spiffe:
   - envoy.tls.cert_validator
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tracers.dynamic_modules:
+  categories:
+  - envoy.tracers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.tracers.dynamic_modules.v3.DynamicModuleTracer
 envoy.tracers.fluentd:
   categories:
   - envoy.tracers
@@ -1750,6 +1771,13 @@ envoy.network.dns_resolver.getaddrinfo:
   status: stable
   type_urls:
   - envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+envoy.network.dns_resolver.hickory:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig
 envoy.resolvers.reverse_connection:
   categories:
   - envoy.resolvers
