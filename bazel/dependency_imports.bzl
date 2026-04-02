@@ -68,6 +68,10 @@ def envoy_dependency_imports(
         extra_target_triples = [
             "wasm32-unknown-unknown",
             "wasm32-wasi",
+            # Unconditionally specify the target triples for x-compilations.
+            # Note that the toolchain won't be fetched/used unless the target triple is actually used in the build.
+            "x86_64-unknown-linux-gnu",
+            "aarch64-unknown-linux-gnu",
         ],
     )
     crate_universe_dependencies()
