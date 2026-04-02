@@ -293,9 +293,7 @@ public:
     return *this;
   }
 
-  bool expectEmptyPeerCertificateIssuer() const {
-    return expect_empty_peer_certificate_issuer_;
-  }
+  bool expectEmptyPeerCertificateIssuer() const { return expect_empty_peer_certificate_issuer_; }
 
   TestUtilOptions& setExpectedPeerSubject(const std::string& expected_peer_subject) {
     expected_peer_subject_ = expected_peer_subject;
@@ -1526,7 +1524,8 @@ TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestNonMtls) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options.setExpectNoCert().setExpectNoCertChain().setExpectEmptyPeerCertificateIssuer());
+  testUtil(
+      test_options.setExpectNoCert().setExpectNoCertChain().setExpectEmptyPeerCertificateIssuer());
 }
 
 // Verify that sha256PeerCertificateIssuerDigest() and serialNumberPeerCertificateIssuer()
