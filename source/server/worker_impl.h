@@ -74,7 +74,7 @@ private:
   void stopAcceptingConnectionsCb(OverloadActionState state);
   void rejectIncomingConnectionsCb(OverloadActionState state);
   void resetStreamsUsingExcessiveMemory(OverloadActionState state);
-  void closeIdleHttpConnectionsCb(OverloadActionState state);
+  void closeIdleHttpConnectionsCb(OverloadActionState::Phase phase);
 
   ThreadLocal::Instance& tls_;
   ListenerHooks& hooks_;
@@ -85,7 +85,8 @@ private:
   Thread::ThreadPtr thread_;
   WatchDogSharedPtr watch_dog_;
   Event::TimerPtr check_idle_connection_timer_;
-  OverloadActionState close_idle_http_connections_state_{OverloadActionState::inactive()};
+  OverloadActionState::Phase close_idle_http_connections_state_{
+      OverloadActionState::Phase::Inactive};
 };
 
 } // namespace Server

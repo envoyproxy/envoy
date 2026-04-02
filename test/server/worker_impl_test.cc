@@ -196,25 +196,41 @@ TEST_F(WorkerOverloadTest, CloseIdleHttpConnections) {
   EXPECT_CALL(*handler, closeIdleHttpConnections(false));
   captured_cb(OverloadActionState(UnitFloat(0.5)));
 
-  // 2. Advance time - the timer should fire and call again.
+  // 2. Fluctuation within Scaling (no callback invocation)
+  EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
+  captured_cb(OverloadActionState(UnitFloat(0.6)));
+
+  // 3. Advance time - the timer should fire and call again.
   EXPECT_CALL(*handler, closeIdleHttpConnections(false));
   simTime().advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_ptr,
                               Event::Dispatcher::RunType::NonBlock);
 
-  // 3. Transition to saturated
+  // 4. Transition to saturated
   EXPECT_CALL(*handler, closeIdleHttpConnections(true));
   captured_cb(OverloadActionState::saturated());
 
-  // 4. Advance time - timer fires with saturated=true.
+  // 5. Fluctuation within Saturated (no callback invocation)
+  EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
+  captured_cb(OverloadActionState::saturated());
+
+  // 6. Advance time - timer fires with saturated=true.
   EXPECT_CALL(*handler, closeIdleHttpConnections(true));
   simTime().advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_ptr,
                               Event::Dispatcher::RunType::NonBlock);
 
-  // 5. Transition to inactive
+  // 7. Transition back to scaling
+  EXPECT_CALL(*handler, closeIdleHttpConnections(false));
+  captured_cb(OverloadActionState(UnitFloat(0.7)));
+
+  // 8. Transition to inactive
   EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
   captured_cb(OverloadActionState::inactive());
 
-  // 6. Advance time - timer should NOT fire anymore.
+  // 9. Fluctuation within Inactive (no callback invocation)
+  EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
+  captured_cb(OverloadActionState::inactive());
+
+  // 10. Advance time - timer should NOT fire anymore.
   simTime().advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_ptr,
                               Event::Dispatcher::RunType::NonBlock);
 }
