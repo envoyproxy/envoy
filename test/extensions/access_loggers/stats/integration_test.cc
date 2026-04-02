@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -260,21 +261,28 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   // added and DownstreamEnd evaluates access logs upon stream destruction. We wrap the entire
   // connection flow in the death test so the parent process doesn't create a mock connection that
   // would crash during test teardown.
-  init(config_yaml, /*autonomous_upstream=*/false,
-       /*flush_access_log_on_new_request=*/true);
+  EXPECT_LOG_CONTAINS("error",
+                      "Stats access logger gauge paired subtract was skipped due to no "
+                      "corresponding add, possibly due to misconfigured events",
+                      {
+                        init(config_yaml, /*autonomous_upstream=*/false,
+                             /*flush_access_log_on_new_request=*/true);
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+                        codec_client_ = makeHttpConnection(lookupPort("http"));
+                        IntegrationStreamDecoderPtr response =
+                            codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  waitForNextUpstreamRequest();
+                        waitForNextUpstreamRequest();
 
-  upstream_request_->encodeHeaders(response_headers, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ(response->headers().getStatusValue(), "200");
+                        upstream_request_->encodeHeaders(response_headers, true);
+                        ASSERT_TRUE(response->waitForEndStream());
+                        EXPECT_EQ(response->headers().getStatusValue(), "200");
 
-  test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
-  codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+                        test_server_->waitForGaugeEq(
+                            "test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
+                        codec_client_->close();
+                        test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+                      });
 }
 
 TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {

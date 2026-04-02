@@ -639,13 +639,18 @@ TEST_F(StatsAccessLoggerTest, GaugeSubtractBeforeAdd) {
   initialize(yaml);
 
   // Subtract without add -> logs instead of crashing
-  EXPECT_LOG_CONTAINS("error", "removeInflightGauge called without matching addInflightGauge", {
-    formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
-    EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate)).Times(testing::AtLeast(1));
-    EXPECT_CALL(*gauge_, add(_)).Times(0);
-    EXPECT_CALL(*gauge_, sub(_)).Times(0);
-    logger_->log(formatter_context_, stream_info_);
-  });
+  EXPECT_LOG_CONTAINS("error",
+                      "Stats access logger gauge paired subtract was skipped due to no "
+                      "corresponding add, possibly due to misconfigured events",
+                      {
+                        formatter_context_.setAccessLogType(
+                            envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+                        EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate))
+                            .Times(testing::AtLeast(1));
+                        EXPECT_CALL(*gauge_, add(_)).Times(0);
+                        EXPECT_CALL(*gauge_, sub(_)).Times(0);
+                        logger_->log(formatter_context_, stream_info_);
+                      });
 }
 
 TEST_F(StatsAccessLoggerTest, GaugeMultipleSubAfterAdd) {

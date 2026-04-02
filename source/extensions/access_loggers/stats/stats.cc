@@ -127,8 +127,8 @@ void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
       inflight_gauges_.erase(it);
     }
   } else {
-    ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
-                            "removeInflightGauge called without matching addInflightGauge");
+    ENVOY_LOG_MISC(error, "Stats access logger gauge paired subtract was skipped due to no "
+                          "corresponding add, possibly due to misconfigured events");
   }
 }
 
