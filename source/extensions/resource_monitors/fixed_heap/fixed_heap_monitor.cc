@@ -21,15 +21,13 @@ uint64_t MemoryStatsReader::allocatedHeapBytes() {
   return Memory::Stats::totalCurrentlyAllocated();
 }
 
-FixedHeapMonitor::FixedHeapMonitor(
-    const envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig& config,
-    std::unique_ptr<MemoryStatsReader> stats)
-    : max_heap_(config.max_heap_size_bytes()), stats_(std::move(stats)) {
+FixedHeapMonitor::FixedHeapMonitor(uint64_t max_heap_size_bytes,
+                                   std::unique_ptr<MemoryStatsReader> stats)
+    : max_heap_(max_heap_size_bytes), stats_(std::move(stats)) {
   ASSERT(max_heap_ > 0);
 }
 
 void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
-
   size_t used = 0;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_heap_use_allocated")) {
     used = stats_->allocatedHeapBytes();

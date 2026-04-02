@@ -269,6 +269,15 @@ message RuntimeUInt32 {
   string runtime_key = 3;
 }
 
+// Runtime derived uint64 with a default when not specified.
+message RuntimeUInt64 {
+  // Default value if runtime value is not available.
+  uint64 default_value = 2;
+
+  // Runtime key to get value for comparison. This value is used if defined.
+  string runtime_key = 3;
+}
+
 // Runtime derived percentage with a default when not specified.
 message RuntimePercent {
   // Default value if runtime value is not available.

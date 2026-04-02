@@ -20,6 +20,7 @@ MockSnapshot::MockSnapshot() {
 MockSnapshot::~MockSnapshot() = default;
 
 MockLoader::MockLoader() {
+  ON_CALL(*this, onWorkerThreadsRegistered()).WillByDefault(Return(absl::OkStatus()));
   ON_CALL(*this, threadsafeSnapshot()).WillByDefault(Return(threadsafe_snapshot_));
   ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(snapshot_));
   ON_CALL(*this, getRootScope()).WillByDefault(ReturnRef(*store_.rootScope()));
