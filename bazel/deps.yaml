@@ -273,7 +273,7 @@ perfetto:
   project_name: "Perfetto"
   project_desc: "Perfetto Tracing SDK"
   project_url: "https://perfetto.dev/"
-  release_date: "2025-11-13"
+  release_date: "2026-03-02"
   use_category:
   - dataplane_core
   - controlplane
