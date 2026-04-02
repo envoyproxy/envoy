@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "aws_eventstream_to_metadata_lib",
+    name = "aws_eventstream_parser_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
@@ -18,11 +18,12 @@ envoy_cc_library(
         "//envoy/content_parser:factory_interface",
         "//envoy/content_parser:parser_interface",
         "//envoy/server:filter_config_interface",
+        "//source/common/common:hex_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/common/aws/eventstream:eventstream_parser_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/extensions/filters/http/aws_eventstream_to_metadata/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/aws_eventstream_parser/v3:pkg_cc_proto",
     ],
 )
 
@@ -31,11 +32,11 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":aws_eventstream_to_metadata_lib",
+        ":aws_eventstream_parser_lib",
         "//envoy/content_parser:config_interface",
         "//envoy/registry",
         "//source/extensions/content_parsers/json:config",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/aws_eventstream_to_metadata/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/aws_eventstream_parser/v3:pkg_cc_proto",
     ],
 )

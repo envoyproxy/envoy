@@ -1,11 +1,11 @@
-.. _config_http_filters_aws_eventstream_to_metadata:
+.. _config_http_filters_aws_eventstream_parser:
 
-AWS-EventStream-To-Metadata Filter
+AWS-EventStream-Parser Filter
 ==================================
-* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.aws_eventstream_to_metadata.v3.AwsEventstreamToMetadata``.
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.aws_eventstream_to_metadata.v3.AwsEventstreamToMetadata>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.aws_eventstream_parser.v3.AwsEventstreamParser``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.aws_eventstream_parser.v3.AwsEventstreamParser>`
 
-The AWS-EventStream-To-Metadata filter extracts values from AWS EventStream HTTP response bodies and writes them to dynamic metadata.
+The AWS-EventStream-Parser filter extracts values from AWS EventStream HTTP response bodies and writes them to dynamic metadata.
 Currently, the filter processes response bodies only. This is particularly useful for observability, logging, and
 custom filters that need to access values from AWS streaming responses (e.g., AWS Bedrock streaming responses).
 
@@ -17,6 +17,8 @@ The filter is configured with:
 
 * A **content parser** that specifies how to parse and extract values from message payloads (e.g., JSON parser)
 * **Rules** within the content parser that define selector paths and metadata actions
+* Optional **header rules** that extract EventStream message header values directly to metadata
+
 When a rule matches, the extracted value is written to the configured metadata namespace and key.
 The metadata can then be consumed from access logs, used by custom filters, exported to metrics systems, or
 attached to trace spans.
@@ -32,9 +34,9 @@ This filter can extract the token count and other metadata, making it available 
 .. code-block:: yaml
 
   http_filters:
-  - name: envoy.filters.http.aws_eventstream_to_metadata
+  - name: envoy.filters.http.aws_eventstream_parser
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.aws_eventstream_to_metadata.v3.AwsEventstreamToMetadata
+      "@type": type.googleapis.com/envoy.extensions.filters.http.aws_eventstream_parser.v3.AwsEventstreamParser
       response_rules:
         content_parser:
           name: envoy.content_parsers.json
@@ -75,7 +77,8 @@ For AWS EventStream format with JSON content parser:
    Matching is performed on the media type only, ignoring parameters.
 2. It parses the EventStream binary protocol according to the `AWS EventStream specification <https://smithy.io/2.0/aws/amazon-eventstream.html>`_,
    validating CRC checksums and properly handling messages split across multiple data chunks
-3. For each complete EventStream message, it extracts the payload bytes and delegates to the configured **content parser**
+3. For each complete EventStream message, it first evaluates **header rules** against the message's EventStream headers,
+   then extracts the payload bytes and delegates to the configured **content parser**
 4. The JSON content parser parses the payload as JSON and navigates the object using the configured selectors
 5. Based on the result, it writes metadata according to the configured rules defined in the content parser:
 
@@ -94,9 +97,9 @@ Complete Example
 .. code-block:: yaml
 
   http_filters:
-  - name: envoy.filters.http.aws_eventstream_to_metadata
+  - name: envoy.filters.http.aws_eventstream_parser
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.aws_eventstream_to_metadata.v3.AwsEventstreamToMetadata
+      "@type": type.googleapis.com/envoy.extensions.filters.http.aws_eventstream_parser.v3.AwsEventstreamParser
       response_rules:
         content_parser:
           name: envoy.content_parsers.json
@@ -111,6 +114,12 @@ Complete Example
                   metadata_namespace: envoy.lb
                   key: tokens
                   type: NUMBER
+        header_rules:
+        - header_name: ":event-type"
+          on_present:
+            metadata_namespace: envoy.lb
+            key: event_type
+
 Key Configuration Options
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -139,10 +148,32 @@ When using ``envoy.content_parsers.json``, configure rules within the typed_conf
     - **on_missing**: Metadata to write when the selector path is not found.
     - **on_error**: Metadata to write when a parse error occurs.
 
+**response_rules.header_rules**
+  Optional list of rules for extracting EventStream message headers to dynamic metadata.
+  These are evaluated directly by the filter, not by the content parser.
+
+  Each header rule contains:
+
+  * **header_name**: The EventStream header name to match (case-sensitive).
+  * **on_present**: Metadata action when the header is found. The header's typed value is
+    automatically converted to a Protobuf value:
+
+    - BoolTrue/BoolFalse -> ``bool_value``
+    - Byte/Short/Int32/Int64/Timestamp -> ``number_value``
+    - String -> ``string_value``
+    - ByteArray -> ``string_value`` (hex-encoded)
+    - UUID -> ``string_value`` (formatted as ``xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx``)
+
+    An optional ``value`` field can override the header's actual value.
+  * **on_missing**: Metadata action when the header was not found in any message by end-of-stream.
+    The ``value`` field must be set.
+
+  If ``metadata_namespace`` is empty, defaults to ``envoy.filters.http.aws_eventstream_parser``.
+
 Statistics
 ----------
 
-The aws_eventstream_to_metadata filter outputs statistics in the ``http.<stat_prefix>.aws_eventstream_to_metadata.resp.<parser_prefix>*`` namespace.
+The aws_eventstream_parser filter outputs statistics in the ``http.<stat_prefix>.aws_eventstream_parser.resp.<parser_prefix>*`` namespace.
 The :ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager, and ``<parser_prefix>`` comes from the content parser (e.g., ``json.`` for the JSON parser).
 

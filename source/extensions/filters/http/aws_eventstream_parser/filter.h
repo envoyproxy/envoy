@@ -6,7 +6,7 @@
 #include "envoy/content_parser/config.h"
 #include "envoy/content_parser/factory.h"
 #include "envoy/content_parser/parser.h"
-#include "envoy/extensions/filters/http/aws_eventstream_to_metadata/v3/aws_eventstream_to_metadata.pb.h"
+#include "envoy/extensions/filters/http/aws_eventstream_parser/v3/aws_eventstream_parser.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
@@ -14,59 +14,69 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/common/aws/eventstream/eventstream_parser.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace AwsEventstreamToMetadata {
+namespace AwsEventstreamParser {
 
 /**
- * All stats for the AWS EventStream to Metadata filter. @see stats_macros.h
+ * All stats for the AWS EventStream Parser filter. @see stats_macros.h
  */
-#define ALL_AWS_EVENTSTREAM_TO_METADATA_FILTER_STATS(COUNTER)                                      \
+#define ALL_AWS_EVENTSTREAM_PARSER_FILTER_STATS(COUNTER)                                           \
   COUNTER(metadata_added)                                                                          \
   COUNTER(metadata_from_fallback)                                                                  \
   COUNTER(mismatched_content_type)                                                                 \
   COUNTER(empty_payload)                                                                           \
   COUNTER(parse_error)                                                                             \
   COUNTER(preserved_existing_metadata)                                                             \
-  COUNTER(eventstream_error)
+  COUNTER(eventstream_error)                                                                       \
+  COUNTER(type_conversion_error)
 
 /**
- * Wrapper struct for AWS EventStream to Metadata filter stats. @see stats_macros.h
+ * Wrapper struct for AWS EventStream Parser filter stats. @see stats_macros.h
  */
-struct AwsEventstreamToMetadataStats {
-  ALL_AWS_EVENTSTREAM_TO_METADATA_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+struct AwsEventstreamParserStats {
+  ALL_AWS_EVENTSTREAM_PARSER_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
- * Configuration for the AWS EventStream to Metadata filter.
+ * Configuration for the AWS EventStream Parser filter.
  */
+using ProtoConfig =
+    envoy::extensions::filters::http::aws_eventstream_parser::v3::AwsEventstreamParser;
+
 class FilterConfig {
 public:
-  FilterConfig(const envoy::extensions::filters::http::aws_eventstream_to_metadata::v3::
-                   AwsEventstreamToMetadata& config,
-               Server::Configuration::ServerFactoryContext& context);
+  FilterConfig(const ProtoConfig& config, Server::Configuration::ServerFactoryContext& context);
 
-  const AwsEventstreamToMetadataStats& stats() const { return stats_; }
+  static constexpr absl::string_view DefaultHeaderNamespace =
+      "envoy.filters.http.aws_eventstream_parser";
+
+  const AwsEventstreamParserStats& stats() const { return stats_; }
   ContentParser::ParserFactory& parserFactory() { return *parser_factory_; }
+  const Protobuf::RepeatedPtrField<ProtoConfig::HeaderRule>& headerRules() const {
+    return header_rules_;
+  }
 
 private:
-  static AwsEventstreamToMetadataStats generateStats(const std::string& prefix,
-                                                     Stats::Scope& scope) {
-    return AwsEventstreamToMetadataStats{
-        ALL_AWS_EVENTSTREAM_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  static AwsEventstreamParserStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return AwsEventstreamParserStats{
+        ALL_AWS_EVENTSTREAM_PARSER_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
   ContentParser::ParserFactoryPtr parser_factory_;
-  const AwsEventstreamToMetadataStats stats_;
+  const AwsEventstreamParserStats stats_;
+  const Protobuf::RepeatedPtrField<ProtoConfig::HeaderRule> header_rules_;
 };
 
 /**
- * HTTP AWS EventStream to Metadata Filter.
+ * HTTP AWS EventStream Parser Filter.
  * Extracts values from AWS EventStream HTTP response bodies and writes them to dynamic
  * metadata. Uses pluggable content parsers to extract values from message payloads.
  */
@@ -95,15 +105,37 @@ private:
   bool processMessage(absl::string_view payload);
 
   /**
+   * Process EventStream headers from a single message against configured header rules.
+   * @param headers the parsed EventStream message headers.
+   */
+  void
+  processMessageHeaders(const std::vector<Extensions::Common::Aws::Eventstream::Header>& headers);
+
+  /**
    * Finalize rules at end of stream. Executes deferred actions for rules that haven't matched.
    */
   void finalizeRules();
 
   /**
-   * Write a metadata action to dynamic metadata.
-   * @return true if metadata was successfully written, false otherwise.
+   * Add a metadata action to the pending batch. Validates the action and accumulates
+   * into structs_by_namespace_ for later flushing.
+   * @return true if metadata was successfully added to pending batch, false otherwise.
    */
-  bool writeMetadata(const ContentParser::MetadataAction& action);
+  bool addMetadata(const ContentParser::MetadataAction& action);
+
+  /**
+   * Flush all pending metadata to dynamic metadata via setDynamicMetadata().
+   * One call per namespace. Clears the pending batch.
+   */
+  void writeMetadata();
+
+  /**
+   * Convert an EventStream header value to a Protobuf::Value for metadata.
+   */
+  static Protobuf::Value
+  headerValueToProtobufValue(const Extensions::Common::Aws::Eventstream::HeaderValue& header_value);
+
+  using StructMap = absl::flat_hash_map<std::string, Protobuf::Struct>;
 
   const std::shared_ptr<FilterConfig> config_;
   // Parser instance for this stream
@@ -113,9 +145,17 @@ private:
   // Set to true when all rules have reached their match limits. Stops further processing.
   bool processing_complete_{false};
   Buffer::OwnedImpl buffer_;
+  // Pending metadata writes, batched by namespace.
+  StructMap structs_by_namespace_;
+
+  // Per-header-rule state tracking (whether each rule has matched at least once).
+  struct HeaderRuleState {
+    bool ever_matched{false};
+  };
+  std::vector<HeaderRuleState> header_rule_states_;
 };
 
-} // namespace AwsEventstreamToMetadata
+} // namespace AwsEventstreamParser
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

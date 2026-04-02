@@ -1,6 +1,6 @@
 #include <zlib.h>
 
-#include "envoy/extensions/filters/http/aws_eventstream_to_metadata/v3/aws_eventstream_to_metadata.pb.h"
+#include "envoy/extensions/filters/http/aws_eventstream_parser/v3/aws_eventstream_parser.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace {
 
-class AwsEventstreamToMetadataIntegrationTest : public HttpProtocolIntegrationTest {
+class AwsEventstreamParserIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initializeFilter() {
     config_helper_.prependFilter(filter_config_);
@@ -110,9 +110,9 @@ public:
   }
 
   const std::string filter_config_ = R"EOF(
-name: envoy.filters.http.aws_eventstream_to_metadata
+name: envoy.filters.http.aws_eventstream_parser
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.aws_eventstream_to_metadata.v3.AwsEventstreamToMetadata
+  "@type": type.googleapis.com/envoy.extensions.filters.http.aws_eventstream_parser.v3.AwsEventstreamParser
   response_rules:
     content_parser:
       name: envoy.content_parsers.json
@@ -154,11 +154,11 @@ typed_config:
 
 // TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
-    Protocols, AwsEventstreamToMetadataIntegrationTest,
+    Protocols, AwsEventstreamParserIntegrationTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(AwsEventstreamToMetadataIntegrationTest, BasicEventstreamTokenExtraction) {
+TEST_P(AwsEventstreamParserIntegrationTest, BasicEventstreamTokenExtraction) {
   initializeFilter();
   runTest(request_headers_, "", response_headers_, eventstream_response_body_);
 
@@ -166,50 +166,41 @@ TEST_P(AwsEventstreamToMetadataIntegrationTest, BasicEventstreamTokenExtraction)
   // - Messages 1,2: no matches (model and usage.totalTokens not present)
   // - Message 3: both tokens and model_name match (2 successes)
   // Total: 2 metadata_added
-  EXPECT_EQ(2UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.metadata_added")->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.mismatched_content_type")
-                ->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.empty_payload")->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.parse_error")->value());
+  EXPECT_EQ(2UL, test_server_->counter("aws_eventstream_parser.resp.json.metadata_added")->value());
+  EXPECT_EQ(
+      0UL,
+      test_server_->counter("aws_eventstream_parser.resp.json.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("aws_eventstream_parser.resp.json.empty_payload")->value());
+  EXPECT_EQ(0UL, test_server_->counter("aws_eventstream_parser.resp.json.parse_error")->value());
 }
 
-TEST_P(AwsEventstreamToMetadataIntegrationTest, EventstreamWithSmallChunks) {
+TEST_P(AwsEventstreamParserIntegrationTest, EventstreamWithSmallChunks) {
   initializeFilter();
   // Test with very small chunks to ensure buffering works correctly
   runTest(request_headers_, "", response_headers_, eventstream_response_body_, 10);
 
-  EXPECT_EQ(2UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.metadata_added")->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.mismatched_content_type")
-                ->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.empty_payload")->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.parse_error")->value());
+  EXPECT_EQ(2UL, test_server_->counter("aws_eventstream_parser.resp.json.metadata_added")->value());
+  EXPECT_EQ(
+      0UL,
+      test_server_->counter("aws_eventstream_parser.resp.json.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("aws_eventstream_parser.resp.json.empty_payload")->value());
+  EXPECT_EQ(0UL, test_server_->counter("aws_eventstream_parser.resp.json.parse_error")->value());
 }
 
-TEST_P(AwsEventstreamToMetadataIntegrationTest, EventstreamWithLargeChunks) {
+TEST_P(AwsEventstreamParserIntegrationTest, EventstreamWithLargeChunks) {
   initializeFilter();
   // Test with large chunks (entire response in one chunk)
   runTest(request_headers_, "", response_headers_, eventstream_response_body_, 1000);
 
-  EXPECT_EQ(2UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.metadata_added")->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.mismatched_content_type")
-                ->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.empty_payload")->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.parse_error")->value());
+  EXPECT_EQ(2UL, test_server_->counter("aws_eventstream_parser.resp.json.metadata_added")->value());
+  EXPECT_EQ(
+      0UL,
+      test_server_->counter("aws_eventstream_parser.resp.json.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("aws_eventstream_parser.resp.json.empty_payload")->value());
+  EXPECT_EQ(0UL, test_server_->counter("aws_eventstream_parser.resp.json.parse_error")->value());
 }
 
-TEST_P(AwsEventstreamToMetadataIntegrationTest, MismatchedContentType) {
+TEST_P(AwsEventstreamParserIntegrationTest, MismatchedContentType) {
   Http::TestResponseHeaderMapImpl json_headers{{":status", "200"},
                                                {"content-type", "application/json"}};
   initializeFilter();
@@ -217,18 +208,15 @@ TEST_P(AwsEventstreamToMetadataIntegrationTest, MismatchedContentType) {
   runTest(request_headers_, "", json_headers, json_body);
 
   // Content-type mismatch should not process the response
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.metadata_added")->value());
-  EXPECT_EQ(1UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.mismatched_content_type")
-                ->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.empty_payload")->value());
-  EXPECT_EQ(0UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.parse_error")->value());
+  EXPECT_EQ(0UL, test_server_->counter("aws_eventstream_parser.resp.json.metadata_added")->value());
+  EXPECT_EQ(
+      1UL,
+      test_server_->counter("aws_eventstream_parser.resp.json.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("aws_eventstream_parser.resp.json.empty_payload")->value());
+  EXPECT_EQ(0UL, test_server_->counter("aws_eventstream_parser.resp.json.parse_error")->value());
 }
 
-TEST_P(AwsEventstreamToMetadataIntegrationTest, VerifyMetadataValues) {
+TEST_P(AwsEventstreamParserIntegrationTest, VerifyMetadataValues) {
   // Configure access log to capture and verify actual metadata values
   config_helper_.prependFilter(filter_config_);
   useAccessLog("%DYNAMIC_METADATA(envoy.lb)%");
@@ -261,16 +249,15 @@ TEST_P(AwsEventstreamToMetadataIntegrationTest, VerifyMetadataValues) {
   EXPECT_THAT(log, testing::HasSubstr(R"("model_name":"anthropic.claude-3")"));
 
   // Also verify stats
-  EXPECT_EQ(2UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.metadata_added")->value());
+  EXPECT_EQ(2UL, test_server_->counter("aws_eventstream_parser.resp.json.metadata_added")->value());
 }
 
 // Test extraction of inputTokens and outputTokens for input/output token-based rate limiting
-TEST_P(AwsEventstreamToMetadataIntegrationTest, VerifyTokenBreakdown) {
+TEST_P(AwsEventstreamParserIntegrationTest, VerifyTokenBreakdown) {
   const std::string token_breakdown_config = R"EOF(
-name: envoy.filters.http.aws_eventstream_to_metadata
+name: envoy.filters.http.aws_eventstream_parser
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.aws_eventstream_to_metadata.v3.AwsEventstreamToMetadata
+  "@type": type.googleapis.com/envoy.extensions.filters.http.aws_eventstream_parser.v3.AwsEventstreamParser
   response_rules:
     content_parser:
       name: envoy.content_parsers.json
@@ -335,11 +322,10 @@ typed_config:
   EXPECT_THAT(log, testing::HasSubstr(R"("total_tokens":30)"));
 
   // Verify stats: 3 token fields extracted from message 3
-  EXPECT_EQ(3UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.metadata_added")->value());
+  EXPECT_EQ(3UL, test_server_->counter("aws_eventstream_parser.resp.json.metadata_added")->value());
 }
 
-TEST_P(AwsEventstreamToMetadataIntegrationTest, EmptyPayloadMessage) {
+TEST_P(AwsEventstreamParserIntegrationTest, EmptyPayloadMessage) {
   initializeFilter();
 
   // Create response with an empty payload message
@@ -349,13 +335,11 @@ TEST_P(AwsEventstreamToMetadataIntegrationTest, EmptyPayloadMessage) {
   runTest(request_headers_, "", response_headers_, response_with_empty);
 
   // First message has empty payload, second message matches model rule
-  EXPECT_EQ(1UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.metadata_added")->value());
-  EXPECT_EQ(1UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.empty_payload")->value());
+  EXPECT_EQ(1UL, test_server_->counter("aws_eventstream_parser.resp.json.metadata_added")->value());
+  EXPECT_EQ(1UL, test_server_->counter("aws_eventstream_parser.resp.json.empty_payload")->value());
 }
 
-TEST_P(AwsEventstreamToMetadataIntegrationTest, InvalidJsonPayload) {
+TEST_P(AwsEventstreamParserIntegrationTest, InvalidJsonPayload) {
   initializeFilter();
 
   // Create response with invalid JSON payload followed by valid message
@@ -365,10 +349,8 @@ TEST_P(AwsEventstreamToMetadataIntegrationTest, InvalidJsonPayload) {
   runTest(request_headers_, "", response_headers_, response_with_invalid);
 
   // First message has parse error, second message matches model rule
-  EXPECT_EQ(1UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.metadata_added")->value());
-  EXPECT_EQ(1UL,
-            test_server_->counter("aws_eventstream_to_metadata.resp.json.parse_error")->value());
+  EXPECT_EQ(1UL, test_server_->counter("aws_eventstream_parser.resp.json.metadata_added")->value());
+  EXPECT_EQ(1UL, test_server_->counter("aws_eventstream_parser.resp.json.parse_error")->value());
 }
 
 } // namespace
