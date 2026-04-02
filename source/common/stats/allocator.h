@@ -24,6 +24,20 @@ public:
   Allocator(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   virtual ~Allocator();
 
+private:
+  // We use a private section for makeCounter, makeGauge, and makeTextReadout.
+  // We do not want general filter code to be creating stats in this way, they
+  // must go through the Scope interface.
+  //
+  // This allows the MetricSnapshotImpl to hold onto references to the stats
+  // holding onto references to the Scopes, rather than holding onto each
+  // individual stat. In other words, all the stats must be owned by one or
+  // more scopes.
+  //
+  // The alternative is to have that function hold onto reference to every stat,
+  // which requires incrementing and decrementing reference counts to each stat,
+  // which is very slow, particularly on ARM processors.
+
   /**
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
@@ -50,6 +64,8 @@ public:
    */
   TextReadoutSharedPtr makeTextReadout(StatName name, StatName tag_extracted_name,
                                        const StatNameTagVector& stat_name_tags);
+
+public:
   SymbolTable& symbolTable() { return symbol_table_; }
   const SymbolTable& constSymbolTable() const { return symbol_table_; }
 
@@ -111,9 +127,13 @@ protected:
 
 private:
   template <class BaseClass> friend class StatsSharedImpl;
+  friend class AllocatorTest;
   friend class CounterImpl;
   friend class GaugeImpl;
+  friend class IsolatedStoreImpl;
+  friend class MetricImplTest;
   friend class TextReadoutImpl;
+  friend class ThreadLocalStoreImpl;
 
   // A mutex is needed here to protect both the stats_ object from both
   // alloc() and free() operations. Although alloc() operations are called under existing locking,

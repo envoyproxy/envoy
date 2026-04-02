@@ -119,10 +119,13 @@ static void bmFlushToSinksWithPredicatesSet(::benchmark::State& state) {
   speed_test.test(state);
 }
 
-BENCHMARK(bmFlushToSinks)->Unit(::benchmark::kMillisecond)->RangeMultiplier(10)->Range(10, 1000000);
+BENCHMARK(bmFlushToSinks)
+    ->Unit(::benchmark::kMillisecond)
+    ->RangeMultiplier(10)
+    ->Range(10, 10000000);
 BENCHMARK(bmFlushToSinksWithPredicatesSet)
     ->Unit(::benchmark::kMillisecond)
     ->RangeMultiplier(10)
-    ->Range(10, 1000000);
+    ->Range(10, 10000000);
 
 } // namespace Envoy
