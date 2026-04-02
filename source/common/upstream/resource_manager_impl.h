@@ -177,7 +177,7 @@ private:
           budget_percent_key_, budget_percent_ ? *budget_percent_ : 20.0);
       const uint64_t budget_interval = runtime_.snapshot().getInteger(
           budget_interval_key_,
-          budget_interval_ ? static_cast<uint64_t>(budget_interval_->count()) : 100);
+          budget_interval_ ? static_cast<uint64_t>(budget_interval_->count()) : 0);
       const uint32_t min_retry_concurrency = runtime_.snapshot().getInteger(
           min_retry_concurrency_key_, min_retry_concurrency_ ? *min_retry_concurrency_ : 3);
 
@@ -221,9 +221,9 @@ private:
     uint64_t sumRequests() {
       expire();
 
-      uint64_t sum = writer_.load(std::memory_order_relaxed);
+      uint64_t sum = writer_.load(std::memory_order_seq_cst);
       for (const auto& slot : slots_) {
-        sum += slot.load(std::memory_order_relaxed);
+        sum += slot.load(std::memory_order_seq_cst);
       }
       return sum;
     }

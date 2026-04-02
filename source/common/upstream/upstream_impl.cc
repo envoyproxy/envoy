@@ -2021,7 +2021,7 @@ std::tuple<absl::optional<double>, absl::optional<std::chrono::milliseconds>,
 ClusterInfoImpl::getRetryBudgetParams(
     const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds) {
   constexpr double default_budget_percent = 20.0;
-  constexpr uint64_t default_budget_interval_ms = 100;
+  constexpr uint64_t default_budget_interval_ms = 0;
   constexpr uint32_t default_retry_concurrency = 3;
 
   absl::optional<double> budget_percent;
