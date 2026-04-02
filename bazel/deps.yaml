@@ -902,7 +902,7 @@ gperftools:
   project_name: "gperftools"
   project_desc: "tcmalloc and profiling libraries"
   project_url: "https://github.com/gperftools/gperftools"
-  release_date: "2025-08-15"
+  release_date: "2026-03-06"
   use_category:
   - dataplane_core
   - controlplane
