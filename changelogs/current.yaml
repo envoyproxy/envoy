@@ -129,6 +129,12 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: router
+  change: |
+    Fixed a bug where the router could double-count an already buffered request body
+    when request decoding resumed from the shared request buffer, causing retries
+    or internal redirects to be abandoned unexpectedly.
+
 - area: hot_restart
   change: |
     Fixed hot restart for listeners with a network namespace in the address. Previously, socket
