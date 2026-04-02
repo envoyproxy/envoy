@@ -1562,7 +1562,7 @@ TEST_F(MetricAggregatorTests, GaugeAggregation) {
   metric_aggregator_->addGauge("metric2", /*value=*/20, attr1);
   metric_aggregator_->addGauge("metric1", /*value=*/30, attr1); // Aggregated with 10 (10+30=40)
   metric_aggregator_->addGauge("metric3", /*value=*/40, attr1);
-  metric_aggregator_->addGauge("metric1", /*value=*/50, attr2); // New point for attr2
+  metric_aggregator_->addGauge("metric1", /*value=*/50, attr2); // New point for `attr2`
   metric_aggregator_->addGauge("metric4", /*value=*/60, attr1);
 
   auto metrics = metric_aggregator_->releaseResult();

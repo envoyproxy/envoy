@@ -10,8 +10,8 @@ PUBSUB
 RANDOMKEY
 SLOWLOG
 addrlen
-attr
 defragmentation
+dp
 evictable
 flushdb
 itr
@@ -96,7 +96,6 @@ CEL
 CWND
 DLE
 DPE
-dp
 DSR
 DSS
 EBADF

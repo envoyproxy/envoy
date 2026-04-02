@@ -32,8 +32,7 @@ void MetricAggregator::addGauge(absl::string_view metric_name, uint64_t value,
   if (it != gauge_data_.end()) {
     it->second += value;
   } else {
-    MetricKey key{metric_name, std::move(attributes)};
-    gauge_data_.insert_or_assign(std::move(key), value);
+    gauge_data_.emplace(MetricKey{metric_name, std::move(attributes)}, value);
   }
 }
 
@@ -53,8 +52,7 @@ void MetricAggregator::addCounter(absl::string_view metric_name, uint64_t value,
   if (it != counter_data_.end()) {
     it->second += point_value;
   } else {
-    MetricKey key{metric_name, std::move(attributes)};
-    counter_data_.insert_or_assign(std::move(key), point_value);
+    counter_data_.emplace(MetricKey{metric_name, std::move(attributes)}, point_value);
   }
 }
 
@@ -89,8 +87,7 @@ void MetricAggregator::addHistogram(absl::string_view metric_name,
     custom_hist.bucket_counts_ = stats.computeDisjointBuckets();
     custom_hist.bucket_counts_.push_back(stats.outOfBoundCount());
     custom_hist.explicit_bounds_ = stats.supportedBuckets();
-    MetricKey key{metric_name, std::move(attributes)};
-    histogram_data_.insert_or_assign(std::move(key), std::move(custom_hist));
+    histogram_data_.emplace(MetricKey{metric_name, std::move(attributes)}, std::move(custom_hist));
   }
 }
 

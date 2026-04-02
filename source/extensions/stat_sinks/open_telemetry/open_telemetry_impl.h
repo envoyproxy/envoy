@@ -187,7 +187,7 @@ private:
 
 /**
  * Helper class to build ExportMetricsServiceRequest objects from AggregationResult.
- * It handles the batching of data points into requests, controlled by max_dp_ per request.
+ * It handles the batching of data points into requests, controlled by `max_dp_` per request.
  * Once a request reaches its data point limit, it is seamlessly dispatched to the provided
  * send_callback_.
  */
