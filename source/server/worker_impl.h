@@ -84,7 +84,7 @@ private:
   Stats::Counter& reset_streams_counter_;
   Thread::ThreadPtr thread_;
   WatchDogSharedPtr watch_dog_;
-  Event::TimerPtr idle_connection_timer_;
+  Event::TimerPtr check_idle_connection_timer_;
   OverloadActionState close_idle_http_connections_state_{OverloadActionState::inactive()};
 };
 

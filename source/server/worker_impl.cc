@@ -198,8 +198,8 @@ void WorkerImpl::closeIdleHttpConnectionsCb(OverloadActionState state) {
   close_idle_http_connections_state_ = state;
 
   // Lazy initialize the timer if it does not exist.
-  if (idle_connection_timer_ == nullptr) {
-    idle_connection_timer_ = dispatcher_->createTimer([this]() {
+  if (check_idle_connection_timer_ == nullptr) {
+    check_idle_connection_timer_ = dispatcher_->createTimer([this]() {
       if (handler_) {
         // If state is saturated, aggressive closure is triggered (ignoring the
         // idle timer threshold). Otherwise, it's a "scaled active" state which
@@ -209,14 +209,14 @@ void WorkerImpl::closeIdleHttpConnectionsCb(OverloadActionState state) {
       // Re-enable the timer only if the worker is still in an active overload
       // state
       if (close_idle_http_connections_state_.value().value() > 0.0) {
-        idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
+        check_idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
       }
     });
   }
 
   if (state.value().value() > 0.0) {
-    if (!idle_connection_timer_->enabled()) {
-      idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
+    if (!check_idle_connection_timer_->enabled()) {
+      check_idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
     }
     if (handler_) {
       // If state is saturated, aggressive closure is triggered (ignoring the
@@ -225,7 +225,7 @@ void WorkerImpl::closeIdleHttpConnectionsCb(OverloadActionState state) {
       handler_->closeIdleHttpConnections(state.isSaturated());
     }
   } else {
-    idle_connection_timer_->disableTimer();
+    check_idle_connection_timer_->disableTimer();
   }
 }
 

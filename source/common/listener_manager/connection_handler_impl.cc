@@ -316,7 +316,10 @@ void ConnectionHandlerImpl::closeIdleHttpConnections(bool is_saturated) {
     }
     listener->invokeListenerMethod(
         [is_saturated](Network::ConnectionHandler::ActiveListener& active_listener) {
-          active_listener.onCloseIdleHttpConnections(is_saturated);
+          if (active_listener.listener() != nullptr &&
+              !active_listener.listener()->shouldBypassOverloadManager()) {
+            active_listener.onCloseIdleHttpConnections(is_saturated);
+          }
         });
   }
 }
