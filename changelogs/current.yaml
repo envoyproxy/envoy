@@ -264,9 +264,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-- area: aws_eventstream_to_metadata
+- area: aws_eventstream_parser
   change: |
-    Added the :ref:`aws_eventstream_to_metadata <config_http_filters_aws_eventstream_to_metadata>` filter.
+    Added the :ref:`aws_eventstream_parser <config_http_filters_aws_eventstream_parser>` filter.
     This filter extracts values from AWS EventStream HTTP response bodies (used by AWS Bedrock streaming APIs)
     and writes them to dynamic metadata for observability, logging, and cost tracking use cases.
 - area: dynamic_modules

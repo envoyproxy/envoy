@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.aws_eventstream_parser.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "google/protobuf/struct.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.aws_eventstream_parser.v3";
+option java_outer_classname = "AwsEventstreamParserProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/aws_eventstream_parser/v3;aws_eventstream_parserv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: AWS-EventStream-Parser Filter]
+//
+// The AWS-EventStream-Parser filter extracts values from AWS EventStream HTTP response bodies
+// and writes them to dynamic metadata. This is useful for AWS Bedrock streaming response processing,
+// token usage tracking, logging, and other observability use cases.
+//
+// The filter specifically handles the AWS EventStream binary protocol
+// (application/vnd.amazon.eventstream) and uses pluggable content parsers to extract values
+// from the message payloads. The content parser is a typed extension that can be configured
+// to handle different content types (JSON, plaintext, XML, etc.).
+//
+// The filter only processes responses with Content-Type "application/vnd.amazon.eventstream".
+// Content-Type parameters are ignored.
+//
+// See AWS-EventStream-Parser :ref:`configuration overview <config_http_filters_aws_eventstream_parser>` for more details.
+// [#extension: envoy.filters.http.aws_eventstream_parser]
+
+message AwsEventstreamParser {
+  // Metadata action to write when an EventStream header matches or is missing.
+  message HeaderKeyValuePair {
+    // The namespace — if this is empty, the filter's namespace will be used.
+    // Default: "envoy.filters.http.aws_eventstream_parser".
+    string metadata_namespace = 1;
+
+    // The key to use within the namespace.
+    string key = 2 [(validate.rules).string = {min_len: 1}];
+
+    // Optional: a fixed value to use instead of the header's actual value.
+    // When set for on_present, uses this value instead of the header value.
+    // Required for on_missing (since there is no header value available).
+    google.protobuf.Value value = 3;
+
+    // False if we want to overwrite the existing metadata value. Default to false.
+    bool preserve_existing_metadata_value = 4;
+  }
+
+  // A rule for extracting an EventStream message header to dynamic metadata.
+  message HeaderRule {
+    // The EventStream header name to match. Case-sensitive.
+    string header_name = 1 [(validate.rules).string = {min_len: 1}];
+
+    // If the header is present in a message, apply this metadata action.
+    HeaderKeyValuePair on_present = 2;
+
+    // If the header was not found in any message by end-of-stream, apply this metadata action.
+    // The value field in the HeaderKeyValuePair must be set (since there is no header value).
+    HeaderKeyValuePair on_missing = 3;
+  }
+
+  // Rules for processing AWS EventStream streams and extracting metadata.
+  //
+  // The filter parses the AWS EventStream binary protocol (messages with headers and payloads),
+  // then delegates to a content parser to parse the message payload and extract metadata.
+  // The content parser determines which values to extract and how to write them to metadata.
+  message ProcessingRules {
+    // Content parser configuration for parsing message payloads and extracting metadata.
+    //
+    // The content parser specifies:
+    // - How to parse the message payload (e.g., JSON, XML, plaintext)
+    // - Which values to extract from the parsed content (e.g., JSON paths like usage.total_tokens)
+    // - How to map extracted values to metadata (namespace, key, type conversions)
+    // - When to write metadata (on_present, on_missing, on_error actions)
+    // [#extension-category: envoy.content_parsers]
+    config.core.v3.TypedExtensionConfig content_parser = 1
+        [(validate.rules).message = {required: true}];
+
+    // Rules for extracting EventStream message headers to dynamic metadata.
+    // These are evaluated directly by the filter (not by the content parser).
+    // Headers are simple typed key-value pairs at the EventStream protocol level.
+    //
+    // Header values are automatically converted to the appropriate Protobuf value type:
+    // - BoolTrue/BoolFalse -> bool_value
+    // - Byte/Short/Int32/Int64/Timestamp -> number_value
+    // - String -> string_value
+    // - ByteArray -> string_value (hex-encoded)
+    // - UUID -> string_value (formatted as xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+    repeated HeaderRule header_rules = 2;
+  }
+
+  // Rules for processing AWS EventStream response streams.
+  ProcessingRules response_rules = 1 [(validate.rules).message = {required: true}];
+}
