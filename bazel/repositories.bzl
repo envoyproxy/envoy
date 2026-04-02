@@ -929,6 +929,21 @@ def _wasmtime():
         name = "wasmtime",
         build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
         repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+        patch_cmds = ["""
+          find ./crates/c-api -type f -exec sed -i.bak   \
+             -e 's/\\ wasm_/\\ wasmtime_wasm_/g'                 \
+             -e 's/\\*wasm_/\\*wasmtime_wasm_/g'                 \
+             -e 's/^wasm_/wasmtime_wasm_/g'                      \
+             -e 's/<wasm_/<wasmtime_wasm_/g'                     \
+             -e 's/\\.wasm_/\\.wasmtime_wasm_/g'                 \
+             -e 's/\\&wasm_/\\&wasmtime_wasm_/g'                 \
+             -e 's/\\[wasm_/\\[wasmtime_wasm_/g'                 \
+             -e 's/wasmtime_config_wasm_/wasmtime_config_wasmtime_wasm_/g' \
+             -e 's/(wasm_/(wasmtime_wasm_/g' {} \\;
+          cat >src/lib.rs <<EOF
+pub use wasmtime_c_api;
+EOF
+        """],
     )
 
 def _dlb():

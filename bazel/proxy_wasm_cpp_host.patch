@@ -1,9 +1,9 @@
 diff --git a/BUILD b/BUILD
-index 91792a8..872131c 100644
+index e531ce1..cc4562c 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -91,7 +91,7 @@ cc_library(
-         ":headers",
+@@ -92,7 +92,7 @@ cc_library(
+         "@com_google_absl//absl/cleanup",
      ] + select({
          "//bazel:crypto_system": [],
 -        "//conditions:default": ["@boringssl//:crypto"],
@@ -11,7 +11,7 @@ index 91792a8..872131c 100644
      }),
      alwayslink = 1,
  )
-@@ -155,7 +155,7 @@ cc_library(
+@@ -156,7 +156,7 @@ cc_library(
      }),
      deps = [
          ":wasm_vm_headers",
@@ -20,21 +20,12 @@ index 91792a8..872131c 100644
      ],
  )
  
-@@ -221,7 +221,7 @@ cc_library(
+@@ -241,7 +241,7 @@ cc_library(
      }),
      deps = [
          ":wasm_vm_headers",
 -        "@com_github_bytecodealliance_wasmtime//:wasmtime_lib",
 +        "@wasmtime//:wasmtime_lib",
-     ],
- )
- 
-@@ -280,7 +280,7 @@ cc_library(
-     }),
-     deps = [
-         ":wasm_vm_headers",
--        "@com_github_bytecodealliance_wasmtime//:prefixed_wasmtime_lib",
-+        "@wasmtime//:prefixed_wasmtime_lib",
      ],
  )
  
