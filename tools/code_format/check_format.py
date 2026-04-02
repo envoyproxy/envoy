@@ -399,7 +399,10 @@ class FormatChecker:
     def allow_listed_for_stats_shared_ptr(self, file_path):
         return (file_path.startswith("./test/common/stats/") or
                 file_path.startswith("./source/common/stats/") or
-                file_path.startswith("./envoy/stats/"))
+                file_path.startswith("./envoy/stats/") or
+                file_path == './source/server/server.cc' or  # until #43958 lands.
+                file_path == './source/server/server.h' or   # until #43958 lands.
+                file_path == './test/server/server_test.cc') # until #43958 lands.
 
     def deny_listed_for_exceptions(self, file_path):
         # Returns if this file is deny listed for exceptions.

@@ -444,22 +444,27 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
   // Commented sample code to regenerate the map literals used below in the test log if necessary:
 
   // std::cout << "tag_extracted_counter_map = {";
-  // std::vector<Stats::CounterSharedPtr> counters = test_server_->counters();
-  // for (auto it = counters.begin(); it != counters.end(); ++it) {
-  //   if (it != counters.begin()) {
+  // bool first = true;
+  // test_server_->statsStore()->forEachCounter(nullptr, [&first](Stats::Counter& counter) {
+  //   if (first) }
+  //     first = false;
+  //   } else {
   //     std::cout << ",";
   //   }
-  //   std::cout << std::endl << "{\"" << (*it)->name() << "\", \"" << (*it)->tagExtractedName() <<
+  //   std::cout << std::endl << "{\"" << counter.name() << "\", \"" << counter.tagExtractedName()
+  //   <<
   //   "\"}";
-  // }
+  // });
   // std::cout << "};" << std::endl;
   // std::cout << "tag_extracted_gauge_map = {";
-  // std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
-  // for (auto it = gauges.begin(); it != gauges.end(); ++it) {
-  //   if (it != gauges.begin()) {
+  // first = true;
+  // test_server_->forEachGauges(nullptr, [](Stats::Gauge& gauge) {
+  //   if (first) }
+  //     first = false;
+  //   } else {
   //     std::cout << ",";
   //   }
-  //   std::cout << std::endl << "{\"" << (*it)->name() << "\", \"" << (*it)->tagExtractedName() <<
+  //   std::cout << std::endl << "{\"" << gauge.name() << "\", \"" << gauge.tagExtractedName() <<
   //   "\"}";
   // }
   // std::cout << "};" << std::endl;
