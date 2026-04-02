@@ -171,8 +171,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/tcmalloc/archive/{version}.tar.gz"],
     ),
     gperftools = dict(
-        version = "2.17.2",
-        sha256 = "bb172a54312f623b53d8b94cab040248c559decdb87574ed873e80b516e6e8eb",
+        version = "2.18.1",
+        sha256 = "d18d919175f9e4d740ace6b52f0f4f91284160c454e91b36ffd6456282a02206",
         strip_prefix = "gperftools-{version}",
         urls = ["https://github.com/gperftools/gperftools/releases/download/gperftools-{version}/gperftools-{version}.tar.gz"],
     ),
