@@ -666,8 +666,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_license/releases/download/{version}/rules_license-{version}.tar.gz"],
     ),
     libmaxminddb = dict(
-        version = "1.12.2",
-        sha256 = "1bfbf8efba3ed6462e04e225906ad5ce5fe958aa3d626a1235b2a2253d600743",
+        version = "1.13.3",
+        sha256 = "a66502ea76eadbe17f2cd6fd708946777253972d2ae8157dee1b23a2fb528171",
         strip_prefix = "libmaxminddb-{version}",
         urls = ["https://github.com/maxmind/libmaxminddb/releases/download/{version}/libmaxminddb-{version}.tar.gz"],
     ),
