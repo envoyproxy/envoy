@@ -1174,22 +1174,7 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
 
     // Set quiet shutdown since we are duplicating the socket and closing the original socket. When
     // the original socket is closed, a TLS close_notify alert is otherwise sent.
-    if (connection->ssl()) {
-      ENVOY_LOG(
-          trace,
-          "reverse_tunnel: Setting quiet shutdown on SSL connection to prevent close_notify alert");
-      const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_handshaker =
-          dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
-              connection->ssl().get());
-      if (ssl_handshaker && ssl_handshaker->ssl()) {
-        SSL_set_quiet_shutdown(ssl_handshaker->ssl(), 1);
-        ENVOY_LOG(trace, "reverse_tunnel: Quiet shutdown enabled for connection {}",
-                  connection_key);
-      } else {
-        ENVOY_LOG(warn,
-                  "reverse_tunnel: Failed to cast to SslHandshakerImpl or ssl() returned null");
-      }
-    }
+    ReverseConnectionUtility::applySslQuietClose(*connection);
 
     Network::ClientConnectionPtr released_conn = wrapper->releaseConnection();
 

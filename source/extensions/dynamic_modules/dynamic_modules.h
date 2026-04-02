@@ -128,6 +128,16 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
                                                            const bool load_globally = false);
 
 /**
+ * Writes module bytes to disk at the canonical cache path for the given SHA256.
+ * Uses a staging file with atomic rename for crash safety.
+ * The caller is responsible for verifying the hash before calling this function.
+ * @param module_bytes the content of the shared object file.
+ * @param sha256 the hex-encoded SHA256 hash of the module bytes.
+ */
+absl::Status writeDynamicModuleBytesToDisk(absl::string_view module_bytes,
+                                           absl::string_view sha256);
+
+/**
  * Returns the canonical temporary file path for a remote module identified by its SHA256 hash.
  * This is the path where newDynamicModuleFromBytes writes the module and where the cache looks
  * it up.

@@ -141,16 +141,15 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  stream_info_.route_ = parent_.callbacks()->route();
+  stream_info_.route_ = parent_.callbacks()->routeSharedPtr();
   stream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
   stream_info_.setIsShadow(parent_.callbacks()->streamInfo().isShadow());
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      parent_.callbacks()->streamInfo().upstreamClusterInfo();
-  if (cluster_info.has_value()) {
-    stream_info_.setUpstreamClusterInfo(*cluster_info);
+  if (const auto cluster_info = parent_.callbacks()->streamInfo().upstreamClusterInfo()) {
+    stream_info_.setUpstreamClusterInfo(
+        parent_.callbacks()->streamInfo().upstreamClusterInfoSharedPtr());
   }
 
   // Set up the upstream HTTP filter manager.
@@ -838,8 +837,12 @@ void UpstreamRequestFilterManagerCallbacks::resetStream(
   return upstream_request_.onResetStream(reset_reason, transport_failure_reason);
 }
 
-Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clusterInfo() {
+OptRef<const Upstream::ClusterInfo> UpstreamRequestFilterManagerCallbacks::clusterInfo() {
   return upstream_request_.parent_.callbacks()->clusterInfo();
+}
+
+Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clusterInfoSharedPtr() {
+  return upstream_request_.parent_.callbacks()->clusterInfoSharedPtr();
 }
 
 Http::Http1StreamEncoderOptionsOptRef

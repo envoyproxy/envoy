@@ -1,5 +1,5 @@
-load("@dynamic_modules_rust_sdk_crate_index//:defs.bzl", "all_crate_deps")
 load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
+load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library")
 load(
@@ -10,6 +10,8 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
+
+exports_files(["Cargo.toml"])
 
 cargo_build_script(
     name = "build_script",

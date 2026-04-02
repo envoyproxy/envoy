@@ -176,6 +176,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "gperftools-{version}",
         urls = ["https://github.com/gperftools/gperftools/releases/download/gperftools-{version}/gperftools-{version}.tar.gz"],
     ),
+    jemalloc = dict(
+        version = "5.3.0",
+        sha256 = "2db82d1e7119df3e71b7640219b6dfe84789bc0537983c3b7ac4f7189aecfeaa",
+        strip_prefix = "jemalloc-{version}",
+        urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
+    ),
     com_github_grpc_grpc = dict(
         version = "1.76.0",
         sha256 = "0af37b800953130b47c075b56683ee60bdc3eda3c37fc6004193f5b569758204",
@@ -542,8 +548,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "3a1960c518a0201b1b34384bcc89ea81add484cf",
-        sha256 = "edc92981797fddf5ff355cba9b83e00b1e0ce180812c5ca0fd139a2120482e0c",
+        version = "603f7ea475700dcdac7b58f5a05d6ccec70396f4",
+        sha256 = "4b3cd50cef5034eb0b5d49fa7345ec3414fbd1d4430af44a59a7645acfd12029",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),

@@ -39,6 +39,7 @@ envoy_cc_library(
         ":filter_config_lib",
         ":filter_lib",
         "//source/extensions/common/wasm:remote_async_datasource_lib",
+        "//source/extensions/dynamic_modules:background_fetch_manager_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",

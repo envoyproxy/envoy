@@ -7,7 +7,7 @@
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
-#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
 namespace Envoy {
@@ -17,15 +17,10 @@ namespace OpenTelemetry {
 
 OpenTelemetryHttpTraceExporter::OpenTelemetryHttpTraceExporter(
     Upstream::ClusterManager& cluster_manager,
-    const envoy::config::core::v3::HttpService& http_service)
-    : cluster_manager_(cluster_manager), http_service_(http_service) {
-
-  // Prepare and store headers to be used later on each export request
-  for (const auto& header_value_option : http_service_.request_headers_to_add()) {
-    parsed_headers_to_add_.push_back({Http::LowerCaseString(header_value_option.header().key()),
-                                      header_value_option.header().value()});
-  }
-}
+    const envoy::config::core::v3::HttpService& http_service,
+    std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator)
+    : cluster_manager_(cluster_manager), http_service_(http_service),
+      headers_applicator_(std::move(headers_applicator)) {}
 
 bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& request) {
   std::string request_body;
@@ -55,10 +50,10 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
   // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.30.0/specification/protocol/exporter.md#user-agent
   message->headers().setReferenceUserAgent(OtlpUtils::getOtlpUserAgentHeader());
 
-  // Add all custom headers to the request.
-  for (const auto& header_pair : parsed_headers_to_add_) {
-    message->headers().setReference(header_pair.first, header_pair.second);
-  }
+  // Add all custom headers to the request (static values set once; formatted values
+  // re-evaluated now so that runtime updates, e.g. SDS rotation, are reflected).
+  headers_applicator_->apply(message->headers());
+
   message->body().add(request_body);
 
   const auto options =

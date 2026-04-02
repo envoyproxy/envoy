@@ -112,6 +112,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver_descriptor.pb.h"
 #include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver_descriptor.pb.h"
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver_descriptor.pb.h"
+#include "envoy/extensions/network/dns_resolver/hickory/v3/hickory_dns_resolver_descriptor.pb.h"
 #include "envoy/extensions/network/socket_interface/v3/default_socket_interface_descriptor.pb.h"
 #include "envoy/extensions/path/match/uri_template/v3/uri_template_match_descriptor.pb.h"
 #include "envoy/extensions/path/rewrite/uri_template/v3/uri_template_rewrite_descriptor.pb.h"
@@ -338,6 +339,8 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
       protobuf::reflection::
           envoy_extensions_network_dns_resolver_getaddrinfo_v3_getaddrinfo_dns_resolver::
               kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_network_dns_resolver_hickory_v3_hickory_dns_resolver::
+          kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_network_socket_interface_v3_default_socket_interface::
           kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_path_match_uri_template_v3_uri_template_match::
