@@ -291,8 +291,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/DataDog/dd-trace-cpp/archive/v{version}.tar.gz"],
     ),
     benchmark = dict(
-        version = "1.9.4",
-        sha256 = "b334658edd35efcf06a99d9be21e4e93e092bd5f95074c1673d5c8705d95c104",
+        version = "1.9.5",
+        sha256 = "9631341c82bac4a288bef951f8b26b41f69021794184ece969f8473977eaa340",
         strip_prefix = "benchmark-{version}",
         urls = ["https://github.com/google/benchmark/archive/v{version}.tar.gz"],
     ),
