@@ -7,5 +7,5 @@ envoy_mobile_package()
 
 py_console_script_binary(
     name = "black",
-    pkg = "@base_pip3//black",
+    pkg = "@mobile_pip3//black",
 )

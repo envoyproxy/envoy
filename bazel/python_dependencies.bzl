@@ -26,6 +26,13 @@ def envoy_python_dependencies():
         extra_pip_args = ["--require-hashes"],
     )
 
+    pip_parse(
+        name = "mobile_pip3",
+        python_interpreter_target = "@python3_12_host//:python",
+        requirements_lock = "@envoy//mobile/tools:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+
     system_python(
         name = "system_python",
         minimum_python_version = "3.7",
