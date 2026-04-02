@@ -27,11 +27,6 @@ namespace RateLimitQuota {
 // GlobalTlsStores holds a singleton hash map of rate_limit_quota TLS stores,
 // indexed by their combined RLQS server targets & domains.
 //
-// This follows the data sharing model of FactoryRegistry, and similarly does
-// not guarantee thread-safety. Additions or removals of indices can only be
-// done on the main thread, as part of filter factory creation and garbage
-// collection respectively.
-//
 // Note, multiple RLQS clients with different configs (e.g. timeouts) can hit
 // the same index (destination + domain). The global map does not guarantee
 // which config will be selected for the client creation.
@@ -52,12 +47,23 @@ public:
       // The global client must be cleaned up by the server main thread before
       // it shuts down.
       if (global_client != nullptr) {
-        main_dispatcher_.deferredDelete(std::move(global_client));
+        // SharedClientDeleter wraps a shared_ptr to GlobalRateLimitClientImpl
+        // to allow it to be used with deferredDelete. It ensures
+        // deleteIsPending() is called and the shared_ptr is dropped on the main
+        // thread.
+        struct SharedClientDeleter : public Event::DeferredDeletable {
+          SharedClientDeleter(std::shared_ptr<GlobalRateLimitClientImpl> client)
+              : client_(std::move(client)) {}
+          void deleteIsPending() override { client_->deleteIsPending(); }
+          std::shared_ptr<GlobalRateLimitClientImpl> client_;
+        };
+        main_dispatcher_.deferredDelete(
+            std::make_unique<SharedClientDeleter>(std::move(global_client)));
       }
       GlobalTlsStores::clearTlsStore(std::make_pair(target_address_, domain_));
     }
 
-    std::unique_ptr<GlobalRateLimitClientImpl> global_client = nullptr;
+    std::shared_ptr<GlobalRateLimitClientImpl> global_client = nullptr;
     ThreadLocal::TypedSlot<ThreadLocalBucketsCache> buckets_tls;
 
   private:
@@ -105,13 +111,7 @@ private:
   }
 
   // Clear a specified index when it is no longer captured by any filter factories.
-  static void clearTlsStore(const TlsStoreIndex& index) {
-    stores().erase(index);
-    if (stores().empty() && getEmptiedCb() != nullptr) {
-      getEmptiedCb()();
-      getEmptiedCb() = nullptr;
-    }
-  }
+  static void clearTlsStore(const TlsStoreIndex& index);
 };
 
 } // namespace RateLimitQuota

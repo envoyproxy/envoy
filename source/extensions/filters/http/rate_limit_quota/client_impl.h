@@ -7,6 +7,7 @@
 
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/rate_limit_quota/filter_persistence.h"
 #include "source/extensions/filters/http/rate_limit_quota/global_client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
 
@@ -30,10 +31,8 @@ using GrpcAsyncClient =
 class LocalRateLimitClientImpl : public RateLimitClient,
                                  public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
-  explicit LocalRateLimitClientImpl(
-      GlobalRateLimitClientImpl* global_client,
-      Envoy::ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_cache_tls)
-      : global_client_(global_client), buckets_cache_tls_(buckets_cache_tls) {}
+  explicit LocalRateLimitClientImpl(std::shared_ptr<GlobalTlsStores::TlsStore> tls_store)
+      : tls_store_(std::move(tls_store)) {}
 
   void createBucket(const BucketId& bucket_id, size_t id, const BucketAction& default_bucket_action,
                     std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
@@ -45,19 +44,18 @@ public:
 
 private:
   inline std::shared_ptr<BucketsCache> getBucketsCache() {
-    return (buckets_cache_tls_.get().has_value()) ? buckets_cache_tls_.get()->quota_buckets_
-                                                  : nullptr;
+    return (tls_store_->buckets_tls.get().has_value())
+               ? tls_store_->buckets_tls.get()->quota_buckets_
+               : nullptr;
   }
 
   // Lockless access to global resources via TLS.
-  GlobalRateLimitClientImpl* global_client_;
-  ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_cache_tls_;
+  std::shared_ptr<GlobalTlsStores::TlsStore> tls_store_;
 };
 
 inline std::unique_ptr<RateLimitClient>
-createLocalRateLimitClient(GlobalRateLimitClientImpl* global_client,
-                           ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_cache_tls_) {
-  return std::make_unique<LocalRateLimitClientImpl>(global_client, buckets_cache_tls_);
+createLocalRateLimitClient(std::shared_ptr<GlobalTlsStores::TlsStore> tls_store) {
+  return std::make_unique<LocalRateLimitClientImpl>(std::move(tls_store));
 }
 
 } // namespace RateLimitQuota

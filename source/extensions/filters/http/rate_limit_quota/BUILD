@@ -55,6 +55,7 @@ envoy_cc_library(
     srcs = ["client_impl.cc"],
     hdrs = ["client_impl.h"],
     deps = [
+        ":filter_persistence",
         ":global_client_lib",
         ":quota_bucket_cache",
         "//envoy/grpc:async_client_interface",
