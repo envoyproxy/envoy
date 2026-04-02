@@ -111,7 +111,7 @@ liburing:
   project_name: "liburing"
   project_desc: "C helpers to set up and tear down io_uring instances"
   project_url: "https://github.com/axboe/liburing"
-  release_date: "2025-12-16"
+  release_date: "2026-02-07"
   use_category:
   - dataplane_core
   - controlplane
