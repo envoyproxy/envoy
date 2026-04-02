@@ -46,7 +46,7 @@ TEST_F(StringReturningActionTest, SubstitutionFormatStringReturnsDynamicValue) {
 )EOF");
   testing::NiceMock<StreamInfo::MockStreamInfo> info;
   {
-    std::string result = action().string(info);
+    std::string result = action().getOutputString(info);
     EXPECT_EQ("-", result);
   }
 
@@ -57,7 +57,7 @@ TEST_F(StringReturningActionTest, SubstitutionFormatStringReturnsDynamicValue) {
       test_key: foo
 )EOF";
     TestUtility::loadFromYaml(metadata_string, info.metadata_);
-    std::string result = action().string(info);
+    std::string result = action().getOutputString(info);
     EXPECT_EQ("foo", result);
   }
 }
@@ -81,7 +81,7 @@ TEST_F(StringReturningActionTest, StringValueReturnsCorrectValue) {
       value: "foo"
 )EOF");
   testing::NiceMock<StreamInfo::MockStreamInfo> info;
-  std::string result = action().string(info);
+  std::string result = action().getOutputString(info);
   EXPECT_EQ("foo", result);
 }
 
@@ -92,7 +92,7 @@ TEST_F(StringReturningActionTest, UnsetStringValueReturnsEmptyString) {
       "@type": "type.googleapis.com/google.protobuf.StringValue"
 )EOF");
   testing::NiceMock<StreamInfo::MockStreamInfo> info;
-  std::string result = action().string(info);
+  std::string result = action().getOutputString(info);
   EXPECT_EQ("", result);
 }
 

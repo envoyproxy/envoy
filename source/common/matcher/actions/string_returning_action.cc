@@ -18,7 +18,7 @@ class StringReturningFormatterActionImpl
 public:
   explicit StringReturningFormatterActionImpl(Formatter::FormatterConstSharedPtr formatter)
       : formatter_(std::move(formatter)) {}
-  std::string string(const StreamInfo::StreamInfo& stream_info) const override {
+  std::string getOutputString(const StreamInfo::StreamInfo& stream_info) const override {
     return formatter_->format({}, stream_info);
   }
 
@@ -53,7 +53,7 @@ class StringReturningDirectActionImpl
 public:
   explicit StringReturningDirectActionImpl(const Protobuf::StringValue& config)
       : value_(config.value()) {}
-  std::string string(const StreamInfo::StreamInfo&) const override { return value_; }
+  std::string getOutputString(const StreamInfo::StreamInfo&) const override { return value_; }
 
 private:
   const std::string value_;

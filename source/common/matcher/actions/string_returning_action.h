@@ -18,7 +18,7 @@ struct StringReturningActionFactoryContext {
 
 class StringReturningAction : public Matcher::Action {
 public:
-  virtual std::string string(const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual std::string getOutputString(const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 } // namespace Actions
