@@ -1771,6 +1771,13 @@ envoy.network.dns_resolver.getaddrinfo:
   status: stable
   type_urls:
   - envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+envoy.network.dns_resolver.hickory:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig
 envoy.resolvers.reverse_connection:
   categories:
   - envoy.resolvers

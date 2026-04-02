@@ -47,6 +47,12 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.sip.router":                                 "//contrib/sip_proxy/filters/network/source/router:config",
 
     #
+    # Stat sinks
+    #
+
+    "envoy.stat_sinks.kafka":                            "//contrib/kafka/stat_sinks/source:config_lib",
+
+    #
     # Tap sinks
     #
 

@@ -118,6 +118,13 @@ envoy.regex_engines.hyperscan:
   - envoy.regex_engines
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.stat_sinks.kafka:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig
 envoy.tap_sinks.udp_sink:
   categories:
   - envoy.filters.http

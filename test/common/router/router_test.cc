@@ -27,6 +27,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/network/win32_redirect_records_option_impl.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/router/context_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
@@ -1654,6 +1655,16 @@ TEST_F(RouterTest, NoRetriesOverflow) {
               putResult(_, absl::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_overflow_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_overflow_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_overflow_.value());
 }
 
 TEST_F(RouterTest, ResetDuringEncodeHeaders) {
@@ -3335,45 +3346,6 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(10));
-
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-
-  Http::TestRequestHeaderMapImpl headers{
-      {"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}, {"myheader", "present"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, false);
-  const std::string body1("body1");
-  Buffer::OwnedImpl buf1(body1);
-  EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
-  router_->decodeData(buf1, false);
-
-  router_->retry_state_->expectResetRetry();
-  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-
-  // Send additional 15 bytes - total 55 bytes, which should exceed request body buffer limit (50).
-  const std::string body2(15, 'y');
-  Buffer::OwnedImpl buf2(body2);
-  router_->decodeData(buf2, false);
-
-  EXPECT_EQ(callbacks_.details(), "request_payload_exceeded_retry_buffer_limit");
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("retry_or_shadow_abandoned")
-                    .value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-}
-
-// Test that router uses request_body_buffer_limit when configured instead of
-// per_request_buffer_limit.
-TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  // Configure a large request body buffer limit (50 bytes) but small request buffer limit (10
-  // bytes).
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(50));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3385,7 +3357,7 @@ TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
 
-  // Send 40 bytes - should be within request body buffer limit (50) but exceeds retry limit (10).
+  // Send 40 bytes - should be within request body buffer limit (50).
   const std::string body1(40, 'x');
   Buffer::OwnedImpl buf1(body1);
   EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
@@ -3414,8 +3386,7 @@ TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
 
-  // Case 1: request_body_buffer_limit=60, per_request_buffer_limit_bytes=20
-  // Should use request_body_buffer_limit = 60
+  // Use route level buffer limit.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(60));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3448,8 +3419,7 @@ TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
-// When per_request_buffer_limit_bytes is set but request_body_buffer_limit is not set,
-// we should use min(per_request_buffer_limit_bytes, per_connection_buffer_limit_bytes).
+// Route level request buffer limit will override the connection buffer limit.
 TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
@@ -3458,8 +3428,8 @@ TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
   // Set up the connection buffer limit mock to return 40 as expected
   EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
-  // Case 2: per_request_buffer_limit_bytes=20, request_body_buffer_limit=not set
-  // Should use min(20, connection_buffer_limit) = 20 (since connection limit is default 40)
+  // Route level request buffer limit is set to 20, which should override connection buffer limit
+  // of 40.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(20));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3481,51 +3451,6 @@ TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
   // Send additional data (10 bytes) - total 25 bytes should exceed limit of 20
-  const std::string body2(10, 'y');
-  Buffer::OwnedImpl buf2(body2);
-  router_->decodeData(buf2, false);
-
-  EXPECT_EQ(callbacks_.details(), "request_payload_exceeded_retry_buffer_limit");
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("retry_or_shadow_abandoned")
-                    .value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-}
-
-// Test that when connection limit is smaller than per_request limit,
-// we use min(per_request_buffer_limit_bytes, per_connection_buffer_limit_bytes) = connection limit.
-TEST_F(RouterTest, BufferLimitLogicCase2ConnectionLimitSmaller) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  // Set up the connection buffer limit mock to return 40 as expected
-  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
-
-  // Case 2: per_request_buffer_limit_bytes=50, request_body_buffer_limit=not set
-  // Should use min(50, connection_limit) = min(50, 40) = 40
-  // With consolidated approach, the effective limit should be 40
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(40));
-
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, false);
-
-  // Send initial data (35 bytes)
-  const std::string body1(35, 'x');
-  Buffer::OwnedImpl buf1(body1);
-  EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
-  router_->decodeData(buf1, false);
-
-  // Simulate upstream failure to trigger retry logic
-  router_->retry_state_->expectResetRetry();
-  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-
-  // Send additional data (10 bytes) - total 45 bytes should exceed connection limit of 40
   const std::string body2(10, 'y');
   Buffer::OwnedImpl buf2(body2);
   router_->decodeData(buf2, false);
@@ -3870,6 +3795,16 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
   response_decoder1->decodeHeaders(std::move(bad_response_headers2), true);
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_limit_exceeded_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_limit_exceeded_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
 // Sequence: 1) per try timeout w/ hedge retry, 2) first request gets reset by upstream,
@@ -4107,6 +4042,17 @@ TEST_F(RouterTest, RetryUpstreamReset) {
               putResult(_, absl::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 TEST_F(RouterTest, RetryHttp3UpstreamReset) {
@@ -4192,8 +4138,53 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
   EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
   Buffer::OwnedImpl body("t");
   router_->decodeData(body, false);
+  Buffer::OwnedImpl body2("t");
+  // Ensure subsequent chunks after overflow are also not buffered.
+  router_->decodeData(body2, false);
   EXPECT_EQ(1U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, EnableRedirectAndRetryButNoRetryWithBodyLimit) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
+
+  recreateFilter();
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  // Enable redirects also. This feature will not be used but will affect buffer logic.
+  enableRedirects(3);
+
+  // Set a per route body limit which disallows any buffering.
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(0));
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  // Unlike RetryUpstreamReset above the data won't be buffered as the body exceeds the buffer limit
+  EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  Buffer::OwnedImpl body("t");
+  router_->decodeData(body, false);
+  Buffer::OwnedImpl body2("t");
+  // Ensure subsequent chunks after overflow are also not buffered.
+  router_->decodeData(body2, false);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -4305,6 +4296,17 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 // Asserts that onHostAttempted is *not* called when the upstream connection fails in such
@@ -4362,6 +4364,17 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
               putResult(_, absl::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
@@ -4516,6 +4529,120 @@ TEST_F(RouterTest, RetryUpstream5xx) {
               putResult(_, absl::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
+}
+
+// Verify that upstream_rq_retry_backoff_exponential_ is incremented when the retry
+// state indicates the retry used exponential backoff.
+TEST_F(RouterTest, RetryUpstreamExponentialBackoff) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // 5xx response triggers a retry.
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, absl::optional<uint64_t>(503)));
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // The retry uses exponential backoff.
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
+  EXPECT_CALL(*router_->retry_state_, doRetryType())
+      .WillOnce(Return(RetryState::DoRetryType::Exponential));
+  router_->retry_state_->callback_();
+
+  // Normal response.
+  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
+      .WillOnce(Return(RetryStatus::No));
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, absl::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_backoff_exponential_.value());
+  EXPECT_EQ(0UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_backoff_ratelimited_.value());
+}
+
+// Verify that upstream_rq_retry_backoff_ratelimited_ is incremented when the retry
+// state indicates the retry used rate-limited backoff.
+TEST_F(RouterTest, RetryUpstreamRateLimitedBackoff) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "envoy-ratelimited"},
+                                         {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Rate-limited response triggers a retry.
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "429"}, {"x-envoy-ratelimited", "true"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, absl::optional<uint64_t>(429)));
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // The retry uses rate-limited backoff.
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
+  EXPECT_CALL(*router_->retry_state_, doRetryType())
+      .WillOnce(Return(RetryState::DoRetryType::Ratelimited));
+  router_->retry_state_->callback_();
+
+  // Normal response.
+  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
+      .WillOnce(Return(RetryStatus::No));
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, absl::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+
+  EXPECT_EQ(0UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_backoff_exponential_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_backoff_ratelimited_.value());
 }
 
 TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
@@ -4842,6 +4969,17 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("zone.zone_name.to_az.upstream_rq_2xx")
                     .value());
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 // Test retry with 2 attempts before success: 503 -> 503 -> 200
@@ -4946,6 +5084,17 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("zone.zone_name.to_az.upstream_rq_2xx")
                     .value());
+  EXPECT_EQ(2UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(2UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(2UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 // Validate gRPC Cancelled response stats are sane when retry is taking effect.
@@ -5271,6 +5420,41 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
                    .filterState()
                    ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
                    ->value());
+}
+
+TEST_F(RouterTest, InternalRedirectWithRequestBodyBufferOverflow) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(10));
+
+  enableRedirects();
+  sendRequest(false);
+
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
+
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
+  // We will not buffer the body data because it exceeds the buffer limit. But note the initial
+  // request is still valid.
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, true));
+
+  // No redirect because buffer overflowed.
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .Times(0);
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  Buffer::OwnedImpl response_data("1234567890");
+  response_decoder_->decodeData(response_data, false);
+
+  router_->onDestroy();
+  EXPECT_FALSE(callbacks_.streamInfo().filterState()->hasDataWithName("num_internal_redirects"));
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
 }
 
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {

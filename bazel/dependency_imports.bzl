@@ -257,9 +257,5 @@ def crates_repositories():
         # * https://github.com/bazelbuild/rules_rust/pull/3866
         #
         # lockfile = Label("@envoy//:Cargo.Bazel.lock"),
-        manifests = [
-            "@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml",
-            "@envoy//test/extensions/dynamic_modules/test_data/rust:Cargo.toml",
-            "@envoy//:Cargo.toml",
-        ],
+        manifests = ["@envoy//:Cargo.toml"],
     )

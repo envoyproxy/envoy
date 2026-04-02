@@ -1302,6 +1302,7 @@ rules_rust:
   - dataplane_core
   - dataplane_ext
   extensions:
+  - envoy.network.dns_resolver.hickory
   - envoy.wasm.runtime.wasmtime
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt"
@@ -1360,6 +1361,7 @@ toolchains_llvm:
   use_category:
   - build
   - dataplane_core
+  - dataplane_ext
   - controlplane
   implied_untracked_deps:
   - llvm_toolchain_llvm

@@ -31,7 +31,9 @@ public:
   Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override;
   const std::string& subjectLocalCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
+  const std::string& pemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
+  absl::Span<const std::string> pemEncodedPeerCertificateChain() const override;
   bool peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const override;
   absl::Span<const std::string> uriSanPeerCertificate() const override;
   absl::Span<const std::string> uriSanLocalCertificate() const override;
@@ -82,7 +84,9 @@ private:
     EmailSansPeerCertificate,
     OthernameSansPeerCertificate,
     UrlEncodedPemEncodedPeerCertificate,
+    PemEncodedPeerCertificate,
     UrlEncodedPemEncodedPeerCertificateChain,
+    PemEncodedPeerCertificateChain,
     PeerCertificateSanMatches,
     DnsSansPeerCertificate,
     IpSansPeerCertificate,

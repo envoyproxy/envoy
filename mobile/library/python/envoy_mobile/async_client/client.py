@@ -3,8 +3,8 @@
 import asyncio
 from typing import Any, Dict, List, Optional, Union
 
-import library.python.envoy_engine as envoy_engine
-from library.python.envoy_engine import EngineBuilder
+from .. import envoy_engine
+from ..envoy_engine import EngineBuilder
 
 from .executor import AsyncioExecutor, Executor
 from .response import ClientResponseError, Response

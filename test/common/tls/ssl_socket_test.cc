@@ -59,6 +59,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
@@ -678,6 +679,12 @@ void testUtil(const TestUtilOptions& options) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
+
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedPeerCert(),
+                  server_connection->ssl()->pemEncodedPeerCertificate());
+        EXPECT_EQ(options.expectedPeerCert(),
+                  server_connection->ssl()->pemEncodedPeerCertificate());
       }
       if (!options.expectedPeerCertChain().empty()) {
         std::string cert_chain = absl::StrReplaceAll(
@@ -686,6 +693,15 @@ void testUtil(const TestUtilOptions& options) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(cert_chain, server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
         EXPECT_EQ(cert_chain, server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
+
+        // Assert twice to ensure a cached value is returned and still valid.
+        absl::Span<const std::string> pem_chain =
+            server_connection->ssl()->pemEncodedPeerCertificateChain();
+        std::string concatenated_chain = absl::StrJoin(pem_chain, "");
+        EXPECT_EQ(options.expectedPeerCertChain(), concatenated_chain);
+        pem_chain = server_connection->ssl()->pemEncodedPeerCertificateChain();
+        concatenated_chain = absl::StrJoin(pem_chain, "");
+        EXPECT_EQ(options.expectedPeerCertChain(), concatenated_chain);
       }
       if (!options.expectedValidFromTimePeerCert().empty()) {
         const std::string formatted = TestUtility::formatTime(
@@ -704,6 +720,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha256PeerCertificateDigest());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha1PeerCertificateDigest());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->pemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
         EXPECT_EQ(absl::nullopt, server_connection->ssl()->parsedSubjectPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
@@ -716,6 +733,7 @@ void testUtil(const TestUtilOptions& options) {
       if (options.expectNoCertChain()) {
         EXPECT_EQ(EMPTY_STRING,
                   server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
+        EXPECT_TRUE(server_connection->ssl()->pemEncodedPeerCertificateChain().empty());
       }
       if (!options.expectedSni().empty()) {
         EXPECT_EQ(options.expectedSni(), server_connection->ssl()->sni());
