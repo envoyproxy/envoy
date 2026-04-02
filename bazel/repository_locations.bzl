@@ -703,8 +703,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/ninja-build/ninja/archive/refs/tags/v{version}.tar.gz"],
     ),
     fips_cmake_linux_x86_64 = dict(
-        version = "4.2.3",
-        sha256 = "5bb505d5e0cca0480a330f7f27ccf52c2b8b5214c5bba97df08899f5ef650c23",
+        version = "4.3.1",
+        sha256 = "208d76804009cbe8ec9aea0aa052c857c6e59bd289b43b9941c99324dc78b1d8",
         strip_prefix = "cmake-{version}-linux-x86_64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-x86_64.tar.gz"],
     ),
