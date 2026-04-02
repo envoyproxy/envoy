@@ -79,8 +79,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/aspect-build/bazel-lib/releases/download/v{version}/bazel-lib-v{version}.tar.gz"],
     ),
     abseil_cpp = dict(
-        version = "20260107.0",
-        sha256 = "4c124408da902be896a2f368042729655709db5e3004ec99f57e3e14439bc1b2",
+        version = "20260107.1",
+        sha256 = "4314e2a7cbac89cac25a2f2322870f343d81579756ceff7f431803c2c9090195",
         strip_prefix = "abseil-cpp-{version}",
         urls = ["https://github.com/abseil/abseil-cpp/archive/{version}.tar.gz"],
     ),
