@@ -2055,8 +2055,7 @@ TEST_P(QuicHttpIntegrationTest, SessionTicketResumptionWithStaticKeys) {
     auto* keys = quic_transport_socket_config.mutable_downstream_tls_context()
                      ->mutable_session_ticket_keys();
     // Session ticket keys must be exactly 80 bytes.
-    keys->add_keys()->set_filename(
-        TestEnvironment::runfilesPath("test/common/tls/test_data/ticket_key_a"));
+    keys->add_keys()->set_inline_bytes(std::string(80, '\x01'));
     ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
   });
 
