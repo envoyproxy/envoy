@@ -456,11 +456,13 @@ ActiveQuicListenerFactory::createActiveQuicListener(
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator) {
   bool enable_session_idle_list = false;
-  for (const auto& action :
-       context_.serverFactoryContext().bootstrap().overload_manager().actions()) {
-    if (action.name() == Server::OverloadActionNames::get().CloseIdleHttpConnections) {
-      enable_session_idle_list = true;
-      break;
+  if (listener_config.udpListenerConfig()->config().quic_options().close_idle_connections_when_overloaded()) {
+    for (const auto& action :
+         context_.serverFactoryContext().bootstrap().overload_manager().actions()) {
+      if (action.name() == Server::OverloadActionNames::get().CloseIdleHttpConnections) {
+        enable_session_idle_list = true;
+        break;
+      }
     }
   }
   return std::make_unique<ActiveQuicListener>(

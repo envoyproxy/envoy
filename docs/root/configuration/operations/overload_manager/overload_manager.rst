@@ -193,7 +193,6 @@ Example configuration:
     :caption: :download:`shrink_heap_overload.yaml <_include/shrink_heap_overload.yaml>`
 
 If no ``typed_config`` is provided, the action will use default values.
->>>>>>> theirs
 
 Load Shed Points
 ----------------
