@@ -25,6 +25,29 @@ bool shouldRecalculateCachedEntry(const Ssl::ParsedX509NamePtr& ptr) { return pt
 bool shouldRecalculateCachedEntry(const bssl::UniquePtr<GENERAL_NAMES>& ptr) {
   return ptr == nullptr;
 }
+
+// Convert a single X509 certificate to a PEM-encoded string.
+std::string certToPem(X509& cert) {
+  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+  RELEASE_ASSERT(buf != nullptr, "");
+  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), &cert) == 1, "");
+  const uint8_t* output;
+  size_t length;
+  RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
+  return std::string(reinterpret_cast<const char*>(output), length);
+}
+
+// Iterate the peer certificate chain, converting each certificate to PEM and calling the provided
+// callback. Does nothing if the chain is not available.
+void forEachPeerCertPem(SSL* ssl, std::function<void(const std::string&)> cb) {
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+  if (cert_chain == nullptr) {
+    return;
+  }
+  for (uint64_t i = 0; i < sk_X509_num(cert_chain); i++) {
+    cb(certToPem(*sk_X509_value(cert_chain, i)));
+  }
+}
 } // namespace
 
 template <typename ValueType>
@@ -190,40 +213,37 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate()
         if (!cert) {
           return std::string{};
         }
+        return Envoy::Http::Utility::PercentEncoding::urlEncode(certToPem(*cert));
+      });
+}
 
-        bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-        RELEASE_ASSERT(buf != nullptr, "");
-        RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1, "");
-        const uint8_t* output;
-        size_t length;
-        RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
-        absl::string_view pem(reinterpret_cast<const char*>(output), length);
-        return Envoy::Http::Utility::PercentEncoding::urlEncode(pem);
+const std::string& ConnectionInfoImplBase::pemEncodedPeerCertificate() const {
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::PemEncodedPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::string{};
+        }
+        return certToPem(*cert);
       });
 }
 
 const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateChain() const {
   return getCachedValueOrCreate<std::string>(
       CachedValueTag::UrlEncodedPemEncodedPeerCertificateChain, [](SSL* ssl) {
-        STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
-        if (cert_chain == nullptr) {
-          return std::string{};
-        }
-
         std::string result;
-        for (uint64_t i = 0; i < sk_X509_num(cert_chain); i++) {
-          X509* cert = sk_X509_value(cert_chain, i);
-
-          bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-          RELEASE_ASSERT(buf != nullptr, "");
-          RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert) == 1, "");
-          const uint8_t* output;
-          size_t length;
-          RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
-
-          absl::string_view pem(reinterpret_cast<const char*>(output), length);
+        forEachPeerCertPem(ssl, [&result](const std::string& pem) {
           absl::StrAppend(&result, Envoy::Http::Utility::PercentEncoding::urlEncode(pem));
-        }
+        });
+        return result;
+      });
+}
+
+absl::Span<const std::string> ConnectionInfoImplBase::pemEncodedPeerCertificateChain() const {
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::PemEncodedPeerCertificateChain, [](SSL* ssl) {
+        std::vector<std::string> result;
+        forEachPeerCertPem(ssl, [&result](const std::string& pem) { result.emplace_back(pem); });
         return result;
       });
 }
