@@ -504,48 +504,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bytecodealliance/wasmtime/archive/v{version}.tar.gz"],
     ),
     v8 = dict(
-        # NOTE: Update together with proxy_wasm_cpp_host, highway, fast_float, dragonbox, simdutf, and fp16.
-        # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
+        # Pre-built V8 wee8 static library, built and published by envoy_toolshed.
+        # V8 sub-dependencies (dragonbox, fast_float, fp16, simdutf, highway) are
+        # baked into the pre-built libwee8.a.
+        # To bump: pick a version already published by envoy_toolshed and update
+        # version + sha256 here.
+        # Note: urls is required by load_repository_locations_spec but the actual
+        # download is handled by setup_v8_prebuilt's custom repository rule.
         version = "14.6.202.10",
-        # Follow this guide to pick next stable release: https://v8.dev/docs/version-numbers#which-v8-version-should-i-use%3F
-        strip_prefix = "v8-{version}",
-        sha256 = "09c3d9f796a671fb9630c7190032f00171ce99effd7c80c7aaeba148a7bcbc1b",
-        urls = ["https://github.com/v8/v8/archive/refs/tags/{version}.tar.gz"],
-    ),
-    fast_float = dict(
-        # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "7.0.0",
-        # Follow this guide to pick next stable release: https://v8.dev/docs/version-numbers#which-v8-version-should-i-use%3F
-        strip_prefix = "fast_float-{version}",
-        sha256 = "d2a08e722f461fe699ba61392cd29e6b23be013d0f56e50c7786d0954bffcb17",
-        urls = ["https://github.com/fastfloat/fast_float/archive/refs/tags/v{version}.tar.gz"],
-    ),
-    highway = dict(
-        # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "1.2.0",
-        strip_prefix = "highway-{version}",
-        sha256 = "7e0be78b8318e8bdbf6fa545d2ecb4c90f947df03f7aadc42c1967f019e63343",
-        urls = ["https://github.com/google/highway/archive/refs/tags/{version}.tar.gz"],
-    ),
-    dragonbox = dict(
-        # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "6c7c925b571d54486b9ffae8d9d18a822801cbda",
-        strip_prefix = "dragonbox-{version}",
-        sha256 = "2f10448d665355b41f599e869ac78803f82f13b070ce7ef5ae7b5cceb8a178f3",
-        urls = ["https://github.com/jk-jeon/dragonbox/archive/{version}.zip"],
-    ),
-    fp16 = dict(
-        # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "3d2de1816307bac63c16a297e8c4dc501b4076df",
-        strip_prefix = "FP16-{version}",
-        sha256 = "e2da4f41bae8869f8dee56f4c104e699e7de3a483b5e451fda8e76fbcc66c59a",
-        urls = ["https://github.com/Maratyszcza/FP16/archive/{version}.zip"],
-    ),
-    simdutf = dict(
-        # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "8.1.0",
-        sha256 = "c3565a8567b21d0096d0366654db473597ea6e5408e464198dce0897be71e4d0",
-        urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
+        sha256 = {
+            "x86_64": "",  # TODO: fill after first artifact is published
+            "aarch64": "",  # TODO: fill after first artifact is published
+        },
+        urls = ["https://github.com/envoyproxy/toolshed/releases/download/v8-v{version}/v8-wee8-{version}-linux-x86_64.tar.xz"],
     ),
     quiche = dict(
         version = "603f7ea475700dcdac7b58f5a05d6ccec70396f4",
