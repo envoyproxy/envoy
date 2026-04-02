@@ -368,6 +368,37 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
                      .value());
 }
 
+TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesButConsecutive5xxZero) {
+  empty_outlier_detection_.mutable_consecutive_5xx()->set_value(0);
+
+  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
+                                                              dispatcher_, runtime_, time_system_,
+                                                              event_logger_, random_)
+                                             .value());
+
+  addHosts({"tcp://127.0.0.1:81"});
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({hosts_[1]}, {});
+
+  // Reporting HTTP codes (5xx) but consecutive_5xx is set to 0, so host should not be ejected.
+  loadRq(hosts_[0], 20, 500);
+
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  EXPECT_EQ(
+      0UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_consecutive_gateway_failure")
+                     .value());
+}
+
 /*
  Tests scenario when active health check clears the FAILED_OUTLIER_CHECK flag.
 */

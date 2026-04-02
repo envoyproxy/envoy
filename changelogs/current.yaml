@@ -129,6 +129,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: router
+  change: |
+    Fixed a crash in scoped RDS when on-demand update is triggered for a scope that uses inline
+    ``route_configuration`` instead of ``route_configuration_name``. The null RDS provider dereference
+    is now guarded and the on-demand callback returns false for inline-config scopes.
 - area: hot_restart
   change: |
     Fixed hot restart for listeners with a network namespace in the address. Previously, socket
@@ -153,6 +158,10 @@ bug_fixes:
 - area: http
   change: |
     Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.
+- area: http
+  change: |
+    Fixed a bug where the internal redirect logic may hang up a request when the request buffer is
+    overflowed.
 - area: load_report
   change: |
     Fixed a race condition during load-report shutdown with the ADS stream by introducing proper cleanup
@@ -357,6 +366,14 @@ new_features:
     and added brotli and zlib to TCP TLS. Controlled by runtime flag
     ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
     When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
+- area: tls
+  change: |
+    Exposed the SHA-256 fingerprint and serial number of the verified issuer (CA) certificate from
+    the validated downstream mTLS peer certificate chain. Accessible via the
+    ``%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%`` and ``%DOWNSTREAM_PEER_ISSUER_SERIAL%``
+    :ref:`access log formatters <config_access_log_format>`, and via the
+    ``sha256PeerCertificateIssuerDigest()`` and ``serialNumberPeerCertificateIssuer()`` methods on
+    :ref:`downstreamSslConnection() <config_http_filters_lua_ssl_socket_info>` in the Lua filter.
 - area: dynamic_modules
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
@@ -616,6 +633,12 @@ new_features:
     Added SSE (Server-Sent Events) streaming support for MCP backend responses. The router now handles
     SSE responses from backends for ``tools/call`` with direct pass-through streaming, and supports SSE
     aggregation for fanout operations (``tools/list``, ``initialize``) with incremental event parsing.
+- area: http
+  change: |
+    Added an optional :ref:`JSON format <config_http_conn_man_headers_x-forwarded-client-cert_json>`
+    for the :ref:`x-forwarded-client-cert <config_http_conn_man_headers_x-forwarded-client-cert>`
+    (XFCC) header. The format can be configured via :ref:`format
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.SetCurrentClientCertDetails.format>`.
 - area: dynamic_modules
   change: |
     Added :ref:`load balancing policies
@@ -865,5 +888,17 @@ new_features:
     Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
     which will close idle downstream HTTP connections (including HTTP/3 QUIC) when the overload
     manager enters the active state.
+
+- area: contrib
+  change: |
+    Added a new :ref:`Kafka stats sink <config_stat_sinks_kafka>` contrib extension
+    (``envoy.stat_sinks.kafka``) that produces metrics directly to an Apache Kafka topic
+    using librdkafka. Supports both JSON and Protobuf serialization formats; the Protobuf
+    format uses the same ``StreamMetricsMessage`` wire format as the gRPC
+    :ref:`metrics_service <envoy_v3_api_msg_config.metrics.v3.MetricsServiceConfig>` sink,
+    allowing consumers to reuse existing deserializers. Configurable batching, delta counters,
+    tag-as-label emission, and full librdkafka producer tuning (including TLS and SASL
+    authentication) are supported via
+    :ref:`KafkaStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig>`.
 
 deprecated:

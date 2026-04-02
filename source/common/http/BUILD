@@ -418,6 +418,7 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/matching:data_impl_lib",
+        "//source/common/json:json_streamer_lib",
         "//source/common/matcher:matcher_lib",
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
