@@ -11,7 +11,6 @@ from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlencode, urlparse
 
-
 Data = Optional[Union[bytes, str, Dict[str, Any], List[Tuple[str, Any]]]]
 NormalData = bytes
 

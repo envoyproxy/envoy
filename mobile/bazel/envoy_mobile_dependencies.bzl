@@ -110,6 +110,7 @@ def kotlin_dependencies(extra_maven_dependencies = []):
 def python_dependencies():
     pip_parse(
         name = "mobile_pip3",
-        requirements_lock = "//third_party/python:requirements.txt",
+        python_interpreter_target = "@python3_12_host//:python",
+        requirements_lock = "//tools/python:requirements.txt",
         timeout = 1000,
     )
