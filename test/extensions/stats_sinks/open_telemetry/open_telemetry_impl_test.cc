@@ -1595,12 +1595,20 @@ TEST_F(MetricAggregatorTests, GaugeAggregation) {
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
 
-  metric_aggregator_->addGauge("metric1", /*value=*/10, attr1);
-  metric_aggregator_->addGauge("metric2", /*value=*/20, attr1);
-  metric_aggregator_->addGauge("metric1", /*value=*/30, attr1); // Aggregated with 10 (10+30=40)
-  metric_aggregator_->addGauge("metric3", /*value=*/40, attr1);
-  metric_aggregator_->addGauge("metric1", /*value=*/50, attr2); // New point for `attr2`
-  metric_aggregator_->addGauge("metric4", /*value=*/60, attr1);
+  metric_aggregator_->addGauge("metric1", /*value=*/10,
+                               MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addGauge("metric2", /*value=*/20,
+                               MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addGauge(
+      "metric1", /*value=*/30,
+      MetricAggregator::SortedAttributesVector{{"key1", ""}}); // Aggregated with 10 (10+30=40)
+  metric_aggregator_->addGauge("metric3", /*value=*/40,
+                               MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addGauge(
+      "metric1", /*value=*/50,
+      MetricAggregator::SortedAttributesVector{{"key2", ""}}); // New point for `attr2`
+  metric_aggregator_->addGauge("metric4", /*value=*/60,
+                               MetricAggregator::SortedAttributesVector{{"key1", ""}});
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.gauge_data_.size(), 5);
@@ -1617,12 +1625,16 @@ TEST_F(MetricAggregatorTests, CounterAggregationDelta) {
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
 
-  metric_aggregator_->addCounter("metric1", /*value=*/10, /*delta=*/5, attr1);
-  metric_aggregator_->addCounter("metric2", /*value=*/20, /*delta=*/15, attr1);
-  metric_aggregator_->addCounter("metric1", /*value=*/15, /*delta=*/10, attr2); // Diff attribute
-
+  metric_aggregator_->addCounter("metric1", /*value=*/10, /*delta=*/5,
+                                 MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addCounter("metric2", /*value=*/20, /*delta=*/15,
+                                 MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addCounter(
+      "metric1", /*value=*/15, /*delta=*/10,
+      MetricAggregator::SortedAttributesVector{{"key2", ""}}); // Diff attribute
   metric_aggregator_->addCounter("metric1", /*value=*/25, /*delta=*/20,
-                                 attr1); // Collides with first
+                                 MetricAggregator::SortedAttributesVector{
+                                     {"key1", ""}}); // Collides with first // Collides with first
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.counter_data_.size(), 3);
@@ -1636,12 +1648,16 @@ TEST_F(MetricAggregatorTests, CounterAggregationCumulative) {
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
 
-  metric_aggregator_->addCounter("metric1", /*value=*/10, /*delta=*/5, attr1);
-  metric_aggregator_->addCounter("metric2", /*value=*/20, /*delta=*/15, attr1);
-  metric_aggregator_->addCounter("metric1", /*value=*/15, /*delta=*/10, attr2); // Diff attribute
-
-  metric_aggregator_->addCounter("metric1", /*value=*/25, /*delta=*/20,
-                                 attr1); // Collides with first
+  metric_aggregator_->addCounter("metric1", /*value=*/10, /*delta=*/5,
+                                 MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addCounter("metric2", /*value=*/20, /*delta=*/15,
+                                 MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addCounter(
+      "metric1", /*value=*/15, /*delta=*/10,
+      MetricAggregator::SortedAttributesVector{{"key2", ""}}); // Diff attribute
+  metric_aggregator_->addCounter(
+      "metric1", /*value=*/25, /*delta=*/20,
+      MetricAggregator::SortedAttributesVector{{"key1", ""}}); // Collides with first
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.counter_data_.size(), 3);
@@ -1659,8 +1675,12 @@ TEST_F(MetricAggregatorTests, CounterAggregationDifferentTagOrders) {
   MetricAggregator::SortedAttributesVector attr2 = {
       {"a", "1"}, {"b", "2"}, {"c", "3"}}; // Identical!
 
-  metric_aggregator_->addCounter("metric_perm", /*value=*/1, /*delta=*/1, attr1);
-  metric_aggregator_->addCounter("metric_perm", /*value=*/2, /*delta=*/2, attr2);
+  metric_aggregator_->addCounter(
+      "metric_perm", /*value=*/1, /*delta=*/1,
+      MetricAggregator::SortedAttributesVector{{"a", "1"}, {"b", "2"}, {"c", "3"}});
+  metric_aggregator_->addCounter(
+      "metric_perm", /*value=*/2, /*delta=*/2,
+      MetricAggregator::SortedAttributesVector{{"a", "1"}, {"b", "2"}, {"c", "3"}});
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.counter_data_.size(), 1);
@@ -1678,12 +1698,18 @@ TEST_F(MetricAggregatorTests, HistogramAggregationCumulative) {
   std::vector<uint64_t> computed_buckets2 = {4, 5, 6};
 
   mockHistogram(supported_buckets, computed_buckets1, 6, 60);
-  metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
-  metric_aggregator_->addHistogram("metric2", custom_stats_, attr1);
-  metric_aggregator_->addHistogram("metric1", custom_stats_, attr2); // Diff attribute
+  metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                   MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addHistogram("metric2", custom_stats_,
+                                   MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addHistogram(
+      "metric1", custom_stats_,
+      MetricAggregator::SortedAttributesVector{{"key2", ""}}); // Diff attribute
 
   mockHistogram(supported_buckets, computed_buckets2, 15, 150);
-  metric_aggregator_->addHistogram("metric1", custom_stats_, attr1); // Aggregates with first
+  metric_aggregator_->addHistogram(
+      "metric1", custom_stats_,
+      MetricAggregator::SortedAttributesVector{{"key1", ""}}); // Aggregates with first
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.histogram_data_.size(), 3);
@@ -1697,7 +1723,8 @@ TEST_F(MetricAggregatorTests, HistogramAggregationCumulative) {
   ASSERT_NE(dp2, nullptr);
   EXPECT_EQ(dp2->count_, 6);
 
-  auto* dp3 = getHistogramPoint(metrics, "metric1", attr2);
+  auto* dp3 =
+      getHistogramPoint(metrics, "metric1", MetricAggregator::SortedAttributesVector{{"key2", ""}});
   ASSERT_NE(dp3, nullptr);
   EXPECT_EQ(dp3->count_, 6);
 }
@@ -1712,8 +1739,8 @@ TEST_F(MetricAggregatorTests, HistogramAggregationDelta) {
                     /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
 
     // 1. Add a 0-count histogram -> should be ignored (early return)
-    mockHistogram(supported_buckets, {0, 0, 0}, 0, 0);
-    metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
+    metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                     MetricAggregator::SortedAttributesVector{{"key1", ""}});
 
     auto metrics = metric_aggregator_->releaseResult();
     EXPECT_TRUE(metrics.histogram_data_.empty());
@@ -1726,16 +1753,19 @@ TEST_F(MetricAggregatorTests, HistogramAggregationDelta) {
     // 2. Add valid data
     std::vector<uint64_t> computed_buckets1 = {1, 2, 3};
     mockHistogram(supported_buckets, computed_buckets1, 6, 60);
-    metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
-    metric_aggregator_->addHistogram("metric2", custom_stats_, attr1);
-
-    MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
-    metric_aggregator_->addHistogram("metric1", custom_stats_, attr2); // Diff attribute
+    metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                     MetricAggregator::SortedAttributesVector{{"key1", ""}});
+    metric_aggregator_->addHistogram("metric2", custom_stats_,
+                                     MetricAggregator::SortedAttributesVector{{"key1", ""}});
+    metric_aggregator_->addHistogram(
+        "metric1", custom_stats_,
+        MetricAggregator::SortedAttributesVector{{"key2", ""}}); // Diff attribute
 
     // 3. Add colliding data -> should aggregate (sum up)
     std::vector<uint64_t> computed_buckets2 = {4, 5, 6};
     mockHistogram(supported_buckets, computed_buckets2, 15, 150);
-    metric_aggregator_->addHistogram("metric1", custom_stats_, attr1);
+    metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                     MetricAggregator::SortedAttributesVector{{"key1", ""}});
 
     auto metrics = metric_aggregator_->releaseResult();
     EXPECT_EQ(metrics.histogram_data_.size(), 3);
@@ -1749,7 +1779,8 @@ TEST_F(MetricAggregatorTests, HistogramAggregationDelta) {
     ASSERT_NE(dp2, nullptr);
     EXPECT_EQ(dp2->count_, 6);
 
-    auto* dp3 = getHistogramPoint(metrics, "metric1", attr2);
+    auto* dp3 = getHistogramPoint(metrics, "metric1",
+                                  MetricAggregator::SortedAttributesVector{{"key2", ""}});
     ASSERT_NE(dp3, nullptr);
     EXPECT_EQ(dp3->count_, 6);
   }
@@ -1799,7 +1830,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestWithLimits) {
 
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   streamer_->addGauge("metric1", 1, {});
-  streamer_->addGauge("metric1", 2, attr1);
+  streamer_->addGauge("metric1", 2, std::move(attr1));
   streamer_->addGauge("metric2", 3, {});
   streamer_->send();
 
@@ -1823,8 +1854,8 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestGauge) {
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
 
-  streamer_->addGauge("metric1", 1, attr1);
-  streamer_->addGauge("metric1", 2, attr2);
+  streamer_->addGauge("metric1", 1, std::move(attr1));
+  streamer_->addGauge("metric1", 2, std::move(attr2));
   streamer_->send();
 
   EXPECT_EQ(requests_.size(), 2);
@@ -1839,8 +1870,8 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationCounter) {
   MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
 
   streamer_->addCounter("metric1", 10, 10, {});
-  streamer_->addCounter("metric1", 20, 20, attr1);
-  streamer_->addCounter("metric1", 30, 30, attr2);
+  streamer_->addCounter("metric1", 20, 20, std::move(attr1));
+  streamer_->addCounter("metric1", 30, 30, std::move(attr2));
   streamer_->send();
   EXPECT_EQ(requests_.size(), 2);
 
@@ -1874,7 +1905,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoAggregationCounter) {
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
 
   streamer_->addCounter("metric1", 10, 10, {});
-  streamer_->addCounter("metric1", 20, 20, attr1);
+  streamer_->addCounter("metric1", 20, 20, std::move(attr1));
   streamer_->send();
 
   EXPECT_EQ(requests_.size(), 2);
@@ -1898,7 +1929,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationHistogram) {
   MetricAggregator::CustomHistogram hist3{3, 30.0, {3}, {30.0}};
 
   streamer_->addHistogram("metric1", hist1, {});
-  streamer_->addHistogram("metric1", hist2, attr1);
+  streamer_->addHistogram("metric1", hist2, std::move(attr1));
   streamer_->addHistogram("metric2", hist3, {});
   streamer_->send();
   EXPECT_EQ(requests_.size(), 2);
@@ -1943,7 +1974,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoAggregationHistogram) 
   MetricAggregator::CustomHistogram hist2{2, 20.0, {2}, {20.0}};
 
   streamer_->addHistogram("metric1", hist1, {});
-  streamer_->addHistogram("metric1", hist2, attr1);
+  streamer_->addHistogram("metric1", hist2, std::move(attr1));
   streamer_->send();
 
   EXPECT_EQ(requests_.size(), 2);
