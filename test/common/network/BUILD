@@ -104,6 +104,7 @@ envoy_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:stats_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/api:api_mocks",

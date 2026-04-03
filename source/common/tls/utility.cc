@@ -12,6 +12,7 @@
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/ssl/ssl.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/x509v3.h"
@@ -624,7 +625,8 @@ std::vector<std::string> Utility::getCertificateCrlDpsForLogging(X509* cert) {
   if (dist_points != nullptr) {
     for (const DIST_POINT* dp : dist_points.get()) {
       if (dp->distpoint != nullptr && dp->distpoint->type == 0) {
-        GENERAL_NAMES* names = dp->distpoint->name.fullname;
+        GENERAL_NAMES* names =
+            ENVOY_OPENSSL_CAST(reinterpret_cast<GENERAL_NAMES*>, dp->distpoint->name.fullname);
         if (names != nullptr) {
           for (const GENERAL_NAME* general_name : names) {
             crldps.push_back(Utility::generalNameAsString(general_name));

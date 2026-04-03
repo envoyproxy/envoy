@@ -19,6 +19,7 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
+#include "source/common/ssl/ssl.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
@@ -1574,7 +1575,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamPrivateKeyInt
                          testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
 
 // Validate that a basic SDS updates work with a private key provider.
-TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
+BORINGSSL_TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
   v3_resource_api_ = true;
 
   TestEnvironment::exec(
@@ -1634,7 +1635,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsCdsPrivateKeyIntegrationTest,
                          testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
 
 // Test private key providers in SDS+CDS setup.
-TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
+BORINGSSL_TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
   v3_resource_api_ = true;
 
   TestEnvironment::exec(

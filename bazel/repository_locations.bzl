@@ -72,6 +72,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "aws-lc-{version}",
         urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
     ),
+    openssl = dict(
+        version = "3.5.5",
+        sha256 = "b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89",
+        strip_prefix = "openssl-{version}",
+        urls = ["https://github.com/openssl/openssl/releases/download/openssl-{version}/openssl-{version}.tar.gz"],
+    ),
     aspect_bazel_lib = dict(
         version = "2.21.2",
         sha256 = "53cadea9109e646a93ed4dc90c9bbcaa8073c7c3df745b92f6a5000daf7aa3da",

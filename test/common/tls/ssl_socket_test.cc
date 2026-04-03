@@ -16,6 +16,7 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
@@ -971,6 +972,11 @@ public:
   TestUtilOptionsV2& setExpectedTransportFailureReasonContains(
       const std::string& expected_transport_failure_reason_contains) {
     expected_transport_failure_reason_contains_ = expected_transport_failure_reason_contains;
+#ifdef ENVOY_SSL_OPENSSL
+    if (expected_transport_failure_reason_contains_ == "TLSV1.*_BAD_CERTIFICATE_HASH_VALUE") {
+      expected_transport_failure_reason_contains_ = "ssl/tls alert handshake failure";
+    }
+#endif
     return *this;
   }
 
@@ -2385,7 +2391,8 @@ TEST_P(SslSocketTest, CertWithNotECCapable) {
   // TODO(luyao): We might need to modify ssl socket to set proper stats for failed handshake
   testUtil(test_options.setExpectedServerStats("")
                .setExpectedSni("server1.example.com")
-               .setExpectedTransportFailureReasonContains("HANDSHAKE_FAILURE_ON_CLIENT_HELLO"));
+               .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                   "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
 }
 
 TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
@@ -2836,7 +2843,8 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
   testUtil(test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY));
+               .setExpectedVerifyErrorCode(SSL_SELECT(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY,
+                                                      X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)));
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
@@ -2930,7 +2938,8 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_CERTIFICATE_EXPIRED"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_CERTIFICATE_EXPIRED", "ssl/tls alert certificate expired")));
 }
 
 // Expired certificates will not be accepted when explicitly disallowed via
@@ -2945,7 +2954,8 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_CERTIFICATE_EXPIRED"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_CERTIFICATE_EXPIRED", "ssl/tls alert certificate expired")));
 }
 
 // Expired certificates will be accepted when explicitly allowed via allow_expired_certificate.
@@ -3462,7 +3472,8 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3490,7 +3501,8 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertifi
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3700,7 +3712,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCert
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3729,7 +3742,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClient
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -5553,7 +5567,7 @@ TEST_P(SslSocketTest, SslError) {
   EXPECT_EQ(1UL, server_stats_store.counter("ssl.connection_error").value());
 }
 
-TEST_P(SslSocketTest, ProtocolVersions) {
+BORINGSSL_TEST_P(SslSocketTest, ProtocolVersions) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
@@ -6377,10 +6391,12 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-  // Ensure that complete crl chains succeed with unrevoked certificates.
+// Ensure that complete crl chains succeed with unrevoked certificates.
+#ifndef ENVOY_SSL_OPENSSL
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
+#endif
 }
 
 TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
@@ -6463,10 +6479,12 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-  // Ensure that complete crl chains succeed with unrevoked certificates.
+// Ensure that complete crl chains succeed with unrevoked certificates.
+#ifndef ENVOY_SSL_OPENSSL
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
+#endif
 }
 
 TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
@@ -7095,7 +7113,7 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
 }
 
 // Test asynchronous signing (ECDHE) using a private key provider.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7129,7 +7147,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
 }
 
 // Test asynchronous decryption (RSA).
-TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
@@ -7166,7 +7184,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
 }
 
 // Test synchronous signing (ECDHE).
-TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7200,7 +7218,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
 }
 
 // Test synchronous decryption (RSA).
-TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
@@ -7237,7 +7255,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
 }
 
 // Test fallback for key provider.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderFallbackSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderFallbackSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
@@ -7278,7 +7296,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderFallbackSuccess) {
 }
 
 // Test asynchronous signing (ECDHE) failure (invalid signature).
-TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7313,7 +7331,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignFailure) {
 }
 
 // Test synchronous signing (ECDHE) failure (invalid signature).
-TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7348,7 +7366,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
 }
 
 // Test the sign operation return with an error.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderSignFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderSignFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7382,7 +7400,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSignFailure) {
 }
 
 // Test the decrypt operation return with an error.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
@@ -7419,7 +7437,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
 }
 
 // Test the sign operation return with an error in complete.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignCompleteFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignCompleteFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7454,7 +7472,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignCompleteFailure) {
 }
 
 // Test the decrypt operation return with an error in complete.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
@@ -7495,7 +7513,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
 
 // Test having one cert with private key method and another with just
 // private key.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertSuccess) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -7535,7 +7553,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertSuccess) {
 // Test having two certs with private key methods. This will
 // synchronously fail because the second certificate is a ECDSA one and
 // the RSA method can't handle it.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -7581,7 +7599,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
 }
 
 // Test ECDSA private key method provider mode.
-TEST_P(SslSocketTest, EcdsaPrivateKeyProviderSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, EcdsaPrivateKeyProviderSuccess) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -7615,7 +7633,7 @@ TEST_P(SslSocketTest, EcdsaPrivateKeyProviderSuccess) {
 // Test having two certs with different private key method modes. It's expected that the ECDSA
 // provider mode is being used. RSA provider mode is set to fail with "async_method_error", but
 // that's not happening.
-TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertSuccess) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -7659,7 +7677,7 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertSuccess) {
 }
 
 // Test having two certs with different private key method modes. ECDSA provider is set to fail.
-TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
+BORINGSSL_TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -7705,7 +7723,7 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
 }
 
 // Test private key provider and cert validation can work together.
-TEST_P(SslSocketTest, PrivateKeyProviderWithCertValidation) {
+BORINGSSL_TEST_P(SslSocketTest, PrivateKeyProviderWithCertValidation) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -8027,7 +8045,7 @@ TEST_P(SslSocketTest, Sni) {
   testUtil(test_options.setExpectedSni("foo.bar.com"));
 }
 
-TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
+BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -8070,7 +8088,7 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
-TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
+BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -8108,7 +8126,7 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 }
 
-TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
+BORINGSSL_TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
@@ -8138,7 +8156,7 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
   testUtilV2(test_options);
 }
 
-TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
+BORINGSSL_TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
