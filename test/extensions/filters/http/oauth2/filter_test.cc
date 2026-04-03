@@ -4613,15 +4613,11 @@ TEST_F(OAuth2Test, EmptyRouteSpecificConfigOverridesGlobalConfig) {
       {Http::Headers::get().Scheme.get(), "https"},
   };
 
-  ASSERT_NE(filter_->config_, nullptr);
-  ASSERT_NE(filter_->validator_, nullptr);
-  ASSERT_NE(filter_->oauth_client_, nullptr);
-
   ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig()).WillByDefault(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _)).Times(0);
+  EXPECT_CALL(*oauth_client_, asyncRefreshAccessToken(_, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(filter_->config_, nullptr);
-  EXPECT_EQ(filter_->validator_, nullptr);
-  EXPECT_EQ(filter_->oauth_client_, nullptr);
 }
 
 // Verify cookie prefixes "__Secure-" and "__Host-" cause addition of the "Secure" attribute at
