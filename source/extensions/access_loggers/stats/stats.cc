@@ -17,68 +17,6 @@ namespace {
 
 using Extensions::Matching::Actions::TransformStat::ActionContext;
 
-class AccessLogState : public StreamInfo::FilterState::Object {
-public:
-  AccessLogState(Stats::ScopeSharedPtr scope) : scope_(std::move(scope)) {}
-
-  // When the request is destroyed, we need to subtract the value from the gauge.
-  // We need to look up the gauge again in the scope because it might have been evicted.
-  // The gauge object itself is kept alive by the shared_ptr in the state, so we can access its
-  // name and tags to re-lookup/re-create it in the scope.
-  ~AccessLogState() override {
-    for (const auto& [gauge_ptr, state] : inflight_gauges_) {
-      // TODO(taoxuy):  make this as an accessor of the
-      // Stat class.
-      Stats::StatNameTagVector tag_names;
-      state.gauge_->iterateTagStatNames(
-          [&tag_names](Stats::StatName name, Stats::StatName value) -> bool {
-            tag_names.emplace_back(name, value);
-            return true;
-          });
-
-      // Using state.gauge_->statName() directly would be incorrect because it returns the fully
-      // qualified name (including tags). Passing this full name to scope_->gaugeFromStatName(...)
-      // would cause the scope to attempt tag extraction on the full name. Since the tags in
-      // AccessLogState are often dynamic and not configured in the global tag extractors, this
-      // extraction would likely fail to identify the tags correctly, resulting in a gauge with a
-      // different identity (the full name as the stat name and no tags).
-      auto& gauge = scope_->gaugeFromStatNameWithTags(
-          state.gauge_->tagExtractedStatName(), tag_names, Stats::Gauge::ImportMode::Accumulate);
-      gauge.sub(state.value_);
-    }
-  }
-
-  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
-    inflight_gauges_.try_emplace(gauge, Stats::GaugeSharedPtr(gauge), value);
-  }
-
-  absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
-    auto it = inflight_gauges_.find(gauge);
-    if (it == inflight_gauges_.end()) {
-      return absl::nullopt;
-    }
-    uint64_t value = it->second.value_;
-    inflight_gauges_.erase(it);
-    return value;
-  }
-
-  static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
-
-private:
-  struct State {
-    State(Stats::GaugeSharedPtr gauge, uint64_t value) : gauge_(std::move(gauge)), value_(value) {}
-
-    Stats::GaugeSharedPtr gauge_;
-    uint64_t value_;
-  };
-
-  Stats::ScopeSharedPtr scope_;
-
-  // The map key holds a raw pointer to the gauge. The value holds a ref-counted pointer to ensure
-  // the gauge is not destroyed if it is evicted from the stats scope.
-  absl::flat_hash_map<Stats::Gauge*, State> inflight_gauges_;
-};
-
 Formatter::FormatterProviderPtr
 parseValueFormat(absl::string_view format,
                  const std::vector<Formatter::CommandParserPtr>& commands) {
@@ -137,6 +75,95 @@ public:
 };
 
 } // namespace
+
+AccessLogState::~AccessLogState() {
+  for (const auto& p : inflight_gauges_) {
+    Stats::Gauge& gauge_stat = parent_->scope().gaugeFromStatNameWithTags(
+        p.first.statName(), p.first.tags(), p.second.import_mode_);
+    gauge_stat.sub(p.second.value_);
+  }
+}
+
+void AccessLogState::addInflightGauge(Stats::StatName stat_name,
+                                      Stats::StatNameTagVectorOptConstRef tags,
+                                      Stats::Gauge::ImportMode import_mode, uint64_t value,
+                                      std::vector<Stats::StatNameDynamicStorage> tags_storage) {
+  if (value == 0) {
+    return;
+  }
+
+  GaugeKey key{stat_name, tags};
+
+  auto it = inflight_gauges_.find(key);
+  if (it == inflight_gauges_.end()) {
+    key.makeOwned();
+    auto [new_it, inserted] = inflight_gauges_.emplace(
+        std::move(key), InflightGauge{std::move(tags_storage), 0, import_mode});
+    it = new_it;
+  }
+  it->second.value_ += value;
+  parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode).add(value);
+}
+
+void AccessLogState::removeInflightGauge(Stats::StatName stat_name,
+                                         Stats::StatNameTagVectorOptConstRef tags,
+                                         Stats::Gauge::ImportMode import_mode, uint64_t value) {
+  if (value == 0) {
+    return;
+  }
+
+  GaugeKey key{stat_name, tags};
+
+  Stats::Gauge& gauge_stat =
+      parent_->scope().gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+
+  auto it = inflight_gauges_.find(key);
+  const bool was_found = (it != inflight_gauges_.end());
+  if (was_found) {
+    ENVOY_BUG(it->second.value_ >= value, "Connection gauge underflow in removeInflightGauge");
+    it->second.value_ -= value;
+    gauge_stat.sub(value);
+    if (it->second.value_ == 0) {
+      inflight_gauges_.erase(it);
+    }
+  } else {
+    ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10),
+                            "Stats access logger gauge paired subtract was skipped due to no "
+                            "corresponding add, possibly due to misconfigured events: {}",
+                            parent_->scope().symbolTable().toString(stat_name));
+  }
+}
+
+GaugeKey::GaugeKey(Stats::StatName stat_name, Stats::StatNameTagVectorOptConstRef borrowed_tags)
+    : stat_name_(stat_name), borrowed_tags_(borrowed_tags) {}
+
+void GaugeKey::makeOwned() {
+  ASSERT(!(borrowed_tags_.has_value() && owned_tags_.has_value()),
+         "Both borrowed and owned tags are present in GaugeKey::makeOwned");
+  if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
+    owned_tags_ = borrowed_tags_.value().get();
+    borrowed_tags_ = absl::nullopt;
+  }
+}
+
+Stats::StatNameTagVectorOptConstRef GaugeKey::tags() const {
+  if (owned_tags_.has_value()) {
+    return std::cref(owned_tags_.value());
+  }
+  return borrowed_tags_;
+}
+
+bool GaugeKey::operator==(const GaugeKey& rhs) const {
+  if (stat_name_ != rhs.stat_name_) {
+    return false;
+  }
+  Stats::StatNameTagVectorOptConstRef lhs_tags = tags();
+  Stats::StatNameTagVectorOptConstRef rhs_tags = rhs.tags();
+  if (lhs_tags.has_value() != rhs_tags.has_value()) {
+    return false;
+  }
+  return !lhs_tags.has_value() || lhs_tags.value().get() == rhs_tags.value().get();
+}
 
 StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v3::Config& config,
                                Server::Configuration::GenericFactoryContext& context,
@@ -417,31 +444,28 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   Stats::Gauge::ImportMode import_mode = op == Gauge::OperationType::SET
                                              ? Stats::Gauge::ImportMode::NeverImport
                                              : Stats::Gauge::ImportMode::Accumulate;
-  auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
 
-  if (op == Gauge::OperationType::PAIRED_ADD || op == Gauge::OperationType::PAIRED_SUBTRACT) {
+  if (op == Gauge::OperationType::SET) {
+    Stats::Gauge& gauge_stat =
+        scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
+    gauge_stat.set(value);
+  } else if (op == Gauge::OperationType::PAIRED_ADD ||
+             op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
-      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(scope_),
-                           StreamInfo::FilterState::StateType::Mutable,
-                           StreamInfo::FilterState::LifeSpan::Request);
+      // TODO(TAOXUY): Create a new PR that adds test coverage around any corner cases of which
+      // level should be used, and adds this comment or an updated version.
+      filter_state.setData(
+          AccessLogState::key(), std::make_shared<AccessLogState>(shared_from_this()),
+          StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
     if (op == Gauge::OperationType::PAIRED_ADD) {
-      state->addInflightGauge(&gauge_stat, value);
-      gauge_stat.add(value);
+      state->addInflightGauge(gauge.stat_.name_, tags, import_mode, value, std::move(storage));
     } else {
-      absl::optional<uint64_t> added_value = state->removeInflightGauge(&gauge_stat);
-      if (added_value.has_value()) {
-        gauge_stat.sub(added_value.value());
-      }
+      state->removeInflightGauge(gauge.stat_.name_, tags, import_mode, value);
     }
-    return;
-  }
-
-  if (op == Gauge::OperationType::SET) {
-    gauge_stat.set(value);
   }
 }
 

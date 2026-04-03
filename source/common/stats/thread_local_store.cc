@@ -1130,15 +1130,22 @@ void ThreadLocalStoreImpl::evictUnused() {
         MetricBag metrics(scope->scope_id_);
         CentralCacheEntrySharedPtr& central_cache = scope->centralCacheMutableNoThreadAnalysis();
         auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
-          return [&unused_metrics](std::pair<StatName, T> kv) {
+          return [&unused_metrics](const std::pair<const StatName, T>& kv) {
             const auto& [name, metric] = kv;
+            // Evictable scopes can contain counters, gauges, text-readouts, and histograms. For all
+            // the gauges we find in one, we treat them as up/down counters that become evictable
+            // when they hit zero.
+            if constexpr (std::is_same_v<T, GaugeSharedPtr>) {
+              if (metric->value() != 0) {
+                return false;
+              }
+            }
             if (metric->used()) {
               metric->markUnused();
               return false;
-            } else {
-              unused_metrics.try_emplace(name, metric);
-              return true;
             }
+            unused_metrics.try_emplace(name, metric);
+            return true;
           };
         };
         absl::erase_if(central_cache->counters_, filter_unused(metrics.counters_));
