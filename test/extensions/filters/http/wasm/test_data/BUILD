@@ -39,6 +39,14 @@ wasm_rust_binary(
 )
 
 wasm_rust_binary(
+    name = "deferred_data_rust.wasm",
+    srcs = ["deferred_data_rust.rs"],
+    deps = [
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+    ],
+)
+
+wasm_rust_binary(
     name = "grpc_call_rust.wasm",
     srcs = ["grpc_call_rust.rs"],
     deps = [
