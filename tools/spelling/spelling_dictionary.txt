@@ -194,6 +194,8 @@ ENOENT
 ENV
 EOF
 EOS
+EPOLLHUP
+EPOLLOUT
 EQ
 ERANGE
 EV
@@ -669,6 +671,7 @@ bulkstring
 bulkstrings
 bursty
 bytecode
+bytearray
 bytestream
 bytestring
 cacert
@@ -842,6 +845,7 @@ evbuffers
 evconnlistener
 evented
 eventfd
+eventstream
 evwatch
 exe
 execlp
@@ -986,6 +990,7 @@ iteratively
 javascript
 jitter
 jittered
+jemalloc
 joinable
 js
 kafka
@@ -1685,3 +1690,4 @@ lcalpha
 nblk
 chr
 IWYU
+CRTP

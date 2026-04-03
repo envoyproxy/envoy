@@ -1,5 +1,5 @@
-load("@dynamic_modules_rust_sdk_crate_index//:defs.bzl", "all_crate_deps")
 load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
+load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library")
 load(
@@ -10,6 +10,8 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
+
+exports_files(["Cargo.toml"])
 
 cargo_build_script(
     name = "build_script",
@@ -31,6 +33,11 @@ cargo_build_script(
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/lib_legacy/clang/18/include",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/x86_64-unknown-linux-gnu/c++/v1/",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/aarch64-unknown-linux-gnu/c++/v1/",
+                # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
+                "-isystem $${pwd}/external/sysroot_linux_x86_64/usr/include",
+                "-isystem $${pwd}/external/sysroot_linux_x86_64/usr/include/x86_64-linux-gnu",
+                "-isystem $${pwd}/external/sysroot_linux_arm64/usr/include",
+                "-isystem $${pwd}/external/sysroot_linux_arm64/usr/include/aarch64-linux-gnu",
             ]),
         },
         "//conditions:default": {},
@@ -44,6 +51,11 @@ cargo_build_script(
             "@llvm_toolchain_llvm//:lib/libclang.so",
             "@llvm_toolchain_llvm//:lib_legacy",
         ],
+        "//conditions:default": [],
+    }) + select({
+        # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
+        "@platforms//cpu:x86_64": ["@sysroot_linux_amd64//:headers"],
+        "@platforms//cpu:aarch64": ["@sysroot_linux_arm64//:headers"],
         "//conditions:default": [],
     }),
     edition = "2021",

@@ -175,7 +175,7 @@ LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_
     return std::make_unique<CgroupV1CpuStatsReader>(fs, time_source);
   }
 
-  throw EnvoyException("No supported cgroup CPU implementation found");
+  throw EnvoyException(std::string(NoSupportedCGroupMessage));
 }
 
 CgroupV1CpuStatsReader::CgroupV1CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)

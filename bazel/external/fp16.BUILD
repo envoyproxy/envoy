@@ -10,6 +10,7 @@ cc_library(
         "include/fp16.h",
         "include/fp16/bitcasts.h",
         "include/fp16/fp16.h",
+        "include/fp16/macros.h",
     ],
     includes = ["include/"],
 )

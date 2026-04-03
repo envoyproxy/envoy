@@ -1509,6 +1509,35 @@ certificate, or no serial number.
 Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
 peer certificate, or no issuer.
 
+``sha256PeerCertificateIssuerDigest()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sha256PeerCertificateIssuerDigest()
+
+Returns the hex-encoded SHA-256 fingerprint of the direct issuer certificate from the
+validated peer certificate chain. The issuer is the second certificate in the validated chain
+(i.e., the certificate that directly signed the peer leaf certificate), as determined by
+BoringSSL during the TLS handshake. Requires the peer certificate chain to have been
+successfully validated (e.g., mTLS with ``require_client_certificate: true`` and a
+``validation_context``). Returns ``""`` if there is no validated peer certificate chain or
+the validated chain contains fewer than two certificates.
+
+``serialNumberPeerCertificateIssuer()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:serialNumberPeerCertificateIssuer()
+
+Returns the serial number of the direct issuer certificate from the validated peer certificate
+chain. The issuer is the second certificate in the validated chain (i.e., the certificate that
+directly signed the peer leaf certificate), as determined by BoringSSL during the TLS handshake.
+Requires the peer certificate chain to have been successfully validated (e.g., mTLS with
+``require_client_certificate: true`` and a ``validation_context``). Returns ``""`` if there is
+no validated peer certificate chain or the validated chain contains fewer than two certificates.
+
 ``subjectPeerCertificate()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

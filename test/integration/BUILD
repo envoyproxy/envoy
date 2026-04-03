@@ -577,6 +577,26 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_service_headers_integration_test",
+    size = "large",
+    srcs = ["http_service_headers_integration_test.cc"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/access_loggers/open_telemetry:config",
+        "//source/extensions/formatter/file_content:config",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/formatter/file_content/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "http_conn_pool_integration_test",
     size = "large",
     srcs = ["http_conn_pool_integration_test.cc"],
