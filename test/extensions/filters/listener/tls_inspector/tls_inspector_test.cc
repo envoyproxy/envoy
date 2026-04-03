@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <numeric>
 #include <vector>
 
 #include "source/common/common/hex.h"
@@ -51,8 +52,8 @@ void append_u24(std::vector<uint8_t>& vec, uint32_t val) {
   vec.push_back(val & 0xFF);
 }
 
-std::vector<uint8_t> CreateClientHello(std::string host_name = "test.google.com",
-                                       size_t padding_size = 0, bool include_extensions = true,
+std::vector<uint8_t> CreateClientHello(absl::string_view host_name, size_t padding_size = 0,
+                                       bool include_extensions = true,
                                        uint16_t tls_version = 0x0303) {
   std::vector<uint8_t> hello;
 

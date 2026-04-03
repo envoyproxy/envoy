@@ -18,8 +18,8 @@
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/tls/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/utility.h"
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
 #include "absl/strings/str_cat.h"
