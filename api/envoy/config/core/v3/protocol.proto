@@ -836,8 +836,8 @@ message Http3ProtocolOptions {
 
   // Whether to disallow obsolete text in header field values.
   // If not set, it defaults to true for alignment with current behavior.
-  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
-  // obs-text = %x80-FF
+  // As defined in RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
+  // an obs-text character is a character in the range %x80-FF
   google.protobuf.BoolValue disallow_obs_text = 9;
 }
 
