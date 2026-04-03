@@ -85,9 +85,8 @@ FilterConfig::getBucketById(const absl::optional<std::string>& id, absl::string_
   if (!id) {
     return nullptr;
   }
-  std::shared_ptr<FairTokenBucket::Bucket> bucket =
-      bucket_singleton_->getBucket(*request_bucket_id_);
-  if (bucket->disabled()) {
+  std::shared_ptr<FairTokenBucket::Bucket> bucket = bucket_singleton_->getBucket(*id);
+  if (!bucket) {
     return nullptr;
   }
   return std::make_shared<FairTokenBucket::Client>(std::move(bucket), tenant,

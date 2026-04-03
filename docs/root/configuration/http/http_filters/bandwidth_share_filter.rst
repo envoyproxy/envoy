@@ -5,11 +5,11 @@ Bandwidth share
 
 * Bandwidth limiting :ref:`architecture overview <arch_overview_bandwidth_limit>`
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare``.
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthLimit>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare>`
 
 The HTTP Bandwidth share filter limits the size of data flow to the max bandwidth set in the ``limit_kbps``
 when the request's route, virtual host or filter chain has a
-:ref:`bandwidth share configuration <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthLimit>`.
+:ref:`bandwidth share configuration <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare>`.
 
 If the bandwidth limit has been exhausted the filter stops further transfer until more bandwidth gets allocated
 according to the ``fill_interval`` (default is 50 milliseconds). If the connection buffer fills up with accumulated
@@ -47,25 +47,22 @@ Example filter configuration for a globally enabled bandwidth share but disabled
 Statistics
 ----------
 
-The HTTP bandwidth share filter outputs statistics in the ``<stat_prefix>.http_bandwidth_share.`` namespace.
+The HTTP bandwidth share filter outputs statistics in the ``<stat_prefix>.bandwidth_share.`` namespace.
+
+All metrics are emitted with the following tags:
+
+* ``bucket_id`` (may be empty-string, as configured in ``request_limit`` or ``response_limit``)
+* ``tenant`` (if not explicitly configured for inclusion with ``include_stats_tag`` in ``tenant_config``, will be empty-string)
+* ``direction`` (``request`` or ``response``)
+
+The counter ``bytes`` is additionally emitted with the following tag:
+
+* ``handling`` (``limited`` or ``not_limited`` - ``not_limited`` is used for bytes for which the limiter remained in "fast" mode as the configured limit had not been approached.)
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  bytes_unlimited, Counter, Total number of bytes for which the bandwidth share filter was consulted
-  bytes_limited, Counter, Total number of bytes for which the bandwidth share filter added a delay
-  streams_currently_limited, GAUGE, Number of request streams which are currently pending transfer in bandwidth share filter
-  request_incoming_size, GAUGE, Size in bytes of incoming request data to bandwidth share filter
-  request_allowed_size, GAUGE, Size in bytes of outgoing request data from bandwidth share filter
-  request_incoming_total_size, Counter, Total size in bytes of incoming request data to bandwidth share filter
-  request_allowed_total_size, Counter, Total size in bytes of outgoing request data from bandwidth share filter
-  request_transfer_duration, HISTOGRAM, Total time (including added delay) it took for the request stream transfer
-  response_enabled, Counter, Total number of response streams for which the bandwidth share filter was consulted
-  response_enforced, Counter, Total number of response streams for which the bandwidth share filter was enforced
-  response_pending, GAUGE, Number of response streams which are currently pending transfer in bandwidth share filter
-  response_incoming_size, GAUGE, Size in bytes of incoming response data to bandwidth share filter
-  response_allowed_size, GAUGE, Size in bytes of outgoing response data from bandwidth share filter
-  response_incoming_total_size, Counter, Total size in bytes of incoming response data to bandwidth share filter
-  response_allowed_total_size, Counter, Total size in bytes of outgoing response data from bandwidth share filter
-  response_transfer_duration, HISTOGRAM, Total time (including added delay) it took for the response stream transfer
+  bytes, Counter, Number of bytes for which the bandwidth share filter was consulted.
+  streams_currently_limited, Gauge, Number of streams that are currently experiencing delays.
+  bytes_pending, Gauge, Number of bytes that are currently buffered due to delays.
