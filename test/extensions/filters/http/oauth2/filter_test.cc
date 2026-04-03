@@ -4605,6 +4605,25 @@ TEST_F(OAuth2Test, RouteSpecificConfigOverridesGlobalConfig) {
   EXPECT_EQ(scope_.counterFromString("test.oauth_passthrough").value(), 1);
 }
 
+TEST_F(OAuth2Test, EmptyRouteSpecificConfigOverridesGlobalConfig) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/resource"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  ASSERT_NE(filter_->config_, nullptr);
+  ASSERT_NE(filter_->validator_, nullptr);
+  ASSERT_NE(filter_->oauth_client_, nullptr);
+
+  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig()).WillByDefault(Return(nullptr));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(filter_->config_, nullptr);
+  EXPECT_EQ(filter_->validator_, nullptr);
+  EXPECT_EQ(filter_->oauth_client_, nullptr);
+}
+
 // Verify cookie prefixes "__Secure-" and "__Host-" cause addition of the "Secure" attribute at
 // signout.
 TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
