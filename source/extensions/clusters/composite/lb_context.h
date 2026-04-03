@@ -67,7 +67,7 @@ public:
     return context_->upstreamTransportSocketOptions();
   }
 
-  absl::optional<OverrideHost> overrideHostToSelect() const override {
+  OptRef<const OverrideHost> overrideHostToSelect() const override {
     return context_->overrideHostToSelect();
   }
 

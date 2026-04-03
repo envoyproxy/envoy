@@ -1,13 +1,13 @@
 # This should match the schema defined in external_deps.bzl.
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_skylib = dict(
-        version = "1.8.2",
-        sha256 = "6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446",
+        version = "1.9.0",
+        sha256 = "3b5b49006181f5f8ff626ef8ddceaa95e9bb8ad294f7b5d7b11ea9f7ddaf8c59",
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
     ),
     com_envoyproxy_protoc_gen_validate = dict(
-        sha256 = "0ce70c9d0bc3381e2fde48e169589f477522cb3adcbb8be327b069d0071430aa",
-        version = "1.3.0",
+        sha256 = "20da84f8efe8f53c10cbde79d2cdd1e63365b0ae1ad9de22af56aa1a49d59330",
+        version = "1.3.3",
         urls = ["https://github.com/bufbuild/protoc-gen-validate/archive/refs/tags/v{version}.zip"],
         strip_prefix = "protoc-gen-validate-{version}",
     ),
@@ -56,8 +56,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_proto/archive/refs/tags/{version}.tar.gz"],
     ),
     opentelemetry_proto = dict(
-        version = "1.9.0",
-        sha256 = "2d2220db196bdfd0aec872b75a5e614458f8396557fc718b28017e1a08db49e4",
+        version = "1.10.0",
+        sha256 = "52c85df79badc45da7e6a8735e8090b05a961b0208756187e1492a40db2d1f5f",
         strip_prefix = "opentelemetry-proto-{version}",
         urls = ["https://github.com/open-telemetry/opentelemetry-proto/archive/v{version}.tar.gz"],
     ),

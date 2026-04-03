@@ -26,14 +26,13 @@ impl Default for EnvoyBuffer<'_> {
 }
 
 impl EnvoyBuffer<'_> {
-  /// This is a helper function to create an [`EnvoyBuffer`] from a static string.
+  /// This is a helper function to create an [`EnvoyBuffer`] from a byte slice.
   ///
   /// This is meant for use by the end users in unit tests.
-  // TODO: relax the lifetime constraint to 'static, so that it becomes more flexible.
-  pub fn new(static_str: &'static str) -> Self {
+  pub fn new(s: &[u8]) -> Self {
     Self {
-      raw_ptr: static_str.as_ptr(),
-      length: static_str.len(),
+      raw_ptr: s.as_ptr(),
+      length: s.len(),
       _marker: std::marker::PhantomData,
     }
   }
@@ -53,6 +52,9 @@ impl EnvoyBuffer<'_> {
   }
 
   pub fn as_slice(&self) -> &[u8] {
+    if self.raw_ptr.is_null() {
+      return &[];
+    }
     unsafe { std::slice::from_raw_parts(self.raw_ptr, self.length) }
   }
 }
@@ -103,13 +105,19 @@ impl EnvoyMutBuffer<'_> {
     }
   }
 
-  /// This returns a immutable slice to the underlying memory region managed by Envoy.
+  /// This returns an immutable slice to the underlying memory region managed by Envoy.
   pub fn as_slice(&self) -> &[u8] {
+    if self.raw_ptr.is_null() {
+      return &[];
+    }
     unsafe { std::slice::from_raw_parts(self.raw_ptr, self.length) }
   }
 
   /// This returns a mutable slice to the underlying memory region managed by Envoy.
   pub fn as_mut_slice(&mut self) -> &mut [u8] {
+    if self.raw_ptr.is_null() {
+      return &mut [];
+    }
     unsafe { std::slice::from_raw_parts_mut(self.raw_ptr, self.length) }
   }
 }

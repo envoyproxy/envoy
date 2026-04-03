@@ -12,7 +12,10 @@ load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
 
-exports_files(["VERSION"])
+exports_files([
+    "VERSION",
+    "pyproject.toml",
+])
 
 alias(
     name = "ios_xcframework",

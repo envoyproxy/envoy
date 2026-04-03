@@ -146,10 +146,12 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // Http::StreamFilterCallbacks
   OptRef<const Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
-  Router::RouteConstSharedPtr route() override;
+  OptRef<const Router::Route> route() override;
+  Router::RouteConstSharedPtr routeSharedPtr() override;
   void resetStream(Http::StreamResetReason reset_reason,
                    absl::string_view transport_failure_reason) override;
-  Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
+  OptRef<const Upstream::ClusterInfo> clusterInfo() override;
+  Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() override;
   uint64_t streamId() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   Tracing::Span& activeSpan() override;
@@ -194,7 +196,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     return saved_response_metadata_.get();
   }
 
-  Router::RouteConstSharedPtr getRoute() const;
+  Router::RouteConstSharedPtr getRouteSharedPtr() const;
+  OptRef<const Router::Route> getRoute() const;
 
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
@@ -298,7 +301,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
   Buffer::BufferMemoryAccountSharedPtr account() const override;
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
-  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
   bool shouldLoadShed() const override;
   void sendGoAwayAndClose(bool graceful = false) override;
 
@@ -529,7 +532,13 @@ public:
   /**
    * Returns the cluster info for the current route entry.
    */
-  virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
+  virtual OptRef<const Upstream::ClusterInfo> clusterInfo() PURE;
+
+  /**
+   * @return ClusterInfoConstSharedPtr the cluster info for the current route entry, extended to
+   * allow a caller to extend or transfer ownership.
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() PURE;
 
   /**
    * Returns the current active span.
@@ -1016,10 +1025,10 @@ private:
 
     void setFilterConfigName(absl::string_view name) override { filter_config_name_ = name; }
 
-    OptRef<const Router::Route> route() const override { return makeOptRefFromPtr(route_.get()); }
+    OptRef<const Router::Route> route() const override { return route_; }
 
     absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
-      return route_ != nullptr ? route_->filterDisabled(config_name) : absl::nullopt;
+      return route_ ? route_->filterDisabled(config_name) : absl::nullopt;
     }
 
     const StreamInfo::StreamInfo& streamInfo() const override { return manager_.streamInfo(); }
@@ -1031,7 +1040,9 @@ private:
   private:
     FilterManager& manager_;
     absl::string_view filter_config_name_;
-    Router::RouteConstSharedPtr route_;
+    // Reference here is safe because the callbacks are only used during filter chain creation,
+    // at which point the route cannot change.
+    OptRef<const Router::Route> route_;
   };
 
   // Indicates which filter to start the iteration with.
@@ -1130,7 +1141,7 @@ private:
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
       std::make_shared<Network::Socket::Options>();
-  std::pair<std::string, bool> upstream_override_host_;
+  Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
 
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.

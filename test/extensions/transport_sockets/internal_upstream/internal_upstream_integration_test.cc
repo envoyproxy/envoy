@@ -325,5 +325,30 @@ TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest5KB) {
                       internalConnectionBufferSizeTest());
 }
 
+TEST_F(InternalUpstreamIntegrationTest, TcpProxyHalfCloseLeak) {
+  // Setup the environment with the internal listeners and TCP proxy filter chains.
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      codec_client_->makeRequestWithBody(default_request_headers_, 1024, true /* end_stream */);
+  waitForNextUpstreamRequest();
+
+  // Tear down the client side of the internal connection. This leaves the server side of the
+  // internal connection unaware that the client is dead.
+  codec_client_->close();
+
+  // Upstream sends final data and immediately closes. This puts the internal connection into the
+  // CloseAfterFlush state waiting for a Write event to drain the buffer.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1024, true);
+  cleanupUpstreamAndDownstream();
+
+  // Verify that the connection does not leak by waiting for the active connection gauge to drop to
+  // zero. If the server side of the internal connection fails to clean up the downstream connection
+  // then this wait will time out because the connection is stuck in CloseAfterFlush indefinitely.
+  test_server_->waitForGaugeEq("listener.envoy_internal_internal_listener.downstream_cx_active", 0);
+}
+
 } // namespace
 } // namespace Envoy

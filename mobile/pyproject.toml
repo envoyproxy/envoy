@@ -1,2 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "envoy-mobile-client"
+version = "0.5.0"
+description = "Python APIs for Envoy Mobile"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Envoy Maintainers", email = "envoy-maintainers@googlegroups.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+[project.urls]
+Homepage = "https://github.com/envoyproxy/envoy"
+Documentation = "https://mobile.envoyproxy.io"
+Repository = "https://github.com/envoyproxy/envoy.git"
+Issues = "https://github.com/envoyproxy/envoy/issues"
+
 [tool.black]
 line-length = 100
