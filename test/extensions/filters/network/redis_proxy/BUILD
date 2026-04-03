@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -20,6 +21,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.redis_proxy"],
     rbe_pool = "4core",
     deps = [
+        ":pubsub_test_utils_lib",
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
@@ -29,7 +31,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/network:connection_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -42,6 +44,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.redis_proxy"],
     rbe_pool = "6gig",
     deps = [
+        ":pubsub_test_utils_lib",
         ":redis_mocks",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -77,6 +80,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.redis_proxy"],
     rbe_pool = "6gig",
     deps = [
+        ":pubsub_test_utils_lib",
         ":redis_mocks",
         "//source/common/event:dispatcher_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
@@ -125,6 +129,16 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "pubsub_test_utils_lib",
+    hdrs = ["pubsub_test_utils.h"],
+    deps = [
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/redis_proxy:subscription_registry_lib",
+    ],
+)
+
 envoy_cc_mock(
     name = "redis_mocks",
     srcs = ["mocks.cc"],
@@ -140,7 +154,50 @@ envoy_cc_mock(
         "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
         "//source/extensions/filters/network/redis_proxy:external_auth_lib",
         "//source/extensions/filters/network/redis_proxy:router_interface",
+        "//source/extensions/filters/network/redis_proxy:subscription_registry_lib",
         "//test/test_common:printers_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "subscription_registry_test",
+    srcs = ["subscription_registry_test.cc"],
+    extension_names = ["envoy.filters.network.redis_proxy"],
+    rbe_pool = "6gig",
+    deps = [
+        ":pubsub_test_utils_lib",
+        ":redis_mocks",
+        "//source/common/stats:isolated_store_lib",
+        "//source/extensions/filters/network/redis_proxy:subscription_registry_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:host_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "control_command_ledger_test",
+    srcs = ["control_command_ledger_test.cc"],
+    extension_names = ["envoy.filters.network.redis_proxy"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/network/redis_proxy:control_command_ledger_lib",
+        "//test/mocks/upstream:host_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "subscribe_ack_deadline_scheduler_test",
+    srcs = ["subscribe_ack_deadline_scheduler_test.cc"],
+    extension_names = ["envoy.filters.network.redis_proxy"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/network/redis_proxy:subscribe_ack_deadline_scheduler_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 

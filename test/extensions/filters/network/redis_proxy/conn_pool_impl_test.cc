@@ -17,7 +17,9 @@
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/extensions/filters/network/redis_proxy/pubsub_test_utils.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/network/connection.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -1546,6 +1548,50 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccessWithDNSEntryViaCallback) {
   tls_.shutdownThread();
 }
 
+// C-1: a MOVED redirect whose target needs a DNS lookup enters an async Loading window. The
+// client-side PendingRequest was already popped before onRedirection fired (ClientImpl pops before
+// dispatching), so the ``request_handler_`` PoolRequest* dangles; the Loading branch clears it. A
+// teardown DURING that window must therefore NOT call ``request_handler_->cancel()`` on the freed
+// handle — a use-after-free. Here the DNS lookup is left outstanding (never completed) and the pool
+// is torn down; the stale upstream handle must not be cancelled.
+TEST_F(RedisConnPoolImplTest, MovedRedirectionTeardownDuringDNSLoadingDoesNotUseFreedHandle) {
+  auto dns_cache = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsCache>();
+  setup(true, true, 100, dns_cache);
+
+  Common::Redis::RespValueSharedPtr request_value = std::make_shared<Common::Redis::RespValue>();
+  Common::Redis::Client::MockPoolRequest active_request;
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+  makeRequest(client, request_value, callbacks, active_request);
+
+  Common::Redis::RespValuePtr moved_response{new Common::Redis::RespValue()};
+  moved_response->type(Common::Redis::RespType::Error);
+  moved_response->asString() = "MOVED 1111 foo:6379";
+
+  // The redirect target is not cached -> the lookup returns Loading and stays outstanding (we never
+  // complete it). The Loading branch clears request_handler_ (C-1).
+  Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache, loadDnsCacheEntry_(Eq("foo:6379"), 6379, false, _))
+      .WillOnce(Invoke([&](absl::string_view, uint16_t, bool,
+                           Extensions::Common::DynamicForwardProxy::DnsCache::
+                               LoadDnsCacheEntryCallbacks&) {
+        return Extensions::Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
+            Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading,
+            handle, std::nullopt};
+      }));
+  client->client_callbacks_.back()->onRedirection(std::move(moved_response), "foo:6379", false);
+
+  // Tear the pool down while the DNS lookup is still Loading. ~PendingRequest must release the live
+  // DNS handle but must NOT cancel the already-consumed upstream handle (request_handler_ was
+  // cleared in the Loading branch). Without the C-1 fix this would be active_request.cancel() on a
+  // freed PoolRequest.
+  EXPECT_CALL(active_request, cancel()).Times(0);
+  EXPECT_CALL(*handle, onDestroy());
+  EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+}
+
 TEST_F(RedisConnPoolImplTest, MovedRedirectionFailedWithDNSEntryViaCallback) {
   InSequence s;
 
@@ -1873,6 +1919,368 @@ TEST_F(RedisConnPoolImplTest, ClientFactoryReceivesResp3OnTransactionClientPath)
   EXPECT_CALL(callbacks, onFailure_());
   // The transaction owns the created client; closing the transaction releases it cleanly.
   transaction.close();
+  tls_.shutdownThread();
+}
+
+// Pub/sub gating: subscriptionRegistryShared() must return nullptr when the listener is not
+// RESP3 (Push frames are RESP3-only on the wire). This is the gate that disables pub/sub on
+// RESP2 listeners. The RESP version is fixed at pool construction from the listener config,
+// so the RESP2 and RESP3 poles are pinned by separate pools.
+TEST_F(RedisConnPoolImplTest, SubscriptionRegistrySharedReturnsNullForNonResp3) {
+  setup();
+  // Default listener is RESP2 → no registry.
+  EXPECT_EQ(nullptr, conn_pool_->subscriptionRegistryShared());
+  tls_.shutdownThread();
+}
+
+// RESP3 pool → registry materializes lazily on first call and is cached.
+TEST_F(RedisConnPoolImplTest, SubscriptionRegistryLazyInitAndCachedOnResp3) {
+  setup(/*cluster_exists=*/true, /*hashtagging=*/true, /*max_unknown_conns=*/100,
+        /*dns_cache=*/nullptr, /*redis_cx_rate_limit_per_sec=*/100,
+        Common::Redis::RespProtocolVersion::Resp3);
+  auto registry = conn_pool_->subscriptionRegistryShared();
+  EXPECT_NE(nullptr, registry);
+  // Subsequent call returns the same instance (lazy init cached).
+  EXPECT_EQ(registry, conn_pool_->subscriptionRegistryShared());
+  tls_.shutdownThread();
+}
+
+// ② (B-3): a data request and a subscription to the SAME host use SEPARATE upstream connections
+// (client_map_ vs subscription_client_map_). Because the subscription connection never carries a
+// pending data request, a non-Push subscribe error on it can never be mis-popped by an unrelated
+// GET — the cross-delivery hazard is removed structurally.
+TEST_F(RedisConnPoolImplTest, SubscriptionUsesSeparateConnectionFromData) {
+  setup(/*cluster_exists=*/true, /*hashtagging=*/true, /*max_unknown_conns=*/100,
+        /*dns_cache=*/nullptr, /*redis_cx_rate_limit_per_sec=*/100,
+        Common::Redis::RespProtocolVersion::Resp3);
+
+  auto& host_set = *cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0);
+  host_set.healthy_hosts_ = {cm_.thread_local_cluster_.lb_.host_};
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+
+  // Two DISTINCT clients to the same host: the first for the data path, the second for the
+  // subscription path.
+  auto* data_client = new NiceMock<Common::Redis::Client::MockClient>();
+  auto* sub_client = new NiceMock<Common::Redis::Client::MockClient>();
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(data_client)).WillOnce(Return(sub_client));
+
+  // Two host selections: one for the data request, one for the sharded subscription (both resolve
+  // to the same host; HostSelectionResponse is move-only so each WillOnce builds a fresh one).
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}));
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockPoolRequest active_request;
+  EXPECT_CALL(*data_client, makeRequest_(_, _)).WillOnce(Return(&active_request));
+  Common::Redis::Client::PoolRequest* req =
+      conn_pool_->makeRequest("hash_key", value, callbacks, transaction_);
+  EXPECT_NE(nullptr, req);
+
+  // Subscription routes to the SECOND client (sub_client) via sendCommand — never through
+  // data_client. data_client sees no setPushCallbacks / sendCommand.
+  EXPECT_CALL(*sub_client, setPushCallbacks(_));
+  EXPECT_CALL(*sub_client, sendCommand(_));
+  EXPECT_CALL(*data_client, setPushCallbacks(_)).Times(0);
+  EXPECT_CALL(*data_client, sendCommand(_)).Times(0);
+  NiceMock<Common::Redis::Client::MockPushMessageCallbacks> push_cb;
+  // A non-null return is the chosen shard host (there is no separate out-param now).
+  EXPECT_NE(nullptr, threadLocalPool().sendUpstreamSsubscribe("chan", push_cb));
+
+  EXPECT_CALL(active_request, cancel());
+  req->cancel();
+  EXPECT_CALL(*data_client, close());
+  EXPECT_CALL(*sub_client, close());
+  tls_.shutdownThread();
+}
+
+// F2 regression: sendUpstreamSunsubscribe must NOT create a subscription connection when none
+// exists for the host. A freshly created connection has no push_callbacks_ installed (only
+// getOrCreateSubscriptionClient does that), so its SUNSUBSCRIBE ack Push would be dropped and
+// permanently poison the host's control FIFO. It must find-only and return NotSent.
+TEST_F(RedisConnPoolImplTest, SunsubscribeWithoutSubscriptionConnectionReturnsNotSent) {
+  setup(/*cluster_exists=*/true, /*hashtagging=*/true, /*max_unknown_conns=*/100,
+        /*dns_cache=*/nullptr, /*redis_cx_rate_limit_per_sec=*/100,
+        Common::Redis::RespProtocolVersion::Resp3);
+
+  auto& host_set = *cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0);
+  host_set.healthy_hosts_ = {cm_.thread_local_cluster_.lb_.host_};
+
+  // No subscription connection exists to this host: no client is created (get-or-CREATE would have
+  // made a callback-less one here) and the result is NotSent.
+  EXPECT_CALL(*this, create_(_)).Times(0);
+  const auto result =
+      threadLocalPool().sendUpstreamSunsubscribe("chan", cm_.thread_local_cluster_.lb_.host_);
+  EXPECT_EQ(RedisProxy::UpstreamSubscriptionCallbacks::SunsubscribeResult::NotSent, result);
+
+  tls_.shutdownThread();
+}
+
+// F1 regression: retiring an idle subscription connection must NOT destroy the SAME host's healthy
+// data connection. maybeCleanupSubscriptionMode erases the subscription entry then close()s it,
+// driving the wrapper's onEvent while it is out of subscription_client_map_; without the
+// data-branch identity check that onEvent falls through and erases the host's DATA client (release:
+// lost request callbacks + a dangling PoolRequest* → UAF; debug: ~ClientImpl ASSERT abort).
+TEST_F(RedisConnPoolImplTest, SubscriptionRetireDoesNotDestroySameHostDataClient) {
+  setup(/*cluster_exists=*/true, /*hashtagging=*/true, /*max_unknown_conns=*/100,
+        /*dns_cache=*/nullptr, /*redis_cx_rate_limit_per_sec=*/100,
+        Common::Redis::RespProtocolVersion::Resp3);
+
+  auto& host_set = *cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0);
+  host_set.healthy_hosts_ = {cm_.thread_local_cluster_.lb_.host_};
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+
+  // Construct the downstream MockConnection FIRST, before any data request creates a client: its
+  // MockStreamInfo allocates the test time system, and doing it up front avoids the "two different
+  // time-systems" conflict with the data path.
+  NiceMock<Network::MockConnection> downstream;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      downstream, testDownstreamSubscriberStats());
+
+  auto* data_client = new NiceMock<Common::Redis::Client::MockClient>();
+  auto* sub_client = new NiceMock<Common::Redis::Client::MockClient>();
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(data_client)).WillOnce(Return(sub_client));
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}));
+
+  // Data request -> data_client in client_map_.
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockPoolRequest active_request;
+  EXPECT_CALL(*data_client, makeRequest_(_, _)).WillOnce(Return(&active_request));
+  Common::Redis::Client::PoolRequest* req =
+      conn_pool_->makeRequest("hash_key", value, callbacks, transaction_);
+  EXPECT_NE(nullptr, req);
+  const auto host = cm_.thread_local_cluster_.lb_.host_;
+  EXPECT_EQ(1UL, clientMap().count(host)); // data client present
+
+  // Subscription to the SAME host -> sub_client in the separate subscription_client_map_.
+  auto registry = conn_pool_->subscriptionRegistryShared();
+  ASSERT_NE(nullptr, registry);
+  EXPECT_CALL(*sub_client, setPushCallbacks(_));
+  EXPECT_CALL(*sub_client, sendCommand(_)).Times(2); // SSUBSCRIBE, then SUNSUBSCRIBE below
+  registry->subscribe({"ch"}, subscriber);
+
+  // ConnectionImpl::close() raises LocalClose synchronously; make the mock do the same so the
+  // retire actually drives sub_client's onEvent.
+  ON_CALL(*sub_client, close()).WillByDefault(Invoke([sub_client]() {
+    sub_client->raiseEvent(Network::ConnectionEvent::LocalClose);
+  }));
+
+  // Unsubscribe the last channel: SUNSUBSCRIBE + retire the now-idle subscription connection, whose
+  // close() drives onEvent. The data client must be untouched.
+  registry->unsubscribe({"ch"}, subscriber);
+  EXPECT_EQ(1UL, clientMap().count(host)); // F1: same-host data client NOT destroyed
+
+  // The data client still serves cleanly (no dangling request).
+  EXPECT_CALL(active_request, cancel());
+  req->cancel();
+  EXPECT_CALL(*data_client, close());
+  tls_.shutdownThread();
+}
+
+// S6-5: an INVOLUNTARY subscription-connection close must mark the host's channels for re-subscribe
+// SYNCHRONOUSLY while KEEPING their channel->host owner (D1), posting only the backoff arm. The
+// pre-fix code posted the owner-map wipe (forgetHostChannels) too, so a SUBSCRIBE hashing to the
+// same host in the SAME event-loop iteration recorded a fresh owner that the deferred wipe then
+// erased — stranding the channel behind a stale-generation ack until a 10s timeout. The owner must
+// survive the close.
+TEST_F(RedisConnPoolImplTest, InvoluntarySubscriptionCloseKeepsChannelOwnerSynchronously) {
+  setup(/*cluster_exists=*/true, /*hashtagging=*/true, /*max_unknown_conns=*/100,
+        /*dns_cache=*/nullptr, /*redis_cx_rate_limit_per_sec=*/100,
+        Common::Redis::RespProtocolVersion::Resp3);
+
+  auto& host_set = *cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0);
+  host_set.healthy_hosts_ = {cm_.thread_local_cluster_.lb_.host_};
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+
+  NiceMock<Network::MockConnection> downstream;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      downstream, testDownstreamSubscriberStats());
+
+  auto* sub_client = new NiceMock<Common::Redis::Client::MockClient>();
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(sub_client));
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}));
+
+  auto registry = conn_pool_->subscriptionRegistryShared();
+  ASSERT_NE(nullptr, registry);
+  EXPECT_CALL(*sub_client, setPushCallbacks(_));
+  EXPECT_CALL(*sub_client, sendCommand(_)); // SSUBSCRIBE
+  registry->subscribe({"ch"}, subscriber);
+  EXPECT_EQ(1UL, registry->channelHosts().count("ch")); // owner recorded synchronously on send
+
+  // Involuntary loss of the subscription connection (NOT a client unsubscribe / planned removal):
+  // onEvent marks "ch" for re-subscribe synchronously and posts only the backoff arm. The owner
+  // must NOT be wiped (the pre-fix deferred forgetHostChannels would have erased it).
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(tls_.dispatcher_, post(_)).WillRepeatedly([&posted](Event::PostCb cb) {
+    posted.push_back(std::move(cb));
+  });
+  EXPECT_CALL(tls_.dispatcher_, deferredDelete_(_));
+  sub_client->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  // Owner survives the SYNCHRONOUS half of onEvent (markHostChannelsForResubscribe keeps it).
+  EXPECT_EQ(1UL, registry->channelHosts().count("ch"));
+  // ...and MUST survive the DEFERRED half too. The pre-fix code posted the forgetHostChannels owner
+  // WIPE into this deferred lambda; the fix leaves only the backoff arm here. Running every posted
+  // callback is what gives the test its discriminating power: pre-fix the wipe would clear the
+  // owner (count -> 0, fail), post-fix only the harmless backoff arm runs (count stays 1).
+  for (auto& cb : posted) {
+    cb();
+  }
+  EXPECT_EQ(1UL, registry->channelHosts().count("ch"));
+
+  tls_.shutdownThread();
+}
+
+// P4 regression: when a subscription client can't be created because the host's connection rate
+// limit is exhausted, getOrCreateClientInMap inserts a null placeholder into
+// subscription_client_map_ for the lookup and then erases it itself before returning nullptr —
+// otherwise teardown / onClusterRemoval later walks subscription_client_map_ and dereferences the
+// null unique_ptr while closing subscription clients, crashing. Here a data request consumes the
+// host's single connection token (the per-host rate limiter is shared with the subscription path),
+// so the subsequent subscription send to the same host is denied.
+TEST_F(RedisConnPoolImplTest, RateLimitedSubscriptionErasesNullPlaceholder) {
+  setup(/*cluster_exists=*/true, /*hashtagging=*/true, /*max_unknown_conns=*/100,
+        /*dns_cache=*/nullptr, /*redis_cx_rate_limit_per_sec=*/1,
+        Common::Redis::RespProtocolVersion::Resp3);
+
+  auto& host_set = *cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0);
+  host_set.healthy_hosts_ = {cm_.thread_local_cluster_.lb_.host_};
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+
+  // The data request consumes the host's single connection token.
+  auto* data_client = new NiceMock<Common::Redis::Client::MockClient>();
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(data_client));
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}));
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockPoolRequest active_request;
+  EXPECT_CALL(*data_client, makeRequest_(_, _)).WillOnce(Return(&active_request));
+  Common::Redis::Client::PoolRequest* req =
+      conn_pool_->makeRequest("hash_key", value, callbacks, transaction_);
+  ASSERT_NE(nullptr, req);
+
+  // The subscription send to the SAME host is now rate-limited: no subscription client is created,
+  // the send reports failure, and the null placeholder must not be left behind.
+  NiceMock<Common::Redis::Client::MockPushMessageCallbacks> push_cb;
+  // Rate-limited: no subscription client is created, so the send reports failure as a null return.
+  EXPECT_EQ(nullptr, threadLocalPool().sendUpstreamSsubscribe("chan", push_cb));
+
+  // Teardown must not dereference a null subscription-client placeholder.
+  EXPECT_CALL(active_request, cancel());
+  req->cancel();
+  EXPECT_CALL(*data_client, close());
+  tls_.shutdownThread();
+}
+
+// C-6: a PLANNED host removal must drive the resubscribe through exactly ONE path. The
+// member-update callback posts onClusterTopologyChange (which re-routes sharded channels), and the
+// removed host's subscription-connection close drives onEvent — which on a planned removal MUST
+// consume the mark and skip its own onUpstreamConnectionClose post. So a single post is queued (the
+// topology change), not two. Before the fix, onEvent also posted, driving a redundant second
+// resubscribe round.
+TEST_F(RedisConnPoolImplTest, PlannedHostRemovalDoesNotDoubleDriveResubscribe) {
+  setup(/*cluster_exists=*/true, /*hashtagging=*/true, /*max_unknown_conns=*/100,
+        /*dns_cache=*/nullptr, /*redis_cx_rate_limit_per_sec=*/100,
+        Common::Redis::RespProtocolVersion::Resp3);
+
+  auto& host_set = *cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0);
+  host_set.healthy_hosts_ = {cm_.thread_local_cluster_.lb_.host_};
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+
+  auto* client = new NiceMock<Common::Redis::Client::MockClient>();
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+
+  // Establish a SHARDED subscription THROUGH the registry so BOTH resubscribe drivers are live on a
+  // host removal — an empty registry fires neither (onClusterTopologyChange needs a non-null
+  // registry; onEvent's post needs a non-empty one). ssubscribe → the pool's sendUpstreamSsubscribe
+  // creates the dedicated subscription client on the chosen host and records the channel→host map.
+  auto registry = conn_pool_->subscriptionRegistryShared();
+  ASSERT_NE(nullptr, registry);
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}));
+  EXPECT_CALL(*client, setPushCallbacks(_));
+  EXPECT_CALL(*client, sendCommand(_));
+  NiceMock<Network::MockConnection> downstream;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      downstream, testDownstreamSubscriberStats());
+  registry->subscribe({"ch"}, subscriber);
+
+  // Capture posted callbacks so the resubscribe drivers can be counted. The subscription setup
+  // above is synchronous (no post), so anything captured here is from the removal.
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(tls_.dispatcher_, post(_)).WillRepeatedly([&posted](Event::PostCb cb) {
+    posted.push_back(std::move(cb));
+  });
+  EXPECT_CALL(tls_.dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(*client, close());
+
+  cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0)->runCallbacks(
+      {}, {cm_.thread_local_cluster_.lb_.host_});
+
+  // Exactly one resubscribe driver (onClusterTopologyChange), not two — onEvent saw the wrapper's
+  // planned-removal flag (A-5) and suppressed its redundant onUpstreamConnectionClose post (before
+  // the fix there were two). The flag lives on the wrapper, which is destroyed with this close, so
+  // there is nothing left to leak.
+  EXPECT_EQ(1UL, posted.size());
+
+  tls_.shutdownThread();
+}
+
+// Slot-only rebalance: a subscribed channel's hash slot migrates between two EXISTING nodes with NO
+// host add/remove (Redis resharding / CLUSTER SETSLOT). RedisCluster fires the member-update
+// callback with empty deltas whenever the slot map changed, so the pool must STILL post
+// onClusterTopologyChange — otherwise the resharded subscription is stranded on the old owner and
+// stops receiving messages. (Regression: the post was previously gated on a non-empty host delta.)
+TEST_F(RedisConnPoolImplTest, SlotOnlyRebalancePostsResubscribe) {
+  setup(/*cluster_exists=*/true, /*hashtagging=*/true, /*max_unknown_conns=*/100,
+        /*dns_cache=*/nullptr, /*redis_cx_rate_limit_per_sec=*/100,
+        Common::Redis::RespProtocolVersion::Resp3);
+
+  auto& host_set = *cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0);
+  host_set.healthy_hosts_ = {cm_.thread_local_cluster_.lb_.host_};
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+
+  auto* client = new NiceMock<Common::Redis::Client::MockClient>();
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+
+  // Establish a sharded subscription so the registry is non-empty (doResubscribe would no-op an
+  // empty one) and there is a channel whose owner could move.
+  auto registry = conn_pool_->subscriptionRegistryShared();
+  ASSERT_NE(nullptr, registry);
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}));
+  EXPECT_CALL(*client, setPushCallbacks(_));
+  EXPECT_CALL(*client, sendCommand(_));
+  NiceMock<Network::MockConnection> downstream;
+  auto subscriber = std::make_shared<RedisProxy::DownstreamSubscriber>(
+      downstream, testDownstreamSubscriberStats());
+  registry->subscribe({"ch"}, subscriber);
+
+  // The subscription setup above is synchronous (no post), so anything captured now is the
+  // rebalance.
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(tls_.dispatcher_, post(_)).WillRepeatedly([&posted](Event::PostCb cb) {
+    posted.push_back(std::move(cb));
+  });
+
+  // Member-update with EMPTY added/removed — exactly what a slot-only rebalance delivers.
+  cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, {});
+
+  // The topology-change resubscribe is posted despite the empty host delta.
+  EXPECT_EQ(1UL, posted.size());
+
   tls_.shutdownThread();
 }
 

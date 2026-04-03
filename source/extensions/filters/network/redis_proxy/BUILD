@@ -17,11 +17,13 @@ envoy_cc_library(
     name = "command_splitter_interface",
     hdrs = ["command_splitter.h"],
     deps = [
+        ":subscription_registry_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/singleton:const_singleton",
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
+        "@abseil-cpp//absl/container:inlined_vector",
         "@abseil-cpp//absl/types:optional",
     ],
 )
@@ -90,6 +92,7 @@ envoy_cc_library(
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
         "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -100,6 +103,7 @@ envoy_cc_library(
     deps = [
         ":config_interface",
         ":conn_pool_interface",
+        ":subscription_registry_lib",
         "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/stats:stats_macros",
@@ -140,6 +144,49 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "control_command_ledger_lib",
+    hdrs = ["control_command_ledger.h"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
+)
+
+envoy_cc_library(
+    name = "subscribe_ack_deadline_scheduler_lib",
+    hdrs = ["subscribe_ack_deadline_scheduler.h"],
+    deps = [
+        "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "subscription_registry_lib",
+    srcs = ["subscription_registry.cc"],
+    hdrs = ["subscription_registry.h"],
+    deps = [
+        ":control_command_ledger_lib",
+        ":subscribe_ack_deadline_scheduler_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//source/common/common:backoff_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/extensions/filters/network/common/redis:client_interface",
+        "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:supported_commands_lib",
+        "//source/extensions/filters/network/common/redis:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+    ],
+)
+
+envoy_cc_library(
     name = "proxy_filter_lib",
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
@@ -148,6 +195,7 @@ envoy_cc_library(
         ":command_splitter_interface",
         ":command_splitter_lib",
         ":external_auth_lib",
+        ":subscription_registry_lib",
         "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
         "//envoy/upstream:cluster_manager_interface",
@@ -183,6 +231,8 @@ envoy_cc_extension(
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:redis_command_stats_lib",
+        "//source/extensions/filters/network/common/redis:supported_commands_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],

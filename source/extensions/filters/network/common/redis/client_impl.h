@@ -18,6 +18,8 @@
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -57,6 +59,13 @@ public:
   ReadPolicy readPolicy() const override { return read_policy_; }
   bool connectionRateLimitEnabled() const override { return connection_rate_limit_enabled_; }
   uint32_t connectionRateLimitPerSec() const override { return connection_rate_limit_per_sec_; }
+  std::chrono::milliseconds subscribeAckTimeout() const override { return subscribe_ack_timeout_; }
+  std::chrono::milliseconds resubscribeBackoffBaseInterval() const override {
+    return resubscribe_backoff_base_interval_;
+  }
+  std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
+    return resubscribe_backoff_max_interval_;
+  }
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -69,6 +78,9 @@ private:
   ReadPolicy read_policy_;
   bool connection_rate_limit_enabled_;
   uint32_t connection_rate_limit_per_sec_;
+  const std::chrono::milliseconds subscribe_ack_timeout_;
+  const std::chrono::milliseconds resubscribe_backoff_base_interval_;
+  const std::chrono::milliseconds resubscribe_backoff_max_interval_;
 };
 
 class ClientImpl : public Client,
@@ -107,10 +119,15 @@ public:
   }
   void close() override;
   PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) override;
-  // Active for the conn pool's drain-vs-close decision: in-flight or init-held work.
-  bool active() override { return hasOutstandingWork(); }
+  // Active for the conn pool's drain-vs-close decision: in-flight, init-held, or subscribed.
+  // push_callbacks_ is deliberately NOT part of hasOutstandingWork(): a subscriber with no
+  // in-flight request has no deadline to enforce (Push frames are out-of-band), so it must
+  // keep the connection alive without keeping the op timer armed.
+  bool active() override { return hasOutstandingWork() || push_callbacks_ != nullptr; }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
+  void sendCommand(const RespValue& request) override;
+  void setPushCallbacks(PushMessageCallbacks* callbacks) override { push_callbacks_ = callbacks; }
 
 private:
   friend class RedisClientImplTest;
@@ -152,6 +169,14 @@ private:
 
   class HeldUserRequest;
 
+  // Held-init-queue entry: user requests carry the wrapper (HeldUserRequest implements both
+  // PoolRequest and ClientCallbacks); fire-and-forget commands store just a RespValuePtr. Declared
+  // here (HeldUserRequest still incomplete) so HeldUserRequest can hold its own list iterator
+  // below; the variant's special members — which need the full type for the unique_ptr destructor —
+  // are only instantiated in the .cc, where HeldUserRequest is complete.
+  using HeldInitEntry =
+      absl::variant<std::unique_ptr<HeldUserRequest>, Common::Redis::RespValuePtr>;
+
   struct PendingRequest : public PoolRequest {
     PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks, Stats::StatName stat_name);
     ~PendingRequest() override;
@@ -173,8 +198,8 @@ private:
   };
 
   // Wrapper for a user request held during init: PoolRequest for cancel, ClientCallbacks for
-  // replay-time response forwarding. Removed via removeHeldUserRequest, failHeldUserRequests,
-  // or onCancelComplete. Post-replay cancel must not self-destruct (the live
+  // replay-time response forwarding. Removed via removeHeldUserRequest, failHeldInitQueue, or
+  // onCancelComplete. Post-replay cancel must not self-destruct (the live
   // PendingRequest::callbacks_ reference would dangle); pre-replay cancel erases immediately.
   class HeldUserRequest : public PoolRequest, public ClientCallbacks {
   public:
@@ -199,7 +224,11 @@ private:
     Common::Redis::RespValuePtr request_;   // owned deep copy
     PendingRequest* live_request_{nullptr}; // set during replay
     bool canceled_{false};
-    std::list<std::unique_ptr<HeldUserRequest>>::iterator self_iter_; // O(1) erase
+    // This entry's own position in ``held_init_queue_``. The queue is a std::list, so the iterator
+    // stays valid across other insertions/erasals; stored at enqueue time so removeHeldUserRequest
+    // can drop this entry in O(1) rather than linear-scanning the whole queue (which, behind a
+    // stalled HELLO with a deep pipeline, made teardown O(depth^2)).
+    std::list<HeldInitEntry>::iterator queue_it_{};
   };
 
   // ClientCallbacks for the HELLO 3 init reply. Validates Map containing
@@ -270,19 +299,20 @@ private:
   // Init state machine + held-queue helpers (see InitState above).
   PoolRequest* makeRequestInternal(const RespValue& request, ClientCallbacks& callbacks);
   void setInitState(InitState new_state);
-  void replayHeldUserRequests();
-  void failHeldUserRequests();
+  void replayHeldInitQueue();
+  void failHeldInitQueue();
   void removeHeldUserRequest(HeldUserRequest* held);
   // True while any request-related work is outstanding: an upstream request is in flight
   // (including init requests such as HELLO/AUTH/READONLY in pending_requests_), user requests
-  // are queued during init (held_user_requests_), or the AWS IAM token fetch is pending.
+  // or fire-and-forget commands are queued during init (held_init_queue_), or the AWS IAM
+  // token fetch is pending.
   // The token wait is the one init stage with no wire request to track, and it must still be
   // bounded by the connect/op timer — otherwise a hung credentials provider leaves a
   // half-initialized connection in the pool with every timer disabled once its held requests
   // are canceled. Drives whether the post-connect op timeout should be armed.
   bool hasOutstandingWork() const {
     return init_state_ == InitState::WaitingForAwsToken || !pending_requests_.empty() ||
-           !held_user_requests_.empty();
+           !held_init_queue_.empty();
   }
   // RAII batching guard for multi-request init/replay sequences: suppresses makeRequestInternal's
   // auto-flush for its scope and performs one explicit flush on destruction, so the batch hits
@@ -347,8 +377,13 @@ private:
   OptRef<Stats::Counter> upstream_resp3_hello_failure_;
   // Init state — see enum comment.
   InitState init_state_{InitState::NotStarted};
-  // Pre-init / IAM-pending user requests, replayed in FIFO when state→Ready or drained on Failed.
-  std::list<std::unique_ptr<HeldUserRequest>> held_user_requests_;
+  // Unified pre-init / IAM-pending operation queue. Holds either user makeRequest entries
+  // (HeldUserRequest, which behaves as both PoolRequest and ClientCallbacks) or fire-and-forget
+  // commands submitted via sendCommand (RespValuePtr). The list IS the submission order — on
+  // setInitState(Ready) the entries are replayed in FIFO so a sequence like
+  // ``GET k → SUBSCRIBE c → SET k v`` lands on the wire in that order regardless of which
+  // entry type each one is.
+  std::list<HeldInitEntry> held_init_queue_;
   // Init reply callbacks. Constructed once with a back-pointer to *this; reused across the
   // single HELLO/READONLY/AUTH dispatch each connection. Stored as members so their addresses
   // remain stable for the lifetime of the live PendingRequest that references them.
@@ -357,6 +392,10 @@ private:
   AwsIamAuthInitCallbacks awsiam_auth_init_callbacks_;
   // AWS IAM token-fetch callback lifetime guard — see struct comment.
   std::shared_ptr<AwsInitCallbackState> aws_init_state_;
+  // RESP3 Push subscriber. Set by the conn pool's pub/sub wiring when this client is the
+  // subscription connection for a host. nullptr means upstream Push frames are dropped with
+  // a debug log (the policy for non-subscriber clients).
+  PushMessageCallbacks* push_callbacks_{nullptr};
 };
 
 class ClientFactoryImpl : public ClientFactory, public Logger::Loggable<Logger::Id::redis> {

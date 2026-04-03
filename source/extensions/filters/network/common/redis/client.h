@@ -72,6 +72,34 @@ public:
 };
 
 /**
+ * Callbacks for RESP3 Push messages received from upstream Redis.
+ * Push messages are out-of-band server-initiated messages that are not
+ * responses to any pending request (e.g., pub/sub messages).
+ */
+class PushMessageCallbacks {
+public:
+  virtual ~PushMessageCallbacks() = default;
+  // @param value the RESP3 Push frame (pub/sub message, or a subscribe/unsubscribe ack).
+  // @param host the upstream host this subscription connection is pinned to. Lets the registry
+  //        correlate control-command acks to the per-host outstanding-command FIFO (see
+  //        onUpstreamControlError) and match a SUNSUBSCRIBE ack to its exact (host, channel).
+  virtual void onPushMessage(RespValuePtr&& value, const Upstream::HostConstSharedPtr& host) PURE;
+
+  /**
+   * Called when a subscription connection receives an out-of-band, non-Push control reply that has
+   * no outstanding request — typically a normal error to a fire-and-forget SSUBSCRIBE/SUNSUBSCRIBE
+   * (e.g. ACL denial, CLUSTERDOWN, or a MOVED/ASK observed mid-reshard). Implementations reconcile
+   * subscription state (e.g. a host-scoped re-subscribe) WITHOUT tearing down the shared upstream
+   * connection, since every other channel multiplexed on it must stay live. Defaults to a no-op so
+   * non-subscription Push consumers need not implement it.
+   * @param value the control reply frame (Error or other non-Push type).
+   * @param host the upstream host this subscription connection is pinned to.
+   */
+  virtual void onUpstreamControlError(RespValuePtr&& /*value*/,
+                                      const Upstream::HostConstSharedPtr& /*host*/) {}
+};
+
+/**
  * A single redis client connection.
  */
 class Client : public Event::DeferredDeletable {
@@ -111,6 +139,25 @@ public:
    * @param auth_password password for upstream host.
    */
   virtual void initialize(const std::string& auth_username, const std::string& auth_password) PURE;
+
+  /**
+   * Send a fire-and-forget command. Unlike makeRequest, no PendingRequest is created and no
+   * ClientCallbacks is invoked — used for subscription commands (``SUBSCRIBE``/``SSUBSCRIBE``/...)
+   * whose acknowledgments and subsequent traffic arrive as RESP3 Push frames routed via
+   * setPushCallbacks. Implementations must defer the request when the connection's init
+   * pipeline (HELLO 3 / AUTH / READONLY / AWS IAM token fetch) is still in flight, replaying
+   * it in original submission order alongside any held user requests once init completes,
+   * and must honor any per-implementation batching/buffering policy active at the time of
+   * dispatch.
+   * @param request the command to send.
+   */
+  virtual void sendCommand(const RespValue& request) PURE;
+
+  /**
+   * Set callbacks for RESP3 Push messages received on this connection.
+   * @param callbacks supplies the push message callback handler, or nullptr to clear.
+   */
+  virtual void setPushCallbacks(PushMessageCallbacks* callbacks) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
@@ -129,6 +176,17 @@ enum class ReadPolicy {
   // Zone-aware routing: prefer replicas in same zone, then primary in same zone, then any
   LocalZoneAffinityReplicasAndPrimary
 };
+
+// Historical hardcoded defaults for the RESP3 pub/sub tuning knobs (``pubsub_settings``), the
+// SINGLE source of truth for all three consumers so a change here can never drift them apart (§6):
+// the connection-pool config (ConfigImpl) reads them via PROTOBUF_GET_MS_OR_DEFAULT to build the
+// runtime values, the redis_proxy filter config validates the EFFECTIVE durations against the same
+// defaults, and SubscriptionRegistry's ctor default arguments (test/omit-caller convenience) alias
+// them. Each knob falls back to its default when unset, so configs predating ``pubsub_settings``
+// are unaffected (A-7).
+constexpr uint32_t kDefaultSubscribeAckTimeoutMs = 10000;
+constexpr uint32_t kDefaultResubscribeBackoffBaseMs = 100;
+constexpr uint32_t kDefaultResubscribeBackoffMaxMs = 30000;
 
 /**
  * Configuration for a redis connection pool.
@@ -201,6 +259,23 @@ public:
 
   virtual bool connectionRateLimitEnabled() const PURE;
   virtual uint32_t connectionRateLimitPerSec() const PURE;
+
+  /**
+   * @return how long to wait for an upstream ``SSUBSCRIBE`` ack before failing the downstream
+   * pub/sub subscribe / re-resolving a re-subscribe generation (RESP3 sharded pub/sub).
+   */
+  virtual std::chrono::milliseconds subscribeAckTimeout() const PURE;
+
+  /**
+   * @return the base (minimum) interval of the jittered exponential backoff used to re-subscribe
+   * pub/sub channels after an upstream subscription connection drop or rejected re-subscribe.
+   */
+  virtual std::chrono::milliseconds resubscribeBackoffBaseInterval() const PURE;
+
+  /**
+   * @return the maximum interval the pub/sub re-subscribe backoff escalates to.
+   */
+  virtual std::chrono::milliseconds resubscribeBackoffMaxInterval() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<const Config>;

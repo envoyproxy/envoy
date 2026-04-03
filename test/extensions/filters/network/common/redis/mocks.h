@@ -90,6 +90,8 @@ public:
   MOCK_METHOD(PoolRequest*, makeRequest_,
               (const Common::Redis::RespValue& request, ClientCallbacks& callbacks));
   MOCK_METHOD(void, initialize, (const std::string& username, const std::string& password));
+  MOCK_METHOD(void, sendCommand, (const Common::Redis::RespValue& request));
+  MOCK_METHOD(void, setPushCallbacks, (PushMessageCallbacks * callbacks));
 
   std::list<Network::ConnectionCallbacks*> callbacks_;
   std::list<ClientCallbacks*> client_callbacks_;
@@ -111,6 +113,26 @@ public:
   MOCK_METHOD(void, onRedirection_,
               (Common::Redis::RespValuePtr & value, const std::string& host_address,
                bool ask_redirection));
+};
+
+// Shared double for the RESP3 Push callback sink (R-5/R-6 dedup: was hand-rolled as a mock in
+// client_impl_test and as a separate no-op in conn_pool_impl_test). gmock cannot match the
+// move-only RespValuePtr directly, so the virtuals forward to by-ref MOCK_METHODs; wrap in NiceMock
+// for a no-op sink. onUpstreamControlError already defaults to a no-op on the interface but is
+// mocked here so subscription tests can assert on it.
+class MockPushMessageCallbacks : public PushMessageCallbacks {
+public:
+  MOCK_METHOD(void, onPushMessage_, (Common::Redis::RespValue & value));
+  void onPushMessage(Common::Redis::RespValuePtr&& value,
+                     const Upstream::HostConstSharedPtr&) override {
+    onPushMessage_(*value);
+  }
+  MOCK_METHOD(void, onUpstreamControlError_,
+              (Common::Redis::RespValue & value, const Upstream::HostConstSharedPtr& host));
+  void onUpstreamControlError(Common::Redis::RespValuePtr&& value,
+                              const Upstream::HostConstSharedPtr& host) override {
+    onUpstreamControlError_(*value, host);
+  }
 };
 
 } // namespace Client

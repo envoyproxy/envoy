@@ -39,6 +39,15 @@ RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std
       Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
   stat_name_set_->rememberBuiltin(
       Extensions::NetworkFilters::Common::Redis::SupportedCommands::mset());
+  // PUBLISH and its SPUBLISH rewrite are real request/response upstream commands (they return an
+  // integer count), so their outcome should surface as upstream_commands.{publish,spublish}.*
+  // rather than folding into "unknown". The subscription verbs (SUBSCRIBE/SSUBSCRIBE/…) are sent
+  // fire-and-forget via ClientImpl::sendCommand, which records no per-command stat, so they are
+  // intentionally not registered here.
+  stat_name_set_->rememberBuiltin(
+      Extensions::NetworkFilters::Common::Redis::SupportedCommands::publish());
+  stat_name_set_->rememberBuiltin(
+      Extensions::NetworkFilters::Common::Redis::SupportedCommands::spublish());
 }
 
 Stats::TimespanPtr RedisCommandStats::createCommandTimer(Stats::Scope& scope,

@@ -131,6 +131,11 @@ const std::string CONFIG_WITH_CUSTOM_COMMANDS = CONFIG + R"EOF(
           - json.set
 )EOF";
 
+// Opt into sharded publish: client PUBLISH is rewritten to upstream SPUBLISH. A RedisProxy
+// field (10-space indent), independent of protocol_version.
+const std::string CONFIG_WITH_SHARDED_PUBLISH = CONFIG + R"EOF(
+          enable_sharded_publish: true
+)EOF";
 const std::string CONFIG_WITH_ROUTES_BASE = fmt::format(R"EOF(
 admin:
   access_log:
@@ -645,6 +650,56 @@ const std::string CONFIG_WITH_EXTERNAL_AUTH = CONFIG + R"EOF(
                 cluster_name: fake_auth
 )EOF";
 
+// RESP3 listener variant used by the SUBSCRIBE/PUBLISH end-to-end test. One cluster, one
+// endpoint, listener ``protocol_version: RESP3`` so the upstream init sequence will issue
+// HELLO 3 (and the registry can consume RESP3 ``Push`` frames). No AUTH so the handshake
+// stays a single round trip per connection.
+const std::string CONFIG_RESP3_UPSTREAM = fmt::format(R"EOF(
+admin:
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+static_resources:
+  clusters:
+    - name: cluster_0
+      type: STATIC
+      lb_policy: RANDOM
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+      filters:
+        name: redis
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+          stat_prefix: redis_stats
+          protocol_version: RESP3
+          prefix_routes:
+            catch_all_route:
+              cluster: cluster_0
+          settings:
+            op_timeout: 5s
+)EOF",
+                                                      Platform::null_device_path);
+
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
 // Redis servers, according to the Redis protocol.
 std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
@@ -895,6 +950,12 @@ public:
       : RedisProxyIntegrationTest(CONFIG_RESP3_PREFER_REPLICA, 2) {}
 };
 
+class RedisProxyShardedPublishIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyShardedPublishIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_SHARDED_PUBLISH, 2) {}
+};
+
 class RedisProxyResp3ListenerWithAuthIntegrationTest : public RedisProxyIntegrationTest {
 public:
   RedisProxyResp3ListenerWithAuthIntegrationTest()
@@ -974,6 +1035,58 @@ class RedisProxyWithFaultInjectionIntegrationTest : public RedisProxyIntegration
 public:
   RedisProxyWithFaultInjectionIntegrationTest()
       : RedisProxyIntegrationTest(CONFIG_WITH_FAULT_INJECTION, 2) {}
+};
+
+class RedisProxyResp3UpstreamIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyResp3UpstreamIntegrationTest() : RedisProxyIntegrationTest(CONFIG_RESP3_UPSTREAM, 1) {}
+
+  // Drive the per-connection RESP3 init handshake: expect ``HELLO 3`` on the wire and reply with
+  // the minimum proto:3 Map, then CLEAR the buffer so the next request the proxy issues appears at
+  // the head of the buffer. Shares the wire expectation with the free
+  // ``expectUpstreamHello3AndReply`` (the sole source of the HELLO-3 shape); this variant discards
+  // the accumulated bytes and clears instead of appending them to a cumulative-ordering
+  // accumulator.
+  void expectResp3HelloHandshake(FakeRawConnectionPtr& conn) {
+    std::string discarded_accumulator;
+    expectUpstreamHello3AndReply(conn, discarded_accumulator);
+    conn->clearData();
+  }
+
+  // Drive the full downstream + upstream handshake that establishes a subscription on ``channel``:
+  // client HELLO 3, client SUBSCRIBE, then the proxy's dedicated RESP3 subscription connection
+  // (HELLO 3 + SSUBSCRIBE), the upstream ssubscribe ack, and the rewritten downstream subscribe
+  // ack. On return ``upstream_conn`` is the established subscription connection and both the client
+  // and upstream buffers are cleared, so the caller can drive the message / failover behavior it is
+  // actually testing. Extracted from the SUBSCRIBE-and-smessage and resubscribe end-to-end tests,
+  // which inlined the same ~20-line driver (R-8).
+  void establishSubscription(IntegrationTcpClientPtr& client, FakeRawConnectionPtr& upstream_conn,
+                             const std::string& channel) {
+    ASSERT_TRUE(client->write(makeBulkStringArray({"HELLO", "3"})));
+    client->waitForData("*0\r\n", false);
+    client->clearData();
+
+    ASSERT_TRUE(client->write(makeBulkStringArray({"subscribe", channel})));
+
+    // The proxy opens a dedicated RESP3 subscription connection: HELLO 3 handshake, then
+    // SSUBSCRIBE.
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_conn));
+    expectResp3HelloHandshake(upstream_conn);
+
+    const std::string ssubscribe_wire = makeBulkStringArray({"SSUBSCRIBE", channel});
+    std::string proxy_to_server;
+    EXPECT_TRUE(upstream_conn->waitForData(ssubscribe_wire.size(), &proxy_to_server));
+    EXPECT_EQ(ssubscribe_wire, proxy_to_server);
+    upstream_conn->clearData();
+
+    // Server-initiated ack push ``[ssubscribe, channel, 1]``; the proxy rewrites the verb to the
+    // client-facing ``subscribe`` before forwarding it downstream.
+    ASSERT_TRUE(upstream_conn->write(
+        fmt::format(">3\r\n$10\r\nssubscribe\r\n${}\r\n{}\r\n:1\r\n", channel.size(), channel)));
+    client->waitForData(
+        fmt::format(">3\r\n$9\r\nsubscribe\r\n${}\r\n{}\r\n:1\r\n", channel.size(), channel));
+    client->clearData();
+  }
 };
 
 class RedisProxyWithExternalAuthIntegrationTest : public Event::TestUsingSimulatedTime,
@@ -1091,6 +1204,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3PreferReplicaIntegrationTest
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyShardedPublishIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3WithMirrorsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -1160,6 +1277,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithCommandStatsIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithFaultInjectionIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyResp3UpstreamIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -1391,6 +1512,177 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
 TEST_P(RedisProxyIntegrationTest, SimpleRequestAndResponse) {
   initialize();
   simpleRequestAndResponse(makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+}
+
+// With ``enable_sharded_publish`` set, client ``PUBLISH foo bar`` lands on the upstream as
+// ``SPUBLISH foo bar`` (the sharded-pubsub rewrite) and the integer reply flows back
+// unchanged. Pins the end-to-end wire shape so a future regression that drops the rewrite
+// surfaces here as a byte mismatch instead of as silent classic pub/sub.
+TEST_P(RedisProxyShardedPublishIntegrationTest, PublishTransformsToSpublishOnWire) {
+  initialize();
+
+  const std::string downstream_request = makeBulkStringArray({"publish", "foo", "bar"});
+  // Wire shape uses the lowercase verb because ``Utility::makeRequest`` is fed by
+  // ``SupportedCommands::spublish()`` which returns ``"spublish"``.
+  const std::string upstream_request = makeBulkStringArray({"spublish", "foo", "bar"});
+  const std::string upstream_response = ":2\r\n";   // 2 receivers on the slot owner
+  const std::string downstream_response = ":2\r\n"; // pass-through, unchanged
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->clearData();
+  ASSERT_TRUE(redis_client->write(downstream_request));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_username;
+  std::string auth_password;
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_username, auth_password);
+
+  redis_client->waitForData(downstream_response);
+  EXPECT_EQ(downstream_response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// Client ``SPUBLISH`` lands on the upstream as ``SPUBLISH`` regardless of
+// ``enable_sharded_publish`` — it is a client-exposed sharded publish that shares the
+// ``PUBLISH`` handler but is always forwarded as ``SPUBLISH`` (never rewritten away).
+TEST_P(RedisProxyIntegrationTest, SpublishOnWireAlsoSpublish) {
+  initialize();
+
+  const std::string downstream_request = makeBulkStringArray({"spublish", "ch", "v"});
+  const std::string upstream_request = makeBulkStringArray({"spublish", "ch", "v"});
+  const std::string upstream_response = ":1\r\n";
+  const std::string downstream_response = ":1\r\n";
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->clearData();
+  ASSERT_TRUE(redis_client->write(downstream_request));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_username;
+  std::string auth_password;
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_username, auth_password);
+
+  redis_client->waitForData(downstream_response);
+  EXPECT_EQ(downstream_response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// End-to-end SUBSCRIBE / smessage path across the real proxy + fake upstream.
+//
+// Proves the maintainer-facing contract: downstream sees only the traditional verbs
+// (``subscribe`` / ``message``) even though the upstream wire carries the sharded
+// variants (``SSUBSCRIBE`` / ``smessage``). Per-conn handshake (HELLO 3) is also
+// covered, exercising the same RESP3 init path Production uses for pub/sub.
+//
+// PUBLISH/SPUBLISH wire shape is covered separately by
+// ``PublishTransformsToSpublishOnWire`` / ``SpublishOnWireAlsoSpublish`` in their own
+// PUBLISH-focused fixtures, so this test focuses on the harder
+// direction (push-frame round trip) and uses a single downstream / single
+// upstream connection. In production a subscription uses a dedicated per-host
+// ``subscription_client_map_`` connection, separate from the ordinary data
+// ``client_map_`` pool; this test collapses both onto one fake-upstream
+// connection for simplicity, since modeling them as two would just race the framework.
+TEST_P(RedisProxyResp3UpstreamIntegrationTest, SubscribeAndSmessageEndToEnd) {
+  initialize();
+
+  IntegrationTcpClientPtr client = makeTcpConnection(lookupPort("redis_proxy"));
+  client->clearData();
+
+  // Establish a subscription on "foo" (client HELLO/SUBSCRIBE + upstream HELLO/SSUBSCRIBE + acks).
+  FakeRawConnectionPtr upstream_conn;
+  establishSubscription(client, upstream_conn, "foo");
+
+  // --- Subscription conn pushes smessage; downstream sees message ---------------
+  const std::string smessage_push_upstream = ">3\r\n$8\r\nsmessage\r\n$3\r\nfoo\r\n$5\r\nhello\r\n";
+  ASSERT_TRUE(upstream_conn->write(smessage_push_upstream));
+
+  const std::string message_push_downstream = ">3\r\n$7\r\nmessage\r\n$3\r\nfoo\r\n$5\r\nhello\r\n";
+  client->waitForData(message_push_downstream);
+  EXPECT_EQ(message_push_downstream, client->data());
+
+  EXPECT_TRUE(upstream_conn->close());
+  client->close();
+}
+
+// Failover: once a subscription is established, the upstream subscription connection is lost
+// (server crash / network drop / cluster failover). The proxy must transparently re-establish the
+// subscription on a FRESH upstream connection — a new HELLO 3 handshake followed by the same
+// SSUBSCRIBE, driven by the registry's resubscribe timer — so pub/sub delivery resumes without the
+// downstream client re-subscribing. End-to-end regression for the dedicated-subscription-connection
+// + resubscribe path (blocker ② / B-3 / B-5): the resubscribe re-issues SSUBSCRIBE but registers no
+// new pending ack, so the client sees no duplicate subscribe ack, only continued message delivery.
+TEST_P(RedisProxyResp3UpstreamIntegrationTest,
+       SubscriptionResubscribesAfterUpstreamConnectionLoss) {
+  initialize();
+
+  IntegrationTcpClientPtr client = makeTcpConnection(lookupPort("redis_proxy"));
+  client->clearData();
+
+  // Establish subscription conn #1 on "foo" (see establishSubscription).
+  FakeRawConnectionPtr upstream_conn1;
+  establishSubscription(client, upstream_conn1, "foo");
+
+  // Baseline: a message flows before the failover.
+  ASSERT_TRUE(upstream_conn1->write(">3\r\n$8\r\nsmessage\r\n$3\r\nfoo\r\n$5\r\nhello\r\n"));
+  client->waitForData(">3\r\n$7\r\nmessage\r\n$3\r\nfoo\r\n$5\r\nhello\r\n");
+  client->clearData();
+
+  // --- FAILOVER: drop the upstream subscription connection ----------------------
+  ASSERT_TRUE(upstream_conn1->close());
+
+  // The resubscribe timer fires and opens a NEW upstream connection, re-handshakes HELLO 3, and
+  // re-issues SSUBSCRIBE foo — all without the downstream client doing anything.
+  FakeRawConnectionPtr upstream_conn2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_conn2));
+  expectResp3HelloHandshake(upstream_conn2);
+
+  const std::string ssubscribe_foo_wire = makeBulkStringArray({"SSUBSCRIBE", "foo"});
+  std::string data;
+  EXPECT_TRUE(upstream_conn2->waitForData(ssubscribe_foo_wire.size(), &data));
+  EXPECT_EQ(ssubscribe_foo_wire, data);
+  upstream_conn2->clearData();
+
+  // The re-issued SSUBSCRIBE has no pending ack (resubscribe is transparent), so this upstream ack
+  // is dropped and produces NO downstream frame. A message on the new connection is what proves
+  // delivery resumed.
+  ASSERT_TRUE(upstream_conn2->write(">3\r\n$10\r\nssubscribe\r\n$3\r\nfoo\r\n:1\r\n"));
+  ASSERT_TRUE(upstream_conn2->write(">3\r\n$8\r\nsmessage\r\n$3\r\nfoo\r\n$8\r\npostfail\r\n"));
+  const std::string message_after_failover =
+      ">3\r\n$7\r\nmessage\r\n$3\r\nfoo\r\n$8\r\npostfail\r\n";
+  client->waitForData(message_after_failover);
+  EXPECT_EQ(message_after_failover, client->data());
+
+  EXPECT_TRUE(upstream_conn2->close());
+  client->close();
+}
+
+// Client ``SSUBSCRIBE`` is rejected with ``ERR unknown command`` even though
+// upstream Redis 7+ supports it — the proxy intentionally hides the sharded
+// pubsub verbs from clients to keep ``SUBSCRIBE`` as the single entry point.
+// The wire is never touched (no upstream connection should be opened).
+TEST_P(RedisProxyIntegrationTest, SsubscribeRejectedNotForwarded) {
+  initialize();
+
+  const std::string downstream_request = makeBulkStringArray({"ssubscribe", "ch"});
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->clearData();
+  ASSERT_TRUE(redis_client->write(downstream_request));
+
+  // ``ERR unknown command 'ssubscribe', with args beginning with: ch``
+  const std::string expected_prefix = "-ERR unknown command 'ssubscribe'";
+  EXPECT_TRUE(redis_client->waitForData(expected_prefix.size()));
+  EXPECT_EQ(expected_prefix, redis_client->data().substr(0, expected_prefix.size()));
+
+  redis_client->close();
 }
 
 TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {

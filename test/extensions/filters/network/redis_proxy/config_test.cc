@@ -95,6 +95,179 @@ settings:
   cb(connection);
 }
 
+// G2: custom_commands must not override the built-in pub/sub handlers — that would silently defeat
+// the sharded PUBLISH rewrite or hang a raw SUBSCRIBE on a data connection. Config load must fail,
+// mirroring the hard rejection of the internal sharded verbs. Case-insensitive.
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsPubsubCustomCommand) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+custom_commands: [PUBLISH]
+settings:
+  op_timeout: 0.02s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(proto_config, context).IgnoreError(), EnvoyException,
+      "redis_proxy: custom_commands cannot override the built-in pub/sub command 'PUBLISH'");
+}
+
+// MISC-1: the pub/sub NACK covers the PATTERN verbs (PSUBSCRIBE/PUNSUBSCRIBE) too, not just the
+// client-exposed SUBSCRIBE/UNSUBSCRIBE/PUBLISH/SPUBLISH. A ``custom_commands: [psubscribe]`` would
+// otherwise register a generic pass-through that sends a raw PSUBSCRIBE down a DATA connection,
+// where it hangs with no Push reply until the op timeout closes the shared connection.
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsPatternSubscribeCustomCommand) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+custom_commands: [psubscribe]
+settings:
+  op_timeout: 0.02s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(proto_config, context).IgnoreError(), EnvoyException,
+      "redis_proxy: custom_commands cannot override the built-in pub/sub command 'psubscribe'");
+}
+
+// MISC-1: the NACK also covers the INTERNAL sharded verbs (SSUBSCRIBE/SUNSUBSCRIBE) the proxy
+// issues upstream — a client must never be able to reintroduce them as a generic pass-through.
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsInternalShardedVerbCustomCommand) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+custom_commands: [ssubscribe]
+settings:
+  op_timeout: 0.02s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(proto_config, context).IgnoreError(), EnvoyException,
+      "redis_proxy: custom_commands cannot override the built-in pub/sub command 'ssubscribe'");
+}
+
+// A-7: a pub/sub resubscribe backoff whose base exceeds its max must be rejected at config load.
+// The proto's ``gt`` rule bounds each interval below only (> 0), but
+// JitteredExponentialBackOffStrategy requires ``base <= max``, so an inverted pair would otherwise
+// load fine and abort a worker on the first RESP3 subscription.
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsInvertedResubscribeBackoff) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
+  pubsub_settings:
+    resubscribe_backoff_base_interval: 30s
+    resubscribe_backoff_max_interval: 1s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(proto_config, context).IgnoreError(), EnvoyException,
+      "redis_proxy: pubsub_settings.resubscribe_backoff_base_interval (30000ms) must not exceed "
+      "resubscribe_backoff_max_interval (1000ms)");
+}
+
+// A-7: a pub/sub duration that rounds to 0ms (sub-millisecond) must be rejected. The proto's ``gt``
+// rule only bounds the Duration above zero, but the millisecond conversion floors 500us to 0ms,
+// which would hit JitteredExponentialBackOffStrategy's ASSERT(base > 0) / a ``% 0`` at runtime.
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsSubMillisecondResubscribeBackoff) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
+  pubsub_settings:
+    resubscribe_backoff_base_interval: 0.0005s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(proto_config, context).IgnoreError(), EnvoyException,
+      "redis_proxy: pubsub_settings durations must each be at least 1ms (subscribe_ack_timeout="
+      "10000ms, resubscribe_backoff_base_interval=0ms, resubscribe_backoff_max_interval=30000ms)");
+}
+
+// SW-3: a pub/sub duration far above any sane value must be rejected. The PGV ``gt`` rule bounds
+// each Duration only above zero (its upper bound is ~292 years), but these feed deadline arithmetic
+// — the subscribe-ack scheduler computes ``monotonicTime() + timeout_`` (a MonotonicTime point) —
+// so an extreme value would overflow the signed nanosecond representation (UB) and could wrap to a
+// PAST deadline, timing out a healthy upstream immediately. Reject anything over 1 hour at load,
+// matching the fail-at-load spirit of the >0 / base<=max checks.
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsExcessivePubsubDuration) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
+  pubsub_settings:
+    subscribe_ack_timeout: 7200s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(proto_config, context).IgnoreError(), EnvoyException,
+      "redis_proxy: pubsub_settings durations must each be at most 3600000ms / 1h "
+      "(subscribe_ack_timeout=7200000ms, resubscribe_backoff_base_interval=100ms, "
+      "resubscribe_backoff_max_interval=30000ms)");
+}
+
+// Finding 1: sharded_subscription_mode is a ``defined_only`` enum, so an out-of-range numeric value
+// is rejected at config load rather than silently treated as SHARDED (config.cc enables the sharded
+// rewrite for any value != DISABLED) — a dangerous silent fallback for a Redis 6.x compatibility
+// switch. A numeric ``2`` is a valid proto3 enum wire value but not a defined
+// ShardedSubscriptionMode.
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyRejectsUndefinedShardedSubscriptionMode) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
+  pubsub_settings:
+    sharded_subscription_mode: 2
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
+                          ProtoValidationException,
+                          "(defined enum values|embedded message failed validation)");
+}
+
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyEmptyProto) {
   const std::string yaml = R"EOF(
 prefix_routes:

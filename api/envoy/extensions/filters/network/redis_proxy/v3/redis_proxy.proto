@@ -28,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -55,7 +55,7 @@ message RedisProxy {
   }
 
   // Redis connection pool settings.
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -173,6 +173,63 @@ message RedisProxy {
     // storm to busy redis server. This config is a protection to rate limit reconnection rate.
     // If not set, there will be no rate limiting on the reconnection.
     ConnectionRateLimit connection_rate_limit = 10;
+
+    // Tuning for RESP3 sharded pub/sub. Client ``SUBSCRIBE`` / ``UNSUBSCRIBE`` are transparently
+    // rewritten onto sharded ``SSUBSCRIBE`` / ``SUNSUBSCRIBE``; ``PUBLISH`` is rewritten to
+    // ``SPUBLISH`` only when ``enable_sharded_publish`` is set (otherwise it is forwarded unchanged).
+    // Every field is optional and falls back to a built-in default, so omitting this message leaves
+    // pub/sub behavior unchanged.
+    message PubsubSettings {
+      // How long the proxy waits for an upstream ``SSUBSCRIBE`` acknowledgement before failing the
+      // downstream ``SUBSCRIBE``. The same deadline also bounds each re-subscribe generation raised
+      // by a topology change or subscription-connection loss, after which the affected channels are
+      // re-resolved on the backoff below. Defaults to 10s if unset.
+      google.protobuf.Duration subscribe_ack_timeout = 1 [(validate.rules).duration = {gt {}}];
+
+      // Initial interval of the jittered exponential backoff the proxy uses to re-subscribe channels
+      // after an upstream subscription connection drops or an upstream rejects a re-subscribe. Full
+      // jitter is applied, so this is NOT a floor: the actual first delay is uniformly random in
+      // ``[0, base_interval)`` and the window doubles each attempt up to
+      // ``resubscribe_backoff_max_interval``. Must round to at least 1ms. Defaults to 100ms if unset.
+      google.protobuf.Duration resubscribe_backoff_base_interval = 2
+          [(validate.rules).duration = {gt {}}];
+
+      // Maximum interval the re-subscribe backoff escalates to. Defaults to 30s if unset. When both
+      // are set this must be greater than or equal to ``resubscribe_backoff_base_interval``.
+      google.protobuf.Duration resubscribe_backoff_max_interval = 3
+          [(validate.rules).duration = {gt {}}];
+
+      // Whether the proxy transparently rewrites client ``SUBSCRIBE`` / ``UNSUBSCRIBE`` to the
+      // sharded ``SSUBSCRIBE`` / ``SUNSUBSCRIBE`` verbs.
+      enum ShardedSubscriptionMode {
+        // Rewrite ``SUBSCRIBE`` / ``UNSUBSCRIBE`` to ``SSUBSCRIBE`` / ``SUNSUBSCRIBE``, routing each
+        // channel to the shard that owns its hash slot. Requires a Redis 7.0+ upstream. This is the
+        // default and preserves the historical behavior of a RESP3 listener.
+        SHARDED = 0;
+
+        // Reject ``SUBSCRIBE`` / ``UNSUBSCRIBE`` as unsupported commands (a clean ``-ERR unknown
+        // command``), the pre-sharded-pubsub behavior. Set this when the upstream speaks RESP3 but
+        // does NOT implement ``SSUBSCRIBE`` (e.g. Redis 6.x): otherwise every client ``SUBSCRIBE``
+        // would be rewritten into an ``SSUBSCRIBE`` the upstream answers with ``-ERR unknown
+        // command``, churning the subscription connection through backoff until it closes the
+        // client. (``PUBLISH`` rewriting is governed separately by ``enable_sharded_publish``.)
+        DISABLED = 1;
+      }
+
+      // Controls the sharded ``SUBSCRIBE`` rewrite (see :ref:`ShardedSubscriptionMode
+      // <envoy_v3_api_enum_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings.ShardedSubscriptionMode>`).
+      // Leave unset (``SHARDED``) for a Redis 7.0+ upstream; set ``DISABLED`` for a RESP3 upstream
+      // without ``SSUBSCRIBE`` such as Redis 6.x. ``defined_only`` so an out-of-range numeric
+      // value is rejected at config load rather than silently treated as ``SHARDED`` (config.cc
+      // enables the rewrite for any value except ``DISABLED``) — a dangerous silent fallback for
+      // a compatibility switch.
+      ShardedSubscriptionMode sharded_subscription_mode = 4
+          [(validate.rules).enum = {defined_only: true}];
+    }
+
+    // RESP3 sharded pub/sub tuning. See :ref:`PubsubSettings
+    // <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.PubsubSettings>`.
+    PubsubSettings pubsub_settings = 11;
   }
 
   message PrefixRoutes {
@@ -424,6 +481,25 @@ message RedisProxy {
   // fail every connection's HELLO 3 negotiation, surfaced as
   // ``upstream_resp3_hello_failure`` stat increments.
   ProtocolVersion protocol_version = 12 [(validate.rules).enum = {defined_only: true}];
+
+  // When ``true``, the proxy rewrites a client ``PUBLISH`` to the sharded ``SPUBLISH``
+  // command before forwarding it upstream, so the message is delivered to the slot-owning
+  // shard — matching the sharded rewrite of ``SUBSCRIBE`` → ``SSUBSCRIBE``. Enable this for
+  // pub/sub against a Redis Cluster where subscribers use this proxy.
+  //
+  // Defaults to ``false``, in which case a client ``PUBLISH`` is forwarded unchanged as
+  // classic ``PUBLISH`` (and keeps its historical read/mirror routing). Leave it disabled
+  // for RESP2 listeners and for Redis deployments older than 7.0 (which have no ``SPUBLISH``
+  // command); enabling it there would make every ``PUBLISH`` fail upstream with
+  // ``-ERR unknown command 'SPUBLISH'``.
+  //
+  // .. note::
+  //   When ``sharded_subscription_mode`` is ``SHARDED`` (the default), ``SUBSCRIBE`` is rewritten
+  //   to sharded ``SSUBSCRIBE``, so a ``PUBLISH`` left classic (this field ``false``) is not
+  //   delivered to subscribers that subscribed through this proxy. Enable this field whenever the
+  //   listener serves sharded pub/sub subscribers. (When ``sharded_subscription_mode`` is
+  //   ``DISABLED``, ``SUBSCRIBE`` is rejected outright rather than rewritten.)
+  bool enable_sharded_publish = 13;
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in

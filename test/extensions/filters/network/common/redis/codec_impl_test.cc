@@ -1990,8 +1990,8 @@ TEST_F(RespEncoderDownconversionTest, NestedMapInsideArrayDownconverts) {
 }
 
 TEST_F(RespEncoderDownconversionTest, PushDownconvertsToArray) {
-  // `>N` becomes `*N` with the same bulk-string payload, matching the RESP2 pubsub wire form
-  // so a RESP2 client's response queue stays framed.
+  // `>N` becomes `*N` with the same bulk-string payload, matching the RESP2 pubsub wire
+  // form so a RESP2 client's response queue stays framed.
   RespValue v;
   v.type(RespType::Push);
   std::vector<RespValue> elems(3);

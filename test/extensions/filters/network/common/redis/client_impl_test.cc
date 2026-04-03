@@ -242,6 +242,15 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   bool connectionRateLimitEnabled() const override { return false; }
   uint32_t connectionRateLimitPerSec() const override { return 0; }
+  std::chrono::milliseconds subscribeAckTimeout() const override {
+    return std::chrono::milliseconds(10000);
+  }
+  std::chrono::milliseconds resubscribeBackoffBaseInterval() const override {
+    return std::chrono::milliseconds(100);
+  }
+  std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
+    return std::chrono::milliseconds(30000);
+  }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -402,6 +411,15 @@ class ConfigEnableCommandStats : public Config {
   bool enableCommandStats() const override { return true; }
   bool connectionRateLimitEnabled() const override { return false; }
   uint32_t connectionRateLimitPerSec() const override { return 0; }
+  std::chrono::milliseconds subscribeAckTimeout() const override {
+    return std::chrono::milliseconds(10000);
+  }
+  std::chrono::milliseconds resubscribeBackoffBaseInterval() const override {
+    return std::chrono::milliseconds(100);
+  }
+  std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
+    return std::chrono::milliseconds(30000);
+  }
 };
 
 void initializeRedisSimpleCommand(Common::Redis::RespValue* request, std::string command_name,
@@ -549,6 +567,58 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
   }));
 
   upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// SPUBLISH (the sharded rewrite of PUBLISH) is a real request/response upstream command, so its
+// outcome must surface as ``upstream_commands.spublish.*`` — not fold into ``unknown``. Regression
+// guard for the builtin registration in RedisCommandStats: without it, every proxy-issued
+// PUBLISH/SPUBLISH would be indistinguishable from an unknown command in operator dashboards.
+TEST_F(RedisClientImplTest, CommandStatsAttributeSpublishNotUnknown) {
+  InSequence s;
+
+  setup(std::make_shared<ConfigEnableCommandStats>());
+  client_->initialize(auth_username_, auth_password_);
+
+  Common::Redis::RespValue request;
+  initializeRedisSimpleCommand(&request, "spublish", "channel");
+  MockClientCallbacks callbacks;
+  EXPECT_CALL(*encoder_, encode(Ref(request), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle = client_->makeRequest(request, callbacks);
+  EXPECT_NE(nullptr, handle);
+
+  onConnected();
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+    simTime().setMonotonicTime(std::chrono::microseconds(10));
+    EXPECT_CALL(stats_,
+                deliverHistogramToSinks(
+                    Property(&Stats::Metric::name, "upstream_commands.spublish.latency"), 10));
+    EXPECT_CALL(stats_,
+                deliverHistogramToSinks(
+                    Property(&Stats::Metric::name, "upstream_commands.upstream_rq_time"), 10));
+    // SPUBLISH replies with the integer receiver count.
+    Common::Redis::RespValuePtr response(new Common::Redis::RespValue());
+    response->type(Common::Redis::RespType::Integer);
+    response->asInteger() = 1;
+    EXPECT_CALL(callbacks, onResponse_(Ref(response)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_,
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+    callbacks_->onRespValue(std::move(response));
+  }));
+
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_EQ(1UL, stats_.counter("upstream_commands.spublish.total").value());
+  EXPECT_EQ(1UL, stats_.counter("upstream_commands.spublish.success").value());
+  EXPECT_EQ(0UL, stats_.counter("upstream_commands.unknown.total").value());
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -837,6 +907,15 @@ class ConfigOutlierDisabled : public Config {
   bool enableCommandStats() const override { return false; }
   bool connectionRateLimitEnabled() const override { return false; }
   uint32_t connectionRateLimitPerSec() const override { return 0; }
+  std::chrono::milliseconds subscribeAckTimeout() const override {
+    return std::chrono::milliseconds(10000);
+  }
+  std::chrono::milliseconds resubscribeBackoffBaseInterval() const override {
+    return std::chrono::milliseconds(100);
+  }
+  std::chrono::milliseconds resubscribeBackoffMaxInterval() const override {
+    return std::chrono::milliseconds(30000);
+  }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {
@@ -2774,6 +2853,243 @@ TEST_F(RedisClientImplTest, Resp3ConnectionCloseDuringAwaitingReadonlyFailsInit)
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(0UL, hello3_failure_counter_->value());
+}
+
+namespace {
+// MockPushMessageCallbacks now lives in test/extensions/filters/network/common/redis/mocks.h (R-6).
+} // namespace
+
+// Rule 1: sendCommand issued while init_state_ == AwaitingHello must be parked behind the held
+// queue and replayed on HELLO 3 success. Without the gate, SUBSCRIBE bytes would race ahead of
+// the in-flight HELLO 3 on the wire.
+TEST_F(RedisClientImplTest, Resp3SendCommandDuringAwaitingHelloIsHeldUntilHelloSuccess) {
+  InSequence s;
+  enableResp3();
+  setup();
+
+  // initialize() — bare HELLO 3 (no AUTH); 1 encode + 2 flush_timer_->enabled() (auto + explicit).
+  Common::Redis::RespValue hello3 = makeBareHello3Request();
+  EXPECT_CALL(*encoder_, encode(Eq(hello3), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize(auth_username_, auth_password_);
+
+  // sendCommand while AwaitingHello — encoder must NOT be called.
+  Common::Redis::RespValue subscribe = Utility::makeRequest("SUBSCRIBE", {"chan"});
+  client_->sendCommand(subscribe);
+
+  // HELLO 3 success reply → setInitState(Ready) → replayHeldInitQueue → SUBSCRIBE encoded + flush.
+  // The HELLO PendingRequest is then popped in onRespValue and pending_requests_ is empty (the
+  // sendCommand path does not create a PendingRequest), so onRespValue's tail disables the op
+  // timer.
+  EXPECT_CALL(*encoder_, encode(Eq(subscribe), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  respondWith(makeHelloMapReply(3));
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Rule 1: sendCommand issued while init_state_ == AwaitingReadonly is held until READONLY acks.
+// Non-Primary read policy drives the AwaitingReadonly hop after HELLO 3 success.
+TEST_F(RedisClientImplTest, Resp3SendCommandDuringAwaitingReadonlyIsHeldUntilReadonlySuccess) {
+  InSequence s;
+  enableResp3();
+  setup(std::make_unique<ConfigImpl>(
+      createConnPoolSettings(20, true, true, 100,
+                             envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+                                 ConnPoolSettings::REPLICA)));
+
+  Common::Redis::RespValue hello3 = makeBareHello3Request();
+  EXPECT_CALL(*encoder_, encode(Eq(hello3), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize(auth_username_, auth_password_);
+
+  // HELLO success → AwaitingReadonly + READONLY dispatched (1 encode + 2 flushes). After
+  // hello_init_callbacks returns, onRespValue's tail re-arms the op timer because READONLY is
+  // now sitting in pending_requests_.
+  Common::Redis::RespValue readonly_request = Utility::ReadOnlyRequest::instance();
+  EXPECT_CALL(*encoder_, encode(Eq(readonly_request), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  respondWith(makeHelloMapReply(3));
+
+  // sendCommand while AwaitingReadonly — held.
+  Common::Redis::RespValue subscribe = Utility::makeRequest("SUBSCRIBE", {"chan"});
+  client_->sendCommand(subscribe);
+
+  // READONLY +OK → setInitState(Ready) → replay; pending_requests_ empty after pop, op timer
+  // disables.
+  EXPECT_CALL(*encoder_, encode(Eq(subscribe), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  auto ok_reply = std::make_unique<Common::Redis::RespValue>();
+  ok_reply->type(Common::Redis::RespType::SimpleString);
+  ok_reply->asString() = "OK";
+  respondWith(std::move(ok_reply));
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Rule 1: sendCommand issued while init_state_ == WaitingForAwsToken is held until the IAM
+// token arrives AND HELLO 3 succeeds. Two-stage gate: token then handshake.
+TEST_F(RedisClientImplTest, Resp3SendCommandDuringAwsIamPendingIsHeldUntilTokenAndHello) {
+  InSequence s;
+  enableResp3();
+  enableAwsIam();
+  setup();
+
+  // sendAwsIamAuth registers a token-ready callback; capture it for later firing.
+  Extensions::Common::Aws::CredentialsPendingCallback captured_on_token;
+  EXPECT_CALL(*mock_aws_iam_authenticator_, addCallbackIfCredentialsPending(_))
+      .WillOnce(Invoke(
+          [&captured_on_token](Extensions::Common::Aws::CredentialsPendingCallback&& cb) -> bool {
+            captured_on_token = std::move(cb);
+            return true; // pending — don't fire synchronously
+          }));
+  client_->initialize(auth_username_, auth_password_);
+
+  // sendCommand while WaitingForAwsToken — held.
+  Common::Redis::RespValue subscribe = Utility::makeRequest("SUBSCRIBE", {"chan"});
+  client_->sendCommand(subscribe);
+
+  // Token arrives → onAwsCredentialsReady → AwaitingHello + HELLO 3 AUTH dispatched.
+  const std::string token = "iam-token";
+  EXPECT_CALL(*mock_aws_iam_authenticator_, getAuthToken(_, _)).WillOnce(Return(token));
+  Common::Redis::RespValue hello3_auth = makeHello3AuthRequest("default", token);
+  EXPECT_CALL(*encoder_, encode(Eq(hello3_auth), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  ASSERT_TRUE(captured_on_token != nullptr);
+  captured_on_token();
+
+  // HELLO success → Ready → replay drains SUBSCRIBE; pending_requests_ empty after HELLO pop,
+  // op timer disables.
+  EXPECT_CALL(*encoder_, encode(Eq(subscribe), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  respondWith(makeHelloMapReply(3));
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Rule 1: held user request entries and held fire-and-forget commands are replayed in original
+// submission order. Caller submits GET → SUBSCRIBE → SET; on HELLO success the wire order must
+// be GET, SUBSCRIBE, SET — the unified queue is what guarantees this.
+TEST_F(RedisClientImplTest, Resp3HeldUserRequestAndSendCommandReplayInSubmissionOrder) {
+  InSequence s;
+  enableResp3();
+  setup();
+
+  Common::Redis::RespValue hello3 = makeBareHello3Request();
+  EXPECT_CALL(*encoder_, encode(Eq(hello3), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize(auth_username_, auth_password_);
+
+  // Hold three entries: user GET, fire-and-forget SUBSCRIBE, user SET.
+  Common::Redis::RespValue get_req = Utility::makeRequest("GET", {"k"});
+  Common::Redis::RespValue subscribe = Utility::makeRequest("SUBSCRIBE", {"chan"});
+  Common::Redis::RespValue set_req = Utility::makeRequest("SET", {"k", "v"});
+  MockClientCallbacks get_cbs;
+  MockClientCallbacks set_cbs;
+  PoolRequest* get_handle = client_->makeRequest(get_req, get_cbs);
+  EXPECT_NE(nullptr, get_handle);
+  client_->sendCommand(subscribe);
+  PoolRequest* set_handle = client_->makeRequest(set_req, set_cbs);
+  EXPECT_NE(nullptr, set_handle);
+
+  // HELLO success → replay in submission order, single trailing flush. connected_ is false (no
+  // onConnected called), so makeRequestInternal does NOT enable the op timer per request — but
+  // after the HELLO PendingRequest pops, pending_requests_ holds the replayed GET + SET, so
+  // onRespValue's tail re-arms the op timer.
+  EXPECT_CALL(*encoder_, encode(Eq(get_req), _));
+  EXPECT_CALL(*encoder_, encode(Eq(subscribe), _));
+  EXPECT_CALL(*encoder_, encode(Eq(set_req), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  respondWith(makeHelloMapReply(3));
+
+  // Tear down — held user requests fail through HeldUserRequest::onFailure → original onFailure.
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(get_cbs, onFailure());
+  EXPECT_CALL(set_cbs, onFailure());
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Rule 3: a Push frame on a subscriber-only client (push_callbacks_ set, pending_requests_
+// empty) is delivered to the registered callback. No assert, no close.
+TEST_F(RedisClientImplTest, SubscriberOnlyClientReceivesPushWithEmptyPendingRequests) {
+  InSequence s;
+  setup();
+
+  MockPushMessageCallbacks push_cbs;
+  client_->setPushCallbacks(&push_cbs);
+  EXPECT_EQ(true, client_->active()); // active() reflects the registered subscriber.
+
+  auto push = std::make_unique<Common::Redis::RespValue>();
+  push->type(Common::Redis::RespType::Push);
+  EXPECT_CALL(push_cbs, onPushMessage_(_));
+  respondWith(std::move(push));
+
+  EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_cx_protocol_error_.value());
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Rule 5: a non-Push reply with empty pending_requests_ on a subscription connection
+// (push_callbacks_ set) is Redis's error reply to a fire-and-forget SSUBSCRIBE/SUNSUBSCRIBE (e.g.
+// -MOVED/-NOPERM, which never created a PendingRequest). It is routed to the registry via
+// onUpstreamControlError so it can reconcile subscription state (host-scoped re-subscribe) without
+// tearing down the shared connection — every other channel multiplexed on it stays live. Expected
+// control traffic: no protocol-error stat, no close.
+TEST_F(RedisClientImplTest, SubscriptionConnectionNonPushReplyRoutesToControlError) {
+  InSequence s;
+  setup();
+
+  MockPushMessageCallbacks push_cbs;
+  client_->setPushCallbacks(&push_cbs);
+
+  EXPECT_CALL(push_cbs, onUpstreamControlError_(_, _));
+  auto err = std::make_unique<Common::Redis::RespValue>();
+  err->type(Common::Redis::RespType::Error);
+  err->asString() = "MOVED 1234 127.0.0.1:6380";
+  respondWith(std::move(err));
+
+  // Connection stayed open (no teardown) and no protocol-error was recorded.
+  EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_cx_protocol_error_.value());
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Rule 5b: a non-Push reply with empty pending_requests_ on a client with NO subscriber
+// (push_callbacks_ unset) is genuinely anomalous — an idle client received an unsolicited reply.
+// Bump the protocol-error stat and tear the connection down; never assert, never silently diverge.
+TEST_F(RedisClientImplTest, IdleClientNonPushReplyClosesConnection) {
+  InSequence s;
+  setup();
+
+  // No setPushCallbacks: this is a plain client, not a subscription connection.
+  // Non-Push reply with no pending request → close (which raises LocalClose → disableTimer) +
+  // protocol_error++. The MockConnection idempotency check makes the raiseEvent inside the close a
+  // no-op for state transitions if invoked again, so the dtor's state==Closed check is satisfied
+  // without an explicit second close.
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  auto err = std::make_unique<Common::Redis::RespValue>();
+  err->type(Common::Redis::RespType::Error);
+  err->asString() = "ERR something";
+  respondWith(std::move(err));
+
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_protocol_error_.value());
 }
 
 TEST(RedisClientFactoryImplTest, Basic) {

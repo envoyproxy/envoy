@@ -14,6 +14,7 @@
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/extensions/filters/network/redis_proxy/pubsub_test_utils.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
@@ -373,10 +374,29 @@ public:
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_total_.value());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_active_.value());
 
-    // NOP currently.
+    // No subscriber attached yet, so the high-watermark callback is a no-op here.
     filter_->onAboveWriteBufferHighWatermark();
     filter_->onBelowWriteBufferLowWatermark();
   }
+
+  // The fixture is a friend of ProxyFilter (friendship is not inherited, so the TEST_F-generated
+  // subclass cannot touch private members directly); attach a subscriber here for the
+  // slow-subscriber backpressure test without driving the whole subscribe path.
+  void attachSubscriberForTest() {
+    filter_->subscriber_ = std::make_shared<DownstreamSubscriber>(filter_callbacks_.connection_,
+                                                                  testDownstreamSubscriberStats());
+  }
+
+  // Simulate active pub/sub work (parked message-push bytes) on the filter, so the slow-subscriber
+  // watermark path treats the attached subscriber as an active consumer (see Issue 5 guard).
+  void setHeldPushBytesForTest(uint64_t n) { filter_->held_push_bytes_ = n; }
+
+  // Create a subscriber through the production path (getOrCreateSubscriber), which also wires the
+  // filter's push-ordering sink so deliverMessage routes back through
+  // ProxyFilter::enqueueOrderedPush (FIFO ordering + backpressure tests). Friendship is not
+  // inherited, so the TEST_F body cannot call the private getOrCreateSubscriber itself — this
+  // fixture helper does.
+  DownstreamSubscriberPtr getWiredSubscriberForTest() { return filter_->getOrCreateSubscriber(); }
 
   ~RedisProxyFilterTest() override {
     filter_.reset();
@@ -458,6 +478,55 @@ TEST_F(RedisProxyFilterTestWithTwoCallbacks, OutOfOrderResponseWithDrainClose) {
   request_callbacks1_->onResponse(std::move(response1));
 
   EXPECT_EQ(1UL, config_->stats_.downstream_cx_drain_close_.value());
+}
+
+// H1 (the report's only HIGH, "merge-blocking + behavior-reproduction required"): within a SINGLE
+// decode() loop, an earlier frame can synchronously close the downstream connection — a reply/ack
+// write tripping the slow-subscriber high-watermark (onAboveWriteBufferHighWatermark →
+// closeSlowSubscriber), or a splitter-driven error close — which runs onEvent(LocalClose) inline
+// and cancels every pending request. The decoder keeps looping over the buffer, so a LATER frame in
+// the same loop MUST be dropped at the Open-state guard: turning it into a PendingRequest would
+// leak a live upstream handle no future close can cancel (~PendingRequest ASSERT in debug /
+// freed-callback UAF in release — H1a), and a SUBSCRIBE would re-create a subscriber on the closed
+// connection (zombie upstream subscription + leaked gauge — H1b). This reproduces the
+// two-pipelined-frame case: frame 1 processed → connection closed → frame 2 dropped before the
+// splitter.
+TEST_F(RedisProxyFilterTest, H1DropsFrameDispatchedAfterConnectionClosedMidDecode) {
+  // The connection is Open until frame 1's processing closes it; a mutable flag lets state() flip
+  // mid-decode without fighting gmock expectation ordering.
+  bool conn_open = true;
+  ON_CALL(filter_callbacks_.connection_, state()).WillByDefault(Invoke([&conn_open]() {
+    return conn_open ? Network::Connection::State::Open : Network::Connection::State::Closed;
+  }));
+
+  auto* handle1 = new CommandSplitter::MockSplitRequest();
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) {
+    // Frame 1 arrives while Open: normal makeRequest, counted active.
+    Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _, _)).WillOnce(Return(handle1));
+    decoder_callbacks_->onRespValue(std::move(request1));
+
+    // Frame 1's processing synchronously closed the connection: onEvent(LocalClose) runs inline,
+    // cancelling the in-flight request and leaving the connection non-Open.
+    conn_open = false;
+    EXPECT_CALL(*handle1, cancel());
+    filter_->onEvent(Network::ConnectionEvent::LocalClose);
+
+    // Frame 2, still dispatched by the same decode loop, must be dropped BEFORE the splitter: no
+    // second makeRequest, no PendingRequest, no subscriber created on the closed connection.
+    Common::Redis::RespValuePtr request2(new Common::Redis::RespValue());
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*request2), _, _, _)).Times(0);
+    decoder_callbacks_->onRespValue(std::move(request2));
+  }));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+
+  // Exactly one request was ever created (frame 1); the close cancelled it and frame 2 never became
+  // a request. pending_requests_ is empty, so the ~ProxyFilter ASSERT and the fixture's gauge-zero
+  // destructor check both hold.
+  EXPECT_EQ(1UL, config_->stats_.downstream_rq_total_.value());
+  EXPECT_EQ(0UL, config_->stats_.downstream_rq_active_.value());
 }
 
 // Covers the setProtocolVersion(Resp2) true branch of the onResponse re-stamp: a reply produced
@@ -555,6 +624,79 @@ TEST_F(RedisProxyFilterTest, ImmediateResponse) {
       }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Pipelined GET (still pending upstream) + SUBSCRIBE that fails locally must serialize on the
+// wire: GET reply, then SUBSCRIBE error. Local pub/sub error frames are RESP Errors (not
+// Push) and must traverse the FIFO. The simulated splitter mirrors the real splitter's terminal
+// respond(): the SUBSCRIBE's accumulated frame batch is handed over in one call, buffered on the
+// SUBSCRIBE's FIFO entry, and only flushed once the earlier GET entry completes — so the SUBSCRIBE
+// error can never overtake the GET reply nor be dropped when the GET entry is popped.
+TEST_F(RedisProxyFilterTest, PipelinedGetThenSubscribeErrorPreservesFifo) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  CommandSplitter::MockSplitRequest* get_handle = new CommandSplitter::MockSplitRequest();
+  CommandSplitter::SplitCallbacks* get_callbacks{};
+  CommandSplitter::SplitCallbacks* sub_callbacks{};
+
+  // Decode two pipelined commands in one onData pass: GET (returns a live SplitRequest) +
+  // SUBSCRIBE (synchronously runs the splitter's terminal respond() with its accumulated frame
+  // batch, the same shape the real SubscriptionRequest::create now uses).
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Common::Redis::RespValuePtr get_req(new Common::Redis::RespValue());
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*get_req), _, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&get_callbacks)), Return(get_handle)));
+    decoder_callbacks_->onRespValue(std::move(get_req));
+
+    Common::Redis::RespValuePtr sub_req(new Common::Redis::RespValue());
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*sub_req), _, _, _))
+        .WillOnce(Invoke([&](const Common::Redis::RespValue&, CommandSplitter::SplitCallbacks& cbs,
+                             Event::Dispatcher&,
+                             const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+          sub_callbacks = &cbs;
+          Common::Redis::RespValuePtr err(new Common::Redis::RespValue());
+          err->type(Common::Redis::RespType::Error);
+          err->asString() = "ERR no route for pub/sub target 'chan'";
+          // Terminal: hand the per-channel -ERR to respond() as a one-frame batch, which buffers
+          // it and marks the SUBSCRIBE FIFO entry done. Front-of-FIFO is still the in-flight GET,
+          // so flushReadyResponses must NOT pop or write anything yet — pin that with the explicit
+          // Times(0) on encode/write below being satisfied during this onData pass.
+          CommandSplitter::RespValueFrames frames;
+          frames.push_back(std::move(err));
+          cbs.respond(std::move(frames));
+          return nullptr;
+        }));
+    decoder_callbacks_->onRespValue(std::move(sub_req));
+  }));
+  // No encode and no connection.write during the decode pass — both must wait for the GET
+  // upstream reply to land below.
+  EXPECT_CALL(*encoder_, encode(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _)).Times(0);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+  testing::Mock::VerifyAndClearExpectations(encoder_);
+  testing::Mock::VerifyAndClearExpectations(&filter_callbacks_.connection_);
+
+  // Now drive the GET reply. The flush should encode GET reply first, then drain the queued
+  // SUBSCRIBE error from the next FIFO entry — both in the same connection.write batch.
+  Common::Redis::RespValue get_reply;
+  get_reply.type(Common::Redis::RespType::SimpleString);
+  get_reply.asString() = "OK";
+  Common::Redis::RespValue sub_err;
+  sub_err.type(Common::Redis::RespType::Error);
+  sub_err.asString() = "ERR no route for pub/sub target 'chan'";
+  testing::Sequence write_seq;
+  EXPECT_CALL(*encoder_, encode(Eq(ByRef(get_reply)), _)).InSequence(write_seq);
+  EXPECT_CALL(*encoder_, encode(Eq(ByRef(sub_err)), _)).InSequence(write_seq);
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+  Common::Redis::RespValuePtr get_reply_ptr(new Common::Redis::RespValue(get_reply));
+  get_callbacks->onResponse(std::move(get_reply_ptr));
+
+  // gMock's leak detector occasionally incorrectly attributes get_handle's destruction (it
+  // is owned by PendingRequest::request_handle_ and reset on respond above).
+  // Allow-leak so the test fails only on actual FIFO assertions.
+  testing::Mock::AllowLeak(get_handle);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -2714,6 +2856,246 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, HelloAuthExternalAuthExpir
       }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
+// B4: a pub/sub subscriber whose downstream write buffer overflows the high watermark is a slow
+// consumer (it cannot pace unsolicited Push frames). Close it — matching Redis's
+// client-output-buffer-limit pubsub eviction — rather than buffer unboundedly; a non-subscriber
+// connection is left alone, and the close happens exactly once.
+TEST_F(RedisProxyFilterTest, SlowSubscriberClosedOnWriteBufferHighWatermark) {
+  // Non-subscriber connection: the high watermark is a no-op (a request/reply client drains its own
+  // backlog by reading).
+  filter_->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(0UL, config_->stats_.pubsub_slow_subscriber_closed_.value());
+
+  // Attach a pub/sub subscriber with active pub/sub work (a parked message push) to this
+  // connection.
+  attachSubscriberForTest();
+  setHeldPushBytesForTest(1);
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  filter_->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(1UL, config_->stats_.pubsub_slow_subscriber_closed_.value());
+
+  // Idempotent: the high watermark can re-fire before the close completes — do not close/count
+  // twice.
+  filter_->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(1UL, config_->stats_.pubsub_slow_subscriber_closed_.value());
+}
+
+// Issue 5 (round-4): the slow-subscriber watermark eviction only applies to a connection with
+// ACTIVE pub/sub work. ``subscriber_`` lingers after the last UNSUBSCRIBE (and a bare UNSUBSCRIBE
+// can create it), so a plain request/reply connection that merely once subscribed — now with no
+// live subscriptions and no parked push bytes — must NOT be evicted on its own reply backlog.
+TEST_F(RedisProxyFilterTest, SlowSubscriberNotClosedWithNoActiveSubscriptions) {
+  attachSubscriberForTest(); // subscriber present but 0 subscriptions and 0 parked push bytes
+  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
+  filter_->onAboveWriteBufferHighWatermark();
+  EXPECT_EQ(0UL, config_->stats_.pubsub_slow_subscriber_closed_.value());
+}
+
+// B2: a MESSAGE push must not overtake an in-flight ordinary reply on a client that is both
+// subscribed and issuing commands (self-``PUBLISH`` being the canonical case). With a GET in flight
+// the push is parked behind it; when the GET reply lands, flushReadyResponses writes the reply and
+// THEN the parked push, in one ordered batch — reply bytes strictly before push bytes on the wire.
+TEST_F(RedisProxyFilterTest, MessagePushHeldBehindPendingReplyThenFlushedInOrder) {
+  // Wire the subscriber through the production path so deliverMessage routes into the filter's
+  // FIFO.
+  DownstreamSubscriberPtr subscriber = getWiredSubscriberForTest();
+
+  // One in-flight GET keeps pending_requests_ non-empty (its reply has not landed yet).
+  Buffer::OwnedImpl fake_data;
+  CommandSplitter::MockSplitRequest* get_handle = new CommandSplitter::MockSplitRequest();
+  CommandSplitter::SplitCallbacks* get_callbacks{};
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Common::Redis::RespValuePtr get_req(new Common::Redis::RespValue());
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*get_req), _, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&get_callbacks)), Return(get_handle)));
+    decoder_callbacks_->onRespValue(std::move(get_req));
+  }));
+  // No write while the GET is in flight — including when the message push is parked below.
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _)).Times(0);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+
+  // parked behind the in-flight GET, not written
+  subscriber->deliverMessage(*makeMessagePush("message", "chan", "hello"));
+  testing::Mock::VerifyAndClearExpectations(&filter_callbacks_.connection_);
+
+  // GET reply lands: a single ordered write carrying the reply bytes BEFORE the parked push bytes.
+  std::string written;
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        written += data.toString();
+        data.drain(data.length());
+      }));
+  Common::Redis::RespValuePtr get_reply(new Common::Redis::RespValue());
+  get_reply->type(Common::Redis::RespType::SimpleString);
+  get_reply->asString() = "OK";
+  get_callbacks->onResponse(std::move(get_reply));
+
+  ASSERT_NE(std::string::npos, written.find("+OK"));
+  ASSERT_NE(std::string::npos, written.find("message"));
+  EXPECT_LT(written.find("+OK"), written.find("message")); // reply strictly before the push
+
+  testing::Mock::AllowLeak(get_handle);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// #2 (intentional control-ack ordering reversal): UNLIKE a MESSAGE push (parked behind an in-flight
+// reply — see MessagePushHeldBehindPendingReplyThenFlushedInOrder), an out-of-band subscription
+// CONTROL ack is delivered directly via DownstreamSubscriber::deliver and therefore BYPASSES the
+// pending-request FIFO — it is written to the wire immediately even while an ordinary command reply
+// is still pending. This reversal is intentional and safe: control acks are RESP3 Push frames (they
+// never break the client's request/reply matching), and deferring a dedup/immediate ack behind an
+// unrelated in-flight command would change the intended out-of-band ack semantics — the ack
+// reflects state already established locally and should not wait on that command's upstream
+// round-trip. Pinning it here guards against a well-meaning "order the acks through the FIFO too"
+// change.
+TEST_F(RedisProxyFilterTest, ControlAckBypassesPendingReplyFifoAndWritesImmediately) {
+  DownstreamSubscriberPtr subscriber = getWiredSubscriberForTest();
+
+  // One in-flight GET keeps pending_requests_ non-empty (its reply has not landed yet).
+  Buffer::OwnedImpl fake_data;
+  CommandSplitter::MockSplitRequest* get_handle = new CommandSplitter::MockSplitRequest();
+  CommandSplitter::SplitCallbacks* get_callbacks{};
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Common::Redis::RespValuePtr get_req(new Common::Redis::RespValue());
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*get_req), _, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&get_callbacks)), Return(get_handle)));
+    decoder_callbacks_->onRespValue(std::move(get_req));
+  }));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+
+  // A subscription CONTROL ack is delivered out-of-band via deliver(): it must hit the wire NOW,
+  // ahead of the still-pending GET reply (a deliverMessage would be parked and write nothing here).
+  std::string written;
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        written += data.toString();
+        data.drain(data.length());
+      }));
+  subscriber->deliver(*makeSubscribeAckPush("subscribe", "chan", 1));
+  EXPECT_NE(std::string::npos,
+            written.find("subscribe")); // ack on the wire while GET still pending
+  testing::Mock::VerifyAndClearExpectations(&filter_callbacks_.connection_);
+
+  // The GET reply lands afterward — the ack already overtook it (the intentional reversal).
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+  Common::Redis::RespValuePtr get_reply(new Common::Redis::RespValue());
+  get_reply->type(Common::Redis::RespType::SimpleString);
+  get_reply->asString() = "OK";
+  get_callbacks->onResponse(std::move(get_reply));
+
+  testing::Mock::AllowLeak(get_handle);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// A2-1 (accepted ordering trade-off, distinct axis from ControlAckBypasses* above): the out-of-band
+// control-ack bypass lets an UNSUBSCRIBE ack overtake a MESSAGE push already PARKED behind an
+// in-flight reply for the SAME channel. A slow GET keeps the FIFO non-empty; a ``message chan``
+// parks behind it; a concurrent UNSUBSCRIBE ack (deliver(), bypasses the FIFO) writes straight to
+// the wire; then the GET reply flushes the parked message. Wire order: ``unsubscribe chan 0``,
+// ``+OK``,
+// ``message chan ...`` — impossible on a single serial Redis push stream, so a client that closes
+// the channel's state machine on the unsubscribe ack sees a trailing message. This pins the
+// accepted behavior; the structural alternative (route control acks through the ordering sink too)
+// reopens the F-series ack decisions and is deferred (see the ProxyFilter FIFO comment).
+TEST_F(RedisProxyFilterTest, UnsubscribeAckOvertakesParkedMessagePushForSameChannel) {
+  DownstreamSubscriberPtr subscriber = getWiredSubscriberForTest();
+
+  // One in-flight GET keeps pending_requests_ non-empty (its reply has not landed yet).
+  Buffer::OwnedImpl fake_data;
+  CommandSplitter::MockSplitRequest* get_handle = new CommandSplitter::MockSplitRequest();
+  CommandSplitter::SplitCallbacks* get_callbacks{};
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Common::Redis::RespValuePtr get_req(new Common::Redis::RespValue());
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*get_req), _, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&get_callbacks)), Return(get_handle)));
+    decoder_callbacks_->onRespValue(std::move(get_req));
+  }));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+
+  std::string written;
+  auto capture = [&](Buffer::Instance& data, bool) {
+    written += data.toString();
+    data.drain(data.length());
+  };
+
+  // A MESSAGE for "chan" parks behind the in-flight GET — nothing on the wire yet.
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _)).Times(0);
+  subscriber->deliverMessage(*makeMessagePush("message", "chan", "hello"));
+  testing::Mock::VerifyAndClearExpectations(&filter_callbacks_.connection_);
+
+  // An out-of-band UNSUBSCRIBE ack for the SAME channel bypasses the FIFO and writes NOW,
+  // overtaking the parked message.
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _)).WillOnce(Invoke(capture));
+  subscriber->deliver(*makeSubscribeAckPush("unsubscribe", "chan", 0));
+  EXPECT_NE(std::string::npos, written.find("unsubscribe"));
+  EXPECT_EQ(std::string::npos,
+            written.find("message")); // the parked message is still not on the wire
+  testing::Mock::VerifyAndClearExpectations(&filter_callbacks_.connection_);
+
+  // The GET reply lands: writes ``+OK`` and THEN the parked message.
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _)).WillOnce(Invoke(capture));
+  Common::Redis::RespValuePtr get_reply(new Common::Redis::RespValue());
+  get_reply->type(Common::Redis::RespType::SimpleString);
+  get_reply->asString() = "OK";
+  get_callbacks->onResponse(std::move(get_reply));
+
+  // The unsubscribe ack reached the wire BEFORE the message push — the accepted A2-1 reversal.
+  ASSERT_NE(std::string::npos, written.find("unsubscribe"));
+  ASSERT_NE(std::string::npos, written.find("message"));
+  EXPECT_LT(written.find("unsubscribe"), written.find("message"));
+
+  testing::Mock::AllowLeak(get_handle);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// B2 fast path: with no ordinary reply in flight, a MESSAGE push goes straight to the wire in
+// arrival order (nothing to order behind).
+TEST_F(RedisProxyFilterTest, MessagePushWrittenImmediatelyWithNoPendingReply) {
+  DownstreamSubscriberPtr subscriber = getWiredSubscriberForTest();
+
+  std::string written;
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        written += data.toString();
+        data.drain(data.length());
+      }));
+  subscriber->deliverMessage(*makeMessagePush("message", "chan", "hello"));
+  EXPECT_NE(std::string::npos, written.find("message"));
+  EXPECT_EQ(1UL, config_->stats_.pubsub_push_messages_delivered_.value());
+}
+
+// B2 backpressure: parked push bytes live in an app buffer the connection high-watermark cannot
+// see, so enqueueOrderedPush bounds them by the same per-connection limit. A subscriber whose FIFO
+// stalls while pushes pile up past the limit is evicted (closed) — the app-queue analog of the
+// watermark path — instead of buffering without limit.
+TEST_F(RedisProxyFilterTest, MessagePushBackpressureClosesSubscriberWhenParkedBytesExceedLimit) {
+  DownstreamSubscriberPtr subscriber = getWiredSubscriberForTest();
+  // A tiny per-connection limit so a single parked message trips the bound.
+  ON_CALL(filter_callbacks_.connection_, bufferLimit()).WillByDefault(Return(4));
+
+  // One in-flight GET so the push is parked (not written straight out).
+  Buffer::OwnedImpl fake_data;
+  CommandSplitter::MockSplitRequest* get_handle = new CommandSplitter::MockSplitRequest();
+  CommandSplitter::SplitCallbacks* get_callbacks{};
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Common::Redis::RespValuePtr get_req(new Common::Redis::RespValue());
+    EXPECT_CALL(splitter_, makeRequest_(Ref(*get_req), _, _, _))
+        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&get_callbacks)), Return(get_handle)));
+    decoder_callbacks_->onRespValue(std::move(get_req));
+  }));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+
+  // The parked bytes (~35) exceed the 4-byte limit -> the subscriber is evicted, stat bumped.
+  // close(NoFlush) raises LocalClose synchronously, so ProxyFilter::onEvent runs inline and cancels
+  // the still-in-flight GET before its PendingRequest (which owns the handle) is destroyed. That
+  // synchronous teardown also empties pending_requests_, so no explicit disconnect is needed here.
+  testing::Mock::AllowLeak(get_handle);
+  EXPECT_CALL(*get_handle, cancel());
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  subscriber->deliverMessage(*makeMessagePush("message", "chan", "hello"));
+  EXPECT_EQ(1UL, config_->stats_.pubsub_slow_subscriber_closed_.value());
 }
 
 } // namespace RedisProxy

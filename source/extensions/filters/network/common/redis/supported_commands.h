@@ -34,11 +34,11 @@ struct SupportedCommands {
         "hpexpireat", "hpexpiretime", "hpttl", "hscan", "hset", "hsetnx", "hstrlen", "httl",
         "hvals", "incr", "incrby", "incrbyfloat", "lindex", "linsert", "llen", "lmove", "lpop",
         "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist", "pexpire", "pexpireat",
-        "pfadd", "pfcount", "psetex", "pttl", "publish", "restore", "rpop", "rpush", "rpushx",
-        "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember", "smembers",
-        "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "xack", "xadd",
-        "xautoclaim", "xclaim", "xdel", "xlen", "xpending", "xrange", "xrevrange", "xtrim", "zadd",
-        "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
+        "pfadd", "pfcount", "psetex", "pttl", "restore", "rpop", "rpush", "rpushx", "sadd", "scard",
+        "set", "setbit", "setex", "setnx", "setrange", "sismember", "smembers", "spop",
+        "srandmember", "srem", "sscan", "strlen", "ttl", "type", "xack", "xadd", "xautoclaim",
+        "xclaim", "xdel", "xlen", "xpending", "xrange", "xrevrange", "xtrim", "zadd", "zcard",
+        "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
         "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
         "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore", "copy",
         "rpoplpush", "smove", "sunion", "sdiff", "sinter", "sinterstore", "zunionstore",
@@ -116,6 +116,37 @@ struct SupportedCommands {
   }
 
   /**
+   * @return commands for pub/sub subscriptions that clients may send to the proxy. The
+   * sharded variants (``SSUBSCRIBE`` / ``SUNSUBSCRIBE``) are intentionally NOT exposed —
+   * the proxy transparently rewrites ``SUBSCRIBE`` / ``UNSUBSCRIBE`` into per-channel
+   * ``SSUBSCRIBE`` / ``SUNSUBSCRIBE`` on the upstream wire, so clients never see them.
+   */
+  static const absl::flat_hash_set<std::string>& subscriptionCommands() {
+    // Only SUBSCRIBE/UNSUBSCRIBE are client-exposed. PSUBSCRIBE/PUNSUBSCRIBE are intentionally
+    // NOT supported: the proxy delivers through an exact-channel registry with no pattern-matching
+    // path, and it rewrites every client SUBSCRIBE onto sharded SSUBSCRIBE — sharded pub/sub
+    // matches only exact channels, never classic patterns — so a pattern subscriber could never
+    // receive proxy-originated messages. Clients issuing PSUBSCRIBE get ``-ERR unknown command``.
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "subscribe", "unsubscribe");
+  }
+
+  /**
+   * @return the full set of pub/sub verbs the proxy owns, which ``custom_commands`` must never
+   * override. Superset of ``subscriptionCommands()``: it also lists the pattern verbs
+   * (``PSUBSCRIBE`` / ``PUNSUBSCRIBE``), the internal sharded verbs (``SSUBSCRIBE`` /
+   * ``SUNSUBSCRIBE``), and ``PUBLISH`` / ``SPUBLISH``. A ``custom_commands`` entry for any of these
+   * would either replace a built-in handler with the generic pass-through (breaking the sharded
+   * rewrite) or route a raw pattern/sharded verb down a DATA connection where it hangs with no Push
+   * reply until the op timeout closes the shared connection — so config load rejects the whole set.
+   * Single source of truth for that guard (see the redis_proxy config factory).
+   */
+  static const absl::flat_hash_set<std::string>& pubSubCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "subscribe", "unsubscribe",
+                           "psubscribe", "punsubscribe", "ssubscribe", "sunsubscribe", "publish",
+                           "spublish");
+  }
+
+  /**
    * @return hello command
    */
   static const std::string& hello() { CONSTRUCT_ON_FIRST_USE(std::string, "hello"); }
@@ -148,6 +179,22 @@ struct SupportedCommands {
    * @return mset command
    */
   static const std::string& mset() { CONSTRUCT_ON_FIRST_USE(std::string, "mset"); }
+
+  /**
+   * @return publish command. The proxy accepts ``PUBLISH`` from clients. When the listener
+   * sets ``enable_sharded_publish`` the upstream verb is rewritten to ``SPUBLISH`` so the
+   * channel is delivered to the slot-owning shard (matching the sharded-pubsub rewrite of
+   * ``SUBSCRIBE`` → ``SSUBSCRIBE``); otherwise classic ``PUBLISH`` is forwarded unchanged.
+   */
+  static const std::string& publish() { CONSTRUCT_ON_FIRST_USE(std::string, "publish"); }
+
+  /**
+   * @return spublish command. A client-exposed sharded publish: ALWAYS forwarded upstream as
+   * ``SPUBLISH`` (its channel routed to the slot-owning shard) regardless of
+   * ``enable_sharded_publish`` — that flag governs only whether a plain ``PUBLISH`` is rewritten,
+   * never an already-sharded ``SPUBLISH``. Shares the ``PUBLISH`` handler (``PublishRequest``).
+   */
+  static const std::string& spublish() { CONSTRUCT_ON_FIRST_USE(std::string, "spublish"); }
 
   /**
    * @return ping command
@@ -189,7 +236,17 @@ struct SupportedCommands {
         "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore", "unlink", "copy",
         "rpoplpush", "smove", "sinterstore", "zunionstore", "zinterstore", "pfmerge", "georadius",
         "georadiusbymember", "rename", "sort", "sdiffstore", "msetnx", "zrangestore", "sunionstore",
-        "geosearchstore", "zdiffstore", "bitop", "renamenx");
+        "geosearchstore", "zdiffstore", "bitop", "renamenx",
+        // Only the sharded ``SPUBLISH`` verb is write-classified, so it shares the
+        // write-side upstream with the rewritten ``SUBSCRIBE`` path under
+        // ``read_command_policy`` — see the explicit ``spublish()``-keyed
+        // ``route->upstream(...)`` lookup in ``SubscriptionRequest::create``. Classic
+        // ``PUBLISH`` is intentionally NOT here: when ``enable_sharded_publish`` is off the
+        // client verb is forwarded unchanged and must keep the read/mirror routing it had
+        // before sharded pub/sub existed (``PUBLISH`` was never write-classified). When the
+        // setting is on, ``PublishRequest`` rewrites the upstream verb to ``spublish`` and
+        // this entry pins that write-side.
+        "spublish");
   }
 
   static bool isReadCommand(const std::string& command) {

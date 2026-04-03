@@ -1,5 +1,8 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 
+#include <algorithm>
+#include <type_traits>
+
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
@@ -55,7 +58,17 @@ ConfigImpl::ConfigImpl(
                // as the buffer is flushed on each request immediately.
       max_upstream_unknown_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
-      enable_command_stats_(config.enable_command_stats()) {
+      enable_command_stats_(config.enable_command_stats()),
+      // RESP3 pub/sub tuning. Each falls back to the historical hardcoded default when unset, so
+      // configs predating ``pubsub_settings`` are unaffected (A-7).
+      subscribe_ack_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
+          config.pubsub_settings(), subscribe_ack_timeout, kDefaultSubscribeAckTimeoutMs)),
+      resubscribe_backoff_base_interval_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config.pubsub_settings(), resubscribe_backoff_base_interval,
+                                     kDefaultResubscribeBackoffBaseMs)),
+      resubscribe_backoff_max_interval_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config.pubsub_settings(), resubscribe_backoff_max_interval,
+                                     kDefaultResubscribeBackoffMaxMs)) {
   switch (config.read_policy()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
@@ -161,7 +174,7 @@ void ClientImpl::onAwsCredentialsReady(
   } else {
     // RESP2 + IAM: send AUTH via makeRequestInternal (NOT immediate) so the bytes flow through
     // the encoder buffer in deterministic FIFO order with any later flush. Held user requests
-    // queued in held_user_requests_ are released by setInitState(Ready) → replayHeldUserRequests
+    // queued in held_init_queue_ are released by setInitState(Ready) → replayHeldInitQueue
     // when the AUTH ack arrives.
     setInitState(InitState::AwaitingAuth);
     Utility::AuthRequest auth_request(auth_username, auth_password);
@@ -202,7 +215,7 @@ ClientImpl::ClientImpl(
 
 ClientImpl::~ClientImpl() {
   ASSERT(pending_requests_.empty());
-  ASSERT(held_user_requests_.empty());
+  ASSERT(held_init_queue_.empty());
   ASSERT(connection_->state() == Network::Connection::State::Closed);
   // Neutralize the AWS IAM token-fetch callback in case it fires after we are gone — the closure
   // holds a weak_ptr to *aws_init_state_ and on lock() will see parent=nullptr and short-circuit.
@@ -242,8 +255,9 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     auto held = std::make_unique<HeldUserRequest>(*this, callbacks);
     held->request_ = std::make_unique<RespValue>(request);
     auto* raw = held.get();
-    held_user_requests_.push_back(std::move(held));
-    raw->self_iter_ = std::prev(held_user_requests_.end());
+    held_init_queue_.emplace_back(std::move(held));
+    // Record this entry's stable position so removeHeldUserRequest is O(1) (see queue_it_).
+    raw->queue_it_ = std::prev(held_init_queue_.end());
     // Pre-connect the connect timeout governs; once connected this held request is the first
     // outstanding work, so start the op timer.
     if (connected_ && was_idle) {
@@ -252,6 +266,33 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     return raw;
   }
   return makeRequestInternal(request, callbacks);
+}
+
+void ClientImpl::sendCommand(const RespValue& request) {
+  // Fire-and-forget command (e.g. SUBSCRIBE). No PendingRequest, no ClientCallbacks, no
+  // pending_requests_ entry. Two gates apply:
+  //   1. Init gate: while a HELLO/AUTH/READONLY/IAM-token step is in flight, park behind the
+  //      held queue alongside any held user requests so the wire order matches submission
+  //      order on replay (e.g. user GET → SUBSCRIBE → user SET stays in that order on the
+  //      wire even though the GET and SET take different code paths).
+  //   2. Batch gate (queue_enabled_): replay path raises this so the post-init flush emits as
+  //      one write. Even outside that window, if some other caller raised the gate we must
+  //      respect it — encode but defer the flush.
+  if (isUserTrafficGated(init_state_)) {
+    // Same idle→work op-timer rule as the makeRequest hold path: only the first outstanding
+    // piece of work starts the op clock (relevant when WaitingForAwsToken has queued nothing),
+    // and later parked entries must not reset the deadline.
+    const bool was_idle = !hasOutstandingWork();
+    held_init_queue_.emplace_back(std::make_unique<RespValue>(request));
+    if (connected_ && was_idle) {
+      connect_or_op_timer_->enableTimer(config_->opTimeout());
+    }
+    return;
+  }
+  encoder_->encode(request, encoder_buffer_);
+  if (!queue_enabled_) {
+    flushBufferAndResetTimer();
+  }
 }
 
 PoolRequest* ClientImpl::makeRequestInternal(const RespValue& request, ClientCallbacks& callbacks) {
@@ -283,7 +324,8 @@ PoolRequest* ClientImpl::makeRequestInternal(const RespValue& request, ClientCal
   }
 
   // Arm op timeout only on the first pending request after connect; before connect the
-  // connect timeout governs (allowing a long TLS handshake spin-up).
+  // connect timeout governs (allowing a long TLS handshake spin-up). Subscription
+  // connections still get a timeout for data requests; Push frames are out-of-band.
   if (connected_ && pending_requests_.size() == 1) {
     connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
@@ -323,6 +365,7 @@ void ClientImpl::putOutlierEvent(Upstream::Outlier::Result result) {
 void ClientImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    push_callbacks_ = nullptr;
     // Transition to Failed FIRST so any init callback invoked by the pending_requests_ drain
     // sees state==Failed in onInitFailure and short-circuits the recursive close. This also
     // drains any held user requests that never made it to pending_requests_.
@@ -343,7 +386,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
       if (!request.canceled_) {
         // For replayed HeldUserRequest entries this is HeldUserRequest::onFailure, which
         // forwards to original_callbacks_.onFailure() and removes self from
-        // held_user_requests_. So the held queue is partially drained by this loop already.
+        // held_init_queue_. So the held queue is partially drained by this loop already.
         request.callbacks_.onFailure();
       } else {
         host_->cluster().trafficStats()->upstream_rq_cancelled_.inc();
@@ -360,7 +403,8 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   } else if (event == Network::ConnectionEvent::Connected) {
     connected_ = true;
     // TCP connect can complete while AWS IAM credentials are still pending: there may be held
-    // user requests but no pending upstream request yet. Once connected, this timer is the op
+    // user requests but no pending upstream request yet — and a subscriber-only client (wired
+    // via setPushCallbacks) may queue nothing at all. Once connected, this timer is the op
     // timer — bound any outstanding (held or pending) work with the op timeout, and disable it
     // when there is none so the connect timeout cannot fire after connect.
     if (hasOutstandingWork()) {
@@ -377,19 +421,48 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
 }
 
 void ClientImpl::onRespValue(RespValuePtr&& value) {
-  // RESP3 Push frames are server-initiated and not replies. Drop them; popping a pending
-  // request here would corrupt pending_requests_ FIFO against the next genuine reply.
+  // RESP3 Push is server-initiated, not a reply. When the connection has a registered
+  // subscriber (pub/sub commands have installed push_callbacks_) the frame is routed to it;
+  // otherwise drop. Popping a pending request for an unrouted Push would corrupt the
+  // pending_requests_ FIFO ordering against the next genuine reply, and silent drop preserves
+  // the invariant for any future Push-producing feature still out of scope here (e.g.
+  // CLIENT TRACKING).
   if (value && value->type() == RespType::Push) {
+    if (push_callbacks_ != nullptr) {
+      push_callbacks_->onPushMessage(std::move(value), host_);
+      return;
+    }
     ENVOY_LOG(debug, "redis: dropping unexpected upstream RESP3 Push frame");
     return;
   }
-  // An init callback (e.g. Hello3InitCallbacks::onResponse on a HELLO 3 failure) can close the
-  // connection from within this very call while the decoder is still draining the same buffer.
-  // A subsequent complete frame in that buffer would then reach onRespValue with no outstanding
-  // request, so guard against front() on an empty list (undefined behavior in release builds) and
-  // drop the surplus frame.
+  // A non-Push frame with no outstanding request arrives in three distinct situations:
+  // 1. An init callback (e.g. Hello3InitCallbacks::onResponse on a HELLO 3 failure) closed the
+  //    connection from within this very call while the decoder was still draining the same
+  //    buffer. The connection is already tearing down (state != Open): drop the surplus frame
+  //    quietly — a second close would double-fire close-time stats, and front() on the empty
+  //    list is undefined behavior in release builds.
+  // 2. The connection is Open and carries subscriptions (push_callbacks_ installed): this is an
+  //    out-of-band control reply to a fire-and-forget SSUBSCRIBE/SUNSUBSCRIBE (SSUBSCRIBE is
+  //    dispatched without a tracked PendingRequest, see conn_pool_impl.cc), e.g. a normal -ERR
+  //    from ACL/CLUSTERDOWN or a -MOVED/-ASK observed mid-reshard. Route it to the subscription
+  //    registry so it can reconcile subscription state (host-scoped re-subscribe) WITHOUT tearing
+  //    down the shared connection — every other channel multiplexed on it must stay live. This is
+  //    expected control-plane traffic, so it does NOT bump the protocol-error stat.
+  // 3. The connection is Open with no subscriber (any idle client) and received an unsolicited
+  //    reply. That is anomalous upstream behavior: bump the protocol-error stat and close.
   if (pending_requests_.empty()) {
-    ENVOY_LOG(debug, "redis: dropping upstream frame with no outstanding request");
+    if (connection_->state() != Network::Connection::State::Open) {
+      ENVOY_LOG(debug, "redis: dropping upstream frame with no outstanding request");
+      return;
+    }
+    if (push_callbacks_ != nullptr) {
+      ENVOY_LOG(debug, "redis: routing out-of-band subscription control reply to registry");
+      push_callbacks_->onUpstreamControlError(std::move(value), host_);
+      return;
+    }
+    ENVOY_LOG(warn, "redis: unexpected non-Push reply with no outstanding request");
+    host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
+    connection_->close(Network::ConnectionCloseType::NoFlush);
     return;
   }
   PendingRequest& request = pending_requests_.front();
@@ -596,7 +669,7 @@ void ClientImpl::onInitFailure() {
   // Feed outlier detection so a host that persistently fails the handshake can be ejected;
   // onRespValue suppresses its tail success event when the init state is Failed.
   putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestFailed);
-  setInitState(InitState::Failed); // drains non-replayed held requests via failHeldUserRequests
+  setInitState(InitState::Failed); // drains non-replayed held requests via failHeldInitQueue
   // Only close if not already mid-teardown — onInitFailure can be re-entered via onEvent's
   // pending_requests_ drain, and a second close would double-fire close-time stats.
   if (connection_->state() == Network::Connection::State::Open) {
@@ -609,53 +682,91 @@ void ClientImpl::setInitState(InitState new_state) {
             static_cast<int>(new_state));
   init_state_ = new_state;
   if (new_state == InitState::Ready) {
-    replayHeldUserRequests();
+    replayHeldInitQueue();
   } else if (new_state == InitState::Failed) {
-    failHeldUserRequests();
+    failHeldInitQueue();
   }
 }
 
-void ClientImpl::replayHeldUserRequests() {
-  if (held_user_requests_.empty()) {
+void ClientImpl::replayHeldInitQueue() {
+  if (held_init_queue_.empty()) {
     return;
   }
-  // Batch all replayed entries for a single flush at the end. Pre-replay cancel erases entries
-  // eagerly (see HeldUserRequest::cancel), so every entry here is live; replayed entries
-  // self-clean via the HeldUserRequest callbacks.
+  // Batch all replayed entries for a single flush at the end. The variant list IS submission
+  // order: user requests and fire-and-forget commands interleaved as the caller submitted
+  // them; replay walks once and dispatches by type. Pre-replay cancel erases entries eagerly
+  // (see HeldUserRequest::cancel), so every entry here is live; user-request entries
+  // self-clean via the HeldUserRequest callbacks, fire-and-forget entries are erased after
+  // the flush.
   BatchFlushGuard batch(*this);
-  for (auto& held_ptr : held_user_requests_) {
-    ASSERT(!held_ptr->canceled_);
-    auto* live = static_cast<PendingRequest*>(makeRequestInternal(*held_ptr->request_, *held_ptr));
-    held_ptr->live_request_ = live;
-    // Back-link so the live request's canceled branch runs this wrapper's cleanup directly,
-    // rather than virtual-dispatching through callbacks_ (see PendingRequest::held_wrapper_).
-    live->held_wrapper_ = held_ptr.get();
+  for (auto& entry : held_init_queue_) {
+    absl::visit(
+        [this](auto& e) {
+          using T = std::decay_t<decltype(e)>;
+          if constexpr (std::is_same_v<T, std::unique_ptr<HeldUserRequest>>) {
+            ASSERT(!e->canceled_);
+            auto* live = static_cast<PendingRequest*>(makeRequestInternal(*e->request_, *e));
+            e->live_request_ = live;
+            // Back-link so the live request's canceled branch runs this wrapper's cleanup
+            // directly, rather than virtual-dispatching through callbacks_ (see
+            // PendingRequest::held_wrapper_).
+            live->held_wrapper_ = e.get();
+          } else {
+            // Fire-and-forget command (sendCommand path). No callback to fire.
+            encoder_->encode(*e, encoder_buffer_);
+          }
+        },
+        entry);
   }
+  // Erase fire-and-forget entries; user-request entries self-erase from their callbacks. The
+  // BatchFlushGuard flushes on scope exit, after this erase — equivalent ordering, since the
+  // erase only mutates the held queue, never the encoder buffer.
+  held_init_queue_.remove_if([](const HeldInitEntry& e) {
+    return absl::holds_alternative<Common::Redis::RespValuePtr>(e);
+  });
 }
 
-void ClientImpl::failHeldUserRequests() {
-  // Failure can only happen during init and replay only happens on Ready, so every entry here
-  // is expected to be non-replayed (live_request_ == nullptr) — a front-pop drain suffices and
-  // avoids the per-iteration re-scan a skip-based drain needs. Pop before firing so re-entrant
-  // mutations (sibling cancel erasing its own node) cannot invalidate anything we hold. Should
-  // the invariant ever break, stop and leave the replayed remainder to fail through onEvent's
-  // pending_requests_ drain (their wrapper owns them there); the ASSERT flags that in debug.
-  while (!held_user_requests_.empty() && held_user_requests_.front()->live_request_ == nullptr) {
-    auto held = std::move(held_user_requests_.front());
-    held_user_requests_.pop_front();
-    if (!held->canceled_) {
-      held->original_callbacks_.onFailure();
+void ClientImpl::failHeldInitQueue() {
+  // Failure can only happen during init and replay only happens on Ready, so every user-request
+  // entry here is expected to be non-replayed (live_request_ == nullptr) — a front-pop drain
+  // suffices and avoids the per-iteration re-scan a skip-based drain needs; fire-and-forget
+  // entries are always actionable. Pop before firing so re-entrant mutations (sibling cancel
+  // erasing its own node) cannot invalidate anything we hold. Should the invariant ever break,
+  // stop and leave the replayed remainder to fail through onEvent's pending_requests_ drain
+  // (their wrapper owns them there); the ASSERT flags that in debug.
+  while (!held_init_queue_.empty()) {
+    if (auto* user_req =
+            absl::get_if<std::unique_ptr<HeldUserRequest>>(&held_init_queue_.front())) {
+      if ((*user_req)->live_request_ != nullptr) {
+        break; // replayed entry — owned by pending_requests_, fails via onEvent's drain
+      }
     }
-    // Canceled non-replayed: stat already incremented in HeldUserRequest::cancel(); no fire.
-    // held destroyed here.
+    HeldInitEntry entry = std::move(held_init_queue_.front());
+    held_init_queue_.pop_front();
+    absl::visit(
+        [](auto& e) {
+          using T = std::decay_t<decltype(e)>;
+          if constexpr (std::is_same_v<T, std::unique_ptr<HeldUserRequest>>) {
+            if (!e->canceled_) {
+              e->original_callbacks_.onFailure();
+            }
+            // Canceled non-replayed: stat already incremented in HeldUserRequest::cancel().
+          }
+          // Fire-and-forget command: nothing to fire; just drop.
+        },
+        entry);
   }
-  ASSERT(held_user_requests_.empty(), "held entry replayed before init completed");
+  ASSERT(held_init_queue_.empty(), "held entry replayed before init completed");
 }
 
 void ClientImpl::removeHeldUserRequest(HeldUserRequest* held) {
-  // O(1) erase via stored iterator. unique_ptr destruction here destroys *held; the caller must
-  // not access *held after this returns.
-  held_user_requests_.erase(held->self_iter_);
+  // O(1) erase via the entry's stored position (see HeldUserRequest::queue_it_). The queue is a
+  // std::list, so ``queue_it_`` stayed valid through any other entries' insert/erase — including
+  // the fire-and-forget sweep in replayHeldInitQueue, which only removes RespValuePtr entries and
+  // leaves the user-request nodes in place. Every caller (pre-replay cancel, and the replay-time
+  // onResponse/onFailure/onRedirection/onCancelComplete) runs while this entry is still queued. The
+  // unique_ptr destruction here destroys *held; the caller must not access *held afterward.
+  held_init_queue_.erase(held->queue_it_);
 }
 
 void ClientImpl::HeldUserRequest::cancel() {

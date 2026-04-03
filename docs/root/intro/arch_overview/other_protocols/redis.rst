@@ -160,15 +160,211 @@ RESP2 and RESP3 diverge structurally: some replies have no transparent mapping (
 The proxy therefore does not cross-encode upstream responses — a reply is always emitted
 downstream in the RESP version it arrived in. The exception is cluster-scope aggregate commands such as
 ``CONFIG GET`` and ``KEYS``, whose per-shard replies are combined into one flat array even when a shard
-answers with a RESP3 Map. Unsolicited RESP3 ``Push`` frames from upstream
-are dropped rather than forwarded downstream (the proxy routes no Push-producing feature on
-ordinary request/response connections, and forwarding one would desynchronize the reply FIFO).
+answers with a RESP3 Map. RESP3 ``Push`` frames from upstream are routed to the connection's
+downstream subscriber when one is registered via ``SUBSCRIBE``
+(see Pub/Sub Support below); on a connection without a registered subscriber a
+Push is unexpected and is dropped with a debug log (the proxy opts into no other
+Push-producing feature — ``CLIENT TRACKING`` is out of scope — and forwarding an unrouted
+Push would desynchronize the reply FIFO). A non-Push reply arriving with no pending request is
+handled by connection role. On a *subscription* connection it is Redis's error reply to a
+fire-and-forget ``SSUBSCRIBE`` / ``SUNSUBSCRIBE`` control command: the connection is kept open
+(closing it would re-issue every channel on it and drop its healthy subscriptions) and the error is
+correlated — in send order, per host — to the oldest outstanding control command, failing that
+channel's pending subscribers or, for a redirect (``-MOVED`` / ``-ASK`` / ``-CLUSTERDOWN``),
+refreshing the slot map and re-resolving on a backoff. On an ordinary data connection an
+unsolicited non-Push reply is treated as a protocol error and the connection is closed.
 
 For the full ``HELLO 3`` negotiation, ``-NOPROTO`` gating of pre-handshake data commands,
 downstream ``HELLO N AUTH`` handling, the locally-synthesized ``HELLO`` reply, and the
 ``upstream_resp3_hello_failure`` stat, see the :ref:`RESP protocol version
 <config_network_filters_redis_proxy_protocol_version>` section of the Redis proxy filter
 configuration.
+
+Pub/Sub Support
+^^^^^^^^^^^^^^^
+Envoy's Redis proxy exposes the client-facing pub/sub commands ``SUBSCRIBE``,
+``UNSUBSCRIBE``, ``PUBLISH``, and ``SPUBLISH``. The subscription commands
+(``SUBSCRIBE`` / ``UNSUBSCRIBE``) require the downstream client to have negotiated
+RESP3 with the proxy via ``HELLO 3`` because messages are delivered as RESP3 ``Push``
+frames. Attempting them without RESP3 returns an error whose text depends on the
+listener: on a listener configured for RESP3 the client simply has not upgraded yet, so it
+is told ``ERR pub/sub requires RESP3. Send HELLO 3 first.``; on a listener that is not
+configured for RESP3 — where ``HELLO 3`` is itself rejected with ``-NOPROTO``, making that
+advice unachievable — it returns ``ERR pub/sub is not enabled on this listener (RESP3
+required)`` instead.
+``PUBLISH`` and ``SPUBLISH`` reply with an ordinary integer and have no RESP3
+requirement — they work on RESP2 and RESP3 downstream connections alike.
+
+Pattern subscriptions (``PSUBSCRIBE`` / ``PUNSUBSCRIBE``) are intentionally not
+supported and are rejected with ``ERR unknown command``. The proxy delivers messages
+through an exact-channel subscription registry with no pattern-matching layer, and it
+rewrites every client ``SUBSCRIBE`` onto sharded ``SSUBSCRIBE`` (see "Transparent sharded
+routing" below) — sharded pub/sub matches only exact channels, never classic patterns. A
+pattern subscriber could therefore never receive a proxy-delivered message, so rather than
+accept a subscription that would silently never fire, the proxy rejects it.
+
+The sharded variants ``SSUBSCRIBE`` and ``SUNSUBSCRIBE`` are likewise not exposed —
+see "Transparent sharded routing" below.
+
+``PUBSUB`` introspection (``PUBSUB CHANNELS`` / ``NUMSUB`` / ``NUMPAT``, and the sharded
+``PUBSUB SHARDCHANNELS`` / ``SHARDNUMSUB``) is not supported and is rejected with
+``ERR unknown command``. Because the proxy transparently rewrites client ``SUBSCRIBE`` onto sharded
+``SSUBSCRIBE`` (see "Transparent sharded routing" below), a classic ``PUBSUB`` query would not
+reflect the real subscriptions, and the sharded query sent upstream would count the proxy's own
+upstream subscription connections rather than downstream subscribers — misleading either way.
+``RESET`` is likewise not supported and is rejected; a subscriber's state is cleaned up when its
+downstream connection closes, not via ``RESET``. Forcing any of these commands through with
+``custom_commands`` bypasses the proxy's pub/sub bookkeeping and yields results inconsistent with
+the proxy's own subscription state.
+
+Pub/sub messages are delivered as RESP3 Push frames on shared upstream connections, enabling
+efficient fan-out: multiple downstream subscribers to the same channel share a single upstream
+subscription. The proxy maintains a per-thread subscription registry that manages
+reference-counted upstream subscriptions — the first subscriber triggers an upstream
+subscribe, and the last unsubscribe triggers an upstream unsubscribe.
+
+A subscriber that cannot keep up with its channels' message rate is a slow consumer: unlike a
+request/response client, which self-paces by withholding requests, it has no flow control over the
+unsolicited Push frames sent to it. To bound memory the proxy closes such a subscriber's downstream
+connection once its write buffer exceeds the connection's high watermark — the existing
+:ref:`per_connection_buffer_limit_bytes
+<envoy_v3_api_field_config.listener.v3.Listener.per_connection_buffer_limit_bytes>` limit, reused
+here rather than a pub/sub-specific option — mirroring Redis's ``client-output-buffer-limit`` pubsub
+eviction. Each eviction increments the ``pubsub_slow_subscriber_closed`` counter.
+
+The subscription registry is tied to the upstream cluster's lifecycle. When the cluster is removed
+or **updated** (a cluster update is processed as a removal followed by an add — the common case is a
+routine CDS refresh, e.g. an endpoint or health-check change), the proxy tears the registry down and
+closes every subscribed downstream connection. Unlike a request/response client — whose in-flight
+requests transparently re-route to the refreshed cluster — a pub/sub subscriber must therefore
+reconnect and re-issue its ``SUBSCRIBE`` after such an event. Deployments that update the pub/sub
+cluster frequently should expect subscribers to reconnect on each update.
+
+Transparent sharded routing
+"""""""""""""""""""""""""""
+The proxy transparently rewrites client pub/sub commands onto Redis Cluster's
+sharded pub/sub protocol so that messages route to the slot-owning shard rather
+than broadcasting across the cluster:
+
+* ``SUBSCRIBE`` channel → upstream ``SSUBSCRIBE`` per channel, with the channel
+  hashed via CRC16 to the owning shard.
+* ``UNSUBSCRIBE`` channel → upstream ``SUNSUBSCRIBE`` against the same shard.
+* ``PUBLISH`` channel value → upstream ``SPUBLISH`` when
+  :ref:`enable_sharded_publish
+  <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.enable_sharded_publish>`
+  is set (default off); otherwise the classic ``PUBLISH`` is forwarded unchanged.
+* ``SPUBLISH`` channel value → upstream ``SPUBLISH`` regardless of ``enable_sharded_publish``. An
+  explicit client ``SPUBLISH`` is a shard command, so its channel is always routed as a sharded
+  pub/sub channel; the ``enable_sharded_publish`` flag governs only whether a plain ``PUBLISH`` is
+  rewritten, never an already-sharded ``SPUBLISH``.
+
+Because the rewrite is transparent, downstream ack and message frames continue
+to use the client-facing verbs: a ``SUBSCRIBE`` is acknowledged as
+``["subscribe", channel, count]``, sharded messages arrive as
+``["message", ...]`` (not ``smessage``), and clients never observe ``ssubscribe``.
+
+Sharded pub/sub requires Redis 7.0 or newer on the upstream cluster. The ``SUBSCRIBE`` /
+``UNSUBSCRIBE`` rewrite is applied unconditionally on a ``RESP3`` listener; the ``PUBLISH``
+→ ``SPUBLISH`` rewrite is opt-in via :ref:`enable_sharded_publish
+<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.enable_sharded_publish>`
+(default off). Because ``SUBSCRIBE`` is always sharded, a ``PUBLISH`` left classic (the
+default) is not delivered to subscribers that subscribed through this proxy — enable the
+option whenever the listener serves sharded pub/sub subscribers, and only against Redis 7.0+
+upstreams (older upstreams have no ``SPUBLISH`` and every rewritten publish would fail).
+
+To enable pub/sub, set the listener's :ref:`RedisProxy.protocol_version
+<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.protocol_version>`
+to ``RESP3``. Both sides of the proxy then speak RESP3 — upstream (so ``HELLO 3`` is sent on
+each connection) and downstream, where the client must have completed its own ``HELLO 3``
+handshake (so a Push frame is acceptable on the wire) before a ``SUBSCRIBE`` is accepted;
+otherwise the proxy returns ``ERR pub/sub requires RESP3``.
+
+If a ``SUBSCRIBE`` channel cannot be routed (no upstream cluster matches the route, or the
+listener is not configured for RESP3), the proxy delivers an inline error frame for that channel
+on the subscriber's connection rather than a fake success ack — the subscriber sees the
+failure clearly, and other channels in the same multi-channel ``SUBSCRIBE`` still proceed.
+
+A ``SUBSCRIBE`` that is routed and sent upstream but never acknowledged — for example against an
+upstream that keeps rejecting the ``SSUBSCRIBE`` (a pre-7.0 Redis with no sharded pub/sub, or an
+ACL/CROSSSLOT denial) — does not stay pending forever. If the upstream rejects the ``SSUBSCRIBE``
+outright, or no ack arrives within an internal subscribe-ack timeout, the proxy rolls back the
+optimistic subscription (including its active-subscription gauge contribution) and closes the
+subscriber's connection. The original ``SUBSCRIBE`` request has already completed — its confirmation
+is delivered out of band, like every pub/sub frame — so there is no in-band reply left to carry an
+error, and writing an unsolicited ``-ERR`` out of band would desync a pipelining RESP3 client (which
+would misattribute the error to an earlier, still-in-flight command). Closing the connection is the
+protocol-clean signal instead: the client observes a clear failure rather than a silently
+unacknowledged ``SUBSCRIBE`` and reconnects to retry.
+
+The active-subscription gauge counts per-downstream-subscriber subscriptions (not per-thread
+distinct channels), so two downstream subscribers to the same channel correctly increment the
+gauge twice — and a disconnect of one decrements only that subscriber's contribution while the
+other remains active.
+
+.. note::
+
+  Subscribe ack timing depends on whether an upstream subscribe is actually issued:
+
+  * **Channel was new on this thread** — the registry sends ``SSUBSCRIBE`` upstream
+    (the rewritten ``SUBSCRIBE`` path) and parks the
+    downstream subscriber. The
+    downstream subscribe ack is delivered when the matching upstream Push subscribe-ack
+    arrives, so the client only sees its ack after the upstream has confirmed. The ack
+    carries the subscriber's per-subscriber count snapshotted at subscribe-call time
+    (matching Redis's "number of subscriptions the client now has at THIS step" semantic).
+  * **Channel is already fully subscribed by another downstream subscriber on this thread** — the
+    registry deduplicates and does not send a fresh upstream subscribe, and the earlier upstream ack
+    has already arrived, so none will fire on this subscriber's behalf. The proxy fabricates the ack
+    immediately to match Redis's per-client semantics.
+  * **Channel is still subscribing (an earlier subscriber's upstream ack has not arrived yet)** — the
+    new subscriber joins the pending bucket rather than receiving a fabricated ack, so it is
+    confirmed together with the others when the shared upstream ack lands — or fails together with
+    them on the subscribe-ack timeout. This avoids handing back a premature success the upstream
+    might still reject.
+
+  The pre-dispatch failure paths (no route, non-RESP3 listener, conn-pool send failure)
+  surface as inline errors per the section above. An upstream-side error that arrives
+  *after* the upstream subscribe was sent (a Redis ``-ERR`` reply to the ``SUBSCRIBE``
+  itself, or an upstream connection close before the ack returns) does not propagate as a
+  per-channel error to the downstream client; it surfaces through the upstream connection's
+  close path, which triggers the registry's resubscribe handler — a fresh subscribe is
+  reissued and the eventual ack drains the still-pending entry.
+
+  All subscribe and unsubscribe acks are RESP3 ``Push`` frames delivered out-of-band over the
+  subscriber connection, never through the in-band response FIFO — so a ``SUBSCRIBE`` /
+  ``UNSUBSCRIBE`` ack may arrive ahead of an earlier pipelined command's reply. Within one
+  multi-channel ``SUBSCRIBE`` the per-channel acks are emitted as each channel's owning shard
+  confirms (deduplicated channels immediately), so their order is not guaranteed to match the
+  order the channels appeared in the command. Every ack carries its channel name, so clients must
+  match acks by the channel field rather than by position — the standard way RESP3 pub/sub clients
+  consume ``Push`` frames, and an inherent property of fanning one command across independent
+  shards rather than a single ordered connection.
+
+.. note::
+
+  **``PUBLISH`` inside ``MULTI``.** A ``PUBLISH`` issued inside a ``MULTI`` / ``EXEC`` transaction is
+  not rewritten to ``SPUBLISH`` even when :ref:`enable_sharded_publish
+  <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.enable_sharded_publish>`
+  is set. A transaction is pinned to a single shard, which is generally not the channel's slot
+  owner, so a sharded rewrite would route the publish to the wrong shard; it is instead forwarded
+  unchanged as part of the transaction and is therefore not delivered to sharded ``SSUBSCRIBE``
+  subscribers of that channel through this proxy. Issue such a ``PUBLISH`` outside a transaction.
+
+  **Slow-subscriber backpressure.** A subscriber that consumes slower than messages are published
+  is bounded: once such a connection's write buffer exceeds its high watermark, the proxy closes the
+  subscriber's downstream connection (see "Pub/sub" above), reusing the connection's
+  :ref:`per_connection_buffer_limit_bytes
+  <envoy_v3_api_field_config.listener.v3.Listener.per_connection_buffer_limit_bytes>` limit rather
+  than a pub/sub-specific option, and increments ``pubsub_slow_subscriber_closed``. This mirrors
+  Redis's ``client-output-buffer-limit pubsub`` eviction. The bound applies to a connection that is
+  subscribed or is holding parked (ordering-pending) push frames; a connection with no active
+  subscription is unaffected.
+
+  **Cluster update.** A management-server update to the upstream cluster this listener routes to is
+  applied as a remove-then-add of the cluster, which rebuilds the thread-local subscription state;
+  downstream connections currently subscribed through that cluster are closed and must reconnect and
+  re-``SUBSCRIBE``. Ordinary (non-subscription) data connections are unaffected. This applies to any
+  routine control-plane update to that cluster, not only its removal.
 
 INFO command
 ^^^^^^^^^^^^
@@ -282,6 +478,9 @@ For details on each command's usage see the official
   RPUSH, List
   RPUSHX, List
   PUBLISH, Pubsub
+  SPUBLISH, Pubsub
+  SUBSCRIBE, Pubsub
+  UNSUBSCRIBE, Pubsub
   EVAL, Scripting
   EVALSHA, Scripting
   SADD, Set

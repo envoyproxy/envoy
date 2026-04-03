@@ -15,6 +15,9 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
+class SubscriptionRegistry; // Forward declaration.
+using SubscriptionRegistryPtr = std::shared_ptr<SubscriptionRegistry>;
+
 namespace ConnPool {
 
 /**
@@ -77,6 +80,12 @@ public:
   virtual Common::Redis::Client::PoolRequest*
   makeRequestToShard(uint16_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
                      Common::Redis::Client::Transaction& transaction) PURE;
+
+  /**
+   * Get the subscription registry as a shared_ptr for safe weak_ptr storage.
+   * Returns nullptr if pub/sub is not supported.
+   */
+  virtual SubscriptionRegistryPtr subscriptionRegistryShared() { return nullptr; }
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;

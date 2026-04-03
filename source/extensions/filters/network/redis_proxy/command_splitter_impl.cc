@@ -7,9 +7,12 @@
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -150,6 +153,7 @@ void localResponse(SplitCallbacks& callbacks, std::string response) {
   res->asString() = response;
   callbacks.onResponse(std::move(res));
 }
+
 } // namespace
 
 // Build the HELLO reply locally as a Map: a RESP3 downstream gets `%7\r\n...`; the encoder
@@ -239,15 +243,15 @@ DelayFaultRequest::create(SplitCallbacks& callbacks, CommandStats& command_stats
                                              delay);
 }
 
-void DelayFaultRequest::onResponse(Common::Redis::RespValuePtr&& response) {
-  response_ = std::move(response);
+void DelayFaultRequest::respond(RespValueFrames&& frames) {
+  frames_ = std::move(frames);
   delay_timer_->enableTimer(delay_);
 }
 
 void DelayFaultRequest::onDelayResponse() {
   command_stats_.delay_fault_.inc();
   command_latency_->complete(); // Complete latency of the command stats of the wrapped request
-  callbacks_.onResponse(std::move(response_));
+  callbacks_.respond(std::move(frames_));
 }
 
 void DelayFaultRequest::cancel() { delay_timer_->disableTimer(); }
@@ -267,6 +271,92 @@ SplitRequestPtr SimpleRequest::create(Router& router,
         base_request, *request_ptr, callbacks.transaction());
   } else {
     ENVOY_LOG(debug, "route not found: '{}'", incoming_request->toString());
+  }
+
+  if (!request_ptr->handle_) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  return request_ptr;
+}
+
+SplitRequestPtr PublishRequest::create(Router& router,
+                                       Common::Redis::RespValuePtr&& incoming_request,
+                                       SplitCallbacks& callbacks, CommandStats& command_stats,
+                                       TimeSource& time_source, bool delay_command_latency,
+                                       const StreamInfo::StreamInfo& stream_info) {
+  // PUBLISH/SPUBLISH: ``<verb> channel value``. Own the arity check here so the wording
+  // matches every other handler regardless of whether the splitter's generic ``size() < 2``
+  // guard ran first (publish/spublish are exempted from that guard, see InstanceImpl::
+  // makeRequest, so this is the only arity check that fires).
+  if (incoming_request->asArray().size() != 3) {
+    onWrongNumberOfArguments(callbacks, *incoming_request);
+    command_stats.error_.inc();
+    return nullptr;
+  }
+
+  std::unique_ptr<PublishRequest> request_ptr{
+      new PublishRequest(callbacks, command_stats, time_source, delay_command_latency)};
+
+  // ``router.upstreamPool(std::string& key, ...)`` may rewrite ``key`` in place via
+  // ``key_formatter`` / ``remove_prefix``. ``channel`` is a reference to the request's channel
+  // element, so whether that rewrite reaches the upstream wire depends on WHICH string we route on
+  // — and the two publish modes want opposite things (F4):
+  const std::string& channel = incoming_request->asArray()[1].asString();
+  // The sharded WIRE path is taken when the client sent ``SPUBLISH`` explicitly OR when
+  // ``enable_sharded_publish`` rewrites ``PUBLISH`` to ``SPUBLISH``. An explicit ``SPUBLISH`` is a
+  // shard command by definition, so it must use the sharded path REGARDLESS of the config flag —
+  // otherwise (flag off) it would fall to the classic branch below and a ``remove_prefix`` /
+  // ``key_formatter`` route would rewrite its channel, silently sending it to the wrong shard and
+  // breaking the shard-channel contract.
+  // Case-insensitive compare instead of AsciiStrToLower + == so no lowercased copy is allocated per
+  // PUBLISH (E-4); makeRequest already lowercased the dispatch verb, but that value is not threaded
+  // into the handler factory.
+  const bool is_spublish = absl::EqualsIgnoreCase(incoming_request->asArray()[0].asString(),
+                                                  Common::Redis::SupportedCommands::spublish());
+  const bool use_sharded_wire = is_spublish || callbacks.shardedPublishEnabled();
+  RouteSharedPtr route;
+  if (use_sharded_wire) {
+    // Sharded pub/sub delivers to ``SSUBSCRIBE`` subscribers on the slot-owning shard. The channel
+    // drives slot hashing and the SPUBLISH wire request and MUST stay the unmodified original:
+    // SSUBSCRIBE returns the client's channel verbatim and hashes it un-stripped, so a
+    // ``remove_prefix`` / ``key_formatter`` here would desync PUBLISH from SUBSCRIBE and break
+    // delivery. Route on a COPY so any rewrite is discarded and ``channel`` stays original.
+    std::string route_key = channel;
+    route = router.upstreamPool(route_key, stream_info);
+    if (route) {
+      // Normalize the verb to ``spublish`` in place and forward the same array — no deep copy of
+      // the channel and (possibly large) payload into a fresh request. This rewrites a client
+      // ``PUBLISH`` (config-enabled) and byte-normalizes an explicit client ``SPUBLISH`` alike.
+      // Force BulkString so the emitted verb is byte-identical regardless of how the client framed
+      // the original verb element.
+      incoming_request->asArray()[0].type(Common::Redis::RespType::BulkString);
+      incoming_request->asArray()[0].asString() = Common::Redis::SupportedCommands::spublish();
+    }
+  } else {
+    // Classic ``PUBLISH`` (client sent ``PUBLISH`` and sharded off — RESP2 listeners, Redis <7): it
+    // is never delivered to proxy subscribers (SUBSCRIBE is always sharded), so there is no
+    // hashing-parity constraint. Restore the pre-``PublishRequest`` ``simpleCommand`` behavior of
+    // passing the request's channel element BY REFERENCE, so ``PrefixRoutes`` rewrites the upstream
+    // wire request in place (``remove_prefix`` / ``key_formatter``). ``channel`` then reflects the
+    // rewritten value for hashing too (both alias the same array element). (F4 regression fix.)
+    route = router.upstreamPool(incoming_request->asArray()[1].asString(), stream_info);
+  }
+  if (route) {
+    // Reuse the incoming array as the upstream request (unique -> shared, no payload copy).
+    Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+    // The upstream verb (``spublish`` when rewritten, else the original client verb) also drives
+    // read/write pool selection and mirror policy in ``makeSingleServerRequest``
+    // (``route->upstream`` / ``shouldMirror``): classic ``publish`` keeps its historical routing,
+    // sharded ``spublish`` is write-pinned (see ``SupportedCommands::writeCommands``).
+    const std::string& upstream_verb = base_request->asArray()[0].asString();
+    request_ptr->handle_ = makeSingleServerRequest(route, upstream_verb, channel, base_request,
+                                                   *request_ptr, callbacks.transaction());
+  } else {
+    ENVOY_LOG(debug, "route not found for publish: '{}'",
+              incoming_request != nullptr ? incoming_request->toString() : std::string{});
   }
 
   if (!request_ptr->handle_) {
@@ -914,13 +1004,31 @@ TransactionRequest::create(Router& router, Common::Redis::RespValuePtr&& incomin
   // So if this is not a transaction command, a simple command or a custom command, it is an error.
   // We also support multi-key commands, but will leave it to the client to handle the case where
   // the keys provided are not from the same shard.
+  //
+  // PUBLISH and SPUBLISH are out of scope for the SUBSCRIBE→SSUBSCRIBE rewrite when issued
+  // inside MULTI: they queue and execute through the transaction path untransformed (no
+  // SPUBLISH upstream rewrite), preserving the pre-rewrite behavior for transactional
+  // publishes documented in the changelog.
+  const bool is_publish_family = command_name == Common::Redis::SupportedCommands::publish() ||
+                                 command_name == Common::Redis::SupportedCommands::spublish();
   if (Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0 &&
       Common::Redis::SupportedCommands::simpleCommands().count(command_name) == 0 &&
       Common::Redis::SupportedCommands::multiKeyCommands().count(command_name) == 0 &&
-      custom_commands.count(command_name) == 0) {
+      custom_commands.count(command_name) == 0 && !is_publish_family) {
     callbacks.onResponse(Common::Redis::Utility::makeError(
         fmt::format("'{}' command is not supported within transaction",
                     incoming_request->asArray()[0].asString())));
+    return nullptr;
+  }
+
+  // publish/spublish were exempted from the splitter's generic ``size() < 2`` guard so
+  // ``PublishRequest::create`` can own the arity error wording on the non-transaction
+  // path. Inside MULTI the request goes through TransactionRequest instead, so the
+  // arity check has to fire here — otherwise the transaction code path's
+  // ``asArray()[1]`` access below would crash on bare ``PUBLISH`` inside MULTI.
+  if (is_publish_family && incoming_request->asArray().size() != 3) {
+    onWrongNumberOfArguments(callbacks, *incoming_request);
+    command_stats.error_.inc();
     return nullptr;
   }
 
@@ -1039,18 +1147,361 @@ TransactionRequest::create(Router& router, Common::Redis::RespValuePtr&& incomin
   return request_ptr;
 }
 
+SplitRequestPtr SubscriptionRequest::create(Router& router,
+                                            Common::Redis::RespValuePtr&& incoming_request,
+                                            SplitCallbacks& callbacks, CommandStats& command_stats,
+                                            TimeSource& time_source, bool delay_command_latency,
+                                            const StreamInfo::StreamInfo& stream_info) {
+  // Subscription acks flow out-of-band, so this handler ALWAYS returns nullptr (never handed back
+  // to the FIFO). Stack-allocate it and alias a raw pointer, so no per-SUBSCRIBE heap allocation is
+  // made while every ``request_ptr->`` use below stays unchanged (E-7).
+  SubscriptionRequest request(command_stats, time_source, delay_command_latency);
+  SubscriptionRequest* request_ptr = &request;
+
+  // This handler serves exactly SUBSCRIBE / UNSUBSCRIBE (subscriptionCommands()) — ``sunsubscribe``
+  // (internal-only) and ``punsubscribe`` (unsupported) never reach it. Classify the raw verb
+  // case-insensitively rather than allocating a lowercased copy (E-4 symmetry with PublishRequest),
+  // and use the canonical lowercase form as ``command_name``: it is echoed as the downstream ack
+  // verb (makeSubscriptionAck), and real Redis always replies lowercase regardless of the request's
+  // case.
+  static const std::string kSubscribeVerb = "subscribe";
+  static const std::string kUnsubscribeVerb = "unsubscribe";
+  const bool is_unsubscribe =
+      absl::EqualsIgnoreCase(incoming_request->asArray()[0].asString(), kUnsubscribeVerb);
+  const std::string& command_name = is_unsubscribe ? kUnsubscribeVerb : kSubscribeVerb;
+  if (!is_unsubscribe && incoming_request->asArray().size() < 2) {
+    onWrongNumberOfArguments(callbacks, *incoming_request);
+    request_ptr->updateStats(false);
+    return nullptr;
+  }
+
+  if (callbacks.currentDownstreamRespVersion() != 3) {
+    // Sharded pub/sub delivers messages as RESP3 push frames, so the subscriber must be on RESP3.
+    // Only tell the client to "Send HELLO 3 first" when that is actually achievable — i.e. the
+    // LISTENER is configured for RESP3 and the client simply has not upgraded yet. When the
+    // listener is NOT RESP3, HELLO 3 is answered with -NOPROTO (handleHelloCommand exact-matches
+    // the listener's protocol_version), so that advice would loop the client between two errors and
+    // never surface the real, operator-actionable condition. Report that pub/sub is unavailable on
+    // this listener instead (SW-2), consistent with how a DISABLED subscription mode rejects the
+    // command.
+    const bool listener_is_resp3 =
+        Common::Redis::toWireRespVersion(callbacks.protocolVersion()) == 3;
+    callbacks.onResponse(Common::Redis::Utility::makeError(
+        listener_is_resp3 ? "ERR pub/sub requires RESP3. Send HELLO 3 first."
+                          : "ERR pub/sub is not enabled on this listener (RESP3 required)"));
+    request_ptr->updateStats(false);
+    return nullptr;
+  }
+
+  // Pub/sub state (subscriber, tracked registries, subscription-delta stats) lives on the
+  // connection's PendingRequest, the sole PubsubSession. It is always present here: only a real
+  // ProxyFilter dispatches subscribe/unsubscribe commands to this handler. Guard for real (not just
+  // ASSERT): a future handler-registration change, a wrapper that does not forward pubsub(), or a
+  // test double would otherwise null-deref in NDEBUG. Degrade to an inline -ERR instead. (F8)
+  PubsubSession* pubsub = callbacks.pubsub();
+  ASSERT(pubsub != nullptr);
+  if (pubsub == nullptr) {
+    callbacks.onResponse(Common::Redis::Utility::makeError("ERR pub/sub is not available"));
+    request_ptr->updateStats(false);
+    return nullptr;
+  }
+
+  DownstreamSubscriberPtr subscriber;
+  const bool is_bare_unsubscribe = is_unsubscribe && incoming_request->asArray().size() < 2;
+  // Only a bare ``UNSUBSCRIBE`` needs an owned snapshot: it enumerates the subscriber's current
+  // channels, and the per-channel teardown below mutates ``subscribed_channels_`` as it drops each,
+  // so iterating the live set would invalidate under us. Explicit channels are read straight off
+  // the request array in the loop below (no per-channel string copy).
+  std::vector<std::string> bare_unsubscribe_channels;
+  if (is_bare_unsubscribe) {
+    subscriber = pubsub->downstreamSubscriber();
+    if (subscriber) {
+      // Bare ``UNSUBSCRIBE`` enumerates the subscriber's current channels. After the
+      // SUBSCRIBE→SSUBSCRIBE rewrite every subscribed channel lives in ``subscribed_channels_``
+      // (the sole subscription set — cluster sharding is transparent), so read it to find what to
+      // drop.
+      const auto& active_subscriptions = subscriber->subscribedChannels();
+      bare_unsubscribe_channels.assign(active_subscriptions.begin(), active_subscriptions.end());
+    }
+
+    if (bare_unsubscribe_channels.empty()) {
+      // Deliver the bare-unsubscribe ack out-of-band via the subscriber, consistent with the
+      // active-channel unsubscribe path below and with subscribe acks: every subscription-control
+      // confirmation is a RESP3 Push frame delivered through subscriber->deliver(), never the
+      // in-band FIFO. This lone path previously used the in-band onResponse(), so a bare
+      // UNSUBSCRIBE's ack ordering relative to pipelined command replies flipped depending on
+      // whether the subscriber happened to hold channels — the C-2 inconsistency. (A null
+      // subscriber only happens once the connection is gone, in which case there is nothing to
+      // ack; respond({}) still closes the request's FIFO entry with no frames.)
+      //
+      // respond({}) runs BEFORE the deliver: the ack's downstream write can synchronously drive a
+      // connection close → ProxyFilter::onEvent destroys this PendingRequest (== callbacks), so
+      // calling into callbacks after delivering would be a use-after-free. Complete the (empty)
+      // FIFO entry first; the subscriber is owned by ProxyFilter and outlives the request, so
+      // delivering afterward is safe.
+      callbacks.respond({});
+      if (subscriber) {
+        subscriber->deliver(makeSubscriptionAck(command_name, nullptr, 0));
+      }
+      request_ptr->updateStats(true);
+      return nullptr;
+    }
+  }
+
+  if (!subscriber) {
+    subscriber = pubsub->downstreamSubscriber();
+  }
+  if (!subscriber) {
+    callbacks.onResponse(Common::Redis::Utility::makeError("ERR failed to create subscriber"));
+    request_ptr->updateStats(false);
+    return nullptr;
+  }
+
+  // Per-channel processing. The success/error stat fires once for the whole command after the
+  // loop: we count it as success unless EVERY channel failed (matching Redis's
+  // partial-success-with-inline-error semantics for multi-channel SUBSCRIBE).
+  bool any_succeeded = false;
+  bool any_failed = false;
+  // Accumulate every per-channel inline -ERR here and hand the whole batch to the single terminal
+  // respond() after the loop. Buffering (rather than emitting each error as it happens) preserves
+  // the FIFO contract: the request stays one entry that flushes in order once complete.
+  RespValueFrames frames;
+  // Out-of-band subscribe/unsubscribe ack Push frames are ENCODED into the subscriber's reused
+  // batch buffer as each channel is processed (appendAck), but not WRITTEN until AFTER the terminal
+  // respond() below (flushAckBatch). Writing mid-loop would let a synchronous downstream close
+  // (e.g. a write filter that closes on write) destroy this PendingRequest — which is what
+  // ``callbacks`` /
+  // ``pubsub`` alias — and leave the rest of the loop, and the terminal respond(), dereferencing
+  // freed memory. Encoding mid-loop is side-effect-free, so only the write is deferred; the
+  // registry guards its own fan-out the same way (deliverFrameToSubscribers snapshots first). The
+  // subscriber is owned by ProxyFilter and outlives the request, so flushing after respond() is
+  // safe.
+  //
+  // E-6: rather than build one ack RespValue tree per channel and hand a vector to deliverBatch, a
+  // single ``ack_skeleton`` (``["<verb>", <channel>, <count>]`` Push) is reused across every
+  // channel — only its channel string ([1]) and count ([2]) are mutated per iteration before
+  // appendAck encodes it. ``command_name`` is invariant for the whole command (one verb, N
+  // channels), so the skeleton's verb element ([0]) is correct throughout. ``preserved_acks`` is a
+  // per-iteration scratch for the rare subscribe acks a shared-channel UNSUBSCRIBE must re-emit
+  // (see unsubscribeChannelAcrossRegistries); it is cleared and reused each iteration, not
+  // reallocated.
+  std::vector<Common::Redis::RespValue> preserved_acks;
+  const std::string skeleton_channel_placeholder;
+  Common::Redis::RespValue ack_skeleton =
+      makeSubscriptionAck(command_name, &skeleton_channel_placeholder, 0);
+  // ``route_registry`` memoizes the per-Route registry resolution so a multi-channel SUBSCRIBE
+  // whose channels share a prefix route resolves it once, not per channel (a null mapped value is
+  // the "resolved, unavailable" sentinel). Unused on the UNSUBSCRIBE path (which routes via
+  // trackedRegistries below). The pub/sub upstream itself is now resolved via
+  // Route::pubsubUpstream() (A-3) rather than a hand-picked write verb string.
+  absl::flat_hash_map<const Route*, SubscriptionRegistryPtr> route_registry;
+  // Two per-channel snippets the subscribe and unsubscribe arms below both use, factored to lambdas
+  // over the loop's shared state: emit the reused ack skeleton for a (channel, count), and report a
+  // net per-subscriber delta to the cumulative subscribe/unsubscribe counters (the active-
+  // subscriptions gauge already moved via add/removeChannel — A-2).
+  const auto emit_ack = [&](const std::string& channel, uint64_t count) {
+    ack_skeleton.asArray()[1].asString() = channel;
+    ack_skeleton.asArray()[2].asInteger() = static_cast<int64_t>(count);
+    subscriber->appendAck(ack_skeleton);
+  };
+  const auto report_subscription_delta = [&](uint64_t prev, uint64_t cur) {
+    if (cur != prev) {
+      pubsub->onPubsubSubscriptionChange(static_cast<int64_t>(cur) - static_cast<int64_t>(prev));
+    }
+  };
+  // Process one channel (subscribe or unsubscribe arm). Invoked per channel from either iteration
+  // source below — the bare-unsubscribe owned snapshot, or (for explicit channels) straight off the
+  // request array with no per-channel copy. A per-channel skip is a ``return`` from this lambda.
+  const auto process_channel = [&](const std::string& subscription_arg) {
+    if (is_unsubscribe) {
+      // Cross-registry unsubscribe is a session concern, not a routing one (A-8): the session walks
+      // every registry that might own the channel (routing may have moved it since the SUBSCRIBE)
+      // and buffers any preserved ``subscribe`` ack into ``preserved_acks``. Per-subscriber count
+      // (not registry-wide distinct count) is what the ack and gauge track, so shared-channel
+      // teardown stays correct when several subscribers hold the same channel on this thread.
+      const uint64_t prev_subscriber_count = subscriber->totalSubscriptionCount();
+      preserved_acks.clear();
+      const uint64_t count =
+          pubsub->unsubscribeChannelAcrossRegistries(subscription_arg, subscriber, preserved_acks);
+      report_subscription_delta(prev_subscriber_count, subscriber->totalSubscriptionCount());
+      // Emit any preserved subscribe acks first (rare shared-channel teardown), then this channel's
+      // unsubscribe ack — matching the original preserved-then-unsub order, now via the reused
+      // skeleton + encode-as-you-go instead of freshly built trees.
+      for (const auto& preserved_ack : preserved_acks) {
+        subscriber->appendAck(preserved_ack);
+      }
+      emit_ack(subscription_arg, count);
+      any_succeeded = true;
+      return;
+    }
+
+    // Subscribe path: route to the correct registry via upstreamPool. If routing or upstream
+    // pub/sub is unavailable, deliver an inline error for *this* channel and mark the per-
+    // channel failure — do NOT fake a success ack (that hid genuine failures from clients and
+    // lied to the success stat).
+    std::string route_key = subscription_arg;
+    const auto route = router.upstreamPool(route_key, stream_info);
+    if (!route) {
+      ENVOY_LOG(warn, "redis: no route for pub/sub target '{}'", subscription_arg);
+      // Per-channel -ERR buffered into ``frames`` (NOT terminal) so the FIFO entry stays alive for
+      // the remaining channels in this multi-channel SUBSCRIBE and so the frame waits behind any
+      // earlier pipelined non-pubsub request still pending upstream. The terminal respond() at the
+      // bottom of the loop hands the whole batch over, marks the request done and triggers the
+      // front-of-FIFO flush. Push frames + fabricated subscribe acks intentionally bypass the FIFO
+      // via subscriber->deliver() — those are out-of-band per the RESP3 spec; ordinary -ERR replies
+      // must NOT. (A subscribe-ack timeout / upstream SSUBSCRIBE error fires long after this
+      // request already completed, so no FIFO entry is left to carry an error in band; rather than
+      // write an unsolicited out-of-band -ERR — which a pipelining client would misattribute to an
+      // earlier in-flight command — the registry rolls the subscription back and CLOSES the
+      // subscriber's connection (F3). See SubscriptionRegistry::handleSubscribeAckTimeout.)
+      frames.push_back(Common::Redis::Utility::makeError(
+          fmt::format("ERR no route for pub/sub target '{}'", subscription_arg)));
+      any_failed = true;
+      return;
+    }
+
+    // Resolve the subscription registry for this route, memoized by Route*. ``upstreamPool``
+    // above stays per-channel (prefix routing is genuinely key-dependent), but the registry
+    // behind a given route is invariant — so a ``SUBSCRIBE c1..cN`` whose channels share a prefix
+    // route resolves it (route->pubsubUpstream() + TLS deref + atomic load) once instead of N
+    // times. A cached null is the valid "route resolved, pub/sub unavailable" sentinel (distinct
+    // from an absent key), which collapses the two former failure causes — no write-side conn pool,
+    // or no registry on the upstream — into the single unavailable error below.
+    SubscriptionRegistryPtr registry;
+    if (auto memo = route_registry.find(route.get()); memo != route_registry.end()) {
+      registry = memo->second;
+    } else {
+      const auto upstream = route->pubsubUpstream();
+      if (!upstream) {
+        // Route matched but has no conn pool for the write-side verb (mirror-only or otherwise
+        // partially-configured route). The spublish()-keyed lookup is new on this path, so a null
+        // upstream that older key lookups never hit could surface here.
+        ENVOY_LOG(warn, "redis: no upstream pool for pub/sub target '{}'", subscription_arg);
+      } else {
+        registry = upstream->subscriptionRegistryShared();
+        if (!registry) {
+          ENVOY_LOG(warn, "redis: pub/sub not available for target '{}'", subscription_arg);
+        }
+      }
+      // Cache the outcome (registry or null) so later channels on this route skip re-resolution.
+      route_registry.emplace(route.get(), registry);
+      // Register the resolved registry with the subscriber once per route (idempotent) instead of
+      // once per channel; the memo-hit path above reuses an already-registered registry.
+      if (registry) {
+        pubsub->setSubscriptionRegistry(registry);
+      }
+    }
+    if (!registry) {
+      // Route resolved but pub/sub is unavailable on it. Per-channel inline -ERR buffered into
+      // ``frames`` (non-terminal; the terminal respond() at loop end flushes the FIFO — Push frames
+      // and fabricated acks intentionally bypass the FIFO via subscriber->deliver(), ordinary -ERR
+      // replies must not). The client-visible message is identical for both causes; the specific
+      // cause was logged once above when this route was first resolved.
+      frames.push_back(Common::Redis::Utility::makeError(
+          fmt::format("ERR pub/sub unavailable on upstream for target '{}' (RESP3 not enabled)",
+                      subscription_arg)));
+      any_failed = true;
+      return;
+    }
+
+    // Snapshot the pre-subscribe count for the subscribe/unsubscribe COUNTERS below. The
+    // active-subscriptions GAUGE is not computed from this delta — addChannel owns it (A-2).
+    const uint64_t prev_subscriber_count = subscriber->totalSubscriptionCount();
+    // command_name is always "subscribe" on this branch: is_unsubscribe is false and the only
+    // client-exposed subscribe-family verbs that reach this handler are subscribe / unsubscribe
+    // (the sharded verbs are rejected earlier — see subscriptionCommands()). Assert the invariant
+    // rather than branching to a terminal error that would discard any per-channel -ERR frames
+    // already accumulated for earlier channels in this multi-channel SUBSCRIBE.
+    ASSERT(command_name == "subscribe");
+    // Rewrite the client SUBSCRIBE to a sharded SSUBSCRIBE. The registry always emits the
+    // downstream ack with the literal ``subscribe`` verb, so the client still sees ``["subscribe",
+    // channel, count]`` — cluster sharding is transparent. SUBSCRIBE is the only client-exposed
+    // subscribe verb (PSUBSCRIBE is unsupported — see subscriptionCommands()).
+    //
+    // B-3 trade-off: a multi-channel ``SUBSCRIBE a b`` whose channels hash to DIFFERENT shards
+    // issues one SSUBSCRIBE per shard, and each shard acks independently. So the downstream acks
+    // can arrive out of command order — if b's shard acks first the client sees ``subscribe b 2``
+    // before
+    // ``subscribe a 1`` — and the trailing count is per-channel snapshot order, not the monotonic
+    // 1,2,3,... a single-node Redis emits in strict command order. This is inherent to per-shard
+    // fan-out (there is no cross-shard barrier to serialize the acks); a client that
+    // position-matches acks to request order or asserts a monotonic count must not rely on it here.
+    SubscriptionRegistry::SubscribeResult result =
+        registry->subscribe(subscription_arg, subscriber);
+
+    if (!result.success) {
+      // Upstream send failed (no healthy host, conn-pool failure). Registry already rolled
+      // back local state; surface as inline error rather than a fake success ack.
+      ENVOY_LOG(warn, "redis: upstream {} send failed for '{}'", command_name, subscription_arg);
+      // Buffered into ``frames``, not terminal (see no-route branch comment).
+      frames.push_back(Common::Redis::Utility::makeError(
+          fmt::format("ERR upstream {} send failed for '{}'", command_name, subscription_arg)));
+      any_failed = true;
+      return;
+    }
+
+    const uint64_t cur_subscriber_count = result.subscription_count;
+    if (!result.ack_deferred) {
+      // Dedup hit on an already-ACTIVE channel: its upstream ack has already landed, so no upstream
+      // ack will fire on our behalf — fabricate the ack now to match Redis's per-client semantics
+      // (encoded now via the reused skeleton, written after the terminal respond() below —
+      // appendAck/flushAckBatch). A dedup on a
+      // channel still awaiting its first upstream ack instead joins that pending bucket in
+      // subscribe() (ack_deferred = true), so it waits for the upstream confirmation like the first
+      // subscriber rather than seeing a premature success.
+      emit_ack(subscription_arg, cur_subscriber_count);
+    }
+    // else: ack deferred to the registry; onPushMessage delivers it when the upstream subscribe-ack
+    // Push arrives (fresh upstream send, or a dedup that joined the still-open pending bucket).
+    report_subscription_delta(prev_subscriber_count, cur_subscriber_count);
+    any_succeeded = true;
+  };
+
+  // Drive process_channel over the right source: a bare ``UNSUBSCRIBE`` walks its owned channel
+  // snapshot; every other form (explicit SUBSCRIBE / UNSUBSCRIBE) reads the channel arguments in
+  // place off the request array — no per-channel string copy.
+  if (is_bare_unsubscribe) {
+    for (const auto& channel : bare_unsubscribe_channels) {
+      process_channel(channel);
+    }
+  } else {
+    const auto& array = incoming_request->asArray();
+    for (uint64_t i = 1; i < array.size(); ++i) {
+      process_channel(array[i].asString());
+    }
+  }
+
+  // Terminal: hand the accumulated per-channel error frames (possibly empty — all channels
+  // succeeded with acks flowing out-of-band) to the request in one call, which marks it complete
+  // and flushes the FIFO. This is the LAST use of ``callbacks`` / ``pubsub``, so a deliver-driven
+  // synchronous close afterward can no longer dangle them.
+  callbacks.respond(std::move(frames));
+  // Flush the acks encoded during the loop now, in a SINGLE write: a bare ``UNSUBSCRIBE`` on N
+  // channels accumulates N acks, and delivering them one-per-write was N downstream writes. The
+  // subscriber is owned by ProxyFilter and outlives the (possibly just-popped) request;
+  // flushAckBatch no-ops (draining any partial batch) if the connection has already closed and
+  // never touches callbacks.
+  subscriber->flushAckBatch();
+  // Partial-success: count as command-level success unless every channel failed.
+  request_ptr->updateStats(any_succeeded || !any_failed);
+  return nullptr;
+}
+
 InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                            TimeSource& time_source, bool latency_in_micros,
                            Common::Redis::FaultManagerPtr&& fault_manager,
-                           absl::flat_hash_set<std::string>&& custom_commands)
-    : router_(std::move(router)), simple_command_handler_(*router_),
+                           absl::flat_hash_set<std::string>&& custom_commands,
+                           bool enable_sharded_subscribe)
+    : router_(std::move(router)), simple_command_handler_(*router_), publish_handler_(*router_),
       eval_command_handler_(*router_), object_command_handler_(*router_), mget_handler_(*router_),
       mset_handler_(*router_), scan_handler_(*router_), shard_info_handler_(*router_),
       random_shard_handler_(*router_), split_keys_sum_result_handler_(*router_),
       custom_commands_(std::move(custom_commands)),
-      transaction_handler_(*router_, custom_commands_), cluster_scope_handler_(*router_),
+      transaction_handler_(*router_, custom_commands_), subscription_handler_(*router_),
+      cluster_scope_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      time_source_(time_source), fault_manager_(std::move(fault_manager)) {
+      time_source_(time_source), fault_manager_(std::move(fault_manager)),
+      enable_sharded_subscribe_(enable_sharded_subscribe) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
@@ -1074,6 +1525,18 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
   addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mset(), latency_in_micros,
              mset_handler_);
 
+  // PUBLISH and SPUBLISH share one handler. A client ``SPUBLISH`` always goes out as ``SPUBLISH``;
+  // a client ``PUBLISH`` is rewritten to ``SPUBLISH`` only when ``enable_sharded_publish`` is set
+  // (see PublishRequest::create), otherwise it is forwarded unchanged as classic ``PUBLISH``. Two
+  // registrations keep per-verb stats isolated under ``command.publish.*`` / ``command.spublish.*``
+  // so operators can tell which verb the client sent.
+  // PublishRequest::create owns its arity check (so it emits the unified wrong-arg wording);
+  // PUBLISH is otherwise a normal command (allowed in MULTI, subject to fault injection).
+  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::publish(), latency_in_micros,
+             publish_handler_, /*owns_arity_check=*/true);
+  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::spublish(), latency_in_micros,
+             publish_handler_, /*owns_arity_check=*/true);
+
   addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::scan(), latency_in_micros,
              scan_handler_);
 
@@ -1086,6 +1549,19 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
   for (const std::string& command : Common::Redis::SupportedCommands::transactionCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, transaction_handler_);
+  }
+
+  // The subscribe family owns its per-channel arity checks, is forbidden inside MULTI, and bypasses
+  // fault injection (acks are out-of-band RESP3 Push frames). These capabilities live on the
+  // handler registration so makeRequest() stays free of pub/sub command-name special cases. The
+  // handlers are registered UNCONDITIONALLY even when sharded subscription is disabled (D2): the
+  // disable is enforced in makeRequest, which rejects SUBSCRIBE/UNSUBSCRIBE as unknown commands
+  // BEFORE the handler lookup. Registering anyway keeps that lookup's ``handler != nullptr``
+  // invariant intact for the enabled path.
+  for (const std::string& command : Common::Redis::SupportedCommands::subscriptionCommands()) {
+    addHandler(scope, stat_prefix, command, latency_in_micros, subscription_handler_,
+               /*owns_arity_check=*/true, /*forbidden_in_transaction=*/true,
+               /*bypasses_fault_injection=*/true);
   }
 
   for (const std::string& command : Common::Redis::SupportedCommands::ClusterScopeCommands()) {
@@ -1268,14 +1744,38 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   }
 
   std::string command_name = absl::AsciiStrToLower(request->asArray()[0].asString());
+
+  // Hard-reject the sharded pub/sub commands that the proxy intentionally does not
+  // expose to clients. SUBSCRIBE/UNSUBSCRIBE are silently rewritten into their sharded
+  // variants (SSUBSCRIBE/SUNSUBSCRIBE) on the upstream wire — clients have no business
+  // issuing the s-variants directly. The check runs BEFORE the ``custom_commands_`` lookup
+  // so an operator config of ``custom_commands: [ssubscribe]`` cannot accidentally
+  // re-enable them. SPUBLISH is intentionally NOT on this list: unlike the subscribe
+  // s-variants it IS client-exposed — a sharded publish that shares the PUBLISH handler and
+  // is always forwarded upstream as SPUBLISH (a plain PUBLISH is rewritten to SPUBLISH only
+  // when ``enable_sharded_publish`` is set).
+  if (command_name == "ssubscribe" || command_name == "sunsubscribe") {
+    rejectUnknownCommand(callbacks, *request);
+    return nullptr;
+  }
+
+  // D2: when sharded subscription is disabled (PubsubSettings mode DISABLED — the Redis 6.x escape
+  // hatch), reject client SUBSCRIBE/UNSUBSCRIBE as unknown commands too, ahead of auth exactly like
+  // PSUBSCRIBE and the internal sharded verbs above. The client gets a clean ``-ERR unknown
+  // command`` (the pre-sharded-pubsub behavior) rather than the proxy rewriting it into an
+  // SSUBSCRIBE the upstream answers with ``-ERR unknown command``, which would churn the
+  // subscription connection through backoff until it closes the client.
+  if (!enable_sharded_subscribe_ &&
+      Common::Redis::SupportedCommands::subscriptionCommands().contains(command_name)) {
+    rejectUnknownCommand(callbacks, *request);
+    return nullptr;
+  }
+
   // Compatible with redis behavior, if there is an unsupported command, return immediately,
   // this action must be performed before verifying auth, some redis clients rely on this behavior.
   if (!Common::Redis::SupportedCommands::isSupportedCommand(command_name) &&
       custom_commands_.find(command_name) == custom_commands_.end()) {
-    stats_.unsupported_command_.inc();
-    callbacks.onResponse(Common::Redis::Utility::makeError(fmt::format(
-        "ERR unknown command '{}', with args beginning with: {}", request->asArray()[0].asString(),
-        request->asArray().size() > 1 ? request->asArray()[1].asString() : "")));
+    rejectUnknownCommand(callbacks, *request);
     return nullptr;
   }
 
@@ -1362,10 +1862,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
             fmt::format("ERR wrong number of arguments for 'client|{}' command", subcommand)));
         return nullptr;
       }
-      auto ok = std::make_unique<Common::Redis::RespValue>();
-      ok->type(Common::Redis::RespType::SimpleString);
-      ok->asString() = "OK";
-      callbacks.onResponse(std::move(ok));
+      localResponse(callbacks, "OK");
       return nullptr;
     }
     callbacks.onResponse(Common::Redis::Utility::makeError(
@@ -1376,10 +1873,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
 
   if (command_name == Common::Redis::SupportedCommands::ping()) {
     // Respond to PING locally.
-    Common::Redis::RespValuePtr pong(new Common::Redis::RespValue());
-    pong->type(Common::Redis::RespType::SimpleString);
-    pong->asString() = "PONG";
-    callbacks.onResponse(std::move(pong));
+    localResponse(callbacks, "PONG");
     return nullptr;
   }
 
@@ -1429,21 +1923,64 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     }
   }
 
+  // Get the handler for the downstream request. Unsupported commands were rejected above and the
+  // locally-answered commands (PING/ECHO/TIME/...) returned earlier, so every command reaching here
+  // has a registered handler — its capability flags now drive the dispatch decisions below.
+  auto handler = handler_lookup_table_.find(command_name);
+  ASSERT(handler != nullptr);
+
   if (request->asArray().size() < 2 &&
-      !Common::Redis::SupportedCommands::isCommandValidWithoutArgs(command_name)) {
-    // Commands that require at least one argument beyond the command name
+      !Common::Redis::SupportedCommands::isCommandValidWithoutArgs(command_name) &&
+      !handler->owns_arity_check) {
+    // Commands that require at least one argument beyond the command name. Handlers that own their
+    // arity validation (PublishRequest, the subscribe family) opt out via ``owns_arity_check`` so
+    // they can emit the unified ``wrong number of arguments for '<cmd>' command`` wording from
+    // ``SplitRequestBase::onWrongNumberOfArguments``.
     onInvalidRequest(callbacks);
     return nullptr;
   }
 
-  // Get the handler for the downstream request
-  auto handler = handler_lookup_table_.find(command_name);
-  ASSERT(handler != nullptr);
-
   // If we are within a transaction, forward all requests to the transaction handler (i.e. handler
-  // of "multi" command).
+  // of "multi" command) — except pub/sub, which real Redis forbids inside MULTI. Reject those
+  // here rather than letting them fall through to the transaction handler: routed there, a
+  // SUBSCRIBE would be sent raw to a single shard with no downstream subscriber / registry / RESP3
+  // gate, and its RESP3 Push subscribe-ack would be dropped by ClientImpl (no push_callbacks_ on a
+  // data connection), hanging the request until op-timeout. The guard runs before the multi
+  // reassignment so the subscription fast path below still sees the real subscription handler
+  // outside transactions.
   if (callbacks.transaction().active_) {
+    if (handler->forbidden_in_transaction) {
+      callbacks.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("{} is not allowed in transactions", absl::AsciiStrToUpper(command_name))));
+      return nullptr;
+    }
     handler = handler_lookup_table_.find("multi");
+  }
+
+  // Subscription commands intentionally bypass the fault-injection layer below.
+  //
+  // Delay/error faults only make sense for a command whose entire reply flows through the fault
+  // wrapper. A subscribe-family command's output is split: successful subscribe/unsubscribe acks
+  // are RESP3 Push frames delivered out-of-band via subscriber->deliver() (they never touch the
+  // wrapper), and only the per-channel inline ``-ERR`` replies go through respond(). Wrapping such
+  // a command in DelayFaultRequest would fire the acks immediately but delay just the error replies
+  // — a meaningless, inconsistent "delay" — so pub/sub is pinned out of fault injection by design.
+  //
+  // (This is not a lifetime constraint. DelayFaultRequest::respond() defers, and completing the
+  // wrapped PendingRequest from the timer callback destroys the DelayFaultRequest — and its own
+  // timer — mid-callback; but that reentrant teardown is the same path every delay-faulted command
+  // takes and is safe because the wrapper's callback returns immediately afterward. The former
+  // second reason — that DelayFaultRequest could not carry a multi-frame response — also no longer
+  // applies now that respond() takes the whole frame vector.)
+  //
+  // The intentional skip means delay/error fault injection does not apply to ``SUBSCRIBE`` /
+  // ``PSUBSCRIBE`` / ``SSUBSCRIBE`` / ``UNSUBSCRIBE`` / ``PUNSUBSCRIBE`` / ``SUNSUBSCRIBE``;
+  // covered by tests pinning that pub/sub paths bypass the fault manager.
+  if (handler->bypasses_fault_injection) {
+    ENVOY_LOG(debug, "splitting '{}'", request->toString());
+    handler->command_stats_.total_.inc();
+    return handler->handler_.get().startRequest(
+        std::move(request), callbacks, handler->command_stats_, time_source_, false, stream_info);
   }
 
   // Fault Injection Check
@@ -1493,9 +2030,18 @@ void InstanceImpl::onInvalidRequest(SplitCallbacks& callbacks) {
   callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().InvalidRequest));
 }
 
+void InstanceImpl::rejectUnknownCommand(SplitCallbacks& callbacks,
+                                        const Common::Redis::RespValue& request) {
+  stats_.unsupported_command_.inc();
+  callbacks.onResponse(Common::Redis::Utility::makeError(fmt::format(
+      "ERR unknown command '{}', with args beginning with: {}", request.asArray()[0].asString(),
+      request.asArray().size() > 1 ? request.asArray()[1].asString() : "")));
+}
+
 void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefix,
                               const std::string& name, bool latency_in_micros,
-                              CommandHandler& handler) {
+                              CommandHandler& handler, bool owns_arity_check,
+                              bool forbidden_in_transaction, bool bypasses_fault_injection) {
   std::string to_lower_name = absl::AsciiStrToLower(name);
   const std::string command_stat_prefix = fmt::format("{}command.{}.", stat_prefix, to_lower_name);
   Stats::StatNameManagedStorage storage{command_stat_prefix + std::string("latency"),
@@ -1508,7 +2054,7 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
                                                        latency_in_micros
                                                            ? Stats::Histogram::Unit::Microseconds
                                                            : Stats::Histogram::Unit::Milliseconds)},
-          handler}));
+          handler, owns_arity_check, forbidden_in_transaction, bypasses_fault_injection}));
 }
 
 } // namespace CommandSplitter

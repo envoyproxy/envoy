@@ -48,6 +48,17 @@ public:
 
   virtual ConnPool::InstanceSharedPtr upstream(const std::string& command) const PURE;
 
+  /**
+   * @return the upstream connection pool that owns this route's pub/sub (SSUBSCRIBE/SPUBLISH)
+   * subscription registry. A first-class accessor rather than ``upstream(some-verb)`` so the
+   * pub/sub registry always resolves to the write-side pool regardless of ``read_command_policy``:
+   * client SUBSCRIBE is transparently sharded, so its registry must live on the same pool as
+   * PUBLISH/SPUBLISH or delivery splits across the read/write pools. Previously the caller passed a
+   * hand-picked write verb (``spublish``) into upstream(); coupling on that verb string meant a
+   * future change to the read/write command classification could silently reroute pub/sub.
+   */
+  virtual ConnPool::InstanceSharedPtr pubsubUpstream() const PURE;
+
   virtual const MirrorPolicies& mirrorPolicies() const PURE;
 };
 

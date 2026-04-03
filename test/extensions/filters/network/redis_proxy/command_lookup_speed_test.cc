@@ -25,7 +25,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-class NoOpSplitCallbacks : public CommandSplitter::SplitCallbacks {
+class NoOpSplitCallbacks : public CommandSplitter::SplitCallbacks,
+                           public CommandSplitter::NoOpPubsubSession {
 public:
   NoOpSplitCallbacks() = default;
   ~NoOpSplitCallbacks() override = default;
@@ -34,7 +35,7 @@ public:
   void onQuit() override {}
   void onAuth(const std::string&) override {}
   void onAuth(const std::string&, const std::string&) override {}
-  void onResponse(Common::Redis::RespValuePtr&&) override {}
+  void respond(CommandSplitter::RespValueFrames&&) override {}
   Common::Redis::Client::Transaction& transaction() override { return transaction_; }
   void setDownstreamRespVersion(uint32_t) override {}
   Common::Redis::RespProtocolVersion protocolVersion() const override {
@@ -46,6 +47,9 @@ public:
   }
   uint32_t currentDownstreamRespVersion() const override { return 2; }
   std::optional<uint32_t> takePendingHelloAuthVersion() override { return std::nullopt; }
+  CommandSplitter::PubsubSession* pubsub() override { return this; }
+  // downstreamSubscriber / setSubscriptionRegistry / unsubscribeChannelAcrossRegistries /
+  // onPubsubSubscriptionChange are inherited from CommandSplitter::NoOpPubsubSession (R-7).
 
 private:
   Common::Redis::Client::NoOpTransaction transaction_;

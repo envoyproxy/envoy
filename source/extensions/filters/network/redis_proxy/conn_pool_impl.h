@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <memory>
 #include <string>
@@ -29,7 +30,9 @@
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool.h"
+#include "source/extensions/filters/network/redis_proxy/subscription_registry.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 
@@ -94,6 +97,7 @@ public:
   Common::Redis::Client::PoolRequest*
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::ClientCallbacks& callbacks);
+  SubscriptionRegistryPtr subscriptionRegistryShared() override;
   void init();
 
   // Allow the unit test to have access to private members.
@@ -113,6 +117,13 @@ private:
     ThreadLocalPool& parent_;
     Upstream::HostConstSharedPtr host_;
     Common::Redis::Client::ClientPtr redis_client_;
+    // A-5: why this connection is being torn down, stamped on the wrapper by the caller rather than
+    // reconstructed in onEvent from a separate per-thread container. A PLANNED subscription-host
+    // removal (onHostsRemoved) sets this true so the close-driven onEvent can tell it apart from a
+    // genuine connection loss and skip its redundant resubscribe (the onClusterTopologyChange the
+    // member-update posts already re-routes the moved channels — C-6). Only meaningful for a
+    // subscription connection; the data path ignores it.
+    bool planned_removal_{false};
   };
 
   using ThreadLocalActiveClientPtr = std::unique_ptr<ThreadLocalActiveClient>;
@@ -156,6 +167,7 @@ private:
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks,
+                           public RedisProxy::UpstreamSubscriptionCallbacks,
                            public Logger::Loggable<Logger::Id::redis> {
     ThreadLocalPool(
         std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
@@ -165,7 +177,17 @@ private:
         std::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
             aws_iam_authenticator);
     ~ThreadLocalPool() override;
-    ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
+    ThreadLocalActiveClient* threadLocalActiveClient(Upstream::HostConstSharedPtr host);
+    // Same as threadLocalActiveClient but keyed into subscription_client_map_ so subscription
+    // traffic gets its own connection, never shared with data requests.
+    ThreadLocalActiveClient* threadLocalActiveSubscriptionClient(Upstream::HostConstSharedPtr host);
+    // Shared create-or-lookup body for the two maps above (client_map_ / subscription_client_map_).
+    // Returns the live client, or nullptr when the host's connection rate limit denied a new
+    // connection — in which case the helper ERASES the null placeholder it inserted for the lookup
+    // before returning, so no caller (nor teardown) ever observes a null entry in either map.
+    ThreadLocalActiveClient* getOrCreateClientInMap(
+        absl::node_hash_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr>& client_map,
+        Upstream::HostConstSharedPtr host);
     uint16_t shardSize();
     Common::Redis::Client::PoolRequest*
     makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
@@ -184,6 +206,9 @@ private:
     void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
     void drainClients();
+    ThreadLocalActiveClient*
+    getOrCreateSubscriptionClient(Upstream::HostConstSharedPtr host,
+                                  Common::Redis::Client::PushMessageCallbacks& push_callbacks);
 
     // Upstream::ClusterUpdateCallbacks
     void onClusterAddOrUpdate(absl::string_view cluster_name,
@@ -194,6 +219,60 @@ private:
 
     void onRequestCompleted();
 
+    // Close every upstream connection this pool owns — data, subscription, and draining — by
+    // repeatedly closing the front of each map/set (close() erases the entry, so the loops drain).
+    // Shared by ~ThreadLocalPool and onClusterRemoval, which previously open-coded the identical
+    // three-loop stanza. Each caller still runs its own registry teardown and resubscribe-timer
+    // handling around this — those legitimately differ (the dtor also drains pending_requests_; the
+    // two disable the resubscribe timer on opposite sides of the registry reset for reasons each
+    // documents), so only the common close stanza is factored out.
+    void closeAllClients();
+
+    // Per-host dedicated subscription connections (node_hash_map for pointer/reference stability
+    // across inserts and erases — see subscription_client_map_).
+    using SubscriptionClientMap =
+        absl::node_hash_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr>;
+
+    // UpstreamSubscriptionCallbacks
+    Upstream::HostConstSharedPtr chooseUpstreamHostForChannel(const std::string& channel) override;
+    Upstream::HostConstSharedPtr
+    sendUpstreamSsubscribe(const std::string& channel,
+                           Common::Redis::Client::PushMessageCallbacks& push_callbacks) override;
+    bool sendUpstreamSsubscribeToHost(const std::string& channel,
+                                      Common::Redis::Client::PushMessageCallbacks& push_callbacks,
+                                      const Upstream::HostConstSharedPtr& host) override;
+    UpstreamSubscriptionCallbacks::SunsubscribeResult
+    sendUpstreamSunsubscribe(const std::string& channel,
+                             Upstream::HostConstSharedPtr host) override;
+    void scheduleResubscribe(std::chrono::milliseconds delay) override;
+    bool resubscribeTimerPending() const override {
+      return resubscribe_timer_ != nullptr && resubscribe_timer_->enabled();
+    }
+    void requestTopologyRefresh() override;
+    bool retireSubscriptionConnectionIfIdle(const Upstream::HostConstSharedPtr& host) override;
+    // Retire ``host``'s now-idle subscription connection when its last channel unsubscribes.
+    // Returns true iff the connection was retired (the host had no remaining subscriptions), so the
+    // caller can report ConnectionRetired to the registry — a retired connection never acks the
+    // SUNSUBSCRIBE. ``client_it`` is the caller's already-resolved subscription_client_map_ entry
+    // for ``host`` (both call sites just looked it up to send/guard); reusing it avoids a second
+    // lookup (§6). Precondition: ``client_it`` points to a live (non-null) client and is not
+    // dereferenced by the caller after this returns. It stays valid across the
+    // hostHasSubscriptions() query below — that reads the registry's channel index, never
+    // subscription_client_map_, so no insert/rehash intervenes — and subscription_client_map_ is a
+    // node_hash_map, so the only entry this can erase is ``client_it``'s own (the retire branch),
+    // which the caller no longer touches.
+    bool maybeCleanupSubscriptionMode(const Upstream::HostConstSharedPtr& host,
+                                      SubscriptionClientMap::iterator client_it);
+
+    // Post ``fn`` to run against ``registry`` on the next event-loop iteration, capturing the
+    // registry WEAKLY (MISC-3): on worker shutdown a still-pending post must not hold the last
+    // registry ref, or its destruction while the dispatcher is being torn down would deregister the
+    // registry's subscribe-ack timer against an already-freed dispatcher (UAF). If the pool
+    // released the registry first, the post simply no-ops. Centralizes the weak-post boilerplate
+    // the connection-loss and topology-change paths share.
+    void postToRegistry(const SubscriptionRegistryPtr& registry,
+                        std::function<void(SubscriptionRegistry&)> fn);
+
     std::weak_ptr<InstanceImpl> parent_;
     Event::Dispatcher& dispatcher_;
     const std::string cluster_name_;
@@ -202,6 +281,19 @@ private:
     Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
     Upstream::ThreadLocalCluster* cluster_{};
     absl::node_hash_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
+    // Subscription connections, one per host, kept OUT of client_map_ so data requests never
+    // share them. A subscription connection carries only (S)SUBSCRIBE/(S)UNSUBSCRIBE and thus has
+    // an empty pending_requests_; an in-band (non-Push) reply on it is Redis's error reply to a
+    // fire-and-forget SSUBSCRIBE/SUNSUBSCRIBE, which ClientImpl::onRespValue routes to
+    // onUpstreamControlError. The connection is KEPT open (closing it would re-issue and drop its
+    // healthy channels): a correlated error fails that channel's pending subscribers (or refreshes
+    // the slot map on a redirect), and an uncorrelated one re-resolves this host's channels on
+    // backoff. (The protocol-error close for an unsolicited reply is the DATA-connection path — a
+    // connection with no push callbacks installed — which a live subscription connection never
+    // hits.)
+    SubscriptionClientMap subscription_client_map_;
+    // (A planned subscription-host removal is now flagged on the closing wrapper itself —
+    // ThreadLocalActiveClient::planned_removal_ — instead of a separate host set here; A-5.)
     absl::node_hash_map<Upstream::HostConstSharedPtr, TokenBucketPtr> cx_rate_limiter_map_;
     Envoy::Common::CallbackHandlePtr host_set_member_update_cb_handle_;
     absl::node_hash_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
@@ -230,6 +322,12 @@ private:
     std::string client_zone_; // Zone from node.locality.zone
     // Mirrors InstanceImpl::protocol_version_; drives upstream HELLO 3 emission.
     Common::Redis::RespProtocolVersion upstream_protocol_version_;
+    // Pub/sub state. The registry is created lazily on the first subscriber. The resubscribe
+    // timer's callback reads subscription_registry_ directly (nulled + timer disabled together on
+    // teardown), so no separate callback/strong-ref bookkeeping is needed to keep the registry
+    // alive.
+    SubscriptionRegistryPtr subscription_registry_;
+    Event::TimerPtr resubscribe_timer_;
   };
 
   const std::string& localZone() const { return local_zone_; }
