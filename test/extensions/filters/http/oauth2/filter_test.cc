@@ -122,14 +122,14 @@ public:
   void init(FilterConfigSharedPtr config) {
     // Set up the OAuth client.
     oauth_client_ = new MockOAuth2Client();
-    auto oauth_client_holder =
-        std::make_shared<std::unique_ptr<OAuth2Client>>(std::unique_ptr<OAuth2Client>{oauth_client_});
+    auto oauth_client_holder = std::make_shared<std::unique_ptr<OAuth2Client>>(
+        std::unique_ptr<OAuth2Client>{oauth_client_});
 
     config_ = config;
     ON_CALL(test_random_, random()).WillByDefault(Return(123456789));
     filter_ = std::make_shared<OAuth2Filter>(
-        config_, [this, oauth_client_holder](const FilterConfigSharedPtr&)
-                     -> std::unique_ptr<OAuth2Client> {
+        config_,
+        [this, oauth_client_holder](const FilterConfigSharedPtr&) -> std::unique_ptr<OAuth2Client> {
           if (*oauth_client_holder != nullptr) {
             return std::move(*oauth_client_holder);
           }
