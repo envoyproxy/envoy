@@ -266,7 +266,7 @@ function build_openssl() {
     BAZEL_BUILD_OPTIONS+=("--config=openssl")
     # shellcheck disable=SC2207
     # Append OpenSSL compat tests, and exclude quiche tests
-    TEST_TARGETS=("@compat-openssl//test/..." $(printf "%s\n" "${TEST_TARGETS[@]}" | grep -Fxv "@quiche//:ci_tests"))
+    TEST_TARGETS=("//compat/openssl/test/..." $(printf "%s\n" "${TEST_TARGETS[@]}" | grep -Fxv "@quiche//:ci_tests"))
     setup_clang_toolchain
     echo "Bazel fastbuild build with OpenSSL..."
     bazel_envoy_binary_build fastbuild

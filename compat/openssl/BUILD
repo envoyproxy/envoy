@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//:bazel/rules.bzl", "mapping_func_filegroup", "patched_bssl_filegroup")
+load("//compat/openssl:bazel/rules.bzl", "mapping_func_filegroup", "patched_bssl_filegroup")
 
 licenses(["notice"])  # Apache 2
 
@@ -178,7 +178,7 @@ genrule(
         export LD_LIBRARY_PATH="$$LLVM_LIB_DIR$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"
 
         # Run the prefixer with absolute source path and relative output path
-        $(location //prefixer:prefixer) \
+        $(location //compat/openssl/prefixer:prefixer) \
             --src-path "$(location @openssl//:include)" \
             --src-incl "openssl/*.h" \
             --src-skip "openssl/asn1_mac.h" \
@@ -188,7 +188,7 @@ genrule(
             --prefix ossl 2>&1
     """,
     tools = [
-        "//prefixer",
+        "//compat/openssl/prefixer",
         "@llvm_toolchain_llvm//:lib/libclang-cpp.so.18.1",
     ],
     visibility = ["//visibility:private"],
@@ -908,6 +908,7 @@ cc_library(
     # directory when they run, so libbssl-compat.a can dlopen() them.
     data = ["@openssl//:libs"],
     includes = [
+        ".",
         "include",
         "source",
     ],

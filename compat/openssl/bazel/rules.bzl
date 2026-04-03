@@ -15,7 +15,7 @@ def patched_bssl_filegroup(name, srcs):
         dst_file = file
         native.genrule(
             name = target_name,
-            srcs = [src_file, "//patch:all"],
+            srcs = [src_file, "//compat/openssl/patch:all"],
             outs = [dst_file],
             cmd = """
                 # Set up paths - all paths need to be relative to bssl-compat package
@@ -23,8 +23,8 @@ def patched_bssl_filegroup(name, srcs):
                 DST_FILE="$(location {dst_file})"
                 BASENAME="$$(basename $$SRC_FILE)"
                 # Patch files are in the package, so use relative paths from execroot
-                PATCH_SCRIPT="external/compat-openssl/patch/{dst_file}.sh"
-                PATCH_FILE="external/compat-openssl/patch/{dst_file}.patch"
+                PATCH_SCRIPT="compat/openssl/patch/{dst_file}.sh"
+                PATCH_FILE="compat/openssl/patch/{dst_file}.patch"
 
                 # Create output directory
                 mkdir -p "$$(dirname $$DST_FILE)"
@@ -49,11 +49,11 @@ def patched_bssl_filegroup(name, srcs):
                 # Apply patch script if it exists, otherwise comment out the whole file
                 if [ -f "$$PATCH_SCRIPT" ]; then
                     cp "$$PATCH_SCRIPT" "$$TMP_DIR/03.$$(basename $$PATCH_SCRIPT)"
-                    TOOLS_DIR="$$(dirname "$(location //tools:uncomment.sh)")"
+                    TOOLS_DIR="$$(dirname "$(location //compat/openssl/tools:uncomment.sh)")"
                     PATH="$$TOOLS_DIR:$$PATH" bash "$$PATCH_SCRIPT" "$$WORKING"
                     cp "$$WORKING" "$$TMP_DIR/04.$$BASENAME.applied.sh"
                 else
-                    bash $(location //tools:uncomment.sh) "$$WORKING" --comment
+                    bash $(location //compat/openssl/tools:uncomment.sh) "$$WORKING" --comment
                     cp "$$WORKING" "$$TMP_DIR/05.commented.out"
                 fi
 
@@ -61,7 +61,7 @@ def patched_bssl_filegroup(name, srcs):
                 cp "$$WORKING" "$$DST_FILE"
                 rm "$$WORKING"
             """.format(src_file = src_file, dst_file = dst_file),
-            tools = ["//tools:uncomment.sh"],
+            tools = ["//compat/openssl/tools:uncomment.sh"],
         )
 
     # Create a filegroup containing the copied & patched files
@@ -100,7 +100,7 @@ def mapping_func_filegroup(name, funcs):
             native.genrule(
                 name = target_name,
                 srcs = [":patched_bssl_headers"],
-                tools = ["//tools:generate.c.sh"],
+                tools = ["//compat/openssl/tools:generate.c.sh"],
                 outs = [out],
                 cmd = """
                     mkdir -p "$$(dirname $(location {out}))"
@@ -110,7 +110,7 @@ def mapping_func_filegroup(name, funcs):
                     PATCHED_BSSL_INCLUDE_DIR="$$(dirname "$$(dirname "$$FIRST_INCLUDE")")"
 
                     # Run generate.c.sh with the patched BoringSSL include directory
-                    $(location //tools:generate.c.sh) "{func}" "$(location {out})" "$$PATCHED_BSSL_INCLUDE_DIR"
+                    $(location //compat/openssl/tools:generate.c.sh) "{func}" "$(location {out})" "$$PATCHED_BSSL_INCLUDE_DIR"
                 """.format(func = func, out = out),
             )
 

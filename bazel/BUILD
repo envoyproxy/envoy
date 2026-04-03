@@ -538,7 +538,7 @@ config_setting(
 
 config_setting(
     name = "using_openssl",
-    flag_values = {":ssl": "@compat-openssl//:ssl"},
+    flag_values = {":ssl": "//compat/openssl:ssl"},
 )
 
 # Convenience grouping for any FIPS SSL library

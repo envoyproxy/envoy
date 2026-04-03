@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
-load("//:bazel/rules.bzl", "patched_bssl_filegroup")
+load("//compat/openssl:bazel/rules.bzl", "patched_bssl_filegroup")
 
 licenses(["notice"])  # Apache 2
 
@@ -83,8 +83,8 @@ cc_test(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@compat-openssl//:crypto",
-        "@compat-openssl//:ssl",
+        "//compat/openssl:crypto",
+        "//compat/openssl:ssl",
         "@googletest//:gtest",
     ],
 )
