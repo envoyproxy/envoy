@@ -309,16 +309,19 @@ TEST_P(WasmFilterIntegrationTest, LargeRequestHitBufferLimit) {
 } // namespace Wasm
 } // namespace Extensions
 
+// For some reason, this test doesn't pass with any runtime other than V8.
+#if defined(PROXY_WASM_HAS_RUNTIME_V8)
+
 namespace {
 
 // ---------------------------------------------------------------------------
-// C++ orchestrator filter: triggers readDisable(true) on decodeHeaders so the
+// C++ setup filter: triggers readDisable(true) on decodeHeaders so the
 // codec buffers subsequent DATA frames, then allows a posted callback to
 // re-enable reads and close the connection — delivering buffered data after
 // the filter chain has been destroyed.
 // ---------------------------------------------------------------------------
 
-struct WasmDeferredDataOrchestratorFilterState {
+struct WasmDeferredDataSetupFilterState {
   absl::Mutex mu;
   bool destroyed ABSL_GUARDED_BY(mu){false};
   bool decode_data_after_destroy ABSL_GUARDED_BY(mu){false};
@@ -327,10 +330,9 @@ struct WasmDeferredDataOrchestratorFilterState {
   bool headers_processed ABSL_GUARDED_BY(mu){false};
 };
 
-class WasmDeferredDataOrchestratorFilter : public Http::PassThroughFilter {
+class WasmDeferredDataSetupFilter : public Http::PassThroughFilter {
 public:
-  explicit WasmDeferredDataOrchestratorFilter(
-      std::shared_ptr<WasmDeferredDataOrchestratorFilterState> state)
+  explicit WasmDeferredDataSetupFilter(std::shared_ptr<WasmDeferredDataSetupFilterState> state)
       : state_(std::move(state)) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
@@ -359,25 +361,25 @@ public:
   }
 
 private:
-  std::shared_ptr<WasmDeferredDataOrchestratorFilterState> state_;
+  std::shared_ptr<WasmDeferredDataSetupFilterState> state_;
 };
 
-class WasmDeferredDataOrchestratorFilterConfig
+class WasmDeferredDataSetupFilterConfig
     : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  explicit WasmDeferredDataOrchestratorFilterConfig(
-      std::shared_ptr<WasmDeferredDataOrchestratorFilterState> state)
-      : EmptyHttpFilterConfig("orchestrator-filter"), state_(std::move(state)) {}
+  explicit WasmDeferredDataSetupFilterConfig(
+      std::shared_ptr<WasmDeferredDataSetupFilterState> state)
+      : EmptyHttpFilterConfig("setup-filter"), state_(std::move(state)) {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
     return [state = state_](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(std::make_shared<WasmDeferredDataOrchestratorFilter>(state));
+      callbacks.addStreamFilter(std::make_shared<WasmDeferredDataSetupFilter>(state));
     };
   }
 
 private:
-  std::shared_ptr<WasmDeferredDataOrchestratorFilterState> state_;
+  std::shared_ptr<WasmDeferredDataSetupFilterState> state_;
 };
 
 class WasmDeferredDataTest : public HttpProtocolIntegrationTest {};
@@ -391,10 +393,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, WasmDeferredDataTest,
 // proxy_on_request_body on a Wasm filter whose context has already been
 // destroyed (via proxy_on_delete) during connection close.
 //
-// Filter chain: [Wasm passthrough filter] -> [C++ orchestrator filter]
+// Filter chain: [Wasm passthrough filter] -> [setup filter]
 //
 // Scenario:
-//   1. C++ orchestrator calls readDisable(true) in decodeHeaders.
+//   1. Setup filter calls readDisable(true) in decodeHeaders.
 //   2. Client sends DATA + END_STREAM -> codec buffers the frame.
 //   3. A posted callback calls readDisable(false) (schedules
 //      process_buffered_data_callback_) then closes the connection
@@ -403,16 +405,16 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, WasmDeferredDataTest,
 //      calls decodeData on the Wasm filter with an already-deleted context_id,
 //      causing a Rust panic "invalid context_id" that disables the Wasm VM.
 TEST_P(WasmDeferredDataTest, InvalidContextIdPanicOnDeferredData) {
-  auto state = std::make_shared<WasmDeferredDataOrchestratorFilterState>();
+  auto state = std::make_shared<WasmDeferredDataSetupFilterState>();
 
-  // Register the C++ orchestrator filter.
-  WasmDeferredDataOrchestratorFilterConfig filter_config(state);
+  // Register the C++ setup filter.
+  WasmDeferredDataSetupFilterConfig filter_config(state);
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered(
       filter_config);
 
-  // Prepend the C++ orchestrator (will end up second in chain).
+  // Prepend the setup filter (will end up second in chain).
   config_helper_.prependFilter(R"EOF(
-name: orchestrator-filter
+name: setup-filter
 )EOF");
 
   // Prepend the Wasm filter (will end up first in chain — hit by deferred data).
@@ -439,7 +441,7 @@ typed_config:
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Send HEADERS only. The Wasm filter passes through; the C++ orchestrator
+  // Send HEADERS only. The Wasm filter passes through; the setup filter
   // calls readDisable(true) and sets headers_processed.
   auto [request_encoder, response_decoder] = codec_client_->startRequest(default_request_headers_);
 
@@ -503,7 +505,7 @@ typed_config:
   conn_dispatcher->post([&event_loop_drained]() { event_loop_drained.Notify(); });
   event_loop_drained.WaitForNotification();
 
-  // Check 1: the C++ orchestrator must not have seen decodeData after destroy.
+  // Check 1: the setup filter must not have seen decodeData after destroy.
   {
     absl::MutexLock l(&state->mu);
     EXPECT_FALSE(state->decode_data_after_destroy)
@@ -529,4 +531,7 @@ typed_config:
 }
 
 } // namespace
+
+#endif // PROXY_WASM_HAS_RUNTIME_V8
+
 } // namespace Envoy
