@@ -641,7 +641,7 @@ TEST_F(StatsAccessLoggerTest, GaugeSubtractBeforeAdd) {
   // Subtract without add -> logs instead of crashing
   EXPECT_LOG_CONTAINS("error",
                       "Stats access logger gauge paired subtract was skipped due to no "
-                      "corresponding add, possibly due to misconfigured events",
+                      "corresponding add, possibly due to misconfigured events: gauge",
                       {
                         formatter_context_.setAccessLogType(
                             envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
