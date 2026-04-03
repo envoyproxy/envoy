@@ -43,7 +43,7 @@ message BandwidthShare {
   message Limit {
     // The unique id of the limiter. Should be set if you want to apply distinct
     // limits on different listeners, or distinct limits for requests and responses.
-    // With matching ``bucket_id``s, multiple listeners can share a single limit
+    // With matching ``bucket_id`` values, multiple listeners can share a single limit
     // (e.g. for https and http listener that share a network bandwidth constraint).
     //
     // Also used for the ``bucket_id`` stats tag.
