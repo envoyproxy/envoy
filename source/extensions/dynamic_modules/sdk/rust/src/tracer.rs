@@ -1,8 +1,5 @@
 use crate::{
-  abi,
-  bytes_to_module_buffer,
-  str_to_module_buffer,
-  wrap_into_c_void_ptr,
+  abi, bytes_to_module_buffer, str_to_module_buffer, wrap_into_c_void_ptr,
   NEW_TRACER_CONFIG_FUNCTION,
 };
 use std::ffi::c_void;
