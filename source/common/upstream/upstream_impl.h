@@ -67,6 +67,7 @@
 #include "source/extensions/upstreams/tcp/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
 
@@ -297,7 +298,8 @@ private:
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   absl::optional<MonotonicTime> last_hc_pass_time_;
-  std::vector<HostLbPolicyDataPtr> lb_policy_datas_;
+  // Inline capacity of 2 covers the typical case of 1-2 LB policies per host.
+  absl::InlinedVector<HostLbPolicyDataPtr, 2> lb_policy_datas_;
 };
 
 /**

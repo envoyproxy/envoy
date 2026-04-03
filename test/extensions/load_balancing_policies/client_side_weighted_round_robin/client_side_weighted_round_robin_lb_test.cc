@@ -294,7 +294,8 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
     xds::data::orca::v3::OrcaLoadReport orca_load_report;
     orca_load_report.set_rps_fractional(1000);
     orca_load_report.set_application_utilization(0.5);
-    EXPECT_EQ(host->lbPolicyDataAt(0)->onOrcaLoadReport(orca_load_report, mock_stream_info),
+    EXPECT_EQ(host->typedLbPolicyData<OrcaHostLbPolicyData>()->onOrcaLoadReport(orca_load_report,
+                                                                                mock_stream_info),
               absl::OkStatus());
     EXPECT_EQ(host->weight(), 1);
   }

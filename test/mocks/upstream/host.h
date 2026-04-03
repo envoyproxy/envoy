@@ -15,6 +15,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"
 
+#include "absl/container/inlined_vector.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -133,7 +134,7 @@ public:
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 
 private:
-  std::vector<HostLbPolicyDataPtr> lb_policy_datas_;
+  absl::InlinedVector<HostLbPolicyDataPtr, 2> lb_policy_datas_;
 };
 
 class MockHostLight : public Host {
@@ -252,7 +253,7 @@ public:
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 
 private:
-  std::vector<HostLbPolicyDataPtr> lb_policy_datas_;
+  absl::InlinedVector<HostLbPolicyDataPtr, 2> lb_policy_datas_;
 };
 
 } // namespace Upstream
