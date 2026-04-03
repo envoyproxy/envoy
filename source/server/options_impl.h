@@ -54,6 +54,7 @@ public:
 
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
+  void parseFineGrainLogLevels(const std::string& fine_grain_log_levels);
   static void logError(const std::string& error);
   static std::string allowedLogLevels();
 };

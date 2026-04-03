@@ -301,6 +301,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:tag_utility_lib",
         "//source/common/version:version_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@tclap",

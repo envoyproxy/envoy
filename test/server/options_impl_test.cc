@@ -347,6 +347,37 @@ TEST_F(OptionsImplTest, SetEnableFineGrainLogging) {
   EXPECT_TRUE(options->enableFineGrainLogging());
 }
 
+TEST_F(OptionsImplTest, FineGrainLogLevelsCLI) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl(
+      "envoy --enable-fine-grain-logging --fine-grain-log-levels *filter*:debug,*common*:trace");
+  EXPECT_TRUE(options->enableFineGrainLogging());
+  const auto& levels = options->fineGrainLogLevels();
+  ASSERT_EQ(2, levels.size());
+  EXPECT_EQ("*filter*", levels[0].first);
+  EXPECT_EQ(spdlog::level::debug, levels[0].second);
+  EXPECT_EQ("*common*", levels[1].first);
+  EXPECT_EQ(spdlog::level::trace, levels[1].second);
+}
+
+TEST_F(OptionsImplTest, FineGrainLogLevelsRequiresFineGrainLogging) {
+  EXPECT_THROW_WITH_REGEX(
+      createOptionsImpl("envoy --fine-grain-log-levels *filter*:debug"), MalformedArgvException,
+      "error: --fine-grain-log-levels requires --enable-fine-grain-logging");
+}
+
+TEST_F(OptionsImplTest, InvalidFineGrainLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(options->parseFineGrainLogLevels("*filter*:blah"),
+                          MalformedArgvException, "error: invalid log level specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, InvalidFineGrainLogLevelStructure) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(options->parseFineGrainLogLevels("*filter*"),
+                          MalformedArgvException,
+                          "error: fine-grain log level not correctly specified '\\*filter\\*'");
+}
+
 // Validates that the server_info proto is in sync with the options.
 TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");

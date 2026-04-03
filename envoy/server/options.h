@@ -202,6 +202,13 @@ public:
   virtual bool enableFineGrainLogging() const PURE;
 
   /**
+   * @return const std::vector<std::pair<std::string, spdlog::level::level_enum>>& pair of
+   * glob-pattern,log-level for all configured fine-grain log overrides.
+   */
+  virtual const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
+  fineGrainLogLevels() const PURE;
+
+  /**
    * @return const std::string& the log file path.
    */
   virtual const std::string& logPath() const PURE;

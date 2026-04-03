@@ -196,6 +196,24 @@ following are the command line options that Envoy supports.
   more. The administration interface usage is similar. Please see :ref:`Administration interface
   <operations_admin_interface>` for more detail. This option is incompatible with :option:`--component-log-level`.
 
+.. option:: --fine-grain-log-levels <string>
+
+  *(optional)* Sets per-file log verbosity when
+  :option:`--enable-fine-grain-logging` is active. Accepts a comma-separated
+  list of ``glob-pattern:log-level`` pairs (e.g.,
+  ``source/common/*.cc:debug,source/server/*.cc:warn``). Log levels are the
+  same as those accepted by :option:`--log-level`. Requires
+  :option:`--enable-fine-grain-logging`.
+
+.. option:: --fine-grain-log-levels <string>
+
+  *(optional)* Sets per-file log verbosity when
+  :option:`--enable-fine-grain-logging` is active. Accepts a comma-separated
+  list of ``glob-pattern:log-level`` pairs (e.g.,
+  ``source/common/*.cc:debug,source/server/*.cc:warn``). Log levels are the
+  same as those accepted by :option:`--log-level`. Requires
+  :option:`--enable-fine-grain-logging`.
+
 .. option:: --socket-path <path string>
 
   *(optional)* The output file path to the socket address for :ref:`hot restart <arch_overview_hot_restart>`.

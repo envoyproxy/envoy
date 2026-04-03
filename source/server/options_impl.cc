@@ -16,6 +16,7 @@
 #include "source/server/options_impl_platform.h"
 
 #include "absl/strings/str_replace.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "spdlog/spdlog.h"
@@ -49,6 +50,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   const std::string component_log_level_string =
       "Comma-separated list of component log levels. For example upstream:debug,config:trace";
+  const std::string fine_grain_log_levels_string =
+      "Comma-separated list of file-level log overrides for fine-grain logging. "
+      "Glob patterns are matched against source file names. For example "
+      "\"*filter*:debug,source/common/common/*:trace\". "
+      "Requires --enable-fine-grain-logging.";
   const std::string log_format_string =
       fmt::format("Log message format in spdlog syntax "
                   "(see https://github.com/gabime/spdlog/wiki/3.-Custom-formatting)"
@@ -123,6 +129,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg enable_fine_grain_logging(
       "", "enable-fine-grain-logging",
       "Logger mode: enable file level log control (Fine-Grain Logger) or not", cmd, false);
+  TCLAP::ValueArg<std::string> fine_grain_log_levels(
+      "", "fine-grain-log-levels", fine_grain_log_levels_string, false, "", "string", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "Hot restart epoch #", false, 0,
@@ -228,7 +236,13 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
         "error: --component-log-level will not work with --enable-fine-grain-logging");
   }
 
+  if (!fine_grain_log_levels.getValue().empty() && !enable_fine_grain_logging_) {
+    throw MalformedArgvException(
+        "error: --fine-grain-log-levels requires --enable-fine-grain-logging");
+  }
+
   parseComponentLogLevels(component_log_level.getValue());
+  parseFineGrainLogLevels(fine_grain_log_levels.getValue());
 
   if (mode.getValue() == "serve") {
     mode_ = Server::Mode::Serve;
@@ -397,6 +411,26 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
 
 void OptionsImpl::logError(const std::string& error) { throw MalformedArgvException(error); }
 
+void OptionsImpl::parseFineGrainLogLevels(const std::string& fine_grain_log_levels) {
+  if (fine_grain_log_levels.empty()) {
+    return;
+  }
+  std::vector<std::string> log_levels = absl::StrSplit(fine_grain_log_levels, ',');
+  for (auto& level : log_levels) {
+    std::vector<std::string> glob_level = absl::StrSplit(level, absl::MaxSplits(':', 1));
+    if (glob_level.size() != 2) {
+      logError(
+          fmt::format("error: fine-grain log level not correctly specified '{}'", level));
+    }
+    const std::string glob = glob_level[0];
+    auto status_or_error = parseAndValidateLogLevel(glob_level[1]);
+    if (!status_or_error.status().ok()) {
+      logError(std::string(status_or_error.status().message()));
+    }
+    fine_grain_log_levels_.emplace_back(glob, status_or_error.value());
+  }
+}
+
 Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =
       std::make_unique<envoy::admin::v3::CommandLineOptions>();
@@ -419,6 +453,14 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_log_format(logFormat());
   command_line_options->set_log_format_escaped(logFormatEscaped());
   command_line_options->set_enable_fine_grain_logging(enableFineGrainLogging());
+  if (!fine_grain_log_levels_.empty()) {
+    std::vector<std::string> parts;
+    parts.reserve(fine_grain_log_levels_.size());
+    for (const auto& [glob, level] : fine_grain_log_levels_) {
+      parts.push_back(fmt::format("{}:{}", glob, spdlog::level::to_string_view(level)));
+    }
+    command_line_options->set_fine_grain_log_levels(absl::StrJoin(parts, ","));
+  }
   command_line_options->set_log_path(logPath());
   command_line_options->set_service_cluster(serviceClusterName());
   command_line_options->set_service_node(serviceNodeName());
