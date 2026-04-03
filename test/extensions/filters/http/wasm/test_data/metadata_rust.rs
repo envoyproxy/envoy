@@ -50,7 +50,7 @@ impl HttpContext for TestStream {
     if let Some(value) = self.get_property(vec!["request", "duration"]) {
       info!(
         "duration is {}",
-        u64::from_le_bytes(<[u8; 8]>::try_from(&value[0 .. 8]).unwrap())
+        u64::from_le_bytes(<[u8; 8]>::try_from(&value[0..8]).unwrap())
       );
     } else {
       error!("failed to get request duration");
