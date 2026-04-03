@@ -4,6 +4,8 @@ package envoy.extensions.clusters.mcp_multicluster.v3;
 
 import "google/protobuf/duration.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -12,18 +14,19 @@ option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/mcp_multicluster/v3;mcp_multiclusterv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: MCP multi cluster configuration]
 
 // Configuration for the MCP multi cluster. See the :ref:`architecture overview
 // <arch_overview_mcp_multicluster>` for more information. This cluster type allows aggregation of
 // multiple clusters into one, providing metadata with the list of aggregated clusters.
-// MCP multicluster picks a subcluster for host selection using the ``attemptCount`` property of the
-// request ``StreamInfo`` object. If the ``attemptCount`` value is greater than the number of aggregated
-// clusters, the host selection will fail.
+// Use the ``attemptCount`` property of the request ``StreamInfo`` object to select host in a specific subcluster.
+// If the ``attemptCount`` value is greater than the number of aggregated clusters, the host selection will fail.
 //
 // The primary purpose of this cluster extension is to provide the list of servers for the MCP router
-// configured for tool and resource aggregation.
+// configured for tool and resource aggregation. For details of how tools and resource are aggregated see
+// :ref:`MCP router documentation<config_http_filters_mcp_router>`.
 //
 // Example configuration:
 //
@@ -77,8 +80,10 @@ message ClusterConfig {
     McpCluster mcp_cluster = 2;
   }
 
-  // A list of remote MCP servers. MCP router aggregates capabilities, tools and resources from remote MCP servers
+  // A list of remote MCP servers.
+  // Based on the MCP multi cluster configuration the MCP router aggregates capabilities, tools and resources from remote MCP servers
   // and presents itself as single MCP server to the client. All remote MCP servers are sent the same capabilities
-  // that the client presented to Envoy.
+  // that the client presented to Envoy. MCP router prefixes tool names and resource path with the server name to resolve
+  // naming collisions.
   repeated McpBackend servers = 1 [(validate.rules).repeated = {min_items: 1}];
 }
