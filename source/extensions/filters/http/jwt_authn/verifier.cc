@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "source/common/jwt/check_audience.h"
+#include "source/common/runtime/runtime_features.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirement;
@@ -368,23 +369,42 @@ JwtProviderList getAllProvidersAsList(const Protobuf::Map<std::string, JwtProvid
   return list;
 }
 
+namespace {
+constexpr absl::string_view kDefaultVerificationStatusHeader = "x-jwt-signature-verified";
+constexpr absl::string_view kVerificationStatusValue = "false";
+} // namespace
+
 class ExtractOnlyWithoutValidationVerifierImpl : public BaseVerifierImpl {
 public:
-  ExtractOnlyWithoutValidationVerifierImpl(const AuthFactory& factory,
-                                           const JwtProviderList& providers,
-                                           const BaseVerifierImpl* parent)
-      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)) {
+  ExtractOnlyWithoutValidationVerifierImpl(
+      const AuthFactory& factory, const JwtProviderList& providers,
+      const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation&
+          extract_config,
+      const BaseVerifierImpl* parent)
+      : BaseVerifierImpl(parent), auth_factory_(factory),
+        extractor_(Extractor::create(providers)) {
+    // Resolve verification status header name from config or use default.
+    const auto& configured = extract_config.verification_status_header();
+    verification_status_header_ = Http::LowerCaseString(
+        configured.empty() ? std::string(kDefaultVerificationStatusHeader) : configured);
     ENVOY_LOG(info,
-              "JWT filter configured for claim extraction only - signature validation is disabled");
+              "JWT filter configured for claim extraction only - signature validation disabled. "
+              "Setting '{}' to 'false' on all extract-only requests.",
+              verification_status_header_.get());
   }
 
   void verify(ContextSharedPtr context) const override {
     ENVOY_LOG(debug, "Extracting JWT claims without signature validation");
 
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    // Set allow_failed=true and allow_missing=true to bypass validation
-    // The key difference is we're telling the authenticator to extract claims
-    // even when signature validation would fail
+
+    // Set verification status header so downstream filters (RBAC, ext_authz)
+    // can distinguish unverified claims from cryptographically validated ones.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.jwt_authn_add_verification_status_header")) {
+      ctximpl.headers().setCopy(verification_status_header_, kVerificationStatusValue);
+    }
+
     auto auth = auth_factory_.create(nullptr, absl::nullopt,
                                      /*=allow failed*/ true,
                                      /*=allow missing*/ true);
@@ -396,8 +416,6 @@ public:
           ctximpl.addExtractedData(name, extracted_data);
         },
         [this, &ctximpl](const Status& status) {
-          // Always treat as success for extract-only mode
-          // This ensures claims are forwarded even if signature validation failed
           ENVOY_LOG(debug, "JWT extraction completed with status: {}, treating as success",
                     static_cast<int>(status));
           onComplete(Status::Ok, ctximpl);
@@ -414,6 +432,7 @@ public:
 private:
   const AuthFactory& auth_factory_;
   const ExtractorConstPtr extractor_;
+  Http::LowerCaseString verification_status_header_;
 };
 
 VerifierConstPtr innerCreate(const JwtRequirement& requirement,
@@ -445,7 +464,8 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
                                                       parent);
   case JwtRequirement::RequiresTypeCase::kExtractOnlyWithoutValidation:
     return std::make_unique<ExtractOnlyWithoutValidationVerifierImpl>(
-        factory, getAllProvidersAsList(providers), parent);
+        factory, getAllProvidersAsList(providers),
+        requirement.extract_only_without_validation(), parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);
   }
