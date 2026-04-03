@@ -314,13 +314,6 @@ TEST_P(WasmFilterIntegrationTest, LargeRequestHitBufferLimit) {
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// C++ setup filter: triggers readDisable(true) on decodeHeaders so the
-// codec buffers subsequent DATA frames, then allows a posted callback to
-// re-enable reads and close the connection — delivering buffered data after
-// the filter chain has been destroyed.
-// ---------------------------------------------------------------------------
-
 struct WasmDeferredDataSetupFilterState {
   absl::Mutex mu;
   bool destroyed ABSL_GUARDED_BY(mu){false};
