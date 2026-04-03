@@ -149,6 +149,13 @@ The following overload actions are supported:
     - Envoy will reset expensive streams to terminate them. See
       :ref:`below <config_overload_manager_reset_streams>` for details on configuration.
 
+  * - envoy.overload_actions.close_idle_http_connections
+    - Envoy will close ilde downstream HTTP/3 QUIC connections
+      when the action is active. When the action is *saturated*, connections
+      will be closed aggressively (ignoring the idle timer threshold). When the
+      action is in a *scaled active* state, the idle timer threshold is still
+      respected.
+
 .. _config_overload_manager_shrink_heap:
 
 Shrink Heap

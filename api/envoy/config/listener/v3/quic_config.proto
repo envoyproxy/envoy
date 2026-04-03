@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -105,4 +105,10 @@ message QuicProtocolOptions {
   // This is an equivalent of the TCP listener option
   // max_connections_to_accept_per_socket_event.
   google.protobuf.UInt32Value max_sessions_per_event_loop = 14 [(validate.rules).uint32 = {gt: 0}];
+
+  // Enables the QUIC listener to opt-in to the ``close_idle_http_connections``
+  // overload action. When true, the listener will proactively trim idle
+  // connections whenever the overload action is active due to resource
+  // pressure.
+  bool close_idle_connections_when_overloaded = 15;
 }

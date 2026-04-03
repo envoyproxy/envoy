@@ -883,6 +883,13 @@ new_features:
     Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
     ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
     This is necessary if the route configuration may depend on the filter state values set.
+- area: http
+  change: |
+    Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
+    which will close idle downstream HTTP connections when the overload action is active.
+    This is an opt-in feature; once the global overload action is configured, it must also be enabled per-listener via the new
+    :ref:`close_idle_connections_when_overloaded
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.close_idle_connections_when_overloaded>` field in the QUIC protocol options.
 
 - area: contrib
   change: |

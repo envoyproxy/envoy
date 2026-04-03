@@ -174,6 +174,7 @@ envoy_cc_library(
         "//source/common/event:deferred_task",
         "//source/common/network:address_lib",
         "//source/common/network:connection_lib",
+        "//source/common/quic:active_quic_listener_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:active_udp_listener",
         "//source/server:listener_manager_factory_lib",

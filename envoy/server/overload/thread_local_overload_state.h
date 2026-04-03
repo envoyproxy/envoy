@@ -49,17 +49,33 @@ using OverloadProactiveResources = ConstSingleton<OverloadProactiveResourceNameV
  */
 class OverloadActionState {
 public:
+  enum class Phase {
+    Inactive,
+    Scaling,
+    Saturated,
+  };
+
   static constexpr OverloadActionState inactive() { return OverloadActionState(UnitFloat::min()); }
 
   static constexpr OverloadActionState saturated() { return OverloadActionState(UnitFloat::max()); }
 
-  explicit constexpr OverloadActionState(UnitFloat value) : action_value_(value) {}
+  explicit constexpr OverloadActionState(UnitFloat value) : action_value_(value) {
+    if (value == UnitFloat::min()) {
+      phase_ = Phase::Inactive;
+    } else if (value == UnitFloat::max()) {
+      phase_ = Phase::Saturated;
+    } else {
+      phase_ = Phase::Scaling;
+    }
+  }
 
   UnitFloat value() const { return action_value_; }
   bool isSaturated() const { return action_value_.value() == UnitFloat::max().value(); }
+  Phase phase() const { return phase_; }
 
 private:
   UnitFloat action_value_;
+  Phase phase_ = Phase::Inactive;
 };
 
 /**
