@@ -454,7 +454,7 @@ nghttp2:
   project_name: "Nghttp2"
   project_desc: "Implementation of HTTP/2 and its header compression algorithm HPACK in C"
   project_url: "https://nghttp2.org"
-  release_date: "2025-06-17"
+  release_date: "2026-03-18"
   use_category:
   - controlplane
   - dataplane_core

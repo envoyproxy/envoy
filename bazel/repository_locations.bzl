@@ -249,8 +249,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/{version}.tar.gz"],
     ),
     nghttp2 = dict(
-        version = "1.66.0",
-        sha256 = "e178687730c207f3a659730096df192b52d3752786c068b8e5ee7aeb8edae05a",
+        version = "1.68.1",
+        sha256 = "ceb434c1f9dfe2a9d305b6b797786fb9227484dfa88508d14ca1c50263db55d3",
         strip_prefix = "nghttp2-{version}",
         urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
     ),
