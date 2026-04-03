@@ -37,6 +37,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: load_balancing
+  change: |
+    Changed the default behavior of ``OrcaWeightManager`` to prefer named metrics over application
+    utilization when computing utilization. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.orca_weight_manager_use_named_metrics_first`` to ``false``.
 - area: compressor
   change: |
     Strong ``ETag`` removal when compressing now uses the same weak ``W/`` check as
