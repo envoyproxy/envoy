@@ -128,10 +128,12 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
-  std::vector<HostLbPolicyDataPtr> lb_policy_datas_;
   envoy::config::core::v3::Locality locality_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
+
+private:
+  std::vector<HostLbPolicyDataPtr> lb_policy_datas_;
 };
 
 class MockHostLight : public Host {
@@ -246,9 +248,11 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
-  std::vector<HostLbPolicyDataPtr> lb_policy_datas_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
+
+private:
+  std::vector<HostLbPolicyDataPtr> lb_policy_datas_;
 };
 
 } // namespace Upstream

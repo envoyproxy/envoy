@@ -7939,9 +7939,7 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   // Configure the HostLbData to receive the report.
   auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.clear();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.push_back(
-      std::move(host_lb_policy_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
@@ -7995,9 +7993,7 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   // Configure the HostLbData to receive the report.
   auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.clear();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.push_back(
-      std::move(host_lb_policy_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
@@ -8038,9 +8034,7 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
   // called for invalid orca header.
   auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.clear();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.push_back(
-      std::move(host_lb_policy_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _)).Times(0);
 
   // Send report with invalid ORCA proto.
@@ -8069,11 +8063,8 @@ TEST_F(RouterTest, OrcaLoadReportCallbacksFanOutToMultipleHostDataEntries) {
   auto* first_lb_policy_data_raw_ptr = first_lb_policy_data.get();
   auto second_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
   auto* second_lb_policy_data_raw_ptr = second_lb_policy_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.clear();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.push_back(
-      std::move(first_lb_policy_data));
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.push_back(
-      std::move(second_lb_policy_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(first_lb_policy_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(second_lb_policy_data));
 
   EXPECT_CALL(*first_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
       .WillOnce(Return(absl::OkStatus()));
@@ -8116,9 +8107,8 @@ TEST_F(RouterTest, OrcaLoadReportSkipsEntriesNotInterestedInOrca) {
   auto* non_orca_data_raw_ptr = non_orca_data.get();
   auto orca_data = std::make_unique<TestOrcaLoadReportLbData>();
   auto* orca_data_raw_ptr = orca_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.clear();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.push_back(std::move(non_orca_data));
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_datas_.push_back(std::move(orca_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(non_orca_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(orca_data));
 
   // Non-ORCA entry should never be called, ORCA entry should be called.
   EXPECT_CALL(*non_orca_data_raw_ptr, onOrcaLoadReport(_, _)).Times(0);
