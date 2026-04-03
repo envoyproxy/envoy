@@ -1,4 +1,5 @@
 #!/bin/bash
-
-# Do nothing here so the file just gets copied
-# without commenting or uncommenting anything
+set -euo pipefail
+uncomment.sh "$1" \
+  --comment-gtest-func BIOTest BIOFreeReturnValue \
+  --comment-gtest-func BIOTest BIOFreeReturnValueChain

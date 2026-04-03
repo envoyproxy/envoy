@@ -20,7 +20,8 @@ uncomment.sh "$1" --comment -h \
   --uncomment-regex-range 'inline std::enable_if_t.*' '}' \
   --uncomment-regex-range 'inline .*StackIterator.*begin' '}' \
   --uncomment-regex-range 'inline .*StackIterator.*end' '}' \
-  --uncomment-regex '}$' \
+  --uncomment-regex-range 'inline .*StackIterator.*begin' '}' \
+  --uncomment-regex-range 'inline .*StackIterator.*end' '}' \
   --uncomment-regex 'namespace internal {' \
   --uncomment-regex '}  // namespace internal' \
   --uncomment-typedef OPENSSL_sk_free_func \
@@ -58,3 +59,4 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl sk_free \
   --uncomment-macro OPENSSL_STACK \
   --uncomment-macro _STACK \
+  --sed '/^BSSL_NAMESPACE_END$/{N;s/\n\/\/ }$/\n}/}' \

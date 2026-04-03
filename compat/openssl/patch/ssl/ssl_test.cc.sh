@@ -30,6 +30,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-gtest-func SSLVersionTest WriteAfterShutdown \
   --uncomment-gtest-func SSLVersionTest WriteAfterReadSentFatalAlert \
   --uncomment-gtest-func SSLTest SetBIO \
+  --uncomment-static-func-impl AcceptAnyCertificate \
   --uncomment-static-func-impl VerifySucceed \
   --uncomment-gtest-func SSLVersionTest GetPeerCertificate \
   --uncomment-gtest-func SSLVersionTest NoPeerCertificate \
@@ -42,7 +43,6 @@ uncomment.sh "$1" --comment -h \
   --uncomment-gtest-func SSLTest GetCertificate \
   --uncomment-gtest-func SSLTest NoCiphersAvailable \
   --uncomment-gtest-func SSLTest GetCertificateThreads \
-  --uncomment-regex 'int BORINGSSL_enum_c_type_test' '}' \
   --uncomment-gtest-func SSLTest EnumTypes \
   --uncomment-gtest-func-skip SSLVersionTest SameKeyResume \
   --uncomment-regex '}\s*//\s*namespace\s*$'

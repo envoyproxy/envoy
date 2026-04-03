@@ -1,5 +1,5 @@
---- a/source/crypto/digest_extra/digest_test.cc
-+++ b/source/crypto/digest_extra/digest_test.cc
+--- a/crypto/digest/digest_test.cc
++++ b/crypto/digest/digest_test.cc
 @@ -71,14 +71,15 @@
  static const DigestTestVector kTestVectors[] = {
      // MD4 tests, from RFC 1320. (crypto/md4 does not provide a

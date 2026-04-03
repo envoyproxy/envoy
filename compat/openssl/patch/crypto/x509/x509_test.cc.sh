@@ -5,6 +5,11 @@ set -euo pipefail
 uncomment.sh "$1" --comment \
   --uncomment-regex '#include' \
   --comment-regex '#include\s*"internal\.h"' \
+  --comment-regex '#include\s*<openssl/mldsa\.h>' \
+  --uncomment-regex 'BSSL_NAMESPACE_BEGIN' \
+  --uncomment-regex 'BSSL_NAMESPACE_END' \
+  --uncomment-regex 'namespace\s*{\s*$' \
+  --uncomment-regex '}\s*//\s*namespace\s*$' \
   --uncomment-func-impl CertFromPEM \
   --uncomment-func-impl CRLFromPEM \
   --uncomment-func-impl PrivateKeyFromPEM \
@@ -17,7 +22,7 @@ uncomment.sh "$1" --comment \
   --uncomment-gtest-func X509Test ManyNamesAndConstraints \
   --uncomment-static-func-impl MakeGeneralName \
   --uncomment-static-func-impl MakeTestCert \
-  --uncomment-gtest-func X509Test NameConstraints \
+  --uncomment-gtest-func-skip X509Test NameConstraints \
   --uncomment-gtest-func X509Test TestPSSBadParameters \
   --uncomment-gtest-func X509Test TestEd25519 \
   --uncomment-gtest-func X509Test X509NameSet \

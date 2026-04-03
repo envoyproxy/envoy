@@ -65,8 +65,8 @@ uncomment_line_range() {
 
 uncomment_regex_range() {
   [[ $# == 2 ]] || error "uncomment_regex_range(): Two regexes required"
-  L1=$(grep -n "^// $1" "$HDR_FILE" | sed -n 1p | cut -d: -f1)
-  L2=$(grep -n "^// $2" "$HDR_FILE" | awk -F: '$1 > '"$L1"' {print $1; exit}')
+  L1=$(grep -n "^// $1" "$HDR_FILE" | sed -n 1p | cut -d: -f1 || true)
+  L2=$(grep -n "^// $2" "$HDR_FILE" | awk -F: '$1 > '"$L1"' {print $1; exit}' || true)
   [ -z "$L1" ] && error "Failed to locate first pattern '$1'"
   [ -z "$L2" ] && error "Failed to locate second pattern '$2'"
   uncomment_line_range "$L1" "$L2"
