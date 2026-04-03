@@ -32,10 +32,15 @@ private:
 
 class CELFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
-  CELFormatterCommandParser() = default;
+  explicit CELFormatterCommandParser(
+      Server::Configuration::ServerFactoryContext& server_factory_context)
+      : server_factory_context_(server_factory_context) {}
   ::Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
                                                  absl::string_view subcommand,
                                                  absl::optional<size_t> max_length) const override;
+
+private:
+  Server::Configuration::ServerFactoryContext& server_factory_context_;
 };
 
 } // namespace Formatter

@@ -85,10 +85,9 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
     if (!parse_status.ok()) {
       throw EnvoyException("Not able to parse expression: " + parse_status.status().ToString());
     }
-    Server::Configuration::ServerFactoryContext& context =
-        Server::Configuration::ServerFactoryContextInstance::get();
     return std::make_unique<CELFormatter>(
-        context.localInfo(), Extensions::Filters::Common::Expr::getBuilder(context),
+        server_factory_context_.localInfo(),
+        Extensions::Filters::Common::Expr::getBuilder(server_factory_context_),
         parse_status.value().expr(), max_length, command == "TYPED_CEL");
   }
 

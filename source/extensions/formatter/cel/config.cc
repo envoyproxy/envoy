@@ -8,14 +8,13 @@ namespace Envoy {
 namespace Extensions {
 namespace Formatter {
 
-::Envoy::Formatter::CommandParserPtr
-CELFormatterFactory::createCommandParserFromProto(const Protobuf::Message&,
-                                                  Server::Configuration::GenericFactoryContext&) {
+::Envoy::Formatter::CommandParserPtr CELFormatterFactory::createCommandParserFromProto(
+    const Protobuf::Message&, Server::Configuration::GenericFactoryContext& context) {
 #if defined(USE_CEL_PARSER)
   ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), warn,
                       "'CEL' formatter is treated as a built-in formatter and does not "
                       "require configuration.");
-  return std::make_unique<CELFormatterCommandParser>();
+  return std::make_unique<CELFormatterCommandParser>(context.serverFactoryContext());
 #else
   UNREFERENCED_PARAMETER(context);
   throw EnvoyException("CEL is not available for use in this environment.");
@@ -35,7 +34,9 @@ public:
   std::string name() const override { return "envoy.built_in_formatters.cel"; }
 
   ::Envoy::Formatter::CommandParserPtr createCommandParser() const override {
-    return std::make_unique<CELFormatterCommandParser>();
+    Server::Configuration::ServerFactoryContext& context =
+        Server::Configuration::ServerFactoryContextInstance::get();
+    return std::make_unique<CELFormatterCommandParser>(context);
   }
 };
 

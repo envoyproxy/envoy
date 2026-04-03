@@ -87,7 +87,7 @@ public:
 
 #ifdef USE_CEL_PARSER
 TEST_F(CELFormatterTest, TestNodeId) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "xds.node.id", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -99,7 +99,7 @@ TEST_F(CELFormatterTest, TestNodeId) {
 }
 
 TEST_F(CELFormatterTest, Testformat) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "xds.node.id", max_length);
   EXPECT_THAT(formatter->format(formatter_context_, stream_info_), "node_name");
@@ -109,7 +109,7 @@ TEST_F(CELFormatterTest, Testformat) {
 }
 
 TEST_F(CELFormatterTest, TestFormatStringValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "request.headers[':method']", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -121,7 +121,7 @@ TEST_F(CELFormatterTest, TestFormatStringValue) {
 }
 
 TEST_F(CELFormatterTest, TestFormatNumberValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "request.headers[':method'].size()", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -134,7 +134,7 @@ TEST_F(CELFormatterTest, TestFormatNumberValue) {
 }
 
 TEST_F(CELFormatterTest, TestFormatNullValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "request.headers.nope", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -148,7 +148,7 @@ TEST_F(CELFormatterTest, TestFormatNullValue) {
 TEST_F(CELFormatterTest, TestFormatNoHeaders) {
   Envoy::Formatter::Context formatter_context;
 
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
 
   {
@@ -183,7 +183,7 @@ TEST_F(CELFormatterTest, TestFormatNoHeaders) {
 }
 
 TEST_F(CELFormatterTest, TestFormatBoolValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "request.headers[':method'] == 'GET'", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -196,7 +196,7 @@ TEST_F(CELFormatterTest, TestFormatBoolValue) {
 }
 
 TEST_F(CELFormatterTest, TestFormatDurationValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "duration(\"1h30m\")", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -208,7 +208,7 @@ TEST_F(CELFormatterTest, TestFormatDurationValue) {
 }
 
 TEST_F(CELFormatterTest, TestFormatTimestampValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "timestamp(\"2023-08-26T12:39:00-07:00\")", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -221,7 +221,7 @@ TEST_F(CELFormatterTest, TestFormatTimestampValue) {
 }
 
 TEST_F(CELFormatterTest, TestFormatBytesValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "bytes(\"hello\")", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -233,7 +233,7 @@ TEST_F(CELFormatterTest, TestFormatBytesValue) {
 }
 
 TEST_F(CELFormatterTest, TestFormatListValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "[\"foo\", 42, true]", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -247,7 +247,7 @@ TEST_F(CELFormatterTest, TestFormatListValue) {
 }
 
 TEST_F(CELFormatterTest, TestFormatMapValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "{\"foo\": \"42\"}", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -265,7 +265,7 @@ TEST_F(CELFormatterTest, TestFormatMapValue) {
 }
 
 TEST_F(CELFormatterTest, TestTruncation) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = 2;
   auto formatter = cel_parser->parse("CEL", "request.headers[':method']", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -277,14 +277,14 @@ TEST_F(CELFormatterTest, TestTruncation) {
 }
 
 TEST_F(CELFormatterTest, TestParseFail) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   EXPECT_EQ(nullptr,
             cel_parser->parse("INVALID_CMD", "requests.headers['missing_headers']", max_length));
 }
 
 TEST_F(CELFormatterTest, TestNullFormatValue) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "requests.headers['missing_headers']", max_length);
   EXPECT_THAT(formatter->formatValue(formatter_context_, stream_info_),
@@ -292,7 +292,7 @@ TEST_F(CELFormatterTest, TestNullFormatValue) {
 }
 
 TEST_F(CELFormatterTest, TestFormatConversionV1AlphaToDevCel) {
-  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>(context_.server_factory_context_);
   absl::optional<size_t> max_length = absl::nullopt;
 
   // Test with a basic path expression
