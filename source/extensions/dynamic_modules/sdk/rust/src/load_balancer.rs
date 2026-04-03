@@ -1,16 +1,7 @@
 use crate::{
-  abi,
-  drop_wrapped_c_void_ptr,
-  str_to_module_buffer,
-  strs_to_module_buffers,
-  wrap_into_c_void_ptr,
-  EnvoyCounterId,
-  EnvoyCounterVecId,
-  EnvoyGaugeId,
-  EnvoyGaugeVecId,
-  EnvoyHistogramId,
-  EnvoyHistogramVecId,
-  NEW_LOAD_BALANCER_CONFIG_FUNCTION,
+  abi, drop_wrapped_c_void_ptr, str_to_module_buffer, strs_to_module_buffers, wrap_into_c_void_ptr,
+  EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId,
+  EnvoyHistogramVecId, NEW_LOAD_BALANCER_CONFIG_FUNCTION,
 };
 use mockall::*;
 use std::sync::Arc;
