@@ -20,7 +20,7 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:token_bucket_impl_lib",
-        "//source/common/config:subscription_base_interface",
+        "//source/common/config:resource_type_helper_lib",
         "//source/common/grpc:common_lib",
         "//source/common/init:target_lib",
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",

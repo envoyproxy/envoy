@@ -21,7 +21,7 @@
 
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/cleanup.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/watched_directory.h"
 #include "source/common/init/target_impl.h"
@@ -46,8 +46,7 @@ struct SdsApiStats {
 /**
  * SDS API implementation that fetches secrets from SDS server via Subscription.
  */
-class SdsApi : public Envoy::Config::SubscriptionBase<
-                   envoy::extensions::transport_sockets::tls::v3::Secret> {
+class SdsApi : public Config::SubscriptionCallbacks {
 public:
   struct SecretData {
     const std::string resource_name_;
@@ -108,6 +107,8 @@ private:
 
   Stats::ScopeSharedPtr scope_;
   SdsApiStats sds_api_stats_;
+  const Config::ResourceTypeHelper<envoy::extensions::transport_sockets::tls::v3::Secret>
+      resource_type_helper_;
 
   const envoy::config::core::v3::ConfigSource sds_config_;
   Config::SubscriptionPtr subscription_;

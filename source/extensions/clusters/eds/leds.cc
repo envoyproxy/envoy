@@ -15,22 +15,23 @@ LedsSubscription::LedsSubscription(
     const std::string& cluster_name,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::Scope& cluster_stats_scope, const UpdateCb& callback)
-    : Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::LbEndpoint>(
-          factory_context.messageValidationVisitor(), leds_config.leds_collection_name()),
-      local_info_(factory_context.serverFactoryContext().localInfo()), cluster_name_(cluster_name),
+    : local_info_(factory_context.serverFactoryContext().localInfo()), cluster_name_(cluster_name),
       stats_scope_(cluster_stats_scope.createScope("leds.")),
-      stats_({ALL_LEDS_STATS(POOL_COUNTER(*stats_scope_))}), callback_(callback) {
+      stats_({ALL_LEDS_STATS(POOL_COUNTER(*stats_scope_))}), callback_(callback),
+      resource_type_helper_(factory_context.messageValidationVisitor(),
+                            leds_config.leds_collection_name()) {
   const xds::core::v3::ResourceLocator leds_resource_locator = THROW_OR_RETURN_VALUE(
       Config::XdsResourceIdentifier::decodeUrl(leds_config.leds_collection_name()),
       xds::core::v3::ResourceLocator);
-  const auto resource_name = getResourceName();
-  subscription_ = THROW_OR_RETURN_VALUE(
-      factory_context.serverFactoryContext()
-          .clusterManager()
-          .subscriptionFactory()
-          .collectionSubscriptionFromUrl(leds_resource_locator, leds_config.leds_config(),
-                                         resource_name, *stats_scope_, *this, resource_decoder_),
-      Config::SubscriptionPtr);
+  const auto resource_name = resource_type_helper_.getResourceName();
+  subscription_ =
+      THROW_OR_RETURN_VALUE(factory_context.serverFactoryContext()
+                                .clusterManager()
+                                .subscriptionFactory()
+                                .collectionSubscriptionFromUrl(
+                                    leds_resource_locator, leds_config.leds_config(), resource_name,
+                                    *stats_scope_, *this, resource_type_helper_.resourceDecoder()),
+                            Config::SubscriptionPtr);
   subscription_->start({});
 }
 
