@@ -53,9 +53,9 @@ std::shared_ptr<FairTokenBucket::Bucket>
 TokenBucketSingleton::getBucket(absl::string_view bucket_id) {
   Thread::LockGuard lock(mu_);
   auto it = buckets_.find(bucket_id);
-  // There is a code error if the entry is not found, since getFactory should
+  // There is a code error if the entry is not found, since getBucket should
   // only ever be called with an id that has already been configured and therefore
-  // passed to setFactory successfully.
+  // passed to setBucket successfully.
   ASSERT(it != buckets_.end());
   auto& entry = it->second;
   uint32_t max_tokens_value = entry.max_tokens_runtime_config_.value();

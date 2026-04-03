@@ -189,6 +189,15 @@ TEST_F(ConfigTest, StatsGetTenantTagOnlyIfExplicitlyConfiguredTo) {
       foo_stats.bytes_limited_.name(),
       "bandwidth_share.bytes.bucket_id.bucket1.tenant.foo.direction.request.handling.limited");
   EXPECT_THAT(
+      foo_stats.bytes_not_limited_.name(),
+      "bandwidth_share.bytes.bucket_id.bucket1.tenant.foo.direction.request.handling.not_limited");
+  EXPECT_THAT(
+      foo_stats.streams_currently_limited_.name(),
+      "bandwidth_share.streams_currently_limited.bucket_id.bucket1.tenant.foo.direction.request");
+  EXPECT_THAT(foo_stats.bytes_pending_.name(),
+              "bandwidth_share.bytes_pending.bucket_id.bucket1.tenant.foo.direction.request");
+  // bar_stats should have omitted tenant, and response stats should have direction=response.
+  EXPECT_THAT(
       bar_stats.bytes_limited_.name(),
       "bandwidth_share.bytes.bucket_id.bucket2.tenant..direction.response.handling.limited");
 }
