@@ -106,7 +106,8 @@ TEST_F(StatefulSessionTest, NormalSessionStateTest) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
+        EXPECT_EQ("1.2.3.4", host.host);
+        EXPECT_FALSE(host.strict);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -146,7 +147,8 @@ TEST_F(StatefulSessionTest, SessionStateOverrideByRoute) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
+        EXPECT_EQ("1.2.3.4", host.host);
+        EXPECT_FALSE(host.strict);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -190,7 +192,8 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
+        EXPECT_EQ("1.2.3.4", host.host);
+        EXPECT_FALSE(host.strict);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));

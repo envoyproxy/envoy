@@ -30,7 +30,7 @@ TEST(LoadBalancerContextBaseTest, LoadBalancerContextBaseTest) {
     EXPECT_EQ(1, context.hostSelectionRetryCount());
     EXPECT_EQ(nullptr, context.upstreamSocketOptions());
     EXPECT_EQ(nullptr, context.upstreamTransportSocketOptions());
-    EXPECT_EQ(absl::nullopt, context.overrideHostToSelect());
+    EXPECT_FALSE(context.overrideHostToSelect().has_value());
     context.setHeadersModifier(nullptr);
   }
 }

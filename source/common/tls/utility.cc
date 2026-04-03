@@ -8,6 +8,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -218,6 +219,22 @@ std::string Utility::getSerialNumberFromCertificate(X509& cert) {
     return serial_number;
   }
   return "";
+}
+
+std::string Utility::getSha256DigestFromCertificate(X509& cert) {
+  std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
+  unsigned int n;
+  X509_digest(&cert, EVP_sha256(), computed_hash.data(), &n);
+  RELEASE_ASSERT(n == computed_hash.size(), "");
+  return Hex::encode(computed_hash);
+}
+
+std::string Utility::getSha1DigestFromCertificate(X509& cert) {
+  std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
+  unsigned int n;
+  X509_digest(&cert, EVP_sha1(), computed_hash.data(), &n);
+  RELEASE_ASSERT(n == computed_hash.size(), "");
+  return Hex::encode(computed_hash);
 }
 
 std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type) {

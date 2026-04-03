@@ -33,7 +33,7 @@ bazel_features:
   project_name: "Bazel features"
   project_desc: "Support Bazel feature detection from starlark"
   project_url: "https://github.com/bazel-contrib/bazel_features"
-  release_date: "2026-03-09"
+  release_date: "2026-03-23"
   use_category:
   - build
   license: "Apache-2.0"
@@ -53,7 +53,7 @@ boringssl:
   project_name: "BoringSSL"
   project_desc: "Minimal OpenSSL fork"
   project_url: "https://github.com/google/boringssl"
-  release_date: "2025-11-25"
+  release_date: "2026-03-30"
   use_category:
   - controlplane
   - dataplane_core
@@ -99,7 +99,7 @@ aws_c_auth_testdata:
   project_name: "aws-c-auth"
   project_desc: "C99 library implementation of AWS client-side authentication: standard credentials providers and signing"
   project_url: "https://github.com/awslabs/aws-c-auth"
-  release_date: "2026-01-05"
+  release_date: "2026-03-05"
   use_category:
   - test_only
   extensions:
@@ -111,7 +111,7 @@ liburing:
   project_name: "liburing"
   project_desc: "C helpers to set up and tear down io_uring instances"
   project_url: "https://github.com/axboe/liburing"
-  release_date: "2025-12-16"
+  release_date: "2026-02-07"
   use_category:
   - dataplane_core
   - controlplane
@@ -120,7 +120,7 @@ buildtools:
   project_name: "Bazel build tools"
   project_desc: "Developer tools for working with Google's bazel buildtool."
   project_url: "https://github.com/bazelbuild/buildtools"
-  release_date: "2025-06-10"
+  release_date: "2026-01-30"
   use_category:
   - test_only
 
@@ -211,7 +211,7 @@ benchmark:
   project_name: "Benchmark"
   project_desc: "Library to benchmark code snippets"
   project_url: "https://github.com/google/benchmark"
-  release_date: "2025-05-19"
+  release_date: "2026-01-21"
   use_category:
   - test_only
   license: "Apache-2.0"
@@ -284,7 +284,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-03-13"
+  release_date: "2026-03-23"
   use_category:
   - controlplane
   - dataplane_core
@@ -331,7 +331,7 @@ qatlib:
   project_name: "qatlib"
   project_desc: "Intel QuickAssist Technology Library"
   project_url: "https://github.com/intel/qatlib"
-  release_date: "2025-07-17"
+  release_date: "2026-02-06"
   use_category:
   - dataplane_ext
   extensions:
@@ -345,7 +345,7 @@ qatzip:
   project_name: "qatzip"
   project_desc: "Intel QuickAssist Technology QATzip Library"
   project_url: "https://github.com/intel/qatzip"
-  release_date: "2025-04-25"
+  release_date: "2026-02-18"
   use_category:
   - dataplane_ext
   extensions:
@@ -406,7 +406,7 @@ libmaxminddb:
   project_name: "maxmind_libmaxminddb"
   project_desc: "C library for reading MaxMind DB files"
   project_url: "https://github.com/maxmind/libmaxminddb"
-  release_date: "2025-01-10"
+  release_date: "2026-03-05"
   use_category:
   - dataplane_ext
   extensions:
@@ -549,7 +549,7 @@ abseil_cpp:
   project_name: "Abseil"
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
   project_url: "https://abseil.io/"
-  release_date: "2026-01-07"
+  release_date: "2026-02-11"
   use_category:
   - dataplane_core
   - controlplane
@@ -816,7 +816,7 @@ fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-01-27"
+  release_date: "2026-03-27"
   use_category:
   - build
   - dataplane_core
@@ -829,7 +829,7 @@ fips_cmake_linux_x86_64:
   project_name: "CMake (Linux x86_64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-01-27"
+  release_date: "2026-03-27"
   use_category:
   - build
   - dataplane_core
@@ -902,13 +902,25 @@ gperftools:
   project_name: "gperftools"
   project_desc: "tcmalloc and profiling libraries"
   project_url: "https://github.com/gperftools/gperftools"
-  release_date: "2025-08-15"
+  release_date: "2026-03-06"
   use_category:
   - dataplane_core
   - controlplane
   cpe: "cpe:2.3:a:gperftools_project:gperftools:*"
   license: "BSD-3-Clause"
   license_url: "https://github.com/gperftools/gperftools/blob/gperftools-{version}/COPYING"
+
+jemalloc:
+  project_name: "jemalloc"
+  project_desc: "General-purpose scalable concurrent memory allocator"
+  project_url: "https://github.com/jemalloc/jemalloc"
+  release_date: "2022-05-06"
+  use_category:
+  - dataplane_core
+  - controlplane
+  cpe: "N/A"
+  license: "BSD-2-Clause"
+  license_url: "https://github.com/jemalloc/jemalloc/blob/{version}/COPYING"
 
 grpc_httpjson_transcoding:
   project_name: "grpc-httpjson-transcoding"
@@ -986,7 +998,7 @@ opentelemetry_cpp:
   project_name: "OpenTelemetry"
   project_desc: "Observability framework and toolkit designed to create and manage telemetry data such as traces, metrics, and logs."
   project_url: "https://opentelemetry.io"
-  release_date: "2025-11-21"
+  release_date: "2026-03-20"
   use_category:
   - observability_ext
   extensions:
@@ -1262,7 +1274,7 @@ rules_python:
   project_name: "Python rules for Bazel"
   project_desc: "Bazel rules for the Python language"
   project_url: "https://github.com/bazelbuild/rules_python"
-  release_date: "2025-11-14"
+  release_date: "2026-03-04"
   use_category:
   - build
   - controlplane
@@ -1290,6 +1302,7 @@ rules_rust:
   - dataplane_core
   - dataplane_ext
   extensions:
+  - envoy.network.dns_resolver.hickory
   - envoy.wasm.runtime.wasmtime
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt"
@@ -1298,7 +1311,7 @@ rules_shell:
   project_name: "Shell script rules for Bazel"
   project_desc: "Bazel rules for shell scripts"
   project_url: "https://github.com/bazelbuild/rules_shell"
-  release_date: "2026-03-13"
+  release_date: "2026-03-23"
   use_category:
   - build
   license: "Apache-2.0"
@@ -1344,10 +1357,11 @@ toolchains_llvm:
   project_name: "LLVM toolchain for Bazel"
   project_desc: "LLVM toolchain for Bazel"
   project_url: "https://github.com/bazel-contrib/toolchains_llvm"
-  release_date: "2025-12-09"
+  release_date: "2026-03-13"
   use_category:
   - build
   - dataplane_core
+  - dataplane_ext
   - controlplane
   implied_untracked_deps:
   - llvm_toolchain_llvm

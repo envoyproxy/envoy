@@ -182,6 +182,7 @@ def envoy_dependencies(skip_targets = []):
     _libsxg()
     _tcmalloc()
     _gperftools()
+    _jemalloc()
     _com_github_grpc_grpc()
     _rules_proto_grpc()
     _icu()
@@ -902,6 +903,12 @@ def _tcmalloc():
 def _gperftools():
     external_http_archive(
         name = "gperftools",
+    )
+
+def _jemalloc():
+    external_http_archive(
+        name = "jemalloc",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _wamr():
