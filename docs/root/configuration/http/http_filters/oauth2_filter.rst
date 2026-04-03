@@ -242,37 +242,6 @@ can be defined in one shared file.
       generic_secret:
         secret: <Your hmac secret here>
 
-The following example shows how the route-level config message is attached:
-
-.. code-block:: yaml
-
-  typed_per_filter_config:
-    envoy.filters.http.oauth2:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2PerRoute
-      config:
-        token_endpoint:
-          cluster: oauth
-          uri: oauth.com/token
-          timeout: 3s
-        authorization_endpoint: https://oauth.com/oauth/authorize/
-        redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
-        redirect_path_matcher:
-          path:
-            exact: /callback
-        signout_path:
-          path:
-            exact: /signout
-        credentials:
-          client_id: foo
-          token_secret:
-            name: token
-            sds_config:
-              path: "/etc/envoy/token-secret.yaml"
-          hmac_secret:
-            name: hmac
-            sds_config:
-              path: "/etc/envoy/hmac.yaml"
-
 The following example shows two independent route prefixes, ``/foo`` and ``/bar``, each with its
 own OAuth2 client settings. The callback path, signout path, and cookie paths are all scoped under
 the same prefix as the protected route:
