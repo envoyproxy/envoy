@@ -17,8 +17,11 @@ and is intended to replace, not merge with, the filter-level config.
 When using per-route configuration, keep the
 :ref:`redirect_path_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.redirect_path_matcher>`
 and :ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`
-within the same route prefix as the protected resources. Cookie paths should cover that same prefix
-so that the callback and signout requests receive the OAuth cookies needed to complete the flow.
+within the same route prefix as the protected resources. If cookie paths are customized, they
+should cover that same prefix so that the callback and signout requests receive the OAuth cookies
+needed to complete the flow. When multiple per-route OAuth2 configurations share the same host,
+customizing :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>`
+is recommended to avoid overlap between routes.
 
 The OAuth filter's flow involves:
 
@@ -243,8 +246,9 @@ can be defined in one shared file.
         secret: <Your hmac secret here>
 
 The following example shows two independent route prefixes, ``/foo`` and ``/bar``, each with its
-own OAuth2 client settings. The callback path, signout path, and cookie paths are all scoped under
-the same prefix as the protected route:
+own OAuth2 client settings. The callback path and signout path stay under the same prefix as the
+protected route, the cookie paths are scoped to that prefix, and the cookie names are customized so
+that the two configurations remain independent on the same host:
 
 .. code-block:: yaml
 
@@ -297,6 +301,14 @@ the same prefix as the protected route:
                   path: "/foo"
               credentials:
                 client_id: foo
+                cookie_names:
+                  bearer_token: FooBearerToken
+                  oauth_hmac: FooOauthHMAC
+                  oauth_expires: FooOauthExpires
+                  id_token: FooIdToken
+                  refresh_token: FooRefreshToken
+                  oauth_nonce: FooOauthNonce
+                  code_verifier: FooCodeVerifier
                 token_secret:
                   name: foo_client_secret
                   sds_config:
@@ -345,6 +357,14 @@ the same prefix as the protected route:
                   path: "/bar"
               credentials:
                 client_id: bar
+                cookie_names:
+                  bearer_token: BarBearerToken
+                  oauth_hmac: BarOauthHMAC
+                  oauth_expires: BarOauthExpires
+                  id_token: BarIdToken
+                  refresh_token: BarRefreshToken
+                  oauth_nonce: BarOauthNonce
+                  code_verifier: BarCodeVerifier
                 token_secret:
                   name: bar_client_secret
                   sds_config:
