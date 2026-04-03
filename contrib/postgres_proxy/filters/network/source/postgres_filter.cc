@@ -4,6 +4,8 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/stream_info/uint64_accessor_impl.h"
+#include "source/common/tls/tls_filter_state_keys.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
@@ -17,8 +19,9 @@ PostgresFilterConfig::PostgresFilterConfig(const PostgresFilterConfigOptions& co
                                            Stats::Scope& scope)
     : enable_sql_parsing_(config_options.enable_sql_parsing_),
       terminate_ssl_(config_options.terminate_ssl_), upstream_ssl_(config_options.upstream_ssl_),
-      downstream_ssl_(config_options.downstream_ssl_), scope_{scope},
-      stats_{generateStats(config_options.stats_prefix_, scope)} {}
+      downstream_ssl_(config_options.downstream_ssl_),
+      max_downstream_tls_record_size_bytes_(config_options.max_downstream_tls_record_size_bytes_),
+      scope_{scope}, stats_{generateStats(config_options.stats_prefix_, scope)} {}
 
 PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
@@ -48,6 +51,18 @@ Network::FilterStatus PostgresFilter::onNewConnection() { return Network::Filter
 
 void PostgresFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
+
+  if (config_->max_downstream_tls_record_size_bytes_.has_value()) {
+    read_callbacks_->connection().streamInfo().filterState()->setData(
+        Extensions::TransportSockets::Tls::TlsRecordSizeLimitKey,
+        std::make_shared<StreamInfo::UInt64AccessorImpl>(
+            config_->max_downstream_tls_record_size_bytes_.value()),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+    ENVOY_CONN_LOG(trace, "postgres_proxy: set TLS record size limit to {} bytes via filter state",
+                   read_callbacks_->connection(),
+                   config_->max_downstream_tls_record_size_bytes_.value());
+  }
 }
 
 void PostgresFilter::initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& callbacks) {

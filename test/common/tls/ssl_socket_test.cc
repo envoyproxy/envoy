@@ -17,12 +17,14 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/private_key/private_key_manager_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
+#include "source/common/tls/tls_filter_state_keys.h"
 
 #include "test/common/tls/cert_validator/timed_cert_validator.h"
 #include "test/common/tls/ssl_certs_test.h"
@@ -8163,6 +8165,205 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
   // Server connection error was not populated in this case.
   test_options.setExpectedServerStats("");
   testUtilV2(test_options);
+}
+
+// Test that TLS record size limit can be set via filter state.
+TEST_P(SslSocketTest, TlsRecordSizeLimitViaFilterState) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  ContextManagerImpl manager(server_factory_context);
+  Stats::TestUtil::TestStore server_stats_store;
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
+
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version_));
+  Network::MockTcpListenerCallbacks listener_callbacks;
+  NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener = createListener(socket, listener_callbacks, runtime_,
+                                                 listener_config, overload_state, *dispatcher_);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+  auto client_cfg = *ClientContextConfigImpl::create(client_tls_context, factory_context_);
+  Stats::TestUtil::TestStore client_stats_store;
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
+                                                                   *client_stats_store.rootScope());
+
+  Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+      socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+      client_ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+  client_connection->connect();
+  Network::MockConnectionCallbacks client_callbacks;
+  client_connection->addConnectionCallbacks(client_callbacks);
+  auto client_read_filter = std::make_shared<Network::MockReadFilter>();
+  client_connection->addReadFilter(client_read_filter);
+
+  // Set filter state on the server connection's stream info to limit TLS record size.
+  stream_info_.filterState()->setData(
+      TlsRecordSizeLimitKey, std::make_shared<StreamInfo::UInt64AccessorImpl>(4096),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+
+  Network::ConnectionPtr server_connection;
+  NiceMock<Network::MockConnectionCallbacks> server_callbacks;
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+        server_connection = dispatcher_->createServerConnection(
+            std::move(accepted_socket),
+            server_ssl_socket_factory->createDownstreamTransportSocket(), stream_info_);
+        server_connection->addConnectionCallbacks(server_callbacks);
+      }));
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  const uint32_t write_size = 32 * 1024;
+  uint32_t bytes_received = 0;
+
+  EXPECT_CALL(*client_read_filter, onNewConnection());
+  EXPECT_CALL(*client_read_filter, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        bytes_received += data.length();
+        data.drain(data.length());
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+  Buffer::OwnedImpl data(std::string(write_size, 'a'));
+  server_connection->write(data, false);
+  server_connection->close(Network::ConnectionCloseType::FlushWrite);
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(write_size, bytes_received);
+  EXPECT_EQ(0UL, server_stats_store.counter("ssl.connection_error").value());
+  EXPECT_EQ(0UL, client_stats_store.counter("ssl.connection_error").value());
+}
+
+// Test that without filter state, the default TLS record size limit is used.
+TEST_P(SslSocketTest, TlsRecordSizeLimitDefault) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  ContextManagerImpl manager(server_factory_context);
+  Stats::TestUtil::TestStore server_stats_store;
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
+
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version_));
+  Network::MockTcpListenerCallbacks listener_callbacks;
+  NiceMock<Network::MockListenerConfig> listener_config;
+  Server::ThreadLocalOverloadStateOptRef overload_state;
+  Network::ListenerPtr listener = createListener(socket, listener_callbacks, runtime_,
+                                                 listener_config, overload_state, *dispatcher_);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
+  auto client_cfg = *ClientContextConfigImpl::create(client_tls_context, factory_context_);
+  Stats::TestUtil::TestStore client_stats_store;
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
+                                                                   *client_stats_store.rootScope());
+
+  Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+      socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+      client_ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+  client_connection->connect();
+  Network::MockConnectionCallbacks client_callbacks;
+  client_connection->addConnectionCallbacks(client_callbacks);
+  auto client_read_filter = std::make_shared<Network::MockReadFilter>();
+  client_connection->addReadFilter(client_read_filter);
+
+  Network::ConnectionPtr server_connection;
+  NiceMock<Network::MockConnectionCallbacks> server_callbacks;
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+        server_connection = dispatcher_->createServerConnection(
+            std::move(accepted_socket),
+            server_ssl_socket_factory->createDownstreamTransportSocket(), stream_info_);
+        server_connection->addConnectionCallbacks(server_callbacks);
+      }));
+  EXPECT_CALL(listener_callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  const uint32_t write_size = 32 * 1024;
+  uint32_t bytes_received = 0;
+
+  EXPECT_CALL(*client_read_filter, onNewConnection());
+  EXPECT_CALL(*client_read_filter, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        bytes_received += data.length();
+        data.drain(data.length());
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+  Buffer::OwnedImpl data(std::string(write_size, 'b'));
+  server_connection->write(data, false);
+  server_connection->close(Network::ConnectionCloseType::FlushWrite);
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(write_size, bytes_received);
+  EXPECT_EQ(0UL, server_stats_store.counter("ssl.connection_error").value());
+  EXPECT_EQ(0UL, client_stats_store.counter("ssl.connection_error").value());
 }
 
 // Test that TLS handshakes succeed when certificate compression is enabled via runtime flag.

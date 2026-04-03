@@ -1,6 +1,7 @@
 #include "source/common/tls/ssl_socket.h"
 
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/uint64_accessor.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
@@ -8,6 +9,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/tls/io_handle_bio.h"
 #include "source/common/tls/ssl_handshaker.h"
+#include "source/common/tls/tls_filter_state_keys.h"
 #include "source/common/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -191,6 +193,7 @@ Network::Connection& SslSocket::connection() const { return callbacks_->connecti
 
 void SslSocket::onSuccess(SSL* ssl) {
   ctx_->logHandshake(ssl);
+  maybeInitMaxWriteChunkSize();
   if (callbacks_->connection().streamInfo().upstreamInfo()) {
     callbacks_->connection()
         .streamInfo()
@@ -274,6 +277,18 @@ void SslSocket::drainErrorQueue() {
   }
 }
 
+void SslSocket::maybeInitMaxWriteChunkSize() {
+  const auto* accessor = callbacks_->connection()
+                             .streamInfo()
+                             .filterState()
+                             ->getDataReadOnly<StreamInfo::UInt64Accessor>(TlsRecordSizeLimitKey);
+  if (accessor != nullptr && accessor->value() > 0) {
+    max_write_chunk_size_ = static_cast<uint16_t>(accessor->value());
+    ENVOY_CONN_LOG(trace, "ssl: TLS record size limit set to {} bytes via filter state",
+                   callbacks_->connection(), max_write_chunk_size_);
+  }
+}
+
 Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_stream) {
   ASSERT(info_->state() != Ssl::SocketState::ShutdownSent || write_buffer.length() == 0);
   if (info_->state() != Ssl::SocketState::HandshakeComplete &&
@@ -289,7 +304,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
     bytes_to_write = bytes_to_retry_;
     bytes_to_retry_ = 0;
   } else {
-    bytes_to_write = std::min(write_buffer.length(), static_cast<uint64_t>(16384));
+    bytes_to_write = std::min<uint64_t>(write_buffer.length(), max_write_chunk_size_);
   }
 
   uint64_t total_bytes_written = 0;
@@ -307,7 +322,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       ASSERT(rc == static_cast<int>(bytes_to_write));
       total_bytes_written += rc;
       write_buffer.drain(rc);
-      bytes_to_write = std::min(write_buffer.length(), static_cast<uint64_t>(16384));
+      bytes_to_write = std::min<uint64_t>(write_buffer.length(), max_write_chunk_size_);
     } else {
       int err = SSL_get_error(rawSsl(), rc);
       ENVOY_CONN_LOG(trace, "ssl error occurred while write: {}", callbacks_->connection(),

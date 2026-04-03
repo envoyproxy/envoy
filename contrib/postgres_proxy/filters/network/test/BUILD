@@ -62,6 +62,8 @@ envoy_cc_test(
     deps = [
         ":postgres_test_utils_lib",
         "//contrib/postgres_proxy/filters/network/source:filter",
+        "//envoy/stream_info:uint64_accessor_interface",
+        "//source/common/tls:tls_filter_state_keys_lib",
         "//test/mocks/network:network_mocks",
     ],
 )

@@ -25,6 +25,8 @@ NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromPro
   }
   config_options.upstream_ssl_ = proto_config.upstream_ssl();
   config_options.downstream_ssl_ = proto_config.downstream_ssl();
+  config_options.max_downstream_tls_record_size_bytes_ =
+      PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config, max_downstream_tls_record_size_bytes);
 
   PostgresFilterConfigSharedPtr filter_config(
       std::make_shared<PostgresFilterConfig>(config_options, context.scope()));
