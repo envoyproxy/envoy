@@ -1,18 +1,17 @@
 //! Test module for Bootstrap extension file watcher functionality.
 //!
 //! This module tests the file watcher API including:
-//! - Single watcher monitoring multiple files via add_watch.
+//! - Watching multiple files via separate add_file_watch calls.
 //! - Repeated changes to the same file triggering multiple callbacks.
-//! - Watcher identity (id()) consistency across callbacks.
 //!
 //! Config format: two file paths separated by `|`.
 //!
 //! During config_new it:
 //! 1. Parses two file paths from config.
-//! 2. Creates one file watcher and adds watches for both paths.
+//! 2. Calls add_file_watch for each path.
 //! 3. Creates three timers:
 //!    - Timer A (10ms): writes to file_a  → first change
-//!    - Timer B (100ms): writes to file_b → verifies second file on same watcher
+//!    - Timer B (100ms): writes to file_b → verifies second file
 //!    - Timer C (200ms): writes to file_a again → verifies repeated changes
 //!
 //! on_file_changed tracks which paths fired and how many times. Init completes after
@@ -42,24 +41,19 @@ fn my_new_bootstrap_extension_config_fn(
   let path_b = paths[1].to_string();
   envoy_log_info!("Watching file_a={} and file_b={}", path_a, path_b);
 
-  // Create one watcher with watches on both files.
-  let watcher = envoy_extension_config.new_file_watcher();
-  let added_a = watcher.add_watch(
+  // Add file watches for both paths.
+  let added_a = envoy_extension_config.add_file_watch(
     &path_a,
     FILE_WATCHER_EVENT_MOVED_TO | FILE_WATCHER_EVENT_MODIFIED,
   );
-  assert!(added_a, "add_watch for file_a must succeed");
-  let added_b = watcher.add_watch(
+  assert!(added_a, "add_file_watch for file_a must succeed");
+  let added_b = envoy_extension_config.add_file_watch(
     &path_b,
     FILE_WATCHER_EVENT_MOVED_TO | FILE_WATCHER_EVENT_MODIFIED,
   );
-  assert!(added_b, "add_watch for file_b must succeed");
+  assert!(added_b, "add_file_watch for file_b must succeed");
 
-  let watcher_id = watcher.id();
-  envoy_log_info!(
-    "Single watcher created with id={}, watching 2 files",
-    watcher_id
-  );
+  envoy_log_info!("File watches added for 2 files");
 
   // Timer A (10ms): write to file_a.
   let timer_a = envoy_extension_config.new_timer();
@@ -75,13 +69,11 @@ fn my_new_bootstrap_extension_config_fn(
 
   // Do NOT call signal_init_complete here. Defer until all expected file changes are received.
   Some(Box::new(FileWatcherTestConfig {
-    watcher: Mutex::new(Some(watcher)),
     timer_a: Mutex::new(Some(timer_a)),
     timer_b: Mutex::new(Some(timer_b)),
     timer_c: Mutex::new(Some(timer_c)),
     path_a,
     path_b,
-    watcher_id,
     file_a_count: AtomicU32::new(0),
     file_b_count: AtomicU32::new(0),
     init_signaled: AtomicBool::new(false),
@@ -89,15 +81,11 @@ fn my_new_bootstrap_extension_config_fn(
 }
 
 struct FileWatcherTestConfig {
-  // Held to keep the OS-level inotify watches alive; dropped when this struct is dropped.
-  #[allow(dead_code)]
-  watcher: Mutex<Option<Box<dyn EnvoyBootstrapExtensionFileWatcher>>>,
   timer_a: Mutex<Option<Box<dyn EnvoyBootstrapExtensionTimer>>>,
   timer_b: Mutex<Option<Box<dyn EnvoyBootstrapExtensionTimer>>>,
   timer_c: Mutex<Option<Box<dyn EnvoyBootstrapExtensionTimer>>>,
   path_a: String,
   path_b: String,
-  watcher_id: usize,
   file_a_count: AtomicU32,
   file_b_count: AtomicU32,
   init_signaled: AtomicBool,
@@ -139,16 +127,9 @@ impl BootstrapExtensionConfig for FileWatcherTestConfig {
   fn on_file_changed(
     &self,
     envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
-    watcher: &dyn EnvoyBootstrapExtensionFileWatcher,
     path: &str,
     events: u32,
   ) {
-    assert_eq!(
-      watcher.id(),
-      self.watcher_id,
-      "Watcher id must match the single watcher we created"
-    );
-
     if path == self.path_a {
       let count = self.file_a_count.fetch_add(1, Ordering::SeqCst) + 1;
       envoy_log_info!(

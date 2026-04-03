@@ -1331,8 +1331,8 @@ TEST_F(BootstrapAbiImplTest, TimerFiredAfterConfigDestroyed) {
 // File Watcher Tests
 // -----------------------------------------------------------------------------
 
-// Test that a file watcher can be created, a watch added, and then deleted.
-TEST_F(BootstrapAbiImplTest, FileWatcherLifecycle) {
+// Test that add_watch creates a watcher and succeeds.
+TEST_F(BootstrapAbiImplTest, FileWatcherAddWatch) {
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
@@ -1347,19 +1347,11 @@ TEST_F(BootstrapAbiImplTest, FileWatcherLifecycle) {
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
-  // Create a file watcher via the ABI callback (no path/events at creation time).
-  auto* watcher_ptr = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new(
-      config.value()->thisAsVoidPtr());
-  EXPECT_NE(watcher_ptr, nullptr);
-
   // Add a watch for a specific path and events.
   envoy_dynamic_module_type_module_buffer path_buf = {"/tmp/test_file", 14};
   bool added = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
-      config.value()->thisAsVoidPtr(), watcher_ptr, path_buf, 0x3);
+      config.value()->thisAsVoidPtr(), path_buf, 0x3);
   EXPECT_TRUE(added);
-
-  // Delete the file watcher via the ABI callback.
-  envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete(watcher_ptr);
 }
 
 // Test that the watcher callback invokes the on_file_changed event hook.
@@ -1384,31 +1376,20 @@ TEST_F(BootstrapAbiImplTest, FileWatcherFired) {
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
-  // Create a file watcher via the ABI callback.
-  auto* watcher_ptr = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new(
-      config.value()->thisAsVoidPtr());
-  EXPECT_NE(watcher_ptr, nullptr);
-
   // Add a watch to capture the callback.
   envoy_dynamic_module_type_module_buffer path_buf = {"/tmp/test_file", 14};
   bool added = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
-      config.value()->thisAsVoidPtr(), watcher_ptr, path_buf, 0x3);
+      config.value()->thisAsVoidPtr(), path_buf, 0x3);
   EXPECT_TRUE(added);
 
   // Invoke the captured callback (simulating file change with Modified event).
   ASSERT_NE(captured_cb, nullptr);
   EXPECT_TRUE(captured_cb(0x2).ok());
-
-  // Clean up.
-  envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete(watcher_ptr);
 }
 
 // Test that the watcher callback safely handles a destroyed config via weak_ptr.
 TEST_F(BootstrapAbiImplTest, FileWatcherFiredAfterConfigDestroyed) {
   Filesystem::Watcher::OnChangedCb captured_cb;
-
-  // Use a raw pointer so we can control when the config is destroyed.
-  void* watcher_ptr = nullptr;
 
   {
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
@@ -1433,15 +1414,10 @@ TEST_F(BootstrapAbiImplTest, FileWatcherFiredAfterConfigDestroyed) {
         context_, context_.store_);
     ASSERT_TRUE(config.ok()) << config.status();
 
-    // Create a file watcher via the ABI callback.
-    watcher_ptr = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new(
-        config.value()->thisAsVoidPtr());
-    EXPECT_NE(watcher_ptr, nullptr);
-
     // Add a watch to capture the callback.
     envoy_dynamic_module_type_module_buffer path_buf = {"/tmp/test_file", 14};
     bool added = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
-        config.value()->thisAsVoidPtr(), watcher_ptr, path_buf, 0x3);
+        config.value()->thisAsVoidPtr(), path_buf, 0x3);
     EXPECT_TRUE(added);
 
     // Config goes out of scope here and is destroyed.
@@ -1451,9 +1427,6 @@ TEST_F(BootstrapAbiImplTest, FileWatcherFiredAfterConfigDestroyed) {
   // This should not crash - the weak_ptr should be expired.
   ASSERT_NE(captured_cb, nullptr);
   EXPECT_TRUE(captured_cb(0x2).ok());
-
-  // Clean up the watcher.
-  envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete(watcher_ptr);
 }
 
 // Test that file_watcher_add_watch returns false when addWatch fails.
@@ -1473,19 +1446,11 @@ TEST_F(BootstrapAbiImplTest, FileWatcherAddWatchFails) {
                                                          dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
-  // Create a file watcher via the ABI callback - should succeed.
-  auto* watcher_ptr = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new(
-      config.value()->thisAsVoidPtr());
-  EXPECT_NE(watcher_ptr, nullptr);
-
   // Add a watch - should fail and return false.
   envoy_dynamic_module_type_module_buffer path_buf = {"/tmp/test_file", 14};
   bool added = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
-      config.value()->thisAsVoidPtr(), watcher_ptr, path_buf, 0x3);
+      config.value()->thisAsVoidPtr(), path_buf, 0x3);
   EXPECT_FALSE(added);
-
-  // Clean up.
-  envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete(watcher_ptr);
 }
 
 // -----------------------------------------------------------------------------

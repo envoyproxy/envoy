@@ -119,9 +119,9 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, TimerRust) {
 }
 
 // This test verifies that the Rust bootstrap extension file watcher API works correctly.
-// A single watcher monitors two files. Three timed writes occur: file_a twice and file_b once.
-// on_file_changed verifies watcher identity, tracks per-path counts, and signals init complete
-// only after file_a has been seen at least 2 times and file_b at least 1 time.
+// Two files are watched via separate add_file_watch calls. Three timed writes occur: file_a twice
+// and file_b once. on_file_changed tracks per-path counts, and signals init complete only after
+// file_a has been seen at least 2 times and file_b at least 1 time.
 TEST_P(DynamicModulesBootstrapIntegrationTest, FileWatcherRust) {
   // Create two temporary files for the watcher to monitor.
   const std::string path_a =

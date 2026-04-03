@@ -2430,26 +2430,12 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_delete
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_file_watcher_new(
-  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr {
-  std::ptr::null_mut()
-}
-
-#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  _watcher_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr,
   _path: abi::envoy_dynamic_module_type_module_buffer,
   _events: u32,
 ) -> bool {
   false
-}
-
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_file_watcher_delete(
-  _watcher_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_file_watcher_module_ptr,
-) {
 }
 
 // Thread-local used by the test mock to capture the response body set via the callback.
@@ -2953,9 +2939,9 @@ fn test_bootstrap_extension_timer_fired_identity() {
 }
 
 #[test]
-fn test_bootstrap_extension_file_changed_identity() {
-  // Verify that the file watcher identity passed to on_file_changed matches the raw pointer.
-  static FIRED_WATCHER_ID: AtomicUsize = AtomicUsize::new(0);
+fn test_bootstrap_extension_file_changed() {
+  // Verify that path and events are correctly passed through on_file_changed.
+  static FIRED_PATH: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
   static FIRED_EVENTS: AtomicU32 = AtomicU32::new(0);
 
   struct TestBootstrapExtensionConfig;
@@ -2970,11 +2956,10 @@ fn test_bootstrap_extension_file_changed_identity() {
     fn on_file_changed(
       &self,
       _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
-      watcher: &dyn EnvoyBootstrapExtensionFileWatcher,
-      _path: &str,
+      path: &str,
       events: u32,
     ) {
-      FIRED_WATCHER_ID.store(watcher.id(), std::sync::atomic::Ordering::SeqCst);
+      *FIRED_PATH.lock().unwrap() = path.to_string();
       FIRED_EVENTS.store(events, std::sync::atomic::Ordering::SeqCst);
     }
   }
@@ -2999,61 +2984,45 @@ fn test_bootstrap_extension_file_changed_identity() {
   );
   assert!(!config_ptr.is_null());
 
-  // Use two different fake pointer values as watcher identities.
-  let fake_watcher_a = 0xCCCC_usize as *mut std::os::raw::c_void;
-  let fake_watcher_b = 0xDDDD_usize as *mut std::os::raw::c_void;
-
-  // Create a path buffer for the test.
-  let path = "test/path.txt";
+  // Fire with MovedTo event.
+  let path = "test/path_a.txt";
   let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
     ptr: path.as_ptr() as *mut _,
     length: path.len(),
   };
-
-  // Fire watcher A with MovedTo event and verify the recorded id and events match.
-  FIRED_WATCHER_ID.store(0, std::sync::atomic::Ordering::SeqCst);
-  FIRED_EVENTS.store(0, std::sync::atomic::Ordering::SeqCst);
   unsafe {
     envoy_dynamic_module_on_bootstrap_extension_file_changed(
       std::ptr::null_mut(),
       config_ptr,
-      fake_watcher_a,
       path_buf,
       FILE_WATCHER_EVENT_MOVED_TO,
     );
   }
-  assert_eq!(
-    FIRED_WATCHER_ID.load(std::sync::atomic::Ordering::SeqCst),
-    fake_watcher_a as usize
-  );
+  assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_a.txt");
   assert_eq!(
     FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
     FILE_WATCHER_EVENT_MOVED_TO
   );
 
-  // Fire watcher B with Modified event and verify different id.
-  FIRED_WATCHER_ID.store(0, std::sync::atomic::Ordering::SeqCst);
-  FIRED_EVENTS.store(0, std::sync::atomic::Ordering::SeqCst);
+  // Fire with Modified event on different path.
+  let path2 = "test/path_b.txt";
+  let path_buf2 = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path2.as_ptr() as *mut _,
+    length: path2.len(),
+  };
   unsafe {
     envoy_dynamic_module_on_bootstrap_extension_file_changed(
       std::ptr::null_mut(),
       config_ptr,
-      fake_watcher_b,
-      path_buf,
+      path_buf2,
       FILE_WATCHER_EVENT_MODIFIED,
     );
   }
-  assert_eq!(
-    FIRED_WATCHER_ID.load(std::sync::atomic::Ordering::SeqCst),
-    fake_watcher_b as usize
-  );
+  assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_b.txt");
   assert_eq!(
     FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
     FILE_WATCHER_EVENT_MODIFIED
   );
-
-  // The two watcher ids must be different.
-  assert_ne!(fake_watcher_a as usize, fake_watcher_b as usize);
 
   // Clean up.
   unsafe {
