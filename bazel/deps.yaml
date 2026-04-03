@@ -969,7 +969,7 @@ io_bazel_rules_go:
   project_name: "Go rules for Bazel"
   project_desc: "Bazel rules for the Go language"
   project_url: "https://github.com/bazelbuild/rules_go"
-  release_date: "2025-11-07"
+  release_date: "2026-02-09"
   use_category:
   - build
   - api

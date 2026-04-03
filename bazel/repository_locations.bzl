@@ -445,8 +445,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/opencomputeproject/ocp-diag-core/archive/{version}.zip"],
     ),
     io_bazel_rules_go = dict(
-        version = "0.59.0",
-        sha256 = "68af54cb97fbdee5e5e8fe8d210d15a518f9d62abfd71620c3eaff3b26a5ff86",
+        version = "0.60.0",
+        sha256 = "86d3dc8f59d253524f933aaf2f3c05896cb0b605fc35b460c0b4b039996124c6",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
     ),
     rules_cc = dict(
