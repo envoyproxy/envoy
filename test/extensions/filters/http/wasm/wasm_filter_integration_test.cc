@@ -309,9 +309,6 @@ TEST_P(WasmFilterIntegrationTest, LargeRequestHitBufferLimit) {
 } // namespace Wasm
 } // namespace Extensions
 
-// For some reason, this test doesn't pass with any runtime other than V8.
-#if defined(PROXY_WASM_HAS_RUNTIME_V8)
-
 namespace {
 
 struct WasmDeferredDataSetupFilterState {
@@ -398,6 +395,19 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, WasmDeferredDataTest,
 //      calls decodeData on the Wasm filter with an already-deleted context_id,
 //      causing a Rust panic "invalid context_id" that disables the Wasm VM.
 TEST_P(WasmDeferredDataTest, InvalidContextIdPanicOnDeferredData) {
+  // The bug is runtime-agnostic, but testing with v8 is sufficient.
+  auto runtimes = Extensions::Common::Wasm::wasmTestMatrix(false, false);
+  bool has_v8 = false;
+  for (const auto& [runtime, language] : runtimes) {
+    if (runtime == "v8") {
+      has_v8 = true;
+      break;
+    }
+  }
+  if (!has_v8) {
+    GTEST_SKIP() << "v8 runtime not available";
+  }
+
   auto state = std::make_shared<WasmDeferredDataSetupFilterState>();
 
   // Register the C++ setup filter.
@@ -524,7 +534,4 @@ typed_config:
 }
 
 } // namespace
-
-#endif // PROXY_WASM_HAS_RUNTIME_V8
-
 } // namespace Envoy
