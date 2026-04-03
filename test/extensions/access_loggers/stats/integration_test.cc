@@ -257,8 +257,6 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
-  // In debug mode, this used to assert because the subtraction is attempted for a gauge that wasn't
-  // added and DownstreamEnd evaluates access logs upon stream destruction.
   // We no longer check for the log line here because only 1 test variant will see the log line
   // due to log throttling in periodic logs as IPv4 and IPv6 run in the same process.
   // stats_test.cc has an EXPECT_LOG_CONTAINS for this situation already.
