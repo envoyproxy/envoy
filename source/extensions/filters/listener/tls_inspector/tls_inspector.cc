@@ -1,27 +1,31 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/common/platform.h"
-#include "envoy/event/dispatcher.h"
+#include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/listener_filter_buffer.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tls/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
-#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 #include "openssl/md5.h"
 #include "openssl/ssl.h"
 
@@ -78,6 +82,7 @@ Config::Config(
   SSL_CTX_set_select_certificate_cb(
       ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
         Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
+        filter->setClientTlsVersion(client_hello->version);
         filter->createJA3Hash(client_hello);
         filter->createJA4Hash(client_hello);
 
@@ -212,6 +217,15 @@ ParseState Filter::getParserState(int handshake_status) {
     // In the future it may be possible to add some error checking to make this detection more
     // optimal.
     if (clienthello_success_) {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.tls_inspector_enforce_client_tls_version") &&
+          (client_tls_version_ < Config::TLS_MIN_SUPPORTED_VERSION ||
+           client_tls_version_ > Config::TLS_MAX_SUPPORTED_VERSION)) {
+        config_->stats().tls_not_found_.inc();
+        setDynamicMetadata(failureReasonClientHelloWrongTlsVersion());
+        setDownstreamTransportFailureReason();
+        return ParseState::Error;
+      }
       config_->stats().tls_found_.inc();
       if (alpn_found_) {
         config_->stats().alpn_found_.inc();
@@ -415,6 +429,10 @@ const std::string& Filter::failureReasonClientHelloTooLarge() {
 
 const std::string& Filter::failureReasonClientHelloNotDetected() {
   CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloNotDetected");
+}
+
+const std::string& Filter::failureReasonClientHelloWrongTlsVersion() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloWrongTlsVersion");
 }
 
 } // namespace TlsInspector

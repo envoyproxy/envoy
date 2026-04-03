@@ -1,16 +1,17 @@
 #pragma once
 
-#include "envoy/event/file_event.h"
-#include "envoy/event/timer.h"
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
 #include "envoy/extensions/filters/listener/tls_inspector/v3/tls_inspector.pb.h"
 #include "envoy/network/filter.h"
-#include "envoy/stats/histogram.h"
+#include "envoy/network/listener_filter_buffer.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
+#include "absl/strings/string_view.h"
 #include "openssl/ssl.h"
 #include "openssl/ssl3.h"
 
@@ -96,11 +97,13 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
   size_t maxReadBytes() const override { return requested_read_bytes_; }
+  void setClientTlsVersion(uint16_t version) { client_tls_version_ = version; }
 
   static const std::string& dynamicMetadataKey();
   static const std::string& failureReasonKey();
   static const std::string& failureReasonClientHelloTooLarge();
   static const std::string& failureReasonClientHelloNotDetected();
+  static const std::string& failureReasonClientHelloWrongTlsVersion();
 
 private:
   ParseState parseClientHello(const void* data, size_t len, uint64_t bytes_already_processed);
@@ -124,6 +127,7 @@ private:
   // We dynamically adjust the number of bytes requested by the filter up to the
   // maxConfigReadBytes.
   uint32_t requested_read_bytes_;
+  uint16_t client_tls_version_{0};
 
   // Allows callbacks on the SSL_CTX to set fields in this class.
   friend class Config;

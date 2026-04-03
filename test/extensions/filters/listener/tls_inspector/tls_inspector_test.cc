@@ -1,7 +1,11 @@
+#include <cstdint>
+#include <vector>
+
 #include "source/common/common/hex.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -34,6 +38,115 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 namespace {
+
+void append_u16(std::vector<uint8_t>& vec, uint16_t val) {
+  vec.push_back((val >> 8) & 0xFF);
+  vec.push_back(val & 0xFF);
+}
+
+// Helper to append a 24-bit value in network byte order
+void append_u24(std::vector<uint8_t>& vec, uint32_t val) {
+  vec.push_back((val >> 16) & 0xFF);
+  vec.push_back((val >> 8) & 0xFF);
+  vec.push_back(val & 0xFF);
+}
+
+std::vector<uint8_t> CreateClientHello(std::string host_name = "test.google.com",
+                                       size_t padding_size = 0, bool include_extensions = true,
+                                       uint16_t tls_version = 0x0303) {
+  std::vector<uint8_t> hello;
+
+  const bool has_sni = !host_name.empty();
+  const size_t host_name_len = host_name.length();
+  // SNI Extension Length Calculations
+  uint16_t sni_ext_total_len = 0;
+  uint16_t hnl = 0;
+  uint16_t snll = 0;
+  uint16_t sedl = 0;
+  if (has_sni) {
+    hnl = host_name_len;
+    snll = 1 + 2 + hnl;               // Name Type byte + Host Name Length field + Host Name data
+    sedl = 2 + snll;                  // Server Name List Length field + Server Name List data
+    sni_ext_total_len = 2 + 2 + sedl; // Ext Type field + Ext Length field + Ext Data
+  }
+
+  // Dummy Padding Extension Length Calculations
+  uint16_t dummy_ext_len = 0;
+  if (padding_size > 0) {
+    dummy_ext_len = 2 + 2 + padding_size; // Type + Length + Padding
+  }
+
+  const uint16_t el =
+      include_extensions ? (sni_ext_total_len + dummy_ext_len) : 0; // Total Extensions Length
+
+  // ClientHello Length Calculations
+  const size_t client_hello_core_len = 2    // Client Version
+                                       + 32 // Random
+                                       + 1  // Session ID Length
+                                       + 2  // Cipher Suites Length
+                                       + 2  // Cipher Suites
+                                       + 1  // Compression Methods Length
+                                       + 1; // Compression Methods
+  uint32_t hl = client_hello_core_len;
+  if (include_extensions && el > 0) {
+    hl += 2 + el; // Core + Extensions Length field + Extensions data
+  } else if (!include_extensions) {
+    // No extensions block at all.
+  }
+
+  // Record Length Calculation
+  const uint16_t rl = 4 + hl; // Handshake Header size + Handshake Data
+
+  // Record Header (5 bytes)
+  hello.push_back(0x16); // Content Type: Handshake
+  hello.push_back(0x03); // Version: TLS 1.0 (for the record layer)
+  hello.push_back(0x01);
+  append_u16(hello, rl); // Record Length
+
+  // Handshake Protocol: Client Hello (4 bytes for header)
+  hello.push_back(0x01); // Handshake Type: Client Hello
+  append_u24(hello, hl); // Handshake Length
+
+  // Client Hello Message (hl bytes)
+  // Client Version
+  hello.push_back((tls_version >> 8) & 0xFF);
+  hello.push_back(tls_version & 0xFF);
+  std::vector<uint8_t> random_bytes(32);
+  std::iota(random_bytes.begin(), random_bytes.end(), 1);
+  hello.insert(hello.end(), random_bytes.begin(), random_bytes.end());
+  hello.push_back(0x00); // Session ID Length: 0
+  append_u16(hello, 2);  // Cipher Suites Length: 2
+  hello.push_back(0xc0);
+  hello.push_back(0x2f);
+  hello.push_back(0x01); // Compression Methods Length: 1
+  hello.push_back(0x00); // Compression Method: null
+
+  if (include_extensions && el > 0) {
+    // Extensions (2 + el bytes)
+    append_u16(hello, el); // Extensions Length
+
+    if (has_sni) {
+      // Extension: server_name (sni_ext_total_len bytes)
+      append_u16(hello, 0x0000); // Type: server_name
+      append_u16(hello, sedl);   // Length of Extension Data
+      append_u16(hello, snll);   // Server Name List Length
+      hello.push_back(0x00);     // Name Type: host_name
+      append_u16(hello, hnl);    // Length of Host Name
+      // Host Name data
+      hello.insert(hello.end(), host_name.begin(), host_name.end());
+    }
+
+    // Dummy Padding Extension
+    if (padding_size > 0) {
+      append_u16(hello, 0xFFFF);       // Dummy Extension Type
+      append_u16(hello, padding_size); // Length of Dummy Extension Data
+      std::vector<uint8_t> padding(padding_size, 0xAA);
+      hello.insert(hello.end(), padding.begin(), padding.end());
+    }
+  }
+
+  return hello;
+}
 
 class TlsInspectorTest : public testing::TestWithParam<std::tuple<uint16_t, uint16_t>> {
 public:
@@ -1046,6 +1159,48 @@ TEST_P(TlsInspectorTest, JA4NonAlphanumericALPN) {
   EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
+}
+
+TEST_P(TlsInspectorTest, TlsVersionTooLow) {
+  init();
+  const std::string servername("example.com");
+  // Generate ClientHello with SSLv3 version (0x0300)
+  std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0300);
+  mockSysCallForPeek(client_hello);
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  // trigger the event to copy the client hello message into buffer
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  Protobuf::Struct expected_metadata;
+  auto& fields = *expected_metadata.mutable_fields();
+  fields[Filter::failureReasonKey()].set_string_value(
+      Filter::failureReasonClientHelloWrongTlsVersion());
+  EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
+  EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+}
+
+TEST_P(TlsInspectorTest, TlsVersionTooLowAllowedByRuntime) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.tls_inspector_enforce_client_tls_version", false);
+  init();
+  const std::string servername("example.com");
+  // Generate ClientHello with SSLv3 version (0x0300)
+  std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0300);
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  // With guard false, it proceeds as a normal TLS connection for inspection
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+  EXPECT_EQ(1, cfg_->stats().tls_found_.value());
+  EXPECT_EQ(0, cfg_->stats().tls_not_found_.value());
 }
 
 } // namespace
