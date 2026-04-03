@@ -56,6 +56,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
+        "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:simulated_time_system_lib",

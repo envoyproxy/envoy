@@ -36,6 +36,11 @@ public:
   void onAuth(const std::string&, const std::string&) override {}
   void onResponse(Common::Redis::RespValuePtr&&) override {}
   Common::Redis::Client::Transaction& transaction() override { return transaction_; }
+  void setDownstreamRespVersion(uint32_t) override {}
+  AuthAttempt attemptDownstreamAuthInline(const std::string&, const std::string&,
+                                          uint32_t) override {
+    return AuthAttempt::Denied;
+  }
 
 private:
   Common::Redis::Client::NoOpTransaction transaction_;

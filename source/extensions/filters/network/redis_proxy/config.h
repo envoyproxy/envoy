@@ -115,6 +115,25 @@ public:
     return absl::nullopt;
   }
 
+  // Returns the cluster's configured upstream RESP protocol version.
+  // If the cluster has no RedisProtocolOptions extension or the upstream_protocol
+  // block is absent/UNSPECIFIED, returns RESP2 (backward-compat with pre-RESP3).
+  static envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
+      UpstreamProtocol::Version
+      upstreamProtocolVersion(const Upstream::ClusterInfoConstSharedPtr info) {
+    using Proto = envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions;
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options && options->proto_config_.has_upstream_protocol()) {
+      const auto v = options->proto_config_.upstream_protocol().version();
+      if (v == Proto::UpstreamProtocol::UNSPECIFIED) {
+        return Proto::UpstreamProtocol::RESP2;
+      }
+      return v;
+    }
+    return Proto::UpstreamProtocol::RESP2;
+  }
+
 private:
   absl::StatusOr<
       std::pair<envoy::config::core::v3::DataSource, envoy::config::core::v3::DataSource>>

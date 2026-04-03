@@ -95,6 +95,7 @@ Every Redis cluster has its own extra statistics tree rooted at *cluster.<name>.
 
   max_upstream_unknown_connections_reached, Counter, Total number of times that an upstream connection to an unknown host is not created after redirection having reached the connection pool's max_upstream_unknown_connections limit
   upstream_cx_drained, Counter, Total number of upstream connections drained of active requests before being closed
+  upstream_resp3_hello_failure, Counter, Total number of upstream ``HELLO 3`` negotiations that did not result in a successful RESP3 handshake (error reply, wrong reply shape, connection error, or non-3 ``proto`` field). Only emitted when the cluster's ``upstream_protocol.version`` is ``RESP3``.
   upstream_commands.upstream_rq_time, Histogram, Histogram of upstream request times for all types of requests
 
 .. _arch_overview_redis_cluster_command_stats:
@@ -143,8 +144,66 @@ original Redis command except possibly in failure scenarios.
 
 RESP Protocol
 ^^^^^^^^^^^^^
-Envoy redis proxy supports only RESP2 protocol for now. Clients should connect to Envoy using RESP2 protocol.
-hello command with only hello 2 argument is supported, hello 3 will result in error response from Envoy.
+Envoy redis proxy supports RESP2 and RESP3. There is a single configuration knob: each
+cluster's :ref:`RedisProtocolOptions.upstream_protocol
+<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProtocolOptions.upstream_protocol>`.
+This is the sole source of truth for what RESP version a Redis cluster behind the proxy
+speaks. The downstream RESP version a client may negotiate is derived from it — there is no
+separate downstream knob.
+
+Each new downstream connection starts in RESP2, matching real Redis behavior for clients
+that never send HELLO. A client may upgrade with ``HELLO N`` only when ``2 <= N <=
+cluster_resp_version``; ``HELLO N`` above the cluster cap is rejected with ``-NOPROTO`` so
+the proxy never advertises a RESP version it cannot honor on the upstream wire.
+
+Multi-cluster filters take the floor of the routed clusters' ``upstream_protocol.version``:
+mixing one RESP2 (or ``UNSPECIFIED``) cluster into a RESP3-otherwise-only listener caps the
+whole listener at RESP2. The floor is computed at request time from the worker's live
+cluster manager, so cluster add/remove events (which can shift the cap) are reflected
+without a listener reload.
+
+When a cluster is configured ``upstream_protocol.version: RESP3``, the upstream client
+sends ``HELLO 3`` (combined with ``AUTH`` when static credentials or AWS IAM
+authentication are configured) on every new upstream connection. User requests submitted
+before negotiation completes are buffered on the client and replayed in order once both
+``HELLO`` and any required ``READONLY`` (for non-Primary read policies) succeed. If the
+upstream rejects RESP3 (e.g. during a rolling upgrade window where one member has not yet
+been upgraded) the connection is closed and the buffered requests fail upstream so the
+caller can retry on a fresh connection that will reattempt negotiation. The
+``upstream_resp3_hello_failure`` counter tracks these events.
+
+Downstream ``HELLO N AUTH <user> <pass>`` is supported with both locally configured
+credentials (``downstream_auth_passwords`` / ``downstream_auth_username`` on
+:ref:`RedisProxy <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>`)
+and an external auth provider. The local-credentials path validates inline and emits the
+``HELLO`` Map (or ``WRONGPASS``) synchronously; the external-auth path defers the round
+trip and emits the deferred ``HELLO`` Map (or error) when the provider responds. Any
+commands received while the external auth check is in flight are held on the filter's
+auth-pending queue and dispatched after the auth result resolves, preserving wire
+ordering.
+
+When the downstream and upstream sides differ — for example a client that has not sent
+HELLO and is still on RESP2, served by a RESP3 cluster — the proxy's encoder converts
+RESP3-only reply types (Map, Set, Boolean, Double, BigNumber, BlobError, VerbatimString,
+Null) to the RESP2 compatibility forms defined in the RESP3 specification.
+
+Unsolicited RESP3 ``Push`` frames received from upstream are not delivered downstream:
+the upstream client drops them silently before they reach the encoder. ``Push`` is an
+in-spec RESP3 frame, but this PR does not route any Push-producing feature
+(``SUBSCRIBE`` / ``PSUBSCRIBE`` forwarding and ``CLIENT TRACKING`` are out of scope), so
+a well-behaved upstream should not send Push frames on these connections in steady
+state. Dropping preserves the ``pending_requests_`` FIFO — popping a request for a
+Push would desynchronize the next ordinary reply against its issuing request. The
+encoder still implements ``Push`` → ``Array`` down-conversion as generic codec
+behavior so that future Push-routing work (SUBSCRIBE forwarding, RESP3 client
+tracking) has a stable codec layer to build on; in the current pipeline that
+conversion path is not exercised against live upstream traffic.
+
+The proxy never performs the inverse — it does not synthesize RESP3-only shapes from RESP2
+replies, because doing so would require per-command knowledge that varies across Redis
+versions. The cluster cap rule above prevents this case from arising: a downstream client
+cannot negotiate a RESP version higher than the cluster's, so the encoder is only ever
+asked to downconvert.
 
 INFO command
 ^^^^^^^^^^^^

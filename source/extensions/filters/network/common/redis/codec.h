@@ -17,12 +17,42 @@ namespace Common {
 namespace Redis {
 
 /**
+ * RESP protocol version used by a connection.
+ */
+enum class RespProtocolVersion { Resp2, Resp3 };
+
+inline RespProtocolVersion toRespProtocolVersion(uint32_t version) {
+  return version == 3 ? RespProtocolVersion::Resp3 : RespProtocolVersion::Resp2;
+}
+
+/**
  * All RESP types as defined here: https://redis.io/topics/protocol with the exception of
  * CompositeArray. CompositeArray is an internal type that behaves like an Array type. Its first
  * element is a SimpleString or BulkString and the rest of the elements are portion of another
  * Array. This is created for performance.
+ *
+ * RESP3 types are defined here:
+ * https://github.com/redis/redis-specifications/blob/master/protocol/RESP3.md
  */
-enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array, CompositeArray };
+enum class RespType {
+  // RESP2 types
+  Null,
+  SimpleString,
+  BulkString,
+  Integer,
+  Error,
+  Array,
+  CompositeArray,
+  // RESP3 types
+  Boolean,        // #t\r\n or #f\r\n
+  Double,         // ,<floating-point-number>\r\n
+  BigNumber,      // (<big number>\r\n
+  BlobError,      // !<length>\r\n<error>\r\n
+  VerbatimString, // =<length>\r\n<encoding>:<data>\r\n
+  Map,            // %<count>\r\n (count key-value pairs, stored as 2*count array elements)
+  Set,            // ~<count>\r\n
+  Push,           // ><count>\r\n
+};
 
 /**
  * A variant implementation of a RESP value optimized for performance. A C++11 union is used for
@@ -123,6 +153,9 @@ public:
   const std::string& asString() const;
   int64_t& asInteger();
   int64_t asInteger() const;
+  double& asDouble();
+  double asDouble() const;
+  bool asBoolean() const;
   CompositeArray& asCompositeArray();
   const CompositeArray& asCompositeArray() const;
 
@@ -138,6 +171,7 @@ private:
     std::vector<RespValue> array_;
     std::string string_;
     int64_t integer_;
+    double double_;
     CompositeArray composite_array_;
   };
 
@@ -208,6 +242,24 @@ public:
    * @param out supplies the buffer to encode to.
    */
   virtual void encode(const RespValue& value, Buffer::Instance& out) PURE;
+
+  /**
+   * Set the RESP protocol version for encoding. Drives every RESP3-only type's
+   * conversion choice when the connection is RESP2:
+   *   Null           - RESP3 ``_\r\n``         vs RESP2 ``$-1\r\n``
+   *   Boolean        - RESP3 ``#t/#f\r\n``     vs RESP2 ``:1/:0\r\n``
+   *   Double         - RESP3 ``,<digits>\r\n`` vs RESP2 ``$<len>\r\n<digits>\r\n``
+   *   BigNumber      - RESP3 ``(<digits>\r\n`` vs RESP2 ``$<len>\r\n<digits>\r\n``
+   *   BlobError      - RESP3 ``!<len>\r\n...`` vs RESP2 ``-<sanitized>\r\n``
+   *   VerbatimString - RESP3 ``=<len>\r\n...`` vs RESP2 ``$<len>\r\n<data>\r\n``
+   *                                                       (format prefix stripped)
+   *   Map            - RESP3 ``%<N>\r\n``      vs RESP2 ``*<2N>\r\n`` (flat)
+   *   Set            - RESP3 ``~<N>\r\n``      vs RESP2 ``*<N>\r\n``
+   *   Push           - RESP3 ``><N>\r\n``      vs RESP2 ``*<N>\r\n``
+   * RESP2 base types (Array, BulkString, Integer, SimpleString, Error) are
+   * encoded identically in both versions and are unaffected by this setting.
+   */
+  virtual void setProtocolVersion(RespProtocolVersion) {}
 };
 
 using EncoderPtr = std::unique_ptr<Encoder>;

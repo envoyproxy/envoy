@@ -13,6 +13,7 @@
 
 using testing::Eq;
 using testing::Ref;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -189,6 +190,56 @@ TEST_F(GrpcExternalAuthClientTest, Cancel) {
                                 "password");
 
   EXPECT_CALL(async_request_, cancel());
+  client_->cancel();
+}
+
+// Re-entry from inside the callback: the callback synchronously calls authenticateExternal()
+// again on the same client (the production path that triggers this is ProxyFilter resuming a
+// held AUTH or HELLO N AUTH ... behind a primary HELLO AUTH external-auth round trip — see
+// HelloAuthResumedHeldAuthStartsSecondExternalAuth in proxy_filter_test.cc). Without the
+// snapshot-then-null ordering in onSuccess/onFailure, the second authenticateExternal() hits
+// ASSERT(callback_ == nullptr) because the in-flight state is still set when the callback is
+// invoked. With the fix, the second call observes cleared state and registers fresh.
+TEST_F(GrpcExternalAuthClientTest, CallbackCanReenterAuthenticateExternal) {
+  initialize();
+
+  // First send: alice/secret. Captured as async_request_ via expectCallSend.
+  envoy::service::redis_auth::v3::RedisProxyExternalAuthRequest first;
+  first.set_username("alice");
+  first.set_password("secret");
+  expectCallSend(first);
+  client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "alice",
+                                "secret");
+
+  // The callback for the first round trip will synchronously invoke authenticateExternal a
+  // second time for bob/secret2 — emulating ProxyFilter::onAuthenticateExternal dispatching a
+  // resumed held AUTH that takes the external-auth path again. The expectCallSend helper
+  // hard-codes ProtoBufferEq(request) on async_client_, so build a separate expectation for
+  // the second send keyed to the bob payload.
+  envoy::service::redis_auth::v3::RedisProxyExternalAuthRequest second;
+  second.set_username("bob");
+  second.set_password("secret2");
+  Grpc::MockAsyncRequest second_async_request;
+  EXPECT_CALL(*async_client_,
+              sendRaw(_, _, Grpc::ProtoBufferEq(second), Ref(*(client_.get())), _, _))
+      .WillOnce(Return(&second_async_request));
+
+  EXPECT_CALL(span_, setTag(Eq("redis_auth_status"), Eq("redis_auth_ok")));
+  EXPECT_CALL(request_callback_, onAuthenticateExternal_(_, _))
+      .WillOnce(Invoke([this](CommandSplitter::SplitCallbacks&, AuthenticateResponsePtr&) {
+        // Re-entry while the callback is still on the stack — pre-fix this hits the
+        // ASSERT(callback_ == nullptr) inside authenticateExternal. Post-fix it succeeds.
+        client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "bob",
+                                      "secret2");
+      }));
+
+  auto response =
+      std::make_unique<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>();
+  response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  client_->onSuccess(std::move(response), span_);
+
+  // Cancel the second in-flight request to release async_request_ before test teardown.
+  EXPECT_CALL(second_async_request, cancel());
   client_->cancel();
 }
 

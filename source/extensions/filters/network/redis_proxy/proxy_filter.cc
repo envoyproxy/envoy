@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/redis_proxy/proxy_filter.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 
@@ -10,6 +11,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
+#include "source/extensions/filters/network/redis_proxy/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,7 +22,8 @@ ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
     Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
     Api::Api& api, TimeSource& time_source,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
+    Upstream::ClusterManager& cluster_manager, std::vector<std::string> response_bearing_clusters)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
@@ -30,7 +33,8 @@ ProxyFilterConfig::ProxyFilterConfig(
       external_auth_expiration_enabled_(external_auth_enabled_ &&
                                         config.external_auth_provider().enable_auth_expiration()),
       dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)),
-      time_source_(time_source) {
+      time_source_(time_source), cluster_manager_(cluster_manager),
+      response_bearing_clusters_(std::move(response_bearing_clusters)) {
 
   if (config.settings().enable_redirection() && !config.settings().has_dns_cache_config()) {
     ENVOY_LOG(warn, "redirections without DNS lookups enabled might cause client errors, set the "
@@ -70,6 +74,32 @@ Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ProxyFilterConfig::ge
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {
       ALL_REDIS_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix))};
+}
+
+uint32_t ProxyFilterConfig::clusterRespVersion() const {
+  // Floor across response-bearing clusters, evaluated against the worker's
+  // live thread-local cluster view. Missing/unknown clusters cap at RESP2 —
+  // the conservative default that lets HELLO 3 be rejected with -NOPROTO
+  // until the cluster lands. The function is invoked on the HELLO command
+  // path (once per downstream connection) and the per-command RESP-cap
+  // guard in CommandSplitter::makeRequest (once per non-HELLO command); both
+  // run on the worker thread.
+  uint32_t cap = 3;
+  bool any_seen = false;
+  for (const auto& name : response_bearing_clusters_) {
+    auto* tlc = cluster_manager_.getThreadLocalCluster(name);
+    uint32_t v = 2;
+    if (tlc != nullptr) {
+      v = (ProtocolOptionsConfigImpl::upstreamProtocolVersion(tlc->info()) ==
+           envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
+               UpstreamProtocol::RESP3)
+              ? 3
+              : 2;
+    }
+    cap = std::min(cap, v);
+    any_seen = true;
+  }
+  return any_seen ? cap : 2;
 }
 
 ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
@@ -175,35 +205,111 @@ bool ProxyFilter::connectionAllowed() {
 
 void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& request,
                                          ExternalAuth::AuthenticateResponsePtr&& response) {
-  Common::Redis::RespValuePtr redis_response{new Common::Redis::RespValue()};
+  // The ExternalAuth::AuthenticateCallback interface types ``request`` as SplitCallbacks for
+  // ABI generality, but the only producer of these calls is ProxyFilter::onAuth /
+  // attemptDownstreamAuthInline, both of which pass a PendingRequest. Downcast so we can
+  // observe pending_hello_auth_version_, which distinguishes the AUTH-command path (emit
+  // +OK / error) from the HELLO N AUTH ... path (emit HELLO Map / error).
+  auto& pending = static_cast<PendingRequest&>(request);
+  const bool is_hello_auth = pending.pending_hello_auth_version_.has_value();
 
-  if (response->status == ExternalAuth::AuthenticationRequestStatus::Authorized) {
-    redis_response->type(Common::Redis::RespType::SimpleString);
-    redis_response->asString() = "OK";
+  Common::Redis::RespValuePtr redis_response;
+  const bool authorized = response->status == ExternalAuth::AuthenticationRequestStatus::Authorized;
+  const bool unauthorized =
+      response->status == ExternalAuth::AuthenticationRequestStatus::Unauthorized;
+
+  if (authorized) {
     connection_allowed_ = true;
-
     if (config_->external_auth_expiration_enabled_) {
       external_auth_expiration_epoch_ = response->expiration.seconds() * 1000000;
     }
-  } else if (response->status == ExternalAuth::AuthenticationRequestStatus::Unauthorized) {
-    redis_response->type(Common::Redis::RespType::Error);
-    std::string message = response->message.empty() ? "unauthorized" : response->message;
-    redis_response->asString() = fmt::format("ERR {}", message);
+    if (is_hello_auth) {
+      // Flip the negotiated downstream RESP version BEFORE emitting the HELLO Map so the
+      // encoder serializes the Map natively (RESP3) or down-converts to a flat array (RESP2)
+      // matching what the client just negotiated. setDownstreamRespVersion also updates the
+      // stamp on the in-flight PendingRequest so ProxyFilter::onResponse does not flip the
+      // encoder back to the pre-HELLO version when sending this very reply.
+      const uint32_t version = *pending.pending_hello_auth_version_;
+      pending.setDownstreamRespVersion(version);
+      redis_response = CommandSplitter::buildHelloReply(version);
+
+      // Re-stamp queued pending_request_value_ entries that landed BEHIND this HELLO request
+      // while external_auth_call_status_ was Pending. They were created with
+      // resp_version_at_creation_ = the pre-HELLO downstream version (typically RESP2);
+      // without this re-stamp, ProxyFilter::onResponse's stamp-vs-current branch would
+      // setProtocolVersion(Resp2) → encode → setProtocolVersion(Resp3) for each one, sending
+      // RESP2 reply shapes on a freshly-negotiated RESP3 connection. The contract HELLO N
+      // AUTH establishes is "from this command forward, the connection speaks RESP N", so any
+      // command pipelined after the HELLO inherits the new version regardless of when the
+      // client put it on the wire.
+      bool past_hello = false;
+      for (auto& queued : pending_requests_) {
+        if (&queued == &pending) {
+          past_hello = true;
+          continue;
+        }
+        if (past_hello && queued.pending_request_value_) {
+          queued.resp_version_at_creation_ = version;
+        }
+      }
+    } else {
+      redis_response = std::make_unique<Common::Redis::RespValue>();
+      redis_response->type(Common::Redis::RespType::SimpleString);
+      redis_response->asString() = "OK";
+    }
+  } else if (unauthorized) {
     connection_allowed_ = false;
+    redis_response = std::make_unique<Common::Redis::RespValue>();
+    redis_response->type(Common::Redis::RespType::Error);
+    if (is_hello_auth) {
+      // Match the WRONGPASS shape the splitter emits for a denied local-auth HELLO so RESP3
+      // clients see the same error code regardless of which auth backend is configured.
+      const std::string detail =
+          response->message.empty() ? "invalid username-password pair" : response->message;
+      redis_response->asString() = fmt::format("WRONGPASS {}", detail);
+    } else {
+      const std::string detail = response->message.empty() ? "unauthorized" : response->message;
+      redis_response->asString() = fmt::format("ERR {}", detail);
+    }
   } else {
+    redis_response = std::make_unique<Common::Redis::RespValue>();
     redis_response->type(Common::Redis::RespType::Error);
     redis_response->asString() = "ERR external authentication failed";
     ENVOY_LOG(error, "Redis external authentication failed: {}", response->message);
   }
 
   external_auth_call_status_ = ExternalAuthCallStatus::Ready;
+  pending.pending_hello_auth_version_.reset();
 
   request.onResponse(std::move(redis_response));
 
-  // Resume processing of pending requests.
-  while (!pending_requests_.empty() && pending_requests_.front().pending_request_value_) {
-    processRespValue(std::move(pending_requests_.front().pending_request_value_),
-                     pending_requests_.front());
+  // Resume any commands the client pipelined behind the auth request while we were waiting on
+  // the external provider.
+  resumeAuthHeldRequests();
+}
+
+void ProxyFilter::resumeAuthHeldRequests() {
+  // Iterate the full pending_requests_ list in FIFO order — the front-only loop this replaces
+  // missed every held entry that sat behind a still-in-flight upstream request (e.g. a GET
+  // outstanding before the AUTH/HELLO entry, or a held entry after a sibling that just went
+  // upstream from an earlier resume), so those held entries hung forever waiting on a resume
+  // that never came. std::list iterators are stable across non-self pops, so advancing `it`
+  // before processing protects against the synchronously-popped-self case in processRespValue
+  // (splitter callback emits onResponse → front-pop loop pops the entry). External-auth status
+  // is re-checked each iteration: if a resumed held entry is itself an AUTH or HELLO N AUTH
+  // and its splitter dispatch starts a new round trip, leave the rest of the list held until
+  // that second round trip completes (which will re-enter resumeAuthHeldRequests via
+  // onAuthenticateExternal).
+  for (auto it = pending_requests_.begin(); it != pending_requests_.end();) {
+    if (external_auth_call_status_ == ExternalAuthCallStatus::Pending) {
+      return;
+    }
+    if (!it->pending_request_value_) {
+      ++it;
+      continue;
+    }
+    PendingRequest& held = *it++;
+    processRespValue(std::move(held.pending_request_value_), held);
   }
 }
 
@@ -262,6 +368,45 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
   request.onResponse(std::move(response));
 }
 
+CommandSplitter::SplitCallbacks::AuthAttempt
+ProxyFilter::attemptDownstreamAuthInline(PendingRequest& request, const std::string& username,
+                                         const std::string& password, uint32_t requested_version) {
+  using AuthAttempt = CommandSplitter::SplitCallbacks::AuthAttempt;
+  // External auth is async (gRPC round trip via authenticateExternal). Stash the requested
+  // protocol version on the PendingRequest and start the round trip; onAuthenticateExternal
+  // will emit the deferred HELLO Map (success) or error (failure) for this version when the
+  // round trip completes. external_auth_call_status_ = Pending makes any subsequent
+  // pipelined request decoded in the same onData() pass land in pending_request_value_ until
+  // the round trip resolves — same flow that already gates a separate AUTH command.
+  if (config_->external_auth_enabled_) {
+    request.pending_hello_auth_version_ = requested_version;
+    external_auth_call_status_ = ExternalAuthCallStatus::Pending;
+    auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(),
+                                       username, password);
+    return AuthAttempt::Pending;
+  }
+  // No downstream credentials configured: any HELLO AUTH attempt is denied.
+  // Matches the AUTH-command behavior in onAuth() ("Client sent AUTH, but
+  // no password is set").
+  if (config_->downstream_auth_passwords_.empty() && config_->downstream_auth_username_.empty()) {
+    return AuthAttempt::Denied;
+  }
+  // Local credential check, mirroring the two onAuth overloads:
+  //   - Empty configured username + "default" supplied (Redis 6 ACL synonym).
+  //   - Configured username matches.
+  // When no username was configured but credentials were, only the password
+  // path applies; a username supplied alongside is rejected unless it is
+  // "default".
+  bool credentials_match = false;
+  if (config_->downstream_auth_username_.empty()) {
+    credentials_match = (username.empty() || username == "default") && checkPassword(password);
+  } else {
+    credentials_match = (username == config_->downstream_auth_username_) && checkPassword(password);
+  }
+  connection_allowed_ = credentials_match;
+  return credentials_match ? AuthAttempt::Allowed : AuthAttempt::Denied;
+}
+
 bool ProxyFilter::checkPassword(const std::string& password) {
   for (const auto& p : config_->downstream_auth_passwords_) {
     if (password == p) {
@@ -279,7 +424,16 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
   // The response we got might not be in order, so flush out what we can. (A new response may
   // unlock several out of order responses).
   while (!pending_requests_.empty() && pending_requests_.front().pending_response_) {
-    encoder_->encode(*pending_requests_.front().pending_response_, encoder_buffer_);
+    auto& front = pending_requests_.front();
+    auto request_version = front.resp_version_at_creation_;
+    auto current_version = downstream_resp_version_;
+    if (request_version != current_version) {
+      encoder_->setProtocolVersion(Common::Redis::toRespProtocolVersion(request_version));
+    }
+    encoder_->encode(*front.pending_response_, encoder_buffer_);
+    if (request_version != current_version) {
+      encoder_->setProtocolVersion(Common::Redis::toRespProtocolVersion(current_version));
+    }
     pending_requests_.pop_front();
   }
 
@@ -324,7 +478,8 @@ Network::FilterStatus ProxyFilter::onData(Buffer::Instance& data, bool) {
   }
 }
 
-ProxyFilter::PendingRequest::PendingRequest(ProxyFilter& parent) : parent_(parent) {
+ProxyFilter::PendingRequest::PendingRequest(ProxyFilter& parent)
+    : resp_version_at_creation_(parent.downstream_resp_version_), parent_(parent) {
   parent.config_->stats_.downstream_rq_total_.inc();
   parent.config_->stats_.downstream_rq_active_.inc();
 }

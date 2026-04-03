@@ -389,14 +389,45 @@ message RedisProxy {
   //   The is to support redis's feature wherein new commands can be added using redis' modules api:
   //   https://redis.io/docs/latest/develop/reference/modules/
   repeated string custom_commands = 11;
+
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
 // :ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
 // keyed by the name ``envoy.filters.network.redis_proxy``.
+// [#next-free-field: 6]
 message RedisProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions";
+
+  // RESP protocol configuration for upstream connections in this cluster. This
+  // is the sole source of truth for the RESP version a Redis cluster behind the
+  // proxy speaks. The downstream version a client is allowed to negotiate is
+  // derived from this value (downstream connections start at RESP2 and may
+  // upgrade via ``HELLO N`` only up to the cluster's version) — there is no
+  // separate downstream knob.
+  message UpstreamProtocol {
+    enum Version {
+      // Unspecified. Treated as ``RESP2`` for backward compatibility with clusters
+      // configured before RESP3 support was added. Downstream clients on a
+      // listener whose routes include such a cluster cannot negotiate RESP3.
+      UNSPECIFIED = 0;
+      // Upstream connections speak RESP2. No ``HELLO`` is sent on new connections
+      // (matching pre-RESP3 behavior).
+      RESP2 = 2;
+      // Upstream connections negotiate RESP3 via ``HELLO 3`` (combined with ``AUTH``
+      // when credentials or AWS IAM authentication are configured) on each new
+      // connection. User requests submitted before negotiation completes are buffered
+      // on the client and replayed in order once both ``HELLO`` and any required
+      // ``READONLY`` succeed. On any negotiation failure the connection is closed and
+      // the buffered requests fail upstream so the caller can retry on a fresh
+      // connection that will re-attempt negotiation. The
+      // ``upstream_resp3_hello_failure`` counter tracks these events.
+      RESP3 = 3;
+    }
+
+    Version version = 1 [(validate.rules).enum = {defined_only: true}];
+  }
 
   message Credential {
     // The address to which this username and password applies.
@@ -431,6 +462,11 @@ message RedisProtocolOptions {
   // If no entry in ``credentials`` matches, then the ``auth_password`` and ``auth_username`` fields
   // are used as defaults.
   repeated Credential credentials = 4;
+
+  // Per-cluster upstream RESP protocol options. When unset, upstream connections
+  // default to RESP2 (pre-RESP3 behavior). Set ``upstream_protocol.version`` to
+  // ``RESP3`` to enable ``HELLO 3`` negotiation on new upstream connections.
+  UpstreamProtocol upstream_protocol = 5;
 }
 
 // [#next-free-field: 6]

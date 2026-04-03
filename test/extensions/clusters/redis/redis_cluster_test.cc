@@ -124,8 +124,10 @@ public:
          Stats::Scope&, const std::string&, const std::string&, bool,
          absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
          absl::optional<
-             NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>)
-      override {
+             NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>,
+         envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
+             UpstreamProtocol::Version,
+         Stats::Counter*) override {
     EXPECT_EQ(22120, host->address()->ip()->port());
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{
         create_(host->address()->asString())};

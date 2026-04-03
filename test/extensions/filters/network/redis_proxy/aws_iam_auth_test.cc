@@ -125,22 +125,28 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   EXPECT_CALL(*mock_connection, write(_, _)).Times(0);
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client =
       factory.create(host, dispatcher, config, redis_command_stats, *stats.rootScope(), "username",
-                     "password", false, aws_iam_config, authenticator);
+                     "password", false, aws_iam_config, authenticator,
+                     envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
+                         UpstreamProtocol::UNSPECIFIED);
 
   Common::Redis::RespValue request1;
   Client::MockClientCallbacks callbacks;
-  // Add a request and it should be buffered, until the capture callback is called which will
-  // disable queue and flush
+  // The new init pipeline holds user requests in the init hold queue while
+  // WaitingForAwsToken, and continues to hold them through AwaitingAuth (set by
+  // onAwsCredentialsReady before the AUTH ack arrives). The held entry is failed on
+  // connection close — it never lands on the wire in this test because we never drive an
+  // AUTH success reply.
   Client::PoolRequest* handle1 = client->makeRequest(request1, callbacks);
   EXPECT_NE(nullptr, handle1);
-  // One write for AUTH command, one write for buffer
   InSequence s;
 
-  // Auth is 45 bytes
+  // capture() → onAwsCredentialsReady → setInitState(AwaitingAuth) → AUTH dispatch.
+  // sendAwsIamAuth's RESP2 branch suppresses makeRequestInternal's auto-flush via
+  // queue_enabled_ and emits a single explicit flush, so AUTH lands as exactly one wire
+  // write (no redundant empty-buffer write). Held request1 stays parked.
   EXPECT_CALL(*mock_connection, write(testing::Property(&Buffer::OwnedImpl::length, 45), false));
-  // RespValue is 5 bytes
-  EXPECT_CALL(*mock_connection, write(testing::Property(&Buffer::OwnedImpl::length, 5), false));
-  // Handle callback for close
+  // Close raises LocalClose → onEvent drains the init hold queue, firing onFailure on
+  // request1's callbacks.
   EXPECT_CALL(callbacks, onFailure());
 
   capture();

@@ -26,8 +26,7 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace ConnPool {
 namespace {
-// null_pool_callbacks is used for requests that must be filtered and not redirected such as
-// "asking".
+// Shared no-op callbacks for fire-and-forget requests (asking, etc.).
 Common::Redis::Client::DoNothingPoolCallbacks null_client_callbacks;
 
 const Common::Redis::RespValue& getRequest(const RespVariant& request) {
@@ -170,6 +169,10 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   // AWS IAM Authentication is enabled.
   auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), api_);
   auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), api_);
+  // Pick up the per-cluster upstream RESP configuration. This is read at every
+  // cluster add/update (including the initial add) so that a later cluster
+  // config change flips behavior on subsequent new connections.
+  upstream_protocol_version_ = ProtocolOptionsConfigImpl::upstreamProtocolVersion(cluster_->info());
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>& hosts_added,
@@ -292,9 +295,14 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
       client->host_ = host;
       client->redis_client_ = client_factory_.create(
           host, dispatcher_, config_, redis_command_stats_, *(stats_scope_), credentials.username,
-          credentials.password, false, aws_iam_config_, aws_iam_authenticator_);
+          credentials.password, false, aws_iam_config_, aws_iam_authenticator_,
+          upstream_protocol_version_, &redis_cluster_stats_.upstream_resp3_hello_failure_);
 
       client->redis_client_->addConnectionCallbacks(*client);
+      // RESP3 HELLO 3 negotiation runs inside ClientImpl::initialize (driven by the
+      // upstream_protocol_version_ argument passed into create above). User requests
+      // dispatched against this client before the handshake completes are held by
+      // ClientImpl's held-user-request queue and replayed in order on negotiation success.
     }
   }
   return client;
@@ -461,10 +469,15 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(Upstream::HostConstSharedPtr& h
     transaction.clients_[client_idx] =
         client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
                                auth_credentials.username, auth_credentials.password, true,
-                               aws_iam_config_, aws_iam_authenticator_);
+                               aws_iam_config_, aws_iam_authenticator_, upstream_protocol_version_,
+                               &redis_cluster_stats_.upstream_resp3_hello_failure_);
     if (transaction.connection_cb_) {
       transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
     }
+    // Transaction clients run the same ClientImpl init path as data clients above: RESP3 HELLO
+    // 3 negotiation (when configured) happens inside ClientImpl::initialize. MULTI/EXEC and
+    // any other commands the splitter dispatches against this client are held by ClientImpl's
+    // held-user-request queue until HELLO (and READONLY when applicable) succeed.
   }
 
   pending_requests_.emplace_back(*this, std::move(request), callbacks, host);

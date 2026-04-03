@@ -21,16 +21,30 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 namespace {
-inline void addUniqueClusters(
+// Response-bearing clusters: those whose responses reach the downstream
+// client. These constrain the listener-level RESP cap. Excludes mirror
+// clusters — their responses are fire-and-forget and cannot affect the
+// downstream protocol shape.
+inline void addResponseBearingClusters(
     absl::flat_hash_set<std::string>& clusters,
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route&
         route) {
   clusters.emplace(route.cluster());
-  for (auto& mirror : route.request_mirror_policy()) {
-    clusters.emplace(mirror.cluster());
-  }
   if (route.has_read_command_policy()) {
     clusters.emplace(route.read_command_policy().cluster());
+  }
+}
+
+// All referenced clusters (response-bearing + mirrors). Used to drive
+// upstream connection-pool creation; mirrors need pools too even though
+// they do not constrain the RESP cap.
+inline void addAllReferencedClusters(
+    absl::flat_hash_set<std::string>& clusters,
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route&
+        route) {
+  addResponseBearingClusters(clusters, route);
+  for (auto& mirror : route.request_mirror_policy()) {
+    clusters.emplace(mirror.cluster());
   }
 }
 } // namespace
@@ -52,10 +66,6 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context);
 
-  auto filter_config = std::make_shared<ProxyFilterConfig>(
-      proto_config, context.scope(), context.drainDecision(), server_context.runtime(),
-      server_context.api(), context.serverFactoryContext().timeSource(), cache_manager_factory);
-
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
 
@@ -65,28 +75,68 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   }
 
   absl::flat_hash_set<std::string> unique_clusters;
+  absl::flat_hash_set<std::string> response_bearing_set;
   for (auto& route : prefix_routes.routes()) {
-    addUniqueClusters(unique_clusters, route);
+    addAllReferencedClusters(unique_clusters, route);
+    addResponseBearingClusters(response_bearing_set, route);
   }
-  addUniqueClusters(unique_clusters, prefix_routes.catch_all_route());
+  // Only fold the catch-all route into the unique-cluster set when one is
+  // actually configured. ``prefix_routes.catch_all_route()`` returns a
+  // default-constructed Route message when has_catch_all_route() is false,
+  // which would insert "" into unique_clusters and try to allocate an
+  // upstream pool keyed on the empty string.
+  if (prefix_routes.has_catch_all_route()) {
+    addAllReferencedClusters(unique_clusters, prefix_routes.catch_all_route());
+    addResponseBearingClusters(response_bearing_set, prefix_routes.catch_all_route());
+  }
+
+  // Resolve each cluster's info up front and capture the cluster ``OptRef``
+  // (input to AWS IAM lookup below). One ClusterManager lookup per cluster —
+  // the per-conn-pool loop reuses the captured ``OptRef`` instead of re-resolving.
+  // The listener-level RESP cap is no longer pre-computed here; it is read
+  // dynamically per HELLO and per command via
+  // ProxyFilterConfig::clusterRespVersion(), which consults the worker's live
+  // cluster manager state. This means cluster updates (LDS-before-CDS,
+  // RESP3→RESP2 downgrade) are reflected without listener reload.
+  struct ResolvedCluster {
+    std::string name;
+    Upstream::ClusterConstOptRef optref;
+  };
+  std::vector<ResolvedCluster> resolved_clusters;
+  resolved_clusters.reserve(unique_clusters.size());
+  for (const auto& cluster_name : unique_clusters) {
+    auto cluster_optref = server_context.clusterManager().clusters().getCluster(cluster_name);
+    resolved_clusters.push_back({cluster_name, cluster_optref});
+  }
+
+  // Hand the response-bearing cluster names to the config so
+  // clusterRespVersion() can compute the floor at request time.
+  std::vector<std::string> response_bearing_clusters(response_bearing_set.begin(),
+                                                     response_bearing_set.end());
+
+  auto filter_config = std::make_shared<ProxyFilterConfig>(
+      proto_config, context.scope(), context.drainDecision(), server_context.runtime(),
+      server_context.api(), context.serverFactoryContext().timeSource(), cache_manager_factory,
+      server_context.clusterManager(), std::move(response_bearing_clusters));
 
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
 
   Upstreams upstreams;
-  for (auto& cluster : unique_clusters) {
+  for (const auto& resolved : resolved_clusters) {
+    const std::string& cluster = resolved.name;
 
     // Create the AWS IAM authenticator if required
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator;
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config;
-    auto cluster_optref = server_context.clusterManager().clusters().getCluster(cluster);
-    if (cluster_optref.has_value()) {
+    if (resolved.optref.has_value()) {
       // Does our cluster have an AwsIam element available? If so, create a new authenticator for
       // this connection pool.
-      aws_iam_config = ProtocolOptionsConfigImpl::awsIamConfig(cluster_optref.value().get().info());
+      aws_iam_config =
+          ProtocolOptionsConfigImpl::awsIamConfig(resolved.optref.value().get().info());
       if (aws_iam_config.has_value()) {
-        if (!ProtocolOptionsConfigImpl::authUsername(cluster_optref.value().get().info(),
+        if (!ProtocolOptionsConfigImpl::authUsername(resolved.optref.value().get().info(),
                                                      context.serverFactoryContext().api())
                  .empty()) {
           aws_iam_authenticator = Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::
@@ -110,6 +160,9 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
         refresh_manager, filter_config->dns_cache_, aws_iam_config, aws_iam_authenticator,
         local_zone);
+    // Upstream RESP version is read from the cluster's RedisProtocolOptions
+    // inside InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual,
+    // so no filter-level push is needed here.
     conn_pool_ptr->init();
     upstreams.emplace(cluster, conn_pool_ptr);
   }

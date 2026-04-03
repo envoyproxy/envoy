@@ -38,6 +38,34 @@ RespValuePtr makeError(const std::string& error) {
   return response;
 }
 
+RespValue makeBulkString(absl::string_view value) {
+  RespValue v;
+  v.type(RespType::BulkString);
+  v.asString() = std::string(value);
+  return v;
+}
+
+RespValue makeInteger(int64_t value) {
+  RespValue v;
+  v.type(RespType::Integer);
+  v.asInteger() = value;
+  return v;
+}
+
+RespValue makeRequest(absl::string_view command, const std::vector<std::string>& args) {
+  RespValue request;
+  request.type(RespType::Array);
+  std::vector<RespValue> values(args.size() + 1);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = std::string(command);
+  for (size_t i = 0; i < args.size(); i++) {
+    values[i + 1].type(RespType::BulkString);
+    values[i + 1].asString() = args[i];
+  }
+  request.asArray().swap(values);
+  return request;
+}
+
 ReadOnlyRequest::ReadOnlyRequest() {
   std::vector<RespValue> values(1);
   values[0].type(RespType::BulkString);
@@ -83,6 +111,7 @@ const SetRequest& SetRequest::instance() {
   static const SetRequest* instance = new SetRequest{};
   return *instance;
 }
+
 } // namespace Utility
 } // namespace Redis
 } // namespace Common

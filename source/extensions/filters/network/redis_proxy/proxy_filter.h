@@ -54,7 +54,9 @@ public:
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
       Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
       Api::Api& api, TimeSource& time_source,
-      Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
+      Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
+      Upstream::ClusterManager& cluster_manager,
+      std::vector<std::string> response_bearing_clusters);
 
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;
@@ -64,6 +66,28 @@ public:
   const std::string downstream_auth_username_;
   std::vector<std::string> downstream_auth_passwords_;
   TimeSource& timeSource() const { return time_source_; };
+  // Listener-level RESP cap derived dynamically from the live cluster
+  // manager state. Iterates response_bearing_clusters_ (primary + read
+  // command policy clusters; mirror clusters are excluded — their responses
+  // are fire-and-forget and cannot constrain the downstream protocol shape)
+  // and returns the floor of each cluster's
+  // ``RedisProtocolOptions.upstream_protocol.version``. Clusters not yet
+  // known to the worker's thread-local cluster manager (e.g. CDS hasn't
+  // delivered) are treated as RESP2 — the conservative default that lets
+  // HELLO 3 from a downstream client be rejected with ``-NOPROTO`` until
+  // the cluster lands. Self-healing: once the cluster appears as RESP3,
+  // the next call returns 3 with no listener reload required.
+  //
+  // The HELLO handler rejects ``HELLO N`` with ``N > clusterRespVersion()``
+  // so the proxy never advertises a RESP version it cannot honor on the
+  // upstream wire. The per-command guard in CommandSplitter::makeRequest
+  // additionally closes any already-negotiated downstream connection whose
+  // ``currentDownstreamRespVersion() > clusterRespVersion()`` (cluster
+  // downgraded under it) so the negotiated contract is never violated.
+  //
+  // Read on the worker thread that handles HELLO and per-command dispatch;
+  // ``getThreadLocalCluster`` is worker-safe.
+  uint32_t clusterRespVersion() const;
   const bool external_auth_enabled_;
   const bool external_auth_expiration_enabled_;
 
@@ -76,6 +100,12 @@ private:
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr
   getCache(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config);
   TimeSource& time_source_;
+  Upstream::ClusterManager& cluster_manager_;
+  // Names of clusters whose responses reach the downstream client. Captured
+  // once at filter config load; the contents (RESP version) are read live
+  // on each clusterRespVersion() call. Mirror clusters are intentionally
+  // omitted — see clusterRespVersion() doc.
+  const std::vector<std::string> response_bearing_clusters_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -138,11 +168,51 @@ private:
 
     Common::Redis::Client::Transaction& transaction() override { return parent_.transaction(); }
 
+    AuthAttempt attemptDownstreamAuthInline(const std::string& username,
+                                            const std::string& password,
+                                            uint32_t requested_version) override {
+      return parent_.attemptDownstreamAuthInline(*this, username, password, requested_version);
+    }
+    void setDownstreamRespVersion(uint32_t version) override {
+      parent_.downstream_resp_version_ = version;
+      parent_.encoder_->setProtocolVersion(Common::Redis::toRespProtocolVersion(version));
+      // The in-flight request is the HELLO that just negotiated this version, so its own
+      // reply must encode in ``version`` per the Redis spec (RESP3 clients reject a Map
+      // delivered as a flat *2N array). Update the stamp so onResponse's stamp-vs-current
+      // check does not flip the encoder back for this request.
+      resp_version_at_creation_ = version;
+    }
+    uint32_t clusterRespVersion() const override { return parent_.config_->clusterRespVersion(); }
+
+    uint32_t currentDownstreamRespVersion() const override {
+      return parent_.downstream_resp_version_;
+    }
+    void closeDownstreamAfterResponse() override {
+      // Reuse the existing close-after-flush mechanism (same as QUIT). The
+      // splitter will hand a -NOPROTO error response to onResponse() right
+      // after this call; ProxyFilter::onResponse flushes pending responses,
+      // observes connection_quit_, and closes with FlushWrite.
+      parent_.connection_quit_ = true;
+    }
+
+    // Stamp of the downstream RESP version at request creation. Set in the
+    // PendingRequest constructor's member init list from the parent filter's
+    // current downstream_resp_version_; the inline default of 2 is just a
+    // belt-and-braces match for the parent filter's own initial value (see
+    // ProxyFilter::downstream_resp_version_) so reading this field on a
+    // partially-constructed PendingRequest can never see uninitialized memory.
+    uint32_t resp_version_at_creation_{2};
     ProxyFilter& parent_;
     // This value is set when the request is on hold, waiting for an external auth response.
     Common::Redis::RespValuePtr pending_request_value_;
     Common::Redis::RespValuePtr pending_response_;
     CommandSplitter::SplitRequestPtr request_handle_;
+    // When this PendingRequest is a HELLO N AUTH ... whose inline-auth check was deferred to
+    // the external auth provider, holds N (the requested protocol version). On
+    // onAuthenticateExternal, ProxyFilter consults this to emit the deferred HELLO Map (and
+    // flip the downstream RESP version) on success or an error reply on failure, instead of
+    // the +OK that the AUTH-command path emits.
+    absl::optional<uint32_t> pending_hello_auth_version_;
   };
 
   void onQuit(PendingRequest& request);
@@ -150,7 +220,18 @@ private:
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
   bool checkPassword(const std::string& password);
+  // Inline-auth path used by HELLO N AUTH ... handling. Local-credentials case returns
+  // Allowed (flipping connection_allowed_) or Denied. External-auth case stashes
+  // ``requested_version`` on ``request`` and kicks off ``authenticateExternal``, returning
+  // ``Pending``; ``onAuthenticateExternal`` then emits the deferred HELLO Map / error.
+  CommandSplitter::SplitCallbacks::AuthAttempt
+  attemptDownstreamAuthInline(PendingRequest& request, const std::string& username,
+                              const std::string& password, uint32_t requested_version);
   void processRespValue(Common::Redis::RespValuePtr&& value, PendingRequest& request);
+  // Drain any pending_request_value_ entries left in pending_requests_ after an external-auth
+  // round trip resolved (called from onAuthenticateExternal). Walks the entire list in FIFO
+  // order, not just the front, and bails if a resumed entry starts a new round trip.
+  void resumeAuthHeldRequests();
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
@@ -160,6 +241,12 @@ private:
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
+  // Each fresh downstream connection starts in RESP2 — matches real Redis,
+  // which serves a legacy client that never sends HELLO over RESP2 even when
+  // the server is RESP3-capable. setDownstreamRespVersion mutates this in
+  // place when a client's HELLO negotiates a new version (within the cluster
+  // cap; see SplitCallbacks::clusterRespVersion()).
+  uint32_t downstream_resp_version_{2};
   Common::Redis::Client::Transaction transaction_;
   bool connection_quit_;
   ExternalAuth::ExternalAuthClientPtr auth_client_;

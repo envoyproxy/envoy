@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
@@ -55,6 +56,15 @@ public:
    */
   virtual void onRedirection(RespValuePtr&& value, const std::string& host_address,
                              bool ask_redirection) PURE;
+
+  /**
+   * Called when a canceled PendingRequest is processed (popped without firing onResponse /
+   * onFailure / onRedirection). Default no-op — most callbacks have no per-cancel cleanup.
+   * Wrapper callbacks (e.g. ClientImpl::HeldUserRequest) override this to release themselves
+   * after the live PendingRequest that referenced them is gone, avoiding a dangling reference
+   * in PendingRequest::callbacks_ between the cancel and the eventual processing.
+   */
+  virtual void onCancelComplete() {}
 };
 
 /**
@@ -67,6 +77,7 @@ public:
   void onResponse(Common::Redis::RespValuePtr&&) override {}
   void onFailure() override {}
   void onRedirection(Common::Redis::RespValuePtr&&, const std::string&, bool) override {}
+  // onCancelComplete inherits the base no-op.
 };
 
 /**
@@ -102,14 +113,13 @@ public:
   virtual PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) PURE;
 
   /**
-   * Initialize the connection. Issue the auth command and readonly command as needed.
-   * @param auth password for upstream host.
+   * Initialize the connection. Drives the AUTH / HELLO 3 / READONLY / AWS IAM negotiation
+   * pipeline owned by the implementation; until this returns and any deferred init step
+   * (HELLO 3 ack, IAM token fetch) completes, user makeRequest calls are held internally.
+   * @param auth_username username for upstream host (RESP2 ACL or HELLO 3 AUTH user).
+   * @param auth_password password for upstream host.
    */
   virtual void initialize(const std::string& auth_username, const std::string& auth_password) PURE;
-
-  virtual void sendAwsIamAuth(
-      const std::string& auth_username,
-      const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
@@ -222,6 +232,14 @@ public:
    * @param is_transaction_client true if this client was created to relay a transaction.
    * @param aws_iam_config supplies the AWS IAM configuration from protobuf
    * @param aws_iam_authenticator supplies the AWS IAM authenticator created during config
+   * @param upstream_protocol_version selects the upstream RESP protocol negotiated on the new
+   *        connection. RESP3 triggers a HELLO 3 handshake from ClientImpl::initialize; anything
+   *        else (RESP2 / UNSPECIFIED) keeps the legacy behavior.
+   * @param upstream_resp3_hello_failure optional counter incremented on every HELLO 3 negotiation
+   *        failure (error reply, wrong reply shape, redirection, network failure). Nullable so
+   *        callers that do not own a per-cluster RedisClusterStats (e.g. the redis health checker)
+   *        do not have to fabricate one. Increments are guarded by a nullptr check at the
+   *        increment site.
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(
@@ -231,7 +249,10 @@ public:
       bool is_transaction_client,
       absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-          aws_iam_authenticator) PURE;
+          aws_iam_authenticator,
+      envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
+          Version upstream_protocol_version,
+      Stats::Counter* upstream_resp3_hello_failure = nullptr) PURE;
 };
 
 // A MULTI command sent when starting a transaction.
@@ -282,8 +303,7 @@ struct Transaction {
 
   // The key which represents the transaction hash slot.
   std::string key_;
-  // clients_[0] represents the main connection, clients_[1..n] are for
-  // the mirroring policies.
+  // clients_[0] represents the main connection, clients_[1..n] are for the mirroring policies.
   std::vector<ClientPtr> clients_;
   Network::ConnectionCallbacks* connection_cb_;
 

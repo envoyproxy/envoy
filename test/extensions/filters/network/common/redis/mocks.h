@@ -30,6 +30,7 @@ public:
   ~MockEncoder() override;
 
   MOCK_METHOD(void, encode, (const Common::Redis::RespValue& value, Buffer::Instance& out));
+  MOCK_METHOD(void, setProtocolVersion, (Common::Redis::RespProtocolVersion version));
 
 private:
   Common::Redis::EncoderImpl real_encoder_;
@@ -88,9 +89,6 @@ public:
   MOCK_METHOD(PoolRequest*, makeRequest_,
               (const Common::Redis::RespValue& request, ClientCallbacks& callbacks));
   MOCK_METHOD(void, initialize, (const std::string& username, const std::string& password));
-  MOCK_METHOD(void, sendAwsIamAuth,
-              (const std::string& auth_username,
-               const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config));
 
   std::list<Network::ConnectionCallbacks*> callbacks_;
   std::list<ClientCallbacks*> client_callbacks_;

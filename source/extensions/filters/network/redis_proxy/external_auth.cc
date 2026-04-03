@@ -81,9 +81,15 @@ void GrpcExternalAuthClient::onSuccess(
     auth_response->message = response->message();
   }
 
-  callback_->onAuthenticateExternal(*pending_request_, std::move(auth_response));
+  // Snapshot then null the in-flight state BEFORE invoking the callback. The callback can
+  // dispatch a held AUTH or HELLO N AUTH ... that synchronously calls authenticateExternal()
+  // again (HELLO AUTH external-auth held-queue resume); that re-entry asserts callback_ ==
+  // nullptr and pending_request_ == nullptr, so we have to release them first.
+  auto* callback = callback_;
+  auto* pending_request = pending_request_;
   callback_ = nullptr;
   pending_request_ = nullptr;
+  callback->onAuthenticateExternal(*pending_request, std::move(auth_response));
 }
 
 // Callback method called when the request fails.
@@ -97,9 +103,13 @@ void GrpcExternalAuthClient::onFailure(Grpc::Status::GrpcStatus status, const st
       std::make_unique<AuthenticateResponse>(AuthenticateResponse{});
   auth_response->status = AuthenticationRequestStatus::Error;
   auth_response->message = message;
-  callback_->onAuthenticateExternal(*pending_request_, std::move(auth_response));
+  // Same release-then-invoke ordering as onSuccess — the callback may re-enter
+  // authenticateExternal() to start a second round trip on behalf of a resumed held request.
+  auto* callback = callback_;
+  auto* pending_request = pending_request_;
   callback_ = nullptr;
   pending_request_ = nullptr;
+  callback->onAuthenticateExternal(*pending_request, std::move(auth_response));
 }
 
 } // namespace ExternalAuth

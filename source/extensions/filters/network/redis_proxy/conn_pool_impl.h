@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
@@ -43,7 +44,8 @@ namespace ConnPool {
 #define REDIS_CLUSTER_STATS(COUNTER)                                                               \
   COUNTER(upstream_cx_drained)                                                                     \
   COUNTER(max_upstream_unknown_connections_reached)                                                \
-  COUNTER(connection_rate_limited)
+  COUNTER(connection_rate_limited)                                                                 \
+  COUNTER(upstream_resp3_hello_failure)
 
 struct RedisClusterStats {
   REDIS_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -225,6 +227,13 @@ private:
         aws_iam_authenticator_;
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
     std::string client_zone_; // Zone from node.locality.zone
+    // Per-cluster upstream RESP version, refreshed on every cluster
+    // add/update in onClusterAddOrUpdateNonVirtual. Defaults to RESP2 so
+    // clusters without a RedisProtocolOptions extension (or with an
+    // UNSPECIFIED upstream_protocol) do not attempt HELLO 3.
+    envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::UpstreamProtocol::
+        Version upstream_protocol_version_{envoy::extensions::filters::network::redis_proxy::v3::
+                                               RedisProtocolOptions::UpstreamProtocol::RESP2};
   };
 
   const std::string& localZone() const { return local_zone_; }

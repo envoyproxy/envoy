@@ -126,12 +126,38 @@ public:
 
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
   Common::Redis::Client::Transaction& transaction() override { return transaction_; }
+  void setDownstreamRespVersion(uint32_t version) override { downstream_resp_version_ = version; }
+  uint32_t clusterRespVersion() const override { return cluster_resp_version_; }
 
   MOCK_METHOD(bool, connectionAllowed, ());
   MOCK_METHOD(void, onQuit, ());
   MOCK_METHOD(void, onAuth, (const std::string& password));
   MOCK_METHOD(void, onAuth, (const std::string& username, const std::string& password));
   MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
+
+  uint32_t currentDownstreamRespVersion() const override { return downstream_resp_version_; }
+  void closeDownstreamAfterResponse() override { close_downstream_after_response_called_ = true; }
+  // The mock returns whatever ``inline_auth_attempt_`` is set to. Tests that exercise
+  // HELLO N AUTH ... must set inline_auth_attempt_ explicitly before driving the request —
+  // the default ``Denied`` keeps tests that do not exercise HELLO AUTH safe (a stray
+  // attempt fails loudly with a WRONGPASS reply rather than silently emitting nothing,
+  // which the deferred ``Pending`` case would).
+  AuthAttempt attemptDownstreamAuthInline(const std::string& username, const std::string& password,
+                                          uint32_t requested_version) override {
+    last_inline_auth_username_ = username;
+    last_inline_auth_password_ = password;
+    last_inline_auth_requested_version_ = requested_version;
+    return inline_auth_attempt_;
+  }
+
+  uint32_t downstream_resp_version_{2};
+  // Default RESP3; tests covering the RESP2-cluster ceiling drive this to 2.
+  uint32_t cluster_resp_version_{3};
+  AuthAttempt inline_auth_attempt_{AuthAttempt::Denied};
+  bool close_downstream_after_response_called_{false};
+  std::string last_inline_auth_username_;
+  std::string last_inline_auth_password_;
+  uint32_t last_inline_auth_requested_version_{0};
 
 private:
   Common::Redis::Client::NoOpTransaction transaction_;

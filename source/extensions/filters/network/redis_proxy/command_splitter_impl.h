@@ -158,6 +158,23 @@ public:
   }
   void onResponse(Common::Redis::RespValuePtr&& response) override;
   Common::Redis::Client::Transaction& transaction() override { return callbacks_.transaction(); }
+  void setDownstreamRespVersion(uint32_t version) override {
+    callbacks_.setDownstreamRespVersion(version);
+  }
+  uint32_t clusterRespVersion() const override { return callbacks_.clusterRespVersion(); }
+  AuthAttempt attemptDownstreamAuthInline(const std::string& u, const std::string& p,
+                                          uint32_t requested_version) override {
+    return callbacks_.attemptDownstreamAuthInline(u, p, requested_version);
+  }
+  // Forward the version state through the decorator so any command answered through this
+  // wrapper is encoded against the real filter's per-connection RESP version, not the
+  // default RESP2. (HELLO is dispatched before fault injection runs and so does not flow
+  // through DelayFaultRequest in practice; the forward stays correct for any future fault-
+  // wrapped command that observes the version.)
+  uint32_t currentDownstreamRespVersion() const override {
+    return callbacks_.currentDownstreamRespVersion();
+  }
+  void closeDownstreamAfterResponse() override { callbacks_.closeDownstreamAfterResponse(); }
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;

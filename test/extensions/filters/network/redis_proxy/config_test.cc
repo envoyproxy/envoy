@@ -7,11 +7,13 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/upstream/cluster_info.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -402,6 +404,62 @@ credentials:
   const auto credentials9 = config.authCredentials(api, host9);
   EXPECT_EQ("default_username", credentials9.username);
   EXPECT_EQ("default_password", credentials9.password);
+}
+
+// =============================================================================
+// Cluster-scoped RedisProtocolOptions.upstream_protocol accessor tests.
+//
+// Cover the ProtocolOptionsConfigImpl::upstreamProtocolVersion static
+// accessor: default (no options / UNSPECIFIED -> RESP2) and explicit RESP3.
+// =============================================================================
+
+namespace {
+
+// Build a minimal MockClusterInfo with the given RedisProtocolOptions attached
+// via the standard typed_extension_protocol_options surface. If `options` is
+// nullptr, no extension is registered so accessors must fall back to defaults.
+Upstream::ClusterInfoConstSharedPtr
+makeClusterInfoWithOptions(std::shared_ptr<ProtocolOptionsConfigImpl> options) {
+  auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  ON_CALL(*cluster_info, extensionProtocolOptions(NetworkFilterNames::get().RedisProxy))
+      .WillByDefault(Return(options));
+  return cluster_info;
+}
+
+} // namespace
+
+TEST(RedisProxyFilterProtocolOptionsConfigImplTest, UpstreamVersionDefaultIsResp2) {
+  auto info = makeClusterInfoWithOptions(nullptr);
+  EXPECT_EQ(envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
+                UpstreamProtocol::RESP2,
+            ProtocolOptionsConfigImpl::upstreamProtocolVersion(info));
+}
+
+TEST(RedisProxyFilterProtocolOptionsConfigImplTest, UpstreamVersionUnspecifiedMapsToResp2) {
+  const std::string yaml = R"EOF(
+upstream_protocol: {}
+  )EOF";
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  auto options = std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
+  auto info = makeClusterInfoWithOptions(options);
+  EXPECT_EQ(envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
+                UpstreamProtocol::RESP2,
+            ProtocolOptionsConfigImpl::upstreamProtocolVersion(info));
+}
+
+TEST(RedisProxyFilterProtocolOptionsConfigImplTest, UpstreamVersionResp3) {
+  const std::string yaml = R"EOF(
+upstream_protocol:
+  version: RESP3
+  )EOF";
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  auto options = std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
+  auto info = makeClusterInfoWithOptions(options);
+  EXPECT_EQ(envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions::
+                UpstreamProtocol::RESP3,
+            ProtocolOptionsConfigImpl::upstreamProtocolVersion(info));
 }
 
 } // namespace RedisProxy
