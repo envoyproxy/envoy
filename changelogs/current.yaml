@@ -126,6 +126,18 @@ minor_behavior_changes:
     and the caller does not want to manage shared pointer ownership. The new shared pointer methods
     are intended for use cases where the caller needs to keep the ownerships to the route, cluster,
     or virtual host.
+- area: http
+  change: |
+    ``StreamRateLimiter`` constructor was updated to always take a pre-constructed and initialized
+    ``TokenBucket``, and remove the first argument ``max_buffered_data`` and the ``TimeSource&``
+    argument.
+    The ``write_stats_cb`` callback signature was changed from taking a ``bool`` argument
+    "something is buffered" to a ``uint64_t`` "how many bytes are buffered".
+    If already initializing with a ``TokenBucket``, you may need to call ``maybeReset`` on that
+    bucket before passing it to ``StreamRateLimiter`` to ensure equivalent initialization.
+    If previously constructing a ``StreamRateLimiter`` using ``max_buffered_data``, use
+    ``StreamRateLimiter::simpleTokenBucket(limit_kbps, time_source)`` to initialize an equivalent
+    ``TokenBucket``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
