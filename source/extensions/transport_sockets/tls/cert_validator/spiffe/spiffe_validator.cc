@@ -253,7 +253,7 @@ absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
 
   auto spiffe_data = getSpiffeData();
   for (auto& ca : spiffe_data->ca_certs_) {
-    const X509_NAME* name = X509_get_subject_name(ca.get());
+    X509_NAME* name = X509_get_subject_name(ca.get());
 
     // Check for duplicates.
     if (sk_X509_NAME_find(list.get(), nullptr, name)) {

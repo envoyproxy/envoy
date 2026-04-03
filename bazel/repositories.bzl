@@ -310,6 +310,22 @@ def _aws_lc():
         name = "aws_lc",
         build_file = "@envoy//bazel/external:aws_lc.BUILD",
     )
+    NINJA_BUILD_CONTENT = "%s\nexports_files([\"configure.py\"])" % BUILD_ALL_CONTENT
+    CMAKE_SOURCE_BUILD_CONTENT = "%s\nexports_files([\"bootstrap\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_cmake_src",
+        build_file_content = CMAKE_SOURCE_BUILD_CONTENT,
+    )
+    CLANG_BUILD_CONTENT = "%s\nexports_files([\"bin/clang\", \"bin/clang++\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_clang_ppc64le",
+        build_file_content = CLANG_BUILD_CONTENT,
+    )
+    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % _build_all_content(["test/**"])
+    external_http_archive(
+        name = "fips_go_ppc64le",
+        build_file_content = GO_BUILD_CONTENT,
+    )
 
 def _com_github_openhistogram_libcircllhist():
     external_http_archive(

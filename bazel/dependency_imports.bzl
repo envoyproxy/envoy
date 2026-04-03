@@ -172,6 +172,7 @@ def envoy_dependency_imports(
         importpath = "cel.dev/expr",
         sum = "h1:1KrZg61W6TWSxuNZ37Xy49ps13NUovb66QLprthtwi4=",
         version = "v0.25.1",
+        build_external = "external",
     )
     go_repository(
         name = "com_github_spf13_afero",
