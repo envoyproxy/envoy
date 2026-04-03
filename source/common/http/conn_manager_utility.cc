@@ -18,6 +18,7 @@
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/path_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/json/json_streamer.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -449,11 +450,90 @@ namespace {
 
 // Helper functions to apply forward client cert logic.
 
-// Base implementation that takes the forward client cert type and details directly.
+// Append a single XFCC JSON object into the output string using the cert information from the
+// connection. The caller is responsible for the surrounding array delimiters.
+void appendXfccJsonObject(
+    std::string& output, Network::Connection& connection,
+    const std::vector<ClientCertDetailsType>& set_current_client_cert_details) {
+  Json::StreamerBase<Json::StringOutput> streamer(output);
+  {
+    auto root = streamer.makeRootMap();
+    const auto uri_sans_local_cert = connection.ssl()->uriSanLocalCertificate();
+    if (!uri_sans_local_cert.empty()) {
+      root->addKey("by");
+      auto arr = root->addArray();
+      for (const std::string& uri : uri_sans_local_cert) {
+        arr->addString(uri);
+      }
+    }
+    const std::string& cert_digest = connection.ssl()->sha256PeerCertificateDigest();
+    if (!cert_digest.empty()) {
+      root->addKey("hash");
+      root->addString(cert_digest);
+    }
+    for (const auto& detail : set_current_client_cert_details) {
+      switch (detail) {
+      case ClientCertDetailsType::Cert: {
+        const std::string& peer_cert = connection.ssl()->pemEncodedPeerCertificate();
+        if (!peer_cert.empty()) {
+          root->addKey("cert");
+          root->addString(peer_cert);
+        }
+        break;
+      }
+      case ClientCertDetailsType::Chain: {
+        const absl::Span<const std::string> peer_certs =
+            connection.ssl()->pemEncodedPeerCertificateChain();
+        if (!peer_certs.empty()) {
+          root->addKey("chain");
+          auto arr = root->addArray();
+          for (const std::string& cert : peer_certs) {
+            arr->addString(cert);
+          }
+        }
+        break;
+      }
+      case ClientCertDetailsType::Subject: {
+        const std::string& subject = connection.ssl()->subjectPeerCertificate();
+        if (!subject.empty()) {
+          root->addKey("subject");
+          root->addString(subject);
+        }
+        break;
+      }
+      case ClientCertDetailsType::URI: {
+        const auto uri_sans = connection.ssl()->uriSanPeerCertificate();
+        if (!uri_sans.empty()) {
+          root->addKey("uri");
+          auto arr = root->addArray();
+          for (const std::string& uri : uri_sans) {
+            arr->addString(uri);
+          }
+        }
+        break;
+      }
+      case ClientCertDetailsType::DNS: {
+        auto dns_sans = connection.ssl()->dnsSansPeerCertificate();
+        if (!dns_sans.empty()) {
+          root->addKey("dns");
+          auto arr = root->addArray();
+          for (const std::string& dns : dns_sans) {
+            arr->addString(dns);
+          }
+        }
+        break;
+      }
+      }
+    }
+  }
+}
+
+// Base implementation that takes the forward client cert type, details, and format directly.
 void applyForwardClientCertConfig(
     RequestHeaderMap& request_headers, Network::Connection& connection,
     ForwardClientCertType forward_client_cert,
-    const std::vector<ClientCertDetailsType>& set_current_client_cert_details) {
+    const std::vector<ClientCertDetailsType>& set_current_client_cert_details,
+    ClientCertFormat format) {
   // When AlwaysForwardOnly is set, always forward the XFCC header without modification.
   if (forward_client_cert == ForwardClientCertType::AlwaysForwardOnly) {
     return;
@@ -473,68 +553,99 @@ void applyForwardClientCertConfig(
   // TODO(myidpt): Handle the special characters in By and URI fields.
   // TODO: Optimize client_cert_details based on perf analysis (direct string appending may be more
   // preferable).
-  std::vector<std::string> client_cert_details;
+  std::string client_cert_details_str;
   // When AppendForward or SanitizeSet is set, the client certificate information should be set into
   // the XFCC header.
   if (forward_client_cert == ForwardClientCertType::AppendForward ||
       forward_client_cert == ForwardClientCertType::SanitizeSet) {
-    const auto uri_sans_local_cert = connection.ssl()->uriSanLocalCertificate();
-    if (!uri_sans_local_cert.empty()) {
-      for (const std::string& uri : uri_sans_local_cert) {
-        client_cert_details.push_back(absl::StrCat("By=", uri));
+    // Determine the effective format. For AppendForward with an existing value, match the format
+    // of the existing value rather than the configured format to avoid mixing formats.
+    ClientCertFormat effective_format = format;
+    absl::string_view existing_xfcc;
+    if (forward_client_cert == ForwardClientCertType::AppendForward) {
+      existing_xfcc = request_headers.getForwardedClientCertValue();
+      if (!existing_xfcc.empty()) {
+        effective_format = (existing_xfcc.front() == '[' && existing_xfcc.back() == ']')
+                               ? ClientCertFormat::Json
+                               : ClientCertFormat::Text;
       }
     }
-    const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
-    if (!cert_digest.empty()) {
-      client_cert_details.push_back(absl::StrCat("Hash=", cert_digest));
-    }
-    for (const auto& detail : set_current_client_cert_details) {
-      switch (detail) {
-      case ClientCertDetailsType::Cert: {
-        const std::string peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
-        if (!peer_cert.empty()) {
-          client_cert_details.push_back(absl::StrCat("Cert=\"", peer_cert, "\""));
-        }
-        break;
+
+    if (effective_format == ClientCertFormat::Json) {
+      std::string result;
+      if (!existing_xfcc.empty()) {
+        // Existing JSON array — splice the new object in before the closing ']'.
+        result.reserve(existing_xfcc.size());
+        result.append(existing_xfcc.data(), existing_xfcc.size() - 1);
+        result.append(",");
+      } else {
+        result.append("[");
       }
-      case ClientCertDetailsType::Chain: {
-        const std::string peer_chain = connection.ssl()->urlEncodedPemEncodedPeerCertificateChain();
-        if (!peer_chain.empty()) {
-          client_cert_details.push_back(absl::StrCat("Chain=\"", peer_chain, "\""));
+      appendXfccJsonObject(result, connection, set_current_client_cert_details);
+      result.append("]");
+      request_headers.setForwardedClientCert(result);
+      return;
+    } else {
+      std::vector<std::string> client_cert_details;
+      const absl::Span<const std::string> uri_sans_local_cert =
+          connection.ssl()->uriSanLocalCertificate();
+      if (!uri_sans_local_cert.empty()) {
+        for (const std::string& uri : uri_sans_local_cert) {
+          client_cert_details.push_back(absl::StrCat("By=", uri));
         }
-        break;
       }
-      case ClientCertDetailsType::Subject:
-        // The "Subject" key still exists even if the subject is empty.
-        client_cert_details.push_back(
-            absl::StrCat("Subject=\"", connection.ssl()->subjectPeerCertificate(), "\""));
-        break;
-      case ClientCertDetailsType::URI: {
-        // The "URI" key still exists even if the URI is empty.
-        const auto sans = connection.ssl()->uriSanPeerCertificate();
-        if (!sans.empty()) {
-          for (const std::string& uri : sans) {
-            client_cert_details.push_back(absl::StrCat("URI=", uri));
+      const std::string& cert_digest = connection.ssl()->sha256PeerCertificateDigest();
+      if (!cert_digest.empty()) {
+        client_cert_details.push_back(absl::StrCat("Hash=", cert_digest));
+      }
+      for (const auto& detail : set_current_client_cert_details) {
+        switch (detail) {
+        case ClientCertDetailsType::Cert: {
+          const std::string& peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
+          if (!peer_cert.empty()) {
+            client_cert_details.push_back(absl::StrCat("Cert=\"", peer_cert, "\""));
           }
-        } else {
-          client_cert_details.push_back("URI=");
+          break;
         }
-        break;
-      }
-      case ClientCertDetailsType::DNS: {
-        auto dns_sans = connection.ssl()->dnsSansPeerCertificate();
-        if (!dns_sans.empty()) {
-          for (const std::string& dns : dns_sans) {
-            client_cert_details.push_back(absl::StrCat("DNS=", dns));
+        case ClientCertDetailsType::Chain: {
+          const std::string& peer_chain =
+              connection.ssl()->urlEncodedPemEncodedPeerCertificateChain();
+          if (!peer_chain.empty()) {
+            client_cert_details.push_back(absl::StrCat("Chain=\"", peer_chain, "\""));
           }
+          break;
         }
-        break;
+        case ClientCertDetailsType::Subject:
+          // The "Subject" key still exists even if the subject is empty.
+          client_cert_details.push_back(
+              absl::StrCat("Subject=\"", connection.ssl()->subjectPeerCertificate(), "\""));
+          break;
+        case ClientCertDetailsType::URI: {
+          // The "URI" key still exists even if the URI is empty.
+          const absl::Span<const std::string> sans = connection.ssl()->uriSanPeerCertificate();
+          if (!sans.empty()) {
+            for (const std::string& uri : sans) {
+              client_cert_details.push_back(absl::StrCat("URI=", uri));
+            }
+          } else {
+            client_cert_details.push_back("URI=");
+          }
+          break;
+        }
+        case ClientCertDetailsType::DNS: {
+          const absl::Span<const std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
+          if (!dns_sans.empty()) {
+            for (const std::string& dns : dns_sans) {
+              client_cert_details.push_back(absl::StrCat("DNS=", dns));
+            }
+          }
+          break;
+        }
+        }
       }
-      }
+      client_cert_details_str = absl::StrJoin(client_cert_details, ";");
     }
   }
-
-  const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
 
   ENVOY_BUG(forward_client_cert == ForwardClientCertType::AppendForward ||
                 forward_client_cert == ForwardClientCertType::SanitizeSet,
@@ -563,14 +674,15 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
           match_result.action()->getTyped<ForwardClientCertActionConfig>();
       applyForwardClientCertConfig(request_headers, connection,
                                    forward_client_cert_action.forwardClientCertType(),
-                                   forward_client_cert_action.setCurrentClientCertDetails());
+                                   forward_client_cert_action.setCurrentClientCertDetails(),
+                                   forward_client_cert_action.clientCertFormat());
       return;
     }
   }
 
   // Fall back to static config if no matcher or no match.
   applyForwardClientCertConfig(request_headers, connection, config.forwardClientCert(),
-                               config.setCurrentClientCertDetails());
+                               config.setCurrentClientCertDetails(), config.clientCertFormat());
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,

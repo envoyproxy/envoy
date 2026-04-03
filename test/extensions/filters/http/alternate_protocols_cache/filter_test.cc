@@ -126,9 +126,8 @@ TEST_F(FilterTest, ValidAltSvc) {
   EXPECT_CALL(callbacks_, streamInfo())
       .Times(testing::AtLeast(1))
       .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
-  EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo())
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(Return(info));
+  callbacks_.stream_info_.upstream_cluster_info_ = info;
+  EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
   EXPECT_CALL(callbacks_.stream_info_, upstreamInfo()).Times(testing::AtLeast(1));
   // Get the pointer to MockHostDescription.
   std::shared_ptr<const Upstream::MockHostDescription> hd =
@@ -180,9 +179,8 @@ TEST_F(FilterTest, ValidAltSvcMissingPort) {
   EXPECT_CALL(callbacks_, streamInfo())
       .Times(testing::AtLeast(1))
       .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
-  EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo())
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(Return(info));
+  callbacks_.stream_info_.upstream_cluster_info_ = info;
+  EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
   EXPECT_CALL(callbacks_.stream_info_, upstreamInfo()).Times(testing::AtLeast(1));
   // Get the pointer to MockHostDescription.
   std::shared_ptr<const Upstream::MockHostDescription> hd =

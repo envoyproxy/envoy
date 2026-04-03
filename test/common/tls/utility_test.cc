@@ -8,6 +8,7 @@
 #include "source/common/tls/utility.h"
 
 #include "test/common/tls/ssl_test_utility.h"
+#include "test/common/tls/test_data/intermediate_ca_cert_info.h"
 #include "test/common/tls/test_data/long_validity_cert_info.h"
 #include "test/common/tls/test_data/san_dns_cert_info.h"
 #include "test/test_common/environment.h"
@@ -179,6 +180,30 @@ TEST(UtilityTest, TestGetSerialNumber) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
   EXPECT_EQ(TEST_SAN_DNS_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSha256DigestFromCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  EXPECT_EQ(TEST_SAN_DNS_CERT_256_HASH, Utility::getSha256DigestFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSha1DigestFromCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  EXPECT_EQ(TEST_SAN_DNS_CERT_1_HASH, Utility::getSha1DigestFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSha256DigestFromIntermediateCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem"));
+  EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_256_HASH, Utility::getSha256DigestFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSha1DigestFromIntermediateCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem"));
+  EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_1_HASH, Utility::getSha1DigestFromCertificate(*cert));
 }
 
 TEST(UtilityTest, TestExpirationWithUnixTimeWithExpiredCert) {

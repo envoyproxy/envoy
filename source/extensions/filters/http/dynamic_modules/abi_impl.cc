@@ -2350,7 +2350,7 @@ bool envoy_dynamic_module_callback_http_set_upstream_override_host(
     return false;
   }
   filter->decoder_callbacks_->setUpstreamOverrideHost(
-      std::make_pair(std::string(host_view), strict));
+      Upstream::LoadBalancerContext::OverrideHost{std::string(host_view), strict});
   return true;
 }
 

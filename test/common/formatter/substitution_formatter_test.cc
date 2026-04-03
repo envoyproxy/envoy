@@ -1129,8 +1129,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     const std::string observable_cluster_name = "observability_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    stream_info.upstream_cluster_info_ = cluster_info_mock;
     EXPECT_CALL(*cluster_info_mock, observabilityName())
         .WillRepeatedly(ReturnRef(observable_cluster_name));
     EXPECT_EQ("observability_name", upstream_format.format({}, stream_info));
@@ -1140,8 +1139,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    stream_info.upstream_cluster_info_ = nullptr;
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
@@ -1150,8 +1148,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
     const std::string raw_cluster_name = "raw_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    stream_info.upstream_cluster_info_ = cluster_info_mock;
     EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(raw_cluster_name));
     EXPECT_EQ("raw_name", upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info),
@@ -1160,8 +1157,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER_RAW");
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
-    EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+    stream_info.upstream_cluster_info_ = nullptr;
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
@@ -2579,6 +2575,62 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::string issuer_hash =
+        "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+    EXPECT_CALL(*connection_info, sha256PeerCertificateIssuerDigest())
+        .WillRepeatedly(ReturnRef(issuer_hash));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+              upstream_format.format({}, stream_info));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, sha256PeerCertificateIssuerDigest())
+        .WillRepeatedly(ReturnRef(EMPTY_STRING));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256");
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER_SERIAL");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::string issuer_serial = "0123456789ABCDEF";
+    EXPECT_CALL(*connection_info, serialNumberPeerCertificateIssuer())
+        .WillRepeatedly(ReturnRef(issuer_serial));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("0123456789ABCDEF", upstream_format.format({}, stream_info));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER_SERIAL");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, serialNumberPeerCertificateIssuer())
+        .WillRepeatedly(ReturnRef(EMPTY_STRING));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER_SERIAL");
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string subject_peer =
@@ -3459,6 +3511,47 @@ TEST(SubstitutionFormatterTest, TraceIDFormatter) {
   {
     Context formatter_context;
     TraceIDFormatter formatter{};
+    EXPECT_EQ(absl::nullopt, formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+}
+
+TEST(SubstitutionFormatterTest, SpanIDFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+
+  {
+    // Span present with valid span ID.
+    Tracing::MockSpan active_span;
+    EXPECT_CALL(active_span, getSpanId()).WillRepeatedly(Return("4041424344454647"));
+
+    Context formatter_context;
+    formatter_context.setActiveSpan(active_span);
+
+    SpanIDFormatter formatter{};
+    EXPECT_EQ("4041424344454647", formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("4041424344454647")));
+  }
+
+  {
+    // No active span.
+    Context formatter_context;
+    SpanIDFormatter formatter{};
+    EXPECT_EQ(absl::nullopt, formatter.format(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    // Span present but getSpanId() returns empty (e.g., Zipkin, Datadog, SkyWalking).
+    Tracing::MockSpan active_span;
+    EXPECT_CALL(active_span, getSpanId()).WillRepeatedly(Return(""));
+
+    Context formatter_context;
+    formatter_context.setActiveSpan(active_span);
+
+    SpanIDFormatter formatter{};
     EXPECT_EQ(absl::nullopt, formatter.format(formatter_context, stream_info));
     EXPECT_THAT(formatter.formatValue(formatter_context, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
@@ -4531,17 +4624,15 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataTest) {
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   Context formatter_context;
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
-  absl::optional<std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>> cluster =
-      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(**cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
-  EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
-  EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
+  stream_info.upstream_cluster_info_ = cluster;
 
   const std::string expected_json_map = R"EOF({
     "test_key": "test_value",
@@ -4582,15 +4673,10 @@ TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataNoClusterInfoTest) {
                             key_mapping);
   JsonFormatterImpl formatter(key_mapping, false);
 
-  // Empty optional (absl::nullopt)
+  // No cluster info
   {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
-    EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format(formatter_context, stream_info),
-                                             expected_json_map));
-  }
-  // Empty cluster info (nullptr)
-  {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(nullptr));
+    EXPECT_CALL(Const(stream_info), upstreamClusterInfo())
+        .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
     EXPECT_TRUE(TestUtility::jsonStringEqual(formatter.format(formatter_context, stream_info),
                                              expected_json_map));
   }

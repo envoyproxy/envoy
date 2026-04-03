@@ -168,6 +168,8 @@ enum class ForwardClientCertType {
  */
 enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS };
 
+enum class ClientCertFormat { Text, Json };
+
 /**
  * Type that indicates how port should be stripped from Host header.
  */
@@ -429,6 +431,11 @@ public:
    * @return ForwardClientCertType the configuration of how to forward the client cert information.
    */
   virtual ForwardClientCertType forwardClientCert() const PURE;
+
+  /**
+   * @return ClientCertFormat the format to use for the XFCC header value (text or JSON).
+   */
+  virtual ClientCertFormat clientCertFormat() const PURE;
 
   /**
    * @return vector of ClientCertDetailsType the configuration of the current client cert's details
