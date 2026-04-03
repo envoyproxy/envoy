@@ -360,10 +360,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/zlib-ng/zlib-ng/archive/{version}.tar.gz"],
     ),
     yaml_cpp = dict(
-        version = "0.8.0",
-        sha256 = "fbe74bbdcee21d656715688706da3c8becfd946d92cd44705cc6098bb23b3a16",
-        strip_prefix = "yaml-cpp-{version}",
-        urls = ["https://github.com/jbeder/yaml-cpp/archive/{version}.tar.gz"],
+        version = "0.9.0",
+        sha256 = "25cb043240f828a8c51beb830569634bc7ac603978e0f69d6b63558dadefd49a",
+        strip_prefix = "yaml-cpp-yaml-cpp-{version}",
+        urls = ["https://github.com/jbeder/yaml-cpp/archive/refs/tags/yaml-cpp-{version}.tar.gz"],
         # YAML is also used for runtime as well as controlplane. It shouldn't appear on the
         # dataplane but we can't verify this automatically due to code structure today.
     ),
