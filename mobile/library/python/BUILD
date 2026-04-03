@@ -1,4 +1,5 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@mobile_pip3//:requirements.bzl", "requirement")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 load("@python_abi//:abi.bzl", "abi_tag", "python_tag")
 load("@rules_python//python:defs.bzl", "py_library")
@@ -93,7 +94,10 @@ py_library(
     ],
     imports = ["."],
     visibility = ["//visibility:public"],
-    deps = [":async_client"],
+    deps = [
+        ":async_client",
+        requirement("httpx"),
+    ],
 )
 
 py_package(
