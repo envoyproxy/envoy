@@ -67,8 +67,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
     ),
     aws_lc = dict(
-        version = "1.66.2",
-        sha256 = "d64a46b4f75fa5362da412f1e96ff5b77eed76b3a95685651f81a558c5c9e126",
+        version = "1.71.0",
+        sha256 = "31b1eed775294825f084c0d4e09df53e1cf036fb98a202a8c2c342543828a985",
         strip_prefix = "aws-lc-{version}",
         urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
     ),
