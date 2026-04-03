@@ -59,10 +59,6 @@ class ExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationPara
                                           public HttpIntegrationTest {
 public:
   ExtensionDiscoveryIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'listener_manager.lds.grpc.lds_cluster.streams_closed_10' and stat_prefix 'lds_cluster'.
-    skip_tag_extraction_rule_check_ = true;
   }
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,

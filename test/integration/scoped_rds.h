@@ -31,11 +31,6 @@ protected:
   };
 
   ScopedRdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'http.scoped_rds.foo-scoped-routes.grpc.srds_cluster.streams_closed_16' and stat_prefix
-    // 'srds_cluster'.
-    skip_tag_extraction_rule_check_ = true;
 
     config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
                                       (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||

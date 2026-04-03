@@ -239,6 +239,12 @@ TagNameValues::TagNameValues() {
   // grpc.(<stat_prefix>).**
   addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "grpc.$.**");
 
+  // [*.]grpc.(<stat_prefix>.)streams_closed_<gRPC_status_code>
+  // Handles gRPC client stats where the stat_prefix is embedded inside a longer
+  // stat name (e.g. listener_manager.lds.grpc.(<lds_cluster>.)streams_closed_1,
+  // sds.client_cert.grpc.(<sds_cluster>.)streams_closed_12).
+  addRe2(GOOGLE_GRPC_CLIENT_PREFIX, R"(\.grpc\.((.+)\.streams_closed_\d+)$)", ".grpc.");
+
   // listener.[<address>.]ssl.certificate.(<cert_name>).<metric_name> or
   // cluster.[<cluster_name>.]ssl.certificate.(<cert_name>).<metric_name>
   addRe2(TLS_CERTIFICATE,
