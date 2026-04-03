@@ -60,9 +60,9 @@ public:
   static constexpr OverloadActionState saturated() { return OverloadActionState(UnitFloat::max()); }
 
   explicit constexpr OverloadActionState(UnitFloat value) : action_value_(value) {
-    if (value.value() == UnitFloat::min().value()) {
+    if (value == UnitFloat::min()) {
       phase_ = Phase::Inactive;
-    } else if (value.value() == UnitFloat::max().value()) {
+    } else if (value == UnitFloat::max()) {
       phase_ = Phase::Saturated;
     } else {
       phase_ = Phase::Scaling;
@@ -75,7 +75,7 @@ public:
 
 private:
   UnitFloat action_value_;
-  Phase phase_{Phase::Inactive};
+  Phase phase_ = Phase::Inactive;
 };
 
 /**

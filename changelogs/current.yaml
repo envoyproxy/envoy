@@ -886,8 +886,11 @@ new_features:
 - area: http
   change: |
     Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
-    which will close idle downstream HTTP connections (including HTTP/3 QUIC) when the overload
-    manager enters the active state.
+    which will close idle downstream HTTP connections when the overload action is active.
+    This is an opt-in feature; once the global overload action is configured, it must
+    also be enabled per-listener via the new
+    :ref:`close_idle_connections_when_overloaded <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.close_idle_connections_when_overloaded>`
+    field in the QUIC protocol options.
 
 - area: contrib
   change: |

@@ -310,8 +310,8 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
 }
 
 void ConnectionHandlerImpl::closeIdleHttpConnections(bool is_saturated) {
-  for (auto& iter : listener_map_by_tag_) {
-    iter.second->invokeListenerMethod(
+  for (const auto& [tag, listener] : listener_map_by_tag_) {
+    listener->invokeListenerMethod(
         [is_saturated](Network::ConnectionHandler::ActiveListener& active_listener) {
           if (active_listener.listener() != nullptr &&
               !active_listener.listener()->shouldBypassOverloadManager()) {

@@ -59,9 +59,6 @@ public:
   Network::Listener* listener() override { return listener_.get(); }
   Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) override;
-  void onCloseIdleHttpConnections(bool /*is_saturated*/) override {
-    // TODO(panting): Implement this.
-  };
 
   void pauseListening() override;
   void resumeListening() override;
