@@ -231,7 +231,8 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
 
 TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
   if (GetParam() == Network::Address::IpVersion::v6) {
-    return; // Skip for IPv6 due to log throttling in periodic logs as IPv4 and IPv6 run in the same process.
+    return; // Skip for IPv6 due to log throttling in periodic logs as IPv4 and IPv6 run in the same
+            // process.
   }
   const std::string config_yaml = R"EOF(
               name: envoy.access_loggers.stats
