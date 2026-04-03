@@ -9,6 +9,7 @@
 #include "envoy/http/codec.h"
 
 #include "source/common/http/codec_helper.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -49,6 +50,9 @@ public:
                 [this]() { switchStreamBlockState(); })) {
     if (http3_options_.disable_connection_flow_control_for_streams()) {
       quic_stream_.DisableConnectionFlowControlForThisStream();
+    }
+    if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http3_options_, disallow_obs_text, true)) {
+      header_validator_.SetObsTextOption(http2::adapter::ObsTextOption::kAllow);
     }
   }
 

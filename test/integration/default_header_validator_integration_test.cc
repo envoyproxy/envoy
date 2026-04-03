@@ -80,7 +80,7 @@ public:
     // All codecs allow the following characters that are outside of RFC "<>[]^`{}\|
     std::string additionally_allowed_characters(R"--("<>[]^`{}\|)--");
     if (downstream_protocol_ == Http::CodecType::HTTP2) {
-      // Both nghttp2 and oghttp2 allow extended ASCII >= 0x80 in path
+      // Both nghttp2 and oghttp2 allow extended ASCII >= 0x80 in path.
       additionally_allowed_characters += generateExtendedAsciiString();
     }
     return additionally_allowed_characters;
