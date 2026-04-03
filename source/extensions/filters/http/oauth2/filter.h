@@ -336,8 +336,6 @@ public:
 
   OAuth2Filter(FilterConfigSharedPtr default_config, OAuth2ClientFactory oauth_client_factory,
                TimeSource& time_source, Random::RandomGenerator& random);
-  OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
-               TimeSource& time_source, Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;

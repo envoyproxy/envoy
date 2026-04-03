@@ -618,14 +618,6 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr default_config,
   }
 }
 
-OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
-                           std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source,
-                           Random::RandomGenerator& random)
-    : oauth_client_(std::move(oauth_client)), default_config_(std::move(config)),
-      time_source_(time_source), random_(random) {
-  setActiveConfig(default_config_);
-}
-
 void OAuth2Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   PassThroughDecoderFilter::setDecoderFilterCallbacks(callbacks);
   if (oauth_client_ != nullptr) {

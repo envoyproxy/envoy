@@ -122,12 +122,22 @@ public:
   void init(FilterConfigSharedPtr config) {
     // Set up the OAuth client.
     oauth_client_ = new MockOAuth2Client();
-    std::unique_ptr<OAuth2Client> oauth_client_ptr{oauth_client_};
+    auto oauth_client_holder =
+        std::make_shared<std::unique_ptr<OAuth2Client>>(std::unique_ptr<OAuth2Client>{oauth_client_});
 
     config_ = config;
     ON_CALL(test_random_, random()).WillByDefault(Return(123456789));
-    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), test_time_,
-                                             test_random_);
+    filter_ = std::make_shared<OAuth2Filter>(
+        config_, [this, oauth_client_holder](const FilterConfigSharedPtr&)
+                     -> std::unique_ptr<OAuth2Client> {
+          if (*oauth_client_holder != nullptr) {
+            return std::move(*oauth_client_holder);
+          }
+
+          oauth_client_ = new MockOAuth2Client();
+          return std::unique_ptr<OAuth2Client>{oauth_client_};
+        },
+        test_time_, test_random_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     validator_ = std::make_shared<MockOAuth2CookieValidator>();
