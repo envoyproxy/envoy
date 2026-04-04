@@ -1,13 +1,22 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
+#include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "nlohmann/json.hpp" // IWYU pragma: keep
 
 namespace Envoy {
@@ -18,8 +27,7 @@ namespace McpJsonRestBridge {
 /**
  * Configuration for the MCP JSON REST Bridge filter.
  */
-class McpJsonRestBridgeFilterConfig : public Router::RouteSpecificFilterConfig,
-                                      public Logger::Loggable<Logger::Id::config> {
+class McpJsonRestBridgeFilterConfig : public Logger::Loggable<Logger::Id::config> {
 public:
   explicit McpJsonRestBridgeFilterConfig(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
@@ -30,11 +38,14 @@ public:
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getToolsListHttpRule() const;
 
+  const std::string& fallbackProtocolVersion() const { return fallback_protocol_version_; }
+
 private:
   absl::flat_hash_map<std::string,
                       envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
       tool_to_http_rule_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
+  std::string fallback_protocol_version_;
 };
 
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
@@ -59,7 +70,8 @@ public:
 
 private:
   // Handles "method" field in the MCP request.
-  void handleMcpMethod(const nlohmann::json& json_rpc);
+  void handleMcpMethod(const nlohmann::json& json_rpc,
+                       Http::RequestHeaderMapOptRef request_headers);
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);

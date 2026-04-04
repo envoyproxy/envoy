@@ -1,4 +1,10 @@
+#include "envoy/http/codec.h"
+#include "envoy/network/address.h"
+
+#include "source/common/buffer/buffer_impl.h"
+
 #include "test/integration/http_integration.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -71,7 +77,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InitializeSuccess) {
           "listChanged": false
         }
       },
-      "protocolVersion": "2025-11-25",
+      "protocolVersion": "2025-06-18",
       "serverInfo": {
         "name": "host",
         "version": "1.0.0"
@@ -368,6 +374,60 @@ TEST_P(McpJsonRestBridgeIntegrationTest, ToolsListPassthrough) {
               StrEq(std::to_string(response->body().size())));
 
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(backend_response_body));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, InitializeUnsupportedProtocolVersionFallsBackToLatest) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 100,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "unsupported-version"
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+  EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response->headers().getContentLengthValue(),
+              StrEq(std::to_string(response->body().size())));
+
+  const std::string expected_response = R"({
+    "jsonrpc": "2.0",
+    "id": 100,
+    "result": {
+      "capabilities": {
+        "tools": {
+          "listChanged": false
+        }
+      },
+      "protocolVersion": "2025-11-25",
+      "serverInfo": {
+        "name": "host",
+        "version": "1.0.0"
+      }
+    }
+  })";
+
+  EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_response));
 }
 
 } // namespace
