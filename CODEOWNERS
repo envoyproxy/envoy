@@ -361,7 +361,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # SSE to metadata
 /*/extensions/filters/http/sse_to_metadata @JuniorHsu @PeterL328 @tyxia
 # AWS EventStream parser
-/*/extensions/filters/http/aws_eventstream_parser @JuniorHsu @PeterL328 @cqi1217
+/*/extensions/filters/http/aws_eventstream_parser @JuniorHsu @PeterL328 @cqi1217 @tyxia
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
