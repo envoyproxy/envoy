@@ -5162,6 +5162,219 @@ TEST_F(OAuth2Test, SanitizeInjectedOAuthStatusHeadersOnAllowFailedPath) {
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
 }
 
+/**
+ * Scenario: handleOAuthFailure is called on an allow-failed path.
+ *
+ * This tests the OAuth2Filter::handleOAuthFailure code path (lines 1467-1471), which is
+ * only reachable via OAuth2ClientImpl callbacks (asyncGetAccessToken/asyncRefreshAccessToken
+ * failures). Since the client is mocked in filter tests, this function must be called directly
+ * after decodeHeaders has set request_headers_.
+ *
+ * Expected behavior: shouldAllowFailed returns true, continueWithFailedOAuth is called,
+ * filter returns Continue.
+ */
+TEST_F(OAuth2Test, HandleOAuthFailureOnAllowedPath) {
+  init(getConfig());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/allowfailed/api"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  // Use a valid OAuth flow to set request_headers_ without triggering allow-failed behavior.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // Now call handleOAuthFailure directly (the path exercised by real OAuth client callbacks).
+  // Path matches allow_failed_matcher → should continue as unauthenticated.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->handleOAuthFailure("Token exchange failed"));
+
+  EXPECT_EQ(request_headers.get(OAuth2Headers::get().OAuthStatus)[0]->value().getStringView(),
+            "failed");
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
+}
+
+/**
+ * Scenario: handleOAuthFailure is called on a regular path (not matching allow_failed_matcher),
+ * with extra_details provided.
+ *
+ * This tests the else branch of OAuth2Filter::handleOAuthFailure (lines 1472-1477) and the
+ * non-empty extra_details branch in the details formatting (line 1474).
+ *
+ * Expected behavior: shouldAllowFailed returns false, sendUnauthorizedResponse is called with
+ * "reason: extra_details" formatting, filter returns StopIteration.
+ */
+TEST_F(OAuth2Test, HandleOAuthFailureOnNonAllowedPathWithExtraDetails) {
+  init(getConfig());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/regular/api"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // Path does not match allow_failed_matcher → should send 401 and stop.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->handleOAuthFailure("Token exchange failed", "response code: 500"));
+}
+
+/**
+ * Scenario: shouldAllowFailed is called for the OAuth callback path (/_oauth) when the
+ * allow_failed_matcher is configured to match all paths (prefix "/").
+ *
+ * This tests the redirectPathMatcher guard in shouldAllowFailed (lines 1430-1434): even when
+ * allow_failed_matcher matches the callback URL, shouldAllowFailed must return false because
+ * the callback path is "hosted" by Envoy and must never reach upstream as unauthenticated.
+ *
+ * Expected behavior: handleOAuthFailure sends 401 rather than continuing as unauthenticated.
+ */
+TEST_F(OAuth2Test, AllowFailedBlockedForCallbackPath) {
+  // Create a config where allow_failed_matcher matches all paths including /_oauth.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.set_forward_bearer_token(true);
+  p.set_stat_prefix("my_prefix");
+  p.add_auth_scopes("user");
+  auto* pass_through = p.add_pass_through_matcher();
+  pass_through->set_name(":method");
+  pass_through->mutable_string_match()->set_exact("OPTIONS");
+  // Configure allow_failed_matcher to match all paths, including the callback path /_oauth.
+  auto* allow_failed_matcher = p.add_allow_failed_matcher();
+  allow_failed_matcher->set_name(":path");
+  allow_failed_matcher->mutable_string_match()->set_prefix("/");
+  auto* credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+  MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  init(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
+                                      scope_, "test."));
+
+  // Make a callback request — asyncGetAccessToken is called and returns Idle (async pending).
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+  // getState returns Idle → decodeHeaders waits for async response.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+
+  // Now simulate the real OAuth client calling back with a failure.
+  // Even though allow_failed_matcher matches "/", shouldAllowFailed returns false for /_oauth
+  // because redirectPathMatcher matches it first.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->handleOAuthFailure("Token exchange failed"));
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 0);
+}
+
+/**
+ * Scenario: asyncRefreshAccessToken fails synchronously (FailureStop), meaning the token
+ * endpoint cluster was not found and shouldAllowFailed is false — a 401 was already sent
+ * synchronously inside asyncRefreshAccessToken.
+ *
+ * Expected behavior: decodeHeaders returns StopIteration.
+ */
+TEST_F(OAuth2Test, AllowFailedWithRefreshTokenSyncFailureStop) {
+  init(getConfig(false /* forward_bearer_token */, true /* use_refresh_token */));
+
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/regular/api"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
+  std::string legit_refresh_token{"legit_refresh_token"};
+  EXPECT_CALL(*validator_, refreshToken()).WillRepeatedly(ReturnRef(legit_refresh_token));
+
+  EXPECT_CALL(*oauth_client_,
+              asyncRefreshAccessToken("legit_refresh_token", TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+  // Sync failure: a 401 or redirect was already sent inside asyncRefreshAccessToken.
+  EXPECT_CALL(*oauth_client_, getState()).WillOnce(Return(OAuth2Client::OAuthState::FailureStop));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: asyncGetAccessToken fails synchronously with FailureContinue on the OAuth callback
+ * path — meaning the allow-failed path was triggered synchronously inside asyncGetAccessToken.
+ *
+ * Expected behavior: decodeHeaders returns Continue.
+ */
+TEST_F(OAuth2Test, OAuthCallbackGetAccessTokenSyncContinue) {
+  init(getConfig(false /* forward_bearer_token */, true /* use_refresh_token */));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+  // Sync success on the allow-failed path: continueDecoding() was called inside
+  // asyncGetAccessToken.
+  EXPECT_CALL(*oauth_client_, getState())
+      .WillOnce(Return(OAuth2Client::OAuthState::FailureContinue));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
