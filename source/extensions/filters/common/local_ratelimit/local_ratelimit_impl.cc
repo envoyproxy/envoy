@@ -87,6 +87,22 @@ bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume) {
   return token_bucket_.consume(cb) != 0.0;
 }
 
+void RateLimitTokenBucket::refill(uint64_t tokens) {
+  if (tokens == 0) {
+    return;
+  }
+  // Use a negative consumed value to add tokens back, capped so we never exceed max_tokens.
+  token_bucket_.consume([tokens_to_refill = static_cast<double>(tokens),
+                         max = token_bucket_.maxTokens()](double total) -> double {
+    const double headroom = max - total;
+    if (headroom <= 0) {
+      return 0.0; // Already at or above max, nothing to refill.
+    }
+    // Return negative consumed = tokens added back, capped at available headroom.
+    return -std::min(tokens_to_refill, headroom);
+  });
+}
+
 LocalRateLimiterImpl::LocalRateLimiterImpl(
     const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
     const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
@@ -190,8 +206,12 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
 
   // See if the request is forbidden by any of the matched descriptors.
   for (const auto& match_result : matched_results) {
-    if (!match_result.token_bucket->consume(
-            share_factor, match_result.request_descriptor.get().hits_addend_.value_or(1))) {
+    if (match_result.request_descriptor.get().is_negative_hits_ &&
+        match_result.request_descriptor.get().hits_addend_.has_value()) {
+      // Negative addend means refill tokens instead of consuming.
+      match_result.token_bucket->refill(match_result.request_descriptor.get().hits_addend_.value());
+    } else if (!match_result.token_bucket->consume(
+                   share_factor, match_result.request_descriptor.get().hits_addend_.value_or(1))) {
       // If the request is forbidden by a descriptor, return the result and the descriptor
       // token bucket.
       return {false, std::shared_ptr<TokenBucketContext>(match_result.token_bucket),

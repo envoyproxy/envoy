@@ -330,6 +330,17 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: ratelimit
+  change: |
+    Added ``is_negative_hits`` boolean to the ``hits_addend``
+    configuration in the rate limit API. This allows rate limit
+    requests to add to the rate limit budget (refill previously
+    consumed tokens) via
+    :ref:`HitsAddend.is_negative_hits
+    <envoy_v3_api_field_config.route.v3.RateLimit.HitsAddend.is_negative_hits>`,
+    or per descriptor in
+    :ref:`RateLimitDescriptor.is_negative_hits
+    <envoy_v3_api_field_extensions.common.ratelimit.v3.RateLimitDescriptor.is_negative_hits>`.
 - area: overload_manager
   change: |
     Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed
