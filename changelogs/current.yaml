@@ -864,6 +864,10 @@ new_features:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: formatter
+  change: |
+    Added support for ``%TRACE_ID%`` in the custom response policy filter's local response policy to allow 
+    trace ID to be substituted into the response body.
 - area: redis
   change: |
     Added support for ``BITFIELD_RO`` in ``redis_proxy``.

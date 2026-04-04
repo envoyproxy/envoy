@@ -10,6 +10,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -143,6 +144,36 @@ TEST_F(CustomResponseFilterTest, DontChangeStatusCode) {
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
             ::Envoy::Http::FilterHeadersStatus::StopIteration);
   EXPECT_EQ("200", response_headers.getStatusValue());
+}
+
+TEST_F(CustomResponseFilterTest, TraceIdInBodyFormat) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+          status_code: 503
+          body_format:
+            text_format_source:
+              inline_string: "trace=%TRACE_ID%"
+)EOF");
+  setupFilterAndCallback();
+
+  const std::string trace_id = "abc123trace";
+  ON_CALL(encoder_callbacks_.active_span_, getTraceId()).WillByDefault(Return(trace_id));
+
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(static_cast<::Envoy::Http::Code>(503), "trace=abc123trace", _, _, _));
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
 }
 
 TEST_F(CustomResponseFilterTest, InvalidHostRedirect) {
