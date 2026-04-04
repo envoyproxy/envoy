@@ -4854,7 +4854,7 @@ public:
     endpoint->set_uri("auth.example.com/_oauth");
     endpoint->mutable_timeout()->set_seconds(1);
     p.set_redirect_uri(redirect_uri.empty() ? "%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK
-                                          : redirect_uri);
+                                            : redirect_uri);
     p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
     p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
