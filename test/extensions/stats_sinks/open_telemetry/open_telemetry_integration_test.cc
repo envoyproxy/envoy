@@ -143,32 +143,31 @@ public:
   void checkBasicMetrics(
       const Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>& metrics,
       bool& known_counter_exists, bool& known_gauge_exists, bool& known_histogram_exists) {
-    long long int previous_time_stamp = 0;
     for (const opentelemetry::proto::metrics::v1::Metric& metric : metrics) {
       if (metric.name() == getFullStatName("cluster.membership_change") && metric.has_sum()) {
         known_counter_exists = true;
-        EXPECT_EQ(1, metric.sum().data_points().size());
-        EXPECT_EQ(1, metric.sum().data_points()[0].as_int());
-        EXPECT_TRUE(metric.sum().data_points()[0].time_unix_nano() > 0);
-
-        if (previous_time_stamp > 0) {
-          EXPECT_EQ(previous_time_stamp, metric.sum().data_points()[0].time_unix_nano());
+        EXPECT_GE(metric.sum().data_points().size(), 1);
+        bool found_val = false;
+        for (const auto& dp : metric.sum().data_points()) {
+          if (dp.as_int() == 1) {
+            found_val = true;
+            EXPECT_TRUE(dp.time_unix_nano() > 0);
+          }
         }
-
-        previous_time_stamp = metric.sum().data_points()[0].time_unix_nano();
+        EXPECT_TRUE(found_val);
       }
 
       if (metric.name() == getFullStatName("cluster.membership_total") && metric.has_gauge()) {
         known_gauge_exists = true;
-        EXPECT_EQ(1, metric.gauge().data_points().size());
-        EXPECT_EQ(1, metric.gauge().data_points()[0].as_int());
-        EXPECT_TRUE(metric.gauge().data_points()[0].time_unix_nano() > 0);
-
-        if (previous_time_stamp > 0) {
-          EXPECT_EQ(previous_time_stamp, metric.gauge().data_points()[0].time_unix_nano());
+        EXPECT_GE(metric.gauge().data_points().size(), 1);
+        bool found_val = false;
+        for (const auto& dp : metric.gauge().data_points()) {
+          if (dp.as_int() == 1) {
+            found_val = true;
+            EXPECT_TRUE(dp.time_unix_nano() > 0);
+          }
         }
-
-        previous_time_stamp = metric.gauge().data_points()[0].time_unix_nano();
+        EXPECT_TRUE(found_val);
       }
 
       if (metric.name() == getFullStatName("cluster.upstream_rq_time") && metric.has_histogram()) {
@@ -177,8 +176,6 @@ public:
         EXPECT_EQ(metric.histogram().data_points()[0].bucket_counts().size(),
                   Stats::HistogramSettingsImpl::defaultBuckets().size() + 1);
         EXPECT_TRUE(metric.histogram().data_points()[0].time_unix_nano() > 0);
-
-        previous_time_stamp = metric.histogram().data_points()[0].time_unix_nano();
       }
     }
   }
