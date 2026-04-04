@@ -1,14 +1,7 @@
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi,
-  bytes_to_module_buffer,
-  drop_wrapped_c_void_ptr,
-  str_to_module_buffer,
-  wrap_into_c_void_ptr,
-  EnvoyCounterId,
-  EnvoyGaugeId,
-  EnvoyHistogramId,
-  NewUdpListenerFilterConfigFunction,
+  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr,
+  EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId, NewUdpListenerFilterConfigFunction,
   NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION,
 };
 use mockall::*;

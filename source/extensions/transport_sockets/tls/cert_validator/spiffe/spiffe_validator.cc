@@ -289,11 +289,10 @@ absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>
   return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 }
 
-bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
-                                                           STACK_OF(X509)* cert_chain,
-                                                           X509_VERIFY_PARAM* verify_param,
-                                                           absl::string_view workload_trust_domain,
-                                                           std::string& error_details) {
+bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
+    X509& leaf_cert, STACK_OF(X509)* cert_chain, X509_VERIFY_PARAM* verify_param,
+    absl::string_view workload_trust_domain, std::string& error_details,
+    std::vector<bssl::UniquePtr<X509>>& validated_chain) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
     error_details = "verify cert failed: cert precheck";
     stats_.fail_verify_error_.inc();
@@ -324,6 +323,15 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
                                  Utility::getX509VerificationErrorInfo(new_store_ctx.get()));
     stats_.fail_verify_error_.inc();
     return false;
+  }
+
+  // Capture the validated chain built by X509_verify_cert.
+  STACK_OF(X509)* verified_chain = X509_STORE_CTX_get0_chain(new_store_ctx.get());
+  if (verified_chain != nullptr) {
+    for (size_t i = 0; i < sk_X509_num(verified_chain); i++) {
+      X509* cert = sk_X509_value(verified_chain, i);
+      validated_chain.emplace_back(bssl::UpRef(cert));
+    }
   }
 
   // Do SAN matching.
@@ -368,11 +376,13 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
   }
   absl::string_view workload_trust_domain = obj ? obj->asString() : "";
   std::string error_details;
-  bool verified = verifyCertChainUsingTrustBundleStore(
-      *leaf_cert, &cert_chain, SSL_CTX_get0_param(&ssl_ctx), workload_trust_domain, error_details);
+  std::vector<bssl::UniquePtr<X509>> validated_chain;
+  bool verified =
+      verifyCertChainUsingTrustBundleStore(*leaf_cert, &cert_chain, SSL_CTX_get0_param(&ssl_ctx),
+                                           workload_trust_domain, error_details, validated_chain);
   return verified ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                       Envoy::Ssl::ClientValidationStatus::Validated, absl::nullopt,
-                                      absl::nullopt}
+                                      absl::nullopt, std::move(validated_chain)}
                   : ValidationResults{ValidationResults::ValidationStatus::Failed,
                                       Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt,
                                       error_details};
