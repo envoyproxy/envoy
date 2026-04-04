@@ -23,7 +23,8 @@
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 
-#include "src/proto/grpc/health/v1/health.pb.h"
+#include "absl/container/flat_hash_set.h"
+#include "grpc/health/v1/health.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -52,6 +53,9 @@ public:
                         Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
 private:
+  static absl::flat_hash_set<grpc::health::v1::HealthCheckResponse::ServingStatus>
+  buildAndValidateRetriableStatuses(const Protobuf::RepeatedField<int>& retriable_serving_statuses);
+
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::ResponseDecoderImplBase,
                                         public Http::StreamCallbacks {
@@ -60,7 +64,6 @@ private:
 
     void onRpcComplete(Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message,
                        bool end_stream);
-    bool isHealthCheckSucceeded(Grpc::Status::GrpcStatus grpc_status) const;
     void resetState();
     void logHealthCheckStatus(Grpc::Status::GrpcStatus grpc_status,
                               const std::string& grpc_message);
@@ -148,6 +151,8 @@ private:
   absl::optional<std::string> service_name_;
   absl::optional<std::string> authority_value_;
   Router::HeaderParserPtr request_headers_parser_;
+  const absl::flat_hash_set<grpc::health::v1::HealthCheckResponse::ServingStatus>
+      retriable_statuses_;
 };
 
 /**
