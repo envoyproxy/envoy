@@ -66,7 +66,7 @@ std::vector<Http::ClientCertDetailsType> convertSetCurrentClientCertDetails(
   return result;
 }
 
-Matcher::ActionConstSharedPtr
+absl::StatusOr<Matcher::ActionConstSharedPtr>
 ForwardClientCertActionFactory::createAction(const Protobuf::Message& config,
                                              ForwardClientCertActionFactoryContext&,
                                              ProtobufMessage::ValidationVisitor&) {

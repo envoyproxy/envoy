@@ -487,10 +487,11 @@ TEST_F(TransportSocketMatcherTest, TransportSocketNameActionFactoryAndTypeUrl) {
   cfg.set_name("tls");
   auto& visitor = ProtobufMessage::getNullValidationVisitor();
   auto action = factory.createAction(cfg, mock_factory_context_.serverFactoryContext(), visitor);
-  ASSERT_NE(action, nullptr);
+  ASSERT_TRUE(action.ok());
+  ASSERT_NE(action.value(), nullptr);
 
   // Verify the action holds the expected name and exposes the declared type URL.
-  const auto& typed = action->getTyped<TransportSocketNameAction>();
+  const auto& typed = action.value()->getTyped<TransportSocketNameAction>();
   EXPECT_EQ(typed.name(), "tls");
 }
 

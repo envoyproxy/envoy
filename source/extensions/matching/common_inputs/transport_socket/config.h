@@ -155,9 +155,9 @@ class TransportSocketNameActionFactory
     : public Matcher::ActionFactory<Server::Configuration::ServerFactoryContext> {
 public:
   std::string name() const override { return "envoy.matching.action.transport_socket.name"; }
-  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
-                                             Server::Configuration::ServerFactoryContext&,
-                                             ProtobufMessage::ValidationVisitor&) override;
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
+  createAction(const Protobuf::Message& config, Server::Configuration::ServerFactoryContext&,
+               ProtobufMessage::ValidationVisitor&) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 

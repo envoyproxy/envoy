@@ -2192,21 +2192,20 @@ const Envoy::Config::TypedMetadata& NullConfigImpl::typedMetadata() const {
   return DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
-Matcher::ActionConstSharedPtr
+absl::StatusOr<Matcher::ActionConstSharedPtr>
 RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActionContext& context,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& route_config =
       MessageUtil::downcastAndValidate<const envoy::config::route::v3::Route&>(config,
                                                                                validation_visitor);
-  auto route = THROW_OR_RETURN_VALUE(
-      RouteCreator::createAndValidateRoute(route_config, context.vhost, context.factory_context,
-                                           validation_visitor, false),
-      RouteEntryImplBaseConstSharedPtr);
-  return route;
+  auto route_status = RouteCreator::createAndValidateRoute(
+      route_config, context.vhost, context.factory_context, validation_visitor, false);
+  RETURN_IF_NOT_OK_REF(route_status.status());
+  return route_status.value();
 }
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
-Matcher::ActionConstSharedPtr
+absl::StatusOr<Matcher::ActionConstSharedPtr>
 RouteListMatchActionFactory::createAction(const Protobuf::Message& config,
                                           RouteActionContext& context,
                                           ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -2215,11 +2214,12 @@ RouteListMatchActionFactory::createAction(const Protobuf::Message& config,
           config, validation_visitor);
 
   std::vector<RouteEntryImplBaseConstSharedPtr> routes;
+  routes.reserve(route_config.routes().size());
   for (const auto& route : route_config.routes()) {
-    routes.emplace_back(THROW_OR_RETURN_VALUE(
-        RouteCreator::createAndValidateRoute(route, context.vhost, context.factory_context,
-                                             validation_visitor, false),
-        RouteEntryImplBaseConstSharedPtr));
+    auto route_status = RouteCreator::createAndValidateRoute(
+        route, context.vhost, context.factory_context, validation_visitor, false);
+    RETURN_IF_NOT_OK_REF(route_status.status());
+    routes.emplace_back(std::move(route_status).value());
   }
   return std::make_shared<RouteListMatchAction>(std::move(routes));
 }

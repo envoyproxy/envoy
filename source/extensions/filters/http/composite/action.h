@@ -87,7 +87,7 @@ class ExecuteFilterActionFactory
 public:
   std::string name() const override { return "composite-action"; }
 
-  Matcher::ActionConstSharedPtr
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
   createAction(const Protobuf::Message& config, Http::Matching::HttpFilterActionContext& context,
                ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
@@ -96,7 +96,7 @@ public:
   }
 
 private:
-  Matcher::ActionConstSharedPtr createActionCommon(
+  absl::StatusOr<Matcher::ActionConstSharedPtr> createActionCommon(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
       bool is_downstream);
@@ -127,26 +127,26 @@ private:
         runtime);
   }
 
-  Matcher::ActionConstSharedPtr createDynamicActionDownstream(
+  absl::StatusOr<Matcher::ActionConstSharedPtr> createDynamicActionDownstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context);
 
-  Matcher::ActionConstSharedPtr createDynamicActionUpstream(
+  absl::StatusOr<Matcher::ActionConstSharedPtr> createDynamicActionUpstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context);
 
-  Matcher::ActionConstSharedPtr createStaticActionDownstream(
+  absl::StatusOr<Matcher::ActionConstSharedPtr> createStaticActionDownstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
-  Matcher::ActionConstSharedPtr createStaticActionUpstream(
+  absl::StatusOr<Matcher::ActionConstSharedPtr> createStaticActionUpstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Create an action for filter chain configuration.
-  Matcher::ActionConstSharedPtr createFilterChainAction(
+  absl::StatusOr<Matcher::ActionConstSharedPtr> createFilterChainAction(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);

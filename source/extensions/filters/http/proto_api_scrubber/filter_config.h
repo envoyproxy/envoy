@@ -393,9 +393,9 @@ class RemoveFieldAction : public Matcher::ActionBase<ProtoApiScrubberRemoveField
 // ActionFactory for the RemoveFieldAction.
 class RemoveFilterActionFactory : public Matcher::ActionFactory<ProtoApiScrubberRemoveFieldAction> {
 public:
-  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message&,
-                                             ProtoApiScrubberRemoveFieldAction&,
-                                             ProtobufMessage::ValidationVisitor&) override {
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
+  createAction(const Protobuf::Message&, ProtoApiScrubberRemoveFieldAction&,
+               ProtobufMessage::ValidationVisitor&) override {
     return std::make_shared<RemoveFieldAction>();
   }
 

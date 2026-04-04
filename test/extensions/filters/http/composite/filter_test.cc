@@ -16,6 +16,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -26,6 +27,8 @@ namespace Composite {
 namespace {
 
 using Envoy::Protobuf::util::MessageDifferencer;
+using StatusHelpers::HasStatusMessage;
+using ::testing::HasSubstr;
 
 class CompositeFilterTest : public ::testing::Test {
 public:
@@ -344,9 +347,10 @@ TEST(ConfigTest, TestDynamicConfigInDownstream) {
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THAT(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "Failed to get downstream factory context or server factory context.");
+      HasStatusMessage(
+          HasSubstr("Failed to get downstream factory context or server factory context.")));
 }
 
 TEST(ConfigTest, TestDynamicConfigInUpstream) {
@@ -373,9 +377,10 @@ TEST(ConfigTest, TestDynamicConfigInUpstream) {
       .server_factory_context_ = absl::nullopt,
   };
   ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THAT(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "Failed to get upstream factory context or server factory context.");
+      HasStatusMessage(
+          HasSubstr("Failed to get upstream factory context or server factory context.")));
 }
 
 // For dual filter in downstream, if not overriding
@@ -402,7 +407,8 @@ TEST(ConfigTest, CreateFilterFromServerContextDual) {
   };
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor())
+          .IgnoreError(),
       EnvoyException,
       "DualFactoryBase: creating filter factory from server factory context is not supported");
 }
@@ -429,9 +435,9 @@ TEST(ConfigTest, DualFilterNoUpstreamFactoryContext) {
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THAT(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "Failed to get upstream filter factory creation function");
+      HasStatusMessage(HasSubstr("Failed to get upstream filter factory creation function")));
 }
 
 // For downstream filter, Envoy exception will be thrown if no factory_context
@@ -455,9 +461,9 @@ TEST(ConfigTest, DownstreamFilterNoFactoryContext) {
       .server_factory_context_ = absl::nullopt,
   };
   ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THAT(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "Failed to get downstream filter factory creation function");
+      HasStatusMessage(HasSubstr("Failed to get downstream filter factory creation function")));
 }
 
 // For downstream filter, if not overriding
@@ -484,7 +490,8 @@ TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
   };
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor())
+          .IgnoreError(),
       EnvoyException, "Creating filter factory from server factory context is not supported");
 }
 
@@ -516,7 +523,8 @@ TEST(ConfigTest, TestSamplePercentNotSpecifiedl) {
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
 
-  EXPECT_FALSE(action->getTyped<ExecuteFilterAction>().actionSkip());
+  EXPECT_OK(action);
+  EXPECT_FALSE(action.value()->getTyped<ExecuteFilterAction>().actionSkip());
 }
 
 // Config test to check if sample_percent config is in place and feature enabled.
@@ -555,7 +563,8 @@ TEST(ConfigTest, TestSamplePercentInPlaceFeatureEnabled) {
               featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
       .WillOnce(testing::Return(true));
 
-  EXPECT_FALSE(action->getTyped<ExecuteFilterAction>().actionSkip());
+  EXPECT_OK(action);
+  EXPECT_FALSE(action.value()->getTyped<ExecuteFilterAction>().actionSkip());
 }
 
 // Config test to check if sample_percent config is in place and feature not enabled.
@@ -594,7 +603,8 @@ TEST(ConfigTest, TestSamplePercentInPlaceFeatureNotEnabled) {
               featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
       .WillOnce(testing::Return(false));
 
-  EXPECT_TRUE(action->getTyped<ExecuteFilterAction>().actionSkip());
+  EXPECT_OK(action);
+  EXPECT_TRUE(action.value()->getTyped<ExecuteFilterAction>().actionSkip());
 }
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConfig) {
@@ -625,7 +635,8 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConf
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
 
-  EXPECT_EQ("actionName", action->getTyped<ExecuteFilterAction>().actionName());
+  EXPECT_OK(action);
+  EXPECT_EQ("actionName", action.value()->getTyped<ExecuteFilterAction>().actionName());
 }
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForTypedConfig) {
@@ -657,7 +668,8 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForTypedConfig
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
 
-  EXPECT_EQ("actionName", action->getTyped<ExecuteFilterAction>().actionName());
+  EXPECT_OK(action);
+  EXPECT_EQ("actionName", action.value()->getTyped<ExecuteFilterAction>().actionName());
 }
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
@@ -1532,9 +1544,9 @@ TEST(ConfigTest, TestEmptyFilterChainThrowsException) {
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THAT(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "filter_chain must contain at least one filter.");
+      HasStatusMessage(HasSubstr("filter_chain must contain at least one filter.")));
 }
 
 // Test filter chain configuration for upstream filters.
@@ -1564,8 +1576,9 @@ TEST(ConfigTest, TestUpstreamFilterChainConfiguration) {
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
 
-  EXPECT_TRUE(action->getTyped<ExecuteFilterAction>().isFilterChain());
-  EXPECT_EQ("filter_chain", action->getTyped<ExecuteFilterAction>().actionName());
+  EXPECT_OK(action);
+  EXPECT_TRUE(action.value()->getTyped<ExecuteFilterAction>().isFilterChain());
+  EXPECT_EQ("filter_chain", action.value()->getTyped<ExecuteFilterAction>().actionName());
 }
 
 // Test filter chain configuration for upstream filters when upstream factory context is missing.
@@ -1591,9 +1604,10 @@ TEST(ConfigTest, TestUpstreamFilterChainNoUpstreamFactoryContext) {
       .server_factory_context_ = server_factory_context,
   };
   ExecuteFilterActionFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THAT(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "Failed to create upstream filter factory for filter 'set-response-code'");
+      HasStatusMessage(
+          HasSubstr("Failed to create upstream filter factory for filter 'set-response-code'")));
 }
 
 // Test filter_chain_name creates a named filter chain lookup action.
@@ -1619,9 +1633,10 @@ TEST(ConfigTest, TestFilterChainNameCreatesLookupAction) {
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
 
   // Action should be a named filter chain lookup, not a filter chain.
-  EXPECT_TRUE(action->getTyped<ExecuteFilterAction>().isNamedFilterChainLookup());
-  EXPECT_FALSE(action->getTyped<ExecuteFilterAction>().isFilterChain());
-  EXPECT_EQ("my-chain", action->getTyped<ExecuteFilterAction>().filterChainName());
+  EXPECT_OK(action);
+  EXPECT_TRUE(action.value()->getTyped<ExecuteFilterAction>().isNamedFilterChainLookup());
+  EXPECT_FALSE(action.value()->getTyped<ExecuteFilterAction>().isFilterChain());
+  EXPECT_EQ("my-chain", action.value()->getTyped<ExecuteFilterAction>().filterChainName());
 }
 
 // Test filter_chain_name with sample_percent configuration.
@@ -1650,13 +1665,14 @@ TEST(ConfigTest, TestFilterChainNameWithSamplePercent) {
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
 
-  EXPECT_TRUE(action->getTyped<ExecuteFilterAction>().isNamedFilterChainLookup());
+  EXPECT_OK(action);
+  EXPECT_TRUE(action.value()->getTyped<ExecuteFilterAction>().isNamedFilterChainLookup());
 
   // Test sampling enabled.
   EXPECT_CALL(server_factory_context.runtime_loader_.snapshot_,
               featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
       .WillOnce(testing::Return(false));
-  EXPECT_TRUE(action->getTyped<ExecuteFilterAction>().actionSkip());
+  EXPECT_TRUE(action.value()->getTyped<ExecuteFilterAction>().actionSkip());
 }
 
 // Test filter chain (inline) with multiple filters is still working.

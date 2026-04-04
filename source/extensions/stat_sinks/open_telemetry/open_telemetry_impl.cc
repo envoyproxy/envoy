@@ -299,10 +299,17 @@ OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
 template <class StatType>
 std::string OtlpMetricsFlusherImpl::getMetricName(
     const StatType& stat, OptRef<const SinkConfig::ConversionAction> conversion_config) const {
+  absl::string_view prefix = config_->statPrefix();
   if (conversion_config.has_value()) {
-    return conversion_config->metric_name();
+    if (auto name = conversion_config->metric_name(); !name.empty()) {
+      return name;
+    }
+    if (absl::string_view metric_prefix = conversion_config->metric_prefix();
+        !metric_prefix.empty()) {
+      prefix = metric_prefix;
+    }
   }
-  return absl::StrCat(config_->statPrefix(),
+  return absl::StrCat(prefix,
                       config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
 }
 

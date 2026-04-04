@@ -25,7 +25,7 @@ public:
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Matcher::ActionFactory<ActionContext>>(
             "envoy.extensions.matching.actions.transform_stat.v3.TransformStat");
-    action_ = factory.createAction(config, action_context_, validation_visitor_);
+    action_ = factory.createAction(config, action_context_, validation_visitor_).value();
   }
 
   Stats::SymbolTable symbol_table_;

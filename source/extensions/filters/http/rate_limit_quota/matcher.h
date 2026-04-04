@@ -51,7 +51,7 @@ class RateLimitOnMatchActionFactory : public Matcher::ActionFactory<RateLimitOnM
 public:
   std::string name() const override { return "rate_limit_quota"; }
 
-  Matcher::ActionConstSharedPtr
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
   createAction(const Protobuf::Message& config, RateLimitOnMatchActionContext&,
                ProtobufMessage::ValidationVisitor& validation_visitor) override {
     // Validate and then retrieve the bucket settings from config.

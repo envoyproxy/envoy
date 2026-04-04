@@ -171,7 +171,7 @@ ProtobufTypes::MessagePtr FilterStateInputFactory::createEmptyConfigProto() {
       envoy::extensions::matching::common_inputs::transport_socket::v3::FilterStateInput>();
 }
 
-Matcher::ActionConstSharedPtr
+absl::StatusOr<Matcher::ActionConstSharedPtr>
 TransportSocketNameActionFactory::createAction(const Protobuf::Message& config,
                                                Server::Configuration::ServerFactoryContext&,
                                                ProtobufMessage::ValidationVisitor&) {

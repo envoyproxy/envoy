@@ -50,7 +50,7 @@ private:
 
 class ActionFactory : public Envoy::Matcher::ActionFactory<ActionContext> {
 public:
-  Envoy::Matcher::ActionConstSharedPtr
+  absl::StatusOr<Envoy::Matcher::ActionConstSharedPtr>
   createAction(const Protobuf::Message& config, ActionContext& context,
                ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "envoy.filters.rbac.action"; }

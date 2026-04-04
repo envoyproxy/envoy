@@ -49,9 +49,9 @@ class FilterChainNameActionFactory : public Matcher::ActionFactory<FilterChainAc
                                      Logger::Loggable<Logger::Id::config> {
 public:
   std::string name() const override { return "filter-chain-name"; }
-  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
-                                             FilterChainActionFactoryContext&,
-                                             ProtobufMessage::ValidationVisitor&) override {
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
+  createAction(const Protobuf::Message& config, FilterChainActionFactoryContext&,
+               ProtobufMessage::ValidationVisitor&) override {
     return std::make_shared<FilterChainNameAction>(
         dynamic_cast<const Protobuf::StringValue&>(config).value());
   }

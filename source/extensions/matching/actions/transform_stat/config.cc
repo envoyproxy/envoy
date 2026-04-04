@@ -11,7 +11,7 @@ namespace TransformStat {
 
 class TransformStatActionFactory : public Matcher::ActionFactory<ActionContext> {
 public:
-  Matcher::ActionConstSharedPtr
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
   createAction(const Protobuf::Message& config, ActionContext& /*context*/,
                ProtobufMessage::ValidationVisitor& validation_visitor) override {
     const auto& action_config =

@@ -25,8 +25,10 @@ TEST(ConfigTest, TestConfig) {
   ActionFactory factory;
   auto action =
       factory.createAction(config, factory_context, ProtobufMessage::getStrictValidationVisitor());
-  ASSERT_NE(nullptr, action);
-  const auto& typed_action = action->getTyped<Server::Configuration::FilterChainBaseAction>();
+  ASSERT_TRUE(action.ok());
+  ASSERT_NE(nullptr, action.value());
+  const auto& typed_action =
+      action.value()->getTyped<Server::Configuration::FilterChainBaseAction>();
 
   Server::Configuration::FilterChainsByName chains;
   auto chain = std::make_shared<testing::NiceMock<Network::MockFilterChain>>();

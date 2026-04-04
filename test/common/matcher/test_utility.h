@@ -170,8 +170,9 @@ struct StringAction : public ActionBase<Protobuf::StringValue> {
 // Factory for StringAction.
 class StringActionFactory : public ActionFactory<absl::string_view> {
 public:
-  ActionConstSharedPtr createAction(const Protobuf::Message& config, absl::string_view&,
-                                    ProtobufMessage::ValidationVisitor&) override {
+  absl::StatusOr<ActionConstSharedPtr> createAction(const Protobuf::Message& config,
+                                                    absl::string_view&,
+                                                    ProtobufMessage::ValidationVisitor&) override {
     const auto& string = dynamic_cast<const Protobuf::StringValue&>(config);
     return std::make_shared<StringAction>(string.value());
   }

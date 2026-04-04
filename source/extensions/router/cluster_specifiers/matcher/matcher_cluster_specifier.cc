@@ -10,7 +10,7 @@ namespace Extensions {
 namespace Router {
 namespace Matcher {
 
-Envoy::Matcher::ActionConstSharedPtr
+absl::StatusOr<Envoy::Matcher::ActionConstSharedPtr>
 ClusterActionFactory::createAction(const Protobuf::Message& config, ClusterActionContext&,
                                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& proto_config =

@@ -21,9 +21,9 @@ class ConversionAction
     : public Matcher::ActionBase<
           envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction> {
 public:
-  explicit ConversionAction(
-      const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction& config)
-      : config_(config) {}
+  static absl::StatusOr<std::shared_ptr<ConversionAction>>
+  create(const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction&
+             config);
 
   const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction*
   config() const {
@@ -31,6 +31,9 @@ public:
   }
 
 private:
+  explicit ConversionAction(
+      const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction& config)
+      : config_(config) {}
   const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction config_;
 };
 
@@ -52,14 +55,9 @@ public:
 
 class ConversionActionFactory : public Matcher::ActionFactory<ActionContext> {
 public:
-  Matcher::ActionConstSharedPtr
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
   createAction(const Protobuf::Message& config, ActionContext&,
-               ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& action_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction&>(
-        config, validation_visitor);
-    return std::make_shared<ConversionAction>(action_config);
-  }
+               ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   std::string name() const override { return "otlp_metric_conversion_action_factory"; }
 
@@ -71,7 +69,7 @@ public:
 
 class DropActionFactory : public Matcher::ActionFactory<ActionContext> {
 public:
-  Matcher::ActionConstSharedPtr
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
   createAction(const Protobuf::Message& config, ActionContext&,
                ProtobufMessage::ValidationVisitor& validation_visitor) override {
     const auto& action_config = MessageUtil::downcastAndValidate<
