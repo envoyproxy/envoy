@@ -155,6 +155,10 @@ public:
     return authorization_query_params_;
   }
   const std::string& redirectUri() const { return redirect_uri_; }
+  const std::vector<std::string>& allowedRedirectDomains() const {
+    return allowed_redirect_domains_;
+  }
+  bool matchRedirectUrlToRedirectUri() const { return match_redirect_url_to_redirect_uri_; }
   const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
@@ -220,6 +224,8 @@ private:
   const Http::Utility::QueryParamsMulti authorization_query_params_;
   const std::string client_id_;
   const std::string redirect_uri_;
+  const std::vector<std::string> allowed_redirect_domains_;
+  const bool match_redirect_url_to_redirect_uri_;
   const Matchers::PathMatcher redirect_matcher_;
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;

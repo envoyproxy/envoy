@@ -4838,6 +4838,202 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
   }
 }
 
+// Helper to build a FilterConfig with allowed_redirect_domains and
+// match_redirect_url_to_redirect_uri.
+class OAuth2RedirectDomainTest : public OAuth2Test {
+public:
+  OAuth2RedirectDomainTest() : OAuth2Test(false) {}
+
+  FilterConfigSharedPtr
+  getConfigWithRedirectDomains(const std::vector<std::string>& allowed_domains,
+                               bool match_redirect_url = false,
+                               const std::string& redirect_uri = "") {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p.set_redirect_uri(redirect_uri.empty() ? "%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK
+                                          : redirect_uri);
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.set_forward_bearer_token(true);
+    p.add_auth_scopes("user");
+    p.add_auth_scopes("openid");
+    p.add_auth_scopes("email");
+    p.add_resources("oauth2-resource");
+    p.add_resources("http://example.com");
+    p.add_resources("https://example.com/some/path%2F..%2F/utf8\xc3\x83;foo=bar?var1=1&var2=2");
+    auto credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+    p.mutable_use_refresh_token()->set_value(false);
+
+    for (const auto& domain : allowed_domains) {
+      p.add_allowed_redirect_domains(domain);
+    }
+    p.set_match_redirect_url_to_redirect_uri(match_redirect_url);
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    return std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                          secret_reader, scope_, "test.");
+  }
+};
+
+/**
+ * Scenario: allowed_redirect_domains is set and the state URL host is not in the list.
+ *
+ * Expected behavior: the filter should reject the callback with 401.
+ */
+TEST_F(OAuth2RedirectDomainTest, AllowedRedirectDomainsRejectsInvalidHost) {
+  // TEST_ENCODED_STATE contains url with host "traffic.example.com".
+  // Only allow "other.example.com".
+  init(getConfigWithRedirectDomains({"other.example.com"}));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: allowed_redirect_domains is set and the state URL host matches exactly.
+ *
+ * Expected behavior: the filter should allow the callback and proceed with token exchange.
+ */
+TEST_F(OAuth2RedirectDomainTest, AllowedRedirectDomainsAllowsExactMatch) {
+  // TEST_ENCODED_STATE contains url with host "traffic.example.com".
+  init(getConfigWithRedirectDomains({"traffic.example.com"}));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: allowed_redirect_domains is set with a wildcard and the state URL host matches.
+ *
+ * Expected behavior: "*.example.com" should match "traffic.example.com".
+ */
+TEST_F(OAuth2RedirectDomainTest, AllowedRedirectDomainsAllowsWildcardMatch) {
+  // TEST_ENCODED_STATE contains url with host "traffic.example.com".
+  init(getConfigWithRedirectDomains({"*.example.com"}));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+// {"url":"https://external.example.com/original_path?var1=1&var2=2",
+//  "csrf_token":"00000000075bcd15.na6kru4x1pHgocSIeU/mdtHYn58Gh1bqweS4XXoiqVg=",
+//  "flow_id":"00000000075bcd15"}
+static const std::string TEST_ENCODED_STATE_EXTERNAL_HOST =
+    "eyJ1cmwiOiJodHRwczovL2V4dGVybmFsLmV4YW1wbGUuY29tL29yaWdpbmFsX3BhdGg_dmFyMT0xJnZhcjI9MiIsIm"
+    "NzcmZfdG9rZW4iOiIwMDAwMDAwMDA3NWJjZDE1Lm5hNmtydTR4MXBIZ29jU0llVS9tZHRIWW41OEdoMWJxd2VTNFhY"
+    "b2lxVmc9IiwiZmxvd19pZCI6IjAwMDAwMDAwMDc1YmNkMTUifQ";
+
+/**
+ * Scenario: match_redirect_url_to_redirect_uri is enabled with a static redirect_uri pointing
+ * to an external host. The internal :authority is "traffic.example.com" but the redirect_uri
+ * uses "external.example.com".
+ *
+ * Expected behavior: the state URL encoded in the redirect to the IdP should use
+ * "external.example.com" as the host, not "traffic.example.com".
+ */
+TEST_F(OAuth2RedirectDomainTest, MatchRedirectUrlToRedirectUri) {
+  init(getConfigWithRedirectDomains({}, true, "https://external.example.com/_oauth"));
+
+  Http::TestRequestHeaderMapImpl first_request_headers{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  Http::TestResponseHeaderMapImpl first_response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID + "&code_challenge=" + TEST_CODE_CHALLENGE +
+           "&code_challenge_method=S256"
+           "&redirect_uri=https%3A%2F%2Fexternal.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE_EXTERNAL_HOST +
+           "&resource=oauth2-resource"
+           "&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
+           "3Fvar1%3D1%26var2%3D2"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&first_response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(first_request_headers, false));
+}
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions

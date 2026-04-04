@@ -151,7 +151,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 27]
+// [#next-free-field: 29]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -196,6 +196,21 @@ message OAuth2Config {
   //
   // This URI should not contain any query parameters.
   string redirect_uri = 4 [(validate.rules).string = {min_len: 1}];
+
+  // Optional list of allowed redirect domains for the URL encoded in the OAuth2 state parameter.
+  // When set, the filter validates the host of the original request URL decoded from the state
+  // parameter against this list before redirecting. Supports exact matches (e.g., "example.com")
+  // and wildcard prefix matches (e.g., "*.example.com" matches "foo.example.com").
+  // If not set, no domain restriction is applied.
+  repeated string allowed_redirect_domains = 27;
+
+  // When set to true, the host and scheme encoded in the OAuth2 state parameter
+  // will be derived from the configured redirect_uri instead of from the
+  // request's :authority and :scheme headers. This is useful when Envoy is
+  // deployed behind an external load balancer whose hostname differs from
+  // Envoy's internal hostname.
+  // Default is false.
+  bool match_redirect_url_to_redirect_uri = 28;
 
   // Matching criteria used to determine whether a path appears to be the result of a redirect from the authorization server.
   type.matcher.v3.PathMatcher redirect_path_matcher = 5
