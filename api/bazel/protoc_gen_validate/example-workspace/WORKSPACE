@@ -1,0 +1,29 @@
+# Initialize this as a self-contained Bazel workspace.
+workspace(name = "pgv_example")
+
+# Declare the protoc-gen-validate repository as an external dependency.
+# This uses a local_repository declaration because this workspace is part of
+# the same Git repository. External repositories should declare PGV as a
+# dependency using http_repository pointed at the PGV GitHub repository.
+local_repository(
+    name = "com_envoyproxy_protoc_gen_validate",
+    path = "../",
+)
+
+# Load the dependencies of PGV. This is required for the next step to work.
+load("@com_envoyproxy_protoc_gen_validate//bazel:repositories.bzl", "pgv_dependencies")
+
+pgv_dependencies()
+
+load("@rules_python//python:repositories.bzl", "py_repositories")
+
+py_repositories()
+
+# Perform any necessary actions to initialize dependencies.
+load("@com_envoyproxy_protoc_gen_validate//bazel:dependency_imports.bzl", "pgv_dependency_imports")
+
+pgv_dependency_imports()
+
+load("@com_envoyproxy_protoc_gen_validate//bazel:extra_dependency_imports.bzl", "pgv_extra_dependency_imports")
+
+pgv_extra_dependency_imports()

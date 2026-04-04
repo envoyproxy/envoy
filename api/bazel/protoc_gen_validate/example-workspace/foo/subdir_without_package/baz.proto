@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package pgv.example.foo;
+
+import "validate/validate.proto";
+
+message Baz {
+  int32 not_two = 1 [(validate.rules).int32 = { not_in: 2 }];
+}

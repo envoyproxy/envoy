@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "templates",
+    srcs = ["pkg.go"],
+    importpath = "github.com/envoyproxy/protoc-gen-validate/templates",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//templates/cc",
+        "//templates/ccnop",
+        "//templates/go",
+        "//templates/java",
+        "//templates/shared",
+        "@com_github_lyft_protoc_gen_star_v2//:protoc-gen-star",
+        "@com_github_lyft_protoc_gen_star_v2//lang/go",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":templates",
+    deprecation = "Use :templates instead of :go_default_library.  Details about the new naming convention: https://github.com/bazelbuild/bazel-gazelle/pull/863",
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package pgv.example.foo;
+
+import "validate/validate.proto";
+
+message BarNone {
+  int32 value = 1;
+}
+
+message BarOne {
+  int32 value = 1 [(validate.rules).int32 = { not_in: 1 }];
+}
+
+message Bars {
+  BarNone bar_none = 1;
+  BarOne bar_one = 2;
+}

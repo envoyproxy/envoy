@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package tests.harness.cases.sort;
+option go_package = "github.com/envoyproxy/protoc-gen-validate/tests/harness/cases/sort/go;sort";
+
+enum Direction {
+    UNKNOWN_DIRECTION = 0;
+    ASC = 1;
+    DESC = 2;
+}

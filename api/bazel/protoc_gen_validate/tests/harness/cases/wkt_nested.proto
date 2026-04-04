@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package tests.harness.cases;
+option go_package = "github.com/envoyproxy/protoc-gen-validate/tests/harness/cases/go;cases";
+
+import "validate/validate.proto";
+
+message WktLevelOne {
+    message WktLevelTwo {
+        message WktLevelThree {
+            string uuid = 1 [(validate.rules).string.uuid = true];
+        }
+
+        WktLevelThree three = 1 [(validate.rules).message.required = true];
+    }
+
+    WktLevelTwo two = 1 [(validate.rules).message.required = true];
+}

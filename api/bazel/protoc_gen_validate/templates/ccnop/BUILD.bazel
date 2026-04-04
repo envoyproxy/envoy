@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ccnop",
+    srcs = [
+        "file.go",
+        "register.go",
+    ],
+    importpath = "github.com/envoyproxy/protoc-gen-validate/templates/ccnop",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//templates/cc",
+        "@com_github_lyft_protoc_gen_star_v2//:protoc-gen-star",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":ccnop",
+    visibility = ["//visibility:public"],
+)

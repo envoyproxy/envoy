@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go",
+    srcs = [
+        "duration.go",
+        "file.go",
+        "message.go",
+        "register.go",
+        "required.go",
+        "timestamp.go",
+    ],
+    importpath = "github.com/envoyproxy/protoc-gen-validate/templates/go",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//templates/goshared",
+        "@com_github_lyft_protoc_gen_star_v2//:protoc-gen-star",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":go",
+    deprecation = "Use :go instead of :go_default_library.  Details about the new naming convention: https://github.com/bazelbuild/bazel-gazelle/pull/863",
+    visibility = ["//visibility:public"],
+)
