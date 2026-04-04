@@ -41,7 +41,8 @@ public:
                                 v3::DynatraceResourceDetectorConfig& config,
                             DynatraceMetadataFileReaderPtr dynatrace_file_reader)
       : config_(config), dynatrace_file_reader_(std::move(dynatrace_file_reader)) {}
-  Resource detect() override;
+  ResourceConstSharedPtr detect() const override;
+  ResourceConstSharedPtr detect(const StreamInfo::StreamInfo&) const override { return nullptr; }
 
   static const std::vector<std::string>& dynatraceMetadataFiles() {
     CONSTRUCT_ON_FIRST_USE(std::vector<std::string>,

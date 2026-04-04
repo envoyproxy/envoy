@@ -34,7 +34,7 @@ TEST(DynatraceResourceDetectorTest, DynatraceNotDeployed) {
       config;
 
   auto detector = std::make_shared<DynatraceResourceDetector>(config, std::move(dt_file_reader));
-  Resource resource = detector->detect();
+  Resource resource = *detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
   EXPECT_EQ(0, resource.attributes_.size());
@@ -71,7 +71,7 @@ dt.entity.process_group_instance=PROCESS_GROUP_INSTANCE-abc
       config;
 
   auto detector = std::make_shared<DynatraceResourceDetector>(config, std::move(dt_file_reader));
-  Resource resource = detector->detect();
+  Resource resource = *detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
   EXPECT_EQ(2, resource.attributes_.size());
@@ -108,7 +108,7 @@ k8s.pod.name=envoy
       config;
 
   auto detector = std::make_shared<DynatraceResourceDetector>(config, std::move(dt_file_reader));
-  Resource resource = detector->detect();
+  Resource resource = *detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
   EXPECT_EQ(2, resource.attributes_.size());

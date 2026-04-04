@@ -28,7 +28,7 @@ TEST(StaticConfigResourceDetectorTest, EmptyAttributesMap) {
       StaticConfigResourceDetectorConfig config;
 
   auto detector = std::make_unique<StaticConfigResourceDetector>(config, context);
-  Resource resource = detector->detect();
+  Resource resource = *detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
   EXPECT_TRUE(resource.attributes_.empty());
@@ -54,7 +54,7 @@ TEST(StaticConfigResourceDetectorTest, EmptyAttributesAreIgnored) {
 
   auto detector =
       std::make_unique<StaticConfigResourceDetector>(proto_config, context.server_factory_context_);
-  Resource resource = detector->detect();
+  Resource resource = *detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
   EXPECT_EQ(1, resource.attributes_.size());
@@ -87,7 +87,7 @@ TEST(StaticConfigResourceDetectorTest, ValidAttributes) {
 
   auto detector =
       std::make_unique<StaticConfigResourceDetector>(proto_config, context.server_factory_context_);
-  Resource resource = detector->detect();
+  Resource resource = *detector->detect();
 
   EXPECT_EQ(resource.schema_url_, "");
   EXPECT_EQ(2, resource.attributes_.size());

@@ -28,6 +28,16 @@ struct Resource {
   std::string schema_url_{""};
   ResourceAttributes attributes_{};
 
+  /**
+   * @brief Updates this resource with a new one. This function implements
+   * the Merge operation defined in the OpenTelemetry Resource SDK specification.
+   * @see
+   * https://github.com/open-telemetry/opentelemetry-specification/blob/v1.24.0/specification/resource/sdk.md#merge
+   *
+   * @param other The new resource.
+   */
+  void merge(const Resource& other);
+
   virtual ~Resource() = default;
 };
 
@@ -44,9 +54,22 @@ public:
   /**
    * @brief Load attributes and returns a Resource object
    * populated with them and a possible SchemaUrl.
-   * @return Resource
+   * @return Resource. It is expected that the shared pointer returned is
+   * constructed once and the same over the lifetime of the ResourceDetector.
    */
-  virtual Resource detect() PURE;
+  virtual ResourceConstSharedPtr detect() const PURE;
+
+  /**
+   * @brief Detects the resource based on the stream info given.
+   * @param stream_info The stream info to detect the resource detector for.
+   * @return Resource shared pointer.
+   *
+   * The expectation is that the returned Resource will be persistently attached
+   * to a route or cluster and reused for the lifetime of that route or cluster.
+   * This allows for the resource to be attached to a span and for spans to be
+   * keyed by resource without additional hashing overhead.
+   */
+  virtual ResourceConstSharedPtr detect(const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using ResourceDetectorPtr = std::unique_ptr<ResourceDetector>;
