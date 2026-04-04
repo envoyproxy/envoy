@@ -670,6 +670,43 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationSafeHttp1) {
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 }
 
+// Verify that max_connection_duration_jitter_percent applies a deterministic
+// random offset to the connection duration timer.
+TEST_F(HttpConnectionManagerImplTest, ConnectionDurationWithJitter) {
+  // Not used in the test.
+  delete codec_;
+
+  // Base duration 100ms, 50% jitter → max_jitter_ms = ceil(100 * 0.5) = 50.
+  max_connection_duration_ = std::chrono::milliseconds(100);
+  max_connection_duration_jitter_percent_ = 50.0;
+
+  // random() % 50 == 30 → effective timer = 100 + 30 = 130ms.
+  EXPECT_CALL(random_, random()).WillOnce(Return(30UL));
+
+  Event::MockTimer* connection_duration_timer = setUpTimer();
+  EXPECT_CALL(*connection_duration_timer,
+              enableTimer(std::chrono::milliseconds(130), _));
+  setup();
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+  connection_duration_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
+}
+
+// Verify that jitter is not applied when max_connection_duration is unset.
+TEST_F(HttpConnectionManagerImplTest, ConnectionDurationJitterNoBaseIgnored) {
+  // Not used in the test.
+  delete codec_;
+
+  // jitter_percent is set but max_connection_duration is absent — no timer expected.
+  max_connection_duration_jitter_percent_ = 50.0;
+  setup();
+
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_max_duration_reached_.value());
+}
+
 TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(

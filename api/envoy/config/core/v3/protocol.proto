@@ -273,7 +273,7 @@ message AlternateProtocolsCacheOptions {
   repeated string canonical_suffixes = 5;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HttpProtocolOptions";
@@ -380,6 +380,23 @@ message HttpProtocolOptions {
   // Setting this parameter to ``1`` will effectively disable keep alive.
   // For HTTP/2 and HTTP/3, due to concurrent stream processing, the limit is approximate.
   google.protobuf.UInt32Value max_requests_per_connection = 6;
+
+  // Percentage-based jitter for :ref:`max_connection_duration
+  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`.
+  // The jitter value increases the effective ``max_connection_duration`` by a random amount
+  // (up to the provided percentage of the base duration) to avoid thundering herd problems
+  // when many connections are established simultaneously. For example, setting
+  // ``max_connection_duration`` to 10s with a 25% jitter means connections will be
+  // drained after a uniformly random duration between 10s and 12.5s.
+  //
+  // This field is ignored if ``max_connection_duration`` is not set. If not set, no jitter
+  // is applied.
+  //
+  // .. note::
+  //   This field is only effective for HTTP/1.1 and HTTP/2 connections. Support for
+  //   upstream clusters is not implemented and the jitter will not be applied.
+  type.v3.Percent max_connection_duration_jitter_percent = 8
+      [(validate.rules).message = {required: true}];
 }
 
 // [#next-free-field: 12]

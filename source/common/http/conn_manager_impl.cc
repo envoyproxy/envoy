@@ -205,7 +205,16 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_duration_timer_ =
         dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout,
                                        [this]() -> void { onConnectionDurationTimeout(); });
-    connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
+    std::chrono::milliseconds effective_duration = config_->maxConnectionDuration().value();
+    if (const auto jitter_pct = config_->maxConnectionDurationJitterPercent();
+        jitter_pct.has_value() && jitter_pct.value() > 0.0) {
+      const uint64_t max_jitter_ms =
+          static_cast<uint64_t>(std::ceil(effective_duration.count() * (jitter_pct.value() / 100.0)));
+      if (max_jitter_ms > 0) {
+        effective_duration += std::chrono::milliseconds(random_generator_.random() % max_jitter_ms);
+      }
+    }
+    connection_duration_timer_->enableTimer(effective_duration);
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_->delayedCloseTimeout());

@@ -392,6 +392,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
+      max_connection_duration_jitter_percent_(
+          config.common_http_protocol_options().has_max_connection_duration_jitter_percent()
+              ? absl::optional<double>(
+                    config.common_http_protocol_options()
+                        .max_connection_duration_jitter_percent()
+                        .value())
+              : absl::nullopt),
       http1_safe_max_connection_duration_(config.http1_safe_max_connection_duration()),
       max_stream_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
