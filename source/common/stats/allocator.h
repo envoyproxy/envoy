@@ -60,21 +60,9 @@ public:
    * called only once, prior to any calls to f_stat.
    * @param f_stat functor that is provided one stat at a time from the stats container.
    */
-  void forEachCounter(SizeFn, StatFn<Counter>) const;
-  void forEachGauge(SizeFn, StatFn<Gauge>) const;
-  void forEachTextReadout(SizeFn, StatFn<TextReadout>) const;
-
-  /**
-   * Iterate over all stats that need to be flushed to sinks. Note, that implementations can
-   * potentially hold on to a mutex that will deadlock if the passed in functors try to create
-   * or delete a stat.
-   * @param f_size functor that is provided the number of all stats that will be flushed to sinks.
-   * Note that this is called only once, prior to any calls to f_stat.
-   * @param f_stat functor that is provided one stat that will be flushed to sinks, at a time.
-   */
-  void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const;
-  void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const;
-  void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const;
+  void forEachCounter(SizeFn, StatFn<Counter>, const IterationCriteria& criteria) const;
+  void forEachGauge(SizeFn, StatFn<Gauge>, const IterationCriteria& criteria) const;
+  void forEachTextReadout(SizeFn, StatFn<TextReadout>, const IterationCriteria& criteria) const;
 
   /**
    * Set the predicates to filter stats for sink.

@@ -186,10 +186,14 @@ public:
   std::vector<TextReadoutSharedPtr> textReadouts() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
 
-  void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
-  void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
-  void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
-  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
+  void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat,
+                      const IterationCriteria& criteria) const override;
+  void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat,
+                    const IterationCriteria& criteria) const override;
+  void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat,
+                          const IterationCriteria& criteria) const override;
+  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat,
+                        const IterationCriteria& criteria) const override;
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
 
   void evictUnused() override;
@@ -208,11 +212,6 @@ public:
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
 
   Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id);
-
-  void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
-  void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
-  void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
-  void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
 
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override;
   OptRef<SinkPredicates> sinkPredicates() override { return sink_predicates_; }

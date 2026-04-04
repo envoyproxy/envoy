@@ -586,19 +586,20 @@ TEST_F(StatsThreadLocalStoreTest, ForEach) {
   auto collect_counters = [this]() -> std::vector<std::string> {
     std::vector<std::string> names;
     store_->forEachCounter([](size_t) {},
-                           [&names](Counter& counter) { names.push_back(counter.name()); });
+                           [&names](Counter& counter) { names.push_back(counter.name()); }, {});
     return names;
   };
   auto collect_gauges = [this]() -> std::vector<std::string> {
     std::vector<std::string> names;
-    store_->forEachGauge([](size_t) {}, [&names](Gauge& gauge) { names.push_back(gauge.name()); });
+    store_->forEachGauge([](size_t) {}, [&names](Gauge& gauge) { names.push_back(gauge.name()); },
+                         {});
     return names;
   };
   auto collect_text_readouts = [this]() -> std::vector<std::string> {
     std::vector<std::string> names;
     store_->forEachTextReadout(
         [](size_t) {},
-        [&names](TextReadout& text_readout) { names.push_back(text_readout.name()); });
+        [&names](TextReadout& text_readout) { names.push_back(text_readout.name()); }, {});
     return names;
   };
 
@@ -2242,7 +2243,7 @@ TEST_F(HistogramTest, ForEachHistogram) {
   size_t num_histograms = 0;
   size_t num_iterations = 0;
   store_->forEachHistogram([&num_histograms](std::size_t size) { num_histograms = size; },
-                           [&num_iterations](ParentHistogram&) { ++num_iterations; });
+                           [&num_iterations](ParentHistogram&) { ++num_iterations; }, {});
   EXPECT_EQ(num_histograms, 11);
   EXPECT_EQ(num_iterations, 11);
 
@@ -2256,7 +2257,7 @@ TEST_F(HistogramTest, ForEachHistogram) {
   num_histograms = 0;
   num_iterations = 0;
   store_->forEachHistogram([&num_histograms](std::size_t size) { num_histograms = size; },
-                           [&num_iterations](ParentHistogram&) { ++num_iterations; });
+                           [&num_iterations](ParentHistogram&) { ++num_iterations; }, {});
   EXPECT_EQ(num_histograms, 0);
   EXPECT_EQ(num_iterations, 0);
 
@@ -2310,12 +2311,13 @@ TEST_F(HistogramTest, ForEachSinkedHistogram) {
 
   size_t num_sinked_histograms = 0;
   size_t num_iterations = 0;
-  store_->forEachSinkedHistogram(
+  store_->forEachHistogram(
       [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
       [&num_iterations, &sink_predicates](ParentHistogram& histogram) {
         EXPECT_TRUE(sink_predicates.has(histogram.statName()));
         ++num_iterations;
-      });
+      },
+      {.sinked_only = true});
   EXPECT_EQ(num_sinked_histograms, 3);
   EXPECT_EQ(num_iterations, 3);
   // Verify that rejecting histograms removes them from the sink set.
@@ -2325,9 +2327,9 @@ TEST_F(HistogramTest, ForEachSinkedHistogram) {
       std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_));
   num_sinked_histograms = 0;
   num_iterations = 0;
-  store_->forEachSinkedHistogram(
+  store_->forEachHistogram(
       [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
-      [&num_iterations](ParentHistogram&) { ++num_iterations; });
+      [&num_iterations](ParentHistogram&) { ++num_iterations; }, {.sinked_only = true});
   EXPECT_EQ(num_sinked_histograms, 0);
   EXPECT_EQ(num_iterations, 0);
 }
@@ -2365,12 +2367,13 @@ TEST_F(HistogramTest, UnsinkedHistogramsAreMerged) {
   store_->mergeHistograms([this, &sink_predicates]() -> void {
     size_t num_iterations = 0;
     size_t num_sinked_histograms = 0;
-    store_->forEachSinkedHistogram(
+    store_->forEachHistogram(
         [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
         [&num_iterations, &sink_predicates](ParentHistogram& histogram) {
           EXPECT_TRUE(sink_predicates.has(histogram.statName()));
           ++num_iterations;
-        });
+        },
+        {.sinked_only = true});
     EXPECT_EQ(num_sinked_histograms, 1);
     EXPECT_EQ(num_iterations, 1);
   });
@@ -2669,17 +2672,19 @@ TEST_F(StatsThreadLocalStoreTest, SetSinkPredicates) {
   uint32_t num_sinked_counters = 0, num_sinked_gauges = 0, num_sinked_text_readouts = 0;
   auto check_expected_size = [](size_t size) { EXPECT_EQ(expected_sinked_stats, size); };
 
-  store_->forEachSinkedCounter(check_expected_size,
-                               [&num_sinked_counters](Counter&) { ++num_sinked_counters; });
+  store_->forEachCounter(check_expected_size,
+                         [&num_sinked_counters](Counter&) { ++num_sinked_counters; },
+                         {.sinked_only = true});
   EXPECT_EQ(expected_sinked_stats, num_sinked_counters);
 
-  store_->forEachSinkedGauge(check_expected_size,
-                             [&num_sinked_gauges](Gauge&) { ++num_sinked_gauges; });
+  store_->forEachGauge(check_expected_size, [&num_sinked_gauges](Gauge&) { ++num_sinked_gauges; },
+                       {.sinked_only = true});
   EXPECT_EQ(expected_sinked_stats, num_sinked_gauges);
 
-  store_->forEachSinkedTextReadout(check_expected_size, [&num_sinked_text_readouts](TextReadout&) {
-    ++num_sinked_text_readouts;
-  });
+  store_->forEachTextReadout(
+      check_expected_size,
+      [&num_sinked_text_readouts](TextReadout&) { ++num_sinked_text_readouts; },
+      {.sinked_only = true});
   EXPECT_EQ(expected_sinked_stats, num_sinked_text_readouts);
 }
 } // namespace Stats

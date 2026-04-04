@@ -56,19 +56,23 @@ public:
     return text_readouts_.toVector();
   }
 
-  void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {
+  void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat,
+                      const IterationCriteria& /*criteria*/) const override {
     counters_.forEachStat(f_size, f_stat);
   }
 
-  void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override {
+  void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat,
+                    const IterationCriteria& /*criteria*/) const override {
     gauges_.forEachStat(f_size, f_stat);
   }
 
-  void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override {
+  void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat,
+                          const IterationCriteria& /*criteria*/) const override {
     text_readouts_.forEachStat(f_size, f_stat);
   }
 
-  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat,
+                        const IterationCriteria& /*criteria*/) const override {
     UNREFERENCED_PARAMETER(f_size);
     UNREFERENCED_PARAMETER(f_stat);
   }
@@ -85,23 +89,6 @@ public:
 
   void evictUnused() override {
     // Do nothing. Eviction is only supported on the thread local stores.
-  }
-
-  void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {
-    forEachCounter(f_size, f_stat);
-  }
-
-  void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override {
-    forEachGauge(f_size, f_stat);
-  }
-
-  void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override {
-    forEachTextReadout(f_size, f_stat);
-  }
-
-  void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
-    UNREFERENCED_PARAMETER(f_size);
-    UNREFERENCED_PARAMETER(f_stat);
   }
 
   NullCounterImpl& nullCounter() override { return null_counter_; }

@@ -875,9 +875,9 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
           << "' and stat_prefix '" << stat_prefix << "'";
     }
   };
-  test_server_->statStore().forEachCounter(nullptr, check_metric);
-  test_server_->statStore().forEachGauge(nullptr, check_metric);
-  test_server_->statStore().forEachHistogram(nullptr, check_metric);
+  test_server_->statStore().forEachCounter(nullptr, check_metric, {});
+  test_server_->statStore().forEachGauge(nullptr, check_metric, {});
+  test_server_->statStore().forEachHistogram(nullptr, check_metric, {});
 }
 
 envoy::config::bootstrap::v3::Bootstrap

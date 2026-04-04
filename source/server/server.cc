@@ -171,7 +171,7 @@ void InstanceBase::failHealthcheck(bool fail) {
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
                                        Upstream::ClusterManager& cluster_manager,
                                        TimeSource& time_source) {
-  store.forEachSinkedCounter(
+  store.forEachCounter(
       [this](std::size_t size) {
         snapped_counters_.reserve(size);
         counters_.reserve(size);
@@ -179,9 +179,10 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
       [this](Stats::Counter& counter) {
         snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
         counters_.push_back({counter.latch(), counter});
-      });
+      },
+      {.sinked_only = true});
 
-  store.forEachSinkedGauge(
+  store.forEachGauge(
       [this](std::size_t size) {
         snapped_gauges_.reserve(size);
         gauges_.reserve(size);
@@ -189,9 +190,10 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
       [this](Stats::Gauge& gauge) {
         snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
         gauges_.push_back(gauge);
-      });
+      },
+      {.sinked_only = true});
 
-  store.forEachSinkedHistogram(
+  store.forEachHistogram(
       [this](std::size_t size) {
         snapped_histograms_.reserve(size);
         histograms_.reserve(size);
@@ -199,9 +201,10 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
       [this](Stats::ParentHistogram& histogram) {
         snapped_histograms_.push_back(Stats::ParentHistogramSharedPtr(&histogram));
         histograms_.push_back(histogram);
-      });
+      },
+      {.sinked_only = true});
 
-  store.forEachSinkedTextReadout(
+  store.forEachTextReadout(
       [this](std::size_t size) {
         snapped_text_readouts_.reserve(size);
         text_readouts_.reserve(size);
@@ -209,7 +212,8 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
       [this](Stats::TextReadout& text_readout) {
         snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
         text_readouts_.push_back(text_readout);
-      });
+      },
+      {.sinked_only = true});
 
   Upstream::HostUtility::forEachHostMetric(
       cluster_manager,

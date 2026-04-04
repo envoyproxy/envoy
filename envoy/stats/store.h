@@ -105,16 +105,23 @@ public:
    * after forEach* is not supported, as scope/stat deletions can occur in any
    * thread. Implementation locks ensures the stat/scope is valid until the
    * f_stat returns.
+   * Additional filtering is passed via a struct reference.
    *
    * @param f_size functor that is provided the current number of all
    * stats. Note that this is called only once, prior to any calls to f_stat.
    * @param f_stat functor that is provided one stat at a time from the stats
    * container.
+   * @param criteria contains filters for the iteration through stats (e.g.
+   * whether to only iterate over stats that need to be flushed to sinks)
    */
-  virtual void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
-  virtual void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
-  virtual void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
-  virtual void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const PURE;
+  virtual void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat,
+                              const IterationCriteria& criteria) const PURE;
+  virtual void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat,
+                            const IterationCriteria& criteria) const PURE;
+  virtual void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat,
+                                  const IterationCriteria& criteria) const PURE;
+  virtual void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat,
+                                const IterationCriteria& criteria) const PURE;
   virtual void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const PURE;
 
   /**
@@ -131,19 +138,6 @@ public:
    * @return a null gauge that will ignore set() calls and always return 0.
    */
   virtual Gauge& nullGauge() PURE;
-
-  /**
-   * Iterate over all stats that need to be flushed to sinks. Note, that implementations can
-   * potentially hold on to a mutex that will deadlock if the passed in functors try to create
-   * or delete a stat.
-   * @param f_size functor that is provided the number of all stats that will be flushed to sinks.
-   * Note that this is called only once, prior to any calls to f_stat.
-   * @param f_stat functor that is provided one stat that will be flushed to sinks, at a time.
-   */
-  virtual void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
-  virtual void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
-  virtual void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
-  virtual void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const PURE;
 
   /**
    * Calls 'fn' for every stat. Note that in the case of overlapping scopes, the

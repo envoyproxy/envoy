@@ -316,5 +316,9 @@ private:
   const StatType& metric_;
 };
 
+struct IterationCriteria {
+  bool sinked_only{false};
+};
+
 } // namespace Stats
 } // namespace Envoy

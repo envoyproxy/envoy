@@ -371,73 +371,78 @@ Counter* Allocator::makeCounterInternal(StatName name, StatName tag_extracted_na
   return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags);
 }
 
-void Allocator::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
-  Thread::LockGuard lock(mutex_);
-  if (f_size != nullptr) {
-    f_size(counters_.size());
-  }
-  for (auto& counter : counters_) {
-    f_stat(*counter);
-  }
-}
-
-void Allocator::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
-  Thread::LockGuard lock(mutex_);
-  if (f_size != nullptr) {
-    f_size(gauges_.size());
-  }
-  for (auto& gauge : gauges_) {
-    f_stat(*gauge);
-  }
-}
-
-void Allocator::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
-  Thread::LockGuard lock(mutex_);
-  if (f_size != nullptr) {
-    f_size(text_readouts_.size());
-  }
-  for (auto& text_readout : text_readouts_) {
-    f_stat(*text_readout);
-  }
-}
-
-void Allocator::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
-  if (sink_predicates_ != nullptr) {
+void Allocator::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat,
+                               const IterationCriteria& criteria) const {
+  if (criteria.sinked_only && sink_predicates_ != nullptr) {
     Thread::LockGuard lock(mutex_);
-    f_size(sinked_counters_.size());
+    if (f_size != nullptr) {
+      f_size(sinked_counters_.size());
+    }
     for (auto counter : sinked_counters_) {
       f_stat(*counter);
     }
   } else {
-    forEachCounter(f_size, f_stat);
+    Thread::LockGuard lock(mutex_);
+    if (f_size != nullptr) {
+      f_size(counters_.size());
+    }
+    for (auto& counter : counters_) {
+      f_stat(*counter);
+    }
   }
 }
 
-void Allocator::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
-  if (sink_predicates_ != nullptr) {
-    Thread::LockGuard lock(mutex_);
-    f_size(sinked_gauges_.size());
-    for (auto gauge : sinked_gauges_) {
-      f_stat(*gauge);
+void Allocator::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat,
+                             const IterationCriteria& criteria) const {
+
+  if (criteria.sinked_only) {
+    if (sink_predicates_ != nullptr) {
+      Thread::LockGuard lock(mutex_);
+      if (f_size != nullptr) {
+        f_size(sinked_gauges_.size());
+      }
+      for (auto gauge : sinked_gauges_) {
+        f_stat(*gauge);
+      }
+    } else {
+      Thread::LockGuard lock(mutex_);
+      if (f_size != nullptr) {
+        f_size(gauges_.size());
+      }
+      for (auto& gauge : gauges_) {
+        if (!gauge->hidden())
+          f_stat(*gauge);
+      }
     }
   } else {
-    forEachGauge(f_size, [&f_stat](Gauge& gauge) {
-      if (!gauge.hidden()) {
-        f_stat(gauge);
-      }
-    });
+    Thread::LockGuard lock(mutex_);
+    if (f_size != nullptr) {
+      f_size(gauges_.size());
+    }
+    for (auto& gauge : gauges_) {
+      f_stat(*gauge);
+    }
   }
 }
 
-void Allocator::forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
-  if (sink_predicates_ != nullptr) {
+void Allocator::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat,
+                                   const IterationCriteria& criteria) const {
+  if (criteria.sinked_only && sink_predicates_ != nullptr) {
     Thread::LockGuard lock(mutex_);
-    f_size(sinked_text_readouts_.size());
+    if (f_size != nullptr) {
+      f_size(sinked_text_readouts_.size());
+    }
     for (auto text_readout : sinked_text_readouts_) {
       f_stat(*text_readout);
     }
   } else {
-    forEachTextReadout(f_size, f_stat);
+    Thread::LockGuard lock(mutex_);
+    if (f_size != nullptr) {
+      f_size(text_readouts_.size());
+    }
+    for (auto& text_readout : text_readouts_) {
+      f_stat(*text_readout);
+    }
   }
 }
 

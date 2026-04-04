@@ -284,42 +284,30 @@ private:
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
   // Stats::Store
-  void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
+  void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat,
+                      const IterationCriteria& criteria) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachCounter(f_size, f_stat);
+    store_.forEachCounter(f_size, f_stat, criteria);
   }
-  void forEachGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
+  void forEachGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat,
+                    const IterationCriteria& criteria) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachGauge(f_size, f_stat);
+    store_.forEachGauge(f_size, f_stat, criteria);
   }
-  void forEachTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
+  void forEachTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat,
+                          const IterationCriteria& criteria) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachTextReadout(f_size, f_stat);
+    store_.forEachTextReadout(f_size, f_stat, criteria);
   }
-  void forEachHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+  void forEachHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat,
+                        const IterationCriteria& criteria) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachHistogram(f_size, f_stat);
+    store_.forEachHistogram(f_size, f_stat, criteria);
   }
   void forEachScope(std::function<void(std::size_t)> f_size,
                     StatFn<const Scope> f_scope) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachScope(f_size, f_scope);
-  }
-  void forEachSinkedCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
-    Thread::LockGuard lock(lock_);
-    store_.forEachSinkedCounter(f_size, f_stat);
-  }
-  void forEachSinkedGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
-    Thread::LockGuard lock(lock_);
-    store_.forEachSinkedGauge(f_size, f_stat);
-  }
-  void forEachSinkedTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
-    Thread::LockGuard lock(lock_);
-    store_.forEachSinkedTextReadout(f_size, f_stat);
-  }
-  void forEachSinkedHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
-    Thread::LockGuard lock(lock_);
-    store_.forEachSinkedHistogram(f_size, f_stat);
   }
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
     UNREFERENCED_PARAMETER(sink_predicates);

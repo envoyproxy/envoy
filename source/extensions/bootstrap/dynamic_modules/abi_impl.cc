@@ -148,7 +148,8 @@ bool envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
           *sample_sum_ptr = stats.sampleSum();
           found = true;
         }
-      });
+      },
+      {});
   return found;
 }
 
@@ -168,7 +169,8 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
                                // action. The module should handle this by setting a flag in
                                // user_data.
                                (void)action;
-                             });
+                             },
+                             {});
 }
 
 void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
@@ -187,7 +189,8 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
                              // action. The module should handle this by setting a flag in
                              // user_data.
                              (void)action;
-                           });
+                           },
+                           {});
 }
 
 // -------------------- Stats Definition and Update Callbacks --------------------
