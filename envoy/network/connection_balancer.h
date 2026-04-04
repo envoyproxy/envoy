@@ -19,13 +19,20 @@ public:
   virtual uint64_t numConnections() const PURE;
 
   /**
-   * Increment the number of connections within the handler. This must be called by a connection
-   * balancer implementation prior to a connection being picked via pickTargetHandler(). This makes
-   * sure that connection counts are accurate during connection transfer (i.e., that the target
-   * balancer accounts for the incoming connection). This is done by the balancer vs. the
-   * connection handler to account for different locking needs inside the balancer.
+   * Increment the connection count used for balancing decisions. Balancer implementations must call
+   * this prior to returning from pickTargetHandler() to ensure accurate connection counts during
+   * connection transfer. For balancers that hold a lock (e.g., ExactConnectionBalancerImpl), this
+   * should be called inside the critical section, while postIncNumConnections() is called after
+   * the lock is released.
    */
-  virtual void incNumConnections() PURE;
+  virtual void preIncNumConnections() PURE;
+
+  /**
+   * Perform any resource-limit bookkeeping after a connection has been assigned by the balancer.
+   * This is the counterpart to preIncNumConnections() and must be called outside any balancer lock
+   * to avoid holding the lock longer than necessary.
+   */
+  virtual void postIncNumConnections() PURE;
 
   /**
    * Post a connected socket to this connection handler. This is used for cross-thread connection
@@ -69,8 +76,9 @@ public:
    * @return current_handler if the connection should stay bound to the current handler, or a
    *         different handler if the connection should be rebalanced.
    *
-   * NOTE: It is the responsibility of the balancer to call incNumConnections() on the returned
-   *       balancer. See the comments above for more explanation.
+   * NOTE: It is the responsibility of the balancer to call preIncNumConnections() and
+   *       postIncNumConnections() on the returned handler. See the comments above for more
+   *       explanation.
    */
   virtual BalancedConnectionHandler&
   pickTargetHandler(BalancedConnectionHandler& current_handler) PURE;
