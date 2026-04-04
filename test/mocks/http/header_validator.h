@@ -38,6 +38,7 @@ public:
   MOCK_METHOD(void, incDroppedHeadersWithUnderscores, ());
   MOCK_METHOD(void, incRequestsRejectedWithUnderscoresInHeaders, ());
   MOCK_METHOD(void, incMessagingError, ());
+  MOCK_METHOD(void, incRequestsWithObsText, ());
 };
 
 class MockHeaderValidatorFactory : public HeaderValidatorFactory {

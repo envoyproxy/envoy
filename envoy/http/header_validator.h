@@ -172,6 +172,7 @@ public:
   virtual void incDroppedHeadersWithUnderscores() PURE;
   virtual void incRequestsRejectedWithUnderscoresInHeaders() PURE;
   virtual void incMessagingError() PURE;
+  virtual void incRequestsWithObsText() PURE;
 };
 
 /**

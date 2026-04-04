@@ -2082,6 +2082,8 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
   og_options_.allow_different_host_and_authority = true;
+  og_options_.allow_obs_text =
+      !PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, disallow_obs_text, false);
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, enable_huffman_encoding, true)) {
     if (http2_options.has_hpack_table_size() && http2_options.hpack_table_size().value() == 0) {
       og_options_.compression_option = http2::adapter::OgHttp2Session::Options::DISABLE_COMPRESSION;
@@ -2354,6 +2356,7 @@ Status ClientConnectionImpl::onBeginHeaders(int32_t stream_id) {
 
 int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
   ASSERT(connection_.state() == Network::Connection::State::Open);
+  Http::HeaderUtility::checkHeaderValueForObsText(value.getStringView(), stats_);
   return saveHeader(stream_id, std::move(name), std::move(value));
 }
 
@@ -2432,6 +2435,7 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
 }
 
 int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
+  Http::HeaderUtility::checkHeaderValueForObsText(value.getStringView(), stats_);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")) {
     StreamImpl* stream = getStreamUnchecked(stream_id);
     if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {

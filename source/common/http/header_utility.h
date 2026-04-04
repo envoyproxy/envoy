@@ -560,6 +560,17 @@ public:
    * Return true if the given header name is a pseudo header.
    */
   static bool isPseudoHeader(absl::string_view header_name);
+
+  /**
+   * Log stats if the given header value contains obs-text.
+   */
+  static void checkHeaderValueForObsText(absl::string_view header_value,
+                                         HeaderValidatorStats& stats);
+
+  /**
+   * Return true if the given header value contains obs-text.
+   */
+  static bool headerValueContainsObsText(absl::string_view header_value);
 };
 
 } // namespace Http
