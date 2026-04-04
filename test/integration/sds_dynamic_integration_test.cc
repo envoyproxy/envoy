@@ -233,6 +233,39 @@ public:
       default_request_headers_.setHost("www.lyft.com");
     });
 
+    if (configure_session_ticket_sds_) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_session_ticket_support",
+                                        "true");
+      config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* ts = bootstrap.mutable_static_resources()
+                       ->mutable_listeners(0)
+                       ->mutable_filter_chains(0)
+                       ->mutable_transport_socket();
+        if (test_quic_) {
+          auto quic_config = MessageUtil::anyConvert<
+              envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
+              *ts->mutable_typed_config());
+          auto* sds_config = quic_config.mutable_downstream_tls_context()
+                                 ->mutable_session_ticket_keys_sds_secret_config();
+          sds_config->set_name(session_ticket_keys_secret_);
+          auto* config_source = sds_config->mutable_sds_config();
+          config_source->mutable_path_config_source()->set_path(session_ticket_keys_sds_path_);
+          config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+          ts->mutable_typed_config()->PackFrom(quic_config);
+        } else {
+          auto tls_context = MessageUtil::anyConvert<
+              envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext>(
+              *ts->mutable_typed_config());
+          auto* sds_config = tls_context.mutable_session_ticket_keys_sds_secret_config();
+          sds_config->set_name(session_ticket_keys_secret_);
+          auto* config_source = sds_config->mutable_sds_config();
+          config_source->mutable_path_config_source()->set_path(session_ticket_keys_sds_path_);
+          config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+          ts->mutable_typed_config()->PackFrom(tls_context);
+        }
+      });
+    }
+
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add a static SDS cluster as the first cluster in the list.
       // The SDS cluster needs to appear before the cluster that uses it for secrets, so that it
@@ -359,10 +392,46 @@ resources:
     return makeClientConnectionWithOptions(port, nullptr);
   }
 
+  void writeSessionTicketKeysSdsYaml(const std::string& inline_key_bytes) {
+    constexpr absl::string_view sds_template =
+        R"EOF(
+---
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: "{}"
+  session_ticket_keys:
+    keys:
+    - inline_bytes: "{}"
+)EOF";
+    const std::string sds_content = fmt::format(sds_template, session_ticket_keys_secret_,
+                                                absl::Base64Escape(inline_key_bytes));
+    TestEnvironment::writeStringToFileForTest("session_ticket_keys.sds.yaml", sds_content, false);
+  }
+
+  void writeEmptySessionTicketKeysSdsYaml() {
+    constexpr absl::string_view sds_template =
+        R"EOF(
+---
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: "{}"
+  session_ticket_keys:
+    keys: []
+)EOF";
+    const std::string sds_content = fmt::format(sds_template, session_ticket_keys_secret_);
+    TestEnvironment::writeStringToFileForTest("session_ticket_keys.sds.yaml", sds_content, false);
+  }
+
 protected:
   Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
   bool dual_cert_{false};
   bool multi_cert_{false};
+  bool configure_session_ticket_sds_{false};
+  const std::string session_ticket_keys_secret_{"session_ticket_keys"};
+  const std::string session_ticket_keys_sds_path_{
+      TestEnvironment::temporaryPath("session_ticket_keys.sds.yaml")};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
@@ -613,6 +682,49 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   // Success
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+}
+
+TEST_P(SdsDynamicDownstreamIntegrationTest, SessionTicketKeysViaSds) {
+  configure_session_ticket_sds_ = true;
+  // Write session ticket keys SDS YAML before server starts.
+  writeSessionTicketKeysSdsYaml(std::string(80, '\x01'));
+  on_server_init_function_ = [this]() {
+    createSdsStream(*sdsUpstream());
+    sendSdsResponse(getServerSecretRsa());
+  };
+  initialize();
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+}
+
+TEST_P(SdsDynamicDownstreamIntegrationTest, SessionTicketKeysRemovedViaSds) {
+  configure_session_ticket_sds_ = true;
+  writeSessionTicketKeysSdsYaml(std::string(80, '\x01'));
+  on_server_init_function_ = [this]() {
+    createSdsStream(*sdsUpstream());
+    sendSdsResponse(getServerSecretRsa());
+  };
+  initialize();
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+  cleanupUpstreamAndDownstream();
+
+  // Update SDS file to remove session ticket keys — should not crash.
+  writeEmptySessionTicketKeysSdsYaml();
+  test_server_->waitForCounterGe(
+      listenerStatPrefix(test_quic_
+                             ? "quic_server_transport_socket_factory.context_config_update_by_sds"
+                             : "server_ssl_socket_factory.ssl_context_update_by_sds"),
+      2);
+
+  // Connection should still succeed (falls back to full handshake without tickets).
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 }
 
 class SdsDynamicDownstreamCertValidationContextTest : public SdsDynamicDownstreamIntegrationTest {

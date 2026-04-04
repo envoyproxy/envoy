@@ -712,6 +712,7 @@ codebase
 codec
 codecs
 codepath
+codepoint
 codepoints
 codings
 combinatorial

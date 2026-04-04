@@ -27,6 +27,26 @@ public:
 
   void updateFilterChainManager(Network::FilterChainManager& filter_chain_manager);
 
+  // Returns the SSL ex_data index used to store transport socket factory pointer during QUIC
+  // handshakes.
+  static int transportSocketFactoryExDataIndex();
+
+  // Session ticket key callback installed on SSL_CTX by OnNewSslCtx.
+  // Retrieves the QuicServerTransportSocketFactory from SSL ex_data and
+  // delegates to processSessionTicket.
+  static int ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
+                               HMAC_CTX* hmac_ctx, int encrypt);
+
+  struct TransportSocketFactoryWithFilterChain {
+    const QuicServerTransportSocketFactory& transport_socket_factory_;
+    const Network::FilterChain& filter_chain_;
+  };
+
+  absl::optional<TransportSocketFactoryWithFilterChain>
+  getTransportSocketAndFilterChain(const quic::QuicSocketAddress& server_address,
+                                   const quic::QuicSocketAddress& client_address,
+                                   const std::string& hostname);
+
 protected:
   // quic::ProofSource
   void signPayload(const quic::QuicSocketAddress& server_address,
@@ -35,11 +55,6 @@ protected:
                    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
-  struct TransportSocketFactoryWithFilterChain {
-    const QuicServerTransportSocketFactory& transport_socket_factory_;
-    const Network::FilterChain& filter_chain_;
-  };
-
   struct CertWithFilterChain {
     quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_;
     std::shared_ptr<quic::CertificatePrivateKey> private_key_;
@@ -48,11 +63,6 @@ private:
 
   CertWithFilterChain getTlsCertAndFilterChain(const TransportSocketFactoryWithFilterChain& data,
                                                const std::string& hostname, bool* cert_matched_sni);
-
-  absl::optional<TransportSocketFactoryWithFilterChain>
-  getTransportSocketAndFilterChain(const quic::QuicSocketAddress& server_address,
-                                   const quic::QuicSocketAddress& client_address,
-                                   const std::string& hostname);
 
   Network::Socket& listen_socket_;
   Network::FilterChainManager* filter_chain_manager_{nullptr};

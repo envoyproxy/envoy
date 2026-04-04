@@ -122,6 +122,7 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
+        "//source/common/common:macros",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:listener_stats",
