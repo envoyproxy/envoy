@@ -1014,7 +1014,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       {cookie_names.bearer_token_, config_->bearerTokenCookieSettings().path_},
       {cookie_names.id_token_, config_->idTokenCookieSettings().path_},
       {cookie_names.refresh_token_, config_->refreshTokenCookieSettings().path_},
-
+      {cookie_names.oauth_expires_, config_->expiresCookieSettings().path_},
   };
 
   absl::flat_hash_map<std::string, std::string> request_cookies =

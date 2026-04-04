@@ -104,6 +104,10 @@ minor_behavior_changes:
     Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
     serialize the ``google.protobuf.Struct`` configuration message to JSON string and pass it to the
     dynamic module side as the configuration.
+- area: oauth2
+  change: |
+    The oauth2 filter now removes the OauthExpires cookie from a user's browser upon logging out.
+    Previously this cookie persisted beyond the logout despite the session no longer existing.
 - area: proto_api_scrubber
   change: |
     If :ref:`scrub_unknown_fields

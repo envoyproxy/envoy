@@ -826,13 +826,14 @@ TEST_F(OAuth2Test, RequestSignout) {
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(headers.Status()->value(), "302");
-        EXPECT_EQ(headers.get(Http::Headers::get().SetCookie).size(), 10);
+        EXPECT_EQ(headers.get(Http::Headers::get().SetCookie).size(), 11);
         EXPECT_EQ(headers.get(Http::Headers::get().Location)[0]->value().getStringView(),
                   "https://traffic.example.com/");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthHMAC"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "IdToken"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "RefreshToken"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthExpires"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthNonce"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "CodeVerifier"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthNonce.1"), "deleted");
@@ -893,6 +894,8 @@ TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
        "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().Location.get(), "https://auth.example.com/oauth/"
                                             "logout?id_token_hint=xyztoken&client_id=1&post_logout_"
                                             "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"},
@@ -4570,6 +4573,7 @@ TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
     auto* cookie_names = credentials->mutable_cookie_names();
     cookie_names->set_oauth_hmac(absl::StrCat(prefix, "OauthHMAC"));
     cookie_names->set_bearer_token(absl::StrCat(prefix, "BearerToken"));
+    cookie_names->set_oauth_expires(absl::StrCat(prefix, "OauthExpires"));
     cookie_names->set_id_token(absl::StrCat(prefix, "IdToken"));
     cookie_names->set_refresh_token(absl::StrCat(prefix, "RefreshToken"));
     cookie_names->set_oauth_nonce(absl::StrCat(prefix, "OauthNonce"));
@@ -4590,7 +4594,7 @@ TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
 
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
         .WillOnce(Invoke([&](Http::ResponseHeaderMap& passed_headers, bool) {
-          EXPECT_EQ(passed_headers.get(Http::Headers::get().SetCookie).size(), 4);
+          EXPECT_EQ(passed_headers.get(Http::Headers::get().SetCookie).size(), 5);
           const auto& cookie_str =
               passed_headers.get(Http::Headers::get().SetCookie)[0]->value().getStringView();
           if (expect_secure) {
@@ -4814,12 +4818,18 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
               filter_->decodeHeaders(signout_headers, false));
 
     auto cookies = extract_cookies(response_headers);
-    bool found_hmac_delete = false, found_nonce_delete = false, found_code_verifier_delete = false;
+    bool found_hmac_delete = false, found_nonce_delete = false, found_code_verifier_delete = false,
+         found_expires_delete = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthHMAC=deleted") != std::string::npos) {
         EXPECT_NE(cookie.find("path=/app"), std::string::npos)
             << "OauthHMAC deletion should have path=/app, got: " << cookie;
         found_hmac_delete = true;
+      }
+      if (cookie.find("OauthExpires=deleted") != std::string::npos) {
+        EXPECT_NE(cookie.find("path=/app"), std::string::npos)
+            << "OauthExpires deletion should have path=/app, got: " << cookie;
+        found_expires_delete = true;
       }
       if (cookie.find("OauthNonce.00000000075bcd15=deleted") != std::string::npos) {
         EXPECT_NE(cookie.find("path=/auth/callback"), std::string::npos)
@@ -4833,6 +4843,7 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
       }
     }
     EXPECT_TRUE(found_hmac_delete) << "OauthHMAC deletion cookie not found.";
+    EXPECT_TRUE(found_expires_delete) << "OauthExpires deletion cookie not found.";
     EXPECT_TRUE(found_nonce_delete) << "OauthNonce deletion cookie not found.";
     EXPECT_TRUE(found_code_verifier_delete) << "CodeVerifier deletion cookie not found.";
   }
