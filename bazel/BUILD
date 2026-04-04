@@ -25,6 +25,20 @@ exports_files([
     "exported_symbols_apple.txt",
 ])
 
+# TODO(phlax): Cleanup once bzlmod migration is complete
+bool_flag(
+    name = "enable_bzlmod",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bzlmod_mode",
+    flag_values = {
+        ":enable_bzlmod": "True",
+    },
+    visibility = ["//visibility:public"],
+)
+
 sh_library(
     name = "volatile_env",
     srcs = ["volatile_env.sh"],

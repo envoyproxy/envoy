@@ -2,7 +2,16 @@
 
 set -e
 
-TEST_CERTS="${TEST_SRCDIR}"/envoy/test/config/integration/certs
+# TODO(phlax): Cleanup once bzlmod migration is complete
+# Determine workspace directory (envoy in WORKSPACE mode, _main in bzlmod mode)
+if [[ -d "${TEST_SRCDIR}/_main" ]]; then
+    TEST_CERTS="${TEST_SRCDIR}/_main/test/config/integration/certs"
+elif [[ -d "${TEST_SRCDIR}/envoy" ]]; then
+    TEST_CERTS="${TEST_SRCDIR}/envoy/test/config/integration/certs"
+else
+    echo "Error: Could not find workspace directory at ${TEST_SRCDIR}/_main or ${TEST_SRCDIR}/envoy" >&2
+    exit 1
+fi
 
 ROOT="${TEST_TMPDIR}"/root
 SERVER_KEYCERT="${ROOT}"/server

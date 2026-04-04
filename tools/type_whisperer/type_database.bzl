@@ -9,6 +9,7 @@ def _type_database_impl(ctx):
 
     def _descriptor_set(dep):
         ws_name = dep.owner.workspace_name
+        ws_name = ws_name.rstrip("~").split("~")[0] if ws_name else ""
         if (not ws_name) or ws_name in proto_repositories:
             return dep.path
 

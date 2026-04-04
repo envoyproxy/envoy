@@ -88,9 +88,10 @@ envoy_cc_library(
     name = "event_impl_base_lib",
     srcs = ["event_impl_base.cc"],
     hdrs = ["event_impl_base.h"],
-    deps = [
-        "//bazel/foreign_cc:event",
-    ],
+    deps = select({
+        "//bazel:bzlmod_mode": ["@libevent"],
+        "//conditions:default": ["//bazel/foreign_cc:event"],
+    }),
 )
 
 envoy_cc_library(
@@ -134,10 +135,12 @@ envoy_cc_library(
     srcs = ["libevent.cc"],
     hdrs = ["libevent.h"],
     deps = [
-        "//bazel/foreign_cc:event",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
-    ],
+    ] + select({
+        "//bazel:bzlmod_mode": ["@libevent"],
+        "//conditions:default": ["//bazel/foreign_cc:event"],
+    }),
 )
 
 envoy_cc_library(
@@ -148,11 +151,13 @@ envoy_cc_library(
         ":libevent_lib",
         ":schedulable_cb_lib",
         ":timer_lib",
-        "//bazel/foreign_cc:event",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//source/common/common:assert_lib",
-    ],
+    ] + select({
+        "//bazel:bzlmod_mode": ["@libevent"],
+        "//conditions:default": ["//bazel/foreign_cc:event"],
+    }),
 )
 
 envoy_cc_library(
@@ -162,9 +167,11 @@ envoy_cc_library(
     deps = [
         ":event_impl_base_lib",
         ":libevent_lib",
-        "//bazel/foreign_cc:event",
         "//envoy/event:schedulable_cb_interface",
-    ],
+    ] + select({
+        "//bazel:bzlmod_mode": ["@libevent"],
+        "//conditions:default": ["//bazel/foreign_cc:event"],
+    }),
 )
 
 envoy_cc_library(
@@ -174,11 +181,13 @@ envoy_cc_library(
     deps = [
         ":event_impl_base_lib",
         ":libevent_lib",
-        "//bazel/foreign_cc:event",
         "//envoy/event:timer_interface",
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
-    ],
+    ] + select({
+        "//bazel:bzlmod_mode": ["@libevent"],
+        "//conditions:default": ["//bazel/foreign_cc:event"],
+    }),
 )
 
 envoy_cc_library(
