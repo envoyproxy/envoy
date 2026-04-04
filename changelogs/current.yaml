@@ -324,6 +324,11 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: oauth2
+  change: |
+    Removed the runtime guard ``envoy.reloadable_features.oauth2_encrypt_tokens``. Token cookies (access,
+    ID, refresh) remain encrypted by default; use the ``disable_token_encryption`` filter configuration
+    to turn encryption off if needed.
 - area: tcp_proxy
   change: |
     Removed runtime guard ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection``

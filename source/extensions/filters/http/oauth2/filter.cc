@@ -829,10 +829,6 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
     return;
   }
 
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
-    return;
-  }
-
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
   if (cookies.empty()) {
     return;
@@ -868,10 +864,7 @@ std::string OAuth2Filter::encryptToken(const std::string& token) const {
     return token;
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
-    return encrypt(token, config_->hmacSecret(), random_);
-  }
-  return token;
+  return encrypt(token, config_->hmacSecret(), random_);
 }
 
 std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const {
