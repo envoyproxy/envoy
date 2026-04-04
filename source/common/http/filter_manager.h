@@ -1,7 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
+#include <iterator>
 #include <memory>
+#include <new>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
@@ -14,6 +17,7 @@
 #include "envoy/protobuf/message_validator.h"
 
 #include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
@@ -37,8 +41,103 @@ class DownstreamFilterManager;
 struct ActiveStreamFilterBase;
 struct ActiveStreamDecoderFilter;
 struct ActiveStreamEncoderFilter;
-using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
-using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
+
+// Reserve-once, fixed-capacity container that constructs filter wrappers in-place
+// via placement-new. Elements are never relocated after construction, which is
+// required because filters set back-references (e.g. setDecoderFilterCallbacks(*this))
+// in their constructors. Capacity is sized by maxFilterCount() and violations
+// trigger assertion failures. The iterator adapter returns T* from operator* so that
+// existing (*entry)->member dereference patterns work unchanged.
+template <typename T> class InPlaceFilterList {
+public:
+  class Iterator {
+  public:
+    using iterator_category = std::bidirectional_iterator_tag;
+    using value_type = T*;
+    using difference_type = std::ptrdiff_t;
+    using pointer = T**;
+    using reference = T*;
+
+    Iterator() = default;
+    explicit Iterator(T* ptr) : ptr_(ptr) {}
+
+    T* operator*() const { return ptr_; }
+    T* operator->() const { return ptr_; }
+
+    Iterator& operator++() { ++ptr_; return *this; }
+    Iterator operator++(int) { Iterator tmp = *this; ++ptr_; return tmp; }
+    Iterator& operator--() { --ptr_; return *this; }
+    Iterator operator--(int) { Iterator tmp = *this; --ptr_; return tmp; }
+
+    bool operator==(const Iterator& other) const { return ptr_ == other.ptr_; }
+    bool operator!=(const Iterator& other) const { return ptr_ != other.ptr_; }
+
+  private:
+    T* ptr_{};
+  };
+
+  InPlaceFilterList() = default;
+  ~InPlaceFilterList() {
+    for (size_t i = 0; i < size_; ++i) {
+      storage_[i].~T();
+    }
+    if (storage_ != nullptr) {
+      ::operator delete(storage_, std::align_val_t{alignof(T)});
+    }
+  }
+
+  InPlaceFilterList(const InPlaceFilterList&) = delete;
+  InPlaceFilterList& operator=(const InPlaceFilterList&) = delete;
+  InPlaceFilterList(InPlaceFilterList&&) = delete;
+  InPlaceFilterList& operator=(InPlaceFilterList&&) = delete;
+
+  void reserve(size_t n) {
+    if (capacity_ > 0) {
+      // Defensive guard: if a prior factory set capacity (maxFilterCount() > 0), it must
+      // also have returned true from createFilterChain(), causing FilterManager::
+      // createFilterChain() to early-return before any subsequent factory reaches this
+      // call. This branch is unreachable with current factories but guards against
+      // future implementations that break the maxFilterCount()/createFilterChain()
+      // coupling invariant.
+      RELEASE_ASSERT(n <= capacity_,
+                     "InPlaceFilterList: subsequent reserve exceeds initial capacity");
+      return;
+    }
+    RELEASE_ASSERT(n > 0, "InPlaceFilterList: reserve called with zero capacity");
+    storage_ = static_cast<T*>(::operator new(sizeof(T) * n, std::align_val_t{alignof(T)}));
+    capacity_ = n;
+  }
+
+  template <typename... Args> T& emplace_back(Args&&... args) {
+    RELEASE_ASSERT(size_ < capacity_, "InPlaceFilterList: emplace_back past capacity");
+    T* slot = &storage_[size_];
+    new (slot) T(std::forward<Args>(args)...);
+    ++size_;
+    return *slot;
+  }
+
+  Iterator begin() { return Iterator(storage_); }
+  Iterator end() { return Iterator(storage_ + size_); }
+
+  using ReverseIterator = std::reverse_iterator<Iterator>;
+  ReverseIterator rbegin() { return ReverseIterator(end()); }
+  ReverseIterator rend() { return ReverseIterator(begin()); }
+
+  T& back() { return storage_[size_ - 1]; }
+  const T& back() const { return storage_[size_ - 1]; }
+  T& front() { return storage_[0]; }
+  const T& front() const { return storage_[0]; }
+  T& operator[](size_t i) { return storage_[i]; }
+  const T& operator[](size_t i) const { return storage_[i]; }
+
+  size_t size() const { return size_; }
+  bool empty() const { return size_ == 0; }
+
+private:
+  T* storage_{};
+  size_t size_{};
+  size_t capacity_{};
+};
 
 constexpr absl::string_view LocalReplyFilterStateKey =
     "envoy.filters.network.http_connection_manager.local_reply_owner";
@@ -59,10 +158,6 @@ private:
   const std::string filter_config_name_;
 };
 
-// TODO(wbpcode): Rather than allocating every filter with an unique pointer, we could
-// construct the filter in place in the vector. This should reduce the heap allocation and
-// memory fragmentation.
-
 // HTTP decoder filters. If filters are configured in the following order (assume all three
 // filters are both decoder/encoder filters):
 //   http_filters:
@@ -72,12 +167,12 @@ private:
 // The decoder filter chain will iterate through filters A, B, C.
 struct StreamDecoderFilters {
   using Element = ActiveStreamDecoderFilter;
-  using Iterator = std::vector<ActiveStreamDecoderFilterPtr>::iterator;
+  using Iterator = InPlaceFilterList<ActiveStreamDecoderFilter>::Iterator;
 
   Iterator begin() { return entries_.begin(); }
   Iterator end() { return entries_.end(); }
 
-  std::vector<ActiveStreamDecoderFilterPtr> entries_;
+  InPlaceFilterList<ActiveStreamDecoderFilter> entries_;
 };
 
 // HTTP encoder filters. If filters are configured in the following order (assume all three
@@ -91,12 +186,12 @@ struct StreamDecoderFilters {
 // here.
 struct StreamEncoderFilters {
   using Element = ActiveStreamEncoderFilter;
-  using Iterator = std::vector<ActiveStreamEncoderFilterPtr>::reverse_iterator;
+  using Iterator = InPlaceFilterList<ActiveStreamEncoderFilter>::ReverseIterator;
 
   Iterator begin() { return entries_.rbegin(); }
   Iterator end() { return entries_.rend(); }
 
-  std::vector<ActiveStreamEncoderFilterPtr> entries_;
+  InPlaceFilterList<ActiveStreamEncoderFilter> entries_;
 };
 
 /**
@@ -240,8 +335,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
 /**
  * Wrapper for a stream decoder filter.
  */
-struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
-                                   public StreamDecoderFilterCallbacks {
+struct ActiveStreamDecoderFilter final : public ActiveStreamFilterBase,
+                                        public StreamDecoderFilterCallbacks {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
                             absl::string_view filter_config_name)
       : ActiveStreamFilterBase(parent, filter_config_name), handle_(std::move(filter)) {
@@ -330,8 +425,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 /**
  * Wrapper for a stream encoder filter.
  */
-struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
-                                   public StreamEncoderFilterCallbacks {
+struct ActiveStreamEncoderFilter final : public ActiveStreamFilterBase,
+                                        public StreamEncoderFilterCallbacks {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
                             absl::string_view filter_config_name)
       : ActiveStreamFilterBase(parent, filter_config_name), handle_(std::move(filter)) {
@@ -995,24 +1090,20 @@ private:
     void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
       manager_.filters_.push_back(filter.get());
 
-      manager_.decoder_filters_.entries_.emplace_back(std::make_unique<ActiveStreamDecoderFilter>(
-          manager_, std::move(filter), filter_config_name_));
+      manager_.decoder_filters_.entries_.emplace_back(manager_, std::move(filter), filter_config_name_);
     }
 
     void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
       manager_.filters_.push_back(filter.get());
 
-      manager_.encoder_filters_.entries_.emplace_back(std::make_unique<ActiveStreamEncoderFilter>(
-          manager_, std::move(filter), filter_config_name_));
+      manager_.encoder_filters_.entries_.emplace_back(manager_, std::move(filter), filter_config_name_);
     }
 
     void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
       manager_.filters_.push_back(filter.get());
 
-      manager_.decoder_filters_.entries_.emplace_back(
-          std::make_unique<ActiveStreamDecoderFilter>(manager_, filter, filter_config_name_));
-      manager_.encoder_filters_.entries_.emplace_back(std::make_unique<ActiveStreamEncoderFilter>(
-          manager_, std::move(filter), filter_config_name_));
+      manager_.decoder_filters_.entries_.emplace_back(manager_, filter, filter_config_name_);
+      manager_.encoder_filters_.entries_.emplace_back(manager_, std::move(filter), filter_config_name_);
     }
 
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {

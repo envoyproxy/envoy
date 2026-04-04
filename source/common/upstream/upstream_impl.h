@@ -973,6 +973,7 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   // Http::FilterChainFactory
+  size_t maxFilterCount() const override { return http_filter_factories_.size(); }
   bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override {
     if (http_filter_factories_.empty()) {
       return false;

@@ -209,6 +209,7 @@ public:
 
   // Http::FilterChainFactory
   MOCK_METHOD(bool, createFilterChain, (FilterChainFactoryCallbacks & callbacks), (const));
+  MOCK_METHOD(size_t, maxFilterCount, (), (const));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
                FilterChainFactoryCallbacks& callbacks),

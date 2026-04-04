@@ -27,7 +27,7 @@ void recordLatestDataFilter(typename Filters::Iterator current_filter,
                             typename Filters::Element*& latest_filter, Filters& filters) {
   // If this is the first time we're calling onData, just record the current filter.
   if (latest_filter == nullptr) {
-    latest_filter = current_filter->get();
+    latest_filter = *current_filter;
     return;
   }
 
@@ -41,8 +41,8 @@ void recordLatestDataFilter(typename Filters::Iterator current_filter,
   // correctly iterate over the filters and set latest, but on subsequent onData iterations
   // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
   // though filter M > N was the filter that inserted data into the buffer.
-  if (current_filter != filters.begin() && latest_filter == std::prev(current_filter)->get()) {
-    latest_filter = current_filter->get();
+  if (current_filter != filters.begin() && latest_filter == *std::prev(current_filter)) {
+    latest_filter = *current_filter;
   }
 }
 
@@ -809,7 +809,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
   // If trailers were adding during decodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
   if (trailers_added_entry != decoder_filters_.end()) {
-    decodeTrailers(trailers_added_entry->get(), *filter_manager_callbacks_.requestTrailers());
+    decodeTrailers(*trailers_added_entry, *filter_manager_callbacks_.requestTrailers());
   }
 
   if (end_stream) {
@@ -1529,7 +1529,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
   if (trailers_added_entry != encoder_filters_.end()) {
-    encodeTrailers(trailers_added_entry->get(), *filter_manager_callbacks_.responseTrailers());
+    encodeTrailers(*trailers_added_entry, *filter_manager_callbacks_.responseTrailers());
   }
 }
 
@@ -1734,7 +1734,12 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory)
     }
   });
 
-  // TODO(wbpcode): reserve memory for filters to avoid frequent reallocation.
+  const size_t max_filters = filter_chain_factory.maxFilterCount();
+  if (max_filters > 0) {
+    decoder_filters_.entries_.reserve(max_filters);
+    encoder_filters_.entries_.reserve(max_filters);
+    filters_.reserve(max_filters);
+  }
 
   OptRef<DownstreamStreamFilterCallbacks> downstream_callbacks =
       filter_manager_callbacks_.downstreamCallbacks();
@@ -1757,6 +1762,10 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory)
 
   state_.create_chain_result_ =
       CreateChainResult(filter_chain_factory.createFilterChain(callbacks), upgrade);
+  ASSERT(decoder_filters_.entries_.size() <= max_filters,
+         "createFilterChain added more decoder filters than maxFilterCount()");
+  ASSERT(encoder_filters_.entries_.size() <= max_filters,
+         "createFilterChain added more encoder filters than maxFilterCount()");
   return state_.create_chain_result_;
 }
 
@@ -1982,7 +1991,7 @@ void FilterManager::resetStream(StreamResetReason reason,
 }
 
 bool FilterManager::isTerminalDecoderFilter(const ActiveStreamDecoderFilter& filter) const {
-  return !decoder_filters_.entries_.empty() && decoder_filters_.entries_.back().get() == &filter;
+  return !decoder_filters_.entries_.empty() && &decoder_filters_.entries_.back() == &filter;
 }
 
 void ActiveStreamFilterBase::resetStream(Http::StreamResetReason reset_reason,

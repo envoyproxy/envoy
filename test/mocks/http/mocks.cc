@@ -50,7 +50,10 @@ MockServerConnection::~MockServerConnection() = default;
 MockClientConnection::MockClientConnection() = default;
 MockClientConnection::~MockClientConnection() = default;
 
-MockFilterChainFactory::MockFilterChainFactory() = default;
+MockFilterChainFactory::MockFilterChainFactory() {
+  ON_CALL(*this, maxFilterCount()).WillByDefault(testing::Return(10));
+}
+
 MockFilterChainFactory::~MockFilterChainFactory() = default;
 
 template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks) {
