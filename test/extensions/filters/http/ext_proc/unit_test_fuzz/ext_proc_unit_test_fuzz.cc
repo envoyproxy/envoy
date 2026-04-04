@@ -82,6 +82,12 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
+  // Keep stat_prefix bounded in fuzzing to avoid pathological stats store cleanup costs.
+  constexpr size_t max_stats_prefix_size = 64;
+  if (input.config().stat_prefix().size() > max_stats_prefix_size) {
+    return;
+  }
+
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
