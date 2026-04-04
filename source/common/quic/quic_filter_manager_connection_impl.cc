@@ -235,16 +235,12 @@ void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
 
 void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferHighWatermark", *this);
-  for (auto callback : callbacks_) {
-    callback->onAboveWriteBufferHighWatermark();
-  }
+  onFilterAboveHighWatermark();
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferLowWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferLowWatermark", *this);
-  for (auto callback : callbacks_) {
-    callback->onBelowWriteBufferLowWatermark();
-  }
+  onFilterBelowLowWatermark();
 }
 
 absl::optional<std::chrono::milliseconds>

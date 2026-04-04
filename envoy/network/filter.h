@@ -116,6 +116,18 @@ public:
    *              marking the filter as close ready.
    */
   virtual void disableClose(bool disabled) PURE;
+
+  /**
+   * Called by a write filter to signal that its internal buffer is above its high watermark.
+   * This propagates backpressure to the connection, which may notify ConnectionCallbacks.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called by a write filter to signal that its internal buffer has drained below its low
+   * watermark. Must be paired with a prior onAboveWriteBufferHighWatermark() call.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
 };
 
 /**

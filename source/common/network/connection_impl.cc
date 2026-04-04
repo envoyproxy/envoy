@@ -80,10 +80,9 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
           [this]() -> void { this->onReadBufferLowWatermark(); },
           [this]() -> void { this->onReadBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      write_buffer_above_high_watermark_(false), detect_early_close_(true),
-      enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
-      write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
-      transport_wants_read_(false),
+      detect_early_close_(true), enable_half_close_(false), read_end_stream_raised_(false),
+      read_end_stream_(false), write_end_stream_(false), current_write_end_stream_(false),
+      dispatch_buffered_data_(false), transport_wants_read_(false),
       enable_close_through_filter_manager_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_close_through_filter_manager")) {
 
@@ -697,30 +696,18 @@ void ConnectionImpl::onReadBufferHighWatermark() {
 
 void ConnectionImpl::onWriteBufferLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
-  ASSERT(write_buffer_above_high_watermark_);
-  write_buffer_above_high_watermark_ = false;
   if (state() == State::Open) {
     maybeCancelBufferHighWatermarkTimeout();
   }
-  for (ConnectionCallbacks* callback : callbacks_) {
-    if (callback) {
-      callback->onBelowWriteBufferLowWatermark();
-    }
-  }
+  onFilterBelowLowWatermark();
 }
 
 void ConnectionImpl::onWriteBufferHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
-  ASSERT(!write_buffer_above_high_watermark_);
-  write_buffer_above_high_watermark_ = true;
   if (state() == State::Open) {
     scheduleBufferHighWatermarkTimeout();
   }
-  for (ConnectionCallbacks* callback : callbacks_) {
-    if (callback) {
-      callback->onAboveWriteBufferHighWatermark();
-    }
-  }
+  onFilterAboveHighWatermark();
 }
 
 void ConnectionImpl::setFailureReason(absl::string_view failure_reason) {

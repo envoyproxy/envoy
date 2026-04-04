@@ -23,6 +23,11 @@ public:
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void removeConnectionCallbacks(ConnectionCallbacks& cb) override;
+
+  // Network::FilterManagerConnection
+  void onFilterAboveHighWatermark() override;
+  void onFilterBelowLowWatermark() override;
+
   Event::Dispatcher& dispatcher() const override { return dispatcher_; }
   uint64_t id() const override { return id_; }
   void hashKey(std::vector<uint8_t>& hash) const override;
@@ -74,6 +79,9 @@ protected:
   const uint64_t id_;
   std::list<ConnectionCallbacks*> callbacks_;
   std::unique_ptr<ConnectionStats> connection_stats_;
+  // Number of sources above their high watermark. ConnectionCallbacks are notified on
+  // transitions (0→1, 1→0).
+  uint32_t above_high_watermark_count_{0};
 
 private:
   // Callback issued when a delayed close timeout triggers.
