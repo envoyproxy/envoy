@@ -96,6 +96,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "aws-c-auth-{version}",
         urls = ["https://github.com/awslabs/aws-c-auth/archive/refs/tags/v{version}.tar.gz"],
     ),
+    libsodium = dict(
+        version = "1.0.20",
+        sha256 = "ebb65ef6ca439333c2bb41a0c1990587288da07f6c7fd07cb3a18cc18d30ce19",
+        strip_prefix = "libsodium-{version}",
+        urls = ["https://download.libsodium.org/libsodium/releases/libsodium-{version}.tar.gz"],
+    ),
     liburing = dict(
         version = "2.14",
         sha256 = "5f80964108981c6ad979c735f0b4877d5f49914c2a062f8e88282f26bf61de0c",
