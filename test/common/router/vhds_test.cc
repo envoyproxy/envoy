@@ -316,6 +316,106 @@ vhds:
               "vhost_vhds1" == actual_vhost_2.name());
 }
 
+// verify that domainNameToAlias works correctly in xdstp mode
+TEST_F(VhdsTest, DomainNameToAliasXdstpMode) {
+  // Collection prefix has trailing '/*' stripped (just '/*', not only '*'),
+  // so domainNameToAlias re-adds the '/' separator.
+  const std::string collection_prefix = "xdstp://test/envoy.config.route.v3.VirtualHost/my-route";
+  EXPECT_EQ("xdstp://test/envoy.config.route.v3.VirtualHost/my-route/vhost.first",
+            VhdsSubscription::domainNameToAlias(collection_prefix, "vhost.first"));
+}
+
+// verify that aliasToDomainName works correctly with xdstp resource names
+TEST_F(VhdsTest, AliasToDomainNameXdstp) {
+  EXPECT_EQ("vhost.first",
+            VhdsSubscription::aliasToDomainName(
+                "xdstp://test/envoy.config.route.v3.VirtualHost/my-route/vhost.first"));
+}
+
+// verify that xdstp VHDS instantiation succeeds with a valid glob collection name
+TEST_F(VhdsTest, VhdsInstantiationWithXdstpShouldSucceed) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/my-route/*"
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_TRUE(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                       context_, provider_)
+                  .status()
+                  .ok());
+}
+
+// verify that xdstp VHDS adds virtual hosts correctly
+TEST_F(VhdsTest, VhdsXdstpAddsVirtualHosts) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  default_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/my-route/*"
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              collectionSubscriptionFromUrl(_, _, _, _, _, _));
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .Times(0);
+  VhdsSubscriptionPtr subscription = VhdsSubscription::createVhdsSubscription(
+                                         config_update_info, factory_context_, context_, provider_)
+                                         .value();
+  EXPECT_NE(subscription, nullptr);
+  EXPECT_EQ(0UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+
+  auto vhost = buildVirtualHost("vhost1", "vhost.first");
+  const auto& added_resources = buildAddedResources({vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  const Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
+                  .ok());
+
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      vhost, config_update_info->protobufConfigurationCast().virtual_hosts(0)));
+}
+
+// verify that legacy VHDS (no xdstp) is not in xdstp mode
+TEST_F(VhdsTest, VhdsLegacyModeIsNotXdstp) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              collectionSubscriptionFromUrl(_, _, _, _, _, _))
+      .Times(0);
+  EXPECT_CALL(
+      factory_context_.cluster_manager_.subscription_factory_,
+      subscriptionFromConfigSource(
+          _, _, _, _, _, testing::Truly([](const Envoy::Config::SubscriptionOptions& options) {
+            return options.use_namespace_matching_;
+          })));
+  VhdsSubscriptionPtr subscription = VhdsSubscription::createVhdsSubscription(
+                                         config_update_info, factory_context_, context_, provider_)
+                                         .value();
+  EXPECT_NE(subscription, nullptr);
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

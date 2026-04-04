@@ -6,6 +6,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
@@ -298,7 +299,12 @@ void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_ur
     }
   }
 
-  pausable_ack_queue_.push(sub->second->handleResponse(response_proto));
+  UpdateAck ack = [&]() {
+    ScopedResume resume_dependent_type_urls = pause(Config::dependentTypeUrls(type_url));
+    return sub->second->handleResponse(response_proto);
+  }();
+
+  pausable_ack_queue_.push(std::move(ack));
   trySendDiscoveryRequests();
   Memory::Utils::tryShrinkHeap();
 }

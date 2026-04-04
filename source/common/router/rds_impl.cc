@@ -22,6 +22,21 @@
 namespace Envoy {
 namespace Router {
 
+namespace {
+
+std::string
+computeVhdsAliasPrefix(const envoy::config::route::v3::RouteConfiguration& route_configuration) {
+  const auto& vhds = route_configuration.vhds();
+  if (!vhds.default_virtual_host_resource_name().empty()) {
+    // Strip trailing '/*' to get collection prefix; domainNameToAlias() re-adds the '/'.
+    const auto& resource_name = vhds.default_virtual_host_resource_name();
+    return resource_name.substr(0, resource_name.size() - 2);
+  }
+  return route_configuration.name();
+}
+
+} // namespace
+
 absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>> RdsRouteConfigSubscription::create(
     RouteConfigUpdatePtr&& config_update,
     Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
@@ -120,6 +135,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   // In it the provider is already set by the 'base_' so it points to that.
   // Need to set again to point to 'this'.
   base_.subscription().routeConfigProvider() = this;
+  vhds_alias_prefix_ = computeVhdsAliasPrefix(config_update_info_->protobufConfigurationCast());
 }
 
 RdsRouteConfigSubscription& RdsRouteConfigProviderImpl::subscription() {
@@ -131,6 +147,8 @@ absl::Status RdsRouteConfigProviderImpl::onConfigUpdate() {
   if (!status.ok()) {
     return status;
   }
+
+  vhds_alias_prefix_ = computeVhdsAliasPrefix(config_update_info_->protobufConfigurationCast());
 
   const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.
@@ -174,8 +192,7 @@ ConfigConstSharedPtr RdsRouteConfigProviderImpl::configCast() const {
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
-  auto alias = VhdsSubscription::domainNameToAlias(
-      config_update_info_->protobufConfigurationCast().name(), for_domain);
+  auto alias = VhdsSubscription::domainNameToAlias(vhds_alias_prefix_, for_domain);
   // The RdsRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to

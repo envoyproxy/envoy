@@ -13,6 +13,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_resource.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
@@ -75,19 +76,45 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       init_target_(fmt::format("VhdsConfigSubscription {}",
                                config_update_info_->protobufConfigurationCast().name()),
                    [this]() {
-                     subscription_->start(
-                         {config_update_info_->protobufConfigurationCast().name()});
+                     if (config_update_info_->protobufConfigurationCast()
+                             .vhds()
+                             .default_virtual_host_resource_name()
+                             .empty()) {
+                       subscription_->start(
+                           {config_update_info_->protobufConfigurationCast().name()});
+                     } else {
+                       subscription_->start({});
+                     }
                    }),
       route_config_provider_(route_config_provider) {
-  const auto resource_name = getResourceName();
-  Envoy::Config::SubscriptionOptions options;
-  options.use_namespace_matching_ = true;
-  absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_update_info_->protobufConfigurationCast().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options);
-  SET_AND_RETURN_IF_NOT_OK(status_or.status(), status);
-  subscription_ = std::move(status_or.value());
+  const auto& vhds = config_update_info_->protobufConfigurationCast().vhds();
+  const auto& default_resource_name = vhds.default_virtual_host_resource_name();
+
+  if (default_resource_name.empty()) {
+    // Legacy mode: use namespace-matching subscription.
+    const auto resource_name = getResourceName();
+    Envoy::Config::SubscriptionOptions options;
+    options.use_namespace_matching_ = true;
+    absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
+        factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+            vhds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this,
+            resource_decoder_, options);
+    SET_AND_RETURN_IF_NOT_OK(status_or.status(), status);
+    subscription_ = std::move(status_or.value());
+  } else {
+    // xdstp mode: use collection subscription.
+    auto resource_locator_or =
+        Envoy::Config::XdsResourceIdentifier::decodeUrl(default_resource_name);
+    SET_AND_RETURN_IF_NOT_OK(resource_locator_or.status(), status);
+    const auto& resource_locator = resource_locator_or.value();
+    const auto resource_name = getResourceName();
+    absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
+        factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
+            resource_locator, vhds.config_source(), resource_name, *scope_, *this,
+            resource_decoder_);
+    SET_AND_RETURN_IF_NOT_OK(status_or.status(), status);
+    subscription_ = std::move(status_or.value());
+  }
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {

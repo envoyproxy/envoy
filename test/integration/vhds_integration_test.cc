@@ -157,5 +157,21 @@ TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
+// xdstp:// VHDS integration tests.
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsXdstpIntegrationTest, VHDS_INTEGRATION_PARAMS,
+                         vhdsTestParamsToString);
+
+// Verify that creating a listener with xdstp VHDS results in:
+// 1. A delta discovery request for the xdstp collection resource name
+// 2. After responding with a virtual host, the host is routable
+TEST_P(VhdsXdstpIntegrationTest, VhdsXdstpSingleSubscription) {
+  // initialize() already asserts the xdstp subscription and sends a VH response.
+  // Verify the VHDS-delivered virtual host is reachable.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 } // namespace
 } // namespace Envoy

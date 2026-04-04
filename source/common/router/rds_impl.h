@@ -137,6 +137,7 @@ private:
   RouteConfigUpdatePtr& config_update_info_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   std::list<UpdateOnDemandCallback> config_update_callbacks_;
+  std::string vhds_alias_prefix_;
   // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
   // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
   std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};

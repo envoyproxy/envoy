@@ -684,6 +684,65 @@ rds:
   EXPECT_NO_THROW(post_cb());
 }
 
+TEST_F(RdsImplTest, VirtualHostUpdateUsesXdstpCollectionPrefix) {
+  setup();
+
+  const std::string response_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "vhds": {
+        "config_source": {
+          "resource_api_version": "V3",
+          "api_config_source": {
+            "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
+            "grpc_services": {
+              "envoy_grpc": {
+                "cluster_name": "xds_cluster"
+              }
+            }
+          }
+        },
+        "default_virtual_host_resource_name":
+          "xdstp://test/envoy.config.route.v3.VirtualHost/foo-route-config/*"
+      }
+    }
+  ]
+}
+)EOF";
+  auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_TRUE(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()).ok());
+  EXPECT_TRUE(rds_->configCast()->usesVhds());
+
+  Event::PostCb post_cb;
+  testing::NiceMock<Event::MockDispatcher> local_thread_dispatcher;
+  testing::MockFunction<void(bool)> mock_callback;
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+
+  rds_->requestVirtualHostsUpdate(
+      "testing", local_thread_dispatcher,
+      std::make_shared<Http::RouteConfigUpdatedCallback>(
+          Http::RouteConfigUpdatedCallback(mock_callback.AsStdFunction())));
+
+  ASSERT_TRUE(static_cast<bool>(post_cb));
+  EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
+              requestOnDemandUpdate(testing::UnorderedElementsAre(
+                  "xdstp://test/envoy.config.route.v3.VirtualHost/foo-route-config/testing")));
+  post_cb();
+}
+
 TEST_F(RdsImplTest, RdsRouteConfigProviderImplSubscriptionSetup) {
   setup();
   EXPECT_CALL(init_watcher_, ready());
