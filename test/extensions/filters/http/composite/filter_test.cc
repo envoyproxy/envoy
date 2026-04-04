@@ -4,6 +4,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/http/matching/data_impl.h"
+#include "source/common/matcher/matcher.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/composite/action.h"
 #include "source/extensions/filters/http/composite/config.h"
@@ -14,6 +16,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 
@@ -1779,6 +1782,13 @@ TEST(FilterCallbacksWrapperTest, SingleModeRejectsMultipleFiltersAndExposesDispa
   EXPECT_EQ(&dispatcher, &wrapper.dispatcher());
   EXPECT_TRUE(wrapper.filter_to_inject_.has_value());
   EXPECT_EQ(1, wrapper.errors_.size());
+
+  // No-op methods for code coverage.
+  wrapper.filterConfigName();
+  wrapper.setFilterConfigName("");
+  wrapper.route();
+  wrapper.filterDisabled("");
+  wrapper.requestHeaders();
 }
 
 TEST(FilterCallbacksWrapperTest, ChainModeAcceptsMultipleFilters) {
@@ -1819,7 +1829,7 @@ TEST_F(FilterTest, NamedFilterChainLookupWithSamplingSkipped) {
   }};
 
   // Create filter with named chains.
-  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, nullptr, named_chains);
   filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
   filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -1889,7 +1899,7 @@ TEST_F(FilterTest, NamedFilterChainLookupChainNotFound) {
     cb.addStreamFilter(std::make_shared<Http::MockStreamFilter>());
   }};
 
-  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, nullptr, named_chains);
   filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
   filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -1925,7 +1935,7 @@ TEST_F(FilterTest, NamedFilterChainLookupSuccess) {
       [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter1); },
       [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter2); }};
 
-  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, nullptr, named_chains);
   filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
   filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -2006,7 +2016,7 @@ TEST_F(FilterTest, NamedFilterChainLookupWithAccessLoggers) {
       },
   };
 
-  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, nullptr, named_chains);
   filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
   filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -2023,6 +2033,161 @@ TEST_F(FilterTest, NamedFilterChainLookupWithAccessLoggers) {
 
   EXPECT_CALL(*filter1, onDestroy());
   filter_with_chains.onDestroy();
+}
+
+// Helper to build a simple AnyMatcher that always resolves to the given action.
+static Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
+makeAlwaysMatchTree(Matcher::ActionConstSharedPtr action) {
+  Matcher::OnMatch<Envoy::Http::HttpMatchingData> on_match{action, nullptr, false};
+  return std::make_shared<Matcher::AnyMatcher<Envoy::Http::HttpMatchingData>>(on_match);
+}
+
+// Helper to build an AnyMatcher with no on_no_match, i.e. never matches.
+static Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> makeNeverMatchTree() {
+  return std::make_shared<Matcher::AnyMatcher<Envoy::Http::HttpMatchingData>>(absl::nullopt);
+}
+
+// Test that onMatchCallback logs an error and is a no-op when an inline match_tree is provided.
+// The inline tree is evaluated in decodeHeaders instead.
+TEST_F(FilterTest, OnMatchCallbackIgnoredWhenInlineMatchTreeIsSet) {
+  auto stream_filter = std::make_shared<Http::MockStreamFilter>();
+  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(stream_filter);
+  };
+  auto action = std::make_shared<ExecuteFilterAction>(
+      [&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; }, "actionName",
+      absl::nullopt, context_.runtime_loader_);
+
+  // Create a filter with a never-match inline tree; we only want to test onMatchCallback.
+  Filter filter_with_tree(stats_, decoder_callbacks_.dispatcher(), false, makeNeverMatchTree());
+  filter_with_tree.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_tree.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // onMatchCallback should log an error and skip the action when match_tree_ is set.
+  EXPECT_CALL(success_counter_, inc()).Times(0);
+  EXPECT_LOG_CONTAINS("error",
+                      "Inline match tree is provided and the onMatchCallback should never be "
+                      "called from the ExtensionWithMatcher",
+                      filter_with_tree.onMatchCallback(*action));
+
+  filter_with_tree.onDestroy();
+}
+
+// Test that decodeHeaders executes the match tree action when the tree produces a match.
+TEST_F(FilterTest, DecodeHeadersExecutesInlineMatchTreeAction) {
+  auto stream_filter = std::make_shared<Http::MockStreamFilter>();
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(stream_filter);
+  };
+  auto action = std::make_shared<ExecuteFilterAction>(
+      [&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; }, "actionName",
+      absl::nullopt, context_.runtime_loader_);
+
+  Filter filter_with_tree(stats_, decoder_callbacks_.dispatcher(), false,
+                          makeAlwaysMatchTree(action));
+  filter_with_tree.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_tree.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // The match tree always matches, so the filter should be delegated.
+  EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+  EXPECT_CALL(*stream_filter, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+
+  auto status = filter_with_tree.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_with_tree.onDestroy();
+}
+
+// Test that decodeHeaders is a no-op (continues) when the match tree produces no match.
+TEST_F(FilterTest, DecodeHeadersNoActionWhenMatchTreeDoesNotMatch) {
+  Filter filter_with_tree(stats_, decoder_callbacks_.dispatcher(), false, makeNeverMatchTree());
+  filter_with_tree.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_tree.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  EXPECT_CALL(success_counter_, inc()).Times(0);
+  auto status = filter_with_tree.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  filter_with_tree.onDestroy();
+}
+
+// Test that decodeHeaders picks up the per-route match tree and overrides the filter-level one.
+TEST_F(FilterTest, DecodeHeadersUsesPerRouteMatchTree) {
+  auto stream_filter = std::make_shared<Http::MockStreamFilter>();
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(stream_filter);
+  };
+  auto action = std::make_shared<ExecuteFilterAction>(
+      [&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; }, "actionName",
+      absl::nullopt, context_.runtime_loader_);
+
+  // The filter-level match tree never matches.
+  Filter filter_with_tree(stats_, decoder_callbacks_.dispatcher(), false, makeNeverMatchTree());
+  filter_with_tree.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_tree.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // Set up per-route config that always matches.
+  auto per_route_match_tree = makeAlwaysMatchTree(action);
+  auto per_route_config = std::make_shared<CompositePerRouteConfig>(per_route_match_tree);
+
+  ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(testing::Return(per_route_config.get()));
+
+  // The per-route match tree always matches, so the filter should be delegated.
+  EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+  EXPECT_CALL(*stream_filter, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+
+  auto status = filter_with_tree.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  EXPECT_CALL(*stream_filter, onDestroy());
+  filter_with_tree.onDestroy();
+}
+
+// Test handleAction with an unsupported action type URL logs an error and does nothing.
+TEST_F(FilterTest, HandleActionWithUnsupportedActionTypeLogsError) {
+  // Create a custom action with a different type URL.
+  class WrongTypeAction : public Matcher::ActionBase<
+                              envoy::extensions::filters::http::composite::v3::CompositePerRoute> {
+  };
+
+  auto wrong_action = std::make_shared<WrongTypeAction>();
+  Filter filter_with_tree(stats_, decoder_callbacks_.dispatcher(), false,
+                          makeAlwaysMatchTree(wrong_action));
+  filter_with_tree.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_tree.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  EXPECT_CALL(success_counter_, inc()).Times(0);
+  EXPECT_LOG_CONTAINS("error", "Received unsupported action type",
+                      filter_with_tree.decodeHeaders(default_request_headers_, false));
+
+  filter_with_tree.onDestroy();
+}
+
+// Test CompositePerRouteConfig stores and returns the match tree.
+TEST(CompositePerRouteConfigTest, StoresAndReturnsMatchTree) {
+  auto match_tree = makeNeverMatchTree();
+  CompositePerRouteConfig config(match_tree);
+  EXPECT_EQ(match_tree, config.matchTree());
 }
 
 } // namespace
