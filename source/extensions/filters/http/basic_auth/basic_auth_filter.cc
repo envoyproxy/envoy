@@ -8,6 +8,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,6 +17,8 @@ namespace BasicAuth {
 
 namespace {
 constexpr uint32_t MaximumUriLength = 256;
+constexpr absl::string_view DynamicMetadataNamespace = "envoy.filters.http.basic_auth";
+constexpr absl::string_view DynamicMetadataUsernameKey = "username";
 
 // Function to compute SHA1 hash
 std::string computeSHA1(absl::string_view password) {
@@ -31,10 +34,12 @@ std::string computeSHA1(absl::string_view password) {
 } // namespace
 
 FilterConfig::FilterConfig(UserMap&& users, const std::string& forward_username_header,
-                           const std::string& authentication_header,
-                           const std::string& stats_prefix, Stats::Scope& scope)
+                           const std::string& authentication_header, bool allow_missing,
+                           bool emit_dynamic_metadata, const std::string& stats_prefix,
+                           Stats::Scope& scope)
     : users_(std::move(users)), forward_username_header_(forward_username_header),
       authentication_header_(Http::LowerCaseString(authentication_header)),
+      allow_missing_(allow_missing), emit_dynamic_metadata_(emit_dynamic_metadata),
       stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
 
 BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {}
@@ -55,6 +60,9 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   }
 
   if (auth_header.empty()) {
+    if (config_->allowMissing()) {
+      return Http::FilterHeadersStatus::Continue;
+    }
     return onDenied("User authentication failed. Missing username and password.",
                     "no_credential_for_basic_auth");
   }
@@ -62,6 +70,9 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
   absl::string_view auth_value = auth_header[0]->value().getStringView();
 
   if (!absl::StartsWith(auth_value, "Basic ")) {
+    if (config_->allowMissing()) {
+      return Http::FilterHeadersStatus::Continue;
+    }
     return onDenied("User authentication failed. Expected 'Basic' authentication scheme.",
                     "invalid_scheme_for_basic_auth");
   }
@@ -90,6 +101,9 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
     headers.setCopy(Http::LowerCaseString(config_->forwardUsernameHeader()), username);
   }
 
+  if (config_->emitDynamicMetadata()) {
+    setDynamicMetadata(username);
+  }
   config_->stats().allowed_.inc();
   return Http::FilterHeadersStatus::Continue;
 }
@@ -102,6 +116,14 @@ bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view usern
   }
 
   return computeSHA1(password) == user->second.hash;
+}
+
+void BasicAuthFilter::setDynamicMetadata(absl::string_view username) {
+  ProtobufWkt::Struct metadata;
+  (*metadata.mutable_fields())[std::string(DynamicMetadataUsernameKey)].set_string_value(
+      std::string(username));
+  decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(DynamicMetadataNamespace),
+                                                      metadata);
 }
 
 Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,

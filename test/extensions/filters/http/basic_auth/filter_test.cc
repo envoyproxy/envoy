@@ -18,7 +18,9 @@ public:
     UserMap users;
     users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
     users.insert({"user2", {"user2", "EJ9LPFDXsN9ynSmbxvjp75Bmlx8="}}); // user2:test2
-    config_ = std::make_unique<FilterConfig>(std::move(users), "x-username", "", "stats",
+    config_ = std::make_unique<FilterConfig>(std::move(users), "x-username", "",
+                                             /*allow_missing=*/false,
+                                             /*emit_dynamic_metadata=*/false, "stats",
                                              *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
@@ -50,6 +52,45 @@ TEST_F(FilterTest, BasicAuth) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_user2, true));
   EXPECT_EQ("user2", request_headers_user2.get_("x-username"));
+}
+
+TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
+  UserMap users;
+  users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
+  auto config = std::make_unique<FilterConfig>(std::move(users), "x-username", "",
+                                               /*allow_missing=*/false,
+                                               /*emit_dynamic_metadata=*/true, "stats",
+                                               *stats_.rootScope());
+  auto filter = std::make_shared<BasicAuthFilter>(config);
+  filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6dGVzdDE="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  ProtobufWkt::Struct captured_metadata;
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.basic_auth", _))
+      .WillOnce(Invoke([&](const std::string&, const ProtobufWkt::Struct& metadata) {
+        captured_metadata = metadata;
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
+
+  ASSERT_TRUE(captured_metadata.fields().contains("username"));
+  EXPECT_EQ("user1", captured_metadata.fields().at("username").string_value());
+}
+
+TEST_F(FilterTest, BasicAuthDoesNotSetDynamicMetadataByDefault) {
+  // emit_dynamic_metadata defaults to false — no metadata call on successful auth.
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6dGVzdDE="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 TEST_F(FilterTest, UserNotExist) {
@@ -277,7 +318,8 @@ TEST_F(FilterTest, OverrideAuthorizationHeaderProvided) {
   users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
 
   FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
-      std::move(users), "x-username", "x-authorization-override", "stats", *stats_.rootScope());
+      std::move(users), "x-username", "x-authorization-override", /*allow_missing=*/false,
+      /*emit_dynamic_metadata=*/false, "stats", *stats_.rootScope());
   std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
   filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
 
@@ -290,6 +332,117 @@ TEST_F(FilterTest, OverrideAuthorizationHeaderProvided) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter->decodeHeaders(request_headers_user1, true));
   EXPECT_EQ("user1", request_headers_user1.get_("x-username"));
+}
+
+// Tests for allow_missing=true behavior.
+
+class AllowMissingFilterTest : public testing::Test {
+public:
+  AllowMissingFilterTest() {
+    UserMap users;
+    users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
+    config_ = std::make_unique<FilterConfig>(std::move(users), "x-username", "",
+                                             /*allow_missing=*/true,
+                                             /*emit_dynamic_metadata=*/true, "stats",
+                                             *stats_.rootScope());
+    filter_ = std::make_shared<BasicAuthFilter>(config_);
+    filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+  }
+
+  NiceMock<Stats::IsolatedStoreImpl> stats_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
+  FilterConfigConstSharedPtr config_;
+  std::shared_ptr<BasicAuthFilter> filter_;
+};
+
+TEST_F(AllowMissingFilterTest, NoAuthHeaderPassesThrough) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  // No sendLocalReply should be called.
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(AllowMissingFilterTest, BearerTokenPassesThrough) {
+  // A request with a Bearer token (intended for JWT filter) should pass through BasicAuth
+  // when allow_missing is true, so JWT filter can handle it downstream.
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Bearer some.jwt.token"}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(AllowMissingFilterTest, ValidBasicCredentialsAuthenticated) {
+  // Valid Basic credentials should still be validated and succeed.
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6dGVzdDE="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("user1", request_headers.get_("x-username"));
+}
+
+TEST_F(AllowMissingFilterTest, InvalidBasicCredentialsRejected) {
+  // Invalid Basic credentials should still be rejected even when allow_missing is true.
+  // user1:wrongpassword
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"Authorization", "Basic dXNlcjE6d3JvbmdwYXNzd29yZA=="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+  EXPECT_CALL(decoder_filter_callbacks_, requestHeaders())
+      .WillOnce(testing::Return(makeOptRef(request_headers)));
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code code, absl::string_view body,
+                           std::function<void(Http::ResponseHeaderMap & headers)>,
+                           const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                           absl::string_view details) {
+        EXPECT_EQ(Http::Code::Unauthorized, code);
+        EXPECT_EQ("User authentication failed. Invalid username/password combination.", body);
+        EXPECT_EQ(grpc_status, absl::nullopt);
+        EXPECT_EQ(details, "invalid_credential_for_basic_auth");
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(AllowMissingFilterTest, SuccessSetsDynamicMetadata) {
+  // On successful Basic auth, dynamic metadata should be set regardless of allow_missing.
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6dGVzdDE="}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  ProtobufWkt::Struct captured_metadata;
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.basic_auth", _))
+      .WillOnce(Invoke([&](const std::string&, const ProtobufWkt::Struct& metadata) {
+        captured_metadata = metadata;
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  ASSERT_TRUE(captured_metadata.fields().contains("username"));
+  EXPECT_EQ("user1", captured_metadata.fields().at("username").string_value());
+}
+
+TEST_F(AllowMissingFilterTest, PassThroughDoesNotSetDynamicMetadata) {
+  // When request passes through (no Basic creds), no metadata should be set —
+  // absence of metadata is how a downstream RBAC filter detects that BasicAuth did not succeed.
+  Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Bearer some.jwt.token"}};
+  request_headers.setScheme("http");
+  request_headers.setHost("host");
+  request_headers.setPath("/");
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 } // namespace BasicAuth
