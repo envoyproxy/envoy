@@ -113,8 +113,13 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
   if (!retriable_request_headers.empty()) {
     // If this route limits retries by request headers, make sure there is a match.
     bool request_header_match = false;
+    const bool match_individually = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.route_match_headers_individually");
     for (const auto& retriable_header : retriable_request_headers) {
-      if (retriable_header->matchesHeaders(request_headers)) {
+      const bool matched = match_individually
+                               ? retriable_header->matchesHeadersIndividually(request_headers)
+                               : retriable_header->matchesHeaders(request_headers);
+      if (matched) {
         request_header_match = true;
         break;
       }
@@ -392,8 +397,13 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_HEADERS) {
+    const bool match_individually = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.route_match_headers_individually");
     for (const auto& retriable_header : retriable_headers_) {
-      if (retriable_header->matchesHeaders(response_headers)) {
+      const bool matched = match_individually
+                               ? retriable_header->matchesHeadersIndividually(response_headers)
+                               : retriable_header->matchesHeaders(response_headers);
+      if (matched) {
         return RetryDecision::RetryWithBackoff;
       }
     }

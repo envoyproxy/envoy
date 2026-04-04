@@ -20,6 +20,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 
 namespace Envoy {
@@ -127,7 +128,13 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   // Check for header matches
-  if (!Http::HeaderUtility::matchHeaders(headers, fault_settings_->filterHeaders())) {
+  const bool fault_header_match =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.route_match_headers_individually")
+          ? Http::HeaderUtility::matchHeadersIndividually(headers,
+                                                         fault_settings_->filterHeaders())
+          : Http::HeaderUtility::matchHeaders(headers, fault_settings_->filterHeaders());
+  if (!fault_header_match) {
     return Http::FilterHeadersStatus::Continue;
   }
 

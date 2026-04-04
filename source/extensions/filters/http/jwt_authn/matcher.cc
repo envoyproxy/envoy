@@ -9,6 +9,7 @@
 #include "source/common/http/path_utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 
@@ -42,7 +43,12 @@ public:
     bool matches = true;
     // TODO(potatop): matching on RouteMatch runtime is not implemented.
 
-    matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.route_match_headers_individually")) {
+      matches &= Http::HeaderUtility::matchHeadersIndividually(headers, config_headers_);
+    } else {
+      matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
+    }
     if (!config_query_parameters_.empty()) {
       Http::Utility::QueryParamsMulti query_parameters =
           Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());

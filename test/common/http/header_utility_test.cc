@@ -327,6 +327,125 @@ TEST_F(MatchHeadersTest, MatchesHeadersIndividuallyPresentMatch) {
   EXPECT_TRUE(matcher->matchesHeadersIndividually(absent));
 }
 
+// Tests for matchHeadersIndividually - the static function that uses matchesHeadersIndividually
+// for each configured header matcher. This is the fix for CVE-2026-26308 incomplete fix.
+TEST_F(MatchHeadersTest, MatchHeadersIndividuallyMultiValueBypass) {
+  // Simulate the multi-value header bypass attack: two headers with values "user" and "admin".
+  // matchHeaders (old) concatenates to "user,admin" which does NOT match "admin" — bypass.
+  // matchHeadersIndividually (new) checks each value — "admin" matches — no bypass.
+  TestRequestHeaderMapImpl headers{{"x-role", "user"}, {"x-role", "admin"}};
+
+  const std::string yaml = R"EOF(
+name: x-role
+string_match:
+  exact: "admin"
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
+
+  // Old behavior: concatenated "user,admin" != "admin", match fails (VULNERABLE)
+  EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
+  // New behavior: checks "user" and "admin" individually, "admin" matches (FIXED)
+  EXPECT_TRUE(HeaderUtility::matchHeadersIndividually(headers, header_data));
+}
+
+// Test that matchHeadersIndividually with a single header value behaves identically to matchHeaders.
+TEST_F(MatchHeadersTest, MatchHeadersIndividuallySingleValueIdentical) {
+  TestRequestHeaderMapImpl headers{{"x-role", "admin"}};
+
+  const std::string yaml = R"EOF(
+name: x-role
+string_match:
+  exact: "admin"
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
+
+  EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
+  EXPECT_TRUE(HeaderUtility::matchHeadersIndividually(headers, header_data));
+}
+
+// Test that matchHeadersIndividually correctly requires ALL config matchers to match.
+TEST_F(MatchHeadersTest, MatchHeadersIndividuallyAllMustMatch) {
+  TestRequestHeaderMapImpl headers{{"x-role", "admin"}, {"x-team", "ops"}};
+
+  const std::string yaml_role = R"EOF(
+name: x-role
+string_match:
+  exact: "admin"
+  )EOF";
+
+  const std::string yaml_team = R"EOF(
+name: x-team
+string_match:
+  exact: "ops"
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml_role), context_));
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml_team), context_));
+
+  EXPECT_TRUE(HeaderUtility::matchHeadersIndividually(headers, header_data));
+
+  // Now test with missing header — should not match
+  TestRequestHeaderMapImpl headers_missing{{"x-role", "admin"}};
+  EXPECT_FALSE(HeaderUtility::matchHeadersIndividually(headers_missing, header_data));
+}
+
+// Test matchHeadersIndividually with no config headers (should always match).
+TEST_F(MatchHeadersTest, MatchHeadersIndividuallyEmptyConfig) {
+  TestRequestHeaderMapImpl headers{{"x-role", "admin"}};
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  EXPECT_TRUE(HeaderUtility::matchHeadersIndividually(headers, header_data));
+}
+
+// Test matchHeadersIndividually with regex match on multi-value headers.
+TEST_F(MatchHeadersTest, MatchHeadersIndividuallyRegexMultiValue) {
+  TestRequestHeaderMapImpl headers{{"x-role", "guest"}, {"x-role", "admin"}};
+
+  const std::string yaml = R"EOF(
+name: x-role
+string_match:
+  safe_regex:
+    google_re2: {}
+    regex: "^admin$"
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
+
+  // Old: "guest,admin" does not match "^admin$"
+  EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
+  // New: "admin" individually matches "^admin$"
+  EXPECT_TRUE(HeaderUtility::matchHeadersIndividually(headers, header_data));
+}
+
+// Test matchHeadersIndividually with prefix match on multi-value headers.
+TEST_F(MatchHeadersTest, MatchHeadersIndividuallyPrefixMultiValue) {
+  TestRequestHeaderMapImpl headers{{"x-role", "user"}, {"x-role", "admin-super"}};
+
+  const std::string yaml = R"EOF(
+name: x-role
+prefix_match: "admin"
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
+
+  // Old: "user,admin-super" does not start with "admin" (starts with "user")
+  EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
+  // New: "admin-super" individually starts with "admin"
+  EXPECT_TRUE(HeaderUtility::matchHeadersIndividually(headers, header_data));
+}
+
 TEST_F(MatchHeadersTest, MustMatchAllHeaderData) {
   TestRequestHeaderMapImpl matching_headers_1{{"match-header-A", "1"}, {"match-header-B", "2"}};
   TestRequestHeaderMapImpl matching_headers_2{

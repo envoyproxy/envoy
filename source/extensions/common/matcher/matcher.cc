@@ -1,6 +1,7 @@
 #include "source/extensions/common/matcher/matcher.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -128,7 +129,14 @@ HttpHeaderMatcherBase::HttpHeaderMatcherBase(
 void HttpHeaderMatcherBase::matchHeaders(const Http::HeaderMap& headers,
                                          MatchStatusVector& statuses) const {
   ASSERT(statuses[my_index_].might_change_status_);
-  statuses[my_index_].matches_ = Http::HeaderUtility::matchHeaders(headers, headers_to_match_);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.route_match_headers_individually")) {
+    statuses[my_index_].matches_ =
+        Http::HeaderUtility::matchHeadersIndividually(headers, headers_to_match_);
+  } else {
+    statuses[my_index_].matches_ =
+        Http::HeaderUtility::matchHeaders(headers, headers_to_match_);
+  }
   statuses[my_index_].might_change_status_ = false;
 }
 
