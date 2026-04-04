@@ -139,6 +139,13 @@ bug_fixes:
     Fixed hot restart for listeners with a network namespace in the address. Previously, socket
     hand-off didn't work cleanly because the namespace was not included in the ``PassListenSocket``
     request, causing the parent to always fall back to binding a new socket.
+- area: tracing/datadog
+  change: |
+    Fixed the Datadog tracer's ``setSampled(true)`` to not override the sampling priority, matching
+    the ``startSpan()`` behavior of leaving the priority unset so the Datadog agent can apply its
+    own sampling rate. Previously, ``setSampled(true)`` would set ``USER_KEEP`` priority which
+    prevented the agent from downsampling, causing a significant increase in trace volume when
+    combined with route cache refreshes in Envoy 1.36.
 - area: dynamic_modules
   change: |
     Fixed the dynamic modules network filter to always set a local close reason when closing connections. This
