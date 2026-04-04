@@ -57,6 +57,10 @@ void SslExtendedSocketInfoImpl::setCertificateValidationStatus(
   certificate_validation_status_ = validated;
 }
 
+void SslExtendedSocketInfoImpl::setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) {
+  ssl_handshaker_.setValidatedCertChain(std::move(chain));
+}
+
 Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidationStatus() const {
   return certificate_validation_status_;
 }

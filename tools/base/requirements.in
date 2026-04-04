@@ -5,7 +5,6 @@ aio.core>=0.10.2
 aiodocker>=0.22.2
 aiohttp>=3.13.3
 aioquic>=0.9.21
-black
 cffi>=1.15.0
 colorama
 coloredlogs

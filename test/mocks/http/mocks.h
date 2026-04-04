@@ -681,6 +681,7 @@ public:
   MOCK_METHOD(Http::ForwardClientCertType, forwardClientCert, (), (const));
   MOCK_METHOD(const std::vector<Http::ClientCertDetailsType>&, setCurrentClientCertDetails, (),
               (const));
+  MOCK_METHOD(Http::ClientCertFormat, clientCertFormat, (), (const));
   MOCK_METHOD(const Matcher::MatchTreePtr<HttpMatchingData>&, forwardClientCertMatcher, (),
               (const));
   MOCK_METHOD(const Network::Address::Instance&, localAddress, ());

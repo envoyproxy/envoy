@@ -262,7 +262,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MultipleStreamsFilter {
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // Create 3 concurrent streams.
-    for i in 1 ..= 3 {
+    for i in 1..=3 {
       let path = format!("/stream{}", i);
       let (result, handle) = envoy_filter.start_http_stream(
         &self.cluster_name,

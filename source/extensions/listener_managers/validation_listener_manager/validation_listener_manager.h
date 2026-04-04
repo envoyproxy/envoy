@@ -71,9 +71,11 @@ private:
 class ValidationListenerManagerFactoryImpl : public ListenerManagerFactory {
 public:
   std::unique_ptr<ListenerManager>
-  createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
+  createListenerManager(const Protobuf::Message& config, Instance& server,
+                        std::unique_ptr<ListenerComponentFactory>&& factory,
                         WorkerFactory& worker_factory, bool enable_dispatcher_stats,
                         Quic::QuicStatNames& quic_stat_names) override {
+    (void)config;
     ASSERT(!factory);
     return std::make_unique<ListenerManagerImpl>(
         server, std::make_unique<ValidationListenerComponentFactory>(server), worker_factory,
