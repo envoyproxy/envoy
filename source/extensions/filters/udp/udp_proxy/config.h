@@ -5,6 +5,7 @@
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/router/header_parser.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 namespace Envoy {
@@ -93,7 +94,7 @@ public:
   }
 
 private:
-  std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+  Envoy::Router::HeaderParserPtr header_parser_;
   Formatter::FormatterPtr proxy_host_formatter_;
   absl::optional<uint32_t> proxy_port_;
   Formatter::FormatterPtr target_host_formatter_;
