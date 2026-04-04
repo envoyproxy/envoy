@@ -99,54 +99,6 @@ public:
     SortedAttributesVector sorted_attributes_;
   };
 
-  // MetricViewKey is a temporary view of MetricKey that does not own the name or attributes.
-  // It is used for zero-allocation heterogeneous searches in the map (e.g., using `find()`).
-  // Since `MetricKeyHash` and `MetricKeyEqual` are marked as transparent, the map can compute
-  // the view's hash and compare it directly against the stored `MetricKey` without allocating
-  // memory to create a `MetricKey` just to search the map.
-  class MetricViewKey {
-  public:
-    MetricViewKey(absl::string_view name, const SortedAttributesVector& sortedAttributes)
-        : name_(name), sorted_attributes_(sortedAttributes) {}
-
-    bool operator==(const MetricViewKey& other) const {
-      return name_ == other.name_ && sorted_attributes_ == other.sorted_attributes_;
-    }
-
-    template <typename H> friend H AbslHashValue(H h, const MetricViewKey& v) {
-      return H::combine(std::move(h), v.name_, v.sorted_attributes_);
-    }
-
-    absl::string_view name() const { return name_; }
-    const SortedAttributesVector& sortedAttributes() const { return sorted_attributes_; }
-
-  private:
-    absl::string_view name_;
-    const SortedAttributesVector& sorted_attributes_;
-  };
-
-  struct MetricKeyHash {
-    using is_transparent = void;
-
-    size_t operator()(const MetricKey& k) const { return absl::Hash<MetricKey>{}(k); }
-
-    size_t operator()(const MetricViewKey& v) const { return absl::Hash<MetricViewKey>{}(v); }
-  };
-
-  struct MetricKeyEqual {
-    using is_transparent = void;
-
-    bool operator()(const MetricKey& a, const MetricKey& b) const { return a == b; }
-
-    bool operator()(const MetricKey& a, const MetricViewKey& b) const {
-      return a.name() == b.name() && a.sortedAttributes() == b.sortedAttributes();
-    }
-
-    bool operator()(const MetricViewKey& a, const MetricKey& b) const {
-      return a.name() == b.name() && a.sortedAttributes() == b.sortedAttributes();
-    }
-  };
-
   struct CustomHistogram {
     // Total number of data points.
     uint64_t count_;
@@ -160,9 +112,9 @@ public:
 
   // Maps a unique combination of metric name and attributes to their data point.
   struct AggregationResult {
-    absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> gauge_data_;
-    absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> counter_data_;
-    absl::flat_hash_map<MetricKey, CustomHistogram, MetricKeyHash, MetricKeyEqual> histogram_data_;
+    absl::flat_hash_map<MetricKey, uint64_t> gauge_data_;
+    absl::flat_hash_map<MetricKey, uint64_t> counter_data_;
+    absl::flat_hash_map<MetricKey, CustomHistogram> histogram_data_;
   };
 
   AggregationResult releaseResult();
@@ -182,9 +134,9 @@ public:
                     SortedAttributesVector&& attributes);
 
 private:
-  absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> gauge_data_;
-  absl::flat_hash_map<MetricKey, uint64_t, MetricKeyHash, MetricKeyEqual> counter_data_;
-  absl::flat_hash_map<MetricKey, CustomHistogram, MetricKeyHash, MetricKeyEqual> histogram_data_;
+  absl::flat_hash_map<MetricKey, uint64_t> gauge_data_;
+  absl::flat_hash_map<MetricKey, uint64_t> counter_data_;
+  absl::flat_hash_map<MetricKey, CustomHistogram> histogram_data_;
   const AggregationTemporality counter_temporality_;
   const AggregationTemporality histogram_temporality_;
 };

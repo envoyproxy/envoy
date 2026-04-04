@@ -27,12 +27,12 @@ MetricAggregator::AggregationResult MetricAggregator::releaseResult() {
 
 void MetricAggregator::addGauge(std::string&& metric_name, uint64_t value,
                                 SortedAttributesVector&& attributes) {
-  MetricViewKey view_key{metric_name, attributes};
-  auto it = gauge_data_.find(view_key);
+  MetricKey key{std::move(metric_name), std::move(attributes)};
+  auto it = gauge_data_.find(key);
   if (it != gauge_data_.end()) {
     it->second += value;
   } else {
-    gauge_data_.emplace(MetricKey{std::move(metric_name), std::move(attributes)}, value);
+    gauge_data_.emplace(std::move(key), value);
   }
 }
 
@@ -46,13 +46,13 @@ void MetricAggregator::addCounter(std::string&& metric_name, uint64_t value, uin
     return;
   }
 
-  MetricViewKey view_key{metric_name, attributes};
-  auto it = counter_data_.find(view_key);
+  MetricKey key{std::move(metric_name), std::move(attributes)};
+  auto it = counter_data_.find(key);
 
   if (it != counter_data_.end()) {
     it->second += point_value;
   } else {
-    counter_data_.emplace(MetricKey{std::move(metric_name), std::move(attributes)}, point_value);
+    counter_data_.emplace(std::move(key), point_value);
   }
 }
 
@@ -64,8 +64,8 @@ void MetricAggregator::addHistogram(std::string&& metric_name,
     return;
   }
 
-  MetricViewKey view_key{metric_name, attributes};
-  auto it = histogram_data_.find(view_key);
+  MetricKey key{std::move(metric_name), std::move(attributes)};
+  auto it = histogram_data_.find(key);
   if (it != histogram_data_.end()) {
     std::vector<uint64_t> new_bucket_counts = stats.computeDisjointBuckets();
     auto& existing_point = it->second;
@@ -78,7 +78,7 @@ void MetricAggregator::addHistogram(std::string&& metric_name,
       }
       existing_point.bucket_counts_.back() += stats.outOfBoundCount();
     } else {
-      ENVOY_LOG(error, "Histogram bounds mismatch for metric {} aggregated from stat", metric_name);
+      ENVOY_LOG(error, "Histogram bounds mismatch for metric {} aggregated from stat", key.name());
     }
   } else {
     CustomHistogram custom_hist;
@@ -87,8 +87,7 @@ void MetricAggregator::addHistogram(std::string&& metric_name,
     custom_hist.bucket_counts_ = stats.computeDisjointBuckets();
     custom_hist.bucket_counts_.push_back(stats.outOfBoundCount());
     custom_hist.explicit_bounds_ = stats.supportedBuckets();
-    histogram_data_.emplace(MetricKey{std::move(metric_name), std::move(attributes)},
-                            std::move(custom_hist));
+    histogram_data_.emplace(std::move(key), std::move(custom_hist));
   }
 }
 

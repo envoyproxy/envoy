@@ -1521,8 +1521,9 @@ public:
   uint64_t getGaugeValue(const MetricAggregator::AggregationResult& metrics,
                          const std::string& name,
                          const MetricAggregator::SortedAttributesVector& attrs) {
-    MetricAggregator::MetricViewKey view_key{name, attrs};
-    auto it = metrics.gauge_data_.find(view_key);
+    MetricAggregator::MetricKey key{std::string(name),
+                                    MetricAggregator::SortedAttributesVector(attrs)};
+    auto it = metrics.gauge_data_.find(key);
     if (it != metrics.gauge_data_.end()) {
       return it->second;
     }
@@ -1532,8 +1533,9 @@ public:
   uint64_t getCounterValue(const MetricAggregator::AggregationResult& metrics,
                            const std::string& name,
                            const MetricAggregator::SortedAttributesVector& attrs) {
-    MetricAggregator::MetricViewKey view_key{name, attrs};
-    auto it = metrics.counter_data_.find(view_key);
+    MetricAggregator::MetricKey key{std::string(name),
+                                    MetricAggregator::SortedAttributesVector(attrs)};
+    auto it = metrics.counter_data_.find(key);
     if (it != metrics.counter_data_.end()) {
       return it->second;
     }
@@ -1543,51 +1545,15 @@ public:
   const MetricAggregator::CustomHistogram*
   getHistogramPoint(const MetricAggregator::AggregationResult& metrics, const std::string& name,
                     const MetricAggregator::SortedAttributesVector& attrs) {
-    MetricAggregator::MetricViewKey view_key{name, attrs};
-    auto it = metrics.histogram_data_.find(view_key);
+    MetricAggregator::MetricKey key{std::string(name),
+                                    MetricAggregator::SortedAttributesVector(attrs)};
+    auto it = metrics.histogram_data_.find(key);
     if (it != metrics.histogram_data_.end()) {
       return &it->second;
     }
     return nullptr;
   }
 };
-
-TEST_F(MetricAggregatorTests, MetricViewKeyEquality) {
-  MetricAggregator::SortedAttributesVector attr1 = {{"key1", "val1"}};
-  MetricAggregator::SortedAttributesVector attr2 = {{"key2", "val2"}};
-
-  MetricAggregator::MetricViewKey view1{"metric1", attr1};
-  MetricAggregator::MetricViewKey view2{"metric1", attr1};
-  MetricAggregator::MetricViewKey view3{"metric2", attr1};
-  MetricAggregator::MetricViewKey view4{"metric1", attr2};
-
-  EXPECT_TRUE(view1 == view2);
-  EXPECT_FALSE(view1 == view3);
-  EXPECT_FALSE(view1 == view4);
-}
-
-TEST_F(MetricAggregatorTests, MetricKeyEqualHeterogeneous) {
-  MetricAggregator::AttributesVector av1 = {{"key1", "val1"}};
-  MetricAggregator::SortedAttributesVector attr1(std::move(av1));
-  MetricAggregator::MetricKey key1{"metric1", std::move(attr1)};
-
-  MetricAggregator::SortedAttributesVector attr1_view = {{"key1", "val1"}};
-  MetricAggregator::MetricViewKey view1{"metric1", attr1_view};
-
-  MetricAggregator::MetricKeyEqual equal;
-
-  EXPECT_TRUE(equal(view1, key1));
-
-  MetricAggregator::AttributesVector av2 = {{"key2", "val2"}};
-  MetricAggregator::SortedAttributesVector attr2(std::move(av2));
-  MetricAggregator::MetricKey key2{"metric1", std::move(attr2)};
-  EXPECT_FALSE(equal(view1, key2));
-
-  MetricAggregator::AttributesVector av3 = {{"key1", "val1"}};
-  MetricAggregator::SortedAttributesVector attr3(std::move(av3));
-  MetricAggregator::MetricKey key3{"metric2", std::move(attr3)};
-  EXPECT_FALSE(equal(view1, key3));
-}
 
 TEST_F(MetricAggregatorTests, GaugeAggregation) {
   setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
