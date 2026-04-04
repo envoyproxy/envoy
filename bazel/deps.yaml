@@ -1304,6 +1304,7 @@ rules_rust:
   extensions:
   - envoy.network.dns_resolver.hickory
   - envoy.wasm.runtime.wasmtime
+  - envoy.transport_sockets.rustls
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt"
 

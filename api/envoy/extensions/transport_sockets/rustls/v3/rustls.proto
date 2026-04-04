@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.rustls.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.rustls.v3";
+option java_outer_classname = "RustlsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/rustls/v3;rustlsv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: ``rustls`` transport socket]
+// [#extension: envoy.transport_sockets.rustls]
+
+// Configuration for upstream TLS connections using the ``rustls`` library with optional
+// kernel TLS (``kTLS``) offload on Linux. ``rustls`` is a pure Rust TLS implementation
+// that supports TLS 1.2 and TLS 1.3 with the ``ring`` cryptographic backend.
+//
+// When ``kTLS`` is enabled, the kernel handles symmetric encryption and decryption after
+// the TLS handshake completes, reducing CPU usage for bulk data transfer.
+// [#next-free-field: 8]
+message RustlsUpstreamTlsContext {
+  // PEM-encoded certificate chain for client authentication (mTLS). Can be inline PEM content
+  // or a filesystem path to a PEM file.
+  //
+  // When not specified, the connection uses server-only authentication.
+  string cert_chain = 1;
+
+  // PEM-encoded private key for client authentication (mTLS). Can be inline PEM content
+  // or a filesystem path to a PEM file. Required when ``cert_chain`` is specified.
+  string private_key = 2;
+
+  // PEM-encoded trusted CA certificates for server certificate verification. Can be inline PEM
+  // content or a filesystem path to a PEM file.
+  //
+  // If not specified, the default ``webpki`` root certificates are used.
+  string trusted_ca = 3;
+
+  // ALPN protocols to advertise during the TLS handshake (e.g., ``h2``, ``http/1.1``).
+  //
+  // If not specified, no ALPN is advertised.
+  repeated string alpn_protocols = 4;
+
+  // Server Name Indication (SNI) hostname used for TLS server certificate verification.
+  //
+  // Defaults to ``localhost`` when not specified.
+  string sni = 5;
+
+  // Enables kernel TLS (``kTLS``) offload after the TLS handshake completes on Linux. When
+  // enabled, both the TX (transmit) and RX (receive) directions are offloaded to the kernel,
+  // reducing context switches and CPU usage for bulk data transfer.
+  //
+  // Defaults to ``false``.
+  bool enable_ktls = 6;
+
+  // When ``true`` together with ``enable_ktls``, disables ``kTLS`` offload for the receive (RX)
+  // direction. The RX path remains in userspace via ``rustls`` while TX is still offloaded to
+  // the kernel. This can be useful when the kernel's RX path has compatibility issues with
+  // certain workloads.
+  //
+  // Has no effect when ``enable_ktls`` is ``false``.
+  //
+  // Defaults to ``false``.
+  bool disable_ktls_rx = 7;
+}
+
+// Configuration for downstream TLS listeners using the ``rustls`` library with optional
+// kernel TLS (``kTLS``) offload on Linux. Both ``cert_chain`` and ``private_key`` are
+// required for downstream listeners.
+// [#next-free-field: 7]
+message RustlsDownstreamTlsContext {
+  // PEM-encoded certificate chain presented to connecting clients. Can be inline PEM content
+  // or a filesystem path to a PEM file.
+  //
+  // Required for downstream listeners.
+  string cert_chain = 1;
+
+  // PEM-encoded private key corresponding to the certificate chain. Can be inline PEM content
+  // or a filesystem path to a PEM file.
+  //
+  // Required for downstream listeners.
+  string private_key = 2;
+
+  // PEM-encoded trusted CA certificates for client certificate verification (mTLS). Can be
+  // inline PEM content or a filesystem path to a PEM file. When specified, client certificates
+  // are required and verified against these trust anchors.
+  //
+  // When not specified, client certificates are not requested.
+  string trusted_ca = 3;
+
+  // ALPN protocols to advertise during the TLS handshake (e.g., ``h2``, ``http/1.1``).
+  //
+  // If not specified, no ALPN is advertised.
+  repeated string alpn_protocols = 4;
+
+  // Enables kernel TLS (``kTLS``) offload after the TLS handshake completes on Linux. When
+  // enabled, both the TX (transmit) and RX (receive) directions are offloaded to the kernel,
+  // reducing context switches and CPU usage for bulk data transfer.
+  //
+  // Defaults to ``false``.
+  bool enable_ktls = 5;
+
+  // When ``true`` together with ``enable_ktls``, disables ``kTLS`` offload for the receive (RX)
+  // direction. The RX path remains in userspace via ``rustls`` while TX is still offloaded to
+  // the kernel. This can be useful when the kernel's RX path has compatibility issues with
+  // certain workloads.
+  //
+  // Has no effect when ``enable_ktls`` is ``false``.
+  //
+  // Defaults to ``false``.
+  bool disable_ktls_rx = 6;
+}
