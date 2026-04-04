@@ -236,7 +236,6 @@ public:
                             StatNameTagVector& tags) override;
   const TagVector& fixedTags() override { return tag_producer_->fixedTags(); };
 
-  void ensureOverflowStats(const ScopeStatsLimitSettings& limits);
 
 private:
   friend class ThreadLocalStoreTestingPeer;
@@ -290,7 +289,6 @@ private:
 
   struct ScopeImpl : public Scope {
     ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable,
-              const ScopeStatsLimitSettings& limits = {},
               StatsMatcherSharedPtr scope_matcher = nullptr);
     ~ScopeImpl() override;
 
@@ -305,10 +303,8 @@ private:
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                               const ScopeStatsLimitSettings& limits = {},
                                StatsMatcherSharedPtr matcher = nullptr) override;
     ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {},
                                      StatsMatcherSharedPtr matcher = nullptr) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
@@ -475,7 +471,6 @@ private:
     ThreadLocalStoreImpl& parent_;
     const bool evictable_{};
 
-    const ScopeStatsLimitSettings limits_;
     StatsMatcherSharedPtr scope_matcher_;
 
   private:

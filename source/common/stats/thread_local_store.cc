@@ -159,21 +159,19 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
 }
 
 ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name, bool evictable,
-                                                            const ScopeStatsLimitSettings& limits,
                                                             StatsMatcherSharedPtr matcher) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(stat_name_storage.statName(), evictable, limits, std::move(matcher));
+  return scopeFromStatName(stat_name_storage.statName(), evictable, std::move(matcher));
 }
 
 ScopeSharedPtr
 ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name, bool evictable,
-                                                   const ScopeStatsLimitSettings& limits,
                                                    StatsMatcherSharedPtr matcher) {
   SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
   // Use explicit matcher if provided; otherwise inherit scope_matcher_ (which may be null,
   // meaning the store-level matcher is used).
   StatsMatcherSharedPtr child_matcher = matcher ? std::move(matcher) : scope_matcher_;
-  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()), evictable, limits,
+  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()), evictable,
                                                std::move(child_matcher));
   parent_.addScope(new_scope);
   return new_scope;
@@ -408,13 +406,11 @@ void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
 }
 
 ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix,
-                                           bool evictable, const ScopeStatsLimitSettings& limits,
+                                           bool evictable,
                                            StatsMatcherSharedPtr scope_matcher)
-    : scope_id_(parent.next_scope_id_++), parent_(parent), evictable_(evictable), limits_(limits),
+    : scope_id_(parent.next_scope_id_++), parent_(parent), evictable_(evictable),
       scope_matcher_(std::move(scope_matcher)), prefix_(prefix, parent.alloc_.symbolTable()),
-      central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {
-  parent_.ensureOverflowStats(limits_);
-}
+      central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   // Helps reproduce a previous race condition by pausing here in tests while we
@@ -531,24 +527,9 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
                                                effectiveMatcher())) {
     return null_stat;
   } else {
-    // Stat creation here. Check limits.
-    if constexpr (std::is_same_v<StatType, Counter>) {
-      if (limits_.max_counters != 0 && central_cache_map.size() >= limits_.max_counters) {
-        parent_.counters_overflow_->inc();
-        return null_stat;
-      }
-    } else if constexpr (std::is_same_v<StatType, Gauge>) {
-      if (limits_.max_gauges != 0 && central_cache_map.size() >= limits_.max_gauges) {
-        parent_.gauges_overflow_->inc();
-        return null_stat;
-      }
-    } else {
-      // TextReadouts are currently not limited, but we must ensure they are the only
-      // other type being handled. This static_assert will trigger a compilation error
-      // if a new StatType is introduced in the future, forcing the developer to
-      // explicitly decide how to handle its limits.
-      static_assert(std::is_same_v<StatType, TextReadout>, "Unexpected StatType");
-    }
+    // Limits don't need to be checked when creating stats because each scope's stats do not
+    // live in shared memory.
+
     StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
 
     RefcountPtr<StatType> stat = make_stat(
@@ -721,11 +702,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       if (iter != parent_.histogram_set_.end()) {
         stat = RefcountPtr<ParentHistogramImpl>(*iter);
       } else {
-        if (limits_.max_histograms != 0 &&
-            central_cache->histograms_.size() >= limits_.max_histograms) {
-          parent_.histograms_overflow_->inc();
-          return parent_.null_histogram_;
-        }
         stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
                                        tag_helper.tagExtractedName(), tag_helper.statNameTags(),
                                        *buckets, bins, parent_.next_histogram_id_++);
@@ -1276,33 +1252,6 @@ void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatName
   tagProducer().produceTags(name, tags);
   for (const auto& tag : tags) {
     stat_tags.emplace_back(pool.add(tag.name_), pool.add(tag.value_));
-  }
-}
-
-void ThreadLocalStoreImpl::ensureOverflowStats(const ScopeStatsLimitSettings& limits) {
-  const bool need_counter_overflow_stat = limits.max_counters != 0;
-  const bool need_gauge_overflow_stat = limits.max_gauges != 0;
-  const bool need_histogram_overflow_stat = limits.max_histograms != 0;
-
-  if (!need_counter_overflow_stat && !need_gauge_overflow_stat && !need_histogram_overflow_stat) {
-    return;
-  }
-
-  Thread::LockGuard lock(lock_);
-  if (need_counter_overflow_stat && counters_overflow_ == nullptr) {
-    StatNamePool pool(symbolTable());
-    StatName name = pool.add("server.stats_overflow.counter");
-    counters_overflow_ = alloc_.makeCounter(name, name, {});
-  }
-  if (need_gauge_overflow_stat && gauges_overflow_ == nullptr) {
-    StatNamePool pool(symbolTable());
-    StatName name = pool.add("server.stats_overflow.gauge");
-    gauges_overflow_ = alloc_.makeCounter(name, name, {});
-  }
-  if (need_histogram_overflow_stat && histograms_overflow_ == nullptr) {
-    StatNamePool pool(symbolTable());
-    StatName name = pool.add("server.stats_overflow.histogram");
-    histograms_overflow_ = alloc_.makeCounter(name, name, {});
   }
 }
 

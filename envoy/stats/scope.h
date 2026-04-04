@@ -29,16 +29,6 @@ using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextR
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
-// Settings for limiting the number of counters, gauges and histograms allowed
-// in a scope. This currently only supports thread local stats.
-struct ScopeStatsLimitSettings {
-  // Max number of counters allowed in this scope. 0 means no limit.
-  uint32_t max_counters = 0;
-  // Max number of gauges allowed in this scope. 0 means no limit.
-  uint32_t max_gauges = 0;
-  // Max number of histograms allowed in this scope. 0 means no limit.
-  uint32_t max_histograms = 0;
-};
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
@@ -91,7 +81,6 @@ public:
    * unless another matcher is explicitly set.
    */
   virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {},
                                      StatsMatcherSharedPtr matcher = nullptr) PURE;
 
   /**
@@ -108,7 +97,6 @@ public:
    * unless another matcher is explicitly set.
    */
   virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                           const ScopeStatsLimitSettings& limits = {},
                                            StatsMatcherSharedPtr matcher = nullptr) PURE;
 
   /**

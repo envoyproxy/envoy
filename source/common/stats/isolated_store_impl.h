@@ -337,10 +337,8 @@ public:
         .value_or(store_.null_counter_);
   }
   ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                             const ScopeStatsLimitSettings& limits = {},
                              StatsMatcherSharedPtr matcher = nullptr) override;
   ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                   const ScopeStatsLimitSettings& limits = {},
                                    StatsMatcherSharedPtr matcher = nullptr) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {

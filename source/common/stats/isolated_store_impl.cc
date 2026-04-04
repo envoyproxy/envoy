@@ -64,14 +64,12 @@ ConstScopeSharedPtr IsolatedStoreImpl::constRootScope() const {
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 
 ScopeSharedPtr IsolatedScopeImpl::createScope(const std::string& name, bool,
-                                              const ScopeStatsLimitSettings& limits,
                                               StatsMatcherSharedPtr matcher) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(stat_name_storage.statName(), false, limits, std::move(matcher));
+  return scopeFromStatName(stat_name_storage.statName(), false, std::move(matcher));
 }
 
 ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName name, bool,
-                                                    const ScopeStatsLimitSettings&,
                                                     StatsMatcherSharedPtr matcher) {
   SymbolTable::StoragePtr prefix_name_storage = symbolTable().join({prefix(), name});
   // Use explicit matcher if provided; otherwise inherit scope_matcher_.
