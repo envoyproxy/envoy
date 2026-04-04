@@ -6058,6 +6058,71 @@ TEST_F(HttpFilterTest, HttpEventTrafficStatsTest) {
   filter_->onDestroy();
 }
 
+// Test that mode_override from BUFFERED to FULL_DUPLEX_STREAMED during response header
+// processing does not hang when the upstream sends a Transfer-Encoding: chunked response
+// with an empty body. With chunked encoding, encodeHeaders is called with end_stream=false,
+// and the terminal chunk (0\r\n\r\n) triggers encodeData with an empty buffer and
+// end_stream=true before the ext_proc server responds to the header request.
+TEST_F(HttpFilterTest, ModeOverrideBufferedToFullDuplexChunkedEmptyBody) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  allow_mode_override: true
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    response_body_mode: "BUFFERED"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+
+  // Response headers arrive with end_stream=false (Transfer-Encoding: chunked).
+  // Set up encoding buffer: the filter manager will hold a 0-length buffer after
+  // encodeData returns StopIterationAndBuffer for the empty body.
+  Buffer::OwnedImpl encoding_buf;
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&encoding_buf));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
+      .WillRepeatedly(
+          Invoke([&encoding_buf](std::function<void(Buffer::Instance&)> cb) { cb(encoding_buf); }));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  // Empty response body arrives BEFORE ext proc responds to headers. This simulates
+  // chunked encoding with empty body: the terminal chunk arrives quickly after headers.
+  // Body mode is still BUFFERED at this point, so the filter returns StopIterationAndBuffer.
+  Buffer::OwnedImpl empty_resp_data;
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(empty_resp_data, true));
+
+  // Process response headers with mode_override changing response_body_mode to
+  // FULL_DUPLEX_STREAMED.
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _)).Times(AnyNumber());
+  processResponseHeaders(false,
+                         [](const HttpHeaders&, ProcessingResponse& response, HeadersResponse&) {
+                           auto mode = response.mutable_mode_override();
+                           mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+                         });
+
+  // Process response body: ext_proc receives the 0-byte body with end_stream=true and
+  // responds with a FULL_DUPLEX_STREAMED streamed_response.
+  Buffer::OwnedImpl want_response_body;
+  processResponseBodyHelper("", want_response_body, true, true);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  // 3 messages sent: request_headers, response_headers, response_body.
+  EXPECT_EQ(3, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(3, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters
