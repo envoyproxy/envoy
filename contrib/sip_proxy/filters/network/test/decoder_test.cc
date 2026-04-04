@@ -1,9 +1,9 @@
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/stats/utility.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
