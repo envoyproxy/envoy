@@ -1,0 +1,161 @@
+#include "source/common/http/route_config_update_requster.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/router/mocks.h"
+#include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+using testing::_;
+using testing::NiceMock;
+using testing::Return;
+
+namespace Envoy {
+namespace Http {
+namespace {
+
+class RouteConfigUpdateRequesterTest : public testing::Test {
+public:
+  RouteConfigUpdateRequesterTest() = default;
+
+  NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+};
+
+// Test that host header is preserved by default (case-sensitive query)
+TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseSensitiveQueryDefault) {
+  // Enable case-sensitive query via runtime flag (default is true)
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.vhds_case_sensitive_query", true);
+
+  RdsRouteConfigUpdateRequester requester(&route_config_provider_);
+
+  // Create a mock route config that uses VHDS
+  auto route_config = std::make_shared<NiceMock<Router::MockConfig>>();
+  EXPECT_CALL(*route_config, usesVhds()).WillRepeatedly(Return(true));
+
+  // Setup request headers with mixed case host
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/test"},
+      {":authority", "Example.Com"},
+  };
+
+  auto route_config_updated_cb = std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
+
+  // Expect that the host header is kept as-is (case-sensitive query)
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("Example.Com", _, _));
+
+  NiceMock<Http::MockRouteCache> route_cache;
+  requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
+                                     dispatcher_, headers);
+}
+
+// Test that host header is lowercased when runtime flag is disabled (backwards compatibility)
+TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveQuery) {
+  // Disable case-sensitive query via runtime flag (for backwards compatibility)
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.vhds_case_sensitive_query", false);
+
+  RdsRouteConfigUpdateRequester requester(&route_config_provider_);
+
+  // Create a mock route config that uses VHDS
+  auto route_config = std::make_shared<NiceMock<Router::MockConfig>>();
+  EXPECT_CALL(*route_config, usesVhds()).WillRepeatedly(Return(true));
+
+  // Setup request headers with mixed case host
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/test"},
+      {":authority", "Example.Com"},
+  };
+
+  auto route_config_updated_cb = std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
+
+  // Expect that the host header is converted to lowercase (case-insensitive query)
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("example.com", _, _));
+
+  NiceMock<Http::MockRouteCache> route_cache;
+  requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
+                                     dispatcher_, headers);
+}
+
+// Test that uppercase host header is preserved by default (case-sensitive query)
+TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseSensitiveQueryUppercase) {
+  // Enable case-sensitive query via runtime flag (default is true)
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.vhds_case_sensitive_query", true);
+
+  RdsRouteConfigUpdateRequester requester(&route_config_provider_);
+
+  auto route_config = std::make_shared<NiceMock<Router::MockConfig>>();
+  EXPECT_CALL(*route_config, usesVhds()).WillRepeatedly(Return(true));
+
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/test"},
+      {":authority", "EXAMPLE.COM"},
+  };
+
+  auto route_config_updated_cb = std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
+
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("EXAMPLE.COM", _, _));
+
+  NiceMock<Http::MockRouteCache> route_cache;
+  requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
+                                     dispatcher_, headers);
+}
+
+// Test that uppercase host header is lowercased when runtime flag is disabled
+TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveQueryUppercase) {
+  // Disable case-sensitive query via runtime flag (for backwards compatibility)
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.vhds_case_sensitive_query", false);
+
+  RdsRouteConfigUpdateRequester requester(&route_config_provider_);
+
+  auto route_config = std::make_shared<NiceMock<Router::MockConfig>>();
+  EXPECT_CALL(*route_config, usesVhds()).WillRepeatedly(Return(true));
+
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/test"},
+      {":authority", "EXAMPLE.COM"},
+  };
+
+  auto route_config_updated_cb = std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
+
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("example.com", _, _));
+
+  NiceMock<Http::MockRouteCache> route_cache;
+  requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
+                                     dispatcher_, headers);
+}
+
+// Test that lowercase host header stays lowercase by default (case-sensitive query)
+TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseSensitiveQueryLowercase) {
+  // Enable case-sensitive query via runtime flag (default is true)
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.vhds_case_sensitive_query", true);
+
+  RdsRouteConfigUpdateRequester requester(&route_config_provider_);
+
+  auto route_config = std::make_shared<NiceMock<Router::MockConfig>>();
+  EXPECT_CALL(*route_config, usesVhds()).WillRepeatedly(Return(true));
+
+  TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/test"},
+      {":authority", "example.com"},
+  };
+
+  auto route_config_updated_cb = std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
+
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("example.com", _, _));
+
+  NiceMock<Http::MockRouteCache> route_cache;
+  requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
+                                     dispatcher_, headers);
+}
+
+} // namespace
+} // namespace Http
+} // namespace Envoy
