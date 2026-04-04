@@ -236,6 +236,7 @@ envoy_cc_library(
     ],
     deps = [
         ":config_lib",
+        ":vhds_lib",
         "//envoy/http:codes_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/router:rds_interface",

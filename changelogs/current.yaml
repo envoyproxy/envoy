@@ -149,6 +149,10 @@ bug_fixes:
     properly as the API definition requires.
     The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
     to the dynamic module side as the configuration.
+- area: vhds
+  change: |
+    Fixed a bug where VHDS using a static route configuration wasn't sending VHDS subscriptions.
+    It should now send subscriptions and also work on-demand.
 - area: http_11_proxy
   change: |
     Fixed bug where providing an empty inner socket config would cause Envoy to crash.
