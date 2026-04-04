@@ -76,6 +76,12 @@ public:
   ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
 
   /**
+   * Set a callback to be run when the scope is destroyed.
+   * @param callback the callback to run.
+   */
+  virtual void setCleanupCallback(std::function<void()> callback) = 0;
+
+  /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
    * that point to the same reference counted backing stats. This allows a new scope to be
    * gracefully swapped in while an old scope with the same name is being destroyed.

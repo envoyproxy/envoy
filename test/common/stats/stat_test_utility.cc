@@ -213,7 +213,7 @@ Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
 }
 
 ScopeSharedPtr TestStore::makeScope(StatName name, StatsMatcherSharedPtr matcher) {
-  return std::make_shared<TestScope>(name, *this, std::move(matcher));
+  return ScopeSharedPtr(new TestScope(name, *this, std::move(matcher)));
 }
 
 TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
