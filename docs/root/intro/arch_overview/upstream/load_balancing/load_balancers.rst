@@ -190,6 +190,76 @@ including Redis, Maglev is very likely a superior drop in replacement for ring h
 :repo:`this benchmark </test/common/upstream/load_balancer_benchmark.cc>` to compare ring hash
 versus Maglev with different parameters.
 
+.. _arch_overview_load_balancing_types_rendezvous_hash:
+
+Rendezvous hash
+^^^^^^^^^^^^^^^
+
+The rendezvous hash load balancer (also known as *Highest Random Weight* or *HRW* hashing) implements
+consistent hashing to upstream hosts using a fundamentally different approach than
+:ref:`ring hash <arch_overview_load_balancing_types_ring_hash>` or
+:ref:`Maglev <arch_overview_load_balancing_types_maglev>`. Instead of building and querying a
+precomputed data structure (a ring or lookup table), rendezvous hashing computes a score for every
+candidate host on each request and selects the host with the highest score. Like the other
+hash-based load balancers, it is only effective when protocol routing is used that specifies a value
+to hash on.
+
+**How it works.** For each request, the load balancer combines the request's hash key with each
+host's identity to produce a deterministic score using the weighted rendezvous hashing formula from
+`Resch (2015) <https://www.snia.org/sites/default/files/SDC15_presentations/dist_sys/Jason_Resch_New_Consistent_Hashings_Rev.pdf>`_:
+
+``score = -weight / ln(hash(key, host))``
+
+The host with the highest score is selected. Because the scoring function is deterministic and
+independent per host, every Envoy instance will agree on host selection for the same key without
+any coordination. The original (unweighted) rendezvous hashing algorithm was introduced by
+`Thaler and Ravishankar (1996) <https://www.eecs.umich.edu/techreports/cse/96/CSE-TR-316-96.pdf>`_.
+
+**Why use rendezvous hash instead of ring hash or Maglev?**
+
+The core advantage of rendezvous hashing is *near-perfect load distribution without any tuning*.
+Ring hash and Maglev both rely on precomputed data structures whose size determines distribution
+quality:
+
+- Ring hash requires enough points (virtual nodes) per host on the ring to approximate the desired
+  traffic split. Each host is hashed onto the ring one or more times, and a host "owns" all keys
+  between its point and the previous point on the ring. When points are placed randomly on the ring
+  via hashing, the arc lengths between adjacent points are random and uneven. Some hosts end up
+  owning much larger arcs than others, receiving proportionally more traffic. With many
+  points per host, the arcs average out and the distribution approaches the ideal, but
+  this requires a proportionally larger ring. With the default ``minimum_ring_size`` of 1024 and
+  equal weights, clusters larger than ~1024 hosts will have as few as 1 point per host, making
+  load distribution almost entirely dependent on the luck of hash placement. Increasing the ring
+  size improves balance but at the cost of O(N log N) rebuild time and O(N) memory, where N is
+  the ring size.
+- Maglev uses a fixed table of 65,537 entries, which provides good balance for moderate cluster
+  sizes but becomes constrained when the number of hosts approaches or exceeds the table size. It
+  also moves approximately twice as many keys as ring hash when hosts are added or removed.
+
+Rendezvous hashing avoids these problems entirely. Because it computes a score for every host on
+each request rather than partitioning a fixed data structure, there are no "arcs" or "slots" that
+can be unevenly sized. Each host independently competes to win each key, and the scoring function
+ensures that over many keys, each host wins a share of traffic proportional to its weight---
+regardless of cluster size and without any tuning parameters. Adding or removing one host from a
+set of N hosts affects the theoretical minimum of only 1/N of requests.
+
+**Trade-offs.** Host selection is O(n) per request (where n is the number of hosts), compared to
+O(log N) for ring hash and O(1) for Maglev. The implementation uses fast hash combination
+(xorshift*) and a `fast logarithm approximation
+<https://innovation.ebayinc.com/stories/fast-approximate-logarithms-part-iii-the-formulas/>`_
+to minimize this cost, making it practical for clusters of typical sizes.
+Memory usage is also minimal at O(n), storing only the host list and
+precomputed hashes rather than a large ring or lookup table. Rebuild cost on membership changes is
+O(n) since there is no ring or table to reconstruct, compared to O(N log N) for ring hash (where
+N is the ring size, often much larger than n) and O(n * table_size) for Maglev.
+
+In summary, rendezvous hashing is recommended for use cases where:
+
+- Consistent hashing is needed but load balance quality is critical and should not degrade with cluster size.
+- The operational burden of tuning ring or table sizes is undesirable.
+- Minimal disruption on host changes is important (only 1/N keys move).
+- Cluster sizes are moderate (up to low thousands of hosts), where the O(n) selection cost is negligible.
+
 .. _arch_overview_load_balancing_types_random:
 
 Random
