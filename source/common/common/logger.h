@@ -104,7 +104,8 @@ const static bool should_log = true;
   FUNCTION(websocket)                                                                              \
   FUNCTION(golang)                                                                                 \
   FUNCTION(stats_sinks)                                                                            \
-  FUNCTION(dynamic_modules)
+  FUNCTION(dynamic_modules)                                                                        \
+  FUNCTION(ip_tagging)
 
 // clang-format off
 enum class Id {
