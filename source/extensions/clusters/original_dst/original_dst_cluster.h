@@ -70,6 +70,7 @@ public:
   ~OriginalDstCluster() override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     cleanup_timer_->disableTimer();
+    batch_update_timer_->disableTimer();
   }
 
   // Upstream::Cluster
@@ -168,7 +169,13 @@ private:
     host_map_ = new_host_map;
   }
 
+  void addHosts(std::vector<HostSharedPtr>& hosts);
   void addHost(HostSharedPtr&);
+  /**
+   * Processes all pending host additions in a batch update.
+   * This method is called by the batch update timer when it fires.
+   */
+  void batchUpdate();
   void cleanup();
 
   // ClusterImplBase
@@ -183,6 +190,9 @@ private:
   absl::optional<Http::LowerCaseString> http_header_name_;
   absl::optional<Config::MetadataKey> metadata_key_;
   absl::optional<uint32_t> port_override_;
+  HostVector pending_add_hosts_list_{};
+  std::chrono::milliseconds batch_update_interval_{};
+  Event::TimerPtr batch_update_timer_;
   friend class OriginalDstClusterFactory;
   friend class OriginalDstClusterHandle;
 };
