@@ -302,6 +302,33 @@ std::string generateCodeChallenge(const std::string& code_verifier) {
   return Base64Url::encode(sha256_string.data(), sha256_string.size());
 }
 
+bool isHostAllowedDomain(absl::string_view host, const std::vector<std::string>& allowed_domains) {
+  if (allowed_domains.empty()) {
+    return true;
+  }
+
+  // Strip port from host if present (e.g., "example.com:8080" -> "example.com")
+  auto colon_pos = host.rfind(':');
+  absl::string_view hostname =
+      (colon_pos != absl::string_view::npos) ? host.substr(0, colon_pos) : host;
+
+  for (const auto& domain : allowed_domains) {
+    if (absl::StartsWith(domain, "*.")) {
+      // Wildcard match: "*.example.com" matches "foo.example.com"
+      absl::string_view suffix = absl::string_view(domain).substr(1);
+      if (absl::EndsWith(hostname, suffix) && hostname.size() > suffix.size()) {
+        return true;
+      }
+    } else {
+      // Exact match
+      if (absl::EqualsIgnoreCase(hostname, domain)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * Encodes the state parameter for the OAuth2 flow.
  * The state parameter is a base64Url encoded JSON object containing the original request URL, a
@@ -456,6 +483,9 @@ FilterConfig::FilterConfig(
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
+      allowed_redirect_domains_(proto_config.allowed_redirect_domains().begin(),
+                                proto_config.allowed_redirect_domains().end()),
+      match_redirect_url_to_redirect_uri_(proto_config.match_redirect_url_to_redirect_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher(), context),
       signout_path_(proto_config.signout_path(), context), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
@@ -915,7 +945,22 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   if (Http::Utility::schemeIsHttp(headers.getSchemeValue())) {
     scheme = Http::Headers::get().SchemeValues.Http;
   }
-  const std::string base_path = absl::StrCat(scheme, "://", host_);
+
+  // Format redirect_uri — needed for the query param, and when
+  // match_redirect_url_to_redirect_uri is set, also for deriving the state URL host.
+  auto formatter = THROW_OR_RETURN_VALUE(Formatter::FormatterImpl::create(config_->redirectUri()),
+                                         Formatter::FormatterPtr);
+  const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
+
+  std::string base_path = absl::StrCat(scheme, "://", host_);
+
+  Http::Utility::Url parsed_redirect_uri;
+  if (config_->matchRedirectUrlToRedirectUri() &&
+      parsed_redirect_uri.initialize(redirect_uri, false)) {
+    base_path =
+        absl::StrCat(parsed_redirect_uri.scheme(), "://", parsed_redirect_uri.hostAndPort());
+  }
+
   const std::string original_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
 
   const CookieNames& cookie_names = config_->cookieNames();
@@ -949,9 +994,6 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
 
-  Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
-      Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
-  const auto redirect_uri = formatter->format({&headers}, decoder_callbacks_->streamInfo());
   const std::string escaped_redirect_uri = Http::Utility::PercentEncoding::urlEncode(redirect_uri);
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
 
@@ -1494,6 +1536,13 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
   if (!url.initialize(original_request_url, false)) {
     return {false, "", "", flow_id,
             fmt::format("State url can not be initialized: {}", original_request_url)};
+  }
+
+  // Validate the host of the original request URL against allowed redirect domains.
+  if (!isHostAllowedDomain(url.hostAndPort(), config_->allowedRedirectDomains())) {
+    return {false, "", "", flow_id,
+            fmt::format("State url host is not in the allowed redirect domains: {}",
+                        url.hostAndPort())};
   }
 
   return {true, "", original_request_url, flow_id, ""};
