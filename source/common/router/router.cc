@@ -39,6 +39,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Router {
 namespace {
@@ -2384,13 +2386,20 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   // the response headers/trailers from the upstream host.
   ASSERT(upstream_host.has_value(), "upstream host is not available for upstream request");
 
-  OptRef<Upstream::HostLbPolicyData> host_lb_policy_data = upstream_host->lbPolicyData();
+  // Inline capacity of 2 covers the typical case of 1-2 LB policies per host.
+  absl::InlinedVector<Upstream::HostLbPolicyData*, 2> orca_recipients;
+  for (size_t i = 0; i < upstream_host->lbPolicyDataCount(); ++i) {
+    auto host_lb_policy_data = upstream_host->lbPolicyDataAt(i);
+    if (host_lb_policy_data.has_value() && host_lb_policy_data->receivesOrcaLoadReport()) {
+      orca_recipients.push_back(host_lb_policy_data.ptr());
+    }
+  }
 
-  if (!cluster_->lrsReportMetricNames().has_value() && !host_lb_policy_data.has_value()) {
+  if (!cluster_->lrsReportMetricNames().has_value() && orca_recipients.empty()) {
     // If the cluster doesn't have LRS metric names configured then there is no need to
     // extract the stats for LRS.
-    // If the host doesn't have LB policy data then that means the LB policy doesn't care
-    // about the ORCA load report.
+    // If the host doesn't have any LB policy data interested in ORCA reports then
+    // the LB policy doesn't care about the ORCA load report.
     // Return early here to avoid parsing the ORCA load report because no one is interested
     // in it.
     return;
@@ -2412,15 +2421,17 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
     Envoy::Orca::addOrcaLoadReportToLoadMetricStats(
         *cluster_->lrsReportMetricNames(), *orca_load_report, upstream_host->loadMetricStats());
   }
-  if (host_lb_policy_data.has_value()) {
+  if (!orca_recipients.empty()) {
     ENVOY_STREAM_LOG(trace, "orca_load_report for {} report = {}", *callbacks_,
                      upstream_host->address()->asString(), orca_load_report->DebugString());
-    const absl::Status status =
-        host_lb_policy_data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
-    if (!status.ok()) {
-      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
-                         "LB policy onOrcaLoadReport failed: {} for load report {}",
-                         status.message(), orca_load_report->DebugString());
+    for (auto* data : orca_recipients) {
+      const absl::Status status =
+          data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
+      if (!status.ok()) {
+        ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                           "LB policy onOrcaLoadReport failed: {} for load report {}",
+                           status.message(), orca_load_report->DebugString());
+      }
     }
   }
 }
