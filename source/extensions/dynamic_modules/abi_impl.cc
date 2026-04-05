@@ -387,6 +387,14 @@ __attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_tim
                "not implemented in this context");
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, uint32_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch: "
+               "not implemented in this context");
+  return false;
+}
+
 __attribute__((weak)) bool
 envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr) {

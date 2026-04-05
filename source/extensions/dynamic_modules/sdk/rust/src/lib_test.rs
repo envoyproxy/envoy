@@ -2429,6 +2429,15 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_delete
 ) {
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path: abi::envoy_dynamic_module_type_module_buffer,
+  _events: u32,
+) -> bool {
+  false
+}
+
 // Thread-local used by the test mock to capture the response body set via the callback.
 thread_local! {
   static TEST_ADMIN_RESPONSE: std::cell::RefCell<String> =
@@ -2922,6 +2931,98 @@ fn test_bootstrap_extension_timer_fired_identity() {
 
   // The two timer ids must be different.
   assert_ne!(fake_timer_a as usize, fake_timer_b as usize);
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_file_changed() {
+  // Verify that path and events are correctly passed through on_file_changed.
+  static FIRED_PATH: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+  static FIRED_EVENTS: AtomicU32 = AtomicU32::new(0);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_file_changed(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      path: &str,
+      events: u32,
+    ) {
+      *FIRED_PATH.lock().unwrap() = path.to_string();
+      FIRED_EVENTS.store(events, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  // Fire with MovedTo event.
+  let path = "test/path_a.txt";
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_file_changed(
+      std::ptr::null_mut(),
+      config_ptr,
+      path_buf,
+      FILE_WATCHER_EVENT_MOVED_TO,
+    );
+  }
+  assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_a.txt");
+  assert_eq!(
+    FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
+    FILE_WATCHER_EVENT_MOVED_TO
+  );
+
+  // Fire with Modified event on different path.
+  let path2 = "test/path_b.txt";
+  let path_buf2 = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path2.as_ptr() as *mut _,
+    length: path2.len(),
+  };
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_file_changed(
+      std::ptr::null_mut(),
+      config_ptr,
+      path_buf2,
+      FILE_WATCHER_EVENT_MODIFIED,
+    );
+  }
+  assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_b.txt");
+  assert_eq!(
+    FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
+    FILE_WATCHER_EVENT_MODIFIED
+  );
 
   // Clean up.
   unsafe {

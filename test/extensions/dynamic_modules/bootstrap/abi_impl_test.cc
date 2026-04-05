@@ -3,6 +3,7 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin_stream.h"
@@ -1324,6 +1325,132 @@ TEST_F(BootstrapAbiImplTest, TimerFiredAfterConfigDestroyed) {
 
   // Clean up the timer.
   envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+// -----------------------------------------------------------------------------
+// File Watcher Tests
+// -----------------------------------------------------------------------------
+
+// Test that add_watch creates a watcher and succeeds.
+TEST_F(BootstrapAbiImplTest, FileWatcherAddWatch) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // Set up MockWatcher to be returned by createFilesystemWatcher.
+  auto* mock_watcher = new testing::NiceMock<Filesystem::MockWatcher>();
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(testing::Return(mock_watcher));
+  EXPECT_CALL(*mock_watcher, addWatch(_, _, _)).WillOnce(testing::Return(absl::OkStatus()));
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Add a watch for a specific path and events.
+  envoy_dynamic_module_type_module_buffer path_buf = {"/tmp/test_file", 14};
+  bool added = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+      config.value()->thisAsVoidPtr(), path_buf, 0x3);
+  EXPECT_TRUE(added);
+}
+
+// Test that the watcher callback invokes the on_file_changed event hook.
+TEST_F(BootstrapAbiImplTest, FileWatcherFired) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // Capture the watcher callback from addWatch.
+  Filesystem::Watcher::OnChangedCb captured_cb;
+  auto* mock_watcher = new testing::NiceMock<Filesystem::MockWatcher>();
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(testing::Return(mock_watcher));
+  EXPECT_CALL(*mock_watcher, addWatch(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) -> absl::Status {
+            captured_cb = std::move(cb);
+            return absl::OkStatus();
+          }));
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Add a watch to capture the callback.
+  envoy_dynamic_module_type_module_buffer path_buf = {"/tmp/test_file", 14};
+  bool added = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+      config.value()->thisAsVoidPtr(), path_buf, 0x3);
+  EXPECT_TRUE(added);
+
+  // Invoke the captured callback (simulating file change with Modified event).
+  ASSERT_NE(captured_cb, nullptr);
+  EXPECT_TRUE(captured_cb(0x2).ok());
+}
+
+// Test that the watcher callback safely handles a destroyed config via weak_ptr.
+TEST_F(BootstrapAbiImplTest, FileWatcherFiredAfterConfigDestroyed) {
+  Filesystem::Watcher::OnChangedCb captured_cb;
+
+  {
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+        testDataDir() + "/libbootstrap_no_op.so", false);
+    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+    // Capture the watcher callback from addWatch.
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
+        .WillOnce(testing::Invoke([&]() -> Filesystem::Watcher* {
+          auto* mock_watcher = new testing::NiceMock<Filesystem::MockWatcher>();
+          EXPECT_CALL(*mock_watcher, addWatch(_, _, _))
+              .WillOnce(testing::Invoke([&](absl::string_view, uint32_t,
+                                            Filesystem::Watcher::OnChangedCb cb) -> absl::Status {
+                captured_cb = std::move(cb);
+                return absl::OkStatus();
+              }));
+          return mock_watcher;
+        }));
+
+    auto config = newDynamicModuleBootstrapExtensionConfig(
+        "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
+        context_, context_.store_);
+    ASSERT_TRUE(config.ok()) << config.status();
+
+    // Add a watch to capture the callback.
+    envoy_dynamic_module_type_module_buffer path_buf = {"/tmp/test_file", 14};
+    bool added = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+        config.value()->thisAsVoidPtr(), path_buf, 0x3);
+    EXPECT_TRUE(added);
+
+    // Config goes out of scope here and is destroyed.
+  }
+
+  // Execute the captured watcher callback after config is destroyed.
+  // This should not crash - the weak_ptr should be expired.
+  ASSERT_NE(captured_cb, nullptr);
+  EXPECT_TRUE(captured_cb(0x2).ok());
+}
+
+// Test that file_watcher_add_watch returns false when addWatch fails.
+TEST_F(BootstrapAbiImplTest, FileWatcherAddWatchFails) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // Set up MockWatcher where addWatch returns an error.
+  auto* mock_watcher = new testing::NiceMock<Filesystem::MockWatcher>();
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(testing::Return(mock_watcher));
+  EXPECT_CALL(*mock_watcher, addWatch(_, _, _))
+      .WillOnce(testing::Return(absl::InvalidArgumentError("watch failed")));
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Add a watch - should fail and return false.
+  envoy_dynamic_module_type_module_buffer path_buf = {"/tmp/test_file", 14};
+  bool added = envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+      config.value()->thisAsVoidPtr(), path_buf, 0x3);
+  EXPECT_FALSE(added);
 }
 
 // -----------------------------------------------------------------------------

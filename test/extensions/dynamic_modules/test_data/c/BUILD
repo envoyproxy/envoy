@@ -118,6 +118,8 @@ test_program(name = "bootstrap_no_http_callout_done")
 
 test_program(name = "bootstrap_no_timer_fired")
 
+test_program(name = "bootstrap_no_file_changed")
+
 test_program(name = "bootstrap_no_admin_request")
 
 test_program(name = "bootstrap_no_cluster_add_or_update")

@@ -4,12 +4,12 @@
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
-
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
   return envoy_dynamic_modules_abi_version;
 }
 
-// A bootstrap extension that is missing envoy_dynamic_module_on_bootstrap_extension_config_scheduled.
+// A bootstrap extension that is missing
+// envoy_dynamic_module_on_bootstrap_extension_config_scheduled.
 
 envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
 envoy_dynamic_module_on_bootstrap_extension_config_new(
@@ -26,7 +26,8 @@ void envoy_dynamic_module_on_bootstrap_extension_config_destroy(
   (void)extension_config_ptr;
 }
 
-envoy_dynamic_module_type_bootstrap_extension_module_ptr envoy_dynamic_module_on_bootstrap_extension_new(
+envoy_dynamic_module_type_bootstrap_extension_module_ptr
+envoy_dynamic_module_on_bootstrap_extension_new(
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr) {
   (void)extension_config_ptr;
@@ -87,6 +88,16 @@ void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
   (void)body_chunks_size;
 }
 
+void envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer path, uint32_t events) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  (void)path;
+  (void)events;
+}
+
 uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
@@ -135,4 +146,3 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
   (void)extension_config_module_ptr;
   (void)listener_name;
 }
-
