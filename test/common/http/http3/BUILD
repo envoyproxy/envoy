@@ -23,6 +23,7 @@ envoy_cc_test(
         "//test/common/quic:test_utils_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/http:conn_pool_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",

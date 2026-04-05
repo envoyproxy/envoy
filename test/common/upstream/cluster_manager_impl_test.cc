@@ -1720,6 +1720,25 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
   EXPECT_TRUE(opt_cp.has_value());
 }
 
+// Verify that httpConnPool calls setLifetimeCallbacks on the newly created pool.
+TEST_F(ClusterManagerImplTest, LifetimeCallbacksPassedToConnPool) {
+  createWithBasicStaticCluster();
+  NiceMock<MockLoadBalancerContext> context;
+
+  Http::ConnectionPool::MockInstance* to_create =
+      new NiceMock<Http::ConnectionPool::MockInstance>();
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(to_create));
+  EXPECT_CALL(*to_create, setLifetimeCallbacks(_, _));
+
+  auto opt_cp =
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(
+              cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(nullptr).host,
+              ResourcePriority::Default, Http::Protocol::Http11, &context);
+  EXPECT_TRUE(opt_cp.has_value());
+}
+
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
   NiceMock<MockLoadBalancerContext> context1;
   NiceMock<MockLoadBalancerContext> context2;
@@ -1809,6 +1828,7 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(pool_mock));
   EXPECT_CALL(*pool_mock, addIdleCallback(_));
+  EXPECT_CALL(*pool_mock, setLifetimeCallbacks(_, _));
 
   auto opt_cp =
       cluster_manager_->getThreadLocalCluster("cluster_1")
@@ -2272,6 +2292,7 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
   for (size_t i = 0; i < 3; ++i) {
     conn_pool_vector.push_back(new Http::ConnectionPool::MockInstance());
     EXPECT_CALL(*conn_pool_vector.back(), addIdleCallback(_));
+    EXPECT_CALL(*conn_pool_vector.back(), setLifetimeCallbacks(_, _));
     EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
         .WillOnce(Return(conn_pool_vector.back()));
     EXPECT_CALL(downstream_connection, hashKey)
@@ -2352,6 +2373,7 @@ TEST_F(ClusterManagerImplTest, PassDownNetworkObserverRegistryToConnectionPool) 
   auto* pool = new Http::ConnectionPool::MockInstance();
   Quic::EnvoyQuicNetworkObserverRegistry* created_registry = nullptr;
   EXPECT_CALL(*pool, addIdleCallback(_));
+  EXPECT_CALL(*pool, setLifetimeCallbacks(_, _));
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .WillOnce(testing::WithArg<5>(
           Invoke([pool, created_registry_ptr = &created_registry](
@@ -2370,6 +2392,7 @@ TEST_F(ClusterManagerImplTest, PassDownNetworkObserverRegistryToConnectionPool) 
 
   pool = new Http::ConnectionPool::MockInstance();
   EXPECT_CALL(*pool, addIdleCallback(_));
+  EXPECT_CALL(*pool, setLifetimeCallbacks(_, _));
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .WillOnce(testing::WithArg<5>(
           Invoke([pool, created_registry](
