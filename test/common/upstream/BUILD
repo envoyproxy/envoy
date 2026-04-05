@@ -512,6 +512,7 @@ envoy_cc_test(
         "//source/common/upstream:resource_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 

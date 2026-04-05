@@ -1286,7 +1286,8 @@ TEST_F(RouterRetryStateImplTest, BudgetAvailableRetries) {
   // budget. As configured, there are no allowed retries via max_retries CB.
   cluster_.resetResourceManagerWithRetryBudget(
       0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */, 0 /* conn_pool */,
-      20.0 /* budget_percent */, 3 /* min_retry_concurrency */);
+      20.0 /* budget_percent */, std::chrono::milliseconds(100) /* budget_interval */,
+      3 /* min_retry_concurrency */);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
 
@@ -1305,7 +1306,8 @@ TEST_F(RouterRetryStateImplTest, BudgetNoAvailableRetries) {
   // CB.
   cluster_.resetResourceManagerWithRetryBudget(
       0 /* cx */, 0 /* rq_pending */, 20 /* rq */, 5 /* rq_retry */, 0 /* conn_pool */,
-      0 /* budget_percent */, 0 /* min_retry_concurrency */);
+      0 /* budget_percent */, std::chrono::milliseconds(100) /* budget_interval */,
+      0 /* min_retry_concurrency */);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
 
@@ -1321,7 +1323,8 @@ TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {
   // Expect no available retries from resource manager.
   cluster_.resetResourceManagerWithRetryBudget(
       0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */, 0 /* conn_pool */,
-      20.0 /* budget_percent */, 3 /* min_retry_concurrency */);
+      20.0 /* budget_percent */, std::chrono::milliseconds(100) /* budget_interval */,
+      3 /* min_retry_concurrency */);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
                                                  {"x-envoy-max-retries", "42"}};

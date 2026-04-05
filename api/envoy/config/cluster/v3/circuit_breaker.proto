@@ -5,6 +5,7 @@ package envoy.config.cluster.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/v3/percent.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -42,6 +43,15 @@ message CircuitBreakers {
       //
       // This parameter is optional. Defaults to 20%.
       type.v3.Percent budget_percent = 1;
+
+      // Specifies the duration in which requests will be considered when calculating
+      // the budget for retries.
+      //
+      // Unless a duration is specified, only active requests will be considered
+      // at the point-in-time when the retry budget is calculated.
+      //
+      // This parameter is optional. Defaults to 0ms.
+      google.protobuf.Duration budget_interval = 3;
 
       // Specifies the minimum retry concurrency allowed for the retry budget. The limit on the
       // number of active retries may never go below this number.

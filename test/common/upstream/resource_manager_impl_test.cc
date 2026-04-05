@@ -5,6 +5,7 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -26,12 +27,13 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<Stats::MockGauge> gauge;
   NiceMock<Stats::MockStore> store;
+  Event::SimulatedTimeSystem time_system;
 
   ON_CALL(store, gauge(_, _)).WillByDefault(ReturnRef(gauge));
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1, 0, 100,
-      clusterCircuitBreakersStats(store), absl::nullopt, absl::nullopt);
+      clusterCircuitBreakersStats(store), absl::nullopt, absl::nullopt, absl::nullopt, time_system);
 
   EXPECT_CALL(
       runtime.snapshot_,
@@ -78,6 +80,10 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
                                             "default.retry_budget.min_retry_concurrency",
                                             _))
       .WillRepeatedly(Return(5U));
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.runtime_resource_manager_test."
+                                            "default.retry_budget.budget_interval",
+                                            _))
+      .WillRepeatedly(Return(100U));
   EXPECT_EQ(5U, resource_manager.retries().max());
   EXPECT_TRUE(resource_manager.retries().canCreate());
 }
@@ -85,11 +91,12 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
 TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   NiceMock<Runtime::MockLoader> runtime;
   Stats::IsolatedStoreImpl store;
+  Event::SimulatedTimeSystem time_system;
 
   auto stats = clusterCircuitBreakersStats(store);
-  ResourceManagerImpl resource_manager(runtime,
-                                       "circuit_breakers.runtime_resource_manager_test.default.", 1,
-                                       2, 1, 0, 3, 100, stats, absl::nullopt, absl::nullopt);
+  ResourceManagerImpl resource_manager(
+      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0, 3, 100, stats,
+      absl::nullopt, absl::nullopt, absl::nullopt, time_system);
 
   // Test remaining_cx_ gauge
   EXPECT_EQ(1U, resource_manager.connections().max());
@@ -150,12 +157,14 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
 TEST(ResourceManagerImplTest, RetryBudgetOverrideGauge) {
   NiceMock<Runtime::MockLoader> runtime;
   Stats::IsolatedStoreImpl store;
+  Event::SimulatedTimeSystem time_system;
 
   auto stats = clusterCircuitBreakersStats(store);
 
   // Test retry budgets disable remaining_retries gauge (it should always be 0).
   ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2,
-                         1, 0, 3, 100, stats, 20.0, 5);
+                         1, 0, 3, 100, stats, 20.0, std::chrono::milliseconds(100),
+                         static_cast<uint32_t>(5), time_system);
 
   EXPECT_EQ(5U, rm.retries().max());
   EXPECT_EQ(0U, stats.remaining_retries_.value());
@@ -165,6 +174,48 @@ TEST(ResourceManagerImplTest, RetryBudgetOverrideGauge) {
   EXPECT_EQ(0U, stats.remaining_retries_.value());
   EXPECT_EQ(100u, rm.maxConnectionsPerHost());
   rm.retries().dec();
+}
+
+TEST(ResourceManagerImplTest, RetryBudgetInterval) {
+  NiceMock<Runtime::MockLoader> runtime;
+  Stats::IsolatedStoreImpl store;
+  Event::SimulatedTimeSystem time_system;
+
+  auto stats = clusterCircuitBreakersStats(store);
+
+  ResourceManagerImpl rm(runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1024,
+                         0, 1024, 0, 3, 100, stats, 20.0, std::chrono::milliseconds(100),
+                         static_cast<uint32_t>(5), time_system);
+
+  EXPECT_EQ(5U, rm.retries().max());
+  for (int i = 0; i < 100; i++) {
+    rm.requests().inc();
+  }
+  EXPECT_EQ(20U, rm.retries().max());
+
+  time_system.advanceTimeWait(std::chrono::milliseconds(15));
+  for (int i = 0; i < 50; i++) {
+    rm.requests().inc();
+  }
+  // max retries = 20% * 150 = 30.
+  EXPECT_EQ(30U, rm.retries().max());
+
+  time_system.advanceTimeWait(std::chrono::milliseconds(100));
+  EXPECT_EQ(5U, rm.retries().max());
+  for (int i = 0; i < 10; i++) {
+    rm.requests().inc();
+  }
+  // max retries = 20% * 10 = 2. Use min retry concurrency.
+  EXPECT_EQ(5U, rm.retries().max());
+
+  rm.retries().inc();
+  EXPECT_EQ(1U, rm.retries().count());
+  EXPECT_TRUE(rm.retries().canCreate());
+
+  for (int i = 0; i <= 5; i++) {
+    rm.retries().inc();
+  }
+  EXPECT_FALSE(rm.retries().canCreate());
 }
 } // namespace
 } // namespace Upstream

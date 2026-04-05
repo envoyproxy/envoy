@@ -74,7 +74,7 @@ MockClusterInfo::MockClusterInfo()
       resource_manager_(new Upstream::ResourceManagerImpl(
           runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
           std::numeric_limits<uint64_t>::max(), circuit_breakers_stats_, absl::nullopt,
-          absl::nullopt)),
+          absl::nullopt, absl::nullopt, time_system_)),
       upstream_local_address_selector_(
           std::make_shared<NiceMock<MockUpstreamLocalAddressSelector>>(source_address_)),
       stats_scope_(stats_store_.createScope("test_scope")) {
