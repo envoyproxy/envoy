@@ -8,6 +8,7 @@
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/server/factory_context.h"
 
+#include "source/common/common/logger.h"
 #include "source/extensions/filters/http/rate_limit_quota/global_client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
 
@@ -31,7 +32,16 @@ initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
   // Quota bucket & global client TLS objects are created with the config and
   // kept alive via shared_ptr to a storage struct. The local rate limit client
   // in each filter instance assumes that the slot will outlive them.
-  std::shared_ptr<TlsStore> tls_store = std::make_shared<TlsStore>(context, target_address, domain);
+  Envoy::Event::Dispatcher& dispatcher = context.serverFactoryContext().mainThreadDispatcher();
+  auto deleter = [main_dispatcher = &dispatcher](TlsStore* store) {
+    if (main_dispatcher->isThreadSafe()) {
+      delete store;
+    } else {
+      main_dispatcher->post([store]() { delete store; });
+    }
+  };
+
+  std::shared_ptr<TlsStore> tls_store(new TlsStore(context, target_address, domain), deleter);
   auto tl_buckets_cache =
       std::make_shared<ThreadLocalBucketsCache>(std::make_shared<BucketsCache>());
   tls_store->buckets_tls.set(
@@ -46,7 +56,7 @@ initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
 
   // Create the global client resource to be shared via TLS to all worker
   // threads (accessed through a filter-specific LocalRateLimitClient).
-  std::unique_ptr<GlobalRateLimitClientImpl> tl_global_client = createGlobalRateLimitClientImpl(
+  std::shared_ptr<GlobalRateLimitClientImpl> tl_global_client = createGlobalRateLimitClientImpl(
       context, domain, reporting_interval, tls_store->buckets_tls, config_with_hash_key);
   tls_store->global_client = std::move(tl_global_client);
 
@@ -60,11 +70,8 @@ GlobalTlsStores::getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_wi
                              Server::Configuration::FactoryContext& context,
                              absl::string_view target_address, absl::string_view domain) {
   TlsStoreIndex index = std::make_pair(std::string(target_address), std::string(domain));
-  // Find existing TlsStore or initialize a new one.
   auto it = stores().find(index);
   if (it != stores().end()) {
-    ENVOY_LOG(debug, "Found existing cache & RLQS client for target ({}) and domain ({}).",
-              index.first, index.second);
     return it->second.lock();
   }
   ENVOY_LOG(debug, "Creating a new cache & RLQS client for target ({}) and domain ({}).",
@@ -74,6 +81,14 @@ GlobalTlsStores::getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_wi
   // Save weak_ptr as an unowned reference.
   stores()[index] = tls_store;
   return tls_store;
+}
+
+void GlobalTlsStores::clearTlsStore(const std::pair<std::string, std::string>& index) {
+  stores().erase(index);
+  if (stores().empty() && getEmptiedCb() != nullptr) {
+    getEmptiedCb()();
+    getEmptiedCb() = nullptr;
+  }
 }
 
 } // namespace RateLimitQuota
