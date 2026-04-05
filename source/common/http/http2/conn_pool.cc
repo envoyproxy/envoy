@@ -18,8 +18,10 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
     Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
     absl::optional<HttpServerPropertiesCache::Origin>& origin,
     Upstream::HostDescriptionConstSharedPtr host) {
+  // Get initial streams limit from cluster config, considering endpoint-specific overrides
   uint32_t initial_streams =
-      host->cluster().httpProtocolOptions().http2Options().max_concurrent_streams().value();
+      host->cluster().httpProtocolOptions(host).http2Options().max_concurrent_streams().value();
+
   if (http_server_properties_cache && origin.has_value()) {
     uint32_t cached_concurrency =
         http_server_properties_cache->getConcurrentStreams(origin.value());
@@ -30,8 +32,8 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
       initial_streams = cached_concurrency;
     }
   }
-  uint32_t max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
-      host->cluster().maxRequestsPerConnection());
+
+  uint32_t max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(host);
   if (max_requests < initial_streams) {
     initial_streams = max_requests;
   }
