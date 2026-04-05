@@ -1700,6 +1700,23 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHostStrict) 
   EXPECT_FALSE(opt_cp.has_value());
 }
 
+TEST_F(ClusterManagerImplTest, StrictOverrideHostNotFoundReturnsCustomFailureStatus) {
+  createWithBasicStaticCluster();
+  NiceMock<MockLoadBalancerContext> context;
+
+  // Non-existing host with strict mode and custom failure status (421).
+  Upstream::LoadBalancerContext::OverrideHost override_host{"127.0.0.2:12345", true,
+                                                            Http::Code::MisdirectedRequest};
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
+
+  auto result = cluster_manager_->getThreadLocalCluster("cluster_1")->chooseHost(&context);
+  EXPECT_EQ(nullptr, result.host);
+  ASSERT_TRUE(result.failure_status.has_value());
+  EXPECT_EQ(Http::Code::MisdirectedRequest, result.failure_status.value());
+}
+
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
   createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;
