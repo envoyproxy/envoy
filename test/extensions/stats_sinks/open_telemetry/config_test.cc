@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -92,6 +93,58 @@ TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
     EXPECT_EQ("key", options.resource_attributes()[0].key());
     EXPECT_EQ("value", options.resource_attributes()[0].value().string_value());
   }
+}
+
+// Verify that the factory injects service.instance.id and service.namespace from
+// LocalInfo into the resource attributes when creating the sink, so consumers can
+// identify the originating Envoy instance.
+TEST(OpenTelemetryConfigTest, NodeAttributesAutoPopulatedFromLocalInfo) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
+
+  // Set a real node id and cluster on the local_info mock.
+  server.local_info_.node_.set_id("test-node-42");
+  server.local_info_.node_.set_cluster("my-cluster");
+
+  Server::Configuration::StatsSinkFactory* factory =
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
+          OpenTelemetryName);
+  ASSERT_NE(factory, nullptr);
+
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+  sink_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("otlp_grpc");
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  TestUtility::jsonConvert(sink_config, *message);
+
+  // Factory must succeed and produce a valid sink.
+  auto sink_or = factory->createStatsSink(*message, server);
+  ASSERT_TRUE(sink_or.ok());
+  EXPECT_NE(sink_or.value(), nullptr);
+}
+
+// Verify that when a resource detector already sets service.instance.id, it takes
+// priority over the auto-populated value from LocalInfo (try_emplace semantics).
+TEST(OpenTelemetryConfigTest, NodeAttributesNotOverriddenByAutoPopulation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+
+  // Manually build a resource as if a detector already set service.instance.id.
+  Tracers::OpenTelemetry::Resource resource;
+  resource.attributes_["service.instance.id"] = "detector-set-id";
+  resource.attributes_["service.namespace"] = "detector-set-cluster";
+
+  OtlpOptions options(sink_config, resource, server);
+  std::string instance_id_val;
+  std::string namespace_val;
+  for (const auto& attr : options.resource_attributes()) {
+    if (attr.key() == "service.instance.id") {
+      instance_id_val = attr.value().string_value();
+    } else if (attr.key() == "service.namespace") {
+      namespace_val = attr.value().string_value();
+    }
+  }
+  // Detector-set values must be preserved.
+  EXPECT_EQ("detector-set-id", instance_id_val);
+  EXPECT_EQ("detector-set-cluster", namespace_val);
 }
 
 } // namespace

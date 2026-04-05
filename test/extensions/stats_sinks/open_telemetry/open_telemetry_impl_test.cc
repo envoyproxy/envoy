@@ -1208,6 +1208,34 @@ TEST_F(OtlpMetricsFlusherTests, SetResourceAttributes) {
             metrics->resource_metrics()[0].resource().attributes()[0].value().string_value());
 }
 
+// Verify that service.instance.id and service.namespace resource attributes are propagated into
+// the exported OTLP ResourceMetrics, enabling consumers to identify the source.
+TEST_F(OtlpMetricsFlusherTests, NodeIdAndClusterResourceAttributes) {
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(true, false, true, true, "",
+                  {{"service.instance.id", "envoy-node-1"}, {"service.namespace", "prod-cluster"}}));
+  addCounterToSnapshot("test_counter1", 5, 5);
+  MetricsExportRequestSharedPtr metrics =
+      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  expectMetricsCount(metrics, 1);
+
+  ASSERT_EQ(1, metrics->resource_metrics().size());
+  const auto& resource_attrs = metrics->resource_metrics()[0].resource().attributes();
+  ASSERT_EQ(2, resource_attrs.size());
+
+  std::string instance_id_val;
+  std::string namespace_val;
+  for (const auto& attr : resource_attrs) {
+    if (attr.key() == "service.instance.id") {
+      instance_id_val = attr.value().string_value();
+    } else if (attr.key() == "service.namespace") {
+      namespace_val = attr.value().string_value();
+    }
+  }
+  EXPECT_EQ("envoy-node-1", instance_id_val);
+  EXPECT_EQ("prod-cluster", namespace_val);
+}
+
 class MockOpenTelemetryGrpcMetricsExporter : public OpenTelemetryGrpcMetricsExporter {
 public:
   MOCK_METHOD(void, send, (MetricsExportRequestPtr&&));
