@@ -607,20 +607,60 @@ bool OAuth2CookieValidator::timestampIsValid() const {
 
 bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
-OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
-                           std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source,
+OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr default_config,
+                           OAuth2ClientFactory oauth_client_factory, TimeSource& time_source,
                            Random::RandomGenerator& random)
-    : validator_(std::make_shared<OAuth2CookieValidator>(time_source, config->cookieNames(),
-                                                         config->cookieDomain())),
-      oauth_client_(std::move(oauth_client)), config_(std::move(config)), time_source_(time_source),
+    : default_config_(std::move(default_config)),
+      oauth_client_factory_(std::move(oauth_client_factory)), time_source_(time_source),
       random_(random) {
-
-  oauth_client_->setCallbacks(*this);
+  if (default_config_ != nullptr) {
+    setActiveConfig(default_config_);
+  }
 }
 
 void OAuth2Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   PassThroughDecoderFilter::setDecoderFilterCallbacks(callbacks);
-  oauth_client_->setDecoderFilterCallbacks(callbacks);
+  if (oauth_client_ != nullptr) {
+    oauth_client_->setDecoderFilterCallbacks(callbacks);
+  }
+}
+
+FilterConfigSharedPtr OAuth2Filter::getConfigForRequest() const {
+  const auto* route_specific_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
+  if (route_specific_config != nullptr) {
+    return route_specific_config->config();
+  }
+
+  return default_config_;
+}
+
+void OAuth2Filter::setActiveConfig(FilterConfigSharedPtr config) {
+  if (config == nullptr) {
+    config_.reset();
+    validator_.reset();
+    oauth_client_.reset();
+    return;
+  }
+
+  if (config_ == config && validator_ != nullptr &&
+      (oauth_client_ != nullptr || !oauth_client_factory_)) {
+    return;
+  }
+
+  config_ = std::move(config);
+  validator_ = std::make_shared<OAuth2CookieValidator>(time_source_, config_->cookieNames(),
+                                                       config_->cookieDomain());
+
+  if (oauth_client_factory_) {
+    oauth_client_ = oauth_client_factory_(config_);
+  }
+  if (oauth_client_ != nullptr) {
+    oauth_client_->setCallbacks(*this);
+    if (decoder_callbacks_ != nullptr) {
+      oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
+    }
+  }
 }
 
 /**
@@ -632,6 +672,12 @@ void OAuth2Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&
  * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  setActiveConfig(getConfigForRequest());
+  // If no config is set, OAuth2 is disabled for this request.
+  if (config_ == nullptr) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   // Skip Filter and continue chain if a Passthrough header is matching.
   // Only increment counters here; do not modify request headers, as there may be
   // other instances of this filter configured that still need to process the request.

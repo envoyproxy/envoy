@@ -649,6 +649,7 @@ envoy.filters.http.oauth2:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.oauth2.v3.OAuth2
+  - envoy.extensions.filters.http.oauth2.v3.OAuth2PerRoute
 envoy.filters.http.on_demand:
   categories:
   - envoy.filters.http

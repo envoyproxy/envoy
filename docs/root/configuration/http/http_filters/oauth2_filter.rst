@@ -7,6 +7,22 @@ OAuth2
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2>`
 
+The OAuth2 filter also defines a route-level config message,
+:ref:`OAuth2PerRoute <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2PerRoute>`,
+which may be attached to
+:ref:`Route.typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`.
+The route-level config carries a complete :ref:`OAuth2Config <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2Config>`
+and is intended to replace, not merge with, the filter-level config.
+
+When using per-route configuration, keep the
+:ref:`redirect_path_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.redirect_path_matcher>`
+and :ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`
+within the same route prefix as the protected resources. If cookie paths are customized, they
+should cover that same prefix so that the callback and signout requests receive the OAuth cookies
+needed to complete the flow. When multiple per-route OAuth2 configurations share the same host,
+customizing :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>`
+is recommended to avoid overlap between routes.
+
 The OAuth filter's flow involves:
 
 * An unauthenticated user arrives at myapp.com, and the oauth filter redirects them to the
@@ -228,6 +244,138 @@ can be defined in one shared file.
     - name: hmac
       generic_secret:
         secret: <Your hmac secret here>
+
+The following example shows two independent route prefixes, ``/foo`` and ``/bar``, each with its
+own OAuth2 client settings. The callback path and signout path stay under the same prefix as the
+protected route, the cookie paths are scoped to that prefix, and the cookie names are customized so
+that the two configurations remain independent on the same host:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  route_config:
+    virtual_hosts:
+    - name: service
+      domains: ["*"]
+      routes:
+      - match:
+          prefix: "/foo"
+        route:
+          cluster: local_service
+        typed_per_filter_config:
+          envoy.filters.http.oauth2:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2PerRoute
+            config:
+              token_endpoint:
+                cluster: google_oauth2
+                uri: https://oauth2.googleapis.com/token
+                timeout: 3s
+              authorization_endpoint: https://accounts.google.com/o/oauth2/v2/auth
+              redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/foo/callback"
+              redirect_path_matcher:
+                path:
+                  exact: /foo/callback
+              signout_path:
+                path:
+                  exact: /foo/signout
+              cookie_configs:
+                bearer_token_cookie_config:
+                  path: "/foo"
+                oauth_hmac_cookie_config:
+                  path: "/foo"
+                oauth_expires_cookie_config:
+                  path: "/foo"
+                id_token_cookie_config:
+                  path: "/foo"
+                refresh_token_cookie_config:
+                  path: "/foo"
+                oauth_nonce_cookie_config:
+                  path: "/foo"
+                code_verifier_cookie_config:
+                  path: "/foo"
+              credentials:
+                client_id: foo
+                cookie_names:
+                  bearer_token: FooBearerToken
+                  oauth_hmac: FooOauthHMAC
+                  oauth_expires: FooOauthExpires
+                  id_token: FooIdToken
+                  refresh_token: FooRefreshToken
+                  oauth_nonce: FooOauthNonce
+                  code_verifier: FooCodeVerifier
+                token_secret:
+                  name: foo_client_secret
+                  sds_config:
+                    path: "/etc/foo-client-secret.yaml"
+                hmac_secret:
+                  name: hmac
+                  sds_config:
+                    path: "/etc/hmac-secret.yaml"
+              auth_scopes:
+              - openid
+              - email
+      - match:
+          prefix: "/bar"
+        route:
+          cluster: local_service
+        typed_per_filter_config:
+          envoy.filters.http.oauth2:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2PerRoute
+            config:
+              token_endpoint:
+                cluster: google_oauth2
+                uri: https://oauth2.googleapis.com/token
+                timeout: 3s
+              authorization_endpoint: https://accounts.google.com/o/oauth2/v2/auth
+              redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/bar/callback"
+              redirect_path_matcher:
+                path:
+                  exact: /bar/callback
+              signout_path:
+                path:
+                  exact: /bar/signout
+              cookie_configs:
+                bearer_token_cookie_config:
+                  path: "/bar"
+                oauth_hmac_cookie_config:
+                  path: "/bar"
+                oauth_expires_cookie_config:
+                  path: "/bar"
+                id_token_cookie_config:
+                  path: "/bar"
+                refresh_token_cookie_config:
+                  path: "/bar"
+                oauth_nonce_cookie_config:
+                  path: "/bar"
+                code_verifier_cookie_config:
+                  path: "/bar"
+              credentials:
+                client_id: bar
+                cookie_names:
+                  bearer_token: BarBearerToken
+                  oauth_hmac: BarOauthHMAC
+                  oauth_expires: BarOauthExpires
+                  id_token: BarIdToken
+                  refresh_token: BarRefreshToken
+                  oauth_nonce: BarOauthNonce
+                  code_verifier: BarCodeVerifier
+                token_secret:
+                  name: bar_client_secret
+                  sds_config:
+                    path: "/etc/bar-client-secret.yaml"
+                hmac_secret:
+                  name: hmac
+                  sds_config:
+                    path: "/etc/hmac-secret.yaml"
+              auth_scopes:
+              - openid
+              - email
 
 
 Notes

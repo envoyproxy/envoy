@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -254,6 +255,16 @@ private:
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  explicit FilterConfigPerRoute(FilterConfigSharedPtr config) : config_(std::move(config)) {}
+
+  const FilterConfigSharedPtr& config() const { return config_; }
+
+private:
+  FilterConfigSharedPtr config_;
+};
+
 /**
  * An OAuth cookie validator:
  * 1. extracts cookies from a request
@@ -320,7 +331,10 @@ class OAuth2Filter : public Http::PassThroughFilter,
                      FilterCallbacks,
                      Logger::Loggable<Logger::Id::oauth2> {
 public:
-  OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
+  using OAuth2ClientFactory =
+      std::function<std::unique_ptr<OAuth2Client>(const FilterConfigSharedPtr&)>;
+
+  OAuth2Filter(FilterConfigSharedPtr default_config, OAuth2ClientFactory oauth_client_factory,
                TimeSource& time_source, Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
@@ -369,9 +383,14 @@ private:
   bool was_refresh_token_flow_{false};
 
   std::unique_ptr<OAuth2Client> oauth_client_;
+  FilterConfigSharedPtr default_config_;
   FilterConfigSharedPtr config_;
+  OAuth2ClientFactory oauth_client_factory_;
   TimeSource& time_source_;
   Random::RandomGenerator& random_;
+
+  FilterConfigSharedPtr getConfigForRequest() const;
+  void setActiveConfig(FilterConfigSharedPtr config);
 
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)

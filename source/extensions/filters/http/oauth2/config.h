@@ -13,7 +13,8 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 class OAuth2Config : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
-                         envoy::extensions::filters::http::oauth2::v3::OAuth2> {
+                         envoy::extensions::filters::http::oauth2::v3::OAuth2,
+                         envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute> {
 public:
   OAuth2Config() : ExceptionFreeFactoryBase("envoy.filters.http.oauth2") {}
 
@@ -21,6 +22,11 @@ public:
   createFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
                                     const std::string&,
                                     Server::Configuration::FactoryContext&) override;
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute&,
+      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace Oauth2
