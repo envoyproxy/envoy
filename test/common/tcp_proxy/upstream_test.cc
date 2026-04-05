@@ -200,6 +200,19 @@ TEST_P(HttpUpstreamTest, UpstreamLocalResetProducesLocalClose) {
   }
 }
 
+// When the runtime guard is disabled, all reset reasons (including remote) should produce
+// LocalClose with Normal close type.
+TEST_P(HttpUpstreamTest, UpstreamResetWithGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.map_http_stream_reset_to_tcp_rst", "false"}});
+  this->setupUpstream();
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  this->upstream_->onResetStream(Http::StreamResetReason::RemoteReset, "");
+  EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
+}
+
 TEST_P(HttpUpstreamTest, UpstreamWatermarks) {
   this->setupUpstream();
   EXPECT_CALL(this->callbacks_, onAboveWriteBufferHighWatermark());
