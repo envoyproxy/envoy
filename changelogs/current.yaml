@@ -883,6 +883,11 @@ new_features:
     Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
     ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
     This is necessary if the route configuration may depend on the filter state values set.
+- area: tcp_proxy
+  change: |
+    Propagate upstream TCP RST to downstream when detected close type is RemoteReset.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy`` to false.
 
 - area: contrib
   change: |

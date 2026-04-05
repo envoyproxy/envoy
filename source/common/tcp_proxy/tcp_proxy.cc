@@ -1245,11 +1245,14 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     if (upstream_) {
       getStreamInfo().upstreamInfo()->setUpstreamLocalCloseReason(upstream_->localCloseReason());
     }
+    // Capture upstream detected close type before upstream is moved/reset.
+    const auto upstream_detected_close_type =
+        upstream_ ? upstream_->detectedCloseType() : StreamInfo::DetectedCloseType::Normal;
     if (Runtime::runtimeFeatureEnabled(
             "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
       read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
     } else if (upstream_) {
-      getStreamInfo().upstreamInfo()->setUpstreamDetectedCloseType(upstream_->detectedCloseType());
+      getStreamInfo().upstreamInfo()->setUpstreamDetectedCloseType(upstream_detected_close_type);
       upstream_.reset();
     }
     disableIdleTimer();
@@ -1274,9 +1277,18 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         enableRetryTimer();
       }
     } else {
-      // TODO(botengyao): propagate RST back to downstream connection if RST is received.
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
-        read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+        // Propagate upstream RST to downstream.
+        if (upstream_detected_close_type == StreamInfo::DetectedCloseType::RemoteReset &&
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
+                                           "propagate_upstream_rst_through_tunneled_tcp_proxy")) {
+          ENVOY_CONN_LOG(trace, "TCP:onUpstreamEvent(): propagating upstream RST to downstream",
+                         read_callbacks_->connection());
+          getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset);
+          read_callbacks_->connection().close(Network::ConnectionCloseType::AbortReset);
+        } else {
+          read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+        }
       }
     }
   }
