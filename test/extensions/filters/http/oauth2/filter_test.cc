@@ -141,7 +141,9 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     validator_ = std::make_shared<MockOAuth2CookieValidator>();
-    filter_->validator_ = validator_;
+    if (config_ != nullptr) {
+      filter_->validator_ = validator_;
+    }
     filter_->flow_id_ = "00000000075bcd15";
   }
 
@@ -4606,6 +4608,8 @@ TEST_F(OAuth2Test, RouteSpecificConfigOverridesGlobalConfig) {
 }
 
 TEST_F(OAuth2Test, EmptyRouteSpecificConfigOverridesGlobalConfig) {
+  init(nullptr);
+
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/resource"},
