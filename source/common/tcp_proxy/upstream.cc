@@ -154,7 +154,7 @@ HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
 
 StreamInfo::DetectedCloseType HttpUpstream::detectedCloseType() const {
-  return StreamInfo::DetectedCloseType::Normal;
+  return detected_close_type_;
 }
 
 bool HttpUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
@@ -243,10 +243,30 @@ HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_vie
   return nullptr;
 }
 
-void HttpUpstream::onResetStream(Http::StreamResetReason, absl::string_view) {
+void HttpUpstream::onResetStream(Http::StreamResetReason reason, absl::string_view) {
   read_half_closed_ = true;
   write_half_closed_ = true;
-  resetEncoder(Network::ConnectionEvent::LocalClose);
+  Network::ConnectionEvent event;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.map_http_stream_reset_to_tcp_rst")) {
+    // Map remote-originated resets to RemoteClose.
+    switch (reason) {
+    case Http::StreamResetReason::RemoteReset:
+    case Http::StreamResetReason::RemoteRefusedStreamReset:
+    case Http::StreamResetReason::RemoteConnectionFailure:
+      event = Network::ConnectionEvent::RemoteClose;
+      detected_close_type_ = StreamInfo::DetectedCloseType::RemoteReset;
+      break;
+    default:
+      event = Network::ConnectionEvent::LocalClose;
+      detected_close_type_ = StreamInfo::DetectedCloseType::Normal;
+      break;
+    }
+  } else {
+    event = Network::ConnectionEvent::LocalClose;
+    detected_close_type_ = StreamInfo::DetectedCloseType::Normal;
+  }
+  resetEncoder(event);
 }
 
 void HttpUpstream::onAboveWriteBufferHighWatermark() {
