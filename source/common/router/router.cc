@@ -1001,17 +1001,25 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   bool buffering = (retry_enabled || redirect_enabled) && (!request_buffer_overflowed_);
 
-  // Check if we would exceed buffer limits, regardless of current buffering state
+  // Check if we would exceed buffer limits, regardless of current buffering state.
   // This ensures error details are set even if retry state was cleared due to upstream reset.
-  const bool would_exceed_buffer =
-      (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
+  //
+  // `decodingBuffer()` normally contains data the router buffered earlier, so the effective size
+  // is that buffered data plus the current chunk. However, when a preceding buffering filter
+  // (e.g. the buffer filter) resumes iteration, the filter manager passes the shared HCM request
+  // buffer as `data`, which aliases `decodingBuffer()`. Detect this via pointer identity — the
+  // same check used by ActiveStreamFilterBase::commonHandleBufferData() — and count once.
+  const auto* decoding_buffer = callbacks_->decodingBuffer();
+  const uint64_t total_buffered_bytes =
+      (decoding_buffer == &data) ? data.length() : getLength(decoding_buffer) + data.length();
+  const bool would_exceed_buffer = (total_buffered_bytes > effective_buffer_limit);
 
   // Handle buffer overflow.
   if (buffering && would_exceed_buffer) {
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. "
               "Giving up on buffering.",
-              getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
+              total_buffered_bytes, effective_buffer_limit);
     cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     ENVOY_LOG(debug, "retry or redirect buffer overflow: skipping buffering");

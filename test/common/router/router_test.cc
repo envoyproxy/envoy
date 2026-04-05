@@ -5431,8 +5431,7 @@ TEST_F(RouterTest, InternalRedirectWithRequestBodyBufferOverflow) {
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
-  // We will not buffer the body data because it exceeds the buffer limit. But note the initial
-  // request is still valid.
+  // The request still proceeds upstream, but the body must not be buffered for redirect handling.
   EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, true));
 
@@ -5455,6 +5454,77 @@ TEST_F(RouterTest, InternalRedirectWithRequestBodyBufferOverflow) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/44128.
+//
+// If a preceding buffering decoder filter resumes iteration with the shared HCM request buffer,
+// `data` aliases `callbacks_->decodingBuffer()`. The router must count that body once and still
+// allow the internal redirect when it is below the limit.
+TEST_F(RouterTest, InternalRedirectNotBlockedByBufferFilterDoubleCount) {
+  enableRedirects();
+  sendRequest(false);
+
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
+
+  // Simulate a buffering filter resuming iteration with the shared request buffer.
+  Buffer::OwnedImpl body_data(std::string(60, 'x'));
+  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(&body_data));
+
+  // Without the alias check, the router would see 60 + 60 > 100 and incorrectly mark overflow.
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(100));
+
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(body_data, true));
+
+  const std::vector<Http::LowerCaseString> toCopy;
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .WillOnce(ReturnRef(toCopy));
+
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
+  // If overflow is incorrectly detected, redirect processing is skipped and recreateStream() is not
+  // called.
+  EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
+
+  router_->onDestroy();
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/44128 (retry path).
+//
+// If a preceding buffering decoder filter resumes iteration with the shared
+// request buffer on a retryable request, the router must count that body once
+// and keep retry buffering enabled.
+TEST_F(RouterTest, RetryNotAbandonedByBufferFilterDoubleCount) {
+  sendRequest(false);
+
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
+
+  // Simulate a buffering filter resuming iteration with the shared request buffer.
+  Buffer::OwnedImpl body_data(std::string(60, 'x'));
+  ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(&body_data));
+
+  // Without the alias check, the router would see 60 + 60 > 100 and incorrectly abandon retry.
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(100));
+  EXPECT_CALL(*router_->retry_state_, enabled()).WillRepeatedly(Return(true));
+
+  // Data should be buffered for potential retry use.
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(body_data, true));
+
+  // Retry should NOT have been abandoned.
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+
+  router_->onDestroy();
 }
 
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
