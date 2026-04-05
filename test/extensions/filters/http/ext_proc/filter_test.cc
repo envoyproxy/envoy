@@ -1947,30 +1947,40 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatency) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
+  last_request_.Clear();
+  Buffer::OwnedImpl req_data0("");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data0, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
+  EXPECT_FALSE(last_request_.has_request_body());
+
   const uint32_t chunk_number = 5;
-  Buffer::OwnedImpl req_data("foo");
+  Buffer::OwnedImpl req_data1("foo");
   // Latency 50 80 60 30 100.
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data1, false));
   EXPECT_TRUE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(50));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data2("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data2, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(80));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data3("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data3, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(60));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data4("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data4, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(30));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  Buffer::OwnedImpl req_data5("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data5, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(100));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());

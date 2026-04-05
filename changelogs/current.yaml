@@ -89,6 +89,9 @@ minor_behavior_changes:
 - area: ext_proc
   change: |
     Added ``received_immediate_response`` flag in the ``ExtProcLoggingInfo`` filter state.
+- area: ext_proc
+  change: |
+    Avoid sending empty data chunk with end_of_stream false to the ext_proc server.
 - area: happy_eyeballs
   change: |
     Happy Eyeballs handles interleaving of non-IP addresses. The restriction against ``additional_addresses``
