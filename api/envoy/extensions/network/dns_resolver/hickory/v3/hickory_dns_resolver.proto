@@ -16,7 +16,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/network/dns_resolver/hickory/v3;hickoryv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Hickory DNS Resolver]
+// [#protodoc-title: Hickory DNS resolver]
 // [#extension: envoy.network.dns_resolver.hickory]
 
 // Configuration for DNS-over-TLS (DoT) servers.

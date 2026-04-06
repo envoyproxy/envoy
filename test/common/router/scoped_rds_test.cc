@@ -2071,6 +2071,76 @@ key:
   EXPECT_EQ(config->name(), "foo_routes");
 }
 
+// Verify that on-demand update for a scope with inline route_configuration (no RDS provider)
+// does not crash and returns false to the callback. This guards against the case where a scope
+// exists in scope_name_by_hash_ but not in route_provider_by_scope_ because it uses an inline
+// route_configuration instead of route_configuration_name.
+TEST_F(ScopedRdsTest, OnDemandUpdateInlineScopeDoesNotCrash) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  // Initialize cluster so the inline route_configuration validation passes.
+  server_factory_context_.cluster_manager_.initializeClusters({"some_cluster"}, {});
+
+  // Create a scope with inline route_configuration (no route_configuration_name).
+  // This scope will be in scope_name_by_hash_ but NOT in route_provider_by_scope_.
+  const std::string inline_scope_resource = R"EOF(
+name: inline_scope
+route_configuration:
+  name: inline_routes
+  virtual_hosts:
+    - name: default
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/known" }
+          route: { cluster: some_cluster }
+key:
+  fragments:
+    - string_key: x-inline-key
+)EOF";
+
+  srdsUpdateWithYaml({inline_scope_resource}, "1");
+  EXPECT_EQ(1UL, all_scopes_.value());
+  // Inline scopes don't increment active_scopes_ (that counter tracks RDS-backed scopes).
+  EXPECT_EQ(0UL, active_scopes_.value());
+
+  // The inline scope's route config should be available.
+  auto route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-inline-key"}}));
+  ASSERT_THAT(route_config, Not(IsNull()));
+  EXPECT_EQ(route_config->name(), "inline_routes");
+
+  // Now simulate an on-demand update for this inline scope.
+  // Before the fix, this would crash because operator[] on route_provider_by_scope_
+  // would insert a null unique_ptr and then dereference it.
+  ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-inline-key"}});
+
+  Event::PostCb main_thread_post_cb;
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
+      .WillOnce([&main_thread_post_cb](Event::PostCb cb) { main_thread_post_cb = std::move(cb); });
+
+  bool callback_called = false;
+  bool callback_value = true; // Initialize to true to verify it gets set to false.
+  std::function<void(bool)> route_config_updated_cb = [&](bool result) {
+    callback_called = true;
+    callback_value = result;
+  };
+
+  getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
+                                            std::move(route_config_updated_cb));
+
+  // Execute the posted callback on the main thread (simulates dispatcher).
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) { cb(); });
+  main_thread_post_cb();
+
+  // The callback should have been invoked with false (no RDS provider for inline scope).
+  EXPECT_TRUE(callback_called);
+  EXPECT_FALSE(callback_value);
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

@@ -2831,6 +2831,8 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sha256PeerCertificateDigest())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():serialNumberPeerCertificate())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():issuerPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():serialNumberPeerCertificateIssuer())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sha256PeerCertificateIssuerDigest())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():subjectPeerCertificate())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():parsedSubjectPeerCertificate():commonName())
         request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():parsedSubjectPeerCertificate():organizationName(), ","))
@@ -2897,6 +2899,14 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   const std::string peer_cert_issuer = "peer-cert-issuer";
   EXPECT_CALL(*connection_info, issuerPeerCertificate()).WillOnce(ReturnRef(peer_cert_issuer));
 
+  const std::string peer_cert_issuer_serial = "peer-cert-issuer-serial";
+  EXPECT_CALL(*connection_info, serialNumberPeerCertificateIssuer())
+      .WillOnce(ReturnRef(peer_cert_issuer_serial));
+
+  const std::string peer_cert_issuer_hash = "peer-cert-issuer-hash";
+  EXPECT_CALL(*connection_info, sha256PeerCertificateIssuerDigest())
+      .WillOnce(ReturnRef(peer_cert_issuer_hash));
+
   const std::string peer_cert_subject = "peer-cert-subject";
   EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillOnce(ReturnRef(peer_cert_subject));
 
@@ -2941,6 +2951,8 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
                                  {"trace", peer_cert_digest},
                                  {"trace", peer_cert_serial_number},
                                  {"trace", peer_cert_issuer},
+                                 {"trace", peer_cert_issuer_serial},
+                                 {"trace", peer_cert_issuer_hash},
                                  {"trace", peer_cert_subject},
                                  {"trace", "Test CN"},
                                  {"trace", "Test O1,Test O2"},

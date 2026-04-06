@@ -172,6 +172,7 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
+  Http::ClientCertFormat clientCertFormat() const override { return client_cert_format_; }
   const Matcher::MatchTreePtr<Http::HttpMatchingData>& forwardClientCertMatcher() const override {
     return forward_client_cert_matcher_;
   }
@@ -289,6 +290,7 @@ public:
   Http::DefaultInternalAddressConfig internal_address_config_;
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  Http::ClientCertFormat client_cert_format_{Http::ClientCertFormat::Text};
   Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   absl::optional<std::string> user_agent_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};

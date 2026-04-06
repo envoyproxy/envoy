@@ -41,6 +41,10 @@ struct ValidationResults {
   absl::optional<uint8_t> tls_alert;
   // The detailed error messages populated during validation.
   absl::optional<std::string> error_details;
+  // The validated certificate chain built by the cert validator.
+  // chain[0] = leaf, chain[1] = direct issuer, ..., chain[n] = trust anchor.
+  // Only populated on successful validation when a trust store is configured.
+  std::vector<bssl::UniquePtr<X509>> validated_chain;
 };
 
 class CertValidator {
