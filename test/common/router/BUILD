@@ -1,13 +1,10 @@
-load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_binary",
     "envoy_cc_test_library",
-    "envoy_directory_genrule",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -240,52 +237,12 @@ envoy_proto_library(
     ],
 )
 
-# envoy_cc_test_binary is generating mostly static binary regardless of config
-envoy_cc_test_binary(
-    name = "config_impl_test_static",
-    rbe_pool = "6gig",
-    deps = [
-        ":config_impl_test_lib",
-        "//test:main",
-    ],
-)
-
-sh_binary(
-    name = "corpus_from_config_impl_sh",
-    srcs = ["corpus_from_config_impl.sh"],
-)
-
-envoy_directory_genrule(
-    name = "corpus_from_config_impl",
-    testonly = 1,
-    srcs = [
-        # This is deliberately in srcs, since we run into host/target confusion
-        # otherwise in oss-fuzz builds.
-        ":config_impl_test_static",
-    ],
-    cmd = " ".join([
-        "$(location corpus_from_config_impl_sh)",
-        "$(location //test/common/router:config_impl_test_static)",
-    ]),
-    exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {"Pool": "6gig"},
-        "//conditions:default": {},
-    }),
-    tools = [":corpus_from_config_impl_sh"],
-)
-
+# The generated entries under route_corpus/generated/ can be refreshed by
+# running corpus_from_config_impl.sh (see the script for instructions).
 filegroup(
     name = "route_corpus",
     testonly = 1,
-    srcs = select({
-        # TODO(asraa): Clean this up for cross-compilation. Right now we assume
-        # the host and target are the same on x86 builds, so we only execute the
-        # corpus generation binary on x86 platforms.
-        "//bazel:x86": [":corpus_from_config_impl"],
-        "//conditions:default": [],
-    }) + glob([
-        "route_corpus/**",
-    ]),
+    srcs = glob(["route_corpus/**"]),
 )
 
 envoy_cc_fuzz_test(
@@ -294,8 +251,6 @@ envoy_cc_fuzz_test(
     srcs = ["route_fuzz_test.cc"],
     corpus = ":route_corpus",
     rbe_pool = "6gig",
-    # The :config_impl_test_static target does not build with coverage
-    tags = ["nocoverage"],
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//source/common/router:config_lib",

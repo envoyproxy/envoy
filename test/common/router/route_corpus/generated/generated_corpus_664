@@ -1,0 +1,497 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+    require_tls: ALL
+  }
+  virtual_hosts {
+    name: "api"
+    domains: "api.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+    require_tls: EXTERNAL_ONLY
+  }
+  virtual_hosts {
+    name: "redirect"
+    domains: "redirect.lyft.com"
+    routes {
+      match {
+        path: "/host"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+      }
+    }
+    routes {
+      match {
+        path: "/path"
+      }
+      redirect {
+        path_redirect: "/new_path"
+      }
+    }
+    routes {
+      match {
+        path: "/redirect_to_path_without_slash"
+      }
+      redirect {
+        path_redirect: "new_path_without_slash"
+      }
+    }
+    routes {
+      match {
+        path: "/https"
+      }
+      redirect {
+        https_redirect: true
+      }
+    }
+    routes {
+      match {
+        path: "/host_path"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        path_redirect: "/new_path"
+      }
+    }
+    routes {
+      match {
+        path: "/host_https"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        https_redirect: true
+      }
+    }
+    routes {
+      match {
+        path: "/path_https"
+      }
+      redirect {
+        path_redirect: "/new_path"
+        https_redirect: true
+      }
+    }
+    routes {
+      match {
+        path: "/host_path_https"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        path_redirect: "/new_path"
+        https_redirect: true
+      }
+    }
+    routes {
+      match {
+        path: "/port"
+      }
+      redirect {
+        port_redirect: 8080
+      }
+    }
+    routes {
+      match {
+        path: "/host_port"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        port_redirect: 8080
+      }
+    }
+    routes {
+      match {
+        path: "/scheme_host_port"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        scheme_redirect: "ws"
+        port_redirect: 8080
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_domain_port_80"
+    domains: "redirect.lyft.com:80"
+    routes {
+      match {
+        path: "/ws"
+      }
+      redirect {
+        scheme_redirect: "ws"
+      }
+    }
+    routes {
+      match {
+        path: "/host_path_https"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        path_redirect: "/new_path"
+        https_redirect: true
+      }
+    }
+    routes {
+      match {
+        path: "/scheme_host_port"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        scheme_redirect: "ws"
+        port_redirect: 8080
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_domain_port_443"
+    domains: "redirect.lyft.com:443"
+    routes {
+      match {
+        path: "/ws"
+      }
+      redirect {
+        scheme_redirect: "ws"
+      }
+    }
+    routes {
+      match {
+        path: "/host_path_http"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        path_redirect: "/new_path"
+        scheme_redirect: "http"
+      }
+    }
+    routes {
+      match {
+        path: "/scheme_host_port"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        scheme_redirect: "ws"
+        port_redirect: 8080
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_domain_port_8080"
+    domains: "redirect.lyft.com:8080"
+    routes {
+      match {
+        path: "/port"
+      }
+      redirect {
+        port_redirect: 8181
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_ipv4"
+    domains: "10.0.0.1"
+    routes {
+      match {
+        path: "/port"
+      }
+      redirect {
+        port_redirect: 8080
+      }
+    }
+    routes {
+      match {
+        path: "/host_port"
+      }
+      redirect {
+        host_redirect: "20.0.0.2"
+        port_redirect: 8080
+      }
+    }
+    routes {
+      match {
+        path: "/scheme_host_port"
+      }
+      redirect {
+        host_redirect: "20.0.0.2"
+        scheme_redirect: "ws"
+        port_redirect: 8080
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_ipv4_port_8080"
+    domains: "10.0.0.1:8080"
+    routes {
+      match {
+        path: "/port"
+      }
+      redirect {
+        port_redirect: 8181
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_ipv4_port_80"
+    domains: "10.0.0.1:80"
+    routes {
+      match {
+        path: "/ws"
+      }
+      redirect {
+        scheme_redirect: "ws"
+      }
+    }
+    routes {
+      match {
+        path: "/host_path_https"
+      }
+      redirect {
+        host_redirect: "20.0.0.2"
+        path_redirect: "/new_path"
+        https_redirect: true
+      }
+    }
+    routes {
+      match {
+        path: "/scheme_host_port"
+      }
+      redirect {
+        host_redirect: "20.0.0.2"
+        scheme_redirect: "ws"
+        port_redirect: 8080
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_ipv4_port_443"
+    domains: "10.0.0.1:443"
+    routes {
+      match {
+        path: "/ws"
+      }
+      redirect {
+        scheme_redirect: "ws"
+      }
+    }
+    routes {
+      match {
+        path: "/host_path_http"
+      }
+      redirect {
+        host_redirect: "20.0.0.2"
+        path_redirect: "/new_path"
+        scheme_redirect: "http"
+      }
+    }
+    routes {
+      match {
+        path: "/scheme_host_port"
+      }
+      redirect {
+        host_redirect: "20.0.0.2"
+        scheme_redirect: "ws"
+        port_redirect: 8080
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_ipv6"
+    domains: "[fe80::1]"
+    routes {
+      match {
+        path: "/port"
+      }
+      redirect {
+        port_redirect: 8080
+      }
+    }
+    routes {
+      match {
+        path: "/host_port"
+      }
+      redirect {
+        host_redirect: "[fe80::2]"
+        port_redirect: 8080
+      }
+    }
+    routes {
+      match {
+        path: "/scheme_host_port"
+      }
+      redirect {
+        host_redirect: "[fe80::2]"
+        scheme_redirect: "ws"
+        port_redirect: 8080
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_ipv6_port_8080"
+    domains: "[fe80::1]:8080"
+    routes {
+      match {
+        path: "/port"
+      }
+      redirect {
+        port_redirect: 8181
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_ipv6_port_80"
+    domains: "[fe80::1]:80"
+    routes {
+      match {
+        path: "/ws"
+      }
+      redirect {
+        scheme_redirect: "ws"
+      }
+    }
+    routes {
+      match {
+        path: "/host_path_https"
+      }
+      redirect {
+        host_redirect: "[fe80::2]"
+        path_redirect: "/new_path"
+        https_redirect: true
+      }
+    }
+    routes {
+      match {
+        path: "/scheme_host_port"
+      }
+      redirect {
+        host_redirect: "[fe80::2]"
+        scheme_redirect: "ws"
+        port_redirect: 8080
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect_ipv6_port_443"
+    domains: "[fe80::1]:443"
+    routes {
+      match {
+        path: "/ws"
+      }
+      redirect {
+        scheme_redirect: "ws"
+      }
+    }
+    routes {
+      match {
+        path: "/host_path_http"
+      }
+      redirect {
+        host_redirect: "[fe80::2]"
+        path_redirect: "/new_path"
+        scheme_redirect: "http"
+      }
+    }
+    routes {
+      match {
+        path: "/scheme_host_port"
+      }
+      redirect {
+        host_redirect: "[fe80::2]"
+        scheme_redirect: "ws"
+        port_redirect: 8080
+      }
+    }
+  }
+  virtual_hosts {
+    name: "direct"
+    domains: "direct.example.com"
+    routes {
+      match {
+        prefix: "/gone"
+      }
+      direct_response {
+        status: 410
+        body {
+          inline_bytes: "Example text 1"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/error"
+      }
+      direct_response {
+        status: 500
+        body {
+          inline_string: "Example text 2"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/no_body"
+      }
+      direct_response {
+        status: 200
+      }
+    }
+    routes {
+      match {
+        prefix: "/static"
+      }
+      direct_response {
+        status: 200
+        body {
+          filename: "/tmp/envoy_test_tmp.UvJQiV/direct_response_body"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+  }
+  max_direct_response_body_size_bytes {
+    value: 1024
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "[fe80::1]"
+  }
+  headers {
+    key: ":path"
+    value: "/scheme_host_port"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+  headers {
+    key: "x-envoy-internal"
+    value: "false"
+  }
+}

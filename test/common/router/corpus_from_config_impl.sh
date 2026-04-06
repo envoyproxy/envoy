@@ -1,18 +1,32 @@
-#!/bin/sh
+#!/bin/bash
 
-# Helper shell script for :corpus_from_config_impl genrule in BUILD.
-
-# Set NORUNFILES so test/main doesn't fail when runfiles manifest is not found.
-SHARDS=5
-for INDEX in $(seq 0 $((SHARDS-1))) ; do
-  if ! TEXT=$(NORUNFILES=1 GTEST_TOTAL_SHARDS=$SHARDS GTEST_SHARD_INDEX=$INDEX "$@" 2>&1); then
-    echo "$TEXT"
-    echo "Router test failed to pass: debug logs above"
-    exit 1
-  fi
-done
+# Regenerates the fuzz corpus entries in route_corpus/generated/ from the
+# config_impl_test unit tests.
+#
+# Usage:
+#   bazel build -c fastbuild //test/common/router:config_impl_test
+#   ./test/common/router/corpus_from_config_impl.sh
 
 set -e
 
-# Verify at least one entry is actually generated
-[ -e "${GENRULE_OUTPUT_DIR}"/generated_corpus_0 ]
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+OUTPUT_DIR="${SCRIPT_DIR}/route_corpus/generated"
+TEST_BINARY="${SCRIPT_DIR}/../../../../bazel-bin/test/common/router/config_impl_test"
+
+if [ ! -x "$TEST_BINARY" ]; then
+  echo "Error: test binary not found at $TEST_BINARY"
+  echo "Build it first: bazel build -c fastbuild //test/common/router:config_impl_test"
+  exit 1
+fi
+
+rm -rf "$OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
+
+if ! TEXT=$(NORUNFILES=1 GENRULE_OUTPUT_DIR="$OUTPUT_DIR" "$TEST_BINARY" 2>&1); then
+  echo "$TEXT"
+  echo "Router test failed to pass: debug logs above"
+  exit 1
+fi
+
+COUNT=$(find "$OUTPUT_DIR" -maxdepth 1 -type f | wc -l)
+echo "Generated $COUNT corpus entries in $OUTPUT_DIR"

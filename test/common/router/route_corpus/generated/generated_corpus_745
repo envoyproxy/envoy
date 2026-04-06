@@ -1,0 +1,78 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        weighted_clusters {
+          clusters {
+            weight {
+              value: 50
+            }
+            request_headers_to_add {
+              header {
+                key: "x-req-cluster"
+                value: "cluster-adding-this-value"
+              }
+            }
+            response_headers_to_add {
+              header {
+                key: "x-resp-cluster"
+                value: "cluster-adding-this-value"
+              }
+            }
+            response_headers_to_remove: "x-header-to-remove-cluster"
+            host_rewrite_literal: "new_host1"
+            cluster_header: "x-route-to-this-cluster"
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+  headers {
+    key: "x-route-to-this-cluster"
+    value: "cluster1"
+  }
+}

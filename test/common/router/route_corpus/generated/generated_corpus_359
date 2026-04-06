@@ -1,0 +1,55 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "whatever"
+      }
+    }
+    include_request_attempt_count: true
+    include_attempt_count_in_response: true
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

@@ -1,0 +1,80 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/foo"
+      }
+      route {
+        cluster: "www2"
+        request_mirror_policies {
+          cluster: "some_cluster"
+          request_headers_mutations {
+            append {
+              header {
+                key: "x-mirror-test"
+                value: "mirror-value"
+              }
+              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+            }
+          }
+          request_headers_mutations {
+            append {
+              header {
+                key: "x-mirror-dynamic"
+                value: "%REQ(:path)%"
+              }
+              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+            }
+          }
+          request_headers_mutations {
+            remove: "x-sensitive-header"
+          }
+          request_headers_mutations {
+            remove: "x-internal-header"
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

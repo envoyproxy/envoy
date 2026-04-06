@@ -1,0 +1,99 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "redirect"
+    domains: "redirect.lyft.com"
+    routes {
+      match {
+        prefix: "/query/true"
+      }
+      redirect {
+        prefix_rewrite: "/new/prefix"
+        strip_query: true
+      }
+    }
+    routes {
+      match {
+        prefix: "/query/false"
+      }
+      redirect {
+        prefix_rewrite: "/new/prefix"
+      }
+    }
+    routes {
+      match {
+        path: "/host/query-default"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+      }
+    }
+    routes {
+      match {
+        path: "/path/redirect/"
+      }
+      redirect {
+        path_redirect: "/new/path-redirect/"
+      }
+    }
+    routes {
+      match {
+        path: "/path/redirect/strip-query/true"
+      }
+      redirect {
+        path_redirect: "/new/path-redirect/"
+        strip_query: true
+      }
+    }
+    routes {
+      match {
+        path: "/path/redirect/query"
+      }
+      redirect {
+        path_redirect: "/new/path-redirect?foo=1"
+      }
+    }
+    routes {
+      match {
+        path: "/path/redirect/query-with-strip"
+      }
+      redirect {
+        path_redirect: "/new/path-redirect?foo=2"
+        strip_query: true
+      }
+    }
+    routes {
+      match {
+        prefix: "/all/combinations"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        https_redirect: true
+        prefix_rewrite: "/new/prefix"
+        strip_query: true
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.foo.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":scheme"
+    value: "https"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "https"
+  }
+  headers {
+    key: "x-envoy-internal"
+    value: "true"
+  }
+}

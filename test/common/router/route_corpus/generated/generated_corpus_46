@@ -1,0 +1,536 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "lyft.com"
+    domains: "www.lyft.com"
+    domains: "w.lyft.com"
+    domains: "ww.lyft.com"
+    domains: "wwww.lyft.com"
+    routes {
+      match {
+        prefix: "/new_endpoint"
+      }
+      route {
+        cluster: "www2"
+        prefix_rewrite: "/api/new_endpoint"
+      }
+    }
+    routes {
+      match {
+        prefix: "/newforreg1_endpoint"
+      }
+      route {
+        cluster: "www2"
+        regex_rewrite {
+          pattern {
+            regex: "^/new(.*?)_endpoint(.*)$"
+          }
+          substitution: "/\\1_rewritten_endpoint\\2"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/newforreg2_endpoint"
+      }
+      route {
+        cluster: "www2"
+        regex_rewrite {
+          pattern {
+            regex: "e"
+          }
+          substitution: "X"
+        }
+      }
+    }
+    routes {
+      match {
+        path: "/exact/path/for/regex1"
+        case_sensitive {
+          value: true
+        }
+      }
+      route {
+        cluster: "www2"
+        regex_rewrite {
+          pattern {
+            regex: "[aeioe]"
+          }
+          substitution: "V"
+        }
+      }
+    }
+    routes {
+      match {
+        path: "/exact/path/for/formatter"
+        case_sensitive {
+          value: true
+        }
+      }
+      route {
+        cluster: "www2"
+        path_rewrite: "%PATH(NQ:PATH)%/something"
+      }
+    }
+    routes {
+      match {
+        path: "/"
+      }
+      route {
+        cluster: "root_www2"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "www2_staging"
+    domains: "www-staging.lyft.net"
+    domains: "www-staging-orca.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2_staging"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "wildcard"
+    domains: "*.foo.com"
+    domains: "*-bar.baz.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "wildcard"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "wildcard2"
+    domains: "*.baz.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "wildcard2"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "regex"
+    domains: "bat.com"
+    routes {
+      match {
+        safe_regex {
+          regex: "/t[io]c"
+        }
+      }
+      route {
+        cluster: "clock"
+      }
+    }
+    routes {
+      match {
+        safe_regex {
+          regex: "/baa+"
+        }
+      }
+      route {
+        cluster: "sheep"
+      }
+    }
+    routes {
+      match {
+        safe_regex {
+          regex: ".*/\\d{3}$"
+        }
+      }
+      route {
+        cluster: "three_numbers"
+        prefix_rewrite: "/rewrote"
+      }
+    }
+    routes {
+      match {
+        safe_regex {
+          regex: ".*/\\d{4}$"
+        }
+      }
+      route {
+        cluster: "four_numbers"
+        regex_rewrite {
+          pattern {
+            regex: "(^.*)/(\\d{4})$"
+          }
+          substitution: "/four/\\2/endpoint\\1"
+        }
+      }
+    }
+    routes {
+      match {
+        safe_regex {
+          regex: ".*"
+        }
+      }
+      route {
+        cluster: "regex_default"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "regex2"
+    domains: "bat2.com"
+    routes {
+      match {
+        safe_regex {
+          regex: ".*"
+        }
+      }
+      route {
+        cluster: "regex_default"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "default"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/api/application_data"
+      }
+      route {
+        cluster: "ats"
+      }
+    }
+    routes {
+      match {
+        path: "/api/locations"
+        case_sensitive {
+        }
+      }
+      route {
+        cluster: "locations"
+        prefix_rewrite: "/rewrote"
+      }
+    }
+    routes {
+      match {
+        prefix: "/api/leads/me"
+      }
+      route {
+        cluster: "ats"
+      }
+    }
+    routes {
+      match {
+        prefix: "/host/rewrite/me"
+      }
+      route {
+        cluster: "ats"
+        host_rewrite_literal: "new_host"
+      }
+    }
+    routes {
+      match {
+        prefix: "/oldhost/rewrite/me"
+      }
+      route {
+        cluster: "ats"
+        host_rewrite_literal: "new_oldhost"
+      }
+    }
+    routes {
+      match {
+        path: "/foo"
+        case_sensitive {
+          value: true
+        }
+      }
+      route {
+        cluster: "instant-server"
+        prefix_rewrite: "/bar"
+      }
+    }
+    routes {
+      match {
+        path: "/tar"
+        case_sensitive {
+        }
+      }
+      route {
+        cluster: "instant-server"
+        prefix_rewrite: "/car"
+      }
+    }
+    routes {
+      match {
+        prefix: "/newhost/rewrite/me"
+        case_sensitive {
+        }
+      }
+      route {
+        cluster: "ats"
+        host_rewrite_literal: "new_host"
+      }
+    }
+    routes {
+      match {
+        path: "/FOOD"
+        case_sensitive {
+        }
+      }
+      route {
+        cluster: "ats"
+        prefix_rewrite: "/cAndy"
+      }
+    }
+    routes {
+      match {
+        path: "/ApplEs"
+        case_sensitive {
+          value: true
+        }
+      }
+      route {
+        cluster: "instant-server"
+        prefix_rewrite: "/oranGES"
+      }
+    }
+    routes {
+      match {
+        path: "/rewrite-host-with-header-value"
+      }
+      route {
+        cluster: "ats"
+        host_rewrite_header: "x-rewrite-host"
+        append_x_forwarded_host: true
+      }
+      request_headers_to_add {
+        header {
+          key: "x-rewrite-host"
+          value: "rewrote"
+        }
+      }
+    }
+    routes {
+      match {
+        path: "/do-not-rewrite-host-with-header-value"
+      }
+      route {
+        cluster: "ats"
+        host_rewrite_header: "x-rewrite-host"
+        append_x_forwarded_host: true
+      }
+    }
+    routes {
+      match {
+        path: "/rewrite-host-with-path-regex/envoyproxy.io"
+      }
+      route {
+        cluster: "ats"
+        host_rewrite_path_regex {
+          pattern {
+            regex: "^/.+/(.+)$"
+          }
+          substitution: "\\1"
+        }
+        append_x_forwarded_host: true
+      }
+    }
+    routes {
+      match {
+        path: "/rewrite-host-with-formatter/envoyproxy.io"
+      }
+      route {
+        cluster: "ats"
+        append_x_forwarded_host: true
+        host_rewrite: "%REQ(host-from-header):8%"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        filter_state {
+          key: "envoy.address"
+          address_match {
+            ranges {
+              address_prefix: "10.0.0.0"
+              prefix_len {
+                value: 8
+              }
+            }
+          }
+        }
+      }
+      route {
+        cluster: "filter_state_cluster"
+        timeout {
+          seconds: 30
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "instant-server"
+        timeout {
+          seconds: 30
+        }
+      }
+    }
+    virtual_clusters {
+      name: "ride_request"
+      headers {
+        name: ":path"
+        string_match {
+          safe_regex {
+            regex: "^/rides$"
+          }
+        }
+      }
+      headers {
+        name: ":method"
+        string_match {
+          exact: "POST"
+        }
+      }
+    }
+    virtual_clusters {
+      name: "update_ride"
+      headers {
+        name: ":path"
+        string_match {
+          safe_regex {
+            regex: "^/rides/\\d+$"
+          }
+        }
+      }
+      headers {
+        name: ":method"
+        string_match {
+          exact: "PUT"
+        }
+      }
+    }
+    virtual_clusters {
+      name: "cc_add"
+      headers {
+        name: ":path"
+        string_match {
+          safe_regex {
+            regex: "^/users/\\d+/chargeaccounts$"
+          }
+        }
+      }
+      headers {
+        name: ":method"
+        string_match {
+          exact: "POST"
+        }
+      }
+    }
+    virtual_clusters {
+      name: "create_user_login"
+      headers {
+        name: ":path"
+        string_match {
+          safe_regex {
+            regex: "^/users$"
+          }
+        }
+      }
+      headers {
+        name: ":method"
+        string_match {
+          exact: "POST"
+        }
+      }
+    }
+    virtual_clusters {
+      name: "update_user"
+      headers {
+        name: ":path"
+        string_match {
+          safe_regex {
+            regex: "^/users/\\d+$"
+          }
+        }
+      }
+      headers {
+        name: ":method"
+        string_match {
+          exact: "PUT"
+        }
+      }
+    }
+    virtual_clusters {
+      name: "ulu"
+      headers {
+        name: ":path"
+        string_match {
+          safe_regex {
+            regex: "^/users/\\d+/location$"
+          }
+        }
+      }
+      headers {
+        name: ":method"
+        string_match {
+          exact: "POST"
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "foo-bar.baz.com"
+  }
+  headers {
+    key: ":path"
+    value: "/"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

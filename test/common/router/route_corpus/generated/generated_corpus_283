@@ -1,0 +1,109 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "local_service"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/"
+        query_parameters {
+          name: "id"
+          string_match {
+            safe_regex {
+              regex: "\\d+[02468]"
+            }
+          }
+        }
+        query_parameters {
+          name: "debug"
+        }
+      }
+      route {
+        cluster: "local_service_with_multiple_query_parameters"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        query_parameters {
+          name: "debug"
+        }
+      }
+      route {
+        cluster: "local_service_with_valueless_query_parameter"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        query_parameters {
+          name: "debug2"
+          present_match: true
+        }
+      }
+      route {
+        cluster: "local_service_with_present_match_query_parameter"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        query_parameters {
+          name: "debug3"
+          string_match {
+            exact: "foo"
+          }
+        }
+      }
+      route {
+        cluster: "local_service_with_string_match_query_parameter"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "local_service_without_query_parameters"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "example.com"
+  }
+  headers {
+    key: ":path"
+    value: "/?param=testing"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

@@ -1,0 +1,101 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/foo"
+      }
+      route {
+        cluster: "www2"
+        request_mirror_policies {
+          cluster: "some_cluster"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/bar"
+      }
+      route {
+        cluster: "www2"
+        request_mirror_policies {
+          cluster: "some_cluster2"
+          runtime_fraction {
+            default_value {
+              numerator: 20
+            }
+            runtime_key: "foo"
+          }
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/baz"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+    routes {
+      match {
+        prefix: "/boz"
+      }
+      route {
+        cluster: "www2"
+        request_mirror_policies {
+          cluster: "some_cluster"
+        }
+        request_mirror_policies {
+          cluster: "some_cluster2"
+          runtime_fraction {
+            default_value {
+              numerator: 20
+            }
+            runtime_key: "foo"
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

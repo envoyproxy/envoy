@@ -1,0 +1,171 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "lyft.com"
+    domains: "www.lyft.com"
+    domains: "w.lyft.com"
+    domains: "ww.lyft.com"
+    domains: "wwww.lyft.com"
+    routes {
+      match {
+        prefix: "/new_endpoint"
+      }
+      route {
+        cluster: "www2"
+        prefix_rewrite: "/api/new_endpoint"
+      }
+      request_headers_to_add {
+        header {
+          key: "x-global-header1"
+          value: "route-override"
+        }
+      }
+      request_headers_to_add {
+        header {
+          key: "x-vhost-header1"
+          value: "route-override"
+        }
+      }
+      request_headers_to_add {
+        header {
+          key: "x-route-header"
+          value: "route-new_endpoint"
+        }
+      }
+      request_headers_to_remove: "x-header-to-remove-at-route-level-1"
+    }
+    routes {
+      match {
+        path: "/"
+      }
+      route {
+        cluster: "root_www2"
+      }
+      request_headers_to_add {
+        header {
+          key: "x-route-header"
+          value: "route-allpath"
+        }
+      }
+      request_headers_to_remove: "x-header-to-remove-at-route-level-2"
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+    request_headers_to_add {
+      header {
+        key: "x-global-header1"
+        value: "vhost-override"
+      }
+    }
+    request_headers_to_add {
+      header {
+        key: "x-vhost-header1"
+        value: "vhost1-www2"
+      }
+    }
+    request_headers_to_remove: "x-header-to-remove-at-vhost-level-1"
+  }
+  virtual_hosts {
+    name: "www2_staging"
+    domains: "www-staging.lyft.net"
+    domains: "www-staging-orca.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2_staging"
+      }
+      request_headers_to_add {
+        header {
+          key: "x-route-header"
+          value: "route-allprefix"
+        }
+      }
+      request_headers_to_remove: "x-header-to-remove-at-route-level-3"
+    }
+    request_headers_to_add {
+      header {
+        key: "x-vhost-header1"
+        value: "vhost1-www2_staging"
+      }
+    }
+    request_headers_to_remove: "x-header-to-remove-at-vhost-level-2"
+  }
+  virtual_hosts {
+    name: "default"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "instant-server"
+        timeout {
+          seconds: 3
+        }
+      }
+    }
+  }
+  internal_only_headers: "x-lyft-user-id"
+  response_headers_to_add {
+    header {
+      key: "x-envoy-upstream-canary"
+      value: "true"
+    }
+  }
+  response_headers_to_remove: "x-envoy-upstream-canary"
+  response_headers_to_remove: "x-envoy-virtual-cluster"
+  request_headers_to_add {
+    header {
+      key: "x-global-header1"
+      value: "global1"
+    }
+  }
+  request_headers_to_remove: "x-header-to-remove-at-global-level"
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/new_endpoint/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

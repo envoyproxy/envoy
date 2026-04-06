@@ -1,0 +1,106 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "local_service"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/foo"
+      }
+      route {
+        cluster_specifier_plugin: "test2"
+      }
+    }
+    routes {
+      match {
+        prefix: "/bar"
+      }
+      route {
+        cluster_specifier_plugin: "test3"
+      }
+    }
+  }
+  cluster_specifier_plugins {
+    extension {
+      name: "test1"
+      typed_config {
+        [type.googleapis.com/google.protobuf.Struct] {
+          fields {
+            key: "a"
+            value {
+              string_value: "test1"
+            }
+          }
+        }
+      }
+    }
+  }
+  cluster_specifier_plugins {
+    extension {
+      name: "test2"
+      typed_config {
+        [type.googleapis.com/google.protobuf.Struct] {
+          fields {
+            key: "a"
+            value {
+              string_value: "test2"
+            }
+          }
+        }
+      }
+    }
+  }
+  cluster_specifier_plugins {
+    extension {
+      name: "test3"
+      typed_config {
+        [type.googleapis.com/google.protobuf.Struct] {
+          fields {
+            key: "a"
+            value {
+              string_value: "test3"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "some_cluster"
+  }
+  headers {
+    key: ":path"
+    value: "/bar"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

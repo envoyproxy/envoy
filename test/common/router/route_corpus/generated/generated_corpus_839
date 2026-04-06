@@ -1,0 +1,82 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "path_prefix"
+    domains: "*"
+    routes {
+      match {
+        path_separated_prefix: "/rest/API"
+      }
+      route {
+        cluster: "case-sensitive"
+      }
+    }
+    routes {
+      match {
+        case_sensitive {
+          value: true
+        }
+        path_separated_prefix: "/REST/api"
+      }
+      route {
+        cluster: "case-sensitive-explicit"
+      }
+    }
+    routes {
+      match {
+        case_sensitive {
+        }
+        path_separated_prefix: "/rest/api"
+      }
+      route {
+        cluster: "case-insensitive"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "default"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "path.prefix.com"
+  }
+  headers {
+    key: ":path"
+    value: "/rest/API"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

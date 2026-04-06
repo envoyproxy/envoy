@@ -1,0 +1,102 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "test"
+    domains: "www.example.com"
+    routes {
+      match {
+        prefix: "/"
+        dynamic_metadata {
+          filter: "example"
+          path {
+            key: "k1"
+          }
+          value {
+            string_match {
+              exact: "foo"
+            }
+          }
+        }
+      }
+      route {
+        cluster: "foo"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        dynamic_metadata {
+          filter: "example"
+          path {
+            key: "k2"
+          }
+          value {
+            string_match {
+              exact: "bar"
+            }
+          }
+        }
+        dynamic_metadata {
+          filter: "example"
+          path {
+            key: "k3"
+          }
+          value {
+            string_match {
+              exact: "bar"
+            }
+          }
+        }
+      }
+      route {
+        cluster: "bar"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "default"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.example.com"
+  }
+  headers {
+    key: ":path"
+    value: "/"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

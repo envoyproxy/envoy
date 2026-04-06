@@ -1,0 +1,26 @@
+goo.gle/debugproto    
+config {
+  virtual_hosts {
+    name: "www"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www"
+      }
+    }
+    require_tls: ALL
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/"
+  }
+}
