@@ -22,7 +22,7 @@ convertProtoToScopeStatsLimitSettings(const envoy::type::v3::ScopeConfig& config
   limits.max_counters = config.max_counters();
   limits.max_gauges = config.max_gauges();
   limits.max_histograms = config.max_histograms();
-  return {limits, config.evictable()};
+  return {limits, config.enable_eviction()};
 }
 
 } // namespace
