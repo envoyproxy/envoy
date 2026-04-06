@@ -649,7 +649,7 @@ private:
  */
 template <class StatType>
 uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
-                        const std::vector<Stats::RefcountPtr<StatType>>& metrics,
+                        const std::vector<StatType*>& metrics,
                         const PrometheusStatsFormatter::OutputFormat& output_format,
                         const Stats::CustomStatNamespaces& custom_namespaces) {
 
@@ -691,7 +691,7 @@ uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
     if (!params.shouldShowMetric(*metric)) {
       continue;
     }
-    groups[metric->tagExtractedStatName()].push_back(metric.get());
+    groups[metric->tagExtractedStatName()].push_back(metric);
   }
 
   auto result = groups.size();
@@ -880,10 +880,9 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
 }
 
 uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
-    const std::vector<Stats::CounterSharedPtr>& counters,
-    const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+    const std::vector<Stats::Counter*>& counters, const std::vector<Stats::Gauge*>& gauges,
+    const std::vector<Stats::ParentHistogram*>& histograms,
+    const std::vector<Stats::TextReadout*>& text_readouts,
     const Upstream::ClusterManager& cluster_manager, Buffer::Instance& response,
     const StatsParams& params, const Stats::CustomStatNamespaces& custom_namespaces,
     OutputFormat& output_format) {
@@ -947,10 +946,9 @@ uint64_t PrometheusStatsFormatter::generateWithOutputFormat(
 }
 
 uint64_t PrometheusStatsFormatter::statsAsPrometheusText(
-    const std::vector<Stats::CounterSharedPtr>& counters,
-    const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+    const std::vector<Stats::Counter*>& counters, const std::vector<Stats::Gauge*>& gauges,
+    const std::vector<Stats::ParentHistogram*>& histograms,
+    const std::vector<Stats::TextReadout*>& text_readouts,
     const Upstream::ClusterManager& cluster_manager, Buffer::Instance& response,
     const StatsParams& params, const Stats::CustomStatNamespaces& custom_namespaces) {
 
@@ -960,10 +958,9 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheusText(
 }
 
 uint64_t PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-    const std::vector<Stats::CounterSharedPtr>& counters,
-    const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+    const std::vector<Stats::Counter*>& counters, const std::vector<Stats::Gauge*>& gauges,
+    const std::vector<Stats::ParentHistogram*>& histograms,
+    const std::vector<Stats::TextReadout*>& text_readouts,
     const Upstream::ClusterManager& cluster_manager, Http::ResponseHeaderMap& response_headers,
     Buffer::Instance& response, const StatsParams& params,
     const Stats::CustomStatNamespaces& custom_namespaces) {
@@ -978,10 +975,9 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheusProtobuf(
 }
 
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(
-    const std::vector<Stats::CounterSharedPtr>& counters,
-    const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+    const std::vector<Stats::Counter*>& counters, const std::vector<Stats::Gauge*>& gauges,
+    const std::vector<Stats::ParentHistogram*>& histograms,
+    const std::vector<Stats::TextReadout*>& text_readouts,
     const Upstream::ClusterManager& cluster_manager, const Http::RequestHeaderMap& request_headers,
     Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
     const StatsParams& params, const Stats::CustomStatNamespaces& custom_namespaces) {

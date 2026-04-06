@@ -52,7 +52,7 @@ public:
                                                          origin_, cache_, overload_manager_)) {}
 
   ~MixedConnPoolImplTest() override {
-    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
+    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_));
   }
 
   Upstream::ClusterConnectivityState state_;

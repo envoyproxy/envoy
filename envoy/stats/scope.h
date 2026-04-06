@@ -41,6 +41,7 @@ struct ScopeStatsLimitSettings {
 };
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
+template <class StatType> using IterateRefFn = std::function<bool(StatType&)>;
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on
@@ -252,13 +253,26 @@ public:
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 
+  ABSL_DEPRECATED("use iterateRef instead") bool iterate(const IterateFn<Counter>& fn) const {
+    return iterateRef([fn](Counter& counter) -> bool { return fn(CounterSharedPtr(&counter)); });
+  }
+  ABSL_DEPRECATED("use iterateRef instead") bool iterate(const IterateFn<Gauge>& fn) const {
+    return iterateRef([fn](Gauge& gauge) -> bool { return fn(GaugeSharedPtr(&gauge)); });
+  }
+  ABSL_DEPRECATED("use iterateRef instead") bool iterate(const IterateFn<TextReadout>& fn) const {
+    return iterateRef([fn](TextReadout& text_readout) -> bool { return fn(TextReadoutSharedPtr(&text_readout)); });
+  }
+  ABSL_DEPRECATED("use iterateRef instead") bool iterate(const IterateFn<Histogram>& fn) const {
+    return iterateRef([fn](Histogram& histogram) -> bool { return fn(HistogramSharedPtr(&histogram)); });
+  }
+
   /**
    * Calls 'fn' for every counter. Iteration stops if `fn` returns false;
    *
    * @param fn Function to be run for every counter, or until fn return false.
    * @return false if fn(counter) return false during iteration, true if every counter was hit.
    */
-  virtual bool iterate(const IterateFn<Counter>& fn) const PURE;
+  virtual bool iterateRef(const IterateRefFn<Counter>& fn) const PURE;
 
   /**
    * Calls 'fn' for every gauge. Iteration stops if `fn` returns false;
@@ -266,7 +280,7 @@ public:
    * @param fn Function to be run for every gauge, or until fn return false.
    * @return false if fn(gauge) return false during iteration, true if every gauge was hit.
    */
-  virtual bool iterate(const IterateFn<Gauge>& fn) const PURE;
+  virtual bool iterateRef(const IterateRefFn<Gauge>& fn) const PURE;
 
   /**
    * Calls 'fn' for every histogram. Iteration stops if `fn` returns false;
@@ -274,7 +288,7 @@ public:
    * @param fn Function to be run for every histogram, or until fn return false.
    * @return false if fn(histogram) return false during iteration, true if every histogram was hit.
    */
-  virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
+  virtual bool iterateRef(const IterateRefFn<Histogram>& fn) const PURE;
 
   /**
    * Calls 'fn' for every text readout. Note that in the case of overlapping
@@ -285,7 +299,7 @@ public:
    * @return false if fn(text_readout) return false during iteration, true if every text readout
    *         was hit.
    */
-  virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
+  virtual bool iterateRef(const IterateRefFn<TextReadout>& fn) const PURE;
 
   /**
    * @return the aggregated prefix for this scope. A trailing dot is not

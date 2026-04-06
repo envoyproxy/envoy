@@ -157,13 +157,13 @@ public:
   }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
-  bool iterate(const IterateFn<Counter>& fn) const override { return wrapped_scope_->iterate(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return wrapped_scope_->iterate(fn); }
-  bool iterate(const IterateFn<Histogram>& fn) const override {
-    return wrapped_scope_->iterate(fn);
+  bool iterateRef(const IterateRefFn<Counter>& fn) const override { return wrapped_scope_->iterateRef(fn); }
+  bool iterateRef(const IterateRefFn<Gauge>& fn) const override { return wrapped_scope_->iterateRef(fn); }
+  bool iterateRef(const IterateRefFn<Histogram>& fn) const override {
+    return wrapped_scope_->iterateRef(fn);
   }
-  bool iterate(const IterateFn<TextReadout>& fn) const override {
-    return wrapped_scope_->iterate(fn);
+  bool iterateRef(const IterateRefFn<TextReadout>& fn) const override {
+    return wrapped_scope_->iterateRef(fn);
   }
   StatName prefix() const override { return wrapped_scope_->prefix(); }
   Store& store() override { return store_; }
@@ -362,11 +362,14 @@ public:
     return store_.textReadouts();
   }
 
-  bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
+  bool iterateRef(const IterateRefFn<Counter>& fn) const override { return store_.iterateRef(fn); }
+  bool iterateRef(const IterateRefFn<Gauge>& fn) const override { return store_.iterateRef(fn); }
+  bool iterateRef(const IterateRefFn<Histogram>& fn) const override { return store_.iterateRef(fn); }
+  bool iterateRef(const IterateRefFn<TextReadout>& fn) const override { return store_.iterateRef(fn); }
+  /*bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }
-  bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
-
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }*/
   void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {};
   void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {};
   const Stats::TagVector& fixedTags() override { CONSTRUCT_ON_FIRST_USE(Stats::TagVector); }
@@ -524,28 +527,20 @@ public:
         statStore(), name, sample_count, time_system_, server().dispatcher(), timeout));
   }
 
-  Stats::CounterSharedPtr counter(const std::string& name) override {
+  OptRef<Stats::Counter> counter(const std::string& name) override {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
-    return TestUtility::findCounter(statStore(), name);
+    return TestUtility::findCounterMainThread(statStore(), name);
   }
 
-  Stats::GaugeSharedPtr gauge(const std::string& name) override {
+  OptRef<Stats::Gauge> gauge(const std::string& name) override {
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
-    return TestUtility::findGauge(statStore(), name);
+    return TestUtility::findGaugeMainThread(statStore(), name);
   }
 
-  Stats::ParentHistogramSharedPtr histogram(const std::string& name) {
-    return TestUtility::findHistogram(statStore(), name);
-  }
-
-  std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
-
-  std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
-
-  std::vector<Stats::ParentHistogramSharedPtr> histograms() override {
-    return statStore().histograms();
+  OptRef<Stats::ParentHistogram> histogram(const std::string& name) {
+    return TestUtility::findHistogramMainThread(statStore(), name);
   }
 
   // ListenerHooks

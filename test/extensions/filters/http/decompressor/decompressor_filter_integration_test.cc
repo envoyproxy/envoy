@@ -342,9 +342,9 @@ TEST_P(DecompressorIntegrationTest, DecompressAndBuffer) {
   EXPECT_TRUE(response->complete());
 
   Stats::Store& stats = test_server_->server().stats();
-  Stats::CounterSharedPtr counter = TestUtility::findCounter(
+  OptRef<Stats::Counter> counter = TestUtility::findCounterMainThread(
       stats, "http.config_test.decompressor.gzip_default.gzip.request.decompressed");
-  ASSERT_NE(nullptr, counter);
+  ASSERT_TRUE(counter.has_value());
   EXPECT_EQ(1L, counter->value());
 }
 

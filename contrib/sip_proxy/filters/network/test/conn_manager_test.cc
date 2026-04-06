@@ -57,9 +57,7 @@ public:
     // Destroy any existing filter first.
     filter_ = nullptr;
 
-    for (const auto& counter : store_.counters()) {
-      counter->reset();
-    }
+    store_.forEachCounter(nullptr, [](Stats::Counter& counter) { counter.reset(); });
 
     if (yaml.empty()) {
       proto_config_.set_stat_prefix("test");

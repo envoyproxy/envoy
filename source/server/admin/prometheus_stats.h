@@ -74,44 +74,41 @@ public:
    * Detects based on request headers whether to emit text or protobuf format.
    * @return uint64_t total number of metric types inserted in response.
    */
-  static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
-                                    const std::vector<Stats::GaugeSharedPtr>& gauges,
-                                    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                                    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+  static uint64_t statsAsPrometheus(const std::vector<Stats::Counter*>& counters,
+                                    const std::vector<Stats::Gauge*>& gauges,
+                                    const std::vector<Stats::ParentHistogram*>& histograms,
+                                    const std::vector<Stats::TextReadout*>& text_readouts,
                                     const Upstream::ClusterManager& cluster_manager,
                                     const Http::RequestHeaderMap& request_headers,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, const StatsParams& params,
                                     const Stats::CustomStatNamespaces& custom_namespaces);
 
-  static uint64_t
-  statsAsPrometheusText(const std::vector<Stats::CounterSharedPtr>& counters,
-                        const std::vector<Stats::GaugeSharedPtr>& gauges,
-                        const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                        const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
-                        const Upstream::ClusterManager& cluster_manager, Buffer::Instance& response,
-                        const StatsParams& params,
-                        const Stats::CustomStatNamespaces& custom_namespaces);
+  static uint64_t statsAsPrometheusText(const std::vector<Stats::Counter*>& counters,
+                                        const std::vector<Stats::Gauge*>& gauges,
+                                        const std::vector<Stats::ParentHistogram*>& histograms,
+                                        const std::vector<Stats::TextReadout*>& text_readouts,
+                                        const Upstream::ClusterManager& cluster_manager,
+                                        Buffer::Instance& response, const StatsParams& params,
+                                        const Stats::CustomStatNamespaces& custom_namespaces);
 
-  static uint64_t
-  statsAsPrometheusProtobuf(const std::vector<Stats::CounterSharedPtr>& counters,
-                            const std::vector<Stats::GaugeSharedPtr>& gauges,
-                            const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                            const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
-                            const Upstream::ClusterManager& cluster_manager,
-                            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                            const StatsParams& params,
-                            const Stats::CustomStatNamespaces& custom_namespaces);
+  static uint64_t statsAsPrometheusProtobuf(const std::vector<Stats::Counter*>& counters,
+                                            const std::vector<Stats::Gauge*>& gauges,
+                                            const std::vector<Stats::ParentHistogram*>& histograms,
+                                            const std::vector<Stats::TextReadout*>& text_readouts,
+                                            const Upstream::ClusterManager& cluster_manager,
+                                            Http::ResponseHeaderMap& response_headers,
+                                            Buffer::Instance& response, const StatsParams& params,
+                                            const Stats::CustomStatNamespaces& custom_namespaces);
 
-  static uint64_t
-  generateWithOutputFormat(const std::vector<Stats::CounterSharedPtr>& counters,
-                           const std::vector<Stats::GaugeSharedPtr>& gauges,
-                           const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                           const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
-                           const Upstream::ClusterManager& cluster_manager,
-                           Buffer::Instance& response, const StatsParams& params,
-                           const Stats::CustomStatNamespaces& custom_namespaces,
-                           OutputFormat& output_format);
+  static uint64_t generateWithOutputFormat(const std::vector<Stats::Counter*>& counters,
+                                           const std::vector<Stats::Gauge*>& gauges,
+                                           const std::vector<Stats::ParentHistogram*>& histograms,
+                                           const std::vector<Stats::TextReadout*>& text_readouts,
+                                           const Upstream::ClusterManager& cluster_manager,
+                                           Buffer::Instance& response, const StatsParams& params,
+                                           const Stats::CustomStatNamespaces& custom_namespaces,
+                                           OutputFormat& output_format);
 
   /**
    * Format the given tags, returning a string as a comma-separated list
