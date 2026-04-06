@@ -465,6 +465,16 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
       *this, host, info.downstreamAddressProvider().sslConnection()));
 }
 
+uint64_t HttpConnPool::tunnelResponseStatus() const {
+  if (upstream_) {
+    return upstream_->tunnelResponseStatus();
+  }
+  if (combined_upstream_) {
+    return combined_upstream_->tunnelResponseStatus();
+  }
+  return 0;
+}
+
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
                                       const Network::ConnectionInfoProvider& address_provider,
                                       Ssl::ConnectionInfoConstSharedPtr ssl_info) {
