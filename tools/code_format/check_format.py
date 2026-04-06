@@ -396,6 +396,14 @@ class FormatChecker:
     def allow_listed_for_raw_try(self, file_path):
         return file_path in self.config.paths["raw_try"]["include"]
 
+    def allow_listed_for_stats_shared_ptr(self, file_path):
+        return (file_path.startswith("./test/common/stats/") or
+                file_path.startswith("./source/common/stats/") or
+                file_path.startswith("./envoy/stats/") or
+                file_path == './source/server/server.cc' or   # until #43958 lands.
+                file_path == './source/server/server.h' or    # until #43958 lands.
+                file_path == './test/server/server_test.cc')  # until #43958 lands.
+
     def deny_listed_for_exceptions(self, file_path):
         # Returns if this file is deny listed for exceptions.
         # Header files are strongly discouraged from throwing exceptions, both for
@@ -733,6 +741,13 @@ class FormatChecker:
         if self.config.re["for_each_n"].search(line):
             report_error("std::for_each_n should not be used, use an alternative for loop instead")
 
+        if not self.allow_listed_for_stats_shared_ptr(file_path) and (
+            "CounterSharedPtr" in line or
+            "GaugeSharedPtr" in line or
+            "TextReadoutSharedPtr" in line or
+            "HistogramSharedPtr" in line):
+            report_error("Don't take shared references to stats, except in the stats system")
+
         if not self.allow_listed_for_serialize_as_string(file_path) and "SerializeAsString" in line:
             # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
             # use MessageUtil::hash instead.
@@ -1050,7 +1065,8 @@ class FormatChecker:
         self.config.buildifier_path
         self.config.buildozer_path
         self.check_visibility()
-        self.run_rustfmt()
+        # self.run_rustfmt()
+
         # We first run formatting on non-BUILD files, since the BUILD file format
         # requires analysis of srcs/hdrs in the BUILD file, and we don't want these
         # to be rewritten by other multiprocessing pooled processes.

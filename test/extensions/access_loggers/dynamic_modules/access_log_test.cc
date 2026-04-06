@@ -266,8 +266,8 @@ TEST_F(DynamicModuleAccessLogTest, MetricsCounterDefineAndIncrement) {
                 static_cast<void*>(config_.get()), counter_id, 5));
 
   // Verify the counter value.
-  auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.test_counter");
-  ASSERT_NE(nullptr, counter);
+  auto counter = TestUtility::findCounterMainThread(stats_, "dynamicmodulescustom.test_counter");
+  ASSERT_TRUE(counter.has_value());
   EXPECT_EQ(5, counter->value());
 }
 

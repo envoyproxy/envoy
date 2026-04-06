@@ -156,7 +156,7 @@ public:
                                                          upstream_ready_cb_, overload_manager_)) {}
 
   ~Http1ConnPoolImplTest() override {
-    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
+    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_));
   }
 
   NiceMock<Random::MockRandomGenerator> random_;
@@ -1147,7 +1147,7 @@ public:
                                                          upstream_ready_cb_, overload_manager_)) {}
 
   ~Http1ConnPoolDestructImplTest() override {
-    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
+    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_));
   }
 
   NiceMock<Random::MockRandomGenerator> random_;

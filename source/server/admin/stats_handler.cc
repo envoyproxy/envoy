@@ -51,9 +51,8 @@ StatsHandler::StatsHandler(Server::Instance& server) : HandlerContextBase(server
 
 Http::Code StatsHandler::handlerResetCounters(Http::ResponseHeaderMap&, Buffer::Instance& response,
                                               AdminStream&) {
-  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    counter->reset();
-  }
+  Stats::StatFn<Stats::Counter> reset_fn = [](Stats::Counter& counter) { counter.reset(); };
+  server_.stats().forEachCounter(nullptr, reset_fn);
   server_.stats().symbolTable().clearRecentLookups();
   response.add("OK\n");
   return Http::Code::OK;
@@ -173,6 +172,7 @@ Http::Code StatsHandler::prometheusFlushAndRender(const StatsParams& params,
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
+
   prometheusRender(server_.stats(), server_.api().customStatNamespaces(), server_.clusterManager(),
                    params, request_headers, response_headers, response);
   return Http::Code::OK;
@@ -185,12 +185,14 @@ void StatsHandler::prometheusRender(Stats::Store& stats,
                                     const Http::RequestHeaderMap& request_headers,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response) {
-  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-      params.prometheus_text_readouts_ ? stats.textReadouts()
-                                       : std::vector<Stats::TextReadoutSharedPtr>();
-  PrometheusStatsFormatter::statsAsPrometheus(
-      stats.counters(), stats.gauges(), stats.histograms(), text_readouts_vec, cluster_manager,
-      request_headers, response_headers, response, params, custom_namespaces);
+  std::vector<Stats::Counter*> counters = Stats::Utility::countersMainThread(stats);
+  std::vector<Stats::Gauge*> gauges = Stats::Utility::gaugesMainThread(stats);
+  std::vector<Stats::ParentHistogram*> histograms = Stats::Utility::histogramsMainThread(stats);
+  std::vector<Stats::TextReadout*> text_readouts = Stats::Utility::textReadoutsMainThread(stats);
+
+  PrometheusStatsFormatter::statsAsPrometheus(counters, gauges, histograms, text_readouts,
+                                              cluster_manager, request_headers, response_headers,
+                                              response, params, custom_namespaces);
 }
 
 Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_headers,

@@ -495,13 +495,13 @@ Event::ProvisionalDispatcher& InternalEngine::dispatcher() const { return *dispa
 Thread::PosixThreadFactory& InternalEngine::threadFactory() const { return *thread_factory_; }
 
 void statsAsText(const std::map<std::string, uint64_t>& all_stats,
-                 const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                 const std::vector<Stats::ParentHistogram*>& histograms,
                  Buffer::Instance& response) {
   for (const auto& stat : all_stats) {
     response.addFragments({stat.first, ": ", absl::StrCat(stat.second), "\n"});
   }
   std::map<std::string, std::string> all_histograms;
-  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
+  for (const Stats::ParentHistogram* histogram : histograms) {
     if (histogram->used()) {
       all_histograms.emplace(histogram->name(), histogram->quantileSummary());
     }
@@ -513,22 +513,25 @@ void statsAsText(const std::map<std::string, uint64_t>& all_stats,
 
 void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
   std::map<std::string, uint64_t> all_stats;
-  for (const Stats::CounterSharedPtr& counter : stats.counters()) {
-    if (counter->used()) {
-      all_stats.emplace(counter->name(), counter->value());
+  stats.forEachCounter(nullptr, [&all_stats](Stats::Counter& counter) {
+    if (counter.used()) {
+      all_stats.emplace(counter.name(), counter.value());
     }
-  }
+  });
 
-  for (const Stats::GaugeSharedPtr& gauge : stats.gauges()) {
-    if (gauge->used()) {
-      all_stats.emplace(gauge->name(), gauge->value());
+  stats.forEachGauge(nullptr, [&all_stats](Stats::Gauge& gauge) {
+    if (gauge.used()) {
+      all_stats.emplace(gauge.name(), gauge.value());
     }
-  }
+  });
 
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = stats.histograms();
-  stats.symbolTable().sortByStatNames<Stats::ParentHistogramSharedPtr>(
+  std::vector<Stats::ParentHistogram*> histograms;
+  stats.forEachHistogram(
+      [&histograms](size_t size) { histograms.reserve(size); },
+      [&histograms](Stats::ParentHistogram& histogram) { histograms.push_back(&histogram); });
+  stats.symbolTable().sortByStatNames<Stats::ParentHistogram*>(
       histograms.begin(), histograms.end(),
-      [](const Stats::ParentHistogramSharedPtr& a) -> Stats::StatName { return a->statName(); });
+      [](const Stats::ParentHistogram* a) -> Stats::StatName { return a->statName(); });
 
   statsAsText(all_stats, histograms, response);
 }

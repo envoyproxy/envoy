@@ -91,7 +91,7 @@ public:
   }
 
   ~Http2ConnPoolImplTest() override {
-    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
+    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_));
   }
 
   void createTestClients(int num_clients) {

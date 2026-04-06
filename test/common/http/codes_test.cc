@@ -96,7 +96,7 @@ TEST_F(CodeUtilityTest, NoCanary) {
   EXPECT_EQ(2U, cluster_store_.counter("prefix.external.upstream_rq_completed").value());
   EXPECT_EQ(2U, cluster_store_.counter("prefix.internal.upstream_rq_completed").value());
 
-  EXPECT_EQ(19U, cluster_store_.counters().size());
+  EXPECT_EQ(19U, Stats::Utility::countersMainThread(cluster_store_).size());
 }
 
 TEST_F(CodeUtilityTest, Canary) {
@@ -134,7 +134,7 @@ TEST_F(CodeUtilityTest, Canary) {
   EXPECT_EQ(2U, cluster_store_.counter("prefix.internal.upstream_rq_completed").value());
   EXPECT_EQ(3U, cluster_store_.counter("prefix.canary.upstream_rq_completed").value());
 
-  EXPECT_EQ(26U, cluster_store_.counters().size());
+  EXPECT_EQ(26U, Stats::Utility::countersMainThread(cluster_store_).size());
 }
 
 TEST_F(CodeUtilityTest, UnknownResponseCodes) {
@@ -147,7 +147,7 @@ TEST_F(CodeUtilityTest, UnknownResponseCodes) {
   EXPECT_EQ(1U, cluster_store_.counter("prefix.canary.upstream_rq_unknown").value());
   EXPECT_EQ(1U, cluster_store_.counter("prefix.external.upstream_rq_unknown").value());
 
-  EXPECT_EQ(8U, cluster_store_.counters().size());
+  EXPECT_EQ(8U, Stats::Utility::countersMainThread(cluster_store_).size());
 }
 
 TEST_F(CodeUtilityTest, All) {

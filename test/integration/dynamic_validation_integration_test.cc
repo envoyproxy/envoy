@@ -133,7 +133,8 @@ TEST_P(DynamicValidationIntegrationTest, LdsFilterRejected) {
     EXPECT_EQ(0, test_server_->counter("listener_manager.lds.update_success")->value());
     // LDS API parsing will reject due to unknown HCM field.
     EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_rejected")->value());
-    EXPECT_EQ(nullptr, test_server_->counter("http.router.rds.route_config_0.update_success"));
+    EXPECT_FALSE(
+        test_server_->counter("http.router.rds.route_config_0.update_success").has_value());
     EXPECT_EQ(0, test_server_->counter("server.dynamic_unknown_fields")->value());
   } else {
     EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
@@ -164,7 +165,8 @@ TEST_P(DynamicValidationIntegrationTest, LdsFilterRejectedTypedStruct) {
     EXPECT_EQ(0, test_server_->counter("listener_manager.lds.update_success")->value());
     // LDS API parsing will reject due to unknown HCM field.
     EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_rejected")->value());
-    EXPECT_EQ(nullptr, test_server_->counter("http.router.rds.route_config_0.update_success"));
+    EXPECT_FALSE(
+        test_server_->counter("http.router.rds.route_config_0.update_success").has_value());
     EXPECT_EQ(0, test_server_->counter("server.dynamic_unknown_fields")->value());
   } else {
     EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());

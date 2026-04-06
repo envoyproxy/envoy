@@ -176,10 +176,33 @@ public:
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
-  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
+  bool iterateRef(const IterateRefFn<Counter>& fn) const override {
+    bool cont = true;
+    forEachCounter(nullptr, [fn, &cont](Counter& counter) { cont = cont && fn(counter); });
+    return cont;
+  }
+
+  bool iterateRef(const IterateRefFn<Gauge>& fn) const override {
+    bool cont = true;
+    forEachGauge(nullptr, [fn, &cont](Gauge& gauge) { cont = cont && fn(gauge); });
+    return cont;
+  }
+
+  bool iterateRef(const IterateRefFn<Histogram>& fn) const override {
+    bool cont = true;
+    forEachHistogram(nullptr, [fn, &cont](ParentHistogram& histogram) {
+      // Note: up-cases to Histogram, annoyingly.
+      cont = cont && fn(histogram);
+    });
+    return cont;
+  }
+
+  bool iterateRef(const IterateRefFn<TextReadout>& fn) const override {
+    bool cont = true;
+    forEachTextReadout(nullptr,
+                       [fn, &cont](TextReadout& text_readout) { cont = cont && fn(text_readout); });
+    return cont;
+  }
 
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
@@ -331,47 +354,47 @@ private:
       return textReadoutFromStatName(storage.statName());
     }
 
-    template <class StatMap, class StatFn> bool iterHelper(StatFn fn, const StatMap& map) const {
+    template <class StatMap, class StatFn> bool iterRefHelper(StatFn fn, const StatMap& map) const {
       for (auto& iter : map) {
-        if (!fn(iter.second)) {
+        if (!fn(*iter.second)) {
           return false;
         }
       }
       return true;
     }
 
-    bool iterate(const IterateFn<Counter>& fn) const override {
+    bool iterateRef(const IterateRefFn<Counter>& fn) const override {
       Thread::LockGuard lock(parent_.lock_);
       return iterateLockHeld(fn);
     }
-    bool iterate(const IterateFn<Gauge>& fn) const override {
+    bool iterateRef(const IterateRefFn<Gauge>& fn) const override {
       Thread::LockGuard lock(parent_.lock_);
       return iterateLockHeld(fn);
     }
-    bool iterate(const IterateFn<Histogram>& fn) const override {
+    bool iterateRef(const IterateRefFn<Histogram>& fn) const override {
       Thread::LockGuard lock(parent_.lock_);
       return iterateLockHeld(fn);
     }
-    bool iterate(const IterateFn<TextReadout>& fn) const override {
+    bool iterateRef(const IterateRefFn<TextReadout>& fn) const override {
       Thread::LockGuard lock(parent_.lock_);
       return iterateLockHeld(fn);
     }
 
-    bool iterateLockHeld(const IterateFn<Counter>& fn) const
+    bool iterateLockHeld(const IterateRefFn<Counter>& fn) const
         ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
-      return iterHelper(fn, centralCacheLockHeld()->counters_);
+      return iterRefHelper(fn, centralCacheLockHeld()->counters_);
     }
-    bool iterateLockHeld(const IterateFn<Gauge>& fn) const
+    bool iterateLockHeld(const IterateRefFn<Gauge>& fn) const
         ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
-      return iterHelper(fn, centralCacheLockHeld()->gauges_);
+      return iterRefHelper(fn, centralCacheLockHeld()->gauges_);
     }
-    bool iterateLockHeld(const IterateFn<Histogram>& fn) const
+    bool iterateLockHeld(const IterateRefFn<Histogram>& fn) const
         ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
-      return iterHelper(fn, centralCacheLockHeld()->histograms_);
+      return iterRefHelper(fn, centralCacheLockHeld()->histograms_);
     }
-    bool iterateLockHeld(const IterateFn<TextReadout>& fn) const
+    bool iterateLockHeld(const IterateRefFn<TextReadout>& fn) const
         ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
-      return iterHelper(fn, centralCacheLockHeld()->text_readouts_);
+      return iterRefHelper(fn, centralCacheLockHeld()->text_readouts_);
     }
     ThreadLocalStoreImpl& store() override { return parent_; }
     const ThreadLocalStoreImpl& constStore() const override { return parent_; }
@@ -447,6 +470,17 @@ private:
       return central_cache_;
     }
 
+    // Detaches the central cache from the scope, and returns it to the
+    // caller. This enables the ScopeImpl to be deleted from any thread,
+    // but guarantee that the stats held by the scope are only removed
+    // from the main thread.
+    CentralCacheEntrySharedPtr releaseCentralCacheLockHeld()
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
+      CentralCacheEntrySharedPtr central_cache = std::move(central_cache_);
+      central_cache_.reset();
+      return central_cache;
+    }
+
     CentralCacheEntrySharedPtr&
     centralCacheMutableNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
       return central_cache_;
@@ -485,7 +519,13 @@ private:
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     TlsCacheEntry& insertScope(uint64_t scope_id);
-    void eraseScopes(const std::vector<uint64_t>& scope_ids);
+
+    // Erases the scopes identified by indices provided in scope_ids. the TLS
+    // cache entries for the scopes are transferred into tls_cache_entries. The
+    // caller must ensure only one thread at a time calls eraseScopes, to avoid
+    // racing the write to tls_cache_entries.
+    void eraseScopes(const std::vector<uint64_t>& scope_ids,
+                     std::vector<TlsCacheEntry>& tls_cache_entries);
     void eraseHistograms(const std::vector<uint64_t>& histograms);
 
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references

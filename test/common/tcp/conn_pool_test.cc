@@ -238,8 +238,8 @@ public:
         host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")) {}
 
   ~TcpConnPoolImplTest() override {
-    EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()))
-        << TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges());
+    EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_))
+        << TestUtility::nonZeroedGauges(cluster_->stats_store_);
   }
 
   void initialize() {

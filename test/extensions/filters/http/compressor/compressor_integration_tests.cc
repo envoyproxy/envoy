@@ -224,22 +224,22 @@ TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
 
   auto request_compressed_counter =
       test_server_->counter("http.config_test.compressor.test.gzip.request.compressed");
-  ASSERT_NE(request_compressed_counter, nullptr);
+  ASSERT_TRUE(request_compressed_counter.has_value());
   ASSERT_EQ(0, request_compressed_counter->value());
 
   auto request_uncompressed_counter =
       test_server_->counter("http.config_test.compressor.test.gzip.request.not_compressed");
-  ASSERT_NE(request_uncompressed_counter, nullptr);
+  ASSERT_TRUE(request_uncompressed_counter.has_value());
   ASSERT_EQ(1, request_uncompressed_counter->value());
 
   auto response_compressed_counter =
       test_server_->counter("http.config_test.compressor.test.gzip.compressed");
-  ASSERT_NE(response_compressed_counter, nullptr);
+  ASSERT_TRUE(response_compressed_counter.has_value());
   ASSERT_EQ(0, response_compressed_counter->value());
 
   auto response_uncompressed_counter =
       test_server_->counter("http.config_test.compressor.test.gzip.not_compressed");
-  ASSERT_NE(response_uncompressed_counter, nullptr);
+  ASSERT_TRUE(response_uncompressed_counter.has_value());
   ASSERT_EQ(1, response_uncompressed_counter->value());
 }
 

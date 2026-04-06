@@ -81,21 +81,25 @@ public:
   /**
    * @return a list of all known counters.
    */
+  ABSL_DEPRECATED("use forEachCounter, iterateRef, or Utility::countersMainThread instead")
   virtual std::vector<CounterSharedPtr> counters() const PURE;
 
   /**
    * @return a list of all known gauges.
    */
+  ABSL_DEPRECATED("use forEachGauge, iterateRef, or Utility::gaugessMainThread instead")
   virtual std::vector<GaugeSharedPtr> gauges() const PURE;
 
   /**
    * @return a list of all known text readouts.
    */
+  ABSL_DEPRECATED("use forEachTextReadout, iterateRef, or Utility::textReadoutsMainThread instead")
   virtual std::vector<TextReadoutSharedPtr> textReadouts() const PURE;
 
   /**
    * @return a list of all known histograms.
    */
+  ABSL_DEPRECATED("use forEachHistogram, iterateRef, or Utility::histogramsMainThread instead")
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
 
   /**
@@ -153,10 +157,26 @@ public:
    * @param fn Function to be run for every counter, or until fn return false.
    * @return false if fn(counter) return false during iteration, true if every counter was hit.
    */
-  virtual bool iterate(const IterateFn<Counter>& fn) const PURE;
-  virtual bool iterate(const IterateFn<Gauge>& fn) const PURE;
-  virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
-  virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
+  virtual bool iterateRef(const IterateRefFn<Counter>& fn) const PURE;
+  virtual bool iterateRef(const IterateRefFn<Gauge>& fn) const PURE;
+  virtual bool iterateRef(const IterateRefFn<Histogram>& fn) const PURE;
+  virtual bool iterateRef(const IterateRefFn<TextReadout>& fn) const PURE;
+
+  ABSL_DEPRECATED("use iterateRef instead") bool iterate(const IterateFn<Counter>& fn) const {
+    return iterateRef([fn](Counter& counter) -> bool { return fn(CounterSharedPtr(&counter)); });
+  }
+  ABSL_DEPRECATED("use iterateRef instead") bool iterate(const IterateFn<Gauge>& fn) const {
+    return iterateRef([fn](Gauge& gauge) -> bool { return fn(GaugeSharedPtr(&gauge)); });
+  }
+  ABSL_DEPRECATED("use iterateRef instead") bool iterate(const IterateFn<TextReadout>& fn) const {
+    return iterateRef([fn](TextReadout& text_readout) -> bool {
+      return fn(TextReadoutSharedPtr(&text_readout));
+    });
+  }
+  ABSL_DEPRECATED("use iterateRef instead") bool iterate(const IterateFn<Histogram>& fn) const {
+    return iterateRef(
+        [fn](Histogram& histogram) -> bool { return fn(HistogramSharedPtr(&histogram)); });
+  }
 
   // Delegate some methods to the root scope; these are exposed to make it more
   // convenient to use stats_macros.h. We may consider dropping them if desired,

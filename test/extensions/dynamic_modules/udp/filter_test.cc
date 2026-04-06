@@ -335,8 +335,9 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsCounterDefineAndIncrement) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
 
   // Verify the counter value.
-  auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.test_filter.test_counter");
-  ASSERT_NE(nullptr, counter);
+  OptRef<Stats::Counter> counter =
+      TestUtility::findCounterMainThread(stats_, "dynamicmodulescustom.test_filter.test_counter");
+  ASSERT_TRUE(counter.has_value());
   EXPECT_EQ(5, counter->value());
 }
 
