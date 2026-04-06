@@ -64,7 +64,7 @@ Network::ClientConnectionPtr SslSPIFFECertValidatorIntegrationTest::makeSslClien
 }
 
 void SslSPIFFECertValidatorIntegrationTest::checkVerifyErrorCouter(uint64_t value) {
-  Stats::CounterSharedPtr counter =
+  OptRef<Stats::Counter> counter =
       test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"));
   EXPECT_EQ(value, counter->value());
   counter->reset();
@@ -200,8 +200,7 @@ typed_config:
     ASSERT_TRUE(codec->waitForDisconnect());
     codec->close();
   }
-  Stats::CounterSharedPtr counter =
-      test_server_->counter(listenerStatPrefix("ssl.fail_verify_san"));
+  OptRef<Stats::Counter> counter = test_server_->counter(listenerStatPrefix("ssl.fail_verify_san"));
   EXPECT_EQ(1u, counter->value());
   counter->reset();
 }

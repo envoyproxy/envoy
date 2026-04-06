@@ -241,8 +241,8 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataDontPopulatedWhenCalledFromLocalhosNoX
   test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.total")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.city_db.hit"));
-  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.asn_db.hit"));
+  EXPECT_FALSE(test_server_->counter("http.config_test.maxmind.city_db.hit").has_value());
+  EXPECT_FALSE(test_server_->counter("http.config_test.maxmind.asn_db.hit").has_value());
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoAnonDataPopulatedUseXff) {
@@ -338,8 +338,8 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXffWithIsp) {
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.hit")->value());
   // asn_db is not used so the metrics should be null.
-  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.asn_db.total"));
-  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.asn_db.hit"));
+  EXPECT_FALSE(test_server_->counter("http.config_test.maxmind.asn_db.total").has_value());
+  EXPECT_FALSE(test_server_->counter("http.config_test.maxmind.asn_db.hit").has_value());
 }
 
 TEST_P(GeoipFilterIntegrationTest, AsnDbTakesPrecedenceOverIspDbForAsnOrg) {
@@ -381,7 +381,7 @@ TEST_P(GeoipFilterIntegrationTest, AsnOrgFallsBackToIspDbWhenAsnDbNotConfigured)
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
-  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.asn_db.total"));
+  EXPECT_FALSE(test_server_->counter("http.config_test.maxmind.asn_db.total").has_value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.hit")->value());
 }
@@ -423,7 +423,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataNotPopulatedOnEmptyLookupResult) {
   ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-anon-vpn")).empty());
   test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.anon_db.total")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.anon_db.hit"));
+  EXPECT_FALSE(test_server_->counter("http.config_test.maxmind.anon_db.hit").has_value());
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {

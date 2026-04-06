@@ -40,7 +40,7 @@ struct ScopeStatsLimitSettings {
   uint32_t max_histograms = 0;
 };
 
-template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
+template <class StatType> using IterateFn = std::function<bool(StatType&)>;
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on

@@ -232,6 +232,24 @@ TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
 TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                       StatNameTagVectorOptConstRef tags = absl::nullopt);
 
+/**
+ * Returns vectors of stats held in the store. This must only be called from the
+ * main thread. The stats are returned as pointers, and the pointers are
+ * guaranteed to remain valid only until the main thread is released -- this is
+ * because stats are always deleted on the main thread.
+ *
+ * The returned pointers are owned by the Stats::Scope in which they were
+ * created. If the last reference to a Stats::ScopeSharedPtr is removed during
+ * or after the call to construct these vectors, the stats will still remain
+ * valid until the current call-sequence on the main thread completes.
+ *
+ * These functions handle de-duplication.
+ */
+std::vector<Stats::Counter*> countersMainThread(Stats::Store& store);
+std::vector<Stats::Gauge*> gaugesMainThread(Stats::Store& store);
+std::vector<Stats::TextReadout*> textReadoutsMainThread(Stats::Store& store);
+std::vector<Stats::ParentHistogram*> histogramsMainThread(Stats::Store& store);
+
 } // namespace Utility
 
 /**
@@ -261,10 +279,9 @@ public:
   absl::optional<std::reference_wrapper<StatType>> get() {
     StatType* stat = stat_.get([this]() -> StatType* {
       StatType* stat = nullptr;
-      IterateFn<StatType> check_stat = [this,
-                                        &stat](const RefcountPtr<StatType>& shared_stat) -> bool {
-        if (shared_stat->name() == name_) {
-          stat = shared_stat.get();
+      IterateFn<StatType> check_stat = [this, &stat](StatType& statref) -> bool {
+        if (statref.name() == name_) {
+          stat = &statref;
           return false; // Stop iteration.
         }
         return true;

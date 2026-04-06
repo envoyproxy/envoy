@@ -325,13 +325,13 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, UpdateConnectionStatsWithDetailedSta
   auto& stats_store = no_stats_extension->getStatsScope();
   bool found_detailed_stats = false;
   Stats::IterateFn<Stats::Gauge> gauge_callback =
-      [&found_detailed_stats](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
-    const std::string& gauge_name = gauge->name();
+      [&found_detailed_stats](Stats::Gauge& gauge) -> bool {
+    const std::string& gauge_name = gauge.name();
     // Check if any detailed stats were created (host. or cluster. or worker_).
     if ((gauge_name.find(".host.") != std::string::npos ||
          gauge_name.find(".cluster.") != std::string::npos ||
          gauge_name.find(".worker_") != std::string::npos) &&
-        gauge->used()) {
+        gauge.used()) {
       found_detailed_stats = true;
       return false; // Stop iteration
     }

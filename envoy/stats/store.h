@@ -79,26 +79,6 @@ public:
   virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
 
   /**
-   * @return a list of all known counters.
-   */
-  virtual std::vector<CounterSharedPtr> counters() const PURE;
-
-  /**
-   * @return a list of all known gauges.
-   */
-  virtual std::vector<GaugeSharedPtr> gauges() const PURE;
-
-  /**
-   * @return a list of all known text readouts.
-   */
-  virtual std::vector<TextReadoutSharedPtr> textReadouts() const PURE;
-
-  /**
-   * @return a list of all known histograms.
-   */
-  virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
-
-  /**
    * Iterate over all stats. Note, that implementations can potentially hold on
    * to a mutex that will deadlock if the passed in functors try to create or
    * delete a stat. Also note that holding onto the stat or scope reference

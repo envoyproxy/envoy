@@ -1054,20 +1054,22 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_EQ(512U, response->body().size());
   Stats::Store& stats = test_server_->server().stats();
   if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    Stats::CounterSharedPtr counter = TestUtility::findCounter(
+    OptRef<Stats::Counter> counter = TestUtility::findCounterMainThread(
         stats, absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".tx_reset"));
-    ASSERT_NE(nullptr, counter);
+    ASSERT_TRUE(counter.has_value());
     EXPECT_EQ(1L, counter->value());
   }
-  EXPECT_NE(nullptr,
-            test_server_->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(),
-                                               ".dropped_headers_with_underscores")));
+  EXPECT_TRUE(TestUtility::findCounterMainThread(
+                  stats, absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(),
+                                      ".dropped_headers_with_underscores"))
+                  .has_value());
 
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_headers_size");
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rs_headers_size");
 
   auto find_histo_sample_count = [&](const std::string& name) -> uint64_t {
-    for (auto& histogram : test_server_->histograms()) {
+    for (Stats::ParentHistogram* histogram :
+         Stats::Utility::histogramsMainThread(test_server_->statStore())) {
       if (histogram->name() == name) {
         return TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
       }

@@ -94,32 +94,17 @@ public:
    * Counter lookup. This is not thread safe, since we don't get a consistent
    * snapshot, uses counters() instead for this behavior.
    * @param name counter name.
-   * @return Stats::CounterSharedPtr counter if it exists, otherwise nullptr.
+   * @return OptRef<Stats::Counter> counter if it exists, otherwise nullptr.
    */
-  virtual Stats::CounterSharedPtr counter(const std::string& name) PURE;
+  virtual OptRef<Stats::Counter> counter(const std::string& name) PURE;
 
   /**
    * Gauge lookup. This is not thread safe, since we don't get a consistent
    * snapshot, uses gauges() instead for this behavior.
    * @param name gauge name.
-   * @return Stats::GaugeSharedPtr gauge if it exists, otherwise nullptr.
+   * @return OptRef<Stats::Gauge> gauge if it exists, otherwise nullptr.
    */
-  virtual Stats::GaugeSharedPtr gauge(const std::string& name) PURE;
-
-  /**
-   * @return std::vector<Stats::CounterSharedPtr> snapshot of server counters.
-   */
-  virtual std::vector<Stats::CounterSharedPtr> counters() PURE;
-
-  /**
-   * @return std::vector<Stats::GaugeSharedPtr> snapshot of server counters.
-   */
-  virtual std::vector<Stats::GaugeSharedPtr> gauges() PURE;
-
-  /**
-   * @return std::vector<Stats::ParentHistogramSharedPtr> snapshot of server histograms.
-   */
-  virtual std::vector<Stats::ParentHistogramSharedPtr> histograms() PURE;
+  virtual OptRef<Stats::Gauge> gauge(const std::string& name) PURE;
 };
 
 } // namespace Envoy

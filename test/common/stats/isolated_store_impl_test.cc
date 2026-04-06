@@ -124,8 +124,8 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
-  EXPECT_EQ(4UL, store_->counters().size());
-  EXPECT_EQ(2UL, store_->gauges().size());
+  EXPECT_EQ(4UL, Stats::Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(2UL, Stats::Utility::gaugesMainThread(*store_).size());
 
   StatNameManagedStorage nonexistent_name("nonexistent", store_->symbolTable());
   EXPECT_EQ(scope_->findCounter(nonexistent_name.statName()), absl::nullopt);
@@ -190,9 +190,9 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   ScopeSharedPtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counterFromString("bar").name());
 
-  EXPECT_EQ(4UL, store_->counters().size());
-  EXPECT_EQ(2UL, store_->gauges().size());
-  EXPECT_EQ(2UL, store_->textReadouts().size());
+  EXPECT_EQ(4UL, Stats::Utility::countersMainThread(*store_).size());
+  EXPECT_EQ(2UL, Stats::Utility::gaugesMainThread(*store_).size());
+  EXPECT_EQ(2UL, Stats::Utility::textReadoutsMainThread(*store_).size());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, CounterWithTag) {
@@ -322,10 +322,24 @@ TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
 TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
   NullCounterImpl& c = store_->nullCounter();
   c.inc();
+  c.markUnused();
   EXPECT_EQ(0, c.value());
+  EXPECT_FALSE(c.hidden());
   NullGaugeImpl& g = store_->nullGauge();
   g.inc();
+  g.setParentValue(0);
+  g.markUnused();
   EXPECT_EQ(0, g.value());
+  EXPECT_FALSE(g.hidden());
+  CounterSharedPtr null_counter(new NullCounterImpl(store_->symbolTable()));
+  GaugeSharedPtr null_gauge(new NullGaugeImpl(store_->symbolTable()));
+  TextReadoutSharedPtr null_text_readout(new NullTextReadoutImpl(store_->symbolTable()));
+  null_text_readout->set("");
+  EXPECT_EQ("", null_text_readout->value());
+  EXPECT_FALSE(null_text_readout->used());
+  EXPECT_FALSE(null_text_readout->hidden());
+  null_text_readout->markUnused();
+  EXPECT_EQ(1, null_text_readout->use_count());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {

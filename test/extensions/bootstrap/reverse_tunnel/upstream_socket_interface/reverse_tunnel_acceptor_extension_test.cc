@@ -231,14 +231,13 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
   uint64_t total_clusters_value = 0;
   uint64_t total_nodes_value = 0;
   Stats::IterateFn<Stats::Gauge> gauge_callback =
-      [&total_clusters_value,
-       &total_nodes_value](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
-    const std::string& gauge_name = gauge->name();
-    if (gauge_name.find(".total_clusters") != std::string::npos && gauge->used()) {
-      total_clusters_value = gauge->value();
+      [&total_clusters_value, &total_nodes_value](Stats::Gauge& gauge) -> bool {
+    const std::string& gauge_name = gauge.name();
+    if (gauge_name.find(".total_clusters") != std::string::npos && gauge.used()) {
+      total_clusters_value = gauge.value();
     }
-    if (gauge_name.find(".total_nodes") != std::string::npos && gauge->used()) {
-      total_nodes_value = gauge->value();
+    if (gauge_name.find(".total_nodes") != std::string::npos && gauge.used()) {
+      total_nodes_value = gauge.value();
     }
     return true;
   };
@@ -249,16 +248,24 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
   // Verify that the stats store doesn't have any detailed stats gauges.
   bool found_detailed_stats = false;
   Stats::IterateFn<Stats::Gauge> detailed_stats_callback =
-      [&found_detailed_stats](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
-    const std::string& gauge_name = gauge->name();
+      [&found_detailed_stats](Stats::Gauge& gauge) -> bool {
+    const std::string& gauge_name = gauge.name(); // note: takes a symbol table lock.
     // Check if any detailed stats were created (nodes. or clusters. or worker_.node. or
     // worker_.cluster.).
+    //
+    // Note: it should be possible to improve the speed of this by searching
+    // inside the StatName with pre-symbolized names like "node", "nodes",
+    // "clusters", "cluster". Support would have to be added to StatName for
+    // this, but it could mostly be done without symbol table locks. The
+    // exception is searching for ".worker_" which requires a symbol table lock
+    // when looking at a token for a substring. If we have to do that then a
+    // lock may not be avoidable.
     if ((gauge_name.find(".nodes.") != std::string::npos ||
          gauge_name.find(".clusters.") != std::string::npos ||
          (gauge_name.find(".worker_") != std::string::npos &&
           (gauge_name.find(".node.") != std::string::npos ||
            gauge_name.find(".cluster.") != std::string::npos))) &&
-        gauge->used()) {
+        gauge.used()) {
       found_detailed_stats = true;
       return false; // Stop iteration
     }
@@ -669,13 +676,13 @@ std::pair<uint64_t, uint64_t> getAggregateMetrics(Stats::Scope& stats_store,
 
   Stats::IterateFn<Stats::Gauge> gauge_callback =
       [&total_clusters_value, &total_nodes_value, &expected_clusters_stat,
-       &expected_nodes_stat](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
-    const std::string& gauge_name = gauge->name();
-    if (gauge_name == expected_clusters_stat && gauge->used()) {
-      total_clusters_value = gauge->value();
+       &expected_nodes_stat](Stats::Gauge& gauge) -> bool {
+    const std::string& gauge_name = gauge.name();
+    if (gauge_name == expected_clusters_stat && gauge.used()) {
+      total_clusters_value = gauge.value();
     }
-    if (gauge_name == expected_nodes_stat && gauge->used()) {
-      total_nodes_value = gauge->value();
+    if (gauge_name == expected_nodes_stat && gauge.used()) {
+      total_nodes_value = gauge.value();
     }
     return true;
   };

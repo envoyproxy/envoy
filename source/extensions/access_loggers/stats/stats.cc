@@ -26,15 +26,14 @@ public:
   // The gauge object itself is kept alive by the shared_ptr in the state, so we can access its
   // name and tags to re-lookup/re-create it in the scope.
   ~AccessLogState() override {
-    for (const auto& [gauge_ptr, state] : inflight_gauges_) {
+    for (const auto& [gauge, value] : inflight_gauges_) {
       // TODO(taoxuy):  make this as an accessor of the
       // Stat class.
       Stats::StatNameTagVector tag_names;
-      state.gauge_->iterateTagStatNames(
-          [&tag_names](Stats::StatName name, Stats::StatName value) -> bool {
-            tag_names.emplace_back(name, value);
-            return true;
-          });
+      gauge->iterateTagStatNames([&tag_names](Stats::StatName name, Stats::StatName value) -> bool {
+        tag_names.emplace_back(name, value);
+        return true;
+      });
 
       // Using state.gauge_->statName() directly would be incorrect because it returns the fully
       // qualified name (including tags). Passing this full name to scope_->gaugeFromStatName(...)
@@ -42,22 +41,22 @@ public:
       // AccessLogState are often dynamic and not configured in the global tag extractors, this
       // extraction would likely fail to identify the tags correctly, resulting in a gauge with a
       // different identity (the full name as the stat name and no tags).
-      auto& gauge = scope_->gaugeFromStatNameWithTags(
-          state.gauge_->tagExtractedStatName(), tag_names, Stats::Gauge::ImportMode::Accumulate);
-      gauge.sub(state.value_);
+      Stats::Gauge& new_gauge = scope_->gaugeFromStatNameWithTags(
+          gauge->tagExtractedStatName(), tag_names, Stats::Gauge::ImportMode::Accumulate);
+      new_gauge.sub(value);
     }
   }
 
-  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
-    inflight_gauges_.try_emplace(gauge, Stats::GaugeSharedPtr(gauge), value);
+  void addInflightGauge(Stats::Gauge& gauge, uint64_t value) {
+    inflight_gauges_.try_emplace(&gauge, value);
   }
 
-  absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
-    auto it = inflight_gauges_.find(gauge);
+  absl::optional<uint64_t> removeInflightGauge(Stats::Gauge& gauge) {
+    auto it = inflight_gauges_.find(&gauge);
     if (it == inflight_gauges_.end()) {
       return absl::nullopt;
     }
-    uint64_t value = it->second.value_;
+    uint64_t value = it->second;
     inflight_gauges_.erase(it);
     return value;
   }
@@ -65,18 +64,11 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  struct State {
-    State(Stats::GaugeSharedPtr gauge, uint64_t value) : gauge_(std::move(gauge)), value_(value) {}
-
-    Stats::GaugeSharedPtr gauge_;
-    uint64_t value_;
-  };
-
   Stats::ScopeSharedPtr scope_;
 
   // The map key holds a raw pointer to the gauge. The value holds a ref-counted pointer to ensure
   // the gauge is not destroyed if it is evicted from the stats scope.
-  absl::flat_hash_map<Stats::Gauge*, State> inflight_gauges_;
+  absl::flat_hash_map<Stats::Gauge*, uint64_t> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -417,7 +409,8 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   Stats::Gauge::ImportMode import_mode = op == Gauge::OperationType::SET
                                              ? Stats::Gauge::ImportMode::NeverImport
                                              : Stats::Gauge::ImportMode::Accumulate;
-  auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
+  Stats::Gauge& gauge_stat =
+      scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
 
   if (op == Gauge::OperationType::PAIRED_ADD || op == Gauge::OperationType::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
@@ -429,10 +422,10 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
     if (op == Gauge::OperationType::PAIRED_ADD) {
-      state->addInflightGauge(&gauge_stat, value);
+      state->addInflightGauge(gauge_stat, value);
       gauge_stat.add(value);
     } else {
-      absl::optional<uint64_t> added_value = state->removeInflightGauge(&gauge_stat);
+      absl::optional<uint64_t> added_value = state->removeInflightGauge(gauge_stat);
       if (added_value.has_value()) {
         gauge_stat.sub(added_value.value());
       }

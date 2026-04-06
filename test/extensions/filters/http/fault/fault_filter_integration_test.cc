@@ -218,7 +218,8 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigEnableDownstreamS
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.superman.aborts_injected")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.delays_injected"));
+  EXPECT_FALSE(
+      test_server_->counter("http.config_test.fault.superman.delays_injected").has_value());
 }
 
 // Request abort controlled via header configuration and disable downstream server stats.
@@ -242,8 +243,10 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfigDisableDownstream
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
-  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.aborts_injected"));
-  EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.delays_injected"));
+  EXPECT_FALSE(
+      test_server_->counter("http.config_test.fault.superman.aborts_injected").has_value());
+  EXPECT_FALSE(
+      test_server_->counter("http.config_test.fault.superman.delays_injected").has_value());
 }
 
 // Request faults controlled via header configuration.

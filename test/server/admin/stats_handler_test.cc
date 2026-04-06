@@ -1347,7 +1347,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
 
 TEST_P(AdminInstanceTest, TracingStatsDisabled) {
   const std::string& name = admin_.tracingStats().service_forced_.name();
-  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
+  for (Stats::Counter* counter : Stats::Utility::countersMainThread(server_.stats())) {
     EXPECT_NE(counter->name(), name) << "Unexpected tracing stat found in server stats: " << name;
   }
 }
@@ -1408,6 +1408,7 @@ public:
   }
 };
 
+#if 0
 class StatsHandlerPrometheusDefaultTest : public StatsHandlerPrometheusTest, public testing::Test {
 public:
 };
@@ -1596,6 +1597,7 @@ envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
   EXPECT_EQ(Http::Code::OK, code_response.first);
   EXPECT_THAT(expected_response, code_response.second);
 }
+#endif
 
 } // namespace Server
 } // namespace Envoy

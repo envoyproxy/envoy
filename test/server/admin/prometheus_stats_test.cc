@@ -54,34 +54,31 @@ private:
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
   PrometheusStatsFormatterTest()
-      : alloc_(*symbol_table_), pool_(*symbol_table_),
+      : pool_(*symbol_table_), store_(std::make_unique<Stats::IsolatedStoreImpl>(*symbol_table_)),
         endpoints_helper_(std::make_unique<Upstream::PerEndpointMetricsTestHelper>()) {}
 
   ~PrometheusStatsFormatterTest() override { clearStorage(); }
 
   void addCounter(const std::string& name, Stats::StatNameTagVector cluster_tags) {
-    Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
-    Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    counters_.push_back(alloc_.makeCounter(name_storage.statName(),
-                                           tag_extracted_name_storage.statName(), cluster_tags));
+    Stats::StatNameManagedStorage name_storage(name, *symbol_table_);
+    counters_.push_back(
+        &store_->rootScope()->counterFromStatNameWithTags(name_storage.statName(), cluster_tags));
   }
 
   void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags,
                 Stats::Gauge::ImportMode import_mode = Stats::Gauge::ImportMode::Accumulate) {
-    Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
-    Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(
-        name_storage.statName(), tag_extracted_name_storage.statName(), cluster_tags, import_mode));
+    Stats::StatNameManagedStorage name_storage(name, *symbol_table_);
+    gauges_.push_back(&store_->rootScope()->gaugeFromStatNameWithTags(name_storage.statName(),
+                                                                      cluster_tags, import_mode));
   }
 
   void addTextReadout(const std::string& name, const std::string& value,
                       Stats::StatNameTagVector cluster_tags) {
-    Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
-    Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    Stats::TextReadoutSharedPtr textReadout = alloc_.makeTextReadout(
-        name_storage.statName(), tag_extracted_name_storage.statName(), cluster_tags);
-    textReadout->set(value);
-    textReadouts_.push_back(textReadout);
+    Stats::StatNameManagedStorage name_storage(name, *symbol_table_);
+    Stats::TextReadout* text_readout = &store_->rootScope()->textReadoutFromStatNameWithTags(
+        name_storage.statName(), cluster_tags);
+    text_readout->set(value);
+    text_readouts_.push_back(text_readout);
   }
 
   void addClusterEndpoints(const std::string& cluster_name, uint32_t num_hosts,
@@ -94,17 +91,19 @@ protected:
         .WillRepeatedly(ReturnRef(*endpoints_tags_.back()));
   }
 
-  using MockHistogramSharedPtr = Stats::RefcountPtr<NiceMock<Stats::MockParentHistogram>>;
-  void addHistogram(MockHistogramSharedPtr histogram) { histograms_.push_back(histogram); }
+  using MockHistogram = NiceMock<Stats::MockParentHistogram>;
 
-  MockHistogramSharedPtr makeHistogram(const std::string& name,
-                                       Stats::StatNameTagVector cluster_tags) {
-    auto histogram = MockHistogramSharedPtr(new NiceMock<Stats::MockParentHistogram>());
-    histogram->name_ = baseName(name, cluster_tags);
-    histogram->setTagExtractedName(name);
-    histogram->setTags(cluster_tags);
-    histogram->used_ = true;
-    histogram->hidden_ = false;
+  // Creates a histogram and adds it to the histograms vector to pass to the Prometheus rendering
+  // functions.
+  MockHistogram& makeHistogram(const std::string& name, Stats::StatNameTagVector cluster_tags) {
+    histogram_storage_.push_back(std::make_unique<MockHistogram>());
+    MockHistogram& histogram = *histogram_storage_.back();
+    histograms_.push_back(&histogram);
+    histogram.name_ = baseName(name, cluster_tags);
+    histogram.setTagExtractedName(name);
+    histogram.setTags(cluster_tags);
+    histogram.used_ = true;
+    histogram.hidden_ = false;
     return histogram;
   }
 
@@ -127,18 +126,21 @@ protected:
     counters_.clear();
     gauges_.clear();
     histograms_.clear();
-    textReadouts_.clear();
+    histogram_storage_.clear();
+    text_readouts_.clear();
+    store_.reset();
     endpoints_helper_.reset();
     EXPECT_EQ(0, symbol_table_->numSymbols());
   }
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::Allocator alloc_;
   Stats::StatNamePool pool_;
-  std::vector<Stats::CounterSharedPtr> counters_;
-  std::vector<Stats::GaugeSharedPtr> gauges_;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms_;
-  std::vector<Stats::TextReadoutSharedPtr> textReadouts_;
+  std::unique_ptr<Stats::IsolatedStoreImpl> store_;
+  std::vector<Stats::Counter*> counters_;
+  std::vector<Stats::Gauge*> gauges_;
+  std::vector<std::unique_ptr<MockHistogram>> histogram_storage_;
+  std::vector<Stats::ParentHistogram*> histograms_;
+  std::vector<Stats::TextReadout*> text_readouts_;
   std::unique_ptr<Upstream::PerEndpointMetricsTestHelper> endpoints_helper_;
   std::vector<std::unique_ptr<Stats::TagVector>> endpoints_tags_;
 };
@@ -220,7 +222,7 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(2UL, size);
 }
@@ -243,7 +245,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(4UL, size);
 }
@@ -254,14 +256,12 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
-
-  addHistogram(histogram);
+  MockHistogram& histogram = makeHistogram("histogram1", {});
+  ON_CALL(histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -298,15 +298,14 @@ TEST_F(PrometheusStatsFormatterTest, SummaryWithNoValuesAndNoTags) {
   HistogramWrapper h1_interval;
   Stats::HistogramStatisticsImpl h1_interval_statistics(h1_interval.getHistogram());
 
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, intervalStatistics()).WillByDefault(ReturnRef(h1_interval_statistics));
+  MockHistogram& histogram = makeHistogram("histogram1", {});
+  ON_CALL(histogram, intervalStatistics()).WillByDefault(ReturnRef(h1_interval_statistics));
 
-  addHistogram(histogram);
   StatsParams params = StatsParams();
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response, params,
       custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -332,14 +331,15 @@ envoy_histogram1_count{} 0
 // coalesce stats in different scopes with the same tag-extracted-name.
 TEST_F(PrometheusStatsFormatterTest, DifferentNamedScopeSameStat) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
-  Stats::ThreadLocalStoreImpl store(alloc_);
+  Stats::Allocator alloc(*symbol_table_);
+  Stats::ThreadLocalStoreImpl store(alloc);
   envoy::config::metrics::v3::StatsConfig stats_config;
   const Stats::TagVector tags;
   store.setTagProducer(Stats::TagProducerImpl::createTagProducer(stats_config, tags).value());
   Stats::StatName name = pool_.add("default.total_match_count");
 
   Stats::ScopeSharedPtr scope1 = store.rootScope()->createScope("cluster.a");
-  counters_.push_back(Stats::CounterSharedPtr(&scope1->counterFromStatName(name)));
+  counters_.push_back(&scope1->counterFromStatName(name));
 
   // To reproduce the problem from we will render
   // cluster.a.default.total_match_count before we discover the existence of
@@ -347,7 +347,7 @@ TEST_F(PrometheusStatsFormatterTest, DifferentNamedScopeSameStat) {
   // "default" comes before "x" with
   // https://github.com/envoyproxy/envoy/pull/24998
   Stats::ScopeSharedPtr scope2 = store.rootScope()->createScope("cluster.x");
-  counters_.push_back(Stats::CounterSharedPtr(&scope2->counterFromStatName(name)));
+  counters_.push_back(&scope2->counterFromStatName(name));
 
   constexpr absl::string_view expected_output =
       R"EOF(# TYPE envoy_cluster_default_total_match_count counter
@@ -369,7 +369,7 @@ envoy_cluster_default_total_match_count{envoy_cluster_name="x"} 0
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1, size);
   EXPECT_EQ(expected_output, response.toString());
@@ -383,14 +383,12 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(
       h1_cumulative.getHistogram(), Stats::Histogram::Unit::Unspecified, buckets);
 
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
-
-  addHistogram(histogram);
+  MockHistogram& histogram = makeHistogram("histogram1", {});
+  ON_CALL(histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -423,14 +421,12 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram(),
                                                           Stats::Histogram::Unit::Percent, buckets);
 
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
-
-  addHistogram(histogram);
+  MockHistogram& histogram = makeHistogram("histogram1", {});
+  ON_CALL(histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -458,14 +454,12 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
 
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
-
-  addHistogram(histogram);
+  MockHistogram& histogram = makeHistogram("histogram1", {});
+  ON_CALL(histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -521,16 +515,15 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 =
+  MockHistogram& histogram1 =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
                                                         {makeStat("key2"), makeStat("value2")}});
-  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  addHistogram(histogram1);
-  EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  histogram1.unit_ = Stats::Histogram::Unit::Milliseconds;
+  EXPECT_CALL(histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(12UL, size);
 
@@ -608,7 +601,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithTextReadoutsInGaugeFormat) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(4UL, size);
 
@@ -647,17 +640,15 @@ TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
     addGauge("cluster.upstream_rq_active", tags);
 
     for (const char* hist_name : {"cluster.upstream_rq_time", "cluster.upstream_response_time"}) {
-      auto histogram1 = makeHistogram(hist_name, tags);
-      histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-      addHistogram(histogram1);
-      EXPECT_CALL(*histogram1, cumulativeStatistics())
-          .WillOnce(ReturnRef(h1_cumulative_statistics));
+      MockHistogram& histogram1 = makeHistogram(hist_name, tags);
+      histogram1.unit_ = Stats::Histogram::Unit::Milliseconds;
+      EXPECT_CALL(histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
     }
   }
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(6UL, size);
 
@@ -832,18 +823,17 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 =
+  MockHistogram& histogram1 =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
                                                         {makeStat("key2"), makeStat("value2")}});
-  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  addHistogram(histogram1);
-  EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  histogram1.unit_ = Stats::Histogram::Unit::Milliseconds;
+  EXPECT_CALL(histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   StatsParams params;
   params.used_only_ = true;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response, params,
       custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -890,7 +880,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithHiddenGauge) {
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::Exclude;
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+        counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected_output =
         R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
@@ -903,7 +893,7 @@ envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::ShowOnly;
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+        counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected_output =
         R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
@@ -916,7 +906,7 @@ envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::Include;
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+        counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected_output =
         R"EOF(# TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
@@ -935,32 +925,31 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 =
+  MockHistogram& histogram1 =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
                                                         {makeStat("key2"), makeStat("value2")}});
-  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  histogram1->used_ = false;
-  addHistogram(histogram1);
+  histogram1.unit_ = Stats::Histogram::Unit::Milliseconds;
+  histogram1.used_ = false;
   StatsParams params;
 
   {
     params.used_only_ = true;
-    EXPECT_CALL(*histogram1, cumulativeStatistics()).Times(0);
+    EXPECT_CALL(histogram1, cumulativeStatistics()).Times(0);
 
     Buffer::OwnedImpl response;
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+        counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(0UL, size);
   }
 
   {
     params.used_only_ = false;
-    EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+    EXPECT_CALL(histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
     Buffer::OwnedImpl response;
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+        counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(1UL, size);
   }
@@ -983,11 +972,10 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram1 =
+  MockHistogram& histogram1 =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("key1"), makeStat("value1")},
                                                         {makeStat("key2"), makeStat("value2")}});
-  histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
-  addHistogram(histogram1);
+  histogram1.unit_ = Stats::Histogram::Unit::Milliseconds;
 
   const std::string expected_output =
       R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
@@ -999,7 +987,7 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     ASSERT_EQ(Http::Code::OK,
               params.parse("/stats?filter=cluster.test_1.upstream_cx_total", response));
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+        counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(1UL, size);
     EXPECT_EQ(expected_output, response.toString());
@@ -1011,7 +999,7 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     ASSERT_EQ(Http::Code::OK,
               params.parse("/stats?filter=cluster.test_1.upstream_cx_total&safe", response));
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+        counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(1UL, size);
     EXPECT_EQ(expected_output, response.toString());
@@ -1023,7 +1011,7 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     StatsParams params;
     ASSERT_EQ(Http::Code::OK, params.parse("/stats?filter=cluster.test_1.endpoint.*c1", response));
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
-        counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
+        counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected =
         R"EOF(# TYPE envoy_cluster_endpoint_c1 counter
@@ -1120,7 +1108,7 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithCountersAndGauges) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, StatsParams(), custom_namespaces);
   EXPECT_EQ(3UL, size);
 
@@ -1158,16 +1146,15 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithHistogram) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram =
+  MockHistogram& histogram =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("cluster"), makeStat("test_1")}});
-  histogram->unit_ = Stats::Histogram::Unit::Milliseconds;
-  addHistogram(histogram);
-  EXPECT_CALL(*histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
+  EXPECT_CALL(histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -1219,15 +1206,15 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithHistogramPercent) {
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram(),
                                                           Stats::Histogram::Unit::Percent, buckets);
 
-  auto histogram = makeHistogram("percent_histogram", {{makeStat("cluster"), makeStat("test_1")}});
-  histogram->unit_ = Stats::Histogram::Unit::Percent;
-  addHistogram(histogram);
-  EXPECT_CALL(*histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  MockHistogram& histogram =
+      makeHistogram("percent_histogram", {{makeStat("cluster"), makeStat("test_1")}});
+  histogram.unit_ = Stats::Histogram::Unit::Percent;
+  EXPECT_CALL(histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -1262,10 +1249,9 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithSummary) {
   h1_interval.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_interval_statistics(h1_interval.getHistogram());
 
-  auto histogram =
+  MockHistogram& histogram =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("cluster"), makeStat("test_1")}});
-  addHistogram(histogram);
-  EXPECT_CALL(*histogram, intervalStatistics()).WillOnce(ReturnRef(h1_interval_statistics));
+  EXPECT_CALL(histogram, intervalStatistics()).WillOnce(ReturnRef(h1_interval_statistics));
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
@@ -1273,7 +1259,7 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithSummary) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -1308,7 +1294,7 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithTextReadouts) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, StatsParams(), custom_namespaces);
   EXPECT_EQ(2UL, size);
 
@@ -1349,7 +1335,7 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithMultipleTags) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, StatsParams(), custom_namespaces);
 
   auto families = parsePrometheusProtobuf(response.toString());
@@ -1387,7 +1373,7 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithClusterEndpoints) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, StatsParams(), custom_namespaces);
   EXPECT_EQ(5UL, size);
 
@@ -1458,7 +1444,7 @@ TEST_F(PrometheusStatsFormatterTest, ContentNegotiationProtobufAcceptHeader) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, request_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, request_headers,
       response_headers, response, StatsParams(), custom_namespaces);
 
   EXPECT_EQ("application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; "
@@ -1482,7 +1468,7 @@ TEST_F(PrometheusStatsFormatterTest, ContentNegotiationTextPlainAcceptHeader) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, request_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, request_headers,
       response_headers, response, StatsParams(), custom_namespaces);
 
   EXPECT_TRUE(response_headers.getContentTypeValue().empty());
@@ -1501,7 +1487,7 @@ TEST_F(PrometheusStatsFormatterTest, ContentNegotiationDefaultToText) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, request_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, request_headers,
       response_headers, response, StatsParams(), custom_namespaces);
 
   // Should default to text format
@@ -1523,7 +1509,7 @@ TEST_F(PrometheusStatsFormatterTest, QueryParamOverridesAcceptHeader) {
   params.parse("?prom_protobuf=1", parse_buffer);
 
   PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, request_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, request_headers,
       response_headers, response, params, custom_namespaces);
 
   // Query param should override Accept header - should use protobuf
@@ -1545,10 +1531,9 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithNativeHistogram) {
   h1_cumulative.setHistogramValues(h1_values);
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram =
+  MockHistogram& histogram =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("cluster"), makeStat("test_1")}});
-  histogram->unit_ = Stats::Histogram::Unit::Milliseconds;
-  addHistogram(histogram);
+  histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
 
   // Set up detailed buckets that will be returned by detailedTotalBuckets().
   // These are used to determine the data range for schema selection.
@@ -1559,10 +1544,10 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithNativeHistogram) {
       {100.0, 50.0, 1}, // [100, 150): 1 sample
   };
 
-  EXPECT_CALL(*histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
-  EXPECT_CALL(*histogram, detailedTotalBuckets()).WillOnce(testing::Return(detailed_buckets));
+  EXPECT_CALL(histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  EXPECT_CALL(histogram, detailedTotalBuckets()).WillOnce(testing::Return(detailed_buckets));
 
-  EXPECT_CALL(*histogram, cumulativeCountLessThanOrEqualToValue(testing::_))
+  EXPECT_CALL(histogram, cumulativeCountLessThanOrEqualToValue(testing::_))
       .WillRepeatedly([](double value) -> uint64_t {
         if (value < 0.0) {
           return 0; // Nothing below 0
@@ -1586,7 +1571,7 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithNativeHistogram) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -1644,14 +1629,13 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithNativeHistogramEmptyBucke
   HistogramWrapper h1_cumulative;
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
-  auto histogram =
+  MockHistogram& histogram =
       makeHistogram("cluster.test_1.upstream_rq_time", {{makeStat("cluster"), makeStat("test_1")}});
-  addHistogram(histogram);
 
   // Empty detailed buckets
   std::vector<Stats::ParentHistogram::Bucket> detailed_buckets = {};
 
-  EXPECT_CALL(*histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
+  EXPECT_CALL(histogram, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -1659,7 +1643,7 @@ TEST_F(PrometheusStatsFormatterTest, ProtobufOutputWithNativeHistogramEmptyBucke
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -1719,15 +1703,6 @@ public:
     store_->mergeHistograms([]() -> void {});
   }
 
-  Stats::ParentHistogramSharedPtr getParentHistogram(const std::string& name) {
-    for (const auto& histogram : store_->histograms()) {
-      if (histogram->name().find(name) != std::string::npos) {
-        return histogram;
-      }
-    }
-    return nullptr;
-  }
-
   // Decode delta-encoded positive bucket counts and return the total sample count.
   // In Prometheus native histograms, positive_delta values are delta-encoded:
   // delta[0] = count[0], delta[i] = count[i] - count[i-1] for i > 0.
@@ -1746,8 +1721,8 @@ public:
   }
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::Allocator alloc_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::Allocator alloc_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
   Stats::Scope& scope_;
   NiceMock<Stats::MockSink> sink_;
@@ -1755,6 +1730,10 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Stats::CustomStatNamespacesImpl custom_namespaces_;
   std::unique_ptr<Upstream::PerEndpointMetricsTestHelper> endpoints_helper_;
+  std::vector<Stats::Counter*> counters_;
+  std::vector<Stats::Gauge*> gauges_;
+  std::vector<Stats::ParentHistogram*> histograms_;
+  std::vector<Stats::TextReadout*> text_readouts_;
 };
 
 // Test native histogram with only zero values using real histogram implementation.
@@ -1768,13 +1747,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithOnlyZeros) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_zeros");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_zeros");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -1782,7 +1758,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithOnlyZeros) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters, gauges, histograms, text_readouts, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces_);
   EXPECT_EQ(1UL, size);
 
@@ -1820,13 +1796,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithZerosAndPositiveVal
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_mixed");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_mixed");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -1834,7 +1807,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithZerosAndPositiveVal
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters, gauges, histograms, text_readouts, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces_);
   EXPECT_EQ(1UL, size);
 
@@ -1871,13 +1844,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithBoundaryValues) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_boundary");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_boundary");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -1885,7 +1855,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithBoundaryValues) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters, gauges, histograms, text_readouts, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces_);
   EXPECT_EQ(1UL, size);
 
@@ -1950,13 +1920,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithWideRange) {
   recordValue(h1, 100000);
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_wide");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_wide");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -1965,7 +1932,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithWideRange) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters, gauges, histograms, text_readouts, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces_);
   EXPECT_EQ(1UL, size);
 
@@ -2007,13 +1974,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSchemaReduction) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_schema");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_schema");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   // Use small max_buckets to force schema reduction
   StatsParams params;
@@ -2023,7 +1987,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSchemaReduction) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters, gauges, histograms, text_readouts, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces_);
   EXPECT_EQ(1UL, size);
 
@@ -2067,13 +2031,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithPercent) {
   recordValue(h1, static_cast<uint64_t>(3.00 * Stats::Histogram::PercentScale));
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_percent_mixed");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_percent_mixed");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2081,7 +2042,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramWithPercent) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters, gauges, histograms, text_readouts, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces_);
   EXPECT_EQ(1UL, size);
 
@@ -2220,22 +2181,19 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSparseDataAccuracy) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_sparse");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_sparse");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
 
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
-  PrometheusStatsFormatter::statsAsPrometheusProtobuf(counters, gauges, histograms, text_readouts,
-                                                      endpoints_helper_->cm_, response_headers,
-                                                      response, params, custom_namespaces_);
+  PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
+      response, params, custom_namespaces_);
 
   auto families = parsePrometheusProtobuf(response.toString());
   ASSERT_EQ(1, families.size());
@@ -2298,22 +2256,19 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramDenseDataAccuracy) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_dense");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_dense");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
 
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
-  PrometheusStatsFormatter::statsAsPrometheusProtobuf(counters, gauges, histograms, text_readouts,
-                                                      endpoints_helper_->cm_, response_headers,
-                                                      response, params, custom_namespaces_);
+  PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
+      response, params, custom_namespaces_);
 
   auto families = parsePrometheusProtobuf(response.toString());
   ASSERT_EQ(1, families.size());
@@ -2382,13 +2337,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramBucketIndexAccuracy) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_exact");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_exact");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2397,9 +2349,9 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramBucketIndexAccuracy) {
 
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
-  PrometheusStatsFormatter::statsAsPrometheusProtobuf(counters, gauges, histograms, text_readouts,
-                                                      endpoints_helper_->cm_, response_headers,
-                                                      response, params, custom_namespaces_);
+  PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
+      response, params, custom_namespaces_);
 
   auto families = parsePrometheusProtobuf(response.toString());
   ASSERT_EQ(1, families.size());
@@ -2450,22 +2402,19 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramVerySparseData) {
   recordValue(h1, 1ULL << 60);
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_very_sparse");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_very_sparse");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
 
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
-  PrometheusStatsFormatter::statsAsPrometheusProtobuf(counters, gauges, histograms, text_readouts,
-                                                      endpoints_helper_->cm_, response_headers,
-                                                      response, params, custom_namespaces_);
+  PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
+      response, params, custom_namespaces_);
 
   auto families = parsePrometheusProtobuf(response.toString());
   ASSERT_EQ(1, families.size());
@@ -2520,13 +2469,10 @@ TEST_F(RealHistogramNativePrometheusTest, TraditionalHistogramWithPercent) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_percent");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_percent");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   // Use default params (traditional/cumulative histogram, not native)
   StatsParams params;
@@ -2534,7 +2480,7 @@ TEST_F(RealHistogramNativePrometheusTest, TraditionalHistogramWithPercent) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters, gauges, histograms, text_readouts, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces_);
   EXPECT_EQ(1UL, size);
 
@@ -2589,13 +2535,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramCumulativeAccuracy) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_cumulative");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_cumulative");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2605,9 +2548,9 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramCumulativeAccuracy) {
 
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
-  PrometheusStatsFormatter::statsAsPrometheusProtobuf(counters, gauges, histograms, text_readouts,
-                                                      endpoints_helper_->cm_, response_headers,
-                                                      response, params, custom_namespaces_);
+  PrometheusStatsFormatter::statsAsPrometheusProtobuf(
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
+      response, params, custom_namespaces_);
 
   auto families = parsePrometheusProtobuf(response.toString());
   ASSERT_EQ(1, families.size());
@@ -2698,13 +2641,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramNormalDistribution) {
   }
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_normal");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_normal");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2712,7 +2652,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramNormalDistribution) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters, gauges, histograms, text_readouts, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces_);
   EXPECT_EQ(1UL, size);
 
@@ -2797,13 +2737,10 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSchemaFallback) {
   recordValue(h1, 1000000000);
   mergeHistograms();
 
-  auto parent_histogram = getParentHistogram("histogram_fallback");
-  ASSERT_NE(nullptr, parent_histogram);
-
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = {parent_histogram};
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts;
+  OptRef<Stats::ParentHistogram> parent_histogram =
+      TestUtility::findHistogramMainThread(*store_, "histogram_fallback");
+  ASSERT_TRUE(parent_histogram.has_value());
+  histograms_.push_back(parent_histogram.ptr());
 
   StatsParams params;
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::PrometheusNative;
@@ -2814,7 +2751,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramSchemaFallback) {
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusProtobuf(
-      counters, gauges, histograms, text_readouts, endpoints_helper_->cm_, response_headers,
+      counters_, gauges_, histograms_, text_readouts_, endpoints_helper_->cm_, response_headers,
       response, params, custom_namespaces_);
   EXPECT_EQ(1UL, size);
 

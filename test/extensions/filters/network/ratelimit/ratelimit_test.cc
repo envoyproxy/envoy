@@ -64,9 +64,7 @@ public:
   }
 
   ~RateLimitFilterTest() override {
-    for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
-    }
+    stats_store_.forEachGauge(nullptr, [](Stats::Gauge& gauge) { EXPECT_EQ(0U, gauge.value()); });
   }
 
   const std::string filter_config_ = R"EOF(

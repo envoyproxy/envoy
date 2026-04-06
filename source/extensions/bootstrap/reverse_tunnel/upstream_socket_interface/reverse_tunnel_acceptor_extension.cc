@@ -132,17 +132,16 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getCr
   // Iterate through all gauges and filter for cross-worker stats only.
   // Cross-worker stats have the pattern "<stat_prefix>.nodes.<node_id>" or
   // "<stat_prefix>.clusters.<cluster_id>" (no dispatcher name in the middle).
-  Stats::IterateFn<Stats::Gauge> gauge_callback =
-      [&stats_map, this](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
-    const std::string& gauge_name = gauge->name();
-    ENVOY_LOG(trace, "reverse_tunnel: gauge_name: {} gauge_value: {}", gauge_name, gauge->value());
+  Stats::IterateFn<Stats::Gauge> gauge_callback = [&stats_map, this](Stats::Gauge& gauge) -> bool {
+    const std::string& gauge_name = gauge.name();
+    ENVOY_LOG(trace, "reverse_tunnel: gauge_name: {} gauge_value: {}", gauge_name, gauge.value());
     std::string nodes_pattern = stat_prefix_ + ".nodes.";
     std::string clusters_pattern = stat_prefix_ + ".clusters.";
     if (gauge_name.find(stat_prefix_ + ".") != std::string::npos &&
         (gauge_name.find(nodes_pattern) != std::string::npos ||
          gauge_name.find(clusters_pattern) != std::string::npos) &&
-        gauge->used()) {
-      stats_map[gauge_name] = gauge->value();
+        gauge.used()) {
+      stats_map[gauge_name] = gauge.value();
     }
     return true;
   };
@@ -386,16 +385,16 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getPe
   }
 
   // Iterate through all gauges and filter for the current dispatcher.
-  Stats::IterateFn<Stats::Gauge> gauge_callback =
-      [&stats_map, &dispatcher_name, this](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
-    const std::string& gauge_name = gauge->name();
-    ENVOY_LOG(trace, "reverse_tunnel: gauge_name: {} gauge_value: {}", gauge_name, gauge->value());
+  Stats::IterateFn<Stats::Gauge> gauge_callback = [&stats_map, &dispatcher_name,
+                                                   this](Stats::Gauge& gauge) -> bool {
+    const std::string& gauge_name = gauge.name();
+    ENVOY_LOG(trace, "reverse_tunnel: gauge_name: {} gauge_value: {}", gauge_name, gauge.value());
     if (gauge_name.find(stat_prefix_ + ".") != std::string::npos &&
         gauge_name.find(dispatcher_name + ".") != std::string::npos &&
         (gauge_name.find(".node.") != std::string::npos ||
          gauge_name.find(".cluster.") != std::string::npos) &&
-        gauge->used()) {
-      stats_map[gauge_name] = gauge->value();
+        gauge.used()) {
+      stats_map[gauge_name] = gauge.value();
     }
     return true;
   };

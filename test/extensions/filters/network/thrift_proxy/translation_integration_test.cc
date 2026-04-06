@@ -153,7 +153,7 @@ TEST_P(ThriftTranslationIntegrationTest, Translates) {
   EXPECT_TRUE(
       TestUtility::buffersEqual(Buffer::OwnedImpl(tcp_client->data()), downstream_response_bytes_));
 
-  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
+  OptRef<Stats::Counter> counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
   counter = test_server_->counter("cluster.cluster_0.thrift.upstream_rq_call");
   EXPECT_EQ(1U, counter->value());

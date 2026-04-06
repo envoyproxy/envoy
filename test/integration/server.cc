@@ -257,6 +257,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Random::RandomGeneratorPtr&& random_generator, ProcessObjectOptRef process_object,
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_admin_server) {
   {
+    Thread::MainThread main_thread;
     Init::ManagerImpl init_manager{"Server"};
     Server::HotRestartNopImpl restarter;
     ThreadLocal::InstanceImpl tls;

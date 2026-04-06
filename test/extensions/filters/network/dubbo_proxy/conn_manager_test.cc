@@ -133,7 +133,7 @@ public:
   void initializeFilter() { initializeFilter(""); }
 
   void initializeFilter(const std::string& yaml) {
-    for (const auto& counter : store_.counters()) {
+    for (Stats::Counter* counter : Stats::Utility::countersMainThread(store_)) {
       counter->reset();
     }
 

@@ -3245,9 +3245,9 @@ TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, DuplicateMetadataStat) {
   });
   // The first 'a' is the original, the next 2 instances of 'a' are duplicates (counted
   // in stat), and 'b' is another non-duplicate.
-  for (auto& gauge : stats_store_.gauges()) {
-    ENVOY_LOG_MISC(debug, "name {} value {}", gauge->name(), gauge->value());
-  }
+  stats_store_.forEachGauge(nullptr, [](Stats::Gauge& gauge) {
+    ENVOY_LOG_MISC(debug, "name {} value {}", gauge.name(), gauge.value());
+  });
   EXPECT_EQ(2, TestUtility::findGauge(stats_store_,
                                       "testprefix.lb_subsets_single_host_per_subset_duplicate")
                    ->value());

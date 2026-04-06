@@ -270,9 +270,7 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
     auto worker0_ctr = test_server_->counter(worker0_stat_name);
     auto worker1_ctr = test_server_->counter(worker1_stat_name);
     auto target = w0_ctr + w1_ctr + requests_per_loop;
-    while (test_server_->counter(worker0_stat_name)->value() +
-               test_server_->counter(worker1_stat_name)->value() <
-           target) {
+    while (worker0_ctr->value() + worker1_ctr->value() < target) {
       timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
     }
     w0_ctr = test_server_->counter(worker0_stat_name)->value();

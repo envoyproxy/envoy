@@ -176,15 +176,33 @@ public:
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
-  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Counter>& fn) const override {
+    bool cont = true;
+    forEachCounter(nullptr, [fn, &cont](Counter& counter) { cont = cont && fn(counter); });
+    return cont;
+  }
 
-  std::vector<CounterSharedPtr> counters() const override;
-  std::vector<GaugeSharedPtr> gauges() const override;
-  std::vector<TextReadoutSharedPtr> textReadouts() const override;
-  std::vector<ParentHistogramSharedPtr> histograms() const override;
+  bool iterate(const IterateFn<Gauge>& fn) const override {
+    bool cont = true;
+    forEachGauge(nullptr, [fn, &cont](Gauge& gauge) { cont = cont && fn(gauge); });
+    return cont;
+  }
+
+  bool iterate(const IterateFn<Histogram>& fn) const override {
+    bool cont = true;
+    forEachHistogram(nullptr, [fn, &cont](ParentHistogram& histogram) {
+      // Note: up-cases to Histogram, annoyingly.
+      cont = cont && fn(histogram);
+    });
+    return cont;
+  }
+
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    bool cont = true;
+    forEachTextReadout(nullptr,
+                       [fn, &cont](TextReadout& text_readout) { cont = cont && fn(text_readout); });
+    return cont;
+  }
 
   void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
@@ -333,7 +351,7 @@ private:
 
     template <class StatMap, class StatFn> bool iterHelper(StatFn fn, const StatMap& map) const {
       for (auto& iter : map) {
-        if (!fn(iter.second)) {
+        if (!fn(*iter.second)) {
           return false;
         }
       }
@@ -447,6 +465,17 @@ private:
       return central_cache_;
     }
 
+    // Detaches the central cache from the scope, and returns it to the
+    // caller. This enables the ScopeImpl to be deleted from any thread,
+    // but guarantee that the stats held by the scope are only removed
+    // from the main thread.
+    CentralCacheEntrySharedPtr releaseCentralCacheLockHeld()
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
+      CentralCacheEntrySharedPtr central_cache = std::move(central_cache_);
+      central_cache_.reset();
+      return central_cache;
+    }
+
     CentralCacheEntrySharedPtr&
     centralCacheMutableNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
       return central_cache_;
@@ -485,7 +514,13 @@ private:
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     TlsCacheEntry& insertScope(uint64_t scope_id);
-    void eraseScopes(const std::vector<uint64_t>& scope_ids);
+
+    // Erases the scopes identified by indices provided in scope_ids. the TLS
+    // cache entries for the scopes are transferred into tls_cache_entries. The
+    // caller must ensure only one thread at a time calls eraseScopes, to avoid
+    // racing the write to tls_cache_entries.
+    void eraseScopes(const std::vector<uint64_t>& scope_ids,
+                     std::vector<TlsCacheEntry>& tls_cache_entries);
     void eraseHistograms(const std::vector<uint64_t>& histograms);
 
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
@@ -531,15 +566,6 @@ private:
 
   bool iterateScopesLockHeld(const std::function<bool(const ScopeImplSharedPtr&)> fn) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-
-  // The Store versions of iterate cover all the scopes in the store.
-  template <class StatFn> bool iterHelper(StatFn fn) const {
-    return iterateScopes([this, fn](const ScopeImplSharedPtr& scope)
-                             ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
-                               assertLocked(*scope);
-                               return scope->iterateLockHeld(fn);
-                             });
-  }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopesFromCaches();

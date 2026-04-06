@@ -48,6 +48,8 @@ Allocator::~Allocator() {
 #endif
 }
 
+void Allocator::setShuttingDown() { shutting_down_ = true; }
+
 #ifndef ENVOY_CONFIG_COVERAGE
 void Allocator::debugPrint() {
   Thread::LockGuard lock(mutex_);
@@ -76,6 +78,13 @@ public:
         alloc_(alloc) {}
 
   ~StatsSharedImpl() override {
+    // We must ensure that stats are destructed on the main thread as part of
+    // scopes teardown from the store. Otherwise stats that are kept in vectors
+    // during main-thread operations such as stats sinks can race destruction.
+    if (!alloc_.shuttingDown()) {
+      ASSERT_IS_MAIN_OR_TEST_THREAD();
+    }
+
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
     // will not be able to access the SymbolTable& to free the symbols. An RAII
     // alternative would be to store the SymbolTable reference in the

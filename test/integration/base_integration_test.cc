@@ -454,19 +454,19 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
     Event::TestTimeSystem::RealTimeBound bound(listeners_bound_timeout_ms_);
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
-    for (Stats::CounterSharedPtr success_counter = test_server->counter(success),
-                                 rejected_counter = test_server->counter(rejected);
-         (success_counter == nullptr ||
+    for (OptRef<Stats::Counter> success_counter = test_server->counter(success),
+                                rejected_counter = test_server->counter(rejected);
+         (!success_counter.has_value() ||
           success_counter->value() <
               concurrency_ * config_helper_.bootstrap().static_resources().listeners_size()) &&
-         (!allow_lds_rejection || rejected_counter == nullptr || rejected_counter->value() == 0);
+         (!allow_lds_rejection || !rejected_counter.has_value() || rejected_counter->value() == 0);
          success_counter = test_server->counter(success),
-                                 rejected_counter = test_server->counter(rejected)) {
+                                rejected_counter = test_server->counter(rejected)) {
       if (!bound.withinBound()) {
         RELEASE_ASSERT(0, "Timed out waiting for listeners.");
       }
       if (!allow_lds_rejection) {
-        RELEASE_ASSERT(rejected_counter == nullptr || rejected_counter->value() == 0,
+        RELEASE_ASSERT(!rejected_counter.has_value() || rejected_counter->value() == 0,
                        absl::StrCat("Lds update failed. Details\n",
                                     getListenerDetails(test_server->server())));
       }

@@ -3422,16 +3422,17 @@ TEST_P(MultiplexedIntegrationTest, PerTryTimeoutWhileDownstreamStopsReading) {
   FakeStreamPtr upstream_request2;
   ASSERT_TRUE(fake_upstream_connection2->waitForNewStream(*dispatcher_, upstream_request2));
 
-  Stats::CounterSharedPtr upstream_read_disabled_counter;
+  OptRef<Stats::Counter> upstream_read_disabled_counter;
   while (!response1->reset() && !response2->reset() && !response1->complete()) {
     // Check upstream flow control condition every 10ms and exit the loop if upstream paused
     // reading.
-    if (upstream_read_disabled_counter == nullptr) {
-      upstream_read_disabled_counter = Envoy::TestUtility::findCounter(
+    if (!upstream_read_disabled_counter.has_value()) {
+      upstream_read_disabled_counter = Envoy::TestUtility::findCounterMainThread(
           test_server_->statStore(),
           "cluster.cluster_0.upstream_flow_control_paused_reading_total");
     }
-    if (upstream_read_disabled_counter != nullptr && upstream_read_disabled_counter->value() >= 1) {
+    if (upstream_read_disabled_counter.has_value() &&
+        upstream_read_disabled_counter->value() >= 1) {
       upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
       upstream_request2->encodeData(1024 * 1024, true);
       break;
