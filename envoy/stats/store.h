@@ -169,10 +169,13 @@ public:
     return iterateRef([fn](Gauge& gauge) -> bool { return fn(GaugeSharedPtr(&gauge)); });
   }
   ABSL_DEPRECATED("use iterateRef instead") bool iterate(const IterateFn<TextReadout>& fn) const {
-    return iterateRef([fn](TextReadout& text_readout) -> bool { return fn(TextReadoutSharedPtr(&text_readout)); });
+    return iterateRef([fn](TextReadout& text_readout) -> bool {
+      return fn(TextReadoutSharedPtr(&text_readout));
+    });
   }
   ABSL_DEPRECATED("use iterateRef instead") bool iterate(const IterateFn<Histogram>& fn) const {
-    return iterateRef([fn](Histogram& histogram) -> bool { return fn(HistogramSharedPtr(&histogram)); });
+    return iterateRef(
+        [fn](Histogram& histogram) -> bool { return fn(HistogramSharedPtr(&histogram)); });
   }
 
   // Delegate some methods to the root scope; these are exposed to make it more

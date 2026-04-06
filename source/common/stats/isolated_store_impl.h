@@ -110,7 +110,9 @@ public:
   bool iterateRef(const IterateRefFn<Counter>& fn) const override {
     return constRootScope()->iterateRef(fn);
   }
-  bool iterateRef(const IterateRefFn<Gauge>& fn) const override { return constRootScope()->iterateRef(fn); }
+  bool iterateRef(const IterateRefFn<Gauge>& fn) const override {
+    return constRootScope()->iterateRef(fn);
+  }
   bool iterateRef(const IterateRefFn<Histogram>& fn) const override {
     return constRootScope()->iterateRef(fn);
   }
@@ -414,7 +416,8 @@ protected:
   void addScopeToStore(const ScopeSharedPtr& scope) { store_.scopes_.push_back(scope); }
 
 private:
-  template <class StatType> IterateRefFn<StatType> iterFilter(const IterateRefFn<StatType>& fn) const {
+  template <class StatType>
+  IterateRefFn<StatType> iterFilter(const IterateRefFn<StatType>& fn) const {
     // We determine here what's in the scope by looking at name
     // prefixes. Strictly speaking this is not correct, as the same stat can be
     // in different scopes, e.g. counter "b.c" in scope "a", and counter "c"

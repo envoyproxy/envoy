@@ -157,8 +157,12 @@ public:
   }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
-  bool iterateRef(const IterateRefFn<Counter>& fn) const override { return wrapped_scope_->iterateRef(fn); }
-  bool iterateRef(const IterateRefFn<Gauge>& fn) const override { return wrapped_scope_->iterateRef(fn); }
+  bool iterateRef(const IterateRefFn<Counter>& fn) const override {
+    return wrapped_scope_->iterateRef(fn);
+  }
+  bool iterateRef(const IterateRefFn<Gauge>& fn) const override {
+    return wrapped_scope_->iterateRef(fn);
+  }
   bool iterateRef(const IterateRefFn<Histogram>& fn) const override {
     return wrapped_scope_->iterateRef(fn);
   }
@@ -364,8 +368,12 @@ public:
 
   bool iterateRef(const IterateRefFn<Counter>& fn) const override { return store_.iterateRef(fn); }
   bool iterateRef(const IterateRefFn<Gauge>& fn) const override { return store_.iterateRef(fn); }
-  bool iterateRef(const IterateRefFn<Histogram>& fn) const override { return store_.iterateRef(fn); }
-  bool iterateRef(const IterateRefFn<TextReadout>& fn) const override { return store_.iterateRef(fn); }
+  bool iterateRef(const IterateRefFn<Histogram>& fn) const override {
+    return store_.iterateRef(fn);
+  }
+  bool iterateRef(const IterateRefFn<TextReadout>& fn) const override {
+    return store_.iterateRef(fn);
+  }
   /*bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }

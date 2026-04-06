@@ -176,7 +176,8 @@ ReverseTunnelInitiatorExtension::getCrossWorkerStatMap() {
   // Iterate through all gauges and filter for cross-worker stats only.
   // Cross-worker stats have the pattern "<stat_prefix>.host.<host_address>.<state_suffix>" or
   // "<stat_prefix>.cluster.<cluster_id>.<state_suffix>" (no dispatcher name in the middle).
-  Stats::IterateRefFn<Stats::Gauge> gauge_callback = [&stats_map, this](Stats::Gauge& gauge) -> bool {
+  Stats::IterateRefFn<Stats::Gauge> gauge_callback = [&stats_map,
+                                                      this](Stats::Gauge& gauge) -> bool {
     const std::string& gauge_name = gauge.name();
     ENVOY_LOG(trace, "reverse_tunnel: gauge_name: {} gauge_value: {}", gauge_name, gauge.value());
     if (gauge_name.find(stat_prefix_ + ".") != std::string::npos &&
@@ -261,7 +262,7 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelInitiatorExtension::getP
 
   // Iterate through all gauges and filter for the current dispatcher.
   Stats::IterateRefFn<Stats::Gauge> gauge_callback = [&stats_map, &dispatcher_name,
-                                                   this](Stats::Gauge& gauge) -> bool {
+                                                      this](Stats::Gauge& gauge) -> bool {
     const std::string& gauge_name = gauge.name();
     ENVOY_LOG(trace, "reverse_tunnel: gauge_name: {} gauge_value: {}", gauge_name, gauge.value());
     if (gauge_name.find(stat_prefix_ + ".") != std::string::npos &&
