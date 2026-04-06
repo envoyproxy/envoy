@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.tls.cert_selectors.filter_state.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.cert_selectors.filter_state.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/cert_selectors/filter_state/v3;filter_statev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Filter state certificate selector]
+// [#extension: envoy.tls.certificate_selectors.filter_state]
+
+// Selects a TLS certificate by reading PEM-encoded certificate chain and private key from
+// connection filter state. This enables dynamic certificate provisioning by listener filters
+// (e.g., for TLS interception or on-the-fly certificate generation).
+//
+// During the TLS handshake, a certificate name is derived from the CLIENT HELLO using the
+// configured certificate mapper. The selector checks a per-worker thread-local cache for a
+// compiled TLS context matching that name. On a cache miss, it reads PEM-encoded certificate
+// chain and private key from connection filter state, creates a TLS context, caches it, and
+// uses it for the handshake.
+//
+// This selector requires session resumption to be disabled since dynamically-provided
+// certificates are not part of the parent TLS context's session ID.
+message Config {
+  // Extension point to compute the certificate name from the CLIENT HELLO.
+  // Typically the SNI mapper (``envoy.tls.certificate_mappers.sni``).
+  // [#extension-category: envoy.tls.certificate_mappers]
+  config.core.v3.TypedExtensionConfig certificate_mapper = 1
+      [(validate.rules).message = {required: true}];
+
+  // Filter state key for the PEM-encoded certificate chain.
+  // Defaults to ``envoy.tls.certificate.cert_chain``.
+  string cert_chain_filter_state_key = 2;
+
+  // Filter state key for the PEM-encoded private key.
+  // Defaults to ``envoy.tls.certificate.private_key``.
+  string private_key_filter_state_key = 3;
+
+  // Maximum number of entries in the per-worker thread-local certificate cache.
+  // 0 means unlimited (default).
+  uint32 max_cache_size = 4;
+}

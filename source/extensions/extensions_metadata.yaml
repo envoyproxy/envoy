@@ -2314,6 +2314,13 @@ envoy.filters.http.dynamic_modules:
   status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+envoy.tls.certificate_selectors.filter_state:
+  categories:
+  - envoy.tls.certificate_selectors
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.tls.cert_selectors.filter_state.v3.Config
 envoy.tls.certificate_selectors.on_demand_secret:
   categories:
   - envoy.tls.certificate_selectors
