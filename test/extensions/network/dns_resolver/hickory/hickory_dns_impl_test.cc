@@ -3,6 +3,7 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/network/dns_resolver/hickory/hickory_dns_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/test_runtime.h"
 
@@ -19,7 +20,8 @@ namespace {
 class HickoryDnsImplTest : public testing::Test {
 public:
   HickoryDnsImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+      : api_(Api::createApiForTest(stats_store_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void
   initialize(const envoy::extensions::network::dns_resolver::hickory::v3::HickoryDnsResolverConfig&
@@ -36,6 +38,19 @@ public:
     resolver_ = std::move(*resolver_or);
   }
 
+  void checkStats(uint64_t resolve_total, uint64_t pending_resolutions, uint64_t not_found,
+                  uint64_t get_addr_failure, uint64_t timeouts) {
+    EXPECT_EQ(resolve_total, stats_store_.counter("dns.hickory.resolve_total").value());
+    EXPECT_EQ(
+        pending_resolutions,
+        stats_store_.gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+            .value());
+    EXPECT_EQ(not_found, stats_store_.counter("dns.hickory.not_found").value());
+    EXPECT_EQ(get_addr_failure, stats_store_.counter("dns.hickory.get_addr_failure").value());
+    EXPECT_EQ(timeouts, stats_store_.counter("dns.hickory.timeouts").value());
+  }
+
+  Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   DnsResolverSharedPtr resolver_;
@@ -84,6 +99,7 @@ TEST_F(HickoryDnsImplTest, CreateResolverWithCustomOptions) {
 
 TEST_F(HickoryDnsImplTest, ResolveLocalhost) {
   initialize();
+  checkStats(0, 0, 0, 0, 0);
 
   bool callback_called = false;
   auto* query =
@@ -98,6 +114,8 @@ TEST_F(HickoryDnsImplTest, ResolveLocalhost) {
   EXPECT_NE(query, nullptr);
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   EXPECT_TRUE(callback_called);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
 TEST_F(HickoryDnsImplTest, ResolveLocalhostV4Only) {
@@ -182,21 +200,36 @@ TEST_F(HickoryDnsImplTest, ResolveNonExistentDomain) {
   initialize();
 
   bool callback_called = false;
-  auto* query = resolver_->resolve(
-      "this-domain-does-not-exist-at-all.invalid", DnsLookupFamily::All,
-      [this, &callback_called](DnsResolver::ResolutionStatus status, absl::string_view,
-                               std::list<DnsResponse>&& response) {
-        callback_called = true;
-        // Non-existent domain should fail or return empty results.
-        if (status == DnsResolver::ResolutionStatus::Failure) {
-          EXPECT_TRUE(response.empty());
-        }
-        dispatcher_->exit();
-      });
+  DnsResolver::ResolutionStatus result_status;
+  auto* query =
+      resolver_->resolve("this-domain-does-not-exist-at-all.invalid", DnsLookupFamily::All,
+                         [this, &callback_called,
+                          &result_status](DnsResolver::ResolutionStatus status, absl::string_view,
+                                          std::list<DnsResponse>&& response) {
+                           callback_called = true;
+                           result_status = status;
+                           if (status == DnsResolver::ResolutionStatus::Failure) {
+                             EXPECT_TRUE(response.empty());
+                           }
+                           dispatcher_->exit();
+                         });
 
   EXPECT_NE(query, nullptr);
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   EXPECT_TRUE(callback_called);
+  // The query completed, so resolve_total should be incremented and pending_resolutions
+  // should be back to zero.
+  EXPECT_EQ(1, stats_store_.counter("dns.hickory.resolve_total").value());
+  EXPECT_EQ(0, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+  // On failure, exactly one error category stat should be incremented.
+  if (result_status == DnsResolver::ResolutionStatus::Failure) {
+    const uint64_t total_errors = stats_store_.counter("dns.hickory.not_found").value() +
+                                  stats_store_.counter("dns.hickory.get_addr_failure").value() +
+                                  stats_store_.counter("dns.hickory.timeouts").value();
+    EXPECT_EQ(1, total_errors);
+  }
 }
 
 TEST_F(HickoryDnsImplTest, CancelQuery) {
@@ -267,6 +300,8 @@ TEST_F(HickoryDnsImplTest, MultipleSimultaneousQueries) {
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   EXPECT_EQ(callbacks_received, num_queries);
+  checkStats(num_queries /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
 TEST_F(HickoryDnsImplTest, ActiveDnsQueryTracing) {
@@ -288,15 +323,17 @@ TEST_F(HickoryDnsImplTest, ActiveDnsQueryTracing) {
 
 TEST_F(HickoryDnsImplTest, OnResolveCompleteWithUnknownQueryId) {
   initialize();
+  checkStats(0, 0, 0, 0, 0);
 
   // Call onResolveComplete with a query ID that does not exist in pending_queries_.
-  // This exercises the early return on line 164-166.
+  // This exercises the early return in onResolveComplete.
   auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
   ASSERT_NE(hickory_resolver, nullptr);
 
-  // This should silently return without crashing.
+  // This should silently return without crashing or affecting stats.
   hickory_resolver->onResolveComplete(
       999999, envoy_dynamic_module_type_dns_resolution_status_Completed, "should_be_ignored", {});
+  checkStats(0, 0, 0, 0, 0);
 }
 
 TEST_F(HickoryDnsImplTest, AbiCallbackWithNullAddress) {
@@ -436,6 +473,144 @@ TEST_F(HickoryDnsImplTest, DestroyWithPendingQueries) {
   // Destroy the resolver immediately. The destructor should cancel all pending queries
   // and shut down the `Tokio` runtime cleanly.
   resolver_.reset();
+}
+
+TEST_F(HickoryDnsImplTest, StatsNotFoundOnDirectCallback) {
+  initialize();
+  auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
+  ASSERT_NE(hickory_resolver, nullptr);
+
+  bool callback_called = false;
+  resolver_->resolve("localhost", DnsLookupFamily::All,
+                     [this, &callback_called](DnsResolver::ResolutionStatus, absl::string_view,
+                                              std::list<DnsResponse>&&) {
+                       callback_called = true;
+                       dispatcher_->exit();
+                     });
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  EXPECT_TRUE(callback_called);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/);
+
+  // Simulate a not-found resolution by directly calling onResolveComplete with a "no record
+  // found" detail string matching the pattern produced by the Hickory Rust module.
+  callback_called = false;
+  auto* query2 =
+      resolver_->resolve("example.invalid", DnsLookupFamily::All,
+                         [this, &callback_called](DnsResolver::ResolutionStatus status,
+                                                  absl::string_view, std::list<DnsResponse>&&) {
+                           callback_called = true;
+                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
+                           dispatcher_->exit();
+                         });
+  EXPECT_NE(query2, nullptr);
+  // Override the async resolution by posting a direct onResolveComplete. Query ID is 2
+  // (second query on this resolver).
+  hickory_resolver->onResolveComplete(
+      2, envoy_dynamic_module_type_dns_resolution_status_Failure,
+      "A lookup failed: no record found for Query { name: Name(\"example.invalid.\"), "
+      "query_type: A, query_class: IN }",
+      {});
+  EXPECT_TRUE(callback_called);
+  checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/);
+}
+
+TEST_F(HickoryDnsImplTest, StatsTimeoutOnDirectCallback) {
+  initialize();
+  auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
+  ASSERT_NE(hickory_resolver, nullptr);
+
+  bool callback_called = false;
+  auto* query =
+      resolver_->resolve("timeout.example", DnsLookupFamily::All,
+                         [this, &callback_called](DnsResolver::ResolutionStatus status,
+                                                  absl::string_view, std::list<DnsResponse>&&) {
+                           callback_called = true;
+                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
+                           dispatcher_->exit();
+                         });
+  EXPECT_NE(query, nullptr);
+  hickory_resolver->onResolveComplete(
+      1, envoy_dynamic_module_type_dns_resolution_status_Failure,
+      "A lookup failed: DNS request timed out for Name(\"timeout.example.\")", {});
+  EXPECT_TRUE(callback_called);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 1 /*timeouts*/);
+}
+
+TEST_F(HickoryDnsImplTest, StatsGetAddrFailureOnDirectCallback) {
+  initialize();
+  auto* hickory_resolver = dynamic_cast<HickoryDnsResolver*>(resolver_.get());
+  ASSERT_NE(hickory_resolver, nullptr);
+
+  bool callback_called = false;
+  auto* query =
+      resolver_->resolve("fail.example", DnsLookupFamily::All,
+                         [this, &callback_called](DnsResolver::ResolutionStatus status,
+                                                  absl::string_view, std::list<DnsResponse>&&) {
+                           callback_called = true;
+                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
+                           dispatcher_->exit();
+                         });
+  EXPECT_NE(query, nullptr);
+  hickory_resolver->onResolveComplete(1, envoy_dynamic_module_type_dns_resolution_status_Failure,
+                                      "A lookup failed: connection refused", {});
+  EXPECT_TRUE(callback_called);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             1 /*get_addr_failure*/, 0 /*timeouts*/);
+}
+
+TEST_F(HickoryDnsImplTest, StatsPendingResolutionsGauge) {
+  initialize();
+  checkStats(0, 0, 0, 0, 0);
+
+  // Issue a query. The pending_resolutions gauge is incremented synchronously in resolve().
+  resolver_->resolve("localhost", DnsLookupFamily::All,
+                     [this](DnsResolver::ResolutionStatus, absl::string_view,
+                            std::list<DnsResponse>&&) { dispatcher_->exit(); });
+
+  // After resolve() but before the async callback, the gauge should reflect at least 1
+  // pending resolution. However, since the `Tokio` task may complete extremely quickly, we
+  // verify the gauge is correct after the dispatcher runs.
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/);
+}
+
+TEST_F(HickoryDnsImplTest, StatsOnCancelledQuery) {
+  initialize();
+
+  auto* query = resolver_->resolve(
+      "localhost", DnsLookupFamily::All,
+      [](DnsResolver::ResolutionStatus, absl::string_view, std::list<DnsResponse>&&) {});
+  EXPECT_NE(query, nullptr);
+  query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
+
+  // Resolve a second query and wait for it to complete.
+  bool second_callback_called = false;
+  resolver_->resolve("localhost", DnsLookupFamily::All,
+                     [this, &second_callback_called](DnsResolver::ResolutionStatus,
+                                                     absl::string_view, std::list<DnsResponse>&&) {
+                       second_callback_called = true;
+                       dispatcher_->exit();
+                     });
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  EXPECT_TRUE(second_callback_called);
+
+  // The second query is guaranteed to complete. The cancelled query's `Tokio` task may or may
+  // not have posted a result before seeing the cancel flag, so resolve_total is at least 1.
+  EXPECT_GE(stats_store_.counter("dns.hickory.resolve_total").value(), 1);
+  EXPECT_EQ(0, stats_store_.counter("dns.hickory.not_found").value());
+  EXPECT_EQ(0, stats_store_.counter("dns.hickory.get_addr_failure").value());
+  EXPECT_EQ(0, stats_store_.counter("dns.hickory.timeouts").value());
+
+  // Destroying the resolver ensures that any remaining pending queries have their
+  // pending_resolutions gauge decremented in the destructor.
+  resolver_.reset();
+  EXPECT_EQ(0, stats_store_
+                   .gauge("dns.hickory.pending_resolutions", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
 }
 
 TEST_F(HickoryDnsImplTest, ResolveIpAddressV4) {

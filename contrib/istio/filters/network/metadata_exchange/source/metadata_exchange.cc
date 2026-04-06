@@ -182,8 +182,8 @@ void MetadataExchangeFilter::writeNodeMetadata() {
   }
   ENVOY_LOG(trace, "Writing metadata to the connection.");
   Protobuf::Struct data;
-  const auto obj = Istio::Common::convertStructToWorkloadMetadata(local_info_.node().metadata(),
-                                                                  config_->additional_labels_);
+  const auto obj = Istio::Common::convertStructToWorkloadMetadata(
+      local_info_.node().metadata(), config_->additional_labels_, local_info_.node().locality());
   *(*data.mutable_fields())[ExchangeMetadataHeader].mutable_struct_value() =
       Istio::Common::convertWorkloadMetadataToStruct(*obj);
   std::string metadata_id = getMetadataId();
@@ -269,13 +269,22 @@ void MetadataExchangeFilter::updatePeer(const Istio::Common::WorkloadMetadataObj
                                         FilterDirection direction) {
   auto filter_state_key = direction == FilterDirection::Downstream ? Istio::Common::DownstreamPeer
                                                                    : Istio::Common::UpstreamPeer;
+  auto obj_key = direction == FilterDirection::Downstream ? Istio::Common::DownstreamPeerObj
+                                                          : Istio::Common::UpstreamPeerObj;
   auto pb = value.serializeAsProto();
   auto peer_info = std::make_shared<CelState>(MetadataExchangeConfig::peerInfoPrototype());
   peer_info->setValue(absl::string_view(pb->SerializeAsString()));
 
-  read_callbacks_->connection().streamInfo().filterState()->setData(
-      filter_state_key, std::move(peer_info), StreamInfo::FilterState::StateType::Mutable,
-      StreamInfo::FilterState::LifeSpan::Connection);
+  auto& filter_state = *read_callbacks_->connection().streamInfo().filterState();
+  filter_state.setData(filter_state_key, std::move(peer_info),
+                       StreamInfo::FilterState::StateType::Mutable,
+                       StreamInfo::FilterState::LifeSpan::Connection);
+
+  // Also store WorkloadMetadataObject for FIELD accessor and peerInfoRead() detection
+  auto workload_metadata = std::make_unique<Istio::Common::WorkloadMetadataObject>(value);
+  filter_state.setData(obj_key, std::move(workload_metadata),
+                       StreamInfo::FilterState::StateType::Mutable,
+                       StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 std::string MetadataExchangeFilter::getMetadataId() { return local_info_.node().id(); }

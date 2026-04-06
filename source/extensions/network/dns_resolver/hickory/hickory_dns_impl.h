@@ -9,6 +9,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/dns_resolver.h"
 #include "envoy/registry/registry.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -20,6 +21,23 @@ namespace Envoy {
 namespace Network {
 
 class HickoryDnsResolver;
+
+/**
+ * All Hickory DNS resolver stats. @see stats_macros.h
+ */
+#define ALL_HICKORY_DNS_RESOLVER_STATS(COUNTER, GAUGE)                                             \
+  COUNTER(resolve_total)                                                                           \
+  GAUGE(pending_resolutions, NeverImport)                                                          \
+  COUNTER(not_found)                                                                               \
+  COUNTER(get_addr_failure)                                                                        \
+  COUNTER(timeouts)
+
+/**
+ * Struct definition for all Hickory DNS resolver stats. @see stats_macros.h
+ */
+struct HickoryDnsResolverStats {
+  ALL_HICKORY_DNS_RESOLVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
 
 // Function pointer types for the DNS resolver ABI event hooks.
 using OnDnsResolverConfigNewType = decltype(&envoy_dynamic_module_on_dns_resolver_config_new);
@@ -96,8 +114,11 @@ public:
  */
 class HickoryDnsResolver : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config, Event::Dispatcher& dispatcher);
+  HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config, Event::Dispatcher& dispatcher,
+                     Stats::Scope& root_scope);
   ~HickoryDnsResolver() override;
+
+  static HickoryDnsResolverStats generateHickoryDnsResolverStats(Stats::Scope& scope);
 
   // DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
@@ -121,6 +142,8 @@ private:
   static envoy_dynamic_module_type_dns_lookup_family
   toLookupFamily(DnsLookupFamily dns_lookup_family);
 
+  void chargeGetAddrInfoErrorStats(absl::string_view details);
+
   HickoryDnsResolverConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
   envoy_dynamic_module_type_dns_resolver_module_ptr resolver_module_ptr_;
@@ -129,6 +152,8 @@ private:
   // Checked by the ABI callback from `Tokio` threads to avoid posting to the dispatcher
   // after the resolver begins destruction.
   std::atomic<bool> shutting_down_{false};
+  Stats::ScopeSharedPtr scope_;
+  HickoryDnsResolverStats stats_;
 };
 
 /**
