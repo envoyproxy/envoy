@@ -1165,7 +1165,7 @@ TEST_P(TlsInspectorTest, JA4NonAlphanumericALPN) {
 TEST_P(TlsInspectorTest, TlsVersionTooLow) {
   init();
   const std::string servername("example.com");
-  // Generate ClientHello with SSLv3 version (0x0300)
+  // Generate ClientHello with SSL v3 version (0x0300)
   std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0300);
   mockSysCallForPeek(client_hello);
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
@@ -1188,7 +1188,7 @@ TEST_P(TlsInspectorTest, TlsVersionTooLowAllowedByRuntime) {
       "envoy.reloadable_features.tls_inspector_enforce_client_tls_version", false);
   init();
   const std::string servername("example.com");
-  // Generate ClientHello with SSLv3 version (0x0300)
+  // Generate ClientHello with SSL v3 version (0x0300)
   std::vector<uint8_t> client_hello = CreateClientHello(servername, 0, true, 0x0300);
   mockSysCallForPeek(client_hello);
 
