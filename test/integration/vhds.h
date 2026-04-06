@@ -139,6 +139,18 @@ enum class RouteConfigType { Rds, Static };
 using VhdsIntegrationTestParam = std::tuple<Network::Address::IpVersion, Grpc::ClientType,
                                             Grpc::LegacyOrUnified, RouteConfigType>;
 
+const char RdsConfigWithOnDemandTemplate[] = R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  on_demand_virtual_host_resource_name: "xdstp://test/envoy.config.route.v3.VirtualHost/my_route/{domain}"
+)EOF";
+
 const char RdsConfigWithXdstp[] = R"EOF(
 name: my_route
 vhds:

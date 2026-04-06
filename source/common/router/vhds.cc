@@ -40,6 +40,19 @@ absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
         "vhds: only 'DELTA_GRPC' or 'ADS' (which uses Delta xDS) is supported as a config source.");
   }
 
+  const absl::string_view on_demand_name =
+      config_update_info->protobufConfigurationCast().vhds().on_demand_virtual_host_resource_name();
+  if (!on_demand_name.empty()) {
+    constexpr absl::string_view placeholder = "{domain}";
+    const size_t first = on_demand_name.find(placeholder);
+    if (first == absl::string_view::npos ||
+        on_demand_name.find(placeholder, first + placeholder.size()) != absl::string_view::npos) {
+      return absl::InvalidArgumentError(
+          "vhds: on_demand_virtual_host_resource_name must contain exactly one '{domain}' "
+          "placeholder.");
+    }
+  }
+
   // If using ADS, verify the parent ADS stream is in Delta mode
   if (is_ads) {
     const auto& bootstrap = factory_context.bootstrap();

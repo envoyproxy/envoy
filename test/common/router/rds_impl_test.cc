@@ -684,7 +684,7 @@ rds:
   EXPECT_NO_THROW(post_cb());
 }
 
-TEST_F(RdsImplTest, VirtualHostUpdateUsesXdstpCollectionPrefix) {
+TEST_F(RdsImplTest, VirtualHostUpdateUsesOnDemandResourceNameTemplate) {
   setup();
 
   const std::string response_json = R"EOF(
@@ -707,8 +707,8 @@ TEST_F(RdsImplTest, VirtualHostUpdateUsesXdstpCollectionPrefix) {
             }
           }
         },
-        "default_virtual_host_resource_name":
-          "xdstp://test/envoy.config.route.v3.VirtualHost/foo-route-config/*"
+        "on_demand_virtual_host_resource_name":
+          "xdstp://test/envoy.config.route.v3.VirtualHost/on-demand/{domain}"
       }
     }
   ]
@@ -739,7 +739,7 @@ TEST_F(RdsImplTest, VirtualHostUpdateUsesXdstpCollectionPrefix) {
   ASSERT_TRUE(static_cast<bool>(post_cb));
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
               requestOnDemandUpdate(testing::UnorderedElementsAre(
-                  "xdstp://test/envoy.config.route.v3.VirtualHost/foo-route-config/testing")));
+                  "xdstp://test/envoy.config.route.v3.VirtualHost/on-demand/testing")));
   post_cb();
 }
 

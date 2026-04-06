@@ -316,13 +316,18 @@ vhds:
               "vhost_vhds1" == actual_vhost_2.name());
 }
 
-// verify that domainNameToAlias works correctly in xdstp mode
-TEST_F(VhdsTest, DomainNameToAliasXdstpMode) {
-  // Collection prefix has trailing '/*' stripped (just '/*', not only '*'),
-  // so domainNameToAlias re-adds the '/' separator.
-  const std::string collection_prefix = "xdstp://test/envoy.config.route.v3.VirtualHost/my-route";
-  EXPECT_EQ("xdstp://test/envoy.config.route.v3.VirtualHost/my-route/vhost.first",
-            VhdsSubscription::domainNameToAlias(collection_prefix, "vhost.first"));
+// verify that domainNameToAlias falls back to route_config_name/domain when template is empty
+TEST_F(VhdsTest, DomainNameToAliasLegacyMode) {
+  const std::string route_config_name = "my_route";
+  EXPECT_EQ("my_route/vhost.first",
+            VhdsSubscription::domainNameToAlias(route_config_name, "", "vhost.first"));
+}
+
+// verify that domainNameToAlias replaces {domain} in the template
+TEST_F(VhdsTest, DomainNameToAliasWithTemplate) {
+  EXPECT_EQ("xdstp://authority/vhds/on-demand/example.com",
+            VhdsSubscription::domainNameToAlias(
+                "my_route", "xdstp://authority/vhds/on-demand/{domain}", "example.com"));
 }
 
 // verify that aliasToDomainName works correctly with xdstp resource names
@@ -330,6 +335,76 @@ TEST_F(VhdsTest, AliasToDomainNameXdstp) {
   EXPECT_EQ("vhost.first",
             VhdsSubscription::aliasToDomainName(
                 "xdstp://test/envoy.config.route.v3.VirtualHost/my-route/vhost.first"));
+}
+
+// verify that on_demand_virtual_host_resource_name with exactly one {domain} passes validation
+TEST_F(VhdsTest, OnDemandResourceNameWithSingleDomainPlaceholderShouldSucceed) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  on_demand_virtual_host_resource_name: "xdstp://authority/vhds/{domain}"
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_TRUE(VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                       context_, provider_)
+                  .status()
+                  .ok());
+}
+
+// verify that on_demand_virtual_host_resource_name with no {domain} fails validation
+TEST_F(VhdsTest, OnDemandResourceNameWithNoDomainPlaceholderShouldFail) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  on_demand_virtual_host_resource_name: "xdstp://authority/vhds/no-placeholder"
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  auto result = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                         context_, provider_);
+  EXPECT_FALSE(result.status().ok());
+  EXPECT_EQ(result.status().message(),
+            "vhds: on_demand_virtual_host_resource_name must contain exactly one '{domain}' "
+            "placeholder.");
+}
+
+// verify that on_demand_virtual_host_resource_name with multiple {domain} fails validation
+TEST_F(VhdsTest, OnDemandResourceNameWithMultipleDomainPlaceholdersShouldFail) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  on_demand_virtual_host_resource_name: "xdstp://authority/{domain}/vhds/{domain}"
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  auto result = VhdsSubscription::createVhdsSubscription(config_update_info, factory_context_,
+                                                         context_, provider_);
+  EXPECT_FALSE(result.status().ok());
+  EXPECT_EQ(result.status().message(),
+            "vhds: on_demand_virtual_host_resource_name must contain exactly one '{domain}' "
+            "placeholder.");
 }
 
 // verify that xdstp VHDS instantiation succeeds with a valid glob collection name

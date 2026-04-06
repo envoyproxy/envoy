@@ -172,10 +172,17 @@ message Vhds {
 
   // The xdstp resource name of a default virtual host collection to subscribe to.
   //
-  // If the name ends in ``/*``, it indicates an LbEndpoint glob collection,
+  // If the name ends in ``/*``, it indicates an VirtualHost glob collection,
   // which is supported only in the xDS incremental protocol variants.
-  // Otherwise, it indicates an LbEndpointCollection list collection.
   //
   // Envoy currently supports only glob collections.
   string default_virtual_host_resource_name = 2;
+
+  // The virtual host resource name to use for on-demand VHDS requests.
+  // The string should contain the token `{domain}`, which will be replaced with
+  // the domain being fetched. For example, if set to
+  // "xdstp://authority/vhds/on-demand/{domain}", if VHDS needs the domain for
+  // "example.com", it will subscribe to the resource
+  // "xdstp://authority/vhds/on-demand/example.com".
+  string on_demand_virtual_host_resource_name = 3;
 }

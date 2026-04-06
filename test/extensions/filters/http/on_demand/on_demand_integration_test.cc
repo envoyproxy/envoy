@@ -809,6 +809,136 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsWildcardUpgradeOnReconnect) {
                                            {"*", "my_route/vhost.first"}, {}, vhds_stream_.get()));
 }
 
+// Test class for VHDS on-demand updates using on_demand_virtual_host_resource_name with {domain}
+// template.
+class OnDemandVhdsWithTemplateIntegrationTest
+    : public HttpIntegrationTest,
+      public testing::TestWithParam<VhdsIntegrationTestParam> {
+public:
+  OnDemandVhdsWithTemplateIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
+    use_lds_ = false;
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      isUnified() ? "true" : "false");
+  }
+
+  Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const { return std::get<1>(GetParam()); }
+  bool isUnified() const { return std::get<2>(GetParam()) == Grpc::LegacyOrUnified::Unified; }
+  RouteConfigType routeConfigType() const { return std::get<3>(GetParam()); }
+
+  void TearDown() override { cleanUpXdsConnection(); }
+
+  std::string virtualHostYaml(const std::string& name, const std::string& domain) {
+    return fmt::format(VhostTemplate, name, domain);
+  }
+
+  std::string vhdsOnDemandResourceName(const std::string& domain) {
+    return "xdstp://test/envoy.config.route.v3.VirtualHost/my_route/" + domain;
+  }
+
+  envoy::config::route::v3::VirtualHost buildVirtualHost() {
+    return TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+        virtualHostYaml("my_route/vhost_0", "sni.lyft.com"));
+  }
+
+  void initialize() override {
+    config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
+
+    if (routeConfigType() == RouteConfigType::Static) {
+      config_helper_.addConfigModifier(
+          [&](envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager& hcm) -> void {
+            hcm.clear_rds();
+            auto* route_config = hcm.mutable_route_config();
+            route_config->CopyFrom(
+                TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+                    RdsConfigWithOnDemandTemplate));
+          });
+    }
+
+    setUpstreamCount(2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+
+    defer_listener_finalization_ = true;
+    HttpIntegrationTest::initialize();
+
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+
+    if (routeConfigType() == RouteConfigType::Rds) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                              {"my_route"}, true));
+      sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+          Config::TestTypeUrl::get().RouteConfiguration,
+          {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+              RdsConfigWithOnDemandTemplate)},
+          "1");
+    }
+
+    result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    vhds_stream_->startGrpcStream();
+
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+
+    test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
+  }
+
+  FakeStreamPtr vhds_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandVhdsWithTemplateIntegrationTest,
+                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+
+// Verify that when on_demand_virtual_host_resource_name is set, on-demand requests use the
+// templated resource name with {domain} replaced by the actual domain.
+TEST_P(OnDemandVhdsWithTemplateIntegrationTest, VhdsOnDemandUpdateUsesTemplateResourceName) {
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Attempt to make a request to an unknown host
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // The delta discovery request should use the templated resource name with {domain} replaced
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsOnDemandResourceName("vhost.first")}, {},
+                                           vhds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          virtualHostYaml("my_route/vhost_1", "vhost.first"))},
+      {}, "4", vhds_stream_.get(), {vhdsOnDemandResourceName("vhost.first")});
+
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
 // Test class for VHDS on-demand updates with request bodies
 class OnDemandVhdsWithBodyIntegrationTest
     : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, VhdsIntegrationTestParam>>,

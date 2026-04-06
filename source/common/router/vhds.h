@@ -24,6 +24,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Router {
@@ -49,9 +50,14 @@ public:
 
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
   void updateOnDemand(const std::string& with_route_config_name_prefix);
-  static std::string domainNameToAlias(const std::string& resource_prefix,
+  static std::string domainNameToAlias(const std::string& route_config_name,
+                                       const std::string& resource_name_template,
                                        const std::string& domain) {
-    return resource_prefix + "/" + domain;
+    if (resource_name_template.empty()) {
+      return route_config_name + "/" + domain;
+    }
+
+    return absl::StrReplaceAll(resource_name_template, {{"{domain}", domain}});
   }
   static std::string aliasToDomainName(const std::string& alias) {
     const auto pos = alias.find_last_of('/');
