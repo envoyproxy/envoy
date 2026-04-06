@@ -87,30 +87,6 @@ def envoy_mobile_package(default_visibility = ["//visibility:public"]):
 def envoy_contrib_package():
     envoy_extension_package(default_visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY)
 
-# A genrule variant that can output a directory. This is useful when doing things like
-# generating a fuzz corpus mechanically.
-def _envoy_directory_genrule_impl(ctx):
-    tree = ctx.actions.declare_directory(ctx.attr.name + ".outputs")
-    ctx.actions.run_shell(
-        inputs = ctx.files.srcs,
-        tools = ctx.files.tools,
-        outputs = [tree],
-        command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
-        env = {"GENRULE_OUTPUT_DIR": tree.path},
-        use_default_shell_env = True,
-        toolchain = None,
-    )
-    return [DefaultInfo(files = depset([tree]))]
-
-envoy_directory_genrule = rule(
-    implementation = _envoy_directory_genrule_impl,
-    attrs = {
-        "srcs": attr.label_list(),
-        "cmd": attr.string(),
-        "tools": attr.label_list(),
-    },
-)
-
 # External CMake C++ library targets should be specified with this function. This defaults
 # to building the dependencies with ninja
 def envoy_cmake(
