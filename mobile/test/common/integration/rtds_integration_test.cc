@@ -37,9 +37,11 @@ public:
     XdsIntegrationTest::createEnvoy();
   }
 
-  void SetUp() override { initialize(); }
+  void SetUp() override {}
 
   void runReloadTest() {
+    initialize();
+
     stream_ = createNewStream(createDefaultStreamCallbacks());
     // Send a request on the data plane.
     stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
@@ -110,6 +112,11 @@ TEST_P(RtdsIntegrationTest, RtdsReloadWithDfpMixedScheme) {
 
 TEST_P(RtdsIntegrationTest, RtdsReloadWithoutDfpMixedScheme) {
   TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"async_host_selection", false}});
+  runReloadTest();
+}
+
+TEST_P(RtdsIntegrationTest, RtdsReloadWithWorkerThread) {
+  builder_.setUseWorkerThread(true);
   runReloadTest();
 }
 

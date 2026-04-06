@@ -7,7 +7,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/server/backtrace.h"
 #include "absl/synchronization/notification.h"
 
 namespace Envoy {
