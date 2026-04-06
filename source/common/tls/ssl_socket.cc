@@ -184,6 +184,11 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
+  // Fallback: if inline detection didn't catch it, check if drainErrorQueue() found ECONNRESET.
+  if (action == PostIoAction::Close && !err_code.has_value()) {
+    err_code = detected_io_error_;
+  }
+
   return {action, bytes_read, end_stream, err_code};
 }
 
@@ -239,6 +244,9 @@ void SslSocket::drainErrorQueue() {
         saw_cert_verify_failed = true;
       }
     } else if (ERR_GET_LIB(err) == ERR_LIB_SYS) {
+      if (ERR_GET_REASON(err) == ECONNRESET) {
+        detected_io_error_ = Api::IoError::IoErrorCode::ConnectionReset;
+      }
       // Any syscall errors that result in connection closure are already tracked in other
       // connection related stats. We will still retain the specific syscall failure for
       // transport failure reasons.
