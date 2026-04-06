@@ -2367,7 +2367,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       dynamic_cast<Http::AsyncStreamImpl*>(stream);
   auto route = filter_callbacks->route();
-  ASSERT_NE(nullptr, route);
+  ASSERT_TRUE(route.has_value());
   auto route_entry = route->routeEntry();
   ASSERT_NE(nullptr, route_entry);
   auto& path_match_criterion = route_entry->pathMatchCriterion();
@@ -2641,8 +2641,8 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHost) {
         // Verify that the upstream override host is passed through the load balancer context
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_TRUE(retrieved_override.has_value());
-        EXPECT_EQ(retrieved_override->first, "192.168.1.100:8080");
-        EXPECT_EQ(retrieved_override->second, true);
+        EXPECT_EQ(retrieved_override->host, "192.168.1.100:8080");
+        EXPECT_EQ(retrieved_override->strict, true);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
 
@@ -2652,8 +2652,8 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHost) {
         // The load balancer should call overrideHostToSelect() to get the override
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_TRUE(retrieved_override.has_value());
-        EXPECT_EQ(retrieved_override->first, "192.168.1.100:8080");
-        EXPECT_EQ(retrieved_override->second, true);
+        EXPECT_EQ(retrieved_override->host, "192.168.1.100:8080");
+        EXPECT_EQ(retrieved_override->strict, true);
         return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
       }));
 
@@ -2697,8 +2697,8 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHostNotStrict) {
         // Verify that the non-strict upstream override host is passed correctly
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_TRUE(retrieved_override.has_value());
-        EXPECT_EQ(retrieved_override->first, "example.com:8080");
-        EXPECT_EQ(retrieved_override->second, false);
+        EXPECT_EQ(retrieved_override->host, "example.com:8080");
+        EXPECT_EQ(retrieved_override->strict, false);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
 
@@ -2708,8 +2708,8 @@ TEST_F(AsyncClientImplTest, UpstreamOverrideHostNotStrict) {
         // The load balancer should call overrideHostToSelect() to get the override
         auto retrieved_override = context->overrideHostToSelect();
         EXPECT_TRUE(retrieved_override.has_value());
-        EXPECT_EQ(retrieved_override->first, "example.com:8080");
-        EXPECT_EQ(retrieved_override->second, false);
+        EXPECT_EQ(retrieved_override->host, "example.com:8080");
+        EXPECT_EQ(retrieved_override->strict, false);
         return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
       }));
 

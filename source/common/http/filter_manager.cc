@@ -299,11 +299,20 @@ Upstream::ClusterInfoConstSharedPtr ActiveStreamFilterBase::clusterInfoSharedPtr
   return parent_.filter_manager_callbacks_.clusterInfoSharedPtr();
 }
 
-Router::RouteConstSharedPtr ActiveStreamFilterBase::route() { return getRoute(); }
+OptRef<const Router::Route> ActiveStreamFilterBase::route() { return getRoute(); }
 
-Router::RouteConstSharedPtr ActiveStreamFilterBase::getRoute() const {
+OptRef<const Router::Route> ActiveStreamFilterBase::getRoute() const {
   if (parent_.filter_manager_callbacks_.downstreamCallbacks()) {
     return parent_.filter_manager_callbacks_.downstreamCallbacks()->route(nullptr);
+  }
+  return parent_.streamInfo().route();
+}
+
+Router::RouteConstSharedPtr ActiveStreamFilterBase::routeSharedPtr() { return getRouteSharedPtr(); }
+
+Router::RouteConstSharedPtr ActiveStreamFilterBase::getRouteSharedPtr() const {
+  if (parent_.filter_manager_callbacks_.downstreamCallbacks()) {
+    return parent_.filter_manager_callbacks_.downstreamCallbacks()->routeSharedPtr(nullptr);
   }
   return parent_.streamInfo().routeSharedPtr();
 }
@@ -314,16 +323,16 @@ void ActiveStreamFilterBase::resetIdleTimer() {
 
 const Router::RouteSpecificFilterConfig*
 ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
-  auto current_route = getRoute();
-  if (current_route == nullptr) {
+  const auto current_route = getRoute();
+  if (!current_route) {
     return nullptr;
   }
   return current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
 }
 
 Router::RouteSpecificFilterConfigs ActiveStreamFilterBase::perFilterConfigs() const {
-  Router::RouteConstSharedPtr current_route = getRoute();
-  if (current_route == nullptr) {
+  const auto current_route = getRoute();
+  if (!current_route) {
     return {};
   }
 
@@ -1989,18 +1998,15 @@ Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const 
 
 void ActiveStreamDecoderFilter::setUpstreamOverrideHost(
     Upstream::LoadBalancerContext::OverrideHost upstream_override_host) {
-  parent_.upstream_override_host_.first.assign(upstream_override_host.first);
-  parent_.upstream_override_host_.second = upstream_override_host.second;
+  parent_.upstream_override_host_ = std::move(upstream_override_host);
 }
 
-absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+OptRef<const Upstream::LoadBalancerContext::OverrideHost>
 ActiveStreamDecoderFilter::upstreamOverrideHost() const {
-  if (parent_.upstream_override_host_.first.empty()) {
-    return absl::nullopt;
+  if (parent_.upstream_override_host_.host.empty()) {
+    return {};
   }
-  return Upstream::LoadBalancerContext::OverrideHost{
-      absl::string_view(parent_.upstream_override_host_.first),
-      parent_.upstream_override_host_.second};
+  return parent_.upstream_override_host_;
 }
 
 } // namespace Http

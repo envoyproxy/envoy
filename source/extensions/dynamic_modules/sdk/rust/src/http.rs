@@ -2,20 +2,10 @@ use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use crate::utility::HeaderPairSlice;
 use crate::{
-  abi,
-  bytes_to_module_buffer,
-  str_to_module_buffer,
-  ClusterHostCount,
-  EnvoyCounterId,
-  EnvoyCounterVecId,
-  EnvoyGaugeId,
-  EnvoyGaugeVecId,
-  EnvoyHistogramId,
-  EnvoyHistogramVecId,
-  NewHttpFilterConfigFunction,
-  NewHttpFilterPerRouteConfigFunction,
-  NEW_HTTP_FILTER_CONFIG_FUNCTION,
-  NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
+  abi, bytes_to_module_buffer, str_to_module_buffer, ClusterHostCount, EnvoyCounterId,
+  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  NewHttpFilterConfigFunction, NewHttpFilterPerRouteConfigFunction,
+  NEW_HTTP_FILTER_CONFIG_FUNCTION, NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
 };
 use mockall::*;
 use std::any::Any;
@@ -1569,7 +1559,13 @@ pub trait EnvoyHttpFilter {
   /// only perform increases to the buffer limit, to avoid potentially conflicting with the
   /// buffer requirements of other filters in the chain. For example:
   ///
-  /// ```ignore
+  /// ```
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  ///
+  /// let mut envoy_filter = MockEnvoyHttpFilter::default();
+  /// envoy_filter.expect_get_buffer_limit().return_const(0u64);
+  /// envoy_filter.expect_set_buffer_limit().return_const(());
+  /// let desired_limit: u64 = 1024;
   /// if desired_limit > envoy_filter.get_buffer_limit() {
   ///   envoy_filter.set_buffer_limit(desired_limit);
   /// }
@@ -3675,7 +3671,7 @@ impl EnvoyHttpFilterImpl {
     // At this point, we assume at least one value is present.
     results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
     // So, we iterate from 1 to count - 1.
-    for i in 1 .. count {
+    for i in 1..count {
       let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: std::ptr::null(),
         length: 0,

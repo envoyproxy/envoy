@@ -42,7 +42,7 @@ protected:
     ON_CALL(decoder_callbacks_, bufferLimit()).WillByDefault(Return(2 << 20));
     ON_CALL(encoder_callbacks_, bufferLimit()).WillByDefault(Return(2 << 20));
 
-    ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+    ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>{}));
   }
 
   static envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
