@@ -38,6 +38,10 @@ double OrcaLoadReportHandler::getUtilizationFromOrcaReport(
     const std::vector<std::string>& metric_names_for_computing_utilization) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.orca_weight_manager_use_named_metrics_first")) {
+    // By default (with runtime feature enabled) we prefer named metrics over application
+    // utilization, so if named metrics are not ignored if application utilization is
+    // available and set. See https://github.com/envoyproxy/envoy/pull/44196 for discussion.
+
     // Find the most constrained utilization metric in `metric_names_for_computing_utilization`.
     double utilization =
         Envoy::Orca::getMaxUtilization(metric_names_for_computing_utilization, orca_load_report);
@@ -50,6 +54,10 @@ double OrcaLoadReportHandler::getUtilizationFromOrcaReport(
       return utilization;
     }
   } else {
+    // With the runtime flag disabled, we use application utilization if it is set over named
+    // metrics. This means that metric_names_for_computing_utilization is ignored if
+    // application_utilization is available and set.
+
     // If application_utilization is valid, use it as the utilization metric.
     double utilization = orca_load_report.application_utilization();
     if (utilization > 0) {
