@@ -330,6 +330,14 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: redis
+  change: |
+    Added zone-aware routing support for Redis Cluster proxy. New read policies
+    ``LOCAL_ZONE_AFFINITY`` and ``LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY`` route read requests
+    to replicas in the same availability zone. Zone discovery is enabled via
+    :ref:`enable_zone_discovery
+    <envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.enable_zone_discovery>`.
+    Note: This feature currently works with Valkey only.
 - area: overload_manager
   change: |
     Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed
