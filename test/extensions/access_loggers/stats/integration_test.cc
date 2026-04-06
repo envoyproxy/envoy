@@ -257,10 +257,6 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
-  // We no longer check for the log line here because only 1 test variant will see the log line
-  // due to log throttling in periodic logs as IPv4 and IPv6 run in the same process.
-  // stats_test.cc has an EXPECT_LOG_CONTAINS for this situation already.
-
   init(config_yaml, /*autonomous_upstream=*/false,
        /*flush_access_log_on_new_request=*/true);
 
