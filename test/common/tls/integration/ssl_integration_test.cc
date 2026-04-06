@@ -146,7 +146,7 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
 
   for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
     // Useful for debugging when the test is failing.
-    if (counter->name().find("ssl") != std::string::npos) {
+    if (absl::StrContains(counter->name(), "ssl")) {
       ENVOY_LOG_MISC(critical, "Found ssl metric: {}", counter->name());
     }
     auto it = expected_counters.find(counter->name());
@@ -385,6 +385,40 @@ TEST_P(SslIntegrationTest, LogPeerIpSanUnsupportedIpVersion) {
   auto result = waitForAccessLog(listener_access_log_name_);
   EXPECT_EQ(result, "1.2.3.4,0:1:2:3::4");
 }
+
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
+TEST_P(SslIntegrationTest, TlsDownstreamReset) {
+  useListenerAccessLog("DS_CLOSE_TYPE=%DOWNSTREAM_DETECTED_CLOSE_TYPE%");
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+
+  while (!callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Abort the connection from the client side by setting SO_LINGER to 0 and closing
+  // the socket directly. This forces a TCP RST to be sent.
+  // NOTE: We bypass connection->close() here because SslSocket would attempt to
+  // perform a graceful TLS shutdown (sending close_notify) even for AbortReset.
+  // Closing the ioHandle directly ensures a TCP RST is sent immediately without
+  // a prior TLS shutdown, allowing the server to correctly detect it as RemoteReset.
+  auto* connection_impl = dynamic_cast<Network::ConnectionImpl*>(connection.get());
+  ASSERT_TRUE(connection_impl != nullptr);
+  struct linger sl;
+  sl.l_onoff = 1;
+  sl.l_linger = 0;
+  auto result_opt = connection_impl->ioHandle().setOption(SOL_SOCKET, SO_LINGER, &sl, sizeof(sl));
+  ASSERT_EQ(0, result_opt.return_value_);
+  connection_impl->ioHandle().close();
+
+  auto result = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(result, testing::HasSubstr("DS_CLOSE_TYPE=RemoteReset"));
+}
+#endif
 
 TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {
   // Config client to use an async cert validator which defer the actual validation by 5ms.
@@ -984,7 +1018,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP384EcdsaClientAllCurve
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
     // Useful for debugging when the test is failing.
-    if (counter->name().find("ssl") != std::string::npos) {
+    if (absl::StrContains(counter->name(), "ssl")) {
       ENVOY_LOG_MISC(critical, "Found ssl metric: {}", counter->name());
     }
   }

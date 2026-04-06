@@ -121,6 +121,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   bool end_stream = false;
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
+  absl::optional<Api::IoError::IoErrorCode> err_code = absl::nullopt;
   while (keep_reading) {
     uint64_t bytes_read_this_iteration = 0;
     Buffer::Reservation reservation = read_buffer.reserveForRead();
@@ -144,6 +145,9 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
             // Non-graceful shutdown by closing the underlying socket.
             end_stream = true;
             break;
+          }
+          if (errno == ECONNRESET) {
+            err_code = Api::IoError::IoErrorCode::ConnectionReset;
           }
           FALLTHRU;
         case SSL_ERROR_WANT_WRITE:
@@ -169,7 +173,11 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
-  return {action, bytes_read, end_stream};
+  if (action == PostIoAction::Close && !err_code.has_value()) {
+    err_code = detected_io_error_;
+  }
+
+  return {action, bytes_read, end_stream, err_code};
 }
 
 void SslSocket::onPrivateKeyMethodComplete() { resumeHandshake(); }
@@ -224,6 +232,9 @@ void SslSocket::drainErrorQueue() {
         saw_cert_verify_failed = true;
       }
     } else if (ERR_GET_LIB(err) == ERR_LIB_SYS) {
+      if (ERR_GET_REASON(err) == ECONNRESET) {
+        detected_io_error_ = Api::IoError::IoErrorCode::ConnectionReset;
+      }
       // Any syscall errors that result in connection closure are already tracked in other
       // connection related stats. We will still retain the specific syscall failure for
       // transport failure reasons.

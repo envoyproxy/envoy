@@ -104,6 +104,7 @@ private:
   ContextImplSharedPtr ctx_;
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
+  absl::optional<Api::IoError::IoErrorCode> detected_io_error_;
 
   SslHandshakerImplSharedPtr info_;
 };
