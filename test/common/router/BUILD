@@ -88,7 +88,7 @@ genrule(
     export GENRULE_OUTPUT_DIR=$$(mktemp -d)
     $(location corpus_from_config_impl_sh) \
       $(location //test/common/router:config_impl_test_static)
-    # normalize the output the test build side effect is not deterministic,
+    # normalize the output as the test build side effect is not deterministic.
     sed -i 's/[[:space:]]*$$//' $$GENRULE_OUTPUT_DIR/*
     sed -i 's|^goo\\.gle/debug[a-z]*|goo.gle/debugproto|' $$GENRULE_OUTPUT_DIR/*
     # Dedupe the resulting corpus files.
