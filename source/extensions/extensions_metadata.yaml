@@ -103,6 +103,13 @@ envoy.bootstrap.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
+envoy.bootstrap.certificate_providers.local:
+  categories:
+  - envoy.bootstrap
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.bootstrap.certificate_providers.local.v3.LocalCertificateProvider
 envoy.bootstrap.reverse_tunnel.downstream_socket_interface:
   categories:
   - envoy.bootstrap

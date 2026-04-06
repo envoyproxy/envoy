@@ -14,6 +14,8 @@
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Secret {
 
@@ -133,6 +135,53 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
     bool warm) {
   return certificate_providers_.findOrCreate(sds_config_source, config_name, server_context,
                                              init_manager, warm);
+}
+
+absl::Status SecretManagerImpl::registerTlsCertificateProvider(
+    const std::string& provider_name, NamedTlsCertificateProviderSharedPtr provider) {
+  if (provider_name.empty()) {
+    return absl::InvalidArgumentError("provider name cannot be empty");
+  }
+  if (provider == nullptr) {
+    return absl::InvalidArgumentError("provider cannot be null");
+  }
+  if (!named_certificate_providers_
+           .insert(std::make_pair(provider_name, std::move(provider)))
+           .second) {
+    return absl::AlreadyExistsError(
+        absl::StrCat("duplicate TLS certificate provider name ", provider_name));
+  }
+  return absl::OkStatus();
+}
+
+TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
+    const std::string& provider_name, const std::string& certificate_name,
+    Server::Configuration::ServerFactoryContext& server_context, OptRef<Init::Manager> init_manager) {
+  const auto provider_factory_it = named_certificate_providers_.find(provider_name);
+  if (provider_factory_it == named_certificate_providers_.end()) {
+    ENVOY_LOG_MISC(error, "unknown TLS certificate provider '{}'", provider_name);
+    return nullptr;
+  }
+
+  TlsCertificateConfigProviderSharedPtr provider =
+      provider_factory_it->second->getProvider(certificate_name, server_context);
+  if (provider == nullptr) {
+    ENVOY_LOG_MISC(error, "TLS certificate provider '{}' failed to create certificate '{}'",
+                   provider_name, certificate_name);
+    return nullptr;
+  }
+
+  if (init_manager) {
+    const Init::Target* target = provider->initTarget();
+    if (target != nullptr) {
+      init_manager->add(*target);
+    } else {
+      provider->start();
+    }
+  } else {
+    provider->start();
+  }
+  return provider;
 }
 
 CertificateValidationContextConfigProviderSharedPtr

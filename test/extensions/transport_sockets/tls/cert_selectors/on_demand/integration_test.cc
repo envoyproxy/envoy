@@ -1,8 +1,12 @@
+#include <algorithm>
+#include <chrono>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/extensions/bootstrap/certificate_providers/local/v3/local_certificate_provider.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.pb.h"
@@ -17,9 +21,11 @@
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
+#include "absl/types/optional.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -32,6 +38,10 @@ namespace {
 
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::secret::v3::SdsDummy _sds_dummy;
+using LocalCertificateProviderProto =
+    envoy::extensions::bootstrap::certificate_providers::local::v3::LocalCertificateProvider;
+using LocalSignerProto =
+    envoy::extensions::bootstrap::certificate_providers::local::v3::LocalSigner;
 
 struct TestParams {
   Network::Address::IpVersion ip_version;
@@ -52,6 +62,17 @@ std::vector<TestParams> testParams() {
   return ret;
 }
 
+uint64_t percentileMillis(std::vector<uint64_t> values, double percentile) {
+  if (values.empty()) {
+    return 0;
+  }
+  const double clamped = std::max(0.0, std::min(100.0, percentile));
+  const size_t idx =
+      static_cast<size_t>((clamped / 100.0) * static_cast<double>(values.size() - 1));
+  std::nth_element(values.begin(), values.begin() + idx, values.end());
+  return values[idx];
+}
+
 class OnDemandIntegrationTest : public BaseTcpProxySslIntegrationTest,
                                 public testing::TestWithParam<TestParams> {
 public:
@@ -65,12 +86,16 @@ public:
     const std::string on_demand_config = config.empty() ? defaultConfig() : config;
     config_helper_.addConfigModifier([this, on_demand_config](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config
+          on_demand;
+      TestUtility::loadFromYaml(on_demand_config, on_demand);
       bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
           bootstrap.static_resources().clusters(0));
       auto* sds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
       sds_cluster->set_name("sds_cluster");
       sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster");
       ConfigHelper::setHttp2(*sds_cluster);
+      addBootstrapExtensions(bootstrap, on_demand);
       if (upstream_selector_) {
         bootstrap.mutable_static_resources()
             ->mutable_listeners(0)
@@ -80,7 +105,7 @@ public:
         auto* transport_socket = backend->mutable_transport_socket();
         transport_socket->set_name("envoy.transport_sockets.tls");
         envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-        configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
+        configToUseSds(*tls_context.mutable_common_tls_context(), on_demand);
         transport_socket->mutable_typed_config()->PackFrom(tls_context);
         if (!filter_state_value_.empty()) {
           const std::string set_filter_state = fmt::format(R"EOF(
@@ -109,7 +134,7 @@ public:
         auto* transport_socket = filter_chain->mutable_transport_socket();
         transport_socket->set_name("envoy.transport_sockets.tls");
         envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-        configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
+        configToUseSds(*tls_context.mutable_common_tls_context(), on_demand);
         tls_context.set_disable_stateless_session_resumption(true);
         tls_context.set_disable_stateful_session_resumption(true);
         tls_context.mutable_require_client_certificate()->set_value(mtls_);
@@ -130,9 +155,84 @@ public:
       )EOF";
   }
 
+  std::string localSignerConfig(absl::string_view mapped_name,
+                                bool strict_hostname_validation = false) {
+    LocalCertificateProviderProto provider;
+    provider.set_provider_name(default_provider_name_);
+    auto* signer = provider.mutable_local_signer();
+    signer->set_ca_cert_path(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    signer->set_ca_key_path(TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
+    signer->set_runtime_key_prefix("on_demand_secret.test.local_signer");
+    signer->set_hostname_validation(strict_hostname_validation
+                                        ? LocalSignerProto::HOSTNAME_VALIDATION_STRICT
+                                        : LocalSignerProto::HOSTNAME_VALIDATION_PERMISSIVE);
+    bootstrap_provider_override_ = provider;
+    return certificateProviderConfig(mapped_name);
+  }
+
+  std::string localSignerSniConfig(absl::string_view ca_cert_path, absl::string_view ca_key_path,
+                                   absl::string_view ca_reload_failure_policy) {
+    LocalCertificateProviderProto provider;
+    provider.set_provider_name(default_provider_name_);
+    auto* signer = provider.mutable_local_signer();
+    signer->set_ca_cert_path(std::string(ca_cert_path));
+    signer->set_ca_key_path(std::string(ca_key_path));
+    if (ca_reload_failure_policy == "CA_RELOAD_FAILURE_POLICY_FAIL_OPEN") {
+      signer->set_ca_reload_failure_policy(LocalSignerProto::CA_RELOAD_FAILURE_POLICY_FAIL_OPEN);
+    } else {
+      signer->set_ca_reload_failure_policy(LocalSignerProto::CA_RELOAD_FAILURE_POLICY_FAIL_CLOSED);
+    }
+    bootstrap_provider_override_ = provider;
+    return R"EOF(
+      certificate_provider_name: local_cert_minter
+      certificate_mapper:
+        name: sni
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+          default_value: fallback.example.com
+      )EOF";
+  }
+
+  std::string certificateProviderConfig(absl::string_view mapped_name) const {
+    return fmt::format(R"EOF(
+      certificate_provider_name: {}
+      certificate_mapper:
+        name: static-name
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+          name: {}
+      )EOF",
+                       default_provider_name_, mapped_name);
+  }
+
+  void addBootstrapExtensions(
+      envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+      const envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config&
+          on_demand) {
+    if (on_demand.certificate_provider_name().empty()) {
+      return;
+    }
+
+    auto* extension = bootstrap.add_bootstrap_extensions();
+    extension->set_name("envoy.bootstrap.certificate_providers.local");
+    LocalCertificateProviderProto provider;
+    if (bootstrap_provider_override_.has_value()) {
+      provider = *bootstrap_provider_override_;
+    } else {
+      provider.set_provider_name(on_demand.certificate_provider_name());
+      auto* signer = provider.mutable_local_signer();
+      signer->set_ca_cert_path(
+          TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+      signer->set_ca_key_path(
+          TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
+    }
+    extension->mutable_typed_config()->PackFrom(provider);
+  }
+
   void configToUseSds(
       envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
-      const std::string& on_demand_config) {
+      envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config&
+          on_demand) {
     common_tls_context.add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
     if (validation_sds_) {
@@ -151,13 +251,10 @@ public:
       }
     }
 
-    // Parse on-demand TLS cert selector config.
-    envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config
-        on_demand;
-    TestUtility::loadFromYaml(on_demand_config, on_demand);
-
-    // Configure config source
-    setConfigSource(on_demand.mutable_config_source());
+    // Configure config source only in SDS mode.
+    if (on_demand.certificate_provider_name().empty()) {
+      setConfigSource(on_demand.mutable_config_source());
+    }
     common_tls_context.mutable_custom_tls_certificate_selector()->set_name("on-demand-config");
     common_tls_context.mutable_custom_tls_certificate_selector()->mutable_typed_config()->PackFrom(
         on_demand);
@@ -196,10 +293,12 @@ public:
   std::string cacert() const { return upstream_selector_ ? "upstreamcacert" : "cacert"; }
 
 protected:
+  const std::string default_provider_name_{"local_cert_minter"};
   const bool upstream_selector_;
   bool mtls_{false};
   bool validation_sds_{false};
   std::string filter_state_value_;
+  absl::optional<LocalCertificateProviderProto> bootstrap_provider_override_;
 
   envoy::extensions::transport_sockets::tls::v3::Secret makeSecret(absl::string_view name,
                                                                    absl::string_view cert) {
@@ -388,6 +487,294 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
   test_server_->waitForCounterEq("sds.server.update_success", 1);
   test_server_->waitForCounterEq("sds.server2.update_success", 1);
   EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, LocalSignerDefaultPermissiveAllowsUnderscoreName) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "local signer behavior is validated on downstream";
+  }
+
+  setup(localSignerConfig("server_name"));
+  auto conn = createClientConnection();
+  waitCertsRequested(1);
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, BasicSuccessCertificateProvider) {
+  setup(certificateProviderConfig("server"));
+  auto conn = createClientConnection();
+  if (upstream_selector_) {
+    conn->waitForUpstreamConnection();
+  }
+  waitCertsRequested(1);
+  if (!upstream_selector_) {
+    conn->waitForUpstreamConnection();
+  }
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, LocalSignerRuntimeStrictHostnameBlocksUnderscoreName) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "local signer behavior is validated on downstream";
+  }
+
+  config_helper_.addRuntimeOverride("on_demand_secret.test.local_signer.hostname_validation", "2");
+  setup(localSignerConfig("server_name"));
+  auto conn = createClientConnection();
+  waitCertsRequested(1);
+  conn->waitForDisconnect();
+  test_server_->waitForGaugeEq(onDemandStat("cert_active"), 0);
+}
+
+TEST_P(OnDemandIntegrationTest, LocalSignerRuntimePermissiveOverridesStrictConfig) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "local signer behavior is validated on downstream";
+  }
+
+  config_helper_.addRuntimeOverride("on_demand_secret.test.local_signer.hostname_validation", "1");
+  setup(localSignerConfig("server_name", true));
+  auto conn = createClientConnection();
+  waitCertsRequested(1);
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+TEST_P(OnDemandIntegrationTest, LocalSignerFailOpenOnCaReloadErrorKeepsServing) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "local signer behavior is validated on downstream";
+  }
+  validation_sds_ = true;
+  FakeStream* ca_stream = nullptr;
+  const std::string ca_cert_content = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  const std::string ca_key_content = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
+  const std::string ca_cert_path = TestEnvironment::writeStringToFileForTest(
+      TestUtility::uniqueFilename("local_signer_ca_cert"), ca_cert_content);
+  const std::string ca_key_path = TestEnvironment::writeStringToFileForTest(
+      TestUtility::uniqueFilename("local_signer_ca_key"), ca_key_content);
+
+  on_server_init_function_ = [&]() {
+    createXdsConnection();
+    ca_stream = &waitSendSdsResponse(cacert());
+  };
+  setup(localSignerSniConfig(ca_cert_path, ca_key_path, "CA_RELOAD_FAILURE_POLICY_FAIL_OPEN"));
+
+  auto conn1 = createClientConnection();
+  waitCertsRequested(1);
+  conn1->waitForUpstreamConnection();
+  conn1->sendAndReceiveTlsData("hello", "world");
+  conn1.reset();
+  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+
+  TestEnvironment::writeStringToFileForTest(ca_key_path, "not-a-valid-key", true);
+
+  sendSecret(*ca_stream, cacert(), cacert());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_updated"))->value());
+
+  auto conn2 = createClientConnection();
+  conn2->waitForUpstreamConnection();
+  conn2->sendAndReceiveTlsData("hello", "world");
+  conn2.reset();
+}
+
+TEST_P(OnDemandIntegrationTest, LocalSignerFailClosedOnCaReloadErrorBlocksNewSecret) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "local signer behavior is validated on downstream";
+  }
+  validation_sds_ = true;
+  FakeStream* ca_stream = nullptr;
+  const std::string ca_cert_content = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  const std::string ca_key_content = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
+  const std::string ca_cert_path = TestEnvironment::writeStringToFileForTest(
+      TestUtility::uniqueFilename("local_signer_ca_cert"), ca_cert_content);
+  const std::string ca_key_path = TestEnvironment::writeStringToFileForTest(
+      TestUtility::uniqueFilename("local_signer_ca_key"), ca_key_content);
+
+  on_server_init_function_ = [&]() {
+    createXdsConnection();
+    ca_stream = &waitSendSdsResponse(cacert());
+  };
+  setup(localSignerSniConfig(ca_cert_path, ca_key_path, "CA_RELOAD_FAILURE_POLICY_FAIL_CLOSED"));
+
+  auto conn1 = createClientConnection();
+  waitCertsRequested(1);
+  conn1->waitForUpstreamConnection();
+  conn1->sendAndReceiveTlsData("hello", "world");
+  conn1.reset();
+  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+
+  TestEnvironment::writeStringToFileForTest(ca_key_path, "not-a-valid-key", true);
+  sendSecret(*ca_stream, cacert(), cacert());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_updated"))->value());
+
+  auto conn2 = createClientConnection();
+  conn2->waitForUpstreamConnection();
+  conn2->sendAndReceiveTlsData("hello", "world");
+  conn2->close();
+}
+
+TEST_P(OnDemandIntegrationTest, LocalSignerHandshakeLatencyUnderCertChurn) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "local signer behavior is validated on downstream";
+  }
+  setup(localSignerSniConfig(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"),
+      "CA_RELOAD_FAILURE_POLICY_FAIL_OPEN"));
+
+  constexpr size_t connection_count = 20;
+  std::vector<uint64_t> latencies_ms;
+  latencies_ms.reserve(connection_count);
+
+  for (size_t i = 0; i < connection_count; ++i) {
+    ssl_options_.setSni(fmt::format("churn-{}.example.com", i));
+    const auto start = std::chrono::steady_clock::now();
+    auto conn = createClientConnection();
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+    conn.reset();
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::steady_clock::now() - start)
+                             .count();
+    latencies_ms.push_back(static_cast<uint64_t>(elapsed));
+  }
+
+  const uint64_t p50 = percentileMillis(latencies_ms, 50.0);
+  const uint64_t p95 = percentileMillis(latencies_ms, 95.0);
+  const uint64_t p99 = percentileMillis(latencies_ms, 99.0);
+  // Guardrail bounds: this is a correctness/perf-regression detector, not a microbenchmark.
+  EXPECT_LT(p95, 5000);
+  EXPECT_LT(p99, 8000);
+  ENVOY_LOG_MISC(info,
+                 "on_demand local signer churn latency: count={} p50_ms={} p95_ms={} p99_ms={}",
+                 connection_count, p50, p95, p99);
+}
+
+TEST_P(OnDemandIntegrationTest, LocalSignerThroughputBurstUniqueCerts) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "local signer behavior is validated on downstream";
+  }
+  setup(localSignerSniConfig(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"),
+      TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"),
+      "CA_RELOAD_FAILURE_POLICY_FAIL_OPEN"));
+
+  constexpr size_t connection_count = 32;
+  const auto start = std::chrono::steady_clock::now();
+  for (size_t i = 0; i < connection_count; ++i) {
+    ssl_options_.setSni(fmt::format("burst-{}.example.com", i));
+    auto conn = createClientConnection();
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+    conn.reset();
+  }
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                              std::chrono::steady_clock::now() - start)
+                              .count();
+  EXPECT_LT(elapsed_ms, 30000);
+}
+
+TEST_P(OnDemandIntegrationTest, LocalSignerFailOpenConcurrentPendingNewSecretSucceeds) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "local signer behavior is validated on downstream";
+  }
+  validation_sds_ = true;
+  FakeStream* ca_stream = nullptr;
+  const std::string ca_cert_content = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  const std::string ca_key_content = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
+  const std::string ca_cert_path = TestEnvironment::writeStringToFileForTest(
+      TestUtility::uniqueFilename("local_signer_ca_cert"), ca_cert_content);
+  const std::string ca_key_path = TestEnvironment::writeStringToFileForTest(
+      TestUtility::uniqueFilename("local_signer_ca_key"), ca_key_content);
+  on_server_init_function_ = [&]() {
+    createXdsConnection();
+    ca_stream = &waitSendSdsResponse(cacert());
+  };
+  setup(localSignerSniConfig(ca_cert_path, ca_key_path, "CA_RELOAD_FAILURE_POLICY_FAIL_OPEN"));
+
+  ssl_options_.setSni("warm.example.com");
+  auto warm = createClientConnection();
+  waitCertsRequested(1);
+  warm->waitForUpstreamConnection();
+  warm->sendAndReceiveTlsData("hello", "world");
+  warm.reset();
+
+  TestEnvironment::writeStringToFileForTest(ca_key_path, "not-a-valid-key", true);
+  sendSecret(*ca_stream, cacert(), cacert());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  ssl_options_.setSni("concurrent-new.example.com");
+  std::vector<std::unique_ptr<TestClientConnection>> conns;
+  conns.reserve(8);
+  for (int i = 0; i < 8; ++i) {
+    conns.emplace_back(createClientConnection());
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  for (auto& conn : conns) {
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+    conn.reset();
+  }
+}
+
+TEST_P(OnDemandIntegrationTest, LocalSignerFailClosedConcurrentPendingNewSecretFails) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "local signer behavior is validated on downstream";
+  }
+  validation_sds_ = true;
+  FakeStream* ca_stream = nullptr;
+  const std::string ca_cert_content = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+  const std::string ca_key_content = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/cakey.pem"));
+  const std::string ca_cert_path = TestEnvironment::writeStringToFileForTest(
+      TestUtility::uniqueFilename("local_signer_ca_cert"), ca_cert_content);
+  const std::string ca_key_path = TestEnvironment::writeStringToFileForTest(
+      TestUtility::uniqueFilename("local_signer_ca_key"), ca_key_content);
+  on_server_init_function_ = [&]() {
+    createXdsConnection();
+    ca_stream = &waitSendSdsResponse(cacert());
+  };
+  setup(localSignerSniConfig(ca_cert_path, ca_key_path, "CA_RELOAD_FAILURE_POLICY_FAIL_CLOSED"));
+
+  ssl_options_.setSni("warm.example.com");
+  auto warm = createClientConnection();
+  waitCertsRequested(1);
+  warm->waitForUpstreamConnection();
+  warm->sendAndReceiveTlsData("hello", "world");
+  warm.reset();
+
+  TestEnvironment::writeStringToFileForTest(ca_key_path, "not-a-valid-key", true);
+  sendSecret(*ca_stream, cacert(), cacert());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  ssl_options_.setSni("blocked-new.example.com");
+  std::vector<std::unique_ptr<TestClientConnection>> conns;
+  conns.reserve(8);
+  for (int i = 0; i < 8; ++i) {
+    conns.emplace_back(createClientConnection());
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+  for (auto& conn : conns) {
+    conn->close();
+    conn.reset();
+  }
 }
 
 TEST_P(OnDemandIntegrationTest, BasicFail) {

@@ -1,7 +1,9 @@
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/common/callback_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/ssl/tls_certificate_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/server/generic_factory_context.h"
 
@@ -17,16 +19,45 @@ AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
                                        const envoy::config::core::v3::ConfigSource& config_source,
                                        OptRef<Init::Manager> init_manager, UpdateCb update_cb,
                                        RemoveCb remove_cb)
+    : AsyncContextConfig(
+          cert_name, factory_context,
+          factory_context.secretManager().findOrCreateTlsCertificateProvider(
+              config_source, std::string(cert_name), factory_context, init_manager, false),
+          update_cb, remove_cb) {}
+
+AsyncContextConfig::AsyncContextConfig(absl::string_view cert_name,
+                                       Server::Configuration::ServerFactoryContext& factory_context,
+                                       absl::string_view provider_name,
+                                       OptRef<Init::Manager> init_manager, UpdateCb update_cb,
+                                       RemoveCb remove_cb)
+    : AsyncContextConfig(
+          cert_name, factory_context,
+          factory_context.secretManager().findOrCreateTlsCertificateProvider(
+              std::string(provider_name), std::string(cert_name), factory_context,
+              init_manager),
+          update_cb, remove_cb) {}
+
+AsyncContextConfig::AsyncContextConfig(
+    absl::string_view cert_name, Server::Configuration::ServerFactoryContext& factory_context,
+    Secret::TlsCertificateConfigProviderSharedPtr cert_provider, UpdateCb update_cb,
+    RemoveCb remove_cb)
     : factory_context_(factory_context), cert_name_(cert_name),
-      cert_provider_(factory_context_.secretManager().findOrCreateTlsCertificateProvider(
-          config_source, cert_name_, factory_context_, init_manager, false)),
+      cert_provider_(std::move(cert_provider)),
       update_cb_(update_cb),
-      update_cb_handle_(cert_provider_->addUpdateCallback([this]() { return loadCert(); })),
-      remove_cb_(remove_cb), remove_cb_handle_(cert_provider_->addRemoveCallback(
-                                 [this]() { return remove_cb_(cert_name_); })) {}
+      update_cb_handle_(cert_provider_ ? cert_provider_->addUpdateCallback(
+                                            [this]() { return loadCert(); })
+                                       : nullptr),
+      remove_cb_(remove_cb),
+      remove_cb_handle_(cert_provider_ ? cert_provider_->addRemoveCallback(
+                                            [this]() { return remove_cb_(cert_name_); })
+                                       : nullptr) {}
 
 absl::Status AsyncContextConfig::loadCert() {
   // Called on main, possibly during the constructor.
+  if (cert_provider_ == nullptr) {
+    return absl::NotFoundError(
+        absl::StrCat("certificate provider not found for certificate '", cert_name_, "'"));
+  }
   auto* secret = cert_provider_->secret();
   if (secret != nullptr) {
     Server::GenericFactoryContextImpl generic_context(factory_context_,
@@ -73,10 +104,18 @@ SecretManager::SecretManager(const ConfigProto& config,
       stats_(generateCertSelectionStats(*stats_scope_)),
       factory_context_(factory_context.serverFactoryContext()),
       config_source_(config.config_source()), context_factory_(std::move(context_factory)),
+      certificate_provider_enabled_(!config.certificate_provider_name().empty()),
+      certificate_provider_name_(config.certificate_provider_name()),
       cert_contexts_(factory_context_.threadLocal()) {
   cert_contexts_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalCerts>(); });
+  if (certificate_provider_enabled_) {
+    ENVOY_LOG(info, "on-demand selector using certificate provider '{}'",
+              certificate_provider_name_);
+  }
   for (const auto& name : config.prefetch_secret_names()) {
-    addCertificateConfig(name, nullptr, factory_context.initManager());
+    const OptRef<Init::Manager> init_manager =
+        certificate_provider_enabled_ ? OptRef<Init::Manager>() : factory_context.initManager();
+    addCertificateConfig(name, nullptr, init_manager);
   }
 }
 
@@ -95,6 +134,31 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
   // Should be last to trigger the callback since constructor can fire the update event for an
   // existing SDS subscription.
   if (entry.cert_config_ == nullptr) {
+    stats_->cert_requested_.inc();
+    stats_->cert_active_.inc();
+    if (certificate_provider_enabled_) {
+      entry.cert_config_ = std::make_unique<AsyncContextConfig>(
+          secret_name, factory_context_, certificate_provider_name_, init_manager,
+          [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
+              -> absl::Status { return updateCertificate(secret_name, cert_config); },
+          [this](absl::string_view secret_name) -> absl::Status {
+            return removeCertificateConfig(secret_name);
+          });
+      if (!entry.cert_config_->hasProvider()) {
+        ENVOY_LOG(error,
+                  "failed to resolve certificate provider '{}', certificate '{}'",
+                  certificate_provider_name_, secret_name);
+        for (auto fetch_handle : entry.callbacks_) {
+          if (auto cb_handle = fetch_handle.lock(); cb_handle) {
+            cb_handle->notify(nullptr);
+          }
+        }
+        entry.callbacks_.clear();
+        cache_.erase(std::string(secret_name));
+        stats_->cert_active_.dec();
+      }
+      return;
+    }
     entry.cert_config_ = std::make_unique<AsyncContextConfig>(
         secret_name, factory_context_, config_source_, init_manager,
         [this](absl::string_view secret_name, const Ssl::TlsCertificateConfig& cert_config)
@@ -102,8 +166,6 @@ void SecretManager::addCertificateConfig(absl::string_view secret_name, HandleSh
         [this](absl::string_view secret_name) -> absl::Status {
           return removeCertificateConfig(secret_name);
         });
-    stats_->cert_requested_.inc();
-    stats_->cert_active_.inc();
   }
 }
 
@@ -287,6 +349,12 @@ createCertificateSelectorFactory(const Protobuf::Message& proto_config,
                                  AsyncContextFactory&& context_factory) {
   const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
       proto_config, factory_context.messageValidationVisitor());
+  const bool has_config_source = config.has_config_source();
+  const bool has_certificate_provider_name = !config.certificate_provider_name().empty();
+  if (!has_config_source && !has_certificate_provider_name) {
+    return absl::InvalidArgumentError(
+        "one of config_source or certificate_provider_name must be configured");
+  }
   MapperFactory& mapper_config =
       Config::Utility::getAndCheckFactory<MapperFactory>(config.certificate_mapper());
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
