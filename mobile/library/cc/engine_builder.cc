@@ -12,6 +12,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
+#include "envoy/extensions/early_data/v3/default_early_data_policy.pb.h"
 
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
@@ -437,6 +438,11 @@ EngineBuilder::setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enableEarlyData(bool early_data_on) {
+  enable_early_data_ = early_data_on;
+  return *this;
+}
+
 #if defined(__APPLE__)
 EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh_interval_secs) {
   respect_system_proxy_settings_ = value;
@@ -583,6 +589,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   auto* backoff = route_to->mutable_retry_policy()->mutable_retry_back_off();
   backoff->mutable_base_interval()->set_nanos(250000000);
   backoff->mutable_max_interval()->set_seconds(60);
+  if (!enable_early_data_) {
+    auto* early_data = route_to->mutable_early_data_policy();
+    early_data->set_name("envoy.route.early_data_policy.default");
+    ::envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
+    early_data->mutable_typed_config()->PackFrom(config);
+  }
 
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
@@ -760,7 +772,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
                                                  CertificateValidationContext::ACCEPT_UNTRUSTED);
   }
 
-  if (platform_certificates_validation_on_) {
+  if (platform_certificates_validation_on_ && !use_worker_thread_) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator
         validator;
     if (network_thread_priority_.has_value()) {
@@ -1163,7 +1175,7 @@ EngineSharedPtr EngineBuilder::build() {
   }
 
 #if defined(__APPLE__)
-  if (respect_system_proxy_settings_) {
+  if (respect_system_proxy_settings_ && !use_worker_thread_) {
     registerAppleProxyResolver(proxy_settings_refresh_interval_secs_);
   }
 #endif

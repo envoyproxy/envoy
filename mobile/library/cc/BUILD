@@ -42,6 +42,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/compression/brotli/decompressor/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/compression/gzip/decompressor/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/early_data/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/decompressor/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg_cc_proto",

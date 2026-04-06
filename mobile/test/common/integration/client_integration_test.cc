@@ -60,9 +60,9 @@ protected:
   std::string value_;
 };
 
-class ClientIntegrationTest
-    : public BaseClientIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http::CodecType, bool>> {
+class ClientIntegrationTest : public BaseClientIntegrationTest,
+                              public testing::TestWithParam<
+                                  std::tuple<Network::Address::IpVersion, Http::CodecType, bool>> {
 public:
   static void SetUpTestCase() { test_key_value_store_ = std::make_shared<TestKeyValueStore>(); }
   static void TearDownTestCase() { test_key_value_store_.reset(); }
@@ -87,6 +87,9 @@ public:
 
   void initialize() override {
     builder_.setUseWorkerThread(getUseWorkerThread());
+    if (getUseWorkerThread()) {
+      builder_.enforceTrustChainVerification(false);
+    }
     // Integration test starts upstreams before Envoy which can cause a data race.
     builder_.enableLogger(false);
     builder_.setLogLevel(Logger::Logger::trace);
@@ -227,8 +230,10 @@ INSTANTIATE_TEST_SUITE_P(
 void ClientIntegrationTest::basicTest() {
   if (getCodecType() != Http::CodecType::HTTP1) {
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
-    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+    if (!getUseWorkerThread()) {
+      EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+      EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+    }
   }
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
@@ -423,6 +428,7 @@ TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAn
   builder_.enableQuicConnectionMigration(true);
   builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
   builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
+  builder_.enableEarlyData(false);
   // Refreshing DNS cache will revert the overridden lyft.com entry with actual
   // internet accessible address which is not intended.
   builder_.setDisableDnsRefreshOnNetworkChange(true);
@@ -963,8 +969,10 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
 
 TEST_P(ClientIntegrationTest, BasicHttps) {
   EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
-  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+  if (!getUseWorkerThread()) {
+    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+  }
 
   builder_.enablePlatformCertificatesValidation(true);
 
@@ -1113,6 +1121,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   builder_.enableDrainPostDnsRefresh(true);
+  builder_.enableEarlyData(false);
   add_fake_dns_ = true;
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
@@ -1685,7 +1694,7 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
 }
 
 TEST_P(ClientIntegrationTest, Proxying) {
-  if (getCodecType() != Http::CodecType::HTTP1) {
+  if (getCodecType() != Http::CodecType::HTTP1 || getUseWorkerThread()) {
     return;
   }
   initialize();

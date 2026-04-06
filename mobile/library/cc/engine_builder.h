@@ -266,6 +266,8 @@ public:
   EngineBuilder& setIosNetworkServiceType(int ios_network_service_type);
 #endif
 
+  EngineBuilder& enableEarlyData(bool early_data_on);
+
   // This is separated from build() for the sake of testability
   virtual std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> generateBootstrap() const;
 
@@ -376,6 +378,7 @@ private:
   bool enable_stats_collection_ = true;
   bool use_worker_thread_{false};
   bool enable_network_change_monitor_{false};
+  bool enable_early_data_{true};
 #ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif // ENVOY_MOBILE_XDS

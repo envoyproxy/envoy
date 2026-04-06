@@ -111,7 +111,6 @@ public:
         (api_config.threading_model() ==
          envoy::config::listener::v3::ApiListenerManager::StandaloneWorkerThread);
     return std::make_unique<ApiListenerManagerImpl>(server, use_worker_thread);
-}
   }
   std::string name() const override { return "envoy.listener_manager_impl.api"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

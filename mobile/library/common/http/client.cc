@@ -536,7 +536,7 @@ void Client::startStream(envoy_stream_t new_stream_handle, EnvoyStreamCallbacks&
   ASSERT(dispatcher_.isThreadSafe());
 
   if (!api_listener_) {
-    ENVOY_LOG(debug, "[S{}] start stream failed because api_listener_ is null", new_stream_handle);
+    ENVOY_LOG(debug, "[S{}] stream can't be started after shutdown.", new_stream_handle);
     stream_callbacks.on_cancel_({}, {});
     return;
   }

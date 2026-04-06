@@ -375,7 +375,10 @@ InternalEngine::~InternalEngine() {
 
 envoy_status_t InternalEngine::setProxySettings(absl::string_view hostname, const uint16_t port) {
   return main_dispatcher_->post([&, host = std::string(hostname), port]() -> void {
-    connectivity_manager_->setProxySettings(Network::ProxySettings::parseHostAndPort(host, port));
+    if (!use_worker_thread_) {
+      // Proxy settings are not supported when using worker thread.
+      connectivity_manager_->setProxySettings(Network::ProxySettings::parseHostAndPort(host, port));
+    }
   });
 }
 
