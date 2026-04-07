@@ -24,8 +24,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grailbio/bazel-compilation-database/archive/{version}.tar.gz"],
     ),
     bazel_features = dict(
-        version = "1.44.0",
-        sha256 = "ccf85bbf0613d12bf6df2c8470ecec544a6fe8ceab684e970e8ed4dde4cb24ec",
+        version = "1.45.0",
+        sha256 = "adfdb3cffab3a99a63363d844d559a81965d2b61a6062dd51a3d2478d416768f",
         urls = ["https://github.com/bazel-contrib/bazel_features/releases/download/v{version}/bazel_features-v{version}.tar.gz"],
         strip_prefix = "bazel_features-{version}",
     ),
@@ -67,10 +67,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
     ),
     aws_lc = dict(
-        version = "1.66.2",
-        sha256 = "d64a46b4f75fa5362da412f1e96ff5b77eed76b3a95685651f81a558c5c9e126",
+        version = "1.71.0",
+        sha256 = "31b1eed775294825f084c0d4e09df53e1cf036fb98a202a8c2c342543828a985",
         strip_prefix = "aws-lc-{version}",
         urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
+    ),
+    openssl = dict(
+        version = "3.5.5",
+        sha256 = "b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89",
+        strip_prefix = "openssl-{version}",
+        urls = ["https://github.com/openssl/openssl/releases/download/openssl-{version}/openssl-{version}.tar.gz"],
     ),
     aspect_bazel_lib = dict(
         version = "2.21.2",
@@ -91,8 +97,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/aignas/rules_shellcheck/archive/{version}.tar.gz"],
     ),
     aws_c_auth_testdata = dict(
-        version = "0.9.5",
-        sha256 = "39000bff55fe8c82265b9044a966ab37da5c192a775e1b68b6fcba7e7f9882fb",
+        version = "0.10.1",
+        sha256 = "85d737f0f735256f1931e85e4cadbe228d88698f7b59a9b390b49ef5d0778a43",
         strip_prefix = "aws-c-auth-{version}",
         urls = ["https://github.com/awslabs/aws-c-auth/archive/refs/tags/v{version}.tar.gz"],
     ),
@@ -105,10 +111,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     # This dependency is built only when performance tracing is enabled with the
     # option --define=perf_tracing=enabled. It's never built for releases.
     perfetto = dict(
-        version = "53.0",
-        sha256 = "b25023f3281165a1a7d7cde9f3ed2dfcfce022ffd727e77f6589951e0ba6af9a",
-        strip_prefix = "perfetto-{version}/sdk",
-        urls = ["https://github.com/google/perfetto/archive/v{version}.tar.gz"],
+        version = "54.0",
+        sha256 = "57cd976ca0b5474b1d617d1a97450ad55a208aaaff918265db3513275bf51d34",
+        urls = ["https://github.com/google/perfetto/releases/download/v{version}/perfetto-cpp-sdk-src.zip"],
     ),
     c_ares = dict(
         version = "1.34.6",
@@ -224,8 +229,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/Linaro/uadk/archive/refs/tags/v{version}.tar.gz"],
     ),
     qatlib = dict(
-        version = "25.08.0",
-        sha256 = "786101683b4817ded72c8ea51204a190aa26e0b5ac8205ee199c7a9438138770",
+        version = "26.02.0",
+        sha256 = "7c68bf05f196153b1b1669a7d17e5bfba6253e7cafb69f67d30a0d17e7facecb",
         strip_prefix = "qatlib-{version}",
         urls = ["https://github.com/intel/qatlib/archive/refs/tags/{version}.tar.gz"],
     ),
@@ -360,10 +365,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/zlib-ng/zlib-ng/archive/{version}.tar.gz"],
     ),
     yaml_cpp = dict(
-        version = "0.8.0",
-        sha256 = "fbe74bbdcee21d656715688706da3c8becfd946d92cd44705cc6098bb23b3a16",
-        strip_prefix = "yaml-cpp-{version}",
-        urls = ["https://github.com/jbeder/yaml-cpp/archive/{version}.tar.gz"],
+        version = "0.9.0",
+        sha256 = "25cb043240f828a8c51beb830569634bc7ac603978e0f69d6b63558dadefd49a",
+        strip_prefix = "yaml-cpp-yaml-cpp-{version}",
+        urls = ["https://github.com/jbeder/yaml-cpp/archive/refs/tags/yaml-cpp-{version}.tar.gz"],
         # YAML is also used for runtime as well as controlplane. It shouldn't appear on the
         # dataplane but we can't verify this automatically due to code structure today.
     ),
@@ -445,8 +450,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/opencomputeproject/ocp-diag-core/archive/{version}.zip"],
     ),
     io_bazel_rules_go = dict(
-        version = "0.59.0",
-        sha256 = "68af54cb97fbdee5e5e8fe8d210d15a518f9d62abfd71620c3eaff3b26a5ff86",
+        version = "0.60.0",
+        sha256 = "86d3dc8f59d253524f933aaf2f3c05896cb0b605fc35b460c0b4b039996124c6",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
     ),
     rules_cc = dict(
@@ -467,8 +472,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_java/releases/download/{version}/rules_java-{version}.tar.gz"],
     ),
     rules_python = dict(
-        version = "1.7.0",
-        sha256 = "f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da",
+        version = "1.9.0",
+        sha256 = "098ba13578e796c00c853a2161f382647f32eb9a77099e1c88bc5299333d0d6e",
         strip_prefix = "rules_python-{version}",
         urls = ["https://github.com/bazelbuild/rules_python/archive/{version}.tar.gz"],
     ),
@@ -486,8 +491,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_pkg/archive/{version}.tar.gz"],
     ),
     rules_shell = dict(
-        version = "0.7.0",
-        sha256 = "e17f72732618a6536559b3015dbe190ef592f7b9ba81969ff4bca766c451b3a5",
+        version = "0.7.1",
+        sha256 = "3709d1745ba4be4ef054449647b62e424267066eca887bb00dd29242cb8463a0",
         strip_prefix = "rules_shell-{version}",
         urls = ["https://github.com/bazelbuild/rules_shell/releases/download/v{version}/rules_shell-v{version}.tar.gz"],
     ),
@@ -548,8 +553,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "603f7ea475700dcdac7b58f5a05d6ccec70396f4",
-        sha256 = "4b3cd50cef5034eb0b5d49fa7345ec3414fbd1d4430af44a59a7645acfd12029",
+        version = "25a16a764323f2734f44182fbf3ce881d3c4ac15",
+        sha256 = "3b08c0edcc376b5a81230ce5db0b680c20ca0fb742c64278378b462bf852a646",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -636,8 +641,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
     #
     rules_rust = dict(
-        version = "0.68.1",
-        sha256 = "c8aa806cf6066679ac23463241ee80ad692265dad0465f51111cbbe30b890352",
+        version = "0.69.0",
+        sha256 = "bbc764c252d061281b2359277a4d46480e2dcfaf72afc1ce6e00ada58ccbfd4c",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.

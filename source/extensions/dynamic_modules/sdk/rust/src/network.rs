@@ -1,16 +1,8 @@
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi,
-  bytes_to_module_buffer,
-  drop_wrapped_c_void_ptr,
-  str_to_module_buffer,
-  wrap_into_c_void_ptr,
-  ClusterHostCount,
-  EnvoyCounterId,
-  EnvoyGaugeId,
-  EnvoyHistogramId,
-  NewNetworkFilterConfigFunction,
+  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr,
+  ClusterHostCount, EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId, NewNetworkFilterConfigFunction,
   NEW_NETWORK_FILTER_CONFIG_FUNCTION,
 };
 use mockall::*;
