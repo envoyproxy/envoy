@@ -254,7 +254,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   // buffered/processed.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_disable_data_read_immediately") &&
-      read_disable_counter_ > 0) {
+      read_disable_counter_ > 0 && HasBytesToRead()) {
     return;
   }
 

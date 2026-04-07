@@ -29,6 +29,21 @@ convertForwardClientCertDetailsType(envoy::extensions::filters::network::http_co
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+Http::ClientCertFormat
+convertForwardClientCertFormat(envoy::extensions::filters::network::http_connection_manager::v3::
+                                   HttpConnectionManager::ForwardClientCertFormat format) {
+  switch (format) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      TEXT:
+    return Http::ClientCertFormat::Text;
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      JSON:
+    return Http::ClientCertFormat::Json;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
 std::vector<Http::ClientCertDetailsType> convertSetCurrentClientCertDetails(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         SetCurrentClientCertDetails& details) {
@@ -61,7 +76,8 @@ ForwardClientCertActionFactory::createAction(const Protobuf::Message& config,
 
   return std::make_shared<ForwardClientCertAction>(
       convertForwardClientCertDetailsType(typed_config.forward_client_cert_details()),
-      convertSetCurrentClientCertDetails(typed_config.set_current_client_cert_details()));
+      convertSetCurrentClientCertDetails(typed_config.set_current_client_cert_details()),
+      convertForwardClientCertFormat(typed_config.set_current_client_cert_details().format()));
 }
 
 REGISTER_FACTORY(ForwardClientCertActionFactory,

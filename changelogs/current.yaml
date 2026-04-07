@@ -129,6 +129,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: router
+  change: |
+    Fixed a crash in scoped RDS when on-demand update is triggered for a scope that uses inline
+    ``route_configuration`` instead of ``route_configuration_name``. The null RDS provider dereference
+    is now guarded and the on-demand callback returns false for inline-config scopes.
 - area: hot_restart
   change: |
     Fixed hot restart for listeners with a network namespace in the address. Previously, socket
@@ -153,6 +158,10 @@ bug_fixes:
 - area: http
   change: |
     Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.
+- area: http
+  change: |
+    Fixed a bug where the internal redirect logic may hang up a request when the request buffer is
+    overflowed.
 - area: load_report
   change: |
     Fixed a race condition during load-report shutdown with the ADS stream by introducing proper cleanup
@@ -308,6 +317,10 @@ bug_fixes:
     Fixed a bug where dynamic module filter may result in a incomplete body being sent to upstream
     or downstream when some filters before or after the dynamic module filter in the chain
     buffered the body and the dynamic module filter did not.
+- area: io_socket
+  change: |
+    Fixed an issue where a userspace IO socket could fail to drain the write buffer of a connection
+    when the peer had closed for reads, causing the connection to remain open indefinitely.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -317,6 +330,14 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: redis
+  change: |
+    Added zone-aware routing support for Redis Cluster proxy. New read policies
+    ``LOCAL_ZONE_AFFINITY`` and ``LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY`` route read requests
+    to replicas in the same availability zone. Zone discovery is enabled via
+    :ref:`enable_zone_discovery
+    <envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.enable_zone_discovery>`.
+    Note: This feature currently works with Valkey only.
 - area: overload_manager
   change: |
     Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed
@@ -324,6 +345,11 @@ new_features:
     operators to configure the timer interval (``timer_interval``, minimum 1s, default 10s) and
     the memory release threshold (``max_unfreed_memory_bytes``, default 100MB) passed to
     ``tcmalloc::MallocExtension::ReleaseMemoryToSystem()``.
+- area: dns_resolver
+  change: |
+    Added :ref:`HickoryDnsResolverConfig
+    <envoy_v3_api_msg_extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig>`, a new DNS
+    resolver using the `Hickory DNS <https://github.com/hickory-dns/hickory-dns>`_ library.
 - area: dynamic_modules
   change: |
     Added :ref:`tracer <envoy_v3_api_msg_extensions.tracers.dynamic_modules.v3.DynamicModuleTracer>`
@@ -348,6 +374,14 @@ new_features:
     and added brotli and zlib to TCP TLS. Controlled by runtime flag
     ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
     When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
+- area: tls
+  change: |
+    Exposed the SHA-256 fingerprint and serial number of the verified issuer (CA) certificate from
+    the validated downstream mTLS peer certificate chain. Accessible via the
+    ``%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%`` and ``%DOWNSTREAM_PEER_ISSUER_SERIAL%``
+    :ref:`access log formatters <config_access_log_format>`, and via the
+    ``sha256PeerCertificateIssuerDigest()`` and ``serialNumberPeerCertificateIssuer()`` methods on
+    :ref:`downstreamSslConnection() <config_http_filters_lua_ssl_socket_info>` in the Lua filter.
 - area: dynamic_modules
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
@@ -607,6 +641,12 @@ new_features:
     Added SSE (Server-Sent Events) streaming support for MCP backend responses. The router now handles
     SSE responses from backends for ``tools/call`` with direct pass-through streaming, and supports SSE
     aggregation for fanout operations (``tools/list``, ``initialize``) with incremental event parsing.
+- area: http
+  change: |
+    Added an optional :ref:`JSON format <config_http_conn_man_headers_x-forwarded-client-cert_json>`
+    for the :ref:`x-forwarded-client-cert <config_http_conn_man_headers_x-forwarded-client-cert>`
+    (XFCC) header. The format can be configured via :ref:`format
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.SetCurrentClientCertDetails.format>`.
 - area: dynamic_modules
   change: |
     Added :ref:`load balancing policies
@@ -686,6 +726,12 @@ new_features:
     Added caching for remotely fetched dynamic modules. Since ``newDynamicModuleFromBytes``
     writes modules to a deterministic path based on SHA256, subsequent config updates
     referencing the same SHA256 load from the existing file, avoiding redundant HTTP fetches.
+- area: dynamic_modules
+  change: |
+    Added ``nack_on_cache_miss`` option for remote dynamic module sources. When enabled,
+    uncached remote modules cause configuration rejection (NACK) with a background fetch,
+    instead of blocking listener warming. This enables remote modules in ECDS and per-route
+    configurations where an init manager is not available.
 - area: dynamic_modules
   change: |
     Network filter read and write buffers now persist after ``on_read``/``on_write`` callbacks, allowing
@@ -836,6 +882,14 @@ new_features:
     :ref:`envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_data`)
     to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
     connection filter state to be populated after first receiving data from the downstream connection.
+- area: oauth2
+  change: |
+    Added :ref:`allow_failed_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.allow_failed_matcher>`
+    to allow requests to proceed to upstream as unauthenticated when OAuth validation fails (missing, invalid, or expired
+    credentials) and the request matches the configured matchers. This enables graceful degradation patterns where services
+    can handle both authenticated and unauthenticated requests. When triggered, all OAuth cookies are stripped and context
+    headers ``x-envoy-oauth-status: failed`` and ``x-envoy-oauth-failure-reason`` are added. The matcher evaluation follows
+    priority order: ``pass_through_matcher`` > ``allow_failed_matcher`` > ``deny_redirect_matcher`` > default OAuth behavior.
 - area: mcp_json_rest_bridge
   change: |
     Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
@@ -847,10 +901,36 @@ new_features:
     This is necessary if the route configuration may depend on the filter state values set.
 - area: tcp_proxy
   change: |
+    Propagate upstream TCP RST to downstream when detected close type is RemoteReset.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy`` to false.
+- area: tcp_proxy
+  change: |
     HttpUpstream now maps remote-originated HTTP stream reset reasons (RemoteReset,
     RemoteRefusedStreamReset, RemoteConnectionFailure) to RemoteClose with
     DetectedCloseType::RemoteReset, enabling RST propagation through tunneled tcp_proxy.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.map_http_stream_reset_to_tcp_rst`` to false.
+
+- area: contrib
+  change: |
+    Added a new :ref:`Kafka stats sink <config_stat_sinks_kafka>` contrib extension
+    (``envoy.stat_sinks.kafka``) that produces metrics directly to an Apache Kafka topic
+    using librdkafka. Supports both JSON and Protobuf serialization formats; the Protobuf
+    format uses the same ``StreamMetricsMessage`` wire format as the gRPC
+    :ref:`metrics_service <envoy_v3_api_msg_config.metrics.v3.MetricsServiceConfig>` sink,
+    allowing consumers to reuse existing deserializers. Configurable batching, delta counters,
+    tag-as-label emission, and full librdkafka producer tuning (including TLS and SASL
+    authentication) are supported via
+    :ref:`KafkaStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig>`.
+
+- area: tls
+  change: |
+    Added support for building Envoy with OpenSSL as an alternative to the default BoringSSL.
+    This is achieved through a BoringSSL compatibility layer (``bssl-compat``) that translates BoringSSL
+    API calls to OpenSSL, allowing Envoy's TLS code to remain unchanged. To build with OpenSSL, use
+    ``--config=openssl``. HTTP/3 (QUIC) is disabled for OpenSSL builds. Note that OpenSSL builds are
+    not currently covered by the `Envoy security policy <https://github.com/envoyproxy/envoy/blob/main/SECURITY.md>`_.
+    See :repo:`bazel/SSL.md <bazel/SSL.md>` for details.
 
 deprecated:

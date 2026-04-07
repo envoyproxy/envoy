@@ -465,7 +465,8 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
   NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks;
   ON_CALL(filter_manager_callbacks_, downstreamCallbacks)
       .WillByDefault(Return(OptRef<DownstreamStreamFilterCallbacks>{downstream_callbacks}));
-  ON_CALL(downstream_callbacks, route(_)).WillByDefault(Return(route));
+  ON_CALL(downstream_callbacks, route(_))
+      .WillByDefault(Return(makeOptRefFromPtr<const Router::Route>(route.get())));
 
   // Get a valid config by the custom filter name.
   EXPECT_CALL(*route, mostSpecificPerFilterConfig(testing::Eq("custom-name")))
@@ -515,10 +516,10 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfigForNullRoute) {
   NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks;
   ON_CALL(filter_manager_callbacks_, downstreamCallbacks)
       .WillByDefault(Return(OptRef<DownstreamStreamFilterCallbacks>{downstream_callbacks}));
-  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(OptRef<const Router::Route>{}));
   decoder_filter->callbacks_->mostSpecificPerFilterConfig();
 
-  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(OptRef<const Router::Route>{}));
   decoder_filter->callbacks_->perFilterConfigs();
 
   filter_manager_->destroyFilters();

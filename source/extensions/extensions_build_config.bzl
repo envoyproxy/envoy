@@ -538,6 +538,8 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
     # getaddrinfo DNS resolver extension can be used when the system resolver is desired (e.g., Android)
     "envoy.network.dns_resolver.getaddrinfo":          "//source/extensions/network/dns_resolver/getaddrinfo:config",
+    # Hickory DNS resolver extension uses a Rust-based DNS library with support for DoT, DoH, and `DNSSEC`.
+    "envoy.network.dns_resolver.hickory":              "//source/extensions/network/dns_resolver/hickory:config",
 
     #
     # Address Resolvers
