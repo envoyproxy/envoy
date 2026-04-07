@@ -491,7 +491,7 @@ TEST_F(OAuth2Test, SecretsNotReadyReturnsServiceUnavailable) {
   };
 
   EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::ServiceUnavailable, "OAuth flow failed.", _, _,
+              sendLocalReply(Http::Code::ServiceUnavailable, "Service Unavailable", _, _,
                              "OAuth2 secrets are not ready"));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
