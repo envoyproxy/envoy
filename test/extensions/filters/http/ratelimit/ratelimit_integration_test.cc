@@ -706,23 +706,18 @@ envoy.xxx:
 
   envoy::service::ratelimit::v3::RateLimitRequest expected_request_msg;
   expected_request_msg.set_domain("some_domain");
-  // Order of descriptors:
-  // Modifiers added before initialize() run first.
-  // So my rate limit message is index 0, and the one from initialize() is index 1.
+  // Verify that descriptor created from cluster metadata is present
+  auto* descriptor = expected_request_msg.add_descriptors();
+  auto* entry = descriptor->add_entries();
+  entry->set_key("cluster_metadata");
+  entry->set_value("foo");
 
-  // My rate limit:
-  auto* descriptor1 = expected_request_msg.add_descriptors();
-  auto* entry2 = descriptor1->add_entries();
-  entry2->set_key("cluster_metadata");
-  entry2->set_value("foo");
+  descriptor = expected_request_msg.add_descriptors();
+  entry = descriptor->add_entries();
+  entry->set_key("destination_cluster");
+  entry->set_value("cluster_0");
 
-  // initialize() rate limit:
-  auto* descriptor2 = expected_request_msg.add_descriptors();
-  auto* entry1 = descriptor2->add_entries();
-  entry1->set_key("destination_cluster");
-  entry1->set_value("cluster_0");
-
-  EXPECT_EQ(expected_request_msg.DebugString(), request_msg.DebugString());
+  EXPECT_TRUE(TestUtility::protoEqual(expected_request_msg, request_msg));
 
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OK, {},
                         Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{}, 0);
