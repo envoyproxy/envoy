@@ -214,10 +214,7 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   }
   case envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_ENTRY: {
     OptRef<const Upstream::ClusterInfo> cluster_info = info.upstreamClusterInfo();
-    if (!cluster_info.has_value()) {
-      return skip_if_absent_;
-    }
-    metadata_source = &cluster_info.ref().metadata();
+    metadata_source = cluster_info.has_value() ? &cluster_info.ref().metadata() : nullptr;
     break;
   }
   }
