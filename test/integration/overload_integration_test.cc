@@ -304,14 +304,6 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
     return; // only relevant for HTTP/3
   }
 
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* quic_options = bootstrap.mutable_static_resources()
-                             ->mutable_listeners(0)
-                             ->mutable_udp_listener_config()
-                             ->mutable_quic_options();
-    quic_options->set_close_idle_connections_when_overloaded(true);
-  });
-
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
       name: "envoy.overload_actions.close_idle_http_connections"
