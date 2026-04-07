@@ -305,12 +305,6 @@ TEST_P(WasmFilterIntegrationTest, LargeRequestHitBufferLimit) {
   }
 }
 
-} // namespace
-} // namespace Wasm
-} // namespace Extensions
-
-namespace {
-
 struct WasmDeferredDataSetupFilterState {
   absl::Mutex mu;
   bool destroyed ABSL_GUARDED_BY(mu){false};
@@ -397,14 +391,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, WasmDeferredDataTest,
 TEST_P(WasmDeferredDataTest, InvalidContextIdPanicOnDeferredData) {
   // The bug is runtime-agnostic, but testing with v8 is sufficient.
   auto runtimes = Extensions::Common::Wasm::wasmTestMatrix(false, false);
-  bool has_v8 = false;
-  for (const auto& [runtime, language] : runtimes) {
-    if (runtime == "v8") {
-      has_v8 = true;
-      break;
-    }
-  }
-  if (!has_v8) {
+  if (!absl::c_any_of(runtimes, [](const auto& p) { return std::get<0>(p) == "v8"; })) {
     GTEST_SKIP() << "v8 runtime not available";
   }
 
@@ -433,9 +420,6 @@ typed_config:
           filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/deferred_data_rust.wasm"
 )EOF");
   config_helper_.prependFilter(wasm_filter);
-
-  // Wasm filters can be slow to start; increase timeout to avoid flakes.
-  setListenersBoundTimeout(30 * TestUtility::DefaultTimeout);
 
   initialize();
 
@@ -534,4 +518,6 @@ typed_config:
 }
 
 } // namespace
+} // namespace Wasm
+} // namespace Extensions
 } // namespace Envoy
