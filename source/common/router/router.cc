@@ -44,7 +44,13 @@ namespace Router {
 namespace {
 constexpr absl::string_view NumInternalRedirectsFilterStateName = "num_internal_redirects";
 
-uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
+uint64_t getLength(const Buffer::Instance* decoding_buffer, const Buffer::Instance& data) {
+  if (decoding_buffer == &data) {
+    return data.length();
+  }
+
+  return (decoding_buffer ? decoding_buffer->length() : 0) + data.length();
+}
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   OptRef<const Network::Connection> connection) {
@@ -1009,9 +1015,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // (e.g. the buffer filter) resumes iteration, the filter manager passes the shared HCM request
   // buffer as `data`, which aliases `decodingBuffer()`. Detect this via pointer identity — the
   // same check used by ActiveStreamFilterBase::commonHandleBufferData() — and count once.
-  const auto* decoding_buffer = callbacks_->decodingBuffer();
-  const uint64_t total_buffered_bytes =
-      (decoding_buffer == &data) ? data.length() : getLength(decoding_buffer) + data.length();
+  const uint64_t total_buffered_bytes = getLength(callbacks_->decodingBuffer(), data);
   const bool would_exceed_buffer = (total_buffered_bytes > effective_buffer_limit);
 
   // Handle buffer overflow.
