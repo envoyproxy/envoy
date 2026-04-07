@@ -12,9 +12,9 @@ on:
         default: 'all'
         type: choice
         options:
-          - all
-          - android
-          - python
+        - all
+        - android
+        - python
   schedule:
   # Mondays at 1pm UTC (8am EST)
   - cron: "0 13 * * 1"
@@ -33,9 +33,12 @@ jobs:
       contents: read
       packages: read
     if: >-
-      ${{ github.repository == 'envoyproxy/envoy' && 
-          (github.event.schedule || !contains(github.actor, '[bot]')) &&
-          (github.event.inputs.job_to_run == 'all' || github.event.inputs.job_to_run == 'android' || github.event_name == 'schedule') }}
+      github.repository == 'envoyproxy/envoy'
+      && (github.event.schedule 
+             || !contains(github.actor, '[bot]'))
+      && (github.event.inputs.job_to_run == 'all' 
+             || github.event.inputs.job_to_run == 'android' 
+             || github.event_name == 'schedule')
     needs: env
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
@@ -49,22 +52,22 @@ jobs:
       request: ${{ needs.env.outputs.request }}
       steps-pre: |
         - run: |
-            mkdir /tmp/mobile
-            VERSION="0.5.0.$(date '+%Y%m%d')"
-            echo "VERSION=${VERSION}" >> $GITHUB_ENV
+              mkdir /tmp/mobile
+              VERSION="0.5.0.$(date '+%Y%m%d')"
+              echo "VERSION=${VERSION}" >> $GITHUB_ENV
           shell: bash
       steps-post: |
         - run: |
-            mkdir /tmp/output
+              mkdir /tmp/output
           shell: bash
         - name: Tar artifacts
           run: >-
-            tar
-            -czhf
-            /tmp/output/${{ matrix.output }}_android_aar_sources.tar.gz
-            -C
-            /tmp/container-output/build
-            .
+              tar
+              -czhf
+              /tmp/output/${{ matrix.output }}_android_aar_sources.tar.gz
+              -C
+              /tmp/container-output/build
+              .
           shell: bash
       target: ${{ matrix.target }}
       upload-name: ${{ matrix.output }}_android_aar_sources
@@ -87,9 +90,11 @@ jobs:
   android-deploy:
     needs: android-release
     if: >-
-      ${{ always() && 
-          (github.event.inputs.job_to_run == 'all' || github.event.inputs.job_to_run == 'android' || github.event_name == 'schedule') &&
-          (needs.android-release.result == 'success') }}
+      always()
+      && (github.event.inputs.job_to_run == 'all'
+             || github.event.inputs.job_to_run == 'android'
+             || github.event_name == 'schedule')
+      && (needs.android-release.result == 'success')
     permissions:
       contents: read
       packages: read
@@ -159,9 +164,10 @@ jobs:
       contents: read
       packages: read
     if: >-
-      ${{ github.repository == 'envoyproxy/envoy' && 
-          (github.event_name == 'workflow_dispatch') &&
-          (github.event.inputs.job_to_run == 'all' || github.event.inputs.job_to_run == 'python') }}
+      github.repository == 'envoyproxy/envoy'
+      && (github.event_name == 'workflow_dispatch')
+      && (github.event.inputs.job_to_run == 'all'
+             || github.event.inputs.job_to_run == 'python')
     needs: env      
     name: Build and Publish Python Wheel
     uses: ./.github/workflows/_mobile_container_ci.yml
@@ -174,19 +180,19 @@ jobs:
       steps-post: |
         - name: Repair wheel
           run: |
-            mkdir -p /tmp/dist
-            WHEEL_PATH=$(find /tmp/container-output/build -name "*.whl" | head -n 1)
+              mkdir -p /tmp/dist
+              WHEEL_PATH=$(find /tmp/container-output/build -name "*.whl" | head -n 1)
             
-            if [ -z "$WHEEL_PATH" ]; then
-              echo "p Error: No wheel file found in /tmp/container-output/build"
-              ls -R /tmp/container-output/
-              exit 1
-            fi
-            python3 -m venv envoy_wheel
-            source envoy_wheel/bin/activate
-            pip install patchelf auditwheel
+              if [[ -z "$WHEEL_PATH" ]]; then
+                  echo "p Error: No wheel file found in /tmp/container-output/build"
+                  ls -R /tmp/container-output/
+                  exit 1
+              fi
+              python3 -m venv envoy_wheel
+              source envoy_wheel/bin/activate
+              pip install patchelf auditwheel
             
-            auditwheel repair "$WHEEL_PATH" --wheel-dir /tmp/dist
+              auditwheel repair "$WHEEL_PATH" --wheel-dir /tmp/dist
           shell: bash
       target: ${{ matrix.target }}
       upload-name: python-wheel
@@ -208,9 +214,10 @@ jobs:
   python-publish:
     needs: python-release
     if: >-
-      ${{ always() && 
-          (github.event.inputs.job_to_run == 'all' || github.event.inputs.job_to_run == 'python') &&
-          (needs.python-release.result == 'success') }}
+      always()
+        && (github.event.inputs.job_to_run == 'all'
+               || github.event.inputs.job_to_run == 'python')
+        && (needs.python-release.result == 'success')
     permissions: 
       contents: read
       id-token: write
@@ -221,7 +228,7 @@ jobs:
       fail-fast: false
     environment:
       name: pypi
-      url: https://pypi.org/p/<your-package-name>
+      url: https://pypi.org/p/envoy-mobile
     steps:
       - uses: actions/download-artifact@v4
         with:
