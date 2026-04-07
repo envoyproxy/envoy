@@ -201,16 +201,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: envoy_mobile_wheel
-            args: >-
-              build
-              --config=ci
-              --config=mobile-rbe
-              --config=mobile-release
-              -c opt --strip=always
-              //library/python:envoy_mobile_wheel
-              --//library/python:python_platform="manylinux2014_x86_64"
-              --@rules_python//python/config_settings:python_version="3.13.1"
+        - target: envoy_mobile_wheel
+          args: >-
+            build
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-release
+            -c opt --strip=always
+            //library/python:envoy_mobile_wheel
+            --//library/python:python_platform="manylinux2014_x86_64"
+            --@rules_python//python/config_settings:python_version="3.13.1"
   python-publish:
     needs: python-release
     if: >-
@@ -230,9 +230,9 @@ jobs:
       name: pypi
       url: https://pypi.org/p/envoy-mobile
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: python-wheel
-          path: .
-      - name: Publish to PyPi
-        uses: pypa/gh-action-pypi-publish@release/v1
+    - uses: actions/download-artifact@v4
+      with:
+        name: python-wheel
+        path: .
+    - name: Publish to PyPi
+      uses: pypa/gh-action-pypi-publish@release/v1
