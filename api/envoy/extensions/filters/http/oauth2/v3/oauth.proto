@@ -318,6 +318,6 @@ message OAuth2PerRoute {
 
 // Filter config.
 message OAuth2 {
-  // Global/default OAuth2 config for this filter.
+  // The OAuth2 filter config.
   OAuth2Config config = 1;
 }
