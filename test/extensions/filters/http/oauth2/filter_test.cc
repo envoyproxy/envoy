@@ -147,6 +147,9 @@ public:
     EXPECT_CALL(*oauth_client_, getState()).WillRepeatedly(Return(OAuth2Client::OAuthState::Idle));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+    if (config_ != nullptr) {
+      filter_->setActiveConfig(config_);
+    }
     validator_ = std::make_shared<MockOAuth2CookieValidator>();
     if (config_ != nullptr) {
       filter_->validator_ = validator_;

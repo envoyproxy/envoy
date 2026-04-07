@@ -613,18 +613,7 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr default_config,
                            Random::RandomGenerator& random)
     : default_config_(std::move(default_config)),
       oauth_client_factory_(std::move(oauth_client_factory)), time_source_(time_source),
-      random_(random) {
-  if (default_config_ != nullptr) {
-    setActiveConfig(default_config_);
-  }
-}
-
-void OAuth2Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  PassThroughDecoderFilter::setDecoderFilterCallbacks(callbacks);
-  if (oauth_client_ != nullptr) {
-    oauth_client_->setDecoderFilterCallbacks(callbacks);
-  }
-}
+      random_(random) {}
 
 FilterConfigSharedPtr OAuth2Filter::getConfigForRequest() const {
   const auto* route_specific_config =
