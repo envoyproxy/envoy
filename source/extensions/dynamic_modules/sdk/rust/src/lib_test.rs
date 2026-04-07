@@ -4987,7 +4987,7 @@ fn test_async_host_selection_with_stored_completion() {
 fn test_bootstrap_extension_cluster_add_or_update() {
   use std::sync::atomic::{AtomicBool, Ordering};
   static CLUSTER_ADDED: AtomicBool = AtomicBool::new(false);
-  static mut CLUSTER_NAME_RECEIVED: String = String::new();
+  static CLUSTER_NAME_RECEIVED: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -5004,9 +5004,7 @@ fn test_bootstrap_extension_cluster_add_or_update() {
       cluster_name: &str,
     ) {
       CLUSTER_ADDED.store(true, Ordering::SeqCst);
-      unsafe {
-        CLUSTER_NAME_RECEIVED = cluster_name.to_string();
-      }
+      *CLUSTER_NAME_RECEIVED.lock().unwrap() = cluster_name.to_string();
     }
   }
 
@@ -5046,9 +5044,7 @@ fn test_bootstrap_extension_cluster_add_or_update() {
   }
 
   assert!(CLUSTER_ADDED.load(Ordering::SeqCst));
-  unsafe {
-    assert_eq!(CLUSTER_NAME_RECEIVED, "test_cluster");
-  }
+  assert_eq!(*CLUSTER_NAME_RECEIVED.lock().unwrap(), "test_cluster");
 
   // Clean up.
   unsafe {
@@ -5060,7 +5056,7 @@ fn test_bootstrap_extension_cluster_add_or_update() {
 fn test_bootstrap_extension_cluster_removal() {
   use std::sync::atomic::{AtomicBool, Ordering};
   static CLUSTER_REMOVED: AtomicBool = AtomicBool::new(false);
-  static mut REMOVED_CLUSTER_NAME: String = String::new();
+  static REMOVED_CLUSTER_NAME: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -5077,9 +5073,7 @@ fn test_bootstrap_extension_cluster_removal() {
       cluster_name: &str,
     ) {
       CLUSTER_REMOVED.store(true, Ordering::SeqCst);
-      unsafe {
-        REMOVED_CLUSTER_NAME = cluster_name.to_string();
-      }
+      *REMOVED_CLUSTER_NAME.lock().unwrap() = cluster_name.to_string();
     }
   }
 
@@ -5119,9 +5113,7 @@ fn test_bootstrap_extension_cluster_removal() {
   }
 
   assert!(CLUSTER_REMOVED.load(Ordering::SeqCst));
-  unsafe {
-    assert_eq!(REMOVED_CLUSTER_NAME, "removed_cluster");
-  }
+  assert_eq!(*REMOVED_CLUSTER_NAME.lock().unwrap(), "removed_cluster");
 
   // Clean up.
   unsafe {
@@ -5191,7 +5183,7 @@ fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
 fn test_bootstrap_extension_listener_add_or_update() {
   use std::sync::atomic::{AtomicBool, Ordering};
   static LISTENER_ADDED: AtomicBool = AtomicBool::new(false);
-  static mut LISTENER_NAME_RECEIVED: String = String::new();
+  static LISTENER_NAME_RECEIVED: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -5208,9 +5200,7 @@ fn test_bootstrap_extension_listener_add_or_update() {
       listener_name: &str,
     ) {
       LISTENER_ADDED.store(true, Ordering::SeqCst);
-      unsafe {
-        LISTENER_NAME_RECEIVED = listener_name.to_string();
-      }
+      *LISTENER_NAME_RECEIVED.lock().unwrap() = listener_name.to_string();
     }
   }
 
@@ -5250,9 +5240,7 @@ fn test_bootstrap_extension_listener_add_or_update() {
   }
 
   assert!(LISTENER_ADDED.load(Ordering::SeqCst));
-  unsafe {
-    assert_eq!(LISTENER_NAME_RECEIVED, "test_listener");
-  }
+  assert_eq!(*LISTENER_NAME_RECEIVED.lock().unwrap(), "test_listener");
 
   // Clean up.
   unsafe {
@@ -5264,7 +5252,7 @@ fn test_bootstrap_extension_listener_add_or_update() {
 fn test_bootstrap_extension_listener_removal() {
   use std::sync::atomic::{AtomicBool, Ordering};
   static LISTENER_REMOVED: AtomicBool = AtomicBool::new(false);
-  static mut REMOVED_LISTENER_NAME: String = String::new();
+  static REMOVED_LISTENER_NAME: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -5281,9 +5269,7 @@ fn test_bootstrap_extension_listener_removal() {
       listener_name: &str,
     ) {
       LISTENER_REMOVED.store(true, Ordering::SeqCst);
-      unsafe {
-        REMOVED_LISTENER_NAME = listener_name.to_string();
-      }
+      *REMOVED_LISTENER_NAME.lock().unwrap() = listener_name.to_string();
     }
   }
 
@@ -5323,9 +5309,7 @@ fn test_bootstrap_extension_listener_removal() {
   }
 
   assert!(LISTENER_REMOVED.load(Ordering::SeqCst));
-  unsafe {
-    assert_eq!(REMOVED_LISTENER_NAME, "removed_listener");
-  }
+  assert_eq!(*REMOVED_LISTENER_NAME.lock().unwrap(), "removed_listener");
 
   // Clean up.
   unsafe {
