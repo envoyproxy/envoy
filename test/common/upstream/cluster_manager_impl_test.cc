@@ -2751,8 +2751,7 @@ TEST_F(ClusterManagerImplTest, AlpnClusterWebSocketForcesHttp11WhenAllowConnectD
   Http::ConnectionPool::MockInstance* pool = new NiceMock<Http::ConnectionPool::MockInstance>();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(pool));
 
-  auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default,
-                                  Http::Protocol::Http2, &context);
+  auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default, Http::Protocol::Http2, &context);
   EXPECT_TRUE(opt_cp.has_value());
 
   // The protocol should have been forced to HTTP/1.1.
@@ -2806,8 +2805,7 @@ TEST_F(ClusterManagerImplTest, AlpnClusterWebSocketPreservesProtocolWhenAllowCon
   Http::ConnectionPool::MockInstance* pool = new NiceMock<Http::ConnectionPool::MockInstance>();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(pool));
 
-  auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default,
-                                  Http::Protocol::Http2, &context);
+  auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default, Http::Protocol::Http2, &context);
   EXPECT_TRUE(opt_cp.has_value());
 
   // With allow_connect enabled, protocols should NOT be forced to HTTP/1.1 only.
@@ -2861,8 +2859,7 @@ TEST_F(ClusterManagerImplTest, AlpnClusterNonWebSocketDoesNotForceHttp11) {
   Http::ConnectionPool::MockInstance* pool = new NiceMock<Http::ConnectionPool::MockInstance>();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(pool));
 
-  auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default,
-                                  Http::Protocol::Http2, &context);
+  auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default, Http::Protocol::Http2, &context);
   EXPECT_TRUE(opt_cp.has_value());
 
   // Non-WebSocket request should preserve the normal ALPN protocol set.
