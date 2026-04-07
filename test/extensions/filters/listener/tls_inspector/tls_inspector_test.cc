@@ -320,7 +320,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   EXPECT_EQ(
       SSL_SELECT("TLS_error|error:10000092:SSL "
                  "routines:OPENSSL_internal:ENCRYPTED_LENGTH_TOO_LONG:TLS_error_end",
-                 "TLS_error|error:0A0000C6:SSL routines::packet length too long:TLS_error_end"),
+                 "TLS_error|error:0A000092:SSL routines::data length too long:TLS_error_end"),
       cb_.streamInfo().downstreamTransportFailureReason());
 }
 
