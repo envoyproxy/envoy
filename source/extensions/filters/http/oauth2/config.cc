@@ -27,7 +27,7 @@ namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
                 Server::Configuration::ServerFactoryContext& server_context,
-                Init::Manager& init_manager) {
+                OptRef<Init::Manager> init_manager) {
   if (config.has_sds_config()) {
     return server_context.secretManager().findOrCreateGenericSecretProvider(
         config.sds_config(), config.name(), server_context, init_manager);
@@ -39,7 +39,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 absl::StatusOr<FilterConfigSharedPtr>
 createFilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
                    Server::Configuration::ServerFactoryContext& server_context,
-                   Init::Manager& init_manager, Stats::Scope& scope,
+                   OptRef<Init::Manager> init_manager, Stats::Scope& scope,
                    const std::string& stats_prefix) {
   const auto& credentials = proto_config.credentials();
   const auto auth_type = proto_config.auth_type();
@@ -126,7 +126,7 @@ OAuth2Config::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute& proto,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
   auto config_or_error =
-      createFilterConfig(proto.config(), context, context.initManager(), context.scope(), "");
+      createFilterConfig(proto.config(), context, absl::nullopt, context.scope(), "");
   if (!config_or_error.ok()) {
     return config_or_error.status();
   }

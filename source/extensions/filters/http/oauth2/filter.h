@@ -177,6 +177,10 @@ public:
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string hmacSecret() const { return secret_reader_->hmacSecret(); }
+  bool requiredSecretsAvailable() const {
+    return !secret_reader_->hmacSecret().empty() &&
+           (auth_type_ == AuthType::TlsClientAuth || !secret_reader_->clientSecret().empty());
+  }
   FilterStats& stats() { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
@@ -447,6 +451,7 @@ private:
   bool shouldDenyRedirect(const Http::RequestHeaderMap& headers) const;
   void continueWithFailedOAuth(const std::string& reason, const std::string& extra_details = "");
   void sendUnauthorizedResponse(const std::string& details);
+  void sendSecretsNotReadyResponse(const std::string& details);
 };
 
 } // namespace Oauth2

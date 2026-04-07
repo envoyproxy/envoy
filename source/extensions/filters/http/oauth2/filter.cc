@@ -51,7 +51,6 @@ constexpr const char* OIDCLogoutUrlFormatString =
     "{0}?id_token_hint={1}&client_id={2}&post_logout_redirect_uri={3}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
-
 constexpr absl::string_view queryParamsError = "error";
 constexpr absl::string_view queryParamsCode = "code";
 constexpr absl::string_view queryParamsState = "state";
@@ -687,6 +686,11 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       config_->stats().oauth_passthrough_.inc();
       return Http::FilterHeadersStatus::Continue;
     }
+  }
+
+  if (!config_->requiredSecretsAvailable()) {
+    sendSecretsNotReadyResponse("OAuth2 secrets are not ready");
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   // Decrypt the OAuth tokens and update the corresponding cookies in the request headers
@@ -1462,6 +1466,14 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
         }
       },
       absl::nullopt, details);
+}
+
+void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
+  ENVOY_STREAM_LOG(warn, "Responding with 503 Service Unavailable. Cause: {}", *decoder_callbacks_,
+                   details);
+  config_->stats().oauth_failure_.inc();
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, UnauthorizedBodyMessage,
+                                     nullptr, absl::nullopt, details);
 }
 
 bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) const {
