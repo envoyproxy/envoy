@@ -13,22 +13,48 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Router {
 
 namespace {
 
 // Resets 'route_config::virtual_hosts' by merging VirtualHost contained in
-// 'rds_vhosts' and 'vhds_vhosts'.
+// 'rds_vhosts' and 'vhds_vhosts'. Per the RouteConfiguration proto spec, VHDS-supplied
+// virtual hosts take precedence: any RDS vhost whose name or domains collide with a
+// VHDS vhost is skipped.
 void rebuildRouteConfigVirtualHosts(
     const RouteConfigUpdateReceiverImpl::VirtualHostMap& rds_vhosts,
     const RouteConfigUpdateReceiverImpl::VirtualHostMap& vhds_vhosts,
     envoy::config::route::v3::RouteConfiguration& route_config) {
   route_config.clear_virtual_hosts();
-  for (const auto& vhost : rds_vhosts) {
-    route_config.mutable_virtual_hosts()->Add()->CheckTypeAndMergeFrom(vhost.second);
-  }
+
+  absl::flat_hash_set<std::string> vhds_domains;
   for (const auto& vhost : vhds_vhosts) {
+    route_config.mutable_virtual_hosts()->Add()->CheckTypeAndMergeFrom(vhost.second);
+    for (const auto& domain : vhost.second.domains()) {
+      vhds_domains.insert(domain);
+    }
+  }
+
+  for (const auto& vhost : rds_vhosts) {
+    if (vhds_vhosts.find(vhost.first) != vhds_vhosts.end()) {
+      ENVOY_LOG_MISC(debug, "rds: skipping vhost '{}' - superseded by VHDS", vhost.first);
+      continue;
+    }
+    bool domain_collision = false;
+    for (const auto& domain : vhost.second.domains()) {
+      if (vhds_domains.contains(domain)) {
+        domain_collision = true;
+        ENVOY_LOG_MISC(warn, "rds: skipping vhost '{}' - domain '{}' already provided by VHDS",
+                       vhost.first, domain);
+        break;
+      }
+    }
+    if (domain_collision) {
+      continue;
+    }
     route_config.mutable_virtual_hosts()->Add()->CheckTypeAndMergeFrom(vhost.second);
   }
 }

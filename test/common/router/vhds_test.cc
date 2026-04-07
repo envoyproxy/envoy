@@ -316,6 +316,157 @@ vhds:
               "vhost_vhds1" == actual_vhost_2.name());
 }
 
+// Verify that when VHDS provides a vhost and RDS later sends a vhost with the same name,
+// the VHDS vhost takes precedence (per the RouteConfiguration proto spec).
+TEST_F(VhdsTest, VhdsVhostTakesPrecedenceOverRdsSameName) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  VhdsSubscriptionPtr subscription = VhdsSubscription::createVhdsSubscription(
+                                         config_update_info, factory_context_, context_, provider_)
+                                         .value();
+  EXPECT_EQ(0UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+
+  // VHDS delivers a vhost named "shared_vhost" with domain "example.com"
+  auto vhds_vhost = buildVirtualHost("shared_vhost", "example.com");
+  const auto& added_resources = buildAddedResources({vhds_vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  const Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
+                  .ok());
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ("shared_vhost",
+            config_update_info->protobufConfigurationCast().virtual_hosts(0).name());
+
+  // RDS update arrives with a vhost of the same name but different route config.
+  const auto updated_route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+virtual_hosts:
+- name: shared_vhost
+  domains: ["example.com"]
+  routes:
+  - match: { prefix: "/rds-route" }
+    route: { cluster: rds_cluster }
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  )EOF");
+  config_update_info->onRdsUpdate(updated_route_config, "2");
+
+  // Only one vhost should remain (no duplicate) and it should be the VHDS version.
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ("shared_vhost",
+            config_update_info->protobufConfigurationCast().virtual_hosts(0).name());
+  // Verify it's the VHDS version (routes to my_service, not rds_cluster).
+  EXPECT_EQ(
+      "my_service",
+      config_update_info->protobufConfigurationCast().virtual_hosts(0).routes(0).route().cluster());
+}
+
+// Verify that a VHDS vhost whose domain collides with an RDS vhost (but has a different name)
+// takes precedence and the RDS vhost is skipped.
+TEST_F(VhdsTest, VhdsVhostTakesPrecedenceOverRdsSameDomain) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+virtual_hosts:
+- name: rds_vhost
+  domains: ["example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: rds_cluster }
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  VhdsSubscriptionPtr subscription = VhdsSubscription::createVhdsSubscription(
+                                         config_update_info, factory_context_, context_, provider_)
+                                         .value();
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+
+  // VHDS delivers a vhost with a *different* name but the *same* domain "example.com".
+  auto vhds_vhost = buildVirtualHost("vhds_vhost", "example.com");
+  const auto& added_resources = buildAddedResources({vhds_vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  const Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
+                  .ok());
+
+  // The VHDS vhost takes precedence; the RDS vhost with domain "example.com" is skipped.
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ("vhds_vhost", config_update_info->protobufConfigurationCast().virtual_hosts(0).name());
+}
+
+// Verify that when VHDS removes a vhost that was shadowing an RDS vhost,
+// the RDS vhost reappears in the merged config.
+TEST_F(VhdsTest, RdsVhostReappearsWhenVhdsRemovesOverlap) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+virtual_hosts:
+- name: rds_vhost
+  domains: ["example.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: rds_cluster }
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  VhdsSubscriptionPtr subscription = VhdsSubscription::createVhdsSubscription(
+                                         config_update_info, factory_context_, context_, provider_)
+                                         .value();
+
+  // VHDS delivers a vhost with the same domain — it supersedes the RDS vhost.
+  auto vhds_vhost = buildVirtualHost("vhds_vhost", "example.com");
+  const auto& added_resources = buildAddedResources({vhds_vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  const Protobuf::RepeatedPtrField<std::string> removed_resources_empty;
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources_empty, "1")
+                  .ok());
+
+  // Only VHDS vhost visible (RDS filtered due to domain overlap).
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ("vhds_vhost", config_update_info->protobufConfigurationCast().virtual_hosts(0).name());
+
+  // VHDS removes the overlapping vhost.
+  const auto removed_resources = buildRemovedResources({"vhds_vhost"});
+  const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> no_added;
+  const auto empty_decoded =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(no_added);
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(empty_decoded.refvec_, removed_resources, "2")
+                  .ok());
+
+  // Now the RDS vhost should reappear since the VHDS shadow is gone.
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ("rds_vhost", config_update_info->protobufConfigurationCast().virtual_hosts(0).name());
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
