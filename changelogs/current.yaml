@@ -330,6 +330,14 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: redis
+  change: |
+    Added zone-aware routing support for Redis Cluster proxy. New read policies
+    ``LOCAL_ZONE_AFFINITY`` and ``LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY`` route read requests
+    to replicas in the same availability zone. Zone discovery is enabled via
+    :ref:`enable_zone_discovery
+    <envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.enable_zone_discovery>`.
+    Note: This feature currently works with Valkey only.
 - area: overload_manager
   change: |
     Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed
@@ -874,6 +882,14 @@ new_features:
     :ref:`envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_data`)
     to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
     connection filter state to be populated after first receiving data from the downstream connection.
+- area: oauth2
+  change: |
+    Added :ref:`allow_failed_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.allow_failed_matcher>`
+    to allow requests to proceed to upstream as unauthenticated when OAuth validation fails (missing, invalid, or expired
+    credentials) and the request matches the configured matchers. This enables graceful degradation patterns where services
+    can handle both authenticated and unauthenticated requests. When triggered, all OAuth cookies are stripped and context
+    headers ``x-envoy-oauth-status: failed`` and ``x-envoy-oauth-failure-reason`` are added. The matcher evaluation follows
+    priority order: ``pass_through_matcher`` > ``allow_failed_matcher`` > ``deny_redirect_matcher`` > default OAuth behavior.
 - area: mcp_json_rest_bridge
   change: |
     Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
@@ -883,6 +899,11 @@ new_features:
     Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
     ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
     This is necessary if the route configuration may depend on the filter state values set.
+- area: tcp_proxy
+  change: |
+    Propagate upstream TCP RST to downstream when detected close type is RemoteReset.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy`` to false.
 - area: ratelimit
   change: |
     Support populating rate limit descriptors from cluster metadata.
@@ -898,5 +919,14 @@ new_features:
     tag-as-label emission, and full librdkafka producer tuning (including TLS and SASL
     authentication) are supported via
     :ref:`KafkaStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig>`.
+
+- area: tls
+  change: |
+    Added support for building Envoy with OpenSSL as an alternative to the default BoringSSL.
+    This is achieved through a BoringSSL compatibility layer (``bssl-compat``) that translates BoringSSL
+    API calls to OpenSSL, allowing Envoy's TLS code to remain unchanged. To build with OpenSSL, use
+    ``--config=openssl``. HTTP/3 (QUIC) is disabled for OpenSSL builds. Note that OpenSSL builds are
+    not currently covered by the `Envoy security policy <https://github.com/envoyproxy/envoy/blob/main/SECURITY.md>`_.
+    See :repo:`bazel/SSL.md <bazel/SSL.md>` for details.
 
 deprecated:
