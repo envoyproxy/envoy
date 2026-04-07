@@ -144,12 +144,40 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
     in_flight_request_ =
         thread_local_cluster->httpAsyncClient().send(std::move(msg), *this, options);
   } else {
-    parent_->sendUnauthorizedResponse("Token endpoint cluster not found");
+    handleOAuthFailure(false, "Token endpoint cluster not found");
+  }
+}
+
+void OAuth2ClientImpl::handleOAuthFailure(bool is_request_dispatched, const std::string& reason,
+                                          const std::string& extra_details) {
+  const auto result = parent_->handleOAuthFailure(reason, extra_details);
+  if (is_request_dispatched) {
+    if (result == Http::FilterHeadersStatus::Continue) {
+      decoder_callbacks_->continueDecoding();
+    }
+  } else {
+    state_ = (result == Http::FilterHeadersStatus::Continue) ? OAuthState::FailureContinue
+                                                             : OAuthState::FailureStop;
+  }
+}
+
+void OAuth2ClientImpl::handleRefreshTokenFailure(bool is_request_dispatched) {
+  const auto result = parent_->onRefreshAccessTokenFailure();
+  if (is_request_dispatched) {
+    if (result == Http::FilterHeadersStatus::Continue) {
+      decoder_callbacks_->continueDecoding();
+    }
+  } else {
+    state_ = (result == Http::FilterHeadersStatus::Continue) ? OAuthState::FailureContinue
+                                                             : OAuthState::FailureStop;
   }
 }
 
 void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                  Http::ResponseMessagePtr&& message) {
+  // If not yet dispatched, onSuccess is called synchronously during decodeHeaders, not in an async
+  // token request. Set state_ for the caller to check instead of calling continueDecoding.
+  const bool is_request_dispatched = (in_flight_request_ != nullptr);
   in_flight_request_ = nullptr;
 
   ASSERT(state_ == OAuthState::PendingAccessToken ||
@@ -166,12 +194,12 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
                      message->bodyAsString());
     switch (oldState) {
     case OAuthState::PendingAccessToken:
-      parent_->sendUnauthorizedResponse(
-          fmt::format("Failed to get access token, response code: {}, response body: {}",
-                      response_code, message->bodyAsString()));
+      handleOAuthFailure(is_request_dispatched, "Failed to get access token",
+                         fmt::format("response code: {}, response body: {}", response_code,
+                                     message->bodyAsString()));
       break;
     case OAuthState::PendingAccessTokenByRefreshToken:
-      parent_->onRefreshAccessTokenFailure();
+      handleRefreshTokenFailure(is_request_dispatched);
       break;
     default:
       PANIC("Malformed oauth client state");
@@ -186,16 +214,17 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     MessageUtil::loadFromJson(response_body, response, ProtobufMessage::getNullValidationVisitor());
   }
   END_TRY catch (EnvoyException& e) {
-    parent_->sendUnauthorizedResponse(fmt::format(
-        "Failed to parse oauth response body: {}, exception: {}", response_body, e.what()));
+    handleOAuthFailure(is_request_dispatched, "Failed to parse oauth response body",
+                       fmt::format("response body: {}, exception: {}", response_body, e.what()));
     return;
   }
 
   // TODO(snowp): Should this be a pgv validation instead? A more readable log
   // message might be good enough reason to do this manually?
   if (!response.has_access_token()) {
-    parent_->sendUnauthorizedResponse(
-        fmt::format("No access token found in the token exchange response: {}", response_body));
+    handleOAuthFailure(is_request_dispatched,
+                       "No access token found in the token exchange response",
+                       fmt::format("response body: {}", response_body));
     return;
   }
 
@@ -208,9 +237,10 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     expires_in = std::chrono::seconds{response.expires_in().value()};
   }
   if (expires_in <= 0s) {
-    parent_->sendUnauthorizedResponse(fmt::format(
-        "No default or explicit access token expiration found in the token exchange response: {}",
-        response_body));
+    handleOAuthFailure(
+        is_request_dispatched,
+        "No default or explicit access token expiration found in the token exchange response",
+        fmt::format("response body: {}", response_body));
     return;
   }
 
@@ -229,16 +259,20 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
                                  Http::AsyncClient::FailureReason) {
   ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
+  // If not yet dispatched, onFailure was called synchronously during decodeHeaders rather than in
+  // an async token request. Set state_ for the caller to check instead of calling continueDecoding.
+  const bool is_request_dispatched = (in_flight_request_ != nullptr);
   in_flight_request_ = nullptr;
   const OAuthState oldState = state_;
   state_ = OAuthState::Idle;
 
   switch (oldState) {
   case OAuthState::PendingAccessToken:
-    parent_->sendUnauthorizedResponse("Failed to get access token due to HTTP request failure");
+    handleOAuthFailure(is_request_dispatched,
+                       "Failed to get access token due to HTTP request failure");
     break;
   case OAuthState::PendingAccessTokenByRefreshToken:
-    parent_->onRefreshAccessTokenFailure();
+    handleRefreshTokenFailure(is_request_dispatched);
     break;
   default:
     PANIC("Malformed oauth client state");
