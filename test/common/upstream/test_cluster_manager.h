@@ -88,17 +88,22 @@ public:
   ~TestClusterManagerFactory() override { server_context_.dispatcher_.to_delete_.clear(); }
 
   Http::ConnectionPool::InstancePtr allocateConnPool(
-      Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, std::vector<Http::Protocol>&,
+      Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
+      std::vector<Http::Protocol>& protocols,
       const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
           alternate_protocol_options,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, TimeSource&,
       ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& /*quic_info*/,
       OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) override {
+    last_protocols_ = protocols;
     return Http::ConnectionPool::InstancePtr{
         allocateConnPool_(host, alternate_protocol_options, options, transport_socket_options,
                           state, network_observer_registry, server_context_.overloadManager())};
   }
+
+  // Protocols passed to the most recent allocateConnPool call.
+  std::vector<Http::Protocol> last_protocols_;
 
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,

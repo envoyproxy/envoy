@@ -2703,6 +2703,172 @@ TEST_F(ClusterManagerImplTest, LocalInterfaceNameForUpstreamConnectionThrowsInWi
 }
 #endif
 
+TEST_F(ClusterManagerImplTest, AlpnClusterWebSocketForcesHttp11WhenAllowConnectDisabled) {
+  AlpnTestConfigFactory alpn_factory;
+  Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
+      registered_factory(alpn_factory);
+
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: alpn_cluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: alpn_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          auto_config:
+            http2_protocol_options: {}
+            http_protocol_options: {}
+      transport_socket:
+        name: envoy.transport_sockets.alpn
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  // Verify the cluster has USE_ALPN.
+  auto* tlc = cluster_manager_->getThreadLocalCluster("alpn_cluster");
+  ASSERT_NE(nullptr, tlc);
+  auto host = tlc->chooseHost(nullptr).host;
+  ASSERT_NE(nullptr, host);
+  EXPECT_NE(0, host->cluster().features() & Upstream::ClusterInfo::Features::USE_ALPN);
+
+  // Set up a WebSocket upgrade context.
+  NiceMock<MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
+  EXPECT_CALL(context, downstreamHeaders()).WillRepeatedly(Return(&headers));
+
+  Http::ConnectionPool::MockInstance* pool = new NiceMock<Http::ConnectionPool::MockInstance>();
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(pool));
+
+  auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default,
+                                  Http::Protocol::Http2, &context);
+  EXPECT_TRUE(opt_cp.has_value());
+
+  // The protocol should have been forced to HTTP/1.1.
+  ASSERT_EQ(1, factory_.last_protocols_.size());
+  EXPECT_EQ(Http::Protocol::Http11, factory_.last_protocols_[0]);
+}
+
+TEST_F(ClusterManagerImplTest, AlpnClusterWebSocketPreservesProtocolWhenAllowConnectEnabled) {
+  AlpnTestConfigFactory alpn_factory;
+  Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
+      registered_factory(alpn_factory);
+
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: alpn_cluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: alpn_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          auto_config:
+            http2_protocol_options:
+              allow_connect: true
+            http_protocol_options: {}
+      transport_socket:
+        name: envoy.transport_sockets.alpn
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  auto* tlc = cluster_manager_->getThreadLocalCluster("alpn_cluster");
+  ASSERT_NE(nullptr, tlc);
+  auto host = tlc->chooseHost(nullptr).host;
+  ASSERT_NE(nullptr, host);
+
+  NiceMock<MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
+  EXPECT_CALL(context, downstreamHeaders()).WillRepeatedly(Return(&headers));
+
+  Http::ConnectionPool::MockInstance* pool = new NiceMock<Http::ConnectionPool::MockInstance>();
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(pool));
+
+  auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default,
+                                  Http::Protocol::Http2, &context);
+  EXPECT_TRUE(opt_cp.has_value());
+
+  // With allow_connect enabled, protocols should NOT be forced to HTTP/1.1 only.
+  // The ALPN cluster should preserve its normal protocol set (HTTP/1.1 + HTTP/2).
+  EXPECT_GT(factory_.last_protocols_.size(), 1);
+}
+
+TEST_F(ClusterManagerImplTest, AlpnClusterNonWebSocketDoesNotForceHttp11) {
+  AlpnTestConfigFactory alpn_factory;
+  Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
+      registered_factory(alpn_factory);
+
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: alpn_cluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: alpn_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          auto_config:
+            http2_protocol_options: {}
+            http_protocol_options: {}
+      transport_socket:
+        name: envoy.transport_sockets.alpn
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  auto* tlc = cluster_manager_->getThreadLocalCluster("alpn_cluster");
+  ASSERT_NE(nullptr, tlc);
+  auto host = tlc->chooseHost(nullptr).host;
+  ASSERT_NE(nullptr, host);
+
+  // Non-WebSocket request headers.
+  NiceMock<MockLoadBalancerContext> context;
+  Http::TestRequestHeaderMapImpl headers{{"content-type", "application/json"}};
+  EXPECT_CALL(context, downstreamHeaders()).WillRepeatedly(Return(&headers));
+
+  Http::ConnectionPool::MockInstance* pool = new NiceMock<Http::ConnectionPool::MockInstance>();
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(pool));
+
+  auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default,
+                                  Http::Protocol::Http2, &context);
+  EXPECT_TRUE(opt_cp.has_value());
+
+  // Non-WebSocket request should preserve the normal ALPN protocol set.
+  EXPECT_GT(factory_.last_protocols_.size(), 1);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
