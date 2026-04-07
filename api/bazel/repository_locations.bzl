@@ -12,9 +12,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "protoc-gen-validate-{version}",
     ),
     rules_jvm_external = dict(
-        version = "6.8",
+        version = "6.10",
         strip_prefix = "rules_jvm_external-{version}",
-        sha256 = "704a0197e4e966f96993260418f2542568198490456c21814f647ae7091f56f2",
+        sha256 = "e5f83b8f2678d2b26441e5eafefb1b061826608417b8d24e5e8e15e585eab1ba",
         urls = ["https://github.com/bazelbuild/rules_jvm_external/releases/download/{version}/rules_jvm_external-{version}.tar.gz"],
     ),
     xds = dict(

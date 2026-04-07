@@ -1,0 +1,72 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "cookie-invert"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/"
+        cookies {
+          name: "blocked"
+          string_match {
+            exact: "nope"
+          }
+          invert_match: true
+        }
+      }
+      route {
+        cluster: "cookie-cluster"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "default"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "cookie.example.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+  headers {
+    key: "cookie"
+    value: "blocked=nope"
+  }
+}
