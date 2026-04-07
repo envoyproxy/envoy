@@ -49,7 +49,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "typed_filter_state_callbacks" => Some(Box::new(TypedFilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     "config_init_failure" => None,
-    _ => panic!("Unknown filter name: {}", name),
+    _ => panic!("Unknown filter name: {name}"),
   }
 }
 

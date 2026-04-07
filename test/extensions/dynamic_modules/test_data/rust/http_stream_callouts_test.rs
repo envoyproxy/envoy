@@ -32,7 +32,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "upstream_reset" => Some(Box::new(UpstreamResetConfig {
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
-    _ => panic!("Unknown filter name: {}", name),
+    _ => panic!("Unknown filter name: {name}"),
   }
 }
 
