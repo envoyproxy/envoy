@@ -33,6 +33,7 @@
 #include "source/common/http/http1/conn_pool.h"
 #include "source/common/http/http2/conn_pool.h"
 #include "source/common/http/mixed_conn_pool.h"
+#include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/shadow_writer_impl.h"
@@ -1969,6 +1970,17 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   // we end up on a connection of the correct protocol, but for simplicity we're
   // starting with something simpler.
   auto upstream_protocols = host->cluster().upstreamHttpProtocol(downstream_protocol);
+
+  // For auto_config (ALPN) clusters: if this is a WebSocket upgrade and HTTP/2 extended
+  // CONNECT is disabled, force HTTP/1.1 to avoid the upgrade-to-CONNECT transformation
+  // that would otherwise occur in the HTTP/2 codec.
+  if ((host->cluster().features() & Upstream::ClusterInfo::Features::USE_ALPN) && context &&
+      context->downstreamHeaders() &&
+      Http::Utility::isWebSocketUpgradeRequest(*context->downstreamHeaders()) &&
+      !host->cluster().httpProtocolOptions().http2Options().allow_connect()) {
+    upstream_protocols = {Http::Protocol::Http11};
+  }
+
   std::vector<uint8_t> hash_key;
   hash_key.reserve(upstream_protocols.size());
   for (auto protocol : upstream_protocols) {
