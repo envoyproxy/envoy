@@ -15,6 +15,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"
 
+#include "absl/container/inlined_vector.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -116,8 +117,9 @@ public:
                const envoy::config::core::v3::Metadata* metadata,
                Network::TransportSocketOptionsConstSharedPtr transport_socket_options),
               (const));
-  MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
-  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
+  MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
+  MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
+  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
   OrcaUtilizationStore& orcaUtilization() const override { return orca_utilization_store_; }
 
   std::string hostname_;
@@ -129,10 +131,12 @@ public:
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
   mutable OrcaUtilizationStore orca_utilization_store_;
-  HostLbPolicyDataPtr lb_policy_data_;
   envoy::config::core::v3::Locality locality_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
+
+private:
+  absl::InlinedVector<HostLbPolicyDataPtr, 2> lb_policy_datas_;
 };
 
 class MockHostLight : public Host {
@@ -216,8 +220,11 @@ public:
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
-  MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
-  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
+  MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
+  MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
+  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
+  MOCK_METHOD(void, setLastHealthCheckHttpStatus, (uint64_t));
+  MOCK_METHOD(absl::optional<uint64_t>, lastHealthCheckHttpStatus, (), (const));
   OrcaUtilizationStore& orcaUtilization() const override { return orca_utilization_store_; }
 
   mutable OrcaUtilizationStore orca_utilization_store_;
@@ -246,9 +253,11 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
-  HostLbPolicyDataPtr lb_policy_data_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
+
+private:
+  absl::InlinedVector<HostLbPolicyDataPtr, 2> lb_policy_datas_;
 };
 
 } // namespace Upstream

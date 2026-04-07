@@ -73,10 +73,10 @@ public:
   virtual bool canReceiveData() const PURE;
 
   /**
-   * @return true if the peer is valid and its receive buffer can accept more data. This means that
-   * write() calls to this handle will not block.
+   * @return true if the peer is valid and its receive buffer can accept more data, or if the peer
+   * is no longer open for reads. Either means that write() calls to this handle will not block.
    */
-  virtual bool isWritable() const PURE;
+  virtual bool isWriteUnblocked() const PURE;
 
   /**
    * Raised by the peer when its receive buffer switches from high watermark to low watermark.

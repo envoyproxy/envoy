@@ -922,17 +922,18 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     // This filter iterates through all possible route matches and choose the last matched route
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
+          EXPECT_EQ(default_route.get(), decoder_filters_[0]->callbacks_->route().ptr());
           EXPECT_EQ(default_cluster->info().get(),
                     decoder_filters_[0]->callbacks_->clusterInfo().ptr());
 
-          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route.get(),
+                    decoder_filters_[0]->callbacks_->streamInfo().route().ptr());
           EXPECT_EQ(default_route->virtual_host_.get(),
                     decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr());
 
           // Not clearing cached route returns cached route and doesn't invoke cb.
           Router::RouteConstSharedPtr route =
-              decoder_filters_[0]->callbacks_->downstreamCallbacks()->route(
+              decoder_filters_[0]->callbacks_->downstreamCallbacks()->routeSharedPtr(
                   [](Router::RouteConstSharedPtr,
                      Router::RouteEvalStatus) -> Router::RouteMatchStatus {
                     ADD_FAILURE() << "When route cache is not cleared CB should not be invoked";
@@ -976,14 +977,15 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           };
 
           decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
-          route = decoder_filters_[0]->callbacks_->downstreamCallbacks()->route(cb);
+          route = decoder_filters_[0]->callbacks_->downstreamCallbacks()->routeSharedPtr(cb);
 
           EXPECT_EQ(default_route, route);
-          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
+          EXPECT_EQ(default_route.get(), decoder_filters_[0]->callbacks_->route().ptr());
           EXPECT_EQ(default_cluster->info().get(),
                     decoder_filters_[0]->callbacks_->clusterInfo().ptr());
 
-          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route.get(),
+                    decoder_filters_[0]->callbacks_->streamInfo().route().ptr());
           EXPECT_EQ(default_route->virtual_host_.get(),
                     decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr());
 
@@ -1011,11 +1013,12 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     // This filter chooses second route
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-          EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->route());
+          EXPECT_EQ(default_route.get(), decoder_filters_[1]->callbacks_->route().ptr());
           EXPECT_EQ(default_cluster->info().get(),
                     decoder_filters_[1]->callbacks_->clusterInfo().ptr());
 
-          EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route.get(),
+                    decoder_filters_[1]->callbacks_->streamInfo().route().ptr());
           EXPECT_EQ(default_route->virtual_host_.get(),
                     decoder_filters_[1]->callbacks_->streamInfo().virtualHost().ptr());
 
@@ -1043,11 +1046,12 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
           decoder_filters_[1]->callbacks_->downstreamCallbacks()->route(cb);
 
-          EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->route());
+          EXPECT_EQ(foo_bar_route.get(), decoder_filters_[1]->callbacks_->route().ptr());
           EXPECT_EQ(foo_bar_cluster->info().get(),
                     decoder_filters_[1]->callbacks_->clusterInfo().ptr());
 
-          EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
+          EXPECT_EQ(foo_bar_route.get(),
+                    decoder_filters_[1]->callbacks_->streamInfo().route().ptr());
           EXPECT_EQ(foo_bar_route->virtual_host_.get(),
                     decoder_filters_[1]->callbacks_->streamInfo().virtualHost().ptr());
 
@@ -1123,17 +1127,17 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
         // refreshCachedRoute(cb), which (1) calls route_config_->route(_, _, _, _) mock to set
         // default_route as cached_route_, and (2) calls getThreadLocalCluster mock to set
         // cached_cluster_info_.
-        EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
+        EXPECT_EQ(default_route.get(), decoder_filters_[0]->callbacks_->route().ptr());
         EXPECT_EQ(default_cluster_name,
                   decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
-        EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
+        EXPECT_EQ(default_route.get(), decoder_filters_[0]->callbacks_->streamInfo().route().ptr());
         EXPECT_EQ(default_cluster->info().get(),
                   decoder_filters_[0]->callbacks_->clusterInfo().ptr());
 
         // Instantiate a DelegatingRoute child class object and invoke setRoute from
         // StreamFilterCallbacks to manually override the cached route for the current request.
         foo_route_override = std::make_shared<Router::ExampleDerivedDelegatingRouteEntry>(
-            decoder_filters_[0]->callbacks_->route(), foo_cluster_name);
+            decoder_filters_[0]->callbacks_->routeSharedPtr(), foo_cluster_name);
         decoder_filters_[0]->callbacks_->downstreamCallbacks()->setRoute(foo_route_override);
 
         return FilterHeadersStatus::Continue;
@@ -1144,14 +1148,15 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         // Returns cached_route, does not invoke route(cb)
-        EXPECT_EQ(foo_route_override, decoder_filters_[1]->callbacks_->route());
+        EXPECT_EQ(foo_route_override.get(), decoder_filters_[1]->callbacks_->route().ptr());
         // Note: The route filter determines the finalized route's upstream cluster name via
         // routeEntry()->clusterName(), so that's the key piece to check.
         // This should directly call the ExampleDerivedDelegatingRouteEntry overridden
         // clusterName() method.
         EXPECT_EQ(foo_cluster_name,
                   decoder_filters_[1]->callbacks_->route()->routeEntry()->clusterName());
-        EXPECT_EQ(foo_route_override, decoder_filters_[1]->callbacks_->streamInfo().route());
+        EXPECT_EQ(foo_route_override,
+                  decoder_filters_[1]->callbacks_->streamInfo().routeSharedPtr());
         // Tests that setRoute correctly sets cached_cluster_info_
         EXPECT_EQ(foo_cluster->info().get(), decoder_filters_[1]->callbacks_->clusterInfo().ptr());
 
@@ -1231,7 +1236,7 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         formatter_context.setRequestHeaders(test_req_headers);
 
         // Check that cached_route was correctly set to the delegating route.
-        EXPECT_EQ(delegating_route_foo, decoder_filters_[1]->callbacks_->route());
+        EXPECT_EQ(delegating_route_foo.get(), decoder_filters_[1]->callbacks_->route().ptr());
 
         // Check that delegating route correctly overrides the routeEntry()->clusterName()
         EXPECT_EQ(foo_cluster_name, delegating_route_foo->routeEntry()->clusterName());
@@ -2730,7 +2735,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.route());
+        EXPECT_NE(nullptr, stream_info.routeSharedPtr());
 
         EXPECT_EQ(stream_info.downstreamAddressProvider().remoteAddress()->ip()->addressAsString(),
                   xff_address);
@@ -2929,7 +2934,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-        EXPECT_NE(nullptr, stream_info.route());
+        EXPECT_NE(nullptr, stream_info.routeSharedPtr());
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -2987,7 +2992,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
             EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
             // Even the request is invalid, will still try to find a route before response filter
             // chain path.
-            EXPECT_EQ(route_config_provider_.route_config_->route_, stream_info.route());
+            EXPECT_EQ(route_config_provider_.route_config_->route_, stream_info.routeSharedPtr());
           }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -3044,7 +3049,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
             EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
             EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
             EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-            EXPECT_NE(nullptr, stream_info.route());
+            EXPECT_NE(nullptr, stream_info.routeSharedPtr());
           }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -3107,7 +3112,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnTunnelEstablished) {
             EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().localAddress());
             EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
             EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
-            EXPECT_NE(nullptr, stream_info.route());
+            EXPECT_NE(nullptr, stream_info.routeSharedPtr());
           }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -3242,7 +3247,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().remoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().directRemoteAddress());
         EXPECT_NE(nullptr, stream_info.downstreamAddressProvider().sslConnection());
-        EXPECT_NE(nullptr, stream_info.route());
+        EXPECT_NE(nullptr, stream_info.routeSharedPtr());
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -3433,7 +3438,7 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
         // were received. Envoy will create a local reply that will go through the encoder filter
         // chain. We want to make sure that encoder filters get a null route object.
         auto route = filter->callbacks_->route();
-        EXPECT_EQ(route.get(), nullptr);
+        EXPECT_FALSE(route.has_value());
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*filter, encodeData(_, _));

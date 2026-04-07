@@ -133,7 +133,10 @@ public:
     return logical_host_->resolveTransportSocketFactory(dest_address, metadata,
                                                         transport_socket_options);
   }
-  OptRef<HostLbPolicyData> lbPolicyData() const override { return logical_host_->lbPolicyData(); }
+  size_t lbPolicyDataCount() const override { return logical_host_->lbPolicyDataCount(); }
+  OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const override {
+    return logical_host_->lbPolicyDataAt(index);
+  }
   OrcaUtilizationStore& orcaUtilization() const override {
     return logical_host_->orcaUtilization();
   }
@@ -152,7 +155,7 @@ public:
   void canary(bool) override {}
   void setLastHcPassTime(MonotonicTime) override {}
   void priority(uint32_t) override {}
-  void setLbPolicyData(HostLbPolicyDataPtr) override {}
+  void addLbPolicyData(HostLbPolicyDataPtr) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;

@@ -57,10 +57,17 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
       .WillOnce(ReturnRef(socket_factory));
   description_.resolveTransportSocketFactory(address_, &metadata, nullptr);
 
+  EXPECT_CALL(*mock_host_, lbPolicyDataCount());
+  description_.lbPolicyDataCount();
+
+  EXPECT_CALL(*mock_host_, lbPolicyDataAt(0));
+  description_.lbPolicyDataAt(0);
+
   description_.canary(false);
   description_.priority(0);
   description_.metadata(nullptr);
   description_.setLastHcPassTime(MonotonicTime());
+  description_.addLbPolicyData(nullptr);
 
   Upstream::HealthCheckHostMonitorPtr heath_check_monitor;
   description_.setHealthChecker(std::move(heath_check_monitor));
@@ -71,10 +78,6 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
   // Verify orcaUtilization() delegates to the logical host.
   mock_host_->orca_utilization_store_.set(0.42, 1000);
   EXPECT_NEAR(description_.orcaUtilization().get(), 0.42, 0.001);
-
-  // Verify lbPolicyData() delegates to the logical host.
-  description_.lbPolicyData();
-  description_.setLbPolicyData(nullptr);
 }
 
 // Test fixture for LogicalHost per-connection transport socket resolution.

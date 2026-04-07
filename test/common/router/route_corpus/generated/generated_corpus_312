@@ -1,0 +1,81 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "default"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/api"
+      }
+      route {
+        cluster: "ats"
+      }
+    }
+    cors {
+      allow_methods: "test-methods"
+      allow_headers: "test-headers"
+      expose_headers: "test-expose-headers"
+      max_age: "test-max-age"
+      allow_credentials {
+        value: true
+      }
+      filter_enabled {
+        default_value {
+        }
+        runtime_key: "cors.www.enabled"
+      }
+      shadow_enabled {
+        default_value {
+          numerator: 100
+        }
+        runtime_key: "cors.www.shadow_enabled"
+      }
+      allow_origin_string_match {
+        safe_regex {
+          regex: ".*\\.envoyproxy\\.io"
+        }
+      }
+      allow_private_network_access {
+        value: true
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "api.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/api"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

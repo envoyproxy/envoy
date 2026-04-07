@@ -2164,6 +2164,24 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.issuerPeerCertificate();
                                      });
                                }}},
+                             {"DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.sha256PeerCertificateIssuerDigest();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_ISSUER_SERIAL",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return connection_info.serialNumberPeerCertificateIssuer();
+                                     });
+                               }}},
                              {"DOWNSTREAM_PEER_CERT",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {

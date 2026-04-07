@@ -10,6 +10,8 @@
 #include "tcmalloc/malloc_extension.h"
 #elif defined(GPERFTOOLS_TCMALLOC)
 #include "gperftools/malloc_extension.h"
+#elif defined(JEMALLOC)
+#include <jemalloc/jemalloc.h>
 #endif
 
 namespace Envoy {
@@ -27,6 +29,17 @@ void setMaxUnfreedMemoryBytes(uint64_t value) {
   max_unfreed_memory_bytes.store(value, std::memory_order_relaxed);
 }
 
+#if defined(JEMALLOC)
+namespace {
+// Refresh jemalloc's epoch so that subsequently-read stats reflect current state.
+void refreshJemallocEpoch() {
+  uint64_t epoch = 1;
+  size_t sz = sizeof(epoch);
+  mallctl("epoch", &epoch, &sz, &epoch, sz);
+}
+} // namespace
+#endif
+
 uint64_t Stats::totalCurrentlyAllocated() {
 #if defined(TCMALLOC)
   return tcmalloc::MallocExtension::GetNumericProperty("generic.current_allocated_bytes")
@@ -35,6 +48,12 @@ uint64_t Stats::totalCurrentlyAllocated() {
   size_t value = 0;
   MallocExtension::instance()->GetNumericProperty("generic.current_allocated_bytes", &value);
   return value;
+#elif defined(JEMALLOC)
+  refreshJemallocEpoch();
+  size_t allocated = 0;
+  size_t sz = sizeof(allocated);
+  mallctl("stats.allocated", &allocated, &sz, nullptr, 0);
+  return allocated;
 #else
   return 0;
 #endif
@@ -51,6 +70,12 @@ uint64_t Stats::totalCurrentlyReserved() {
   size_t value = 0;
   MallocExtension::instance()->GetNumericProperty("generic.heap_size", &value);
   return value;
+#elif defined(JEMALLOC)
+  refreshJemallocEpoch();
+  size_t mapped = 0;
+  size_t sz = sizeof(mapped);
+  mallctl("stats.mapped", &mapped, &sz, nullptr, 0);
+  return mapped;
 #else
   return 0;
 #endif
@@ -65,6 +90,9 @@ uint64_t Stats::totalThreadCacheBytes() {
   MallocExtension::instance()->GetNumericProperty("tcmalloc.current_total_thread_cache_bytes",
                                                   &value);
   return value;
+#elif defined(JEMALLOC)
+  // jemalloc uses per-arena caches rather than per-thread caches; no direct equivalent.
+  return 0;
 #else
   return 0;
 #endif
@@ -77,6 +105,13 @@ uint64_t Stats::totalPageHeapFree() {
   size_t value = 0;
   MallocExtension::instance()->GetNumericProperty("tcmalloc.pageheap_free_bytes", &value);
   return value;
+#elif defined(JEMALLOC)
+  refreshJemallocEpoch();
+  size_t active = 0, allocated = 0;
+  size_t sz = sizeof(size_t);
+  mallctl("stats.active", &active, &sz, nullptr, 0);
+  mallctl("stats.allocated", &allocated, &sz, nullptr, 0);
+  return active > allocated ? active - allocated : 0;
 #else
   return 0;
 #endif
@@ -90,6 +125,12 @@ uint64_t Stats::totalPageHeapUnmapped() {
   size_t value = 0;
   MallocExtension::instance()->GetNumericProperty("tcmalloc.pageheap_unmapped_bytes", &value);
   return value;
+#elif defined(JEMALLOC)
+  refreshJemallocEpoch();
+  size_t retained = 0;
+  size_t sz = sizeof(retained);
+  mallctl("stats.retained", &retained, &sz, nullptr, 0);
+  return retained;
 #else
   return 0;
 #endif
@@ -102,6 +143,12 @@ uint64_t Stats::totalPhysicalBytes() {
   size_t value = 0;
   MallocExtension::instance()->GetNumericProperty("generic.total_physical_bytes", &value);
   return value;
+#elif defined(JEMALLOC)
+  refreshJemallocEpoch();
+  size_t resident = 0;
+  size_t sz = sizeof(resident);
+  mallctl("stats.resident", &resident, &sz, nullptr, 0);
+  return resident;
 #else
   return 0;
 #endif
@@ -115,6 +162,12 @@ void Stats::dumpStatsToLog() {
   auto buffer = std::make_unique<char[]>(buffer_size);
   MallocExtension::instance()->GetStats(buffer.get(), buffer_size);
   ENVOY_LOG_MISC(debug, "TCMalloc stats:\n{}", buffer.get());
+#elif defined(JEMALLOC)
+  std::string output;
+  malloc_stats_print(
+      [](void* opaque, const char* msg) { reinterpret_cast<std::string*>(opaque)->append(msg); },
+      &output, nullptr);
+  ENVOY_LOG_MISC(debug, "jemalloc stats:\n{}", output);
 #else
   return;
 #endif
@@ -129,6 +182,12 @@ absl::optional<std::string> Stats::dumpStats() {
   MallocExtension::instance()->GetStats(buffer.data(), buffer_size);
   buffer.resize(strlen(buffer.c_str()));
   return buffer;
+#elif defined(JEMALLOC)
+  std::string output;
+  malloc_stats_print(
+      [](void* opaque, const char* msg) { reinterpret_cast<std::string*>(opaque)->append(msg); },
+      &output, nullptr);
+  return output;
 #else
   return absl::nullopt;
 #endif

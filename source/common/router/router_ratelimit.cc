@@ -94,10 +94,11 @@ bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
 bool DestinationClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                   const std::string&, const Http::RequestHeaderMap&,
                                                   const StreamInfo::StreamInfo& info) const {
-  if (info.route() == nullptr || info.route()->routeEntry() == nullptr) {
+  const auto route = info.route();
+  if (!route || route->routeEntry() == nullptr) {
     return false;
   }
-  descriptor_entry = {"destination_cluster", info.route()->routeEntry()->clusterName()};
+  descriptor_entry = {"destination_cluster", route->routeEntry()->clusterName()};
   return true;
 }
 
@@ -206,9 +207,11 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   case envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC:
     metadata_source = &info.dynamicMetadata();
     break;
-  case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
-    metadata_source = &info.route()->metadata();
+  case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY: {
+    const auto route = info.route();
+    metadata_source = route ? &route->metadata() : nullptr;
     break;
+  }
   }
 
   const std::string metadata_string_value =
