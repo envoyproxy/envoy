@@ -115,7 +115,6 @@ py_wheel(
         ":is_macos_arm64": "macosx_11_0_arm64",
         "//conditions:default": "any",
     }),
-    abi = "cp313",
     python_tag = python_tag(),
     strip_path_prefixes = [
         "mobile/library/python",
