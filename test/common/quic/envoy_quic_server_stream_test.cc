@@ -558,6 +558,25 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
+TEST_F(EnvoyQuicServerStreamTest, FinPassedUpWhenReadDisableUponHeaders) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_disable_data_read_immediately",
+                                true);
+
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
+      .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr&, bool) {
+        quic_stream_->readDisable(true);
+      }));
+  spdy_request_headers_[":method"] = "GET";
+  std::string header_data = spdyHeaderToHttp3StreamPayload(spdy_request_headers_);
+  quic::QuicStreamFrame frame(stream_id_, /*fin=*/true, 0, header_data);
+  quic_stream_->OnStreamFrame(frame);
+
+  EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+  EXPECT_EQ(quic_stream_->read_side_closed(), true);
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
 TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
   const bool disable_data_read_immediately = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.quic_disable_data_read_immediately");

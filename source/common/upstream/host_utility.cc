@@ -144,18 +144,19 @@ std::pair<HostConstSharedPtr, bool> HostUtility::selectOverrideHost(const HostMa
     return {nullptr, false};
   }
 
-  auto override_host = context->overrideHostToSelect();
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> override_host =
+      context->overrideHostToSelect();
   if (!override_host.has_value()) {
     return {nullptr, false};
   }
 
-  const bool strict_mode = override_host.value().second;
+  const bool strict_mode = override_host->strict;
 
   if (host_map == nullptr) {
     return {nullptr, strict_mode};
   }
 
-  auto host_iter = host_map->find(override_host.value().first);
+  auto host_iter = host_map->find(override_host->host);
 
   // The override host cannot be found in the host map.
   if (host_iter == host_map->end()) {

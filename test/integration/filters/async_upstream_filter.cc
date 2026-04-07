@@ -20,8 +20,8 @@ public:
       : cluster_manager_(cluster_manager) {}
 
   absl::string_view clusterName() {
-    Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-    RELEASE_ASSERT(route != nullptr, "no error handling in AsyncUpstreamFilter yet");
+    const auto route = decoder_callbacks_->route();
+    RELEASE_ASSERT(route.has_value(), "no error handling in AsyncUpstreamFilter yet");
     const Router::RouteEntry* route_entry = route->routeEntry();
     RELEASE_ASSERT(route_entry != nullptr, "no error handling in AsyncUpstreamFilter yet");
     return route_entry->clusterName();

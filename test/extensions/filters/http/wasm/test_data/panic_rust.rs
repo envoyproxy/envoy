@@ -10,27 +10,27 @@ struct TestStream;
 impl Context for TestStream {}
 
 impl HttpContext for TestStream {
-    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
-        panic!("");
-    }
+  fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
+    panic!("");
+  }
 
-    fn on_http_request_body(&mut self, _: usize, _: bool) -> Action {
-        panic!("");
-    }
+  fn on_http_request_body(&mut self, _: usize, _: bool) -> Action {
+    panic!("");
+  }
 
-    fn on_http_request_trailers(&mut self, _: usize) -> Action {
-        panic!("");
-    }
+  fn on_http_request_trailers(&mut self, _: usize) -> Action {
+    panic!("");
+  }
 
-    fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
-        panic!("");
-    }
+  fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
+    panic!("");
+  }
 
-    fn on_http_response_body(&mut self, _: usize, _: bool) -> Action {
-        panic!("");
-    }
+  fn on_http_response_body(&mut self, _: usize, _: bool) -> Action {
+    panic!("");
+  }
 
-    fn on_http_response_trailers(&mut self, _: usize) -> Action {
-        panic!("");
-    }
+  fn on_http_response_trailers(&mut self, _: usize) -> Action {
+    panic!("");
+  }
 }

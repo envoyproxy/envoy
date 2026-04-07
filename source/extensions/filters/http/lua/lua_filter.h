@@ -116,7 +116,8 @@ public:
    * Set the upstream host override.
    * @param host_and_strict supplies the host and whether the host should be treated as strict.
    */
-  virtual void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) PURE;
+  virtual void
+  setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host_and_strict) PURE;
 
   /**
    * Clear the route cache explicitly.
@@ -577,7 +578,8 @@ private:
       return callbacks_->connection().ptr();
     }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
-    void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
+    void
+    setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host_and_strict) override {
       callbacks_->setUpstreamOverrideHost(std::move(host_and_strict));
     }
     void clearRouteCache() override {
@@ -613,7 +615,8 @@ private:
       return callbacks_->connection().ptr();
     }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
-    void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
+    void
+    setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host_and_strict) override {
       UNREFERENCED_PARAMETER(host_and_strict);
     }
     void clearRouteCache() override {}

@@ -30,6 +30,7 @@ def tcmalloc_external_deps(repository):
             _repo("//bazel:debug_tcmalloc"),
             _repo("//bazel:gperftools_tcmalloc"),
         ): [_repo("//bazel/external:gperftools")],
+        (_repo("//bazel:jemalloc_enabled"),): [_repo("//bazel/foreign_cc:jemalloc")],
         "//conditions:default": [_repo("//bazel:tcmalloc_all_libs")],
     })
 

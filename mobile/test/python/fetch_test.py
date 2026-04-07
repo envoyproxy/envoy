@@ -5,7 +5,7 @@ import threading
 import unittest
 from test.python.echo_test_server import EchoTestServer
 
-from library.python.envoy_engine import (
+from envoy_mobile import (
     EngineBuilder,
     EnvoyError,
     ErrorCode,

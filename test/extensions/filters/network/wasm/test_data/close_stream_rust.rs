@@ -10,13 +10,13 @@ struct TestStream;
 impl Context for TestStream {}
 
 impl StreamContext for TestStream {
-    fn on_downstream_data(&mut self, _: usize, _: bool) -> Action {
-        self.close_downstream();
-        Action::Continue
-    }
+  fn on_downstream_data(&mut self, _: usize, _: bool) -> Action {
+    self.close_downstream();
+    Action::Continue
+  }
 
-    fn on_upstream_data(&mut self, _: usize, _: bool) -> Action {
-        self.close_upstream();
-        Action::Continue
-    }
+  fn on_upstream_data(&mut self, _: usize, _: bool) -> Action {
+    self.close_upstream();
+    Action::Continue
+  }
 }
