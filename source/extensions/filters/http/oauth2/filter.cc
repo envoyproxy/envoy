@@ -644,8 +644,7 @@ void OAuth2Filter::setActiveConfig(FilterConfigSharedPtr config) {
     return;
   }
 
-  if (config_ == config && validator_ != nullptr &&
-      (oauth_client_ != nullptr || !oauth_client_factory_)) {
+  if (config_ == config && validator_ != nullptr && oauth_client_ != nullptr) {
     return;
   }
 
@@ -653,14 +652,10 @@ void OAuth2Filter::setActiveConfig(FilterConfigSharedPtr config) {
   validator_ = std::make_shared<OAuth2CookieValidator>(time_source_, config_->cookieNames(),
                                                        config_->cookieDomain());
 
-  if (oauth_client_factory_) {
-    oauth_client_ = oauth_client_factory_(config_);
-  }
-  if (oauth_client_ != nullptr) {
-    oauth_client_->setCallbacks(*this);
-    if (decoder_callbacks_ != nullptr) {
-      oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
-    }
+  oauth_client_ = oauth_client_factory_(config_);
+  oauth_client_->setCallbacks(*this);
+  if (decoder_callbacks_ != nullptr) {
+    oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
   }
 }
 
