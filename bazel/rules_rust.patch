@@ -1,6 +1,6 @@
 --- rust/private/rustc.bzl
 +++ rust/private/rustc.bzl
-@@ -1731,7 +1731,7 @@ def rustc_compile_action(
+@@ -1612,7 +1612,7 @@ def rustc_compile_action(
              **crate_info_dict
          )
  
@@ -12,7 +12,7 @@
 
 --- rust/private/rustc.bzl
 +++ rust/private/rustc.bzl
-@@ -1165,7 +1165,7 @@ def construct_arguments(
+@@ -1061,7 +1061,7 @@ def construct_arguments(
  
      if toolchain.llvm_cov and ctx.configuration.coverage_enabled:
          # https://doc.rust-lang.org/rustc/instrument-coverage.html
@@ -21,17 +21,3 @@
  
      if toolchain._experimental_link_std_dylib:
          rustc_flags.add("--codegen=prefer-dynamic")
-
---- rust/private/rustc.bzl
-+++ rust/private/rustc.bzl
-@@ -1134,6 +1134,10 @@
- 
-             env.update(link_env)
-             rustc_flags.add(ld, format = "--codegen=linker=%s")
-+
-+            # Disable self-contained linker to prevent errors with Rust 1.88+
-+            # which enables rust-lld by default on x86_64-unknown-linux-gnu.
-+            rustc_flags.add("--codegen=link-self-contained=no")
- 
-             # Split link args into individual "--codegen=link-arg=" flags to handle nested spaces.
-             # Additional context: https://github.com/rust-lang/rust/pull/36574
