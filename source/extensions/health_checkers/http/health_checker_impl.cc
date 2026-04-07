@@ -419,6 +419,10 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   request_in_flight_ = false;
 
+  // Extract the HTTP response code for inclusion in health check events.
+  const uint64_t response_code =
+      response_headers_ != nullptr ? Http::Utility::getResponseStatus(*response_headers_) : 0;
+
   switch (healthCheckResult()) {
   case HealthCheckResult::Succeeded:
     handleSuccess(false);
@@ -427,10 +431,12 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     handleSuccess(true);
     break;
   case HealthCheckResult::Failed:
-    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/false);
+    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/false,
+                  /*http_status_code=*/response_code);
     break;
   case HealthCheckResult::Retriable:
-    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/true);
+    handleFailure(envoy::data::core::v3::ACTIVE, /*retriable=*/true,
+                  /*http_status_code=*/response_code);
     break;
   }
 

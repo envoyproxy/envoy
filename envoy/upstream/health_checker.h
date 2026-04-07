@@ -74,10 +74,13 @@ public:
    * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.
    * @param failure_type supplies the type of health check failure.
+   * @param http_status_code the HTTP status code of the response that triggered the ejection,
+   *        or 0 if not applicable (e.g., non-HTTP checkers or network-level failures).
    */
   virtual void logEjectUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                                  const HostDescriptionConstSharedPtr& host,
-                                 envoy::data::core::v3::HealthCheckFailureType failure_type) PURE;
+                                 envoy::data::core::v3::HealthCheckFailureType failure_type,
+                                 uint64_t http_status_code) PURE;
 
   /**
    * Log an unhealthy host event.
@@ -85,11 +88,13 @@ public:
    * @param host supplies the host that generated the event.
    * @param failure_type supplies the type of health check failure.
    * @param first_check whether this is a failure on the first health check for this host.
+   * @param http_status_code the HTTP status code of the response that caused this failure,
+   *        or 0 if not applicable (e.g., non-HTTP checkers or network-level failures).
    */
   virtual void logUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                             const HostDescriptionConstSharedPtr& host,
                             envoy::data::core::v3::HealthCheckFailureType failure_type,
-                            bool first_check) PURE;
+                            bool first_check, uint64_t http_status_code) PURE;
 
   /**
    * Log a healthy host addition event.

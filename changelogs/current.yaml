@@ -278,6 +278,14 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: health_check
+  change: |
+    Added ``http_status_code`` field to :ref:`HealthCheckEjectUnhealthy
+    <envoy_v3_api_msg_data.core.v3.HealthCheckEjectUnhealthy>` and :ref:`HealthCheckFailure
+    <envoy_v3_api_msg_data.core.v3.HealthCheckFailure>` proto messages. When the health checker
+    type is HTTP and the failure type is ``ACTIVE``, the field is populated with the HTTP response
+    status code that caused the failure. For non-HTTP health checkers and network-level failures,
+    the field defaults to ``0``. Fixes :issue:`40221`.
 - area: dynamic_modules
   change: |
     Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform

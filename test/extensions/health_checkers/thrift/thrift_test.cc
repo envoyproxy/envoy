@@ -207,7 +207,7 @@ TEST_F(ThriftHealthCheckerTest, Ping) {
   responseSuccess();
 
   continueHealthCheck();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   responseFailure();
 
   // Shutdown *without* an active request.
@@ -227,7 +227,7 @@ TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
   responseSuccess();
 
   continueHealthCheck();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   responseFailure();
 
   continueHealthCheck();
@@ -258,13 +258,13 @@ TEST_F(ThriftHealthCheckerTest, AlwaysLogHealthCheckFailures) {
 
   continueHealthCheck();
   // Fail on the exception response.
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false, _));
   responseFailure();
 
   continueHealthCheck();
   // Fail again.
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false, _));
   responseFailure();
 
   continueHealthCheck();
@@ -283,8 +283,8 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
   setup();
 
   startHealthChecker();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true, _));
   disconnectHealthCheck();
 
   restartHealthCheckSession();
@@ -311,7 +311,7 @@ TEST_F(ThriftHealthCheckerTest, LogTempFailureFailure) {
   responseSuccess();
 
   continueHealthCheck();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   disconnectHealthCheck();
 
   restartHealthCheckSession();
@@ -335,8 +335,8 @@ TEST_F(ThriftHealthCheckerTest, LogConsecutiveFailures) {
   setup();
 
   startHealthChecker();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true, _));
   responseFailure();
 
   continueHealthCheck();
@@ -367,7 +367,7 @@ TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   client_->raiseResponseResult(true);
 
   restartHealthCheckSession();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   // The connection will be closed on failure.
