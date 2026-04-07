@@ -155,6 +155,10 @@ bug_fixes:
 - area: tls
   change: |
     Fixed on-demand TLS selector to enforce session resumption settings.
+- area: tls
+  change: |
+    Fixed connection reset errors (ECONNRESET) in SslSocket to be correctly exposed to the network
+    connection, allowing them to be reported as RemoteReset instead of masking them as normal closure.
 - area: http
   change: |
     Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.

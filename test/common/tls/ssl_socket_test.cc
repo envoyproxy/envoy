@@ -4195,7 +4195,6 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-
 TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -6779,7 +6778,6 @@ TEST_P(SslSocketTest, TestTransportSocketCallback) {
   ssl_socket->setTransportSocketCallbacks(callbacks);
   EXPECT_EQ(ssl_socket->transportSocketCallbacks(), &callbacks);
 }
-
 
 class SslReadBufferLimitTest : public SslSocketTest {
 protected:
