@@ -130,7 +130,7 @@ TEST(HttpExtProcConfigTest, CorrectHttpServiceConfigServerContext) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, messageValidationVisitor()).Times(testing::AtLeast(1));
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;

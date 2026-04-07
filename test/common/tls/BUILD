@@ -43,6 +43,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -104,6 +105,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -152,6 +154,7 @@ envoy_cc_test(
         ":ssl_test_utils",
         "//source/common/common:base64_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/tls:context_config_lib",
@@ -214,6 +217,14 @@ envoy_cc_test_library(
         "//source/common/tls:ssl_socket_lib",
         "//source/common/tls:utility_lib",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "mock_ssl_handshaker_lib",
+    hdrs = ["mock_ssl_handshaker.h"],
+    deps = [
+        "//source/common/tls:ssl_handshaker_lib",
     ],
 )
 

@@ -273,6 +273,13 @@ public:
     return clusters_maps;
   }
 
+  void forEachActiveCluster(std::function<void(const Cluster&)> cb) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    for (const auto& [unused_name, cluster_data] : active_clusters_) {
+      cb(*cluster_data->cluster_);
+    }
+  }
+
   OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {

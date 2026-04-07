@@ -99,6 +99,9 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   RETURN_IF_ERROR(validateFilteringMode(filtering_mode));
   filtering_mode_ = filtering_mode;
 
+  // Initialize unknown fields scrubbing.
+  scrub_unknown_fields_ = proto_config.scrub_unknown_fields();
+
   // Initialize proto descriptor pool.
   absl::StatusOr<Envoy::Protobuf::FileDescriptorSet> descriptor_set_or_error = loadDescriptorSet(
       context.serverFactoryContext().api(), proto_config.descriptor_set().data_source());

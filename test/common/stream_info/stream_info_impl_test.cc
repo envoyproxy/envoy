@@ -42,11 +42,11 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 728 ||
+        sizeof(stream_info) == 720 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 752 ||
+        sizeof(stream_info) == 744 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 704)
+        sizeof(stream_info) == 696)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -325,7 +325,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.healthCheck(true);
     EXPECT_TRUE(stream_info.healthCheck());
 
-    EXPECT_EQ(nullptr, stream_info.route());
+    EXPECT_FALSE(stream_info.route().has_value());
     EXPECT_FALSE(stream_info.virtualHost().has_value());
 
     std::shared_ptr<NiceMock<Router::MockVirtualHost>> vhost =
@@ -339,7 +339,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     std::shared_ptr<NiceMock<Router::MockRoute>> route =
         std::make_shared<NiceMock<Router::MockRoute>>();
     stream_info.route_ = route;
-    EXPECT_EQ(route, stream_info.route());
+    EXPECT_EQ(route.get(), stream_info.route().ptr());
 
     stream_info.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
                                        FilterState::StateType::ReadOnly,
@@ -352,11 +352,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
                      ->getDataReadOnly<TestIntAccessor>("test")
                      ->access());
 
-    EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
+    EXPECT_FALSE(stream_info.upstreamClusterInfo().has_value());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
     stream_info.setUpstreamClusterInfo(cluster_info);
-    EXPECT_NE(absl::nullopt, stream_info.upstreamClusterInfo());
-    EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo().value()->name());
+    ASSERT_TRUE(stream_info.upstreamClusterInfo().has_value());
+    EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo()->name());
 
     const std::string session_id =
         "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
@@ -496,8 +496,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.requestComplete(), s2.requestComplete());
   EXPECT_EQ(s1.responseFlags(), s2.responseFlags());
   EXPECT_EQ(s1.healthCheck(), s2.healthCheck());
-  EXPECT_NE(s1.route(), nullptr);
-  EXPECT_EQ(s1.route(), s2.route());
+  EXPECT_TRUE(s1.route().has_value());
+  EXPECT_EQ(s1.route().ptr(), s2.route().ptr());
   EXPECT_EQ(
       Config::Metadata::metadataValue(&s1.dynamicMetadata(), "com.test", "test_key").string_value(),
       Config::Metadata::metadataValue(&s2.dynamicMetadata(), "com.test", "test_key")
@@ -506,8 +506,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
             s2.filterState()->getDataReadOnly<TestIntAccessor>("test")->access());
   EXPECT_EQ(*s1.getRequestHeaders(), headers1);
   EXPECT_EQ(*s2.getRequestHeaders(), headers2);
-  EXPECT_TRUE(s2.upstreamClusterInfo().has_value());
-  EXPECT_EQ(s1.upstreamClusterInfo(), s2.upstreamClusterInfo());
+  ASSERT_TRUE(s2.upstreamClusterInfo().has_value());
+  EXPECT_EQ(s1.upstreamClusterInfo().ptr(), s2.upstreamClusterInfo().ptr());
   EXPECT_EQ(s1.getStreamIdProvider().value().get().toStringView().value(),
             s2.getStreamIdProvider().value().get().toStringView().value());
   EXPECT_EQ(s1.traceReason(), s2.traceReason());

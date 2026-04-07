@@ -24,6 +24,7 @@ namespace Envoy {
 class FastMockClusterManager : public testing::StrictMock<Upstream::MockClusterManager> {
 public:
   ClusterInfoMaps clusters() const override { return ClusterInfoMaps{}; }
+  void forEachActiveCluster(std::function<void(const Upstream::Cluster&)>) const override {}
 };
 
 class TestSinkPredicates : public Stats::SinkPredicates {

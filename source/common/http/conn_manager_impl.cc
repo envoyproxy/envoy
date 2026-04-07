@@ -2275,7 +2275,16 @@ OptRef<const Tracing::Config> ConnectionManagerImpl::ActiveStream::tracingConfig
 
 const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
 
-Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
+OptRef<const Upstream::ClusterInfo> ConnectionManagerImpl::ActiveStream::clusterInfo() {
+  // NOTE: Refreshing route caches clusterInfo as well.
+  if (!cached_route_.has_value()) {
+    refreshCachedRoute();
+  }
+
+  return makeOptRefFromPtr(cached_cluster_info_.value().get());
+}
+
+Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfoSharedPtr() {
   // NOTE: Refreshing route caches clusterInfo as well.
   if (!cached_route_.has_value()) {
     refreshCachedRoute();
@@ -2284,8 +2293,17 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::cluster
   return cached_cluster_info_.value();
 }
 
-Router::RouteConstSharedPtr
+OptRef<const Router::Route>
 ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
+  if (cached_route_.has_value()) {
+    return makeOptRefFromPtr(cached_route_.value().get());
+  }
+  refreshCachedRoute(cb);
+  return makeOptRefFromPtr(cached_route_.value().get());
+}
+
+Router::RouteConstSharedPtr
+ConnectionManagerImpl::ActiveStream::routeSharedPtr(const Router::RouteCallback& cb) {
   if (cached_route_.has_value()) {
     return cached_route_.value();
   }

@@ -1,0 +1,92 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "local_service"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: ":path"
+          string_match {
+            prefix: "/foo"
+          }
+        }
+        query_parameters {
+          name: "param"
+          string_match {
+            exact: "test"
+          }
+        }
+        grpc {
+        }
+        runtime_fraction {
+          default_value {
+            numerator: 50
+            denominator: MILLION
+          }
+          runtime_key: "bogus_key"
+        }
+        tls_context {
+          presented {
+            value: true
+          }
+        }
+      }
+      route {
+        cluster: "bar_cluster"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "foo_cluster"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+  headers {
+    key: "content-type"
+    value: "application/grpc"
+  }
+}
+random_value: 41
