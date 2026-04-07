@@ -1895,7 +1895,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
       let val = envoy_filter
         .get_metadata_list_number(source, "ns", "numbers", i)
         .unwrap();
-      let header_name = format!("x-list-num-{}", i);
+      let header_name = format!("x-list-num-{i}");
       envoy_filter.set_response_header(&header_name, (val as i64).to_string().as_bytes());
     }
 
@@ -1909,7 +1909,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
         .get_metadata_list_string(source, "ns", "strings", i)
         .unwrap();
       let val_bytes = val.as_slice().to_vec();
-      let header_name = format!("x-list-str-{}", i);
+      let header_name = format!("x-list-str-{i}");
       envoy_filter.set_response_header(&header_name, &val_bytes);
     }
 
@@ -1922,7 +1922,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
       let val = envoy_filter
         .get_metadata_list_bool(source, "ns", "bools", i)
         .unwrap();
-      let header_name = format!("x-list-bool-{}", i);
+      let header_name = format!("x-list-bool-{i}");
       envoy_filter.set_response_header(&header_name, val.to_string().as_bytes());
     }
 
