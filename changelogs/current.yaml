@@ -883,6 +883,9 @@ new_features:
     Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
     ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
     This is necessary if the route configuration may depend on the filter state values set.
+- area: ratelimit
+  change: |
+    Support populating rate limit descriptors from cluster metadata.
 
 - area: contrib
   change: |

@@ -667,5 +667,70 @@ TEST_P(RatelimitIntegrationTest, OverLimitResponseHeadersToAdd) {
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
 }
 
+TEST_P(RatelimitIntegrationTest, ClusterMetadata) {
+  config_helper_.addClusterFilterMetadata(R"EOF(
+envoy.xxx:
+  test: foo
+)EOF");
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* rate_limit = hcm.mutable_route_config()
+                               ->mutable_virtual_hosts(0)
+                               ->mutable_routes(0)
+                               ->mutable_route()
+                               ->add_rate_limits();
+        auto* action = rate_limit->add_actions()->mutable_metadata();
+        action->set_source(envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_ENTRY);
+        action->set_descriptor_key("cluster_metadata");
+        auto* metadata_key = action->mutable_metadata_key();
+        metadata_key->set_key("envoy.xxx");
+        metadata_key->add_path()->set_key("test");
+      });
+
+  initialize();
+  initiateClientConnection();
+
+  AssertionResult result =
+      fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_);
+  RELEASE_ASSERT(result, result.message());
+  AssertionResult result2 =
+      fake_ratelimit_connection_->waitForNewStream(*dispatcher_, ratelimit_requests_[0]);
+  RELEASE_ASSERT(result2, result2.message());
+  envoy::service::ratelimit::v3::RateLimitRequest request_msg;
+  result = ratelimit_requests_[0]->waitForGrpcMessage(*dispatcher_, request_msg);
+  RELEASE_ASSERT(result, result.message());
+  result = ratelimit_requests_[0]->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  envoy::service::ratelimit::v3::RateLimitRequest expected_request_msg;
+  expected_request_msg.set_domain("some_domain");
+  // Order of descriptors:
+  // Modifiers added before initialize() run first.
+  // So my rate limit message is index 0, and the one from initialize() is index 1.
+
+  // My rate limit:
+  auto* descriptor1 = expected_request_msg.add_descriptors();
+  auto* entry2 = descriptor1->add_entries();
+  entry2->set_key("cluster_metadata");
+  entry2->set_value("foo");
+
+  // initialize() rate limit:
+  auto* descriptor2 = expected_request_msg.add_descriptors();
+  auto* entry1 = descriptor2->add_entries();
+  entry1->set_key("destination_cluster");
+  entry1->set_value("cluster_0");
+
+  EXPECT_EQ(expected_request_msg.DebugString(), request_msg.DebugString());
+
+  sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OK, {},
+                        Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{}, 0);
+  waitForSuccessfulUpstreamResponse(0);
+  cleanup();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
+}
+
 } // namespace
 } // namespace Envoy
