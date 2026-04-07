@@ -111,6 +111,13 @@ private:
   Http::ServerHeaderValidator* header_validator_{nullptr};
   Http::ResponseEncoder* response_encoder_{nullptr};
 };
+
+class MockKeepaliveObserver : public KeepaliveObserver {
+public:
+  MOCK_METHOD(void, onKeepalivePingSent, (StreamInfo::StreamInfo&, uint64_t), (const, override));
+  MOCK_METHOD(void, onKeepalivePingAck, (StreamInfo::StreamInfo&, uint64_t), (const, override));
+  MOCK_METHOD(absl::optional<uint64_t>, pendingKeepalivePingId, (), (const, override));
+};
 } // namespace
 
 enum class Http2Impl {
@@ -1374,6 +1381,37 @@ TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
   driveClient();
   EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush, _));
   timeout_timer->invokeCallback();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionKeepaliveObserver) {
+  constexpr uint32_t interval_ms = 100;
+  constexpr uint32_t timeout_ms = 200;
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
+                                                                                      1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
+                                                                                     1000 * 1000);
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
+
+  auto observer = std::make_shared<NiceMock<MockKeepaliveObserver>>();
+  ON_CALL(*observer, pendingKeepalivePingId()).WillByDefault(Return(absl::nullopt));
+  client_connection_.streamInfo().filterState()->setData(
+      kKeepaliveObserverFilterStateKey, observer, StreamInfo::FilterState::StateType::ReadOnly,
+      StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+  auto send_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
+  initialize();
+
+  testing::InSequence sequence;
+  EXPECT_CALL(*observer, onKeepalivePingSent(_, _));
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  EXPECT_CALL(*observer, onKeepalivePingAck(_, _));
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
+  send_timer->invokeCallback();
+  driveToCompletion();
 }
 
 // Verify that extending the timeout is performed when a frame is received.

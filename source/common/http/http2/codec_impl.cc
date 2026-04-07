@@ -1036,6 +1036,9 @@ void ConnectionImpl::sendKeepalive() {
     // Intended to check through coverage that this error case is tested
     return;
   }
+  if (const auto* observer = keepaliveObserver(); observer != nullptr) {
+    observer->onKeepalivePingSent(connection_.streamInfo(), ms_since_epoch);
+  }
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
 }
 
@@ -1060,6 +1063,14 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
   stats_.keepalive_timeout_.inc();
   connection_.close(Network::ConnectionCloseType::NoFlush,
                     StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
+}
+
+const KeepaliveObserver* ConnectionImpl::keepaliveObserver() const {
+  if (const auto& filter_state = connection_.streamInfo().filterState(); filter_state != nullptr) {
+    return filter_state->getDataReadOnly<KeepaliveObserver>(kKeepaliveObserverFilterStateKey);
+  }
+
+  return nullptr;
 }
 
 bool ConnectionImpl::slowContainsStreamId(int32_t stream_id) const {
@@ -1228,6 +1239,9 @@ Status ConnectionImpl::onPing(uint64_t opaque_data, bool is_ack) {
 
   if (is_ack) {
     ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, opaque_data);
+    if (const auto* observer = keepaliveObserver(); observer != nullptr) {
+      observer->onKeepalivePingAck(connection_.streamInfo(), opaque_data);
+    }
 
     onKeepaliveResponse();
   }

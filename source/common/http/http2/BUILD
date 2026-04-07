@@ -25,11 +25,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "keepalive_observer_lib",
+    hdrs = ["keepalive_observer.h"],
+    deps = [
+        "//envoy/stream_info:stream_info_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
     deps = [
         ":codec_stats_lib",
+        ":keepalive_observer_lib",
         ":metadata_decoder_lib",
         ":metadata_encoder_lib",
         ":protocol_constraints_lib",

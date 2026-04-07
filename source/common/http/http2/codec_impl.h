@@ -24,6 +24,7 @@
 #include "source/common/http/codec_helper.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/http2/keepalive_observer.h"
 #include "source/common/http/http2/metadata_decoder.h"
 #include "source/common/http/http2/metadata_encoder.h"
 #include "source/common/http/http2/protocol_constraints.h"
@@ -798,6 +799,7 @@ private:
                             uint32_t padding_length);
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
+  const KeepaliveObserver* keepaliveObserver() const;
   bool slowContainsStreamId(int32_t stream_id) const;
   virtual StreamResetReason getMessagingErrorResetReason() const PURE;
 
