@@ -33,9 +33,11 @@ Underlying implementation
 -------------------------
 
 Currently Envoy is written to use `BoringSSL <https://boringssl.googlesource.com/boringssl>`_ as the
-default TLS provider. `OpenSSL <https://openssl.org>`_ is also supported as an alternative, using
-the ``--config=openssl`` Bazel option. OpenSSL libraries are not statically linked; they must be
-present at runtime and are loaded dynamically. HTTP/3 (QUIC) is not available with OpenSSL builds.
+default TLS provider.
+
+`OpenSSL <https://openssl.org>`_ can also be used as an alternative, when Envoy is built using
+the ``--config=openssl`` Bazel option. OpenSSL libraries are not statically linked into the main Envoy executable;
+they must be present at runtime and are loaded dynamically. HTTP/3 (QUIC) is not available with OpenSSL builds.
 OpenSSL builds are not currently covered by the :repo:`Envoy security policy <SECURITY.md>`.
 
 .. _arch_overview_ssl_fips:
