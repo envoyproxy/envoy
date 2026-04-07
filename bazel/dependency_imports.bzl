@@ -65,7 +65,7 @@ def envoy_dependency_imports(
     )
     rules_rust_dependencies()
     rust_register_toolchains(
-        versions = ["1.86.0"],
+        versions = ["1.88.0"],
         extra_target_triples = [
             "wasm32-unknown-unknown",
             "wasm32-wasi",
