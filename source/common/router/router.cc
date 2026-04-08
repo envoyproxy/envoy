@@ -2415,19 +2415,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
 
   orca_load_report_received_ = true;
 
-  // 1. ORCA utilization store (non-destructive read for LB policies).
-  double util = orca_load_report->application_utilization();
-  if (!(util > 0)) {
-    util = orca_load_report->cpu_utilization();
-  }
-  {
-    const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                               timeSource().monotonicTime().time_since_epoch())
-                               .count();
-    upstream_host->orcaUtilization().set(util, now_ms);
-  }
-
-  // 2. LRS (accumulator, destructive read by reporter).
+  // 1. LRS (accumulator, destructive read by reporter).
   if (cluster_->lrsReportMetricNames().has_value()) {
     ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
                      orca_load_report->DebugString());

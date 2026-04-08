@@ -67,8 +67,27 @@ LoadAwareLocalityLoadBalancer::LoadAwareLocalityLoadBalancer(
 
 LoadAwareLocalityLoadBalancer::~LoadAwareLocalityLoadBalancer() = default;
 
+void LoadAwareLocalityLoadBalancer::addLbPolicyDataToHosts(const Upstream::HostVector& hosts) {
+  for (const auto& host_ptr : hosts) {
+    if (!host_ptr->typedLbPolicyData<LocalityLbHostData>().has_value()) {
+      auto data = std::make_unique<LocalityLbHostData>(time_source_);
+      host_ptr->addLbPolicyData(std::move(data));
+    }
+  }
+}
+
 absl::Status LoadAwareLocalityLoadBalancer::initialize() {
   RETURN_IF_NOT_OK(factory_->initializeChildLb());
+
+  for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
+    addLbPolicyDataToHosts(host_set->hosts());
+  }
+
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+      [this](uint32_t, const Upstream::HostVector& hosts_added, const Upstream::HostVector&) {
+        addLbPolicyDataToHosts(hosts_added);
+      });
+
   computeLocalityRoutingWeights();
   return absl::OkStatus();
 }
@@ -120,7 +139,11 @@ void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
           uint32_t valid_count = 0;
           if (has_eligible) {
             for (const auto& host : eligible_hosts_per_locality[i]) {
-              const int64_t last_update_ms = host->orcaUtilization().lastUpdateTimeMs();
+              auto host_data = host->typedLbPolicyData<LocalityLbHostData>();
+              if (!host_data.has_value()) {
+                continue;
+              }
+              const int64_t last_update_ms = host_data->lastUpdateTimeMs();
               if (last_update_ms == 0) {
                 continue;
               }
@@ -130,7 +153,7 @@ void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
                 continue;
               }
 
-              util_sum += host->orcaUtilization().get();
+              util_sum += host_data->utilization();
               valid_count++;
             }
           }
@@ -144,7 +167,7 @@ void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
           smoothed_valid.assign(locality_count, false);
         }
 
-        std::vector<double> utilizations(locality_count, 0.0);
+        utilizations_.assign(locality_count, 0.0);
         for (size_t i = 0; i < locality_count; ++i) {
           if (valid_counts_[i] > 0) {
             if (!smoothed_valid[i]) {
@@ -159,12 +182,12 @@ void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
             smoothed[i] = 0.0;
             smoothed_valid[i] = false;
           }
-          utilizations[i] = smoothed_valid[i] ? smoothed[i] : avg_utils_[i];
+          utilizations_[i] = smoothed_valid[i] ? smoothed[i] : avg_utils_[i];
         }
 
         uint32_t total_hosts = 0;
         for (size_t i = 0; i < locality_count; ++i) {
-          weights[i] = host_counts_[i] * std::max(0.0, 1.0 - utilizations[i]);
+          weights[i] = host_counts_[i] * std::max(0.0, 1.0 - utilizations_[i]);
           total_hosts += host_counts_[i];
         }
 
@@ -180,13 +203,13 @@ void LoadAwareLocalityLoadBalancer::computeLocalityRoutingWeights() {
           double remote_util_sum = 0.0;
           uint32_t remote_hosts = 0;
           for (size_t i = 1; i < locality_count; ++i) {
-            remote_util_sum += utilizations[i] * host_counts_[i];
+            remote_util_sum += utilizations_[i] * host_counts_[i];
             remote_hosts += host_counts_[i];
           }
 
           if (total_hosts > 0 && !weights.empty() && weights[0] > 0.0) {
             const double target_util = remote_hosts > 0 ? remote_util_sum / remote_hosts : 0.0;
-            if (utilizations[0] <= target_util + utilization_variance_threshold_) {
+            if (utilizations_[0] <= target_util + utilization_variance_threshold_) {
               set_all_local();
             }
           } else if (total_hosts == 0) {

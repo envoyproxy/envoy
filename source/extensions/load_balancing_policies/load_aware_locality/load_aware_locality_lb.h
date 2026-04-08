@@ -1,6 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <atomic>
+#include <chrono>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,6 +25,60 @@ namespace LoadBalancingPolicies {
 namespace LoadAwareLocality {
 
 class PriorityLoadEvaluator;
+
+/**
+ * Per-host LB policy data for the load-aware locality policy.
+ * Receives ORCA load reports via the multi-slot HostLbPolicyData mechanism
+ * and stores a lock-free utilization value for the main-thread weight computation.
+ *
+ * Written by worker threads via onOrcaLoadReport(); read by the main thread
+ * during locality weight computation. The release/acquire on last_update_time_ms_
+ * ensures the reader sees the utilization that was stored before it.
+ *
+ * Use lastUpdateTimeMs() == 0 to distinguish "never reported" from
+ * "reported 0.0 utilization".
+ */
+class LocalityLbHostData : public Upstream::HostLbPolicyData {
+public:
+  explicit LocalityLbHostData(TimeSource& time_source) : time_source_(time_source) {}
+
+  bool receivesOrcaLoadReport() const override { return true; }
+
+  absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report,
+                                const StreamInfo::StreamInfo&) override {
+    double util = report.application_utilization();
+    if (!(util > 0)) {
+      util = report.cpu_utilization();
+    }
+    const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               time_source_.monotonicTime().time_since_epoch())
+                               .count();
+    storeUtilization(util, now_ms);
+    return absl::OkStatus();
+  }
+
+  double utilization() const { return utilization_.load(std::memory_order_relaxed); }
+  int64_t lastUpdateTimeMs() const { return last_update_time_ms_.load(std::memory_order_acquire); }
+
+  void setUtilization(double util, int64_t monotonic_time_ms) {
+    storeUtilization(util, monotonic_time_ms);
+  }
+
+private:
+  void storeUtilization(double util, int64_t monotonic_time_ms) {
+    if (!std::isfinite(util)) {
+      return;
+    }
+    utilization_.store(std::clamp(util, 0.0, 1.0), std::memory_order_relaxed);
+    last_update_time_ms_.store(monotonic_time_ms, std::memory_order_release);
+  }
+
+  static_assert(std::atomic<double>::is_always_lock_free,
+                "std::atomic<double> must be lock-free for safe cross-thread utilization updates");
+  std::atomic<double> utilization_{0.0};
+  std::atomic<int64_t> last_update_time_ms_{0};
+  TimeSource& time_source_;
+};
 
 /**
  * Load balancer config for the load-aware locality policy.
@@ -354,7 +412,7 @@ private:
 };
 
 /**
- * Main thread load balancer. Reads host-level orcaUtilization() and computes locality routing
+ * Main thread load balancer. Reads host-level utilization data and computes locality routing
  * weights on a periodic timer.
  */
 class LoadAwareLocalityLoadBalancer : public Upstream::ThreadAwareLoadBalancer,
@@ -371,8 +429,11 @@ public:
   absl::Status initialize() override;
 
 private:
-  // Compute per-locality routing weights from host-level orcaUtilization() and publish to factory.
+  // Compute per-locality routing weights from host-level utilization and publish to factory.
   void computeLocalityRoutingWeights();
+
+  // Attach LocalityLbHostData to hosts that don't already have it.
+  void addLbPolicyDataToHosts(const Upstream::HostVector& hosts);
 
   const Upstream::PrioritySet& priority_set_;
   Upstream::ClusterLbStats& stats_;
@@ -386,12 +447,14 @@ private:
   std::array<std::vector<std::vector<bool>>, 3> smoothed_utilizations_valid_;
   // Scratch buffers reused across timer callback
   std::vector<double> avg_utils_;
+  std::vector<double> utilizations_;
   std::vector<uint32_t> valid_counts_;
   std::vector<uint32_t> host_counts_;
   Event::TimerPtr weight_update_timer_;
   std::chrono::milliseconds weight_update_period_;
   std::unique_ptr<PriorityLoadEvaluator> priority_load_evaluator_;
   std::shared_ptr<WorkerLocalLbFactory> factory_;
+  Envoy::Common::CallbackHandlePtr priority_update_cb_;
 };
 
 } // namespace LoadAwareLocality

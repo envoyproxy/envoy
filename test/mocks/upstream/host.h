@@ -120,7 +120,6 @@ public:
   MOCK_METHOD(void, addLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
   MOCK_METHOD(size_t, lbPolicyDataCount, (), (const));
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
-  OrcaUtilizationStore& orcaUtilization() const override { return orca_utilization_store_; }
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -130,7 +129,6 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
-  mutable OrcaUtilizationStore orca_utilization_store_;
   envoy::config::core::v3::Locality locality_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
@@ -225,9 +223,7 @@ public:
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyDataAt, (size_t index), (const));
   MOCK_METHOD(void, setLastHealthCheckHttpStatus, (uint64_t));
   MOCK_METHOD(absl::optional<uint64_t>, lastHealthCheckHttpStatus, (), (const));
-  OrcaUtilizationStore& orcaUtilization() const override { return orca_utilization_store_; }
 
-  mutable OrcaUtilizationStore orca_utilization_store_;
   bool disable_active_health_check_ = false;
 };
 

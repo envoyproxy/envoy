@@ -217,13 +217,16 @@ protected:
   }
 
   void setHostUtilization(Upstream::HostSharedPtr host, double utilization) {
-    dynamic_cast<Upstream::MockHost&>(*host).orca_utilization_store_.set(utilization, nowMs());
+    auto host_data = host->typedLbPolicyData<LocalityLbHostData>();
+    ASSERT(host_data.has_value());
+    host_data->setUtilization(utilization, nowMs());
   }
 
   void setHostUtilizationWithTime(Upstream::HostSharedPtr host, double utilization,
                                   int64_t monotonic_time_ms) {
-    dynamic_cast<Upstream::MockHost&>(*host).orca_utilization_store_.set(utilization,
-                                                                         monotonic_time_ms);
+    auto host_data = host->typedLbPolicyData<LocalityLbHostData>();
+    ASSERT(host_data.has_value());
+    host_data->setUtilization(utilization, monotonic_time_ms);
   }
 
   void setUtilizationForHosts(const Upstream::HostVector& hosts, double utilization) {
@@ -233,7 +236,9 @@ protected:
   }
 
   void clearHostUtilization(Upstream::HostSharedPtr host) {
-    dynamic_cast<Upstream::MockHost&>(*host).orca_utilization_store_.set(0.0, 0);
+    auto host_data = host->typedLbPolicyData<LocalityLbHostData>();
+    ASSERT(host_data.has_value());
+    host_data->setUtilization(0.0, 0);
   }
 
   int64_t nowMs() {
@@ -454,17 +459,21 @@ TEST_F(LoadAwareLocalityLbTest, WeightExpirationIgnoresStaleData) {
   auto h2 = makeWeightTrackingMockHost();
   setupLocalities({{h1}, {h2}});
 
-  setHostUtilizationWithTime(h1, 0.9, 1);
-  setHostUtilizationWithTime(h2, 0.1, 1);
-
   createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0,
            std::chrono::milliseconds(5000));
 
+  // Set utilization at timestamp 1ms (ancient relative to simulated time).
+  setHostUtilizationWithTime(h1, 0.9, 1);
+  setHostUtilizationWithTime(h2, 0.1, 1);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+
+  // Stale data is ignored — weights are equal (host count only).
   const auto* snapshot = routingSnapshot();
   ASSERT_NE(nullptr, snapshot);
   EXPECT_NEAR(snapshot->weights[0], 1.0, 0.01);
   EXPECT_NEAR(snapshot->weights[1], 1.0, 0.01);
 
+  // Fresh data at current time is used.
   setHostUtilizationWithTime(h1, 0.9, nowMs());
   setHostUtilizationWithTime(h2, 0.1, nowMs());
   ASSERT_TRUE(thread_aware_lb_->initialize().ok());
@@ -480,11 +489,13 @@ TEST_F(LoadAwareLocalityLbTest, WeightExpirationDisabledUsesStaleData) {
   auto h2 = makeWeightTrackingMockHost();
   setupLocalities({{h1}, {h2}});
 
-  setHostUtilizationWithTime(h1, 0.9, 1);
-  setHostUtilizationWithTime(h2, 0.1, 1);
-
+  // Expiration disabled (0ms) — stale data is always used.
   createLb(/*variance_threshold=*/0.1, /*ewma_alpha=*/1.0, /*probe_percentage=*/0.0,
            std::chrono::milliseconds(0));
+
+  setHostUtilizationWithTime(h1, 0.9, 1);
+  setHostUtilizationWithTime(h2, 0.1, 1);
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
 
   const auto* snapshot = routingSnapshot();
   ASSERT_NE(nullptr, snapshot);
@@ -793,8 +804,10 @@ TEST_F(LoadAwareLocalityLbTest, EwmaTopologyChangeResetsOnLocalityCountChange) {
   host_set->hosts_per_locality_ =
       Upstream::makeHostsPerLocality({{h1}, {h2}, {h3}}, /*force_no_local_locality=*/true);
   host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
-  setHostUtilization(h3, 0.8);
 
+  // Re-initialize to attach LocalityLbHostData to the new host, then set its utilization.
+  ASSERT_TRUE(thread_aware_lb_->initialize().ok());
+  setHostUtilization(h3, 0.8);
   ASSERT_TRUE(thread_aware_lb_->initialize().ok());
 
   const auto* snapshot = routingSnapshot();
