@@ -50,8 +50,7 @@ ScopeProviderSingleton::getScope(Server::Configuration::GenericFactoryContext& f
           [] { return std::make_shared<ScopeProviderSingleton>(); });
 
   size_t hash = MessageUtil::hash(config);
-  absl::flat_hash_map<size_t, std::weak_ptr<Stats::Scope>>::iterator it =
-      provider->scopes_.find(hash);
+  auto it = provider->scopes_.find(hash);
   if (it != provider->scopes_.end()) {
     Stats::ScopeSharedPtr scope = it->second.lock();
     if (scope != nullptr) {
