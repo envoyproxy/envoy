@@ -333,7 +333,6 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   // EnvoyQuicDispatcher's idle list.
 
   // 2. Trigger the overload state
-  ENVOY_LOG(info, "Triggering overload state.");
   updateResource(0.95); // Set pressure to 0.95, above the 0.9 saturation threshold
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.close_idle_http_connections.active",
                                1);

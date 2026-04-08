@@ -915,7 +915,7 @@ new_features:
   change: |
     Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
     that closes idle downstream HTTP connections when the overload action is active. Currently only HTTP/3 idle connections
-    trimming is supported, and HTTP/1 and HTTP/2 support are to be implemented
+    trimming is supported, and HTTP/1 and HTTP/2 support are to be implemented.
 
 - area: contrib
   change: |

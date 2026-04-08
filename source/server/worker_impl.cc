@@ -202,20 +202,20 @@ void WorkerImpl::closeIdleHttpConnectionsCb(OverloadActionState::Phase phase) {
   close_idle_http_connections_state_ = phase;
 
   // Lazy initialize the timer if it does not exist.
-  if (check_idle_connection_timer_ == nullptr) {
-    check_idle_connection_timer_ = dispatcher_->createTimer([this]() {
+  if (close_idle_connection_timer_ == nullptr) {
+    close_idle_connection_timer_ = dispatcher_->createTimer([this]() {
       maybeCloseIdleHttpConnections();
       ASSERT(close_idle_http_connections_state_ != OverloadActionState::Phase::Inactive);
-      check_idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
+      close_idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
     });
   }
 
   if (close_idle_http_connections_state_ != OverloadActionState::Phase::Inactive) {
-    if (!check_idle_connection_timer_->enabled()) {
-      check_idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
+    if (!close_idle_connection_timer_->enabled()) {
+      close_idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
     }
   } else {
-    check_idle_connection_timer_->disableTimer();
+    close_idle_connection_timer_->disableTimer();
   }
 }
 
