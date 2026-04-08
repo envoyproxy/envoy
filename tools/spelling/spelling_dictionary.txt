@@ -182,6 +182,7 @@ DST
 DW
 DWORD
 EAGAIN
+EINTR
 ECDH
 ECDHE
 ECDS
@@ -195,6 +196,8 @@ ENOENT
 ENV
 EOF
 EOS
+EPOLLHUP
+EPOLLOUT
 EQ
 ERANGE
 EV
@@ -546,6 +549,7 @@ UTC
 UTF
 UUID
 UUIDs
+Valkey
 VC
 VCHAR
 VCL
@@ -1450,6 +1454,7 @@ submessages
 subnet
 subnets
 suboptimal
+subprocess
 subsecond
 subseconds
 subsegment
@@ -1692,3 +1697,4 @@ lcalpha
 nblk
 chr
 IWYU
+CRTP
