@@ -18,7 +18,7 @@ namespace Server {
 namespace {
 
 constexpr std::chrono::milliseconds kCloseIdleHttpConnectionsInterval =
-    std::chrono::milliseconds(1000);
+    std::chrono::milliseconds(100);
 
 std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher, uint32_t index,
                                               OverloadManager& overload_manager,
@@ -64,12 +64,9 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
       OverloadActionNames::get().ResetStreams, *dispatcher_,
       [this](OverloadActionState state) { resetStreamsUsingExcessiveMemory(state); });
 
-  overload_manager.registerForAction(OverloadActionNames::get().CloseIdleHttpConnections,
-                                     *dispatcher_, [this](OverloadActionState state) {
-                                       if (close_idle_http_connections_state_ != state.phase()) {
-                                         closeIdleHttpConnectionsCb(state.phase());
-                                       }
-                                     });
+  overload_manager.registerForAction(
+      OverloadActionNames::get().CloseIdleHttpConnections, *dispatcher_,
+      [this](OverloadActionState state) { closeIdleHttpConnectionsCb(state.phase()); });
 }
 
 void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
@@ -198,17 +195,18 @@ void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
 }
 
 void WorkerImpl::closeIdleHttpConnectionsCb(OverloadActionState::Phase phase) {
+  if (close_idle_http_connections_state_ == phase) {
+    return;
+  }
+
   close_idle_http_connections_state_ = phase;
 
   // Lazy initialize the timer if it does not exist.
   if (check_idle_connection_timer_ == nullptr) {
     check_idle_connection_timer_ = dispatcher_->createTimer([this]() {
       maybeCloseIdleHttpConnections();
-      // Re-enable the timer only if the worker is still in an active overload
-      // state
-      if (close_idle_http_connections_state_ != OverloadActionState::Phase::Inactive) {
-        check_idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
-      }
+      ASSERT(close_idle_http_connections_state_ != OverloadActionState::Phase::Inactive);
+      check_idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
     });
   }
 
@@ -216,7 +214,6 @@ void WorkerImpl::closeIdleHttpConnectionsCb(OverloadActionState::Phase phase) {
     if (!check_idle_connection_timer_->enabled()) {
       check_idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
     }
-    maybeCloseIdleHttpConnections();
   } else {
     check_idle_connection_timer_->disableTimer();
   }

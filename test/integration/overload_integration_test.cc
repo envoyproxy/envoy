@@ -338,11 +338,11 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.close_idle_http_connections.active",
                                1);
 
-  // 3. Advance time to trigger the idle connection timer (which runs every 1s).
-  timeSystem().advanceTimeWait(std::chrono::seconds(1));
+  // 3. Advance time to trigger the check_idle_connection_timer (which runs every 100ms).
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
 
   // 4. Wait for the connection to be closed by the server.
-  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::seconds(5)));
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Check that the close reason was correct (this stat is incremented in
   // EnvoyQuicDispatcher)

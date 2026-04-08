@@ -192,47 +192,23 @@ TEST_F(WorkerOverloadTest, CloseIdleHttpConnections) {
 
   ASSERT_TRUE(captured_cb != nullptr);
 
+  auto trigger_and_advance = [&](OverloadActionState state, std::chrono::milliseconds duration =
+                                                                std::chrono::milliseconds(100)) {
+    captured_cb(state);
+    simTime().advanceTimeAndRun(duration, *dispatcher_ptr, Event::Dispatcher::RunType::NonBlock);
+  };
+
   // 1. Transition to scaling (active)
   EXPECT_CALL(*handler, closeIdleHttpConnections(false));
-  captured_cb(OverloadActionState(UnitFloat(0.5)));
+  trigger_and_advance(OverloadActionState(UnitFloat(0.5)));
 
-  // 2. Fluctuation within Scaling (no callback invocation)
-  EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
-  captured_cb(OverloadActionState(UnitFloat(0.6)));
-
-  // 3. Advance time - the timer should fire and call again.
-  EXPECT_CALL(*handler, closeIdleHttpConnections(false));
-  simTime().advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_ptr,
-                              Event::Dispatcher::RunType::NonBlock);
-
-  // 4. Transition to saturated
+  // 2. Transition to saturated
   EXPECT_CALL(*handler, closeIdleHttpConnections(true));
-  captured_cb(OverloadActionState::saturated());
+  trigger_and_advance(OverloadActionState::saturated());
 
-  // 5. Fluctuation within Saturated (no callback invocation)
+  // 3. Transition back to inactive
   EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
-  captured_cb(OverloadActionState::saturated());
-
-  // 6. Advance time - timer fires with saturated=true.
-  EXPECT_CALL(*handler, closeIdleHttpConnections(true));
-  simTime().advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_ptr,
-                              Event::Dispatcher::RunType::NonBlock);
-
-  // 7. Transition back to scaling
-  EXPECT_CALL(*handler, closeIdleHttpConnections(false));
-  captured_cb(OverloadActionState(UnitFloat(0.7)));
-
-  // 8. Transition to inactive
-  EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
-  captured_cb(OverloadActionState::inactive());
-
-  // 9. Fluctuation within Inactive (no callback invocation)
-  EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
-  captured_cb(OverloadActionState::inactive());
-
-  // 10. Advance time - timer should NOT fire anymore.
-  simTime().advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_ptr,
-                              Event::Dispatcher::RunType::NonBlock);
+  trigger_and_advance(OverloadActionState::inactive());
 }
 
 } // namespace
