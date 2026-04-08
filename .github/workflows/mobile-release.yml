@@ -232,6 +232,6 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: python-wheel
-        path: .
+        path: dist/
     - name: Publish to PyPi
       uses: pypa/gh-action-pypi-publish@release/v1
