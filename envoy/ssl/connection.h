@@ -252,6 +252,18 @@ public:
   virtual std::string ciphersuiteString() const PURE;
 
   /**
+   * @return uint16_t the OpenSSL id of the group that was used for the key agreement of the
+   *         established TLS connection. Returns 0 if there is no group.
+   **/
+  virtual uint16_t tlsGroupId() const PURE;
+
+  /**
+   * @return std::string the OpenSSL name of the group that was used for the key agreement of the
+   *         established TLS connection. Returns "" if there is no group.
+   **/
+  virtual std::string tlsGroupString() const PURE;
+
+  /**
    * @return std::string the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS
    *         connection.
    **/
