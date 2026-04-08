@@ -635,6 +635,8 @@ void OAuth2Filter::setActiveConfig(FilterConfigSharedPtr config) {
 
   if (config_ == config && validator_ != nullptr && oauth_client_ != nullptr) {
     return;
+  if (config == nullptr) {
+    return;
   }
 
   config_ = std::move(config);
