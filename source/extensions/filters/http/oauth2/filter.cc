@@ -653,8 +653,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   headers.remove(OAuth2Headers::get().OAuthStatus);
   headers.remove(OAuth2Headers::get().OAuthFailureReason);
 
-  // Resolve the active configuration for the request. Per-route configuration can override the default filter configuration,
-  // so this step is necessary to determine which configuration to use for the current request.
+  // Resolve the active configuration for the request. Per-route configuration can override the
+  // default filter configuration, so this step is necessary to determine which configuration to use
+  // for the current request.
   resolveAndSetActiveConfig();
   // If no config is set, OAuth2 is disabled for this request.
   if (config_ == nullptr) {
