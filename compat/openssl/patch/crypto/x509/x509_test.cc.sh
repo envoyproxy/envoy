@@ -40,3 +40,7 @@ uncomment.sh "$1" --comment \
 for VAR in kCrossSigningRootPEM kRootCAPEM kRootCrossSignedPEM kIntermediatePEM kIntermediateSelfSignedPEM kLeafPEM kLeafNoKeyUsagePEM kForgeryPEM kBadPSSCertPEM kRSAKey kP256Key kBasicCRL kEd25519Cert kSANTypesRoot kNoBasicConstraintsCertSignIntermediate kNoBasicConstraintsCertSignLeaf kNoBasicConstraintsNetscapeCAIntermediate kNoBasicConstraintsNetscapeCALeaf kP256NoParam kP256NullParam kP256InvalidParam kRSANoParam kRSANullParam kRSAInvalidParam kConstructedBitString kConstructedOctetString kIndefiniteLength kNonZeroPadding kHighTagNumber kNonMinimalLengthSerial kNonMinimalLengthOuter kNonMinimalLengthSignature; do
   uncomment.sh "$1" --uncomment-regex-range 'static\s*const\s*.*\<'$VAR'\[\]\s*=' '[^;]*;\s*$'
 done
+
+# Add [[maybe_unused]] to variables only used under #ifndef BSSL_COMPAT
+sed -i 's/^static const char kP256InvalidParam/[[maybe_unused]] static const char kP256InvalidParam/' "$1"
+sed -i 's/^static const char kRSAInvalidParam/[[maybe_unused]] static const char kRSAInvalidParam/' "$1"
