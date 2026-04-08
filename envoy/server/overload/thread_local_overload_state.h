@@ -49,7 +49,7 @@ using OverloadProactiveResources = ConstSingleton<OverloadProactiveResourceNameV
  */
 class OverloadActionState {
 public:
-  enum class Phase {
+  enum class Phase : uint8_t {
     Inactive,
     Scaling,
     Saturated,

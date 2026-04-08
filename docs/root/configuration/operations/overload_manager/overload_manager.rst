@@ -153,6 +153,7 @@ The following overload actions are supported:
     - Envoy will close idle downstream HTTP/3 QUIC connections when the action is active.
       When the action is *saturated*, connections will be closed aggressively (ignoring the idle timer threshold).
       When the action is in a *scaled active* state, the idle timer threshold is still respected.
+      Note that this action is currently only supported for HTTP/3 QUIC connections.
 
 .. _config_overload_manager_shrink_heap:
 
