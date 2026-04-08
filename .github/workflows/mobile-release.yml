@@ -158,6 +158,7 @@ jobs:
             ${{ matrix.output }}-pom.xml.asc \
             ${{ matrix.output }}-sources.jar.asc \
             ${{ matrix.output }}-javadoc.jar.asc
+            
   python-release:
     permissions:
       actions: read
@@ -210,6 +211,7 @@ jobs:
             -c opt --strip=always
             //library/python:envoy_mobile_wheel
             --//library/python:python_platform="manylinux2014_x86_64"
+            
   python-publish:
     needs: python-release
     if: >-
