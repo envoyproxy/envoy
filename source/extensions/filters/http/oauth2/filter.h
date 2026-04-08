@@ -405,8 +405,7 @@ private:
   TimeSource& time_source_;
   Random::RandomGenerator& random_;
 
-  const FilterConfig* getConfigForRequest() const;
-  void setActiveConfig(const FilterConfig* config);
+  void resolveAndSetActiveConfig();
 
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)

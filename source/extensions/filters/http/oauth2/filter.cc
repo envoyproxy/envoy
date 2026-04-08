@@ -615,17 +615,11 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr default_config,
       oauth_client_factory_(std::move(oauth_client_factory)), time_source_(time_source),
       random_(random) {}
 
-const FilterConfig* OAuth2Filter::getConfigForRequest() const {
+void OAuth2Filter::resolveAndSetActiveConfig() {
   const auto* route_specific_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
-  if (route_specific_config != nullptr) {
-    return route_specific_config;
-  }
-
-  return default_config_.get();
-}
-
-void OAuth2Filter::setActiveConfig(const FilterConfig* config) {
+  const FilterConfig* config =
+      route_specific_config != nullptr ? route_specific_config : default_config_.get();
   if (config == nullptr) {
     return;
   }
@@ -654,7 +648,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   headers.remove(OAuth2Headers::get().OAuthStatus);
   headers.remove(OAuth2Headers::get().OAuthFailureReason);
 
-  setActiveConfig(getConfigForRequest());
+  // Resolve the active configuration for the request. Per-route configuration can override the default filter configuration,
+  // so this step is necessary to determine which configuration to use for the current request.
+  resolveAndSetActiveConfig();
   // If no config is set, OAuth2 is disabled for this request.
   if (config_ == nullptr) {
     return Http::FilterHeadersStatus::Continue;

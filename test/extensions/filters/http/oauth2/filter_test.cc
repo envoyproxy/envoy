@@ -148,7 +148,7 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     if (config_ != nullptr) {
-      filter_->setActiveConfig(config_.get());
+      filter_->resolveAndSetActiveConfig();
     }
     validator_ = std::make_shared<MockOAuth2CookieValidator>();
     if (config_ != nullptr) {
