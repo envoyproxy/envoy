@@ -1018,7 +1018,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     retry_state_.reset();
     ENVOY_LOG(debug, "retry or redirect buffer overflow: skipping buffering");
     buffering = false;
-    active_shadow_policies_.clear();
     request_buffer_overflowed_ = true;
 
     // Only send local reply and cleanup if we're in a retry waiting state (no active upstream

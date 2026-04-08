@@ -138,7 +138,6 @@ public:
     return logical_host_->lbPolicyDataAt(index);
   }
 
-
   // Upstream:HostDescription mutators are all no-ops, because logical_host_ is
   // const. These should never be called except during coverage tests.
   //
