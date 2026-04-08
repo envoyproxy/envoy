@@ -255,7 +255,7 @@ TEST_P(StatsIntegrationTest, WithExpiredCert) {
       test_server_
           ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time_seconds")
           ->value(),
-      1681036973);
+      1743788480);
 }
 
 // TODO(cmluciano) Refactor once https://github.com/envoyproxy/envoy/issues/5624 is solved
