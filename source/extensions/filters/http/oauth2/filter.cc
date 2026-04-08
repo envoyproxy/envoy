@@ -645,9 +645,8 @@ void OAuth2Filter::setActiveConfig(FilterConfigSharedPtr config) {
 
   oauth_client_ = oauth_client_factory_(config_);
   oauth_client_->setCallbacks(*this);
-  if (decoder_callbacks_ != nullptr) {
-    oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
-  }
+  ASSERT(decoder_callbacks_ != nullptr);
+  oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
 }
 
 /**
