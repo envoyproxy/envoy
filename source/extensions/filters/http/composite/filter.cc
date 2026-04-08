@@ -108,10 +108,12 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
 
     return;
   }
-  // this is unnecessary actually because the match tree should be nullptr if we reached here, we
+
+  // This is unnecessary actually because the match tree should be nullptr if we reached here, we
   // just want to be defensive here to make sure the match tree won't be evaluated after this
   // callback is called.
   match_tree_evaluated_ = true;
+
   handleAction(action);
 }
 

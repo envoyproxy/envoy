@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstddef>
-
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"

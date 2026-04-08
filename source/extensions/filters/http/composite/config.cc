@@ -155,20 +155,17 @@ CompositeFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::composite::v3::CompositePerRoute& config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
 
-  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree = nullptr;
-  if (config.has_matcher()) {
-    Envoy::Http::Matching::HttpFilterActionContext action_context{
-        .is_downstream_ = true,
-        .stat_prefix_ = fmt::format(
-            "http.{}.", context.scope().symbolTable().toString(context.scope().prefix())),
-        .factory_context_ = absl::nullopt,
-        .upstream_factory_context_ = absl::nullopt,
-        .server_factory_context_ = context};
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ =
+          fmt::format("http.{}.", context.scope().symbolTable().toString(context.scope().prefix())),
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = context};
 
-    auto match_tree_or_error = createMatcherTree(config.matcher(), action_context);
-    RETURN_IF_NOT_OK(match_tree_or_error.status());
-    match_tree = std::move(match_tree_or_error.value());
-  }
+  auto match_tree_or_error = createMatcherTree(config.matcher(), action_context);
+  RETURN_IF_NOT_OK(match_tree_or_error.status());
+  auto match_tree = std::move(match_tree_or_error.value());
   if (match_tree == nullptr) {
     return nullptr;
   }
