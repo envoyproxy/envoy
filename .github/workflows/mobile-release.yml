@@ -184,7 +184,7 @@ jobs:
             WHEEL_PATH=$(find /tmp/container-output/build -name "*.whl" | head -n 1)
             
             if [[ -z "$WHEEL_PATH" ]]; then
-                echo "p Error: No wheel file found in /tmp/container-output/build"
+                echo "Error: No wheel file found in /tmp/container-output/build"
                 ls -R /tmp/container-output/
                 exit 1
             fi
