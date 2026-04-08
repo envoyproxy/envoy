@@ -461,9 +461,11 @@ message ApiListenerManager {
   enum ThreadingModel {
     // Handle HTTP requests on the main Envoy thread which also processes platform-raised events and runs xDS clients.
     MainThreadOnly = 0;
+
     // Handle HTTP requests on a standalone worker thread.
     StandaloneWorkerThread = 1;
   }
+
   // Default to MainThreadOnly.
   ThreadingModel threading_model = 1;
 }

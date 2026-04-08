@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "absl/synchronization/notification.h"
+
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/config/listener/v3/listener.pb.validate.h"
@@ -43,6 +45,7 @@ private:
   std::unique_ptr<Event::ProvisionalDispatcher> provisional_dispatcher_;
   std::unique_ptr<Http::Client> http_client_;
   WatchDogSharedPtr watch_dog_;
+  absl::Notification shutdown_notification_;
 };
 
 /**

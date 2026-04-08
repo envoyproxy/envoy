@@ -30,6 +30,11 @@ void ApiListenerWorker::addListener(ApiListenerOptRef api_listener, std::functio
       http_client_ = std::make_unique<Http::Client>(
           std::move(api_listener_impl), *provisional_dispatcher_,
           server_.serverFactoryContext().scope(), server_.api().randomGenerator());
+      ENVOY_LOG_MISC(info, "Created API listener.");
+      if (shutdown_notification_.HasBeenNotified()) {
+        ENVOY_LOG_MISC(info, "Shutting down API listener.");
+        http_client_->shutdownApiListener();
+      }
     }
     if (cb) {
       server_.dispatcher().post([cb]() { cb(); });
@@ -53,6 +58,8 @@ void ApiListenerWorker::initializeStats(Stats::Scope& scope) {
 
 void ApiListenerWorker::stop() {
   if (thread_) {
+    shutdown_notification_.WaitForNotification();
+    ENVOY_LOG_MISC(info, "Listener has been shutdown, exiting the event loop.");
     dispatcher_->exit();
     thread_->join();
     thread_.reset();
@@ -64,6 +71,7 @@ void ApiListenerWorker::stopListener() {
     if (http_client_) {
       http_client_->shutdownApiListener();
     }
+    shutdown_notification_.Notify();
   });
 }
 
@@ -79,7 +87,8 @@ void ApiListenerWorker::threadRoutine(OptRef<GuardDog> guard_dog, const std::fun
   }
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-
+  dispatcher_->shutdown();
+  ENVOY_LOG_MISC(info, "ApiListenerWorker dispatcher exited");
   if (guard_dog.has_value() && watch_dog_) {
     guard_dog->stopWatching(watch_dog_);
   }
@@ -149,7 +158,7 @@ absl::Status ApiListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
     return absl::OkStatus();
   }
 
-  if (worker_started_.exchange(true)) {
+  if (worker_started_.load()) {
     return absl::OkStatus();
   }
 
@@ -157,8 +166,10 @@ absl::Status ApiListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
   worker_->addListener(api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt,
                        callback);
   absl::Notification worker_started_notification;
-  worker_->start(guard_dog,
-                 [&worker_started_notification]() { worker_started_notification.Notify(); });
+  worker_->start(guard_dog, [&worker_started_notification, this]() {
+    worker_started_.store(true);
+    worker_started_notification.Notify();
+  });
   worker_started_notification.WaitForNotification();
 
   worker_->httpClient(); // Verify if it's null right after startup
