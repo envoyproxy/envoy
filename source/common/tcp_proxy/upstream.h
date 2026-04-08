@@ -233,6 +233,7 @@ protected:
   // The downstream info that is owned by the downstream connection.
   StreamInfo::StreamInfo& downstream_info_;
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
+  StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
 
 private:
   class DecoderShim : public Http::ResponseDecoderImplBase {
