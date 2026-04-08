@@ -1,3 +1,5 @@
+#pragma once
+
 // NOLINT(namespace-envoy)
 constexpr char TEST_INTERMEDIATE_CA_CERT_256_HASH[] =
     "ef8a9888b36130d209af17d74dd8d2b2bc89a7ee1e1a8c3f0902f6fe97051fa8";

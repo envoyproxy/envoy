@@ -1,3 +1,5 @@
+#pragma once
+
 // NOLINT(namespace-envoy)
 constexpr char TEST_SERVER2_CERT_256_HASH[] =
     "4dc26ced53851035afdd6f02ac3767465613297c3affbb7b2e22e5b3a245c557";
