@@ -13,8 +13,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "allocator_impl_test",
-    srcs = ["allocator_impl_test.cc"],
+    name = "allocator_test",
+    srcs = ["allocator_test.cc"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/stats:allocator_lib",
@@ -352,6 +352,17 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "tag_extractor_impl_benchmark_test",
     benchmark_binary = "tag_extractor_impl_benchmark",
+)
+
+envoy_cc_test(
+    name = "tag_utility_test",
+    srcs = ["tag_utility_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":stat_test_utility_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:tag_utility_lib",
+    ],
 )
 
 envoy_cc_test(

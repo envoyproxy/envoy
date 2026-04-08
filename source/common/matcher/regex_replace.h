@@ -11,7 +11,6 @@ namespace Matcher {
 
 class RegexReplace {
 public:
-  RegexReplace() = default;
   RegexReplace(Regex::CompiledMatcherPtr regex, std::string&& substitution)
       : regex_(std::move(regex)), substitution_(std::move(substitution)) {}
 

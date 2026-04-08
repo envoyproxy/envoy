@@ -337,7 +337,13 @@ public:
 /**
  * RetryStatus whether request should be retried or not.
  */
-enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
+enum class RetryStatus {
+  No,
+  NoOverflow,
+  NoRetryLimitExceeded,
+  Yes,
+  NoRuntime,
+};
 
 /**
  * InternalRedirectPolicy from the route configuration.
@@ -400,6 +406,15 @@ public:
     Unknown,
     Yes,
     No,
+  };
+
+  enum class DoRetryType {
+    // Retry the request immediately.
+    Immediately,
+    // Retry the request with ratelimited backoff delay.
+    Ratelimited,
+    // Retry the request with exponential backoff delay.
+    Exponential,
   };
 
   using DoRetryCallback = std::function<void()>;
@@ -521,6 +536,13 @@ public:
    * return how many times host selection should be reattempted during host selection.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  /**
+   * @return the type of retry to perform when a retry is triggered.
+   * This is used to determine whether to apply a backoff delay or not, and if so, what type of
+   * backoff to apply.
+   */
+  virtual DoRetryType doRetryType() const PURE;
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;
@@ -1323,11 +1345,15 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return const VirtualHostConstSharedPtr& the virtual host that owns the route.
-   *
-   * NOTE: This MUST not be null.
+   * @return const VirtualHost& the virtual host that owns the route.
    */
-  virtual const VirtualHostConstSharedPtr& virtualHost() const PURE;
+  virtual const VirtualHost& virtualHost() const PURE;
+
+  /**
+   * @return VirtualHostConstSharedPtr the virtual host that owns the route, extended to allow a
+   * caller to extend or transfer ownership.
+   */
+  virtual VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

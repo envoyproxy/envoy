@@ -3,8 +3,10 @@
 
 #include "envoy/extensions/filters/http/a2a/v3/a2a.pb.h"
 
+#include "test/integration/fake_access_log.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -75,6 +77,89 @@ TEST_P(A2aFilterIntegrationTest, ValidA2aPostRequest) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_body, upstream_request_->body().toString());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that a valid A2A JSON-RPC POST request with rich metadata fields sets dynamic metadata.
+TEST_P(A2aFilterIntegrationTest, ValidA2aPostRequestWithRichMetadata) {
+  FakeAccessLogFactory factory;
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
+
+  bool metadata_verified = false;
+  factory.setLogCallback(
+      [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
+        auto it = dynamic_metadata.find("envoy.filters.http.a2a");
+        if (it != dynamic_metadata.end()) {
+          const auto& fields = it->second.fields();
+
+          auto it_jsonrpc = fields.find("jsonrpc");
+          ASSERT_NE(it_jsonrpc, fields.end());
+          EXPECT_EQ("2.0", it_jsonrpc->second.string_value());
+
+          auto it_method = fields.find("method");
+          ASSERT_NE(it_method, fields.end());
+          EXPECT_EQ("message/send", it_method->second.string_value());
+
+          auto it_id = fields.find("id");
+          ASSERT_NE(it_id, fields.end());
+          EXPECT_EQ("123", it_id->second.string_value());
+
+          auto it_params = fields.find("params");
+          ASSERT_NE(it_params, fields.end());
+          const auto& params = it_params->second.struct_value().fields();
+          auto it_taskId = params.find("taskId");
+          ASSERT_NE(it_taskId, params.end());
+          EXPECT_EQ("task-abc", it_taskId->second.string_value());
+
+          auto it_msg = params.find("message");
+          ASSERT_NE(it_msg, params.end());
+          const auto& msg = it_msg->second.struct_value().fields();
+          auto it_msg_taskId = msg.find("taskId");
+          ASSERT_NE(it_msg_taskId, msg.end());
+          EXPECT_EQ("msg-task-123", it_msg_taskId->second.string_value());
+          metadata_verified = true;
+        }
+      });
+
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* access_log = hcm.add_access_log();
+    access_log->set_name("envoy.access_loggers.test");
+    test::integration::accesslog::FakeAccessLog access_log_config;
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "message/send",
+    "id": "123",
+    "params": {
+      "taskId": "task-abc",
+      "message": {
+        "taskId": "msg-task-123",
+        "parts": ["part1", "part2"]
+      }
+    }
+  })";
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_body, upstream_request_->body().toString());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_TRUE(metadata_verified);
 }
 
 // Test that a valid A2A JSON-RPC POST request with large body passes through successfully.

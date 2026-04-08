@@ -371,6 +371,53 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
   cleanupUpstreamAndDownstream();
 }
 
+// Verify that upstream RST through tunneled CONNECT propagates as downstream RST
+// (default behavior with both guards enabled).
+TEST_P(ConnectTerminationIntegrationTest, UpstreamRstPropagationThroughTunnel) {
+  enableHalfClose(false);
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Upstream sends RST (AbortReset).
+  ASSERT_TRUE(fake_raw_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForDisconnect());
+
+  // Downstream should be disconnected (stream reset or connection close).
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForAnyTermination());
+  }
+}
+
+// Verify that upstream RST through tunneled CONNECT does NOT propagate as downstream RST
+// when the HTTP guard is explicitly disabled.
+TEST_P(ConnectTerminationIntegrationTest, UpstreamRstNotPropagatedWithoutHttpGuard) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.map_http_stream_reset_to_tcp_rst",
+                                    "false");
+  useAccessLog("%UPSTREAM_DETECTED_CLOSE_TYPE%");
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Upstream sends RST.
+  ASSERT_TRUE(fake_raw_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForDisconnect());
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForAnyTermination());
+  }
+
+  // With HTTP guard disabled, close type should not be RemoteReset.
+  auto log_result = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log_result, testing::Ne("RemoteReset"));
+}
+
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
   enable_timeout_ = true;
   initialize();
@@ -1968,52 +2015,6 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
 
   ASSERT_TRUE(upstream_request_->waitForReset());
   ASSERT_TRUE(fake_upstream_connection_->close());
-}
-
-// Test idle timeout when connection establishment is prevented by not sending upstream response
-TEST_P(TcpTunnelingIntegrationTest,
-       IdleTimeoutNoUpstreamConnectionNoIdleTimeoutSetOnNewConnection) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection", "false");
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(1);
-    auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
-
-    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
-    auto tcp_proxy_config =
-        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
-            *config_blob);
-
-    tcp_proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
-    tcp_proxy_config.mutable_idle_timeout()->CopyFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(1));
-
-    config_blob->PackFrom(tcp_proxy_config);
-  });
-
-  initialize();
-
-  // Start downstream TCP connection (CONNECT will be sent upstream).
-  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
-
-  // Don't send response headers - this prevents the tunnel from being fully established.
-  // The TCP proxy will wait for the response, and the idle timeout will not trigger as
-  // the idle timeout is not set immediately on new connection.
-
-  // Verify the stream wasn't reset due to timeout
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_FALSE(fake_upstream_connection_->waitForDisconnect(std::chrono::milliseconds(10)));
-  } else {
-    ASSERT_FALSE(upstream_request_->waitForReset(std::chrono::milliseconds(10)));
-  }
-
-  // Clean up the TCP client
-  tcp_client_->close();
 }
 
 // Test that a downstream flush works correctly (all data is flushed)

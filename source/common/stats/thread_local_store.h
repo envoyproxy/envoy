@@ -13,7 +13,7 @@
 
 #include "source/common/common/hash.h"
 #include "source/common/common/thread_synchronizer.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
@@ -247,7 +247,7 @@ private:
     // The counters, gauges and text readouts in the TLS cache are stored by reference,
     // depending on the CentralCache for backing store. This avoids a potential
     // contention-storm when destructing a scope, as the counter/gauge ref-count
-    // decrement in allocator_impl.cc needs to hold the single allocator mutex.
+    // decrement in allocator.cc needs to hold the single allocator mutex.
     StatRefMap<Counter> counters_;
     StatRefMap<Gauge> gauges_;
     StatRefMap<TextReadout> text_readouts_;
@@ -255,7 +255,7 @@ private:
     // Histograms also require holding a mutex while decrementing reference
     // counts. The only difference from other stats is that the histogram_set_
     // lives in the ThreadLocalStore object, rather than in
-    // AllocatorImpl. Histograms are removed from that set when all scopes
+    // Allocator. Histograms are removed from that set when all scopes
     // referencing the histogram are dropped. Each ParentHistogram has a unique
     // index, which is not re-used during the process lifetime.
     //

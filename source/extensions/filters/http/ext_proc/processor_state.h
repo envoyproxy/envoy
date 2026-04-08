@@ -185,7 +185,7 @@ public:
 
   const absl::optional<MonotonicTime>& getCallStartTime() const { return call_start_time_; }
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
-                            CallbackState callback_state);
+                            CallbackState callback_state, bool send_body);
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
   void logMutation(CallbackState callback_state,

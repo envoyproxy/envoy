@@ -133,3 +133,22 @@ void envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
   (void)extension_config_module_ptr;
   (void)cluster_name;
 }
+
+void envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer listener_name) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  (void)listener_name;
+}
+
+void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer listener_name) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  (void)listener_name;
+}
+

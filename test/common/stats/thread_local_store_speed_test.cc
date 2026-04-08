@@ -6,7 +6,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/event/dispatcher_impl.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_producer_impl.h"
@@ -77,7 +77,7 @@ private:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::SymbolTableImpl symbol_table_;
   Event::SimulatedTimeSystem time_system_;
-  Stats::AllocatorImpl heap_alloc_;
+  Stats::Allocator heap_alloc_;
   Event::DispatcherPtr dispatcher_;
   ThreadLocal::InstanceImplPtr tls_;
   Stats::ThreadLocalStoreImpl store_;

@@ -122,10 +122,9 @@ TEST_F(MetadataFormatterTest, DynamicMetadataWithLegacyConfigurationAndLength) {
 // cluster's metadata object.
 TEST_F(MetadataFormatterTest, ClusterMetadata) {
   // Make sure that formatter accesses cluster metadata.
-  absl::optional<std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>> cluster =
-      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(**cluster, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
-  EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::ReturnPointee(cluster));
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(*cluster, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
+  stream_info_.upstream_cluster_info_ = cluster;
 
   EXPECT_EQ("test_value",
             getTestMetadataFormatter("CLUSTER")->format(formatter_context_, stream_info_));
@@ -154,7 +153,7 @@ TEST_F(MetadataFormatterTest, UpstreamHostMetadata) {
 TEST_F(MetadataFormatterTest, RouteMetadata) {
   std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
   EXPECT_CALL(*route, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
-  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(route));
+  stream_info_.route_ = route;
 
   EXPECT_EQ("test_value",
             getTestMetadataFormatter("ROUTE")->format(formatter_context_, stream_info_));
@@ -162,7 +161,6 @@ TEST_F(MetadataFormatterTest, RouteMetadata) {
 
 // Make sure that code handles nullptr returned for stream_info::route().
 TEST_F(MetadataFormatterTest, NonExistentRouteMetadata) {
-  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(nullptr));
 
   EXPECT_EQ("-", getTestMetadataFormatter("ROUTE")->format(formatter_context_, stream_info_));
 }

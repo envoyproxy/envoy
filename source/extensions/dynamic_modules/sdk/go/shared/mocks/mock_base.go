@@ -528,6 +528,18 @@ func (mr *MockHttpFilterHandleMockRecorder) ClearRouteCache() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearRouteCache", reflect.TypeOf((*MockHttpFilterHandle)(nil).ClearRouteCache))
 }
 
+// RefreshRouteCluster mocks base method.
+func (m *MockHttpFilterHandle) RefreshRouteCluster() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RefreshRouteCluster")
+}
+
+// RefreshRouteCluster indicates an expected call of RefreshRouteCluster.
+func (mr *MockHttpFilterHandleMockRecorder) RefreshRouteCluster() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshRouteCluster", reflect.TypeOf((*MockHttpFilterHandle)(nil).RefreshRouteCluster))
+}
+
 // ContinueRequest mocks base method.
 func (m *MockHttpFilterHandle) ContinueRequest() {
 	m.ctrl.T.Helper()

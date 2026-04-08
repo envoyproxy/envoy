@@ -6,9 +6,8 @@ import random
 import unittest
 from test.python.echo_test_server import EchoTestServer
 
-from library.python.envoy_engine import EngineBuilder, LogLevel
-from library.python.async_client.client import AsyncClient
-from library.python.async_client.response import ClientResponseError
+from envoy_mobile import EngineBuilder, LogLevel, AsyncClient
+from envoy_mobile.async_client.response import ClientResponseError
 
 
 class TestAsyncClientFetch(unittest.TestCase):

@@ -38,9 +38,6 @@ namespace Compressor {
  *
  * "header_compressor_overshadowed" is a number of requests skipped by this filter instance because
  * they were handled by another filter in the same filter chain.
- *
- * "header_gzip" is specific to the gzip filter and is deprecated since it duplicates
- * "header_compressor_used".
  */
 #define RESPONSE_COMPRESSOR_STATS(COUNTER)                                                         \
   COUNTER(no_accept_header)                                                                        \
@@ -122,6 +119,7 @@ public:
     bool compressionEnabled() const override { return compression_enabled_.enabled(); }
     const ResponseCompressorStats& responseStats() const { return response_stats_; }
     bool disableOnEtagHeader() const { return disable_on_etag_header_; }
+    bool weakenEtagOnCompress() const { return weaken_etag_on_compress_; }
     bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
     bool statusHeaderEnabled() const { return status_header_enabled_; }
     bool areAllResponseCodesCompressible() const;
@@ -139,6 +137,7 @@ public:
     commonConfig(const envoy::extensions::filters::http::compressor::v3::Compressor&);
 
     const bool disable_on_etag_header_;
+    const bool weaken_etag_on_compress_;
     const bool remove_accept_encoding_header_;
     const bool status_header_enabled_;
     const absl::flat_hash_set<uint32_t> uncompressible_response_codes_;
@@ -247,6 +246,7 @@ private:
   bool isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const;
 
   void sanitizeEtagHeader(Http::ResponseHeaderMap& headers);
+  void weakenEtagHeader(Http::ResponseHeaderMap& headers);
   std::string createEnvoyCompressionStatusHeaderValue(
       absl::string_view encoding_type, absl::string_view status_to_set,
       absl::optional<absl::string_view> original_length = std::nullopt);

@@ -1346,6 +1346,24 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%``
+  HTTP/TCP/THRIFT
+    The hex-encoded SHA256 fingerprint of the verified issuer (CA) certificate from the
+    validated downstream TLS peer certificate. Requires a validated peer certificate chain
+    (e.g., mTLS with ``require_client_certificate: true`` and a ``validation_context``). Returns
+    ``"-"`` if there is no validated peer certificate chain or no issuer certificate can be found.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%DOWNSTREAM_PEER_ISSUER_SERIAL%``
+  HTTP/TCP/THRIFT
+    The serial number of the verified issuer (CA) certificate from the validated downstream TLS
+    peer certificate. Requires a validated peer certificate chain (e.g., mTLS with
+    ``require_client_certificate: true`` and a ``validation_context``). Returns ``"-"`` if there
+    is no validated peer certificate chain or no issuer certificate can be found.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%DOWNSTREAM_PEER_CERT%``
   HTTP/TCP/THRIFT
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
@@ -1543,6 +1561,14 @@ Current supported substitution commands include:
 ``%TRACE_ID%``
   HTTP
     The trace ID of the request. If the request does not have a trace ID, this will be an empty string.
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%SPAN_ID%``
+  HTTP
+    The span ID of the active (downstream) span for the request. If the request does not have a span ID,
+    this will be an empty string. Note that span ID availability depends on the tracing provider; not all
+    providers implement span ID retrieval.
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
@@ -1748,3 +1774,41 @@ Current supported substitution commands include:
 
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%FILE_CONTENT(X:Y):Z%``
+  Evaluates to the content of the file at path ``X``. The file is reloaded whenever it changes.
+
+  Optionally specify a directory ``Y`` to watch, and reload the file when changes occur. See
+  :ref:`watched_directory <envoy_v3_api_field_config.core.v3.DataSource.watched_directory>`
+  for more detailed semantics.
+
+  Takes an optional parameter ``Z`` to denote the maximum string length after which the
+  string is truncated.
+
+  This formatter is an extension, which must be explictly configured with:
+
+  .. validated-code-block:: yaml
+    :type-name: envoy.config.core.v3.TypedExtensionConfig
+
+    name: envoy.formatter.file_content
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent
+
+``%SECRET(X):Z%``
+  Evaluates to a secret value ``X`` in the configuration for this formatter, with an optional
+  maximum length ``Z`` after which the data is truncated. The format string ``%SECRET(my-api-token)%``
+  could we used with the following formatter extension configuration:
+
+  .. validated-code-block:: yaml
+    :type-name: envoy.config.core.v3.TypedExtensionConfig
+
+    name: envoy.formatter.generic_secret
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.generic_secret.v3.GenericSecret
+      secret_configs:
+        my-api-token:
+          name: bearer-token
+          sds_config:
+            ads: {}
+
+  This formatter is an extension and must be explicitly configured.

@@ -315,6 +315,13 @@ public:
                         std::shared_ptr<const Upstream::HostDescription> host) const PURE;
 
   /**
+   * @return the default Http11ProxyInfo if configured, or nullopt.
+   */
+  virtual OptRef<const TransportSocketOptions::Http11ProxyInfo> defaultHttp11ProxyInfo() const {
+    return {};
+  }
+
+  /**
    * Returns true if the transport socket created by this factory supports some form of ALPN
    * negotiation.
    */

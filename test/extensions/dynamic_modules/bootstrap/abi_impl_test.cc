@@ -4,7 +4,10 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin_stream.h"
+#include "test/mocks/server/listener_manager.h"
+#include "test/mocks/server/listener_update_callbacks_handle.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -1582,6 +1585,84 @@ TEST_F(BootstrapAbiImplTest, ClusterRemovalCallback) {
 
   // Invoke onClusterRemoval directly on the config.
   config.value()->onClusterRemoval("test_cluster");
+}
+
+// Test that enabling listener lifecycle registers callbacks with ListenerManager.
+TEST_F(BootstrapAbiImplTest, EnableListenerLifecycle) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Simulate server initialization by setting the listener manager.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
+
+  EXPECT_CALL(listener_manager, addListenerUpdateCallbacks_(_))
+      .WillOnce(testing::ReturnNew<Server::MockListenerUpdateCallbacksHandle>());
+
+  bool result = envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
+      config.value()->thisAsVoidPtr());
+  EXPECT_TRUE(result);
+
+  // Second call should be a no-op and return false.
+  bool result2 = envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
+      config.value()->thisAsVoidPtr());
+  EXPECT_FALSE(result2);
+}
+
+// Test that enabling listener lifecycle before server initialization fails.
+TEST_F(BootstrapAbiImplTest, EnableListenerLifecycleBeforeServerInit) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Do not set listener manager - simulate calling before server init.
+  EXPECT_LOG_CONTAINS("error", "cannot enable listener lifecycle before server is initialized", {
+    bool result = envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
+        config.value()->thisAsVoidPtr());
+    EXPECT_FALSE(result);
+  });
+}
+
+// Test that listener add/update events are forwarded to the module.
+TEST_F(BootstrapAbiImplTest, ListenerAddOrUpdateCallback) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Invoke onListenerAddOrUpdate directly on the config to test the callback forwarding.
+  NiceMock<Network::MockListenerConfig> mock_listener_config;
+  config.value()->onListenerAddOrUpdate("test_listener", mock_listener_config);
+}
+
+// Test that listener removal events are forwarded to the module.
+TEST_F(BootstrapAbiImplTest, ListenerRemovalCallback) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Invoke onListenerRemoval directly on the config.
+  config.value()->onListenerRemoval("test_listener");
 }
 
 } // namespace DynamicModules

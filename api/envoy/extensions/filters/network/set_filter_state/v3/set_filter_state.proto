@@ -31,4 +31,8 @@ message Config {
   // For non-TLS downstream connections (where there is no TLS handshake), this
   // list is applied when a new connection is received.
   repeated common.set_filter_state.v3.FilterStateValue on_downstream_tls_handshake = 2;
+
+  // A sequence of the filter state values to apply in the specified order
+  // when data is first received from the downstream connection.
+  repeated common.set_filter_state.v3.FilterStateValue on_downstream_data = 3;
 }

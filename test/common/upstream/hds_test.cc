@@ -57,6 +57,11 @@ public:
   static void swapFactory(HdsDelegate& hd, std::unique_ptr<ClusterInfoFactory>&& factory) {
     hd.info_factory_ = std::move(factory);
   }
+  envoy::config::cluster::v3::Cluster
+  createClusterConfig(HdsDelegate& hd,
+                      const envoy::service::health::v3::ClusterHealthCheck& cluster_health_check) {
+    return hd.createClusterConfig(cluster_health_check);
+  }
 };
 
 class HdsTest : public testing::Test {
@@ -1286,6 +1291,178 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenUpdate) {
     EXPECT_EQ(host->address()->ip()->port(), 1234 + i);
     EXPECT_EQ(host->healthCheckAddress()->ip()->port(), 4321 + i);
   }
+}
+
+// Test that sendResponse includes health_metadata with http_status_code
+// when setHealthCheckMetadata has been called on a host.
+TEST_F(HdsTest, TestSendResponseWithHealthMetadata) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createSimpleMessage());
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Return(connection_));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
+
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Set the HTTP response code on the host to simulate a health check result.
+  auto& host = hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  host->setLastHealthCheckHttpStatus(200);
+
+  // Send Response
+  auto msg = hds_delegate_->sendResponse();
+
+  // Verify health_metadata contains the HTTP status code in the legacy flat list.
+  const auto& endpoint_health = msg.endpoint_health_response().endpoints_health(0);
+  ASSERT_TRUE(endpoint_health.has_health_metadata());
+  const auto& fields = endpoint_health.health_metadata().fields();
+  auto it = fields.find("http_status_code");
+  ASSERT_NE(it, fields.end());
+  EXPECT_EQ(it->second.number_value(), 200.0);
+
+  // Also verify the structured (cluster-based) response.
+  const auto& cluster_endpoint =
+      msg.endpoint_health_response().cluster_endpoints_health(0).locality_endpoints_health(0);
+  const auto& structured_endpoint = cluster_endpoint.endpoints_health(0);
+  ASSERT_TRUE(structured_endpoint.has_health_metadata());
+  EXPECT_EQ(structured_endpoint.health_metadata().fields().at("http_status_code").number_value(),
+            200.0);
+}
+
+// Test that sendResponse does not include health_metadata when no metadata
+// has been set on the host (default empty Struct).
+TEST_F(HdsTest, TestSendResponseNoHealthMetadataByDefault) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createSimpleMessage());
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Return(connection_));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
+
+  // Process message (do NOT set any health metadata on host)
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Send Response
+  auto msg = hds_delegate_->sendResponse();
+
+  // Verify health_metadata is absent when no metadata has been set.
+  EXPECT_FALSE(msg.endpoint_health_response().endpoints_health(0).has_health_metadata());
+}
+
+// Test that createClusterConfig sets http2_protocol_options when a gRPC health check is present.
+TEST_F(HdsTest, TestCreateClusterConfigGrpcHealthCheckEnablesHttp2) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Build a ClusterHealthCheck with only a gRPC health check (no HTTP).
+  envoy::service::health::v3::ClusterHealthCheck cluster_health_check;
+  cluster_health_check.set_cluster_name("test-grpc-cluster");
+  auto* hc = cluster_health_check.add_health_checks();
+  hc->mutable_timeout()->set_seconds(1);
+  hc->mutable_interval()->set_seconds(1);
+  hc->mutable_unhealthy_threshold()->set_value(2);
+  hc->mutable_healthy_threshold()->set_value(2);
+  hc->mutable_grpc_health_check();
+
+  auto* locality_endpoints = cluster_health_check.add_locality_endpoints();
+  auto* socket_address =
+      locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
+  socket_address->set_address("127.0.0.1");
+  socket_address->set_port_value(9090);
+
+  auto cluster_config =
+      hds_delegate_friend_.createClusterConfig(*hds_delegate_, cluster_health_check);
+
+  // The cluster config should have http2_protocol_options set for gRPC.
+  EXPECT_TRUE(cluster_config.has_http2_protocol_options());
+}
+
+// Test that createClusterConfig does NOT set http2_protocol_options for HTTP-only health checks.
+TEST_F(HdsTest, TestCreateClusterConfigHttpHealthCheckNoHttp2) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Build a ClusterHealthCheck with only an HTTP health check.
+  envoy::service::health::v3::ClusterHealthCheck cluster_health_check;
+  cluster_health_check.set_cluster_name("test-http-cluster");
+  auto* hc = cluster_health_check.add_health_checks();
+  hc->mutable_timeout()->set_seconds(1);
+  hc->mutable_interval()->set_seconds(1);
+  hc->mutable_unhealthy_threshold()->set_value(2);
+  hc->mutable_healthy_threshold()->set_value(2);
+  hc->mutable_http_health_check()->set_path("/healthcheck");
+
+  auto* locality_endpoints = cluster_health_check.add_locality_endpoints();
+  auto* socket_address =
+      locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
+  socket_address->set_address("127.0.0.1");
+  socket_address->set_port_value(8080);
+
+  auto cluster_config =
+      hds_delegate_friend_.createClusterConfig(*hds_delegate_, cluster_health_check);
+
+  // The cluster config should NOT have http2_protocol_options for HTTP-only.
+  EXPECT_FALSE(cluster_config.has_http2_protocol_options());
+}
+
+// Test that createClusterConfig sets http2_protocol_options when mixed health checks include gRPC.
+TEST_F(HdsTest, TestCreateClusterConfigMixedHealthChecksWithGrpcEnablesHttp2) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Build a ClusterHealthCheck with both HTTP and gRPC health checks.
+  envoy::service::health::v3::ClusterHealthCheck cluster_health_check;
+  cluster_health_check.set_cluster_name("test-mixed-cluster");
+
+  auto* hc_http = cluster_health_check.add_health_checks();
+  hc_http->mutable_timeout()->set_seconds(1);
+  hc_http->mutable_interval()->set_seconds(1);
+  hc_http->mutable_unhealthy_threshold()->set_value(2);
+  hc_http->mutable_healthy_threshold()->set_value(2);
+  hc_http->mutable_http_health_check()->set_path("/healthcheck");
+
+  auto* hc_grpc = cluster_health_check.add_health_checks();
+  hc_grpc->mutable_timeout()->set_seconds(1);
+  hc_grpc->mutable_interval()->set_seconds(1);
+  hc_grpc->mutable_unhealthy_threshold()->set_value(2);
+  hc_grpc->mutable_healthy_threshold()->set_value(2);
+  hc_grpc->mutable_grpc_health_check();
+
+  auto* locality_endpoints = cluster_health_check.add_locality_endpoints();
+  auto* socket_address =
+      locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
+  socket_address->set_address("127.0.0.1");
+  socket_address->set_port_value(8080);
+
+  auto cluster_config =
+      hds_delegate_friend_.createClusterConfig(*hds_delegate_, cluster_health_check);
+
+  // The cluster config should have http2_protocol_options because gRPC is present.
+  EXPECT_TRUE(cluster_config.has_http2_protocol_options());
 }
 
 } // namespace Upstream

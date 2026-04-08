@@ -9,7 +9,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/ttl.h"
 
-#include "quiche/common/quiche_linked_hash_map.h"
+#include "absl/container/linked_hash_map.h"
 
 namespace Envoy {
 inline constexpr absl::string_view KV_STORE_TTL_KEY = "TTL";
@@ -47,7 +47,7 @@ protected:
     absl::optional<std::chrono::seconds> ttl_;
   };
 
-  using KeyValueMap = quiche::QuicheLinkedHashMap<std::string, ValueWithTtl>;
+  using KeyValueMap = absl::linked_hash_map<std::string, ValueWithTtl>;
 
   const KeyValueMap& store() { return store_; }
 

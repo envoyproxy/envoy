@@ -142,6 +142,17 @@ public:
                               const StreamInfo::StreamInfo& stream_info) const override;
 };
 
+/**
+ * FormatterProvider for span ID.
+ */
+class SpanIDFormatter : public FormatterProvider {
+public:
+  absl::optional<std::string> format(const Context& context,
+                                     const StreamInfo::StreamInfo& stream_info) const override;
+  Protobuf::Value formatValue(const Context& context,
+                              const StreamInfo::StreamInfo& stream_info) const override;
+};
+
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
 public:
   enum Format {

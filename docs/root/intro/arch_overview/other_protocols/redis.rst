@@ -301,6 +301,7 @@ For details on each command's usage see the official
   APPEND, String
   BITCOUNT, String
   BITFIELD, String
+  BITFIELD_RO, String
   BITPOS, String
   DECR, String
   DECRBY, String
