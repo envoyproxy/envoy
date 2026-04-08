@@ -127,33 +127,21 @@ public:
 
   void init(FilterConfigSharedPtr config) {
     // Set up the OAuth client.
-    oauth_client_ = new MockOAuth2Client();
-    auto oauth_client_holder = std::make_shared<std::unique_ptr<OAuth2Client>>(
-        std::unique_ptr<OAuth2Client>{oauth_client_});
+    oauth_client_ = std::make_shared<MockOAuth2Client>();
+    validator_ = std::make_shared<MockOAuth2CookieValidator>();
 
     config_ = config;
     ON_CALL(test_random_, random()).WillByDefault(Return(123456789));
     filter_ = std::make_shared<OAuth2Filter>(
         config_,
-        [this, oauth_client_holder](const FilterConfig&) -> std::unique_ptr<OAuth2Client> {
-          if (*oauth_client_holder != nullptr) {
-            return std::move(*oauth_client_holder);
-          }
-
-          oauth_client_ = new MockOAuth2Client();
-          return std::unique_ptr<OAuth2Client>{oauth_client_};
+        [this](const FilterConfig&) -> std::shared_ptr<OAuth2Client> { return oauth_client_; },
+        [this](TimeSource&, const FilterConfig&) -> std::shared_ptr<CookieValidator> {
+          return validator_;
         },
         test_time_, test_random_);
     EXPECT_CALL(*oauth_client_, getState()).WillRepeatedly(Return(OAuth2Client::OAuthState::Idle));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-    if (config_ != nullptr) {
-      filter_->resolveAndSetActiveConfig();
-    }
-    validator_ = std::make_shared<MockOAuth2CookieValidator>();
-    if (config_ != nullptr) {
-      filter_->validator_ = validator_;
-    }
     filter_->flow_id_ = "00000000075bcd15";
   }
 
@@ -372,7 +360,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   std::shared_ptr<MockOAuth2CookieValidator> validator_;
   std::shared_ptr<OAuth2Filter> filter_;
-  MockOAuth2Client* oauth_client_;
+  std::shared_ptr<MockOAuth2Client> oauth_client_;
   FilterConfigSharedPtr config_;
   Http::MockAsyncClientRequest request_;
   std::deque<Http::AsyncClient::Callbacks*> callbacks_;

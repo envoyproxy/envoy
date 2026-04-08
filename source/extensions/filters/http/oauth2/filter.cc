@@ -609,29 +609,29 @@ bool OAuth2CookieValidator::timestampIsValid() const {
 bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
 OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr default_config,
-                           OAuth2ClientFactory oauth_client_factory, TimeSource& time_source,
+                           OAuth2ClientFactory oauth_client_factory,
+                           ValidatorFactory validator_factory, TimeSource& time_source,
                            Random::RandomGenerator& random)
     : default_config_(std::move(default_config)),
-      oauth_client_factory_(std::move(oauth_client_factory)), time_source_(time_source),
-      random_(random) {}
+      oauth_client_factory_(std::move(oauth_client_factory)),
+      validator_factory_(std::move(validator_factory)), time_source_(time_source), random_(random) {
+}
 
 void OAuth2Filter::resolveAndSetActiveConfig() {
   const auto* route_specific_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
   const FilterConfig* config =
       route_specific_config != nullptr ? route_specific_config : default_config_.get();
+
   if (config == nullptr) {
     return;
   }
-
-  // We only need this for testing purposes to avoid resetting the mock validator.
   if (config_ == config) {
     return;
   }
 
   config_ = config;
-  validator_ = std::make_shared<OAuth2CookieValidator>(time_source_, config_->cookieNames(),
-                                                       config_->cookieDomain());
+  validator_ = validator_factory_(time_source_, *config_);
 
   oauth_client_ = oauth_client_factory_(*config_);
   oauth_client_->setCallbacks(*this);

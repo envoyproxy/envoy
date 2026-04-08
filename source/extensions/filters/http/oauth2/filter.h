@@ -346,10 +346,13 @@ class OAuth2Filter : public Http::PassThroughFilter,
                      FilterCallbacks,
                      Logger::Loggable<Logger::Id::oauth2> {
 public:
-  using OAuth2ClientFactory = std::function<std::unique_ptr<OAuth2Client>(const FilterConfig&)>;
+  using OAuth2ClientFactory = std::function<std::shared_ptr<OAuth2Client>(const FilterConfig&)>;
+  using ValidatorFactory =
+      std::function<std::shared_ptr<CookieValidator>(TimeSource&, const FilterConfig&)>;
 
   OAuth2Filter(FilterConfigSharedPtr default_config, OAuth2ClientFactory oauth_client_factory,
-               TimeSource& time_source, Random::RandomGenerator& random);
+               ValidatorFactory validator_factory, TimeSource& time_source,
+               Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -398,10 +401,11 @@ private:
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
 
-  std::unique_ptr<OAuth2Client> oauth_client_;
+  std::shared_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr default_config_;
   const FilterConfig* config_{nullptr};
   OAuth2ClientFactory oauth_client_factory_;
+  ValidatorFactory validator_factory_;
   TimeSource& time_source_;
   Random::RandomGenerator& random_;
 
