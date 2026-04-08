@@ -52,22 +52,22 @@ jobs:
       request: ${{ needs.env.outputs.request }}
       steps-pre: |
         - run: |
-              mkdir /tmp/mobile
-              VERSION="0.5.0.$(date '+%Y%m%d')"
-              echo "VERSION=${VERSION}" >> $GITHUB_ENV
+            mkdir /tmp/mobile
+            VERSION="0.5.0.$(date '+%Y%m%d')"
+            echo "VERSION=${VERSION}" >> $GITHUB_ENV
           shell: bash
       steps-post: |
         - run: |
-              mkdir /tmp/output
+            mkdir /tmp/output
           shell: bash
         - name: Tar artifacts
           run: >-
-              tar
-              -czhf
-              /tmp/output/${{ matrix.output }}_android_aar_sources.tar.gz
-              -C
-              /tmp/container-output/build
-              .
+            tar
+            -czhf
+            /tmp/output/${{ matrix.output }}_android_aar_sources.tar.gz
+            -C
+            /tmp/container-output/build
+            .
           shell: bash
       target: ${{ matrix.target }}
       upload-name: ${{ matrix.output }}_android_aar_sources
@@ -180,19 +180,19 @@ jobs:
       steps-post: |
         - name: Repair wheel
           run: |
-              mkdir -p /tmp/dist
-              WHEEL_PATH=$(find /tmp/container-output/build -name "*.whl" | head -n 1)
+            mkdir -p /tmp/dist
+            WHEEL_PATH=$(find /tmp/container-output/build -name "*.whl" | head -n 1)
             
-              if [[ -z "$WHEEL_PATH" ]]; then
-                  echo "p Error: No wheel file found in /tmp/container-output/build"
-                  ls -R /tmp/container-output/
-                  exit 1
-              fi
-              python3 -m venv envoy_wheel
-              source envoy_wheel/bin/activate
-              pip install patchelf auditwheel
+            if [[ -z "$WHEEL_PATH" ]]; then
+                echo "p Error: No wheel file found in /tmp/container-output/build"
+                ls -R /tmp/container-output/
+                exit 1
+            fi
+            python3 -m venv envoy_wheel
+            source envoy_wheel/bin/activate
+            pip install patchelf auditwheel
             
-              auditwheel repair "$WHEEL_PATH" --wheel-dir /tmp/dist
+            auditwheel repair "$WHEEL_PATH" --wheel-dir /tmp/dist
           shell: bash
       target: ${{ matrix.target }}
       upload-name: python-wheel
