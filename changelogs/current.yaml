@@ -334,6 +334,11 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: logging
+  change: |
+    Added ``%E`` as a custom spdlog pattern flag that emits the Envoy version string. It can be
+    used in the ``--log-format`` CLI flag or the bootstrap ``application_log_config.log_format``
+    to include the running version in every log line, e.g. ``--log-format "[%E][%l] %v"``.
 - area: ratelimit
   change: |
     Added ``is_negative_hits`` boolean to the ``hits_addend``

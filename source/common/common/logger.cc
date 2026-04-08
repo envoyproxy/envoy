@@ -17,6 +17,16 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
+// Forward declaration to avoid a circular BUILD dependency:
+// minimal_logger_lib -> version_lib -> protobuf -> logger_lib -> minimal_logger_lib.
+// version_lib is always linked into any Envoy binary, so the symbol is resolved at link time.
+class VersionInfo {
+public:
+  static const std::string& version();
+};
+} // namespace Envoy
+
+namespace Envoy {
 namespace Logger {
 
 StandardLogger::StandardLogger(const std::string& name)
@@ -321,6 +331,10 @@ void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format
           CustomFlagFormatter::ExtractedMessage::Placeholder)
       .set_pattern(log_format);
 
+  formatter
+      ->add_flag<CustomFlagFormatter::EnvoyVersion>(CustomFlagFormatter::EnvoyVersion::Placeholder)
+      .set_pattern(log_format);
+
   logger.set_formatter(std::move(formatter));
 }
 
@@ -418,6 +432,12 @@ void ExtractedMessage::format(const spdlog::details::log_msg& msg, const std::tm
   auto original_message =
       absl::string_view(payload.data() + tags_end_pos, payload.size() - tags_end_pos);
   Envoy::Logger::Utility::escapeMessageJsonString(original_message, dest);
+}
+
+void EnvoyVersion::format(const spdlog::details::log_msg&, const std::tm&,
+                          spdlog::memory_buf_t& dest) {
+  const std::string& version = VersionInfo::version();
+  dest.append(version.data(), version.data() + version.size());
 }
 
 } // namespace CustomFlagFormatter
