@@ -126,6 +126,11 @@ minor_behavior_changes:
     and the caller does not want to manage shared pointer ownership. The new shared pointer methods
     are intended for use cases where the caller needs to keep the ownerships to the route, cluster,
     or virtual host.
+- area: http
+  change: |
+    Enable strict parsing of HTTP/1 chunked encoding. Strict parsing is disabled by default and can be
+    enabled by setting the ``envoy.reloadable_features.mcp_filter_use_new_metadata_namespace`` runtime
+    flag to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
