@@ -29,7 +29,7 @@ public:
   void stopListener();
 
   Http::Client& httpClient() {
-    ASSERT(http_client_ != nullptr, "http_client_ is null!");
+    RELEASE_ASSERT(http_client_ != nullptr, "http_client_ is null!");
     return *http_client_;
   }
   Event::Dispatcher& dispatcher() { return *dispatcher_; }

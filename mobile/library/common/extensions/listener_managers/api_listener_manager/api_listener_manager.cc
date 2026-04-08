@@ -171,6 +171,7 @@ absl::Status ApiListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
     worker_started_notification.Notify();
   });
   worker_started_notification.WaitForNotification();
+  ENVOY_LOG_MISC(info, "Worker thread has been started");
 
   worker_->httpClient(); // Verify if it's null right after startup
 
