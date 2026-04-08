@@ -626,18 +626,17 @@ const FilterConfig* OAuth2Filter::getConfigForRequest() const {
 }
 
 void OAuth2Filter::setActiveConfig(const FilterConfig* config) {
-  if (config == nullptr) {
-    config_ = nullptr;
-    validator_.reset();
-    oauth_client_.reset();
-    return;
-  }
-
   if (config_ == config) {
     return;
   }
 
   config_ = config;
+  if (config_ == nullptr) {
+    validator_.reset();
+    oauth_client_.reset();
+    return;
+  }
+
   validator_ = std::make_shared<OAuth2CookieValidator>(time_source_, config_->cookieNames(),
                                                        config_->cookieDomain());
 
