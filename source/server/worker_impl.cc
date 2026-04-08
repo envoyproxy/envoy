@@ -133,6 +133,10 @@ void WorkerImpl::stop() {
   // It's possible for the server to cleanly shut down while cluster initialization during startup
   // is happening, so we might not yet have a thread.
   if (thread_) {
+    if (close_idle_connection_timer_ != nullptr) {
+      close_idle_connection_timer_->disableTimer();
+      close_idle_connection_timer_ = nullptr;
+    }
     dispatcher_->exit();
     thread_->join();
   }
@@ -215,6 +219,7 @@ void WorkerImpl::closeIdleHttpConnectionsCb(OverloadActionState::Phase phase) {
       close_idle_connection_timer_->enableTimer(kCloseIdleHttpConnectionsInterval);
     }
   } else {
+    ASSERT(close_idle_connection_timer_->enabled());
     close_idle_connection_timer_->disableTimer();
   }
 }
