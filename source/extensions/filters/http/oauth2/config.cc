@@ -130,7 +130,7 @@ OAuth2Config::createRouteSpecificFilterConfigTyped(
   if (!config_or_error.ok()) {
     return config_or_error.status();
   }
-  return std::make_shared<FilterConfigPerRoute>(config_or_error.value());
+  return config_or_error.value();
 }
 
 /*

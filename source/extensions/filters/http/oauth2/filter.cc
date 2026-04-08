@@ -617,9 +617,9 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr default_config,
 
 FilterConfigSharedPtr OAuth2Filter::getConfigForRequest() const {
   const auto* route_specific_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
   if (route_specific_config != nullptr) {
-    return route_specific_config->config();
+    return std::const_pointer_cast<FilterConfig>(route_specific_config->shared_from_this());
   }
 
   return default_config_;

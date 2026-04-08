@@ -4678,8 +4678,9 @@ TEST_F(OAuth2Test, RouteSpecificConfigOverridesGlobalConfig) {
   credentials->mutable_hmac_secret()->set_name("hmac");
 
   auto secret_reader = std::make_shared<MockSecretReader>();
-  auto route_config = std::make_shared<FilterConfigPerRoute>(std::make_shared<FilterConfig>(
-      route_proto, factory_context_.server_factory_context_, secret_reader, scope_, "test."));
+  auto route_config = std::make_shared<FilterConfig>(route_proto,
+                                                     factory_context_.server_factory_context_,
+                                                     secret_reader, scope_, "test.");
 
   ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
       .WillByDefault(Return(route_config.get()));

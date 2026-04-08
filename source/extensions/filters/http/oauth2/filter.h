@@ -147,7 +147,9 @@ struct CookieNames {
  * This class encapsulates all data needed for the filter to operate so that we don't pass around
  * raw protobufs and other arbitrary data.
  */
-class FilterConfig : public Logger::Loggable<Logger::Id::oauth2> {
+class FilterConfig : public Router::RouteSpecificFilterConfig,
+                     public Logger::Loggable<Logger::Id::oauth2>,
+                     public std::enable_shared_from_this<FilterConfig> {
 public:
   FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
                Server::Configuration::CommonFactoryContext& context,
@@ -278,16 +280,6 @@ private:
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
-
-class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
-public:
-  explicit FilterConfigPerRoute(FilterConfigSharedPtr config) : config_(std::move(config)) {}
-
-  const FilterConfigSharedPtr& config() const { return config_; }
-
-private:
-  FilterConfigSharedPtr config_;
-};
 
 /**
  * An OAuth cookie validator:
