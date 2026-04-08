@@ -51,7 +51,7 @@ typed_config:
       constexpr auto filter_per_route_config = R"EOF(
 dynamic_module_config:
   name: {}
-per_route_config_name: {}
+filter_name: {}
 filter_config:
   "@type": {}
   value: {}
