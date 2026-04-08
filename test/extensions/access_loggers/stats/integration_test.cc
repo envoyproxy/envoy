@@ -489,11 +489,9 @@ TEST_P(StatsAccessLogIntegrationTest, SharedScope) {
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
                 stats_scope:
-                  enable_sharing: true
+                  sharing_name: "shared_scope"
                   prefix: shared_scope_limits
-                  name: "shared_scope"
-                  config:
-                    max_counters: 1
+                  max_counters: 1
                 counters:
                   - stat:
                       name: formatcounter1
@@ -505,11 +503,9 @@ TEST_P(StatsAccessLogIntegrationTest, SharedScope) {
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
                 stats_scope:
-                  enable_sharing: true
+                  sharing_name: "shared_scope"
                   prefix: shared_scope_limits
-                  name: "shared_scope"
-                  config:
-                    max_counters: 1
+                  max_counters: 1
                 counters:
                   - stat:
                       name: formatcounter2

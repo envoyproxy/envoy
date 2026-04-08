@@ -16,12 +16,17 @@ struct ScopeConfiguration {
   bool evictable_;
 };
 
-ScopeConfiguration
-convertProtoToScopeStatsLimitSettings(const envoy::type::v3::ScopeConfig& config) {
+ScopeConfiguration convertProtoToScopeStatsLimitSettings(const envoy::type::v3::Scope& config) {
   Stats::ScopeStatsLimitSettings limits;
-  limits.max_counters = config.max_counters();
-  limits.max_gauges = config.max_gauges();
-  limits.max_histograms = config.max_histograms();
+  if (config.has_max_counters()) {
+    limits.max_counters = config.max_counters().value();
+  }
+  if (config.has_max_gauges()) {
+    limits.max_gauges = config.max_gauges().value();
+  }
+  if (config.has_max_histograms()) {
+    limits.max_histograms = config.max_histograms().value();
+  }
   return {limits, config.enable_eviction()};
 }
 
@@ -33,8 +38,8 @@ Stats::ScopeSharedPtr
 ScopeProviderSingleton::getScope(Server::Configuration::GenericFactoryContext& factory_context,
                                  const envoy::type::v3::Scope& config) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  if (!config.enable_sharing() || config.name().empty()) {
-    ScopeConfiguration scope_cfg = convertProtoToScopeStatsLimitSettings(config.config());
+  if (config.sharing_name().empty()) {
+    ScopeConfiguration scope_cfg = convertProtoToScopeStatsLimitSettings(config);
     return factory_context.statsScope().createScope(config.prefix(), scope_cfg.evictable_,
                                                     scope_cfg.limits);
   }
@@ -54,7 +59,7 @@ ScopeProviderSingleton::getScope(Server::Configuration::GenericFactoryContext& f
     }
   }
 
-  ScopeConfiguration scope_cfg = convertProtoToScopeStatsLimitSettings(config.config());
+  ScopeConfiguration scope_cfg = convertProtoToScopeStatsLimitSettings(config);
   Stats::ScopeSharedPtr scope = factory_context.serverFactoryContext().serverScope().createScope(
       config.prefix(), scope_cfg.evictable_, scope_cfg.limits);
 

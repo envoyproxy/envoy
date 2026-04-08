@@ -325,15 +325,15 @@ public:
                     StatsMatcherSharedPtr matcher = nullptr)
       : prefix_(prefix, store.symbolTable()), store_(store), scope_matcher_(std::move(matcher)) {}
 
-  void setCleanupCallback(std::function<void()> callback) override {
-    cleanup_callback_ = std::move(callback);
-  }
-
   ~IsolatedScopeImpl() override {
     if (cleanup_callback_) {
       cleanup_callback_();
     }
     prefix_.free(store_.symbolTable());
+  }
+
+  void setCleanupCallback(std::function<void()> callback) override {
+    cleanup_callback_ = std::move(callback);
   }
 
   // Stats::Scope

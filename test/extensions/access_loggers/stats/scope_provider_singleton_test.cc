@@ -40,11 +40,10 @@ public:
 TEST_F(ScopeProviderSingletonTest, GetScopeCachesAndReturnsSameScope) {
   // First request
   envoy::type::v3::Scope scope_config1;
-  scope_config1.set_enable_sharing(true);
-  scope_config1.mutable_config()->set_max_counters(10);
-  scope_config1.mutable_config()->set_max_gauges(20);
-  scope_config1.mutable_config()->set_max_histograms(30);
-  scope_config1.set_name("shared_name");
+  scope_config1.set_sharing_name("shared_name");
+  scope_config1.mutable_max_counters()->set_value(10);
+  scope_config1.mutable_max_gauges()->set_value(20);
+  scope_config1.mutable_max_histograms()->set_value(30);
 
   EXPECT_CALL(factory_context_.server_context_, serverScope())
       .WillRepeatedly(ReturnRef(mock_store_.mockScope()));
@@ -67,11 +66,10 @@ TEST_F(ScopeProviderSingletonTest, GetScopeCachesAndReturnsSameScope) {
   EXPECT_NE(returned_scope1, nullptr);
 
   envoy::type::v3::Scope scope_config2;
-  scope_config2.set_enable_sharing(true);
-  scope_config2.mutable_config()->set_max_counters(10);
-  scope_config2.mutable_config()->set_max_gauges(20);
-  scope_config2.mutable_config()->set_max_histograms(30);
-  scope_config2.set_name("shared_name");
+  scope_config2.set_sharing_name("shared_name");
+  scope_config2.mutable_max_counters()->set_value(10);
+  scope_config2.mutable_max_gauges()->set_value(20);
+  scope_config2.mutable_max_histograms()->set_value(30);
 
   // Expect no new createScope_ calls here
   auto returned_scope2 = Stats::ScopeProviderSingleton::getScope(factory_context_, scope_config2);
@@ -80,11 +78,10 @@ TEST_F(ScopeProviderSingletonTest, GetScopeCachesAndReturnsSameScope) {
 
   // Third request with different config should create new scope
   envoy::type::v3::Scope scope_config3;
-  scope_config3.set_enable_sharing(true);
-  scope_config3.mutable_config()->set_max_counters(15);
-  scope_config3.mutable_config()->set_max_gauges(20);
-  scope_config3.mutable_config()->set_max_histograms(30);
-  scope_config3.set_name("different_limits");
+  scope_config3.set_sharing_name("different_limits");
+  scope_config3.mutable_max_counters()->set_value(15);
+  scope_config3.mutable_max_gauges()->set_value(20);
+  scope_config3.mutable_max_histograms()->set_value(30);
 
   std::shared_ptr<Stats::MockScope> newly_created_scope3;
   EXPECT_CALL(mock_store_.mockScope(), createScope_(_))
@@ -103,11 +100,10 @@ TEST_F(ScopeProviderSingletonTest, GetScopeCachesAndReturnsSameScope) {
 
 TEST_F(ScopeProviderSingletonTest, CleansUpExpiredScopesOnNextGetScope) {
   envoy::type::v3::Scope scope_config;
-  scope_config.set_enable_sharing(true);
-  scope_config.set_name("cleanup_test_name");
-  scope_config.mutable_config()->set_max_counters(10);
-  scope_config.mutable_config()->set_max_gauges(20);
-  scope_config.mutable_config()->set_max_histograms(30);
+  scope_config.set_sharing_name("cleanup_test_name");
+  scope_config.mutable_max_counters()->set_value(10);
+  scope_config.mutable_max_gauges()->set_value(20);
+  scope_config.mutable_max_histograms()->set_value(30);
 
   EXPECT_CALL(factory_context_.server_context_, serverScope())
       .WillRepeatedly(ReturnRef(mock_store_.mockScope()));
@@ -155,8 +151,8 @@ TEST_F(ScopeProviderSingletonTest, CleansUpExpiredScopesOnNextGetScope) {
 
 TEST_F(ScopeProviderSingletonTest, GetScopeWithSharingDisabledDoesNotCache) {
   envoy::type::v3::Scope scope_config;
-  scope_config.set_enable_sharing(false);
-  scope_config.mutable_config()->set_max_counters(10);
+  // sharing_name is empty by default, which means sharing is disabled.
+  scope_config.mutable_max_counters()->set_value(10);
 
   EXPECT_CALL(factory_context_.server_context_, serverScope())
       .WillRepeatedly(ReturnRef(mock_store_.mockScope()));
@@ -192,8 +188,7 @@ TEST_F(ScopeProviderSingletonTest, GetScopeWithSharingDisabledDoesNotCache) {
 
 TEST_F(ScopeProviderSingletonTest, SupportsGetSharedAndCopying) {
   envoy::type::v3::Scope scope_config;
-  scope_config.set_enable_sharing(true);
-  scope_config.set_name("copy_test_name");
+  scope_config.set_sharing_name("copy_test_name");
 
   EXPECT_CALL(factory_context_.server_context_, serverScope())
       .WillRepeatedly(ReturnRef(mock_store_.mockScope()));

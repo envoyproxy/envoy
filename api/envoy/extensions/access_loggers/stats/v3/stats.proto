@@ -9,6 +9,7 @@ import "google/protobuf/wrappers.proto";
 
 import "xds/type/matcher/v3/matcher.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -156,7 +157,8 @@ message Config {
   // The stat prefix for the generated stats.
   // Deprecated: please use ``stats_scope.prefix`` instead.
   // It will override ``stats_scope.prefix`` if non-empty.
-  string stat_prefix = 1;
+  string stat_prefix = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configuration for stats scope limits and sharing.
   type.v3.Scope stats_scope = 6;
