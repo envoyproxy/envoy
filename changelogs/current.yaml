@@ -904,6 +904,13 @@ new_features:
     Propagate upstream TCP RST to downstream when detected close type is RemoteReset.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy`` to false.
+- area: tcp_proxy
+  change: |
+    HttpUpstream now maps remote-originated HTTP stream reset reasons (RemoteReset,
+    RemoteRefusedStreamReset, RemoteConnectionFailure) to RemoteClose with
+    DetectedCloseType::RemoteReset, enabling RST propagation through tunneled tcp_proxy.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.map_http_stream_reset_to_tcp_rst`` to false.
 
 - area: contrib
   change: |
