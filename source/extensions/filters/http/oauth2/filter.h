@@ -177,6 +177,8 @@ public:
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string hmacSecret() const { return secret_reader_->hmacSecret(); }
+  // The secrets are loaded asynchronously if per-route configurations are used, so the filter needs
+  // to check if the secrets are available before processing the request.
   bool requiredSecretsAvailable() const {
     return !secret_reader_->hmacSecret().empty() &&
            (auth_type_ == AuthType::TlsClientAuth || !secret_reader_->clientSecret().empty());
