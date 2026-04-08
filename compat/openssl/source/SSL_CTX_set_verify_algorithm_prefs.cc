@@ -1,5 +1,6 @@
 #include <openssl/ssl.h>
 #include <ossl.h>
+#include <vector>
 
 /*
  * https://github.com/google/boringssl/blob/098695591f3a2665fccef83a3732ecfc99acdcdd/src/include/openssl/ssl.h#L2639
@@ -28,7 +29,7 @@ extern "C" int SSL_CTX_set_verify_algorithm_prefs(SSL_CTX* ctx, const uint16_t* 
   static const int mmax =
       sizeof(kSignatureAlgorithmsMapping) / sizeof(kSignatureAlgorithmsMapping[0]);
 
-  int sigalgs[num_prefs * 2];
+  std::vector<int> sigalgs(num_prefs * 2);
 
   for (size_t pi = 0; pi < num_prefs; pi++) {
     int mi;
@@ -48,5 +49,5 @@ extern "C" int SSL_CTX_set_verify_algorithm_prefs(SSL_CTX* ctx, const uint16_t* 
     }
   }
 
-  return ossl.ossl_SSL_CTX_set1_sigalgs(ctx, sigalgs, num_prefs * 2);
+  return ossl.ossl_SSL_CTX_set1_sigalgs(ctx, sigalgs.data(), num_prefs * 2);
 }
