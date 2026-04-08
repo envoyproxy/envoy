@@ -624,6 +624,11 @@ void OAuth2Filter::resolveAndSetActiveConfig() {
     return;
   }
 
+  // We only need this for testing purposes to avoid resetting the mock validator.
+  if (config_ == config) {
+    return;
+  }
+
   config_ = config;
   validator_ = std::make_shared<OAuth2CookieValidator>(time_source_, config_->cookieNames(),
                                                        config_->cookieDomain());
