@@ -110,11 +110,10 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
       [&context, config, &cluster_manager](Http::FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamFilter(std::make_shared<OAuth2Filter>(
             config,
-            [&cluster_manager](
-                const FilterConfigSharedPtr& active_config) -> std::unique_ptr<OAuth2Client> {
+            [&cluster_manager](const FilterConfig& active_config) -> std::unique_ptr<OAuth2Client> {
               return std::make_unique<OAuth2ClientImpl>(
-                  cluster_manager, active_config->oauthTokenEndpoint(),
-                  active_config->retryPolicy(), active_config->defaultExpiresIn());
+                  cluster_manager, active_config.oauthTokenEndpoint(), active_config.retryPolicy(),
+                  active_config.defaultExpiresIn());
             },
             context.serverFactoryContext().timeSource(),
             context.serverFactoryContext().api().randomGenerator()));

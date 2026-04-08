@@ -148,8 +148,7 @@ struct CookieNames {
  * raw protobufs and other arbitrary data.
  */
 class FilterConfig : public Router::RouteSpecificFilterConfig,
-                     public Logger::Loggable<Logger::Id::oauth2>,
-                     public std::enable_shared_from_this<FilterConfig> {
+                     public Logger::Loggable<Logger::Id::oauth2> {
 public:
   FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
                Server::Configuration::CommonFactoryContext& context,
@@ -185,7 +184,7 @@ public:
     return !secret_reader_->hmacSecret().empty() &&
            (auth_type_ == AuthType::TlsClientAuth || !secret_reader_->clientSecret().empty());
   }
-  FilterStats& stats() { return stats_; }
+  FilterStats& stats() const { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
   const std::string& cookieDomain() const { return cookie_domain_; }
@@ -249,7 +248,7 @@ private:
   const Matchers::PathMatcher redirect_matcher_;
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
-  FilterStats stats_;
+  mutable FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> pass_through_header_matchers_;
@@ -347,8 +346,7 @@ class OAuth2Filter : public Http::PassThroughFilter,
                      FilterCallbacks,
                      Logger::Loggable<Logger::Id::oauth2> {
 public:
-  using OAuth2ClientFactory =
-      std::function<std::unique_ptr<OAuth2Client>(const FilterConfigSharedPtr&)>;
+  using OAuth2ClientFactory = std::function<std::unique_ptr<OAuth2Client>(const FilterConfig&)>;
 
   OAuth2Filter(FilterConfigSharedPtr default_config, OAuth2ClientFactory oauth_client_factory,
                TimeSource& time_source, Random::RandomGenerator& random);
@@ -402,13 +400,13 @@ private:
 
   std::unique_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr default_config_;
-  FilterConfigSharedPtr config_;
+  const FilterConfig* config_{nullptr};
   OAuth2ClientFactory oauth_client_factory_;
   TimeSource& time_source_;
   Random::RandomGenerator& random_;
 
-  FilterConfigSharedPtr getConfigForRequest() const;
-  void setActiveConfig(FilterConfigSharedPtr config);
+  const FilterConfig* getConfigForRequest() const;
+  void setActiveConfig(const FilterConfig* config);
 
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)

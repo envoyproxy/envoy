@@ -615,35 +615,33 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr default_config,
       oauth_client_factory_(std::move(oauth_client_factory)), time_source_(time_source),
       random_(random) {}
 
-FilterConfigSharedPtr OAuth2Filter::getConfigForRequest() const {
+const FilterConfig* OAuth2Filter::getConfigForRequest() const {
   const auto* route_specific_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
   if (route_specific_config != nullptr) {
-    return std::const_pointer_cast<FilterConfig>(route_specific_config->shared_from_this());
+    return route_specific_config;
   }
 
-  return default_config_;
+  return default_config_.get();
 }
 
-void OAuth2Filter::setActiveConfig(FilterConfigSharedPtr config) {
+void OAuth2Filter::setActiveConfig(const FilterConfig* config) {
   if (config == nullptr) {
-    config_.reset();
+    config_ = nullptr;
     validator_.reset();
     oauth_client_.reset();
     return;
   }
 
-  if (config_ == config && validator_ != nullptr && oauth_client_ != nullptr) {
-    return;
-  if (config == nullptr) {
+  if (config_ == config) {
     return;
   }
 
-  config_ = std::move(config);
+  config_ = config;
   validator_ = std::make_shared<OAuth2CookieValidator>(time_source_, config_->cookieNames(),
                                                        config_->cookieDomain());
 
-  oauth_client_ = oauth_client_factory_(config_);
+  oauth_client_ = oauth_client_factory_(*config_);
   oauth_client_->setCallbacks(*this);
   ASSERT(decoder_callbacks_ != nullptr);
   oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
