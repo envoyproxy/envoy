@@ -77,10 +77,10 @@ std::string buildCompositeFilterConfig(const std::string& name, bool use_inline_
 }
 
 struct CompositeFilterTestParams {
-  Network::Address::IpVersion version;
-  bool is_downstream;
-  bool is_dual_factory;
-  bool use_inline_matcher; // NEW
+  Network::Address::IpVersion version{};
+  bool is_downstream{};
+  bool is_dual_factory{};
+  bool use_inline_matcher{};
 };
 
 class CompositeFilterIntegrationTest : public testing::TestWithParam<CompositeFilterTestParams>,
