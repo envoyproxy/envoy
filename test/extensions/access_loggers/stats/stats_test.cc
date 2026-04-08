@@ -204,7 +204,7 @@ TEST(StatsAccessLogConfigTest, ValidationFailBothSet) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   envoy::extensions::access_loggers::stats::v3::Config config;
   config.set_stat_prefix("prefix");
-  config.mutable_stats_scope()->set_name("scope1");
+  config.mutable_stats_scope()->set_sharing_name("scope1");
   EXPECT_THROW_WITH_MESSAGE(
       AccessLogFactory().createAccessLogInstance(config, nullptr, context), EnvoyException,
       "Either 'stat_prefix' or 'stats_scope' must be configured, but not both.");
@@ -906,8 +906,7 @@ TEST_F(StatsAccessLoggerTest, GaugeNotSet) {
 TEST_F(StatsAccessLoggerTest, StatsScope) {
   const std::string yaml = R"EOF(
     stats_scope:
-      config:
-        max_counters: 10
+      max_counters: 10
     counters:
       - stat:
           name: counter
