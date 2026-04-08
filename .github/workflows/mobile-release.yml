@@ -210,7 +210,6 @@ jobs:
             -c opt --strip=always
             //library/python:envoy_mobile_wheel
             --//library/python:python_platform="manylinux2014_x86_64"
-            --@rules_python//python/config_settings:python_version="3.13.1"
   python-publish:
     needs: python-release
     if: >-
