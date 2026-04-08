@@ -1,3 +1,5 @@
+#pragma once
+
 // NOLINT(namespace-envoy)
 constexpr char TEST_UPSTREAMCA_CERT_256_HASH[] =
     "3595dae74d470b24845fe2c0f09406584f05b8737fe233b58558cbea1f31bbd2";
