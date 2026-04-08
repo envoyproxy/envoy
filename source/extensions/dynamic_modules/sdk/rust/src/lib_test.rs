@@ -2990,14 +2990,12 @@ fn test_bootstrap_extension_file_changed() {
     ptr: path.as_ptr() as *mut _,
     length: path.len(),
   };
-  unsafe {
-    envoy_dynamic_module_on_bootstrap_extension_file_changed(
-      std::ptr::null_mut(),
-      config_ptr,
-      path_buf,
-      FILE_WATCHER_EVENT_MOVED_TO,
-    );
-  }
+  envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    std::ptr::null_mut(),
+    config_ptr,
+    path_buf,
+    FILE_WATCHER_EVENT_MOVED_TO,
+  );
   assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_a.txt");
   assert_eq!(
     FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
@@ -3010,14 +3008,12 @@ fn test_bootstrap_extension_file_changed() {
     ptr: path2.as_ptr() as *mut _,
     length: path2.len(),
   };
-  unsafe {
-    envoy_dynamic_module_on_bootstrap_extension_file_changed(
-      std::ptr::null_mut(),
-      config_ptr,
-      path_buf2,
-      FILE_WATCHER_EVENT_MODIFIED,
-    );
-  }
+  envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    std::ptr::null_mut(),
+    config_ptr,
+    path_buf2,
+    FILE_WATCHER_EVENT_MODIFIED,
+  );
   assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_b.txt");
   assert_eq!(
     FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
