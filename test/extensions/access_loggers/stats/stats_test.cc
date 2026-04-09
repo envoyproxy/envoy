@@ -86,7 +86,8 @@ public:
 
   void initialize(std::string config_yaml = {}) {
     const std::string default_config_yaml = R"EOF(
-      stat_prefix: test_stat_prefix
+      stats_scope:
+        prefix: test_stat_prefix
       counters:
         - stat:
             name: counter
@@ -181,7 +182,8 @@ public:
 
 TEST_F(StatsAccessLoggerTest, IncorrectValueFormatter) {
   const std::string cfg = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -201,6 +203,7 @@ TEST(StatsAccessLogConfigTest, ValidationFailBothEmpty) {
       "Either 'stat_prefix' or 'stats_scope' must be configured, but not both.");
 }
 
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
 TEST(StatsAccessLogConfigTest, ValidationFailBothSet) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
@@ -212,10 +215,12 @@ TEST(StatsAccessLogConfigTest, ValidationFailBothSet) {
       AccessLogFactory().createAccessLogInstance(config, nullptr, context), EnvoyException,
       "Either 'stat_prefix' or 'stats_scope' must be configured, but not both.");
 }
+#endif
 
 TEST_F(StatsAccessLoggerTest, HistogramUnits) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: Unspecified
@@ -250,7 +255,8 @@ TEST_F(StatsAccessLoggerTest, HistogramUnits) {
 
 TEST_F(StatsAccessLoggerTest, HistogramUnitsInvalid) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: histogram
@@ -267,7 +273,8 @@ TEST_F(StatsAccessLoggerTest, HistogramUnitsInvalid) {
 
 TEST_F(StatsAccessLoggerTest, CounterBothFormatAndFixed) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -282,7 +289,8 @@ TEST_F(StatsAccessLoggerTest, CounterBothFormatAndFixed) {
 
 TEST_F(StatsAccessLoggerTest, CounterNoValueConfig) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -296,7 +304,8 @@ TEST_F(StatsAccessLoggerTest, CounterNoValueConfig) {
 // Format string resolved to empty optional (no value available).
 TEST_F(StatsAccessLoggerTest, NoValueFormatted) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -316,7 +325,8 @@ TEST_F(StatsAccessLoggerTest, NoValueFormatted) {
 // Format string resolved to a non-number string.
 TEST_F(StatsAccessLoggerTest, NonNumberValueFormatted) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: counter
@@ -335,7 +345,8 @@ TEST_F(StatsAccessLoggerTest, NonNumberValueFormatted) {
 // Format string resolved to a number string.
 TEST_F(StatsAccessLoggerTest, NumberStringValueFormatted) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -353,7 +364,8 @@ TEST_F(StatsAccessLoggerTest, NumberStringValueFormatted) {
 
 TEST_F(StatsAccessLoggerTest, CounterValueFixed) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -372,7 +384,8 @@ TEST_F(StatsAccessLoggerTest, CounterValueFixed) {
 // Histogram values are in the range 0-1.0, so ensure that fractional values work.
 TEST_F(StatsAccessLoggerTest, HistogramPercent) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: histogram
@@ -403,7 +416,8 @@ TEST_F(StatsAccessLoggerTest, HistogramPercent) {
 // Test that a tag formatter that doesn't have a value becomes an empty string.
 TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -435,7 +449,8 @@ TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
 
 TEST_F(StatsAccessLoggerTest, GaugeNonNumberValueFormatted) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -459,7 +474,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNonNumberValueFormatted) {
 // Format string resolved to a number string.
 TEST_F(StatsAccessLoggerTest, GaugeNumberValueFormatted) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -480,7 +496,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNumberValueFormatted) {
 
 TEST_F(StatsAccessLoggerTest, GaugeValueFixed) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -507,7 +524,8 @@ TEST_F(StatsAccessLoggerTest, GaugeValueFixed) {
 
 TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSet) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -528,7 +546,8 @@ TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSet) {
 
 TEST_F(StatsAccessLoggerTest, GaugeBothFormatAndFixed) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -545,7 +564,8 @@ TEST_F(StatsAccessLoggerTest, GaugeBothFormatAndFixed) {
 
 TEST_F(StatsAccessLoggerTest, GaugeNoValueConfig) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -558,7 +578,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNoValueConfig) {
 
 TEST_F(StatsAccessLoggerTest, GaugeBothSetAndAddSubtract) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -576,7 +597,8 @@ TEST_F(StatsAccessLoggerTest, GaugeBothSetAndAddSubtract) {
 
 TEST_F(StatsAccessLoggerTest, GaugeMultipleAdd) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -591,7 +613,8 @@ TEST_F(StatsAccessLoggerTest, GaugeMultipleAdd) {
 
 TEST_F(StatsAccessLoggerTest, GaugeNeitherSetNorAddSubtract) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -603,7 +626,8 @@ TEST_F(StatsAccessLoggerTest, GaugeNeitherSetNorAddSubtract) {
 
 TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -640,7 +664,8 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
 
 TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -670,7 +695,8 @@ TEST_F(StatsAccessLoggerTest, GaugeAddZeroValue) {
 
 TEST_F(StatsAccessLoggerTest, GaugeSubtractBeforeAdd) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -698,7 +724,8 @@ TEST_F(StatsAccessLoggerTest, GaugeSubtractBeforeAdd) {
 
 TEST_F(StatsAccessLoggerTest, GaugeMultipleSubAfterAdd) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -736,7 +763,8 @@ TEST_F(StatsAccessLoggerTest, GaugeMultipleSubAfterAdd) {
 
 TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -762,7 +790,8 @@ TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
 
 TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -794,7 +823,8 @@ TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
 
 TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -853,7 +883,8 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
 
 TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -894,7 +925,8 @@ TEST_F(StatsAccessLoggerTest, SameGaugeAddSubtractDefinedTwice) {
 
 TEST_F(StatsAccessLoggerTest, GaugeNotSet) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -932,7 +964,8 @@ TEST_F(StatsAccessLoggerTest, StatsScope) {
 
 TEST_F(StatsAccessLoggerTest, DropStatAction) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -963,7 +996,8 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
   logger_->log(formatter_context_, stream_info_);
 
   const std::string yaml2 = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -996,7 +1030,8 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
 
 TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: histogram
@@ -1028,7 +1063,8 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
   logger_->log(formatter_context_, stream_info_);
 
   const std::string yaml2 = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: histogram
@@ -1064,7 +1100,8 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
 
 TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTag) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -1107,7 +1144,8 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTag) {
 
 TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     counters:
       - stat:
           name: counter
@@ -1147,7 +1185,8 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
 
 TEST_F(StatsAccessLoggerTest, DropStatActionOnGauge) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -1181,7 +1220,8 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnGauge) {
   logger_->log(formatter_context_, stream_info_);
 
   const std::string yaml2 = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -1217,7 +1257,8 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnGauge) {
 
 TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnGauge) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     gauges:
       - stat:
           name: gauge
@@ -1265,7 +1306,8 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnGauge) {
 
 TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnHistogram) {
   const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
+    stats_scope:
+      prefix: test_stat_prefix
     histograms:
       - stat:
           name: histogram
