@@ -92,10 +92,10 @@ const SslExtractorsValues& SslExtractorsValues::get() {
              return CelValue::CreateString(&info.sha256PeerCertificateDigest());
            }},
           {PeerCertificate, [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
-             if (!info.peerCertificatePresented()) {
+             if (info.pemEncodedPeerCertificate().empty()) {
                return {};
              }
-             return CelValue::CreateString(&info.urlEncodedPemEncodedPeerCertificate());
+             return CelValue::CreateString(&info.pemEncodedPeerCertificate());
            }}});
 }
 
