@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.31",
-        sha256 = "e6878f21ab2c7e80d6600a4c597fe5a95f196f534a8a4b9588e35c0e8d901717",
+        version = "0.3.32",
+        sha256 = "c97a787075422f9748ff3cf28eb160b8ef8b17e27c44083205ed6473d3945ae9",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -73,8 +73,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
     ),
     openssl = dict(
-        version = "3.5.5",
-        sha256 = "b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89",
+        version = "3.5.6",
+        sha256 = "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736",
         strip_prefix = "openssl-{version}",
         urls = ["https://github.com/openssl/openssl/releases/download/openssl-{version}/openssl-{version}.tar.gz"],
     ),
