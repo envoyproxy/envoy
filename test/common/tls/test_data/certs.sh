@@ -269,6 +269,10 @@ rm -f san_dns3_cert.cfg
 # Concatenate san_dns3_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
 cat san_dns3_cert.pem intermediate_ca_cert.pem > san_dns3_chain.pem
 
+# Concatenate san_dns3_cert.pem, Root CA (ca_cert.pem, decoy), and Intermediate CA to create a chain with a decoy CA.
+# This is used to test that the correct issuer is identified even when the chain includes a CA that did not sign the leaf.
+cat san_dns3_cert.pem ca_cert.pem intermediate_ca_cert.pem > san_dns3_with_decoy_chain.pem
+
 # Generate san_dns3_certkeychain.p12 with no password.
 openssl pkcs12 -export -out san_dns3_certkeychain.p12 -inkey san_dns3_key.pem -in san_dns3_cert.pem -certfile san_dns3_chain.pem -keypbe NONE -certpbe NONE -nomaciter -passout pass:
 

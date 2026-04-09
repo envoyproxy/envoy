@@ -9,6 +9,21 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 envoy_cc_library(
+    name = "hashable_string_lib",
+    srcs = ["hashable_string.cc"],
+    hdrs = ["hashable_string.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/common:hashable_interface",
+        "//envoy/registry",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:hash_lib",
+        "//source/common/router:string_accessor_lib",
+        "@abseil-cpp//absl/types:optional",
+    ],
+)
+
+envoy_cc_library(
     name = "metadata_object_lib",
     srcs = ["metadata_object.cc"],
     hdrs = ["metadata_object.h"],
@@ -22,6 +37,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:optional",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

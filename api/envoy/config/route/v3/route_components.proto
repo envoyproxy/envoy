@@ -2392,6 +2392,9 @@ message RateLimit {
 
         // Query :ref:`route entry metadata <envoy_v3_api_field_config.route.v3.Route.metadata>`
         ROUTE_ENTRY = 1;
+
+        // Query :ref:`cluster metadata <envoy_v3_api_field_config.cluster.v3.Cluster.metadata>`
+        CLUSTER_ENTRY = 2;
       }
 
       // The key to use in the descriptor entry.

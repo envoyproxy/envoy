@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.reverse_tunnel.v3;
+
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.reverse_tunnel.v3";
+option java_outer_classname = "DrainAwareHcmProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/reverse_tunnel/v3;reverse_tunnelv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Drain-Aware HTTP Connection Manager]
+// A network filter that wraps the standard HCM and sends HTTP/2 GOAWAY frames
+// on all active connections when the listener is drained (e.g. via admin
+// /drain_listeners). Intended for use on reverse-tunnel listeners so that
+// agents can detect drain and re-establish connections gracefully.
+// [#extension: envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager]
+
+// Configuration for the drain-aware HTTP Connection Manager.
+// All HCM fields are forwarded verbatim; the only difference is that this
+// filter registers a listener-drain callback and emits a GOAWAY before the
+// connection is closed.
+message DrainAwareHttpConnectionManager {
+  // The underlying HCM configuration to apply.
+  http_connection_manager.v3.HttpConnectionManager hcm_config = 1;
+}

@@ -47,7 +47,7 @@ public:
   MOCK_METHOD(void, setNewDataAvailable, ());
   MOCK_METHOD(Buffer::Instance*, getReceiveBuffer, ());
   MOCK_METHOD(bool, canReceiveData, (), (const));
-  MOCK_METHOD(bool, isWritable, (), (const));
+  MOCK_METHOD(bool, isWriteUnblocked, (), (const));
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
   MOCK_METHOD(PassthroughStateSharedPtr, passthroughState, ());
@@ -58,7 +58,7 @@ public:
   FileEventImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
-  void setWritable() { EXPECT_CALL(io_source_, isWritable()).WillRepeatedly(Return(true)); }
+  void setWritable() { EXPECT_CALL(io_source_, isWriteUnblocked()).WillRepeatedly(Return(true)); }
   void setReadable() { EXPECT_CALL(io_source_, isReadable()).WillRepeatedly(Return(true)); }
   void setEof() { EXPECT_CALL(io_source_, hasReceivedEof()).WillRepeatedly(Return(true)); }
   void clearEventExpectation() { testing::Mock::VerifyAndClearExpectations(&io_source_); }
@@ -201,7 +201,7 @@ TEST_F(FileEventImplTest, DefaultReturnAllEnabledReadAndWriteEvents) {
     EXPECT_CALL(io_source_, isReadable())
         .WillOnce(Return((current_event & Event::FileReadyType::Read) != 0))
         .RetiresOnSaturation();
-    EXPECT_CALL(io_source_, isWritable())
+    EXPECT_CALL(io_source_, isWriteUnblocked())
         .WillOnce(Return((current_event & Event::FileReadyType::Write) != 0))
         .RetiresOnSaturation();
     auto user_file_event = std::make_unique<FileEventImpl>(

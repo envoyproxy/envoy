@@ -155,15 +155,11 @@ std::filesystem::path moduleTempPath(const absl::string_view sha256) {
   return std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
 }
 
-absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
-                                                           const absl::string_view sha256,
-                                                           const bool do_not_close,
-                                                           const bool load_globally) {
+absl::Status writeDynamicModuleBytesToDisk(const absl::string_view module_bytes,
+                                           const absl::string_view sha256) {
   std::filesystem::path temp_file_path = moduleTempPath(sha256);
 
   // Write the (already SHA256-verified) bytes to a staging file, then atomically rename.
-  // If the module was already loaded at this path, newDynamicModule's RTLD_NOLOAD check
-  // returns the existing handle without re-init.
   std::string staging_template = temp_file_path.string() + ".XXXXXX";
   int fd = mkstemp(staging_template.data());
   if (fd == -1) {
@@ -193,6 +189,20 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
   std::filesystem::permissions(staging_path, std::filesystem::perms::owner_all,
                                std::filesystem::perm_options::replace);
   std::filesystem::rename(staging_path, temp_file_path);
+  return absl::OkStatus();
+}
+
+absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
+                                                           const absl::string_view sha256,
+                                                           const bool do_not_close,
+                                                           const bool load_globally) {
+  auto status = writeDynamicModuleBytesToDisk(module_bytes, sha256);
+  if (!status.ok()) {
+    return status;
+  }
+  auto temp_file_path = moduleTempPath(sha256);
+  // If the module was already loaded at this path, newDynamicModule's RTLD_NOLOAD check
+  // returns the existing handle without re-init.
   auto result = newDynamicModule(temp_file_path, do_not_close, load_globally);
   if (!result.ok()) {
     // Clean up the invalid file.
