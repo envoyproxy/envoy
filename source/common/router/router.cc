@@ -1009,9 +1009,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // the decoding buffer and `data` may be the same object. Avoid double-counting in that case.
   const Buffer::Instance* decoding_buffer = callbacks_->decodingBuffer();
   const uint64_t payload_length =
-      (decoding_buffer != nullptr && decoding_buffer == &data)
-          ? data.length()
-          : getLength(decoding_buffer) + data.length();
+      (decoding_buffer != &data)
+          ? getLength(decoding_buffer) + data.length()
+          : data.length();
   const bool would_exceed_buffer = (payload_length > effective_buffer_limit);
 
   // Handle buffer overflow.
