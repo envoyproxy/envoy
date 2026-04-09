@@ -703,7 +703,7 @@ actions:
       - key: test
       - key: prop
     source: ROUTE_ENTRY
-  )EOF";
+)EOF";
 
   setupTest(yaml);
 
@@ -712,7 +712,7 @@ filter_metadata:
   envoy.xxx:
     test:
       prop: foo
-  )EOF";
+)EOF";
 
   TestUtility::loadFromYaml(metadata_yaml, route_->metadata_);
 
@@ -720,6 +720,93 @@ filter_metadata:
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
               testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchClusterEntrySource) {
+  const std::string yaml = R"EOF(
+actions:
+- metadata:
+    descriptor_key: fake_key
+    default_value: fake_value
+    metadata_key:
+      key: 'envoy.xxx'
+      path:
+      - key: test
+      - key: prop
+    source: CLUSTER_ENTRY
+)EOF";
+
+  setupTest(yaml);
+
+  NiceMock<Upstream::MockClusterInfo> cluster_info;
+  std::string metadata_yaml = R"EOF(
+filter_metadata:
+  envoy.xxx:
+    test:
+      prop: foo
+)EOF";
+  TestUtility::loadFromYaml(metadata_yaml, cluster_info.metadata_);
+
+  EXPECT_CALL(stream_info_, upstreamClusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>(cluster_info)));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchClusterEntrySourceMissingCluster) {
+  const std::string yaml = R"EOF(
+actions:
+- metadata:
+    descriptor_key: fake_key
+    metadata_key:
+      key: 'envoy.xxx'
+      path:
+      - key: test
+      - key: prop
+    source: CLUSTER_ENTRY
+    skip_if_absent: true
+)EOF";
+
+  setupTest(yaml);
+
+  EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::Return(absl::nullopt));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+
+  // Descriptor should be added but it will be empty because skip_if_absent is true
+  EXPECT_FALSE(descriptors_.empty());
+  EXPECT_TRUE(descriptors_[0].entries_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchClusterEntrySourceMissingMetadata) {
+  const std::string yaml = R"EOF(
+actions:
+- metadata:
+    descriptor_key: fake_key
+    metadata_key:
+      key: 'envoy.xxx'
+      path:
+      - key: test
+      - key: prop
+    source: CLUSTER_ENTRY
+    skip_if_absent: true
+)EOF";
+
+  setupTest(yaml);
+
+  NiceMock<Upstream::MockClusterInfo> cluster_info;
+  // Empty metadata
+  EXPECT_CALL(stream_info_, upstreamClusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>(cluster_info)));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+
+  // Descriptor should be added but it will be empty because skip_if_absent is true
+  EXPECT_FALSE(descriptors_.empty());
+  EXPECT_TRUE(descriptors_[0].entries_.empty());
 }
 
 // Tests that the default_value is used in the descriptor when the metadata_key is empty.

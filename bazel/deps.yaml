@@ -65,7 +65,7 @@ openssl:
   project_name: "OpenSSL"
   project_desc: "TLS/SSL and crypto library"
   project_url: "https://github.com/openssl/openssl"
-  release_date: "2026-01-27"
+  release_date: "2026-04-07"
   use_category:
   - controlplane
   - dataplane_core
