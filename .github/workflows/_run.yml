@@ -10,6 +10,7 @@ on:
       app-key:
       gpg-key:
       gpg-key-password:
+      slack-bot-token:
       ssh-key:
       ssh-key-extra:
     inputs:
@@ -138,6 +139,10 @@ on:
       skip:
         type: boolean
         default: false
+      slack-channel:
+        type: string
+        default: ''
+        description: Slack channel for failure notifications (opt-in, e.g. '#envoy-ci'). Leave empty to disable.
       source:
         type: string
       summary-post:
@@ -385,7 +390,7 @@ jobs:
       name: Configure repo Bazel settings
 
     # NOTE: This is where untrusted code can be run!!!
-    #  It MUST be the last step in the workflow
+    #  Only post-failure notification steps (which don't use any repo code) should follow this step.
     - uses: envoyproxy/toolshed/actions/github/run@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
@@ -438,3 +443,29 @@ jobs:
         MOUNT_GPG_HOME: ${{ inputs.import-gpg && 1 || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
         ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
+
+    - name: Notify Slack on failure
+      if: ${{ failure() && inputs.slack-channel != '' }}
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.slack-bot-token }}
+      run: |
+        JOB_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        curl -sf -X POST https://slack.com/api/chat.postMessage \
+          -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+          -H "Content-type: application/json" \
+          --data "$(cat <<EOF
+        {
+          "channel": "${{ inputs.slack-channel }}",
+          "text": "CI job failed: ${{ inputs.target }}",
+          "blocks": [
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": ":x: *CI job failed:* \`${{ inputs.target }}\`\n<${JOB_URL}|View workflow run>"
+              }
+            }
+          ]
+        }
+        EOF
+        )"
