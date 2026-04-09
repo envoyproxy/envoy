@@ -1138,10 +1138,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   envoy::config::listener::v3::ApiListenerManager api;
   if (!use_worker_thread_) {
-    api.set_threading_model(envoy::config::listener::v3::ApiListenerManager::MainThreadOnly);
+    api.set_threading_model(envoy::config::listener::v3::ApiListenerManager::MAIN_THREAD_ONLY);
   } else {
     api.set_threading_model(
-        envoy::config::listener::v3::ApiListenerManager::StandaloneWorkerThread);
+        envoy::config::listener::v3::ApiListenerManager::STANDALONE_WORKER_THREAD);
   }
   auto* listener_manager = bootstrap->mutable_listener_manager();
   listener_manager->mutable_typed_config()->PackFrom(api);

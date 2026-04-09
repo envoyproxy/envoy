@@ -112,7 +112,7 @@ public:
             config, server.messageValidationContext().staticValidationVisitor());
     bool use_worker_thread =
         (api_config.threading_model() ==
-         envoy::config::listener::v3::ApiListenerManager::StandaloneWorkerThread);
+         envoy::config::listener::v3::ApiListenerManager::STANDALONE_WORKER_THREAD);
     return std::make_unique<ApiListenerManagerImpl>(server, use_worker_thread);
   }
   std::string name() const override { return "envoy.listener_manager_impl.api"; }

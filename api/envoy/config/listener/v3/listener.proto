@@ -460,10 +460,10 @@ message ValidationListenerManager {
 message ApiListenerManager {
   enum ThreadingModel {
     // Handle HTTP requests on the main Envoy thread which also processes platform-raised events and runs xDS clients.
-    MainThreadOnly = 0;
+    MAIN_THREAD_ONLY = 0;
 
     // Handle HTTP requests on a standalone worker thread.
-    StandaloneWorkerThread = 1;
+    STANDALONE_WORKER_THREAD = 1;
   }
 
   // Default to MainThreadOnly.
