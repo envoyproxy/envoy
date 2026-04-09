@@ -7,6 +7,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/version/version_string.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
@@ -26,11 +27,7 @@ const std::string& VersionInfo::revisionStatus() {
   CONSTRUCT_ON_FIRST_USE(std::string, build_scm_status);
 }
 
-const std::string& VersionInfo::version() {
-  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format("{}/{}{}/{}/{}/{}", revision(),
-                                                  BUILD_VERSION_NUMBER, build_version_suffix,
-                                                  revisionStatus(), buildType(), sslVersion()));
-}
+const std::string& VersionInfo::version() { return envoyVersionString(); }
 
 const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
   static const auto* result = new envoy::config::core::v3::BuildVersion(

@@ -4,7 +4,7 @@
 
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/logger.h"
-#include "source/common/version/version.h"
+#include "source/common/version/version_string.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
@@ -244,11 +244,8 @@ TEST_P(LoggerCustomFlagsTest, LogMessageWithTagsAndExtractTags) {
 }
 
 TEST_P(LoggerCustomFlagsTest, LogMessageWithEnvoyVersion) {
-  // %E emits the Envoy version string (via VersionInfo::version()).
-  // The exact value is build-dependent; just verify it is non-empty and appears in the output.
-  const std::string& version = VersionInfo::version();
-  expectLogMessage("%E %v", "hello", absl::StrCat(version, " hello"));
-  // %E should not affect messages that don't use it.
+  // %E emits the Envoy version string from envoyVersionString().
+  expectLogMessage("%E %v", "hello", absl::StrCat(envoyVersionString(), " hello"));
   expectLogMessage("%v", "hello", "hello");
 }
 

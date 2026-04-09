@@ -222,6 +222,7 @@ envoy_cc_library(
         ":macros",
         ":non_copyable",
         "//source/common/protobuf",
+        "//source/common/version:version_string_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/synchronization",
     ] + select({

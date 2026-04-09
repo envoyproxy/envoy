@@ -48,6 +48,26 @@ genrule(
 )
 
 envoy_cc_library(
+    name = "version_string_lib",
+    srcs = ["version_string.cc"],
+    hdrs = [
+        "version_string.h",
+        ":generate_version_number",
+    ],
+    copts = select({
+        "//bazel:using_boringssl_fips": ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
+        "//bazel:using_aws_lc": ["-DENVOY_SSL_VERSION=\\\"AWS-LC-FIPS\\\""],
+        "//bazel:using_openssl": ["-DENVOY_SSL_VERSION=\\\"OpenSSL\\\""],
+        "//conditions:default": ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
+    }),
+    deps = [
+        ":version_suffix_default",
+        "//source/common/common:fmt_lib",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "version_includes",
     hdrs = [
         "version.h",
@@ -72,7 +92,7 @@ envoy_cc_library(
     tags = ["notidy"],
     deps = [
         ":version_includes",
-        ":version_suffix_default",
+        ":version_string_lib",
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
     ],

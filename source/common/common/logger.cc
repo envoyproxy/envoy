@@ -9,22 +9,13 @@
 
 #include "source/common/common/json_escape_string.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/version/version_string.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/strip.h"
 #include "spdlog/spdlog.h"
-
-namespace Envoy {
-// Forward declaration to avoid a circular BUILD dependency:
-// minimal_logger_lib -> version_lib -> protobuf -> logger_lib -> minimal_logger_lib.
-// version_lib is always linked into any Envoy binary, so the symbol is resolved at link time.
-class VersionInfo {
-public:
-  static const std::string& version();
-};
-} // namespace Envoy
 
 namespace Envoy {
 namespace Logger {
@@ -436,7 +427,7 @@ void ExtractedMessage::format(const spdlog::details::log_msg& msg, const std::tm
 
 void EnvoyVersion::format(const spdlog::details::log_msg&, const std::tm&,
                           spdlog::memory_buf_t& dest) {
-  const std::string& version = VersionInfo::version();
+  const std::string& version = envoyVersionString();
   dest.append(version.data(), version.data() + version.size());
 }
 
