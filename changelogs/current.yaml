@@ -915,6 +915,9 @@ new_features:
     DetectedCloseType::RemoteReset, enabling RST propagation through tunneled tcp_proxy.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.map_http_stream_reset_to_tcp_rst`` to false.
+- area: ratelimit
+  change: |
+    Support populating rate limit descriptors from cluster metadata.
 
 - area: contrib
   change: |
