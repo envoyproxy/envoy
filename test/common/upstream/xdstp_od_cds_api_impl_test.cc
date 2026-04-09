@@ -182,6 +182,23 @@ TEST_F(XdstpOdCdsApiImplTest, SubscriptionFailure) {
                                          &e);
 }
 
+// Tests that a config update failure with a null exception pointer is handled correctly.
+TEST_F(XdstpOdCdsApiImplTest, SubscriptionFailureNullException) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+
+  ASSERT_NE(odcds_callbacks_, nullptr);
+
+  EXPECT_CALL(cm_, addOrUpdateCluster(_, _, _)).Times(0);
+  EXPECT_CALL(notifier_, notifyMissingCluster(cluster_name));
+
+  odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         nullptr);
+}
+
 // Tests that an existing cluster is updated.
 TEST_F(XdstpOdCdsApiImplTest, ClusterUpdate) {
   InSequence s;

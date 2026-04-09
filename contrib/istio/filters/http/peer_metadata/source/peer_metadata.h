@@ -19,8 +19,10 @@ using ::Envoy::Extensions::Filters::Common::Expr::CelStatePrototype;
 using ::Envoy::Extensions::Filters::Common::Expr::CelStateType;
 
 struct HeaderValues {
+  const Http::LowerCaseString Baggage{"baggage"};
   const Http::LowerCaseString ExchangeMetadataHeader{"x-envoy-peer-metadata"};
   const Http::LowerCaseString ExchangeMetadataHeaderId{"x-envoy-peer-metadata-id"};
+  const Http::LowerCaseString ExchangeMetadataOriginNetwork{"x-forwarded-network"};
 };
 
 using Headers = ConstSingleton<HeaderValues>;
@@ -88,6 +90,24 @@ private:
   bool skipMXHeaders(const bool, const StreamInfo::StreamInfo&) const;
 };
 
+class BaggagePropagationMethod : public PropagationMethod {
+public:
+  BaggagePropagationMethod(Server::Configuration::ServerFactoryContext& factory_context,
+                           const io::istio::http::peer_metadata::Config_Baggage&);
+  void inject(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
+
+private:
+  std::string computeBaggageValue(Server::Configuration::ServerFactoryContext&) const;
+  const std::string value_;
+};
+
+class BaggageDiscoveryMethod : public DiscoveryMethod, public Logger::Loggable<Logger::Id::filter> {
+public:
+  BaggageDiscoveryMethod();
+  absl::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
+                                          Context&) const override;
+};
+
 class FilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   FilterConfig(const io::istio::http::peer_metadata::Config&,
@@ -131,7 +151,7 @@ private:
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
-class Filter : public Http::PassThroughFilter {
+class Filter : public Http::PassThroughFilter, public Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const FilterConfigSharedPtr& config) : config_(config) {}
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;

@@ -1871,18 +1871,42 @@ TEST_F(HostImplTest, Weight) {
 TEST_F(HostImplTest, HostLbPolicyData) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
-  EXPECT_TRUE(!host->lbPolicyData().has_value());
+  EXPECT_EQ(0, host->lbPolicyDataCount());
 
   class TestLbPolicyData : public Upstream::HostLbPolicyData {
   public:
+    bool receivesOrcaLoadReport() const override { return false; }
     int foo = 42;
   };
+  class AnotherTestLbPolicyData : public Upstream::HostLbPolicyData {
+  public:
+    bool receivesOrcaLoadReport() const override { return false; }
+    int bar = 7;
+  };
 
-  host->setLbPolicyData(std::make_unique<TestLbPolicyData>());
-  EXPECT_TRUE(host->lbPolicyData().has_value());
+  host->addLbPolicyData(std::make_unique<TestLbPolicyData>());
+  EXPECT_EQ(1, host->lbPolicyDataCount());
   auto test_policy_data = host->typedLbPolicyData<TestLbPolicyData>();
   EXPECT_TRUE(test_policy_data.has_value());
   EXPECT_EQ(test_policy_data->foo, 42);
+
+  host->addLbPolicyData(std::make_unique<AnotherTestLbPolicyData>());
+  EXPECT_EQ(2, host->lbPolicyDataCount());
+  auto another_test_policy_data = host->typedLbPolicyData<AnotherTestLbPolicyData>();
+  EXPECT_TRUE(another_test_policy_data.has_value());
+  EXPECT_EQ(another_test_policy_data->bar, 7);
+
+  // First type is still retrievable after adding second.
+  auto first_again = host->typedLbPolicyData<TestLbPolicyData>();
+  EXPECT_TRUE(first_again.has_value());
+  EXPECT_EQ(first_again->foo, 42);
+
+  // Absent type returns empty.
+  class UnregisteredLbPolicyData : public Upstream::HostLbPolicyData {
+  public:
+    bool receivesOrcaLoadReport() const override { return false; }
+  };
+  EXPECT_FALSE(host->typedLbPolicyData<UnregisteredLbPolicyData>().has_value());
 }
 
 TEST_F(HostImplTest, HostnameCanaryAndLocality) {
@@ -4643,6 +4667,131 @@ TEST_P(ParametrizedClusterInfoImplTest, BrokenTypedMetadata) {
   Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Cannot create a Baz when metadata is empty.");
+}
+
+// Cluster without stats matcher metadata: all stats are created normally.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherNoMetadata) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // Without a stats matcher, both connection and request stats are created.
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+// Cluster with reject_all stats matcher: no stats are instantiated.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherRejectAll) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    metadata:
+      typed_filter_metadata:
+        envoy.stats_matcher:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+          reject_all: true
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // With reject_all, no stats are created for this cluster.
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+// Cluster with stats matcher inclusion list: only stats matching the prefix are created.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherInclusionList) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    metadata:
+      typed_filter_metadata:
+        envoy.stats_matcher:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+          inclusion_list:
+            patterns:
+              - prefix: "cluster.name.upstream_cx"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // "upstream_cx_total" matches the inclusion prefix — accepted.
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  // "upstream_rq_total" does not match the inclusion prefix — rejected.
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
+}
+
+// Cluster with stats matcher exclusion list: stats matching the prefix are not created.
+TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherExclusionList) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    metadata:
+      typed_filter_metadata:
+        envoy.stats_matcher:
+          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+          exclusion_list:
+            patterns:
+              - prefix: "cluster.name.upstream_rq"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  cluster->info()->trafficStats();
+  ASSERT_NE(nullptr, cluster);
+
+  // "upstream_cx_total" does not match the exclusion prefix — accepted.
+  EXPECT_NE("", cluster->info()->statsScope().counterFromString("upstream_cx_total").name());
+  // "upstream_rq_total" matches the exclusion prefix — rejected.
+  EXPECT_EQ("", cluster->info()->statsScope().counterFromString("upstream_rq_total").name());
 }
 
 // Cluster extension protocol options fails validation when configured for an unregistered filter.

@@ -1,15 +1,19 @@
 #include "envoy/config/core/v3/address.pb.h"
+#include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/connect.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -469,6 +473,26 @@ TEST_F(SocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
   initialize();
   EXPECT_CALL(*inner_factory_, createTransportSocket(_, _)).WillOnce(testing::ReturnNull());
   ASSERT_EQ(nullptr, factory_->createTransportSocket(nullptr, nullptr));
+}
+
+class SocketConfigFactoryTest : public testing::Test {
+public:
+  void initialize() { factory_ = std::make_unique<UpstreamHttp11ConnectSocketConfigFactory>(); }
+
+  std::unique_ptr<UpstreamHttp11ConnectSocketConfigFactory> factory_;
+};
+
+// Test createTransportSocketFactory handles absent transport_socket config.
+TEST_F(SocketConfigFactoryTest, CreateSocketFactoryWithoutTransportSocket) {
+  initialize();
+
+  // Inner transport socket is absent.
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport config;
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
+  auto factory_or_error = factory_->createTransportSocketFactory(config, context);
+  EXPECT_TRUE(factory_or_error.status().ok());
+  EXPECT_NE(nullptr, factory_or_error.value());
 }
 
 TEST(ParseTest, TestValidResponse) {

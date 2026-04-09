@@ -18,12 +18,16 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/transport_sockets/http_11_proxy:connect",
+        "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/network:transport_socket_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
     ],
 )
 

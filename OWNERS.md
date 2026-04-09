@@ -41,7 +41,7 @@ routing PRs, questions, etc. to the right place.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
   * Caches, file filters, and file I/O.
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
-  * Load balancing, GeoIP, overload manager, security.
+  * Load balancing, data plane, overload manager.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
   * ext_proc, data plane, flow control, CEL.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)

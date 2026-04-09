@@ -17,6 +17,7 @@
 
 namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
+#include "test/common/tls/mock_ssl_handshaker.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
@@ -29,8 +30,10 @@ namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -38,6 +41,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
 namespace {
+
+using TransportSockets::Tls::MockSslHandshakerImpl;
 
 // Helper to create invalid HTTP that will trigger codec dispatch errors
 class HttpErrorHelper {
@@ -365,13 +370,48 @@ TEST_F(ReverseTunnelFilterUnitTest, AutoCloseConnectionsClosesAfterAccept) {
         written.append(data.toString());
         data.drain(data.length());
       }));
-  // Expect close on accept.
+  // Filter should run SSL quiet close on the connection before closing it.
+  EXPECT_CALL(callbacks_.connection_, ssl()).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+}
+
+TEST_F(ReverseTunnelFilterUnitTest, AutoCloseAppliesQuietShutdownOnTls) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_auto_close_connections(true);
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ctx, nullptr);
+  SSL* ssl = SSL_new(ctx.get());
+  ASSERT_NE(ssl, nullptr);
+  auto handshaker = std::make_shared<MockSslHandshakerImpl>(ssl);
+  EXPECT_EQ(0, SSL_get_quiet_shutdown(ssl));
+
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+
+  EXPECT_CALL(callbacks_.connection_, ssl()).WillOnce(Return(handshaker));
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  EXPECT_EQ(1, SSL_get_quiet_shutdown(ssl));
 }
 
 // Exercise RequestDecoder interface methods by obtaining the decoder via

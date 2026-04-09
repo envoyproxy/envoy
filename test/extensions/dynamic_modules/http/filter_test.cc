@@ -181,7 +181,7 @@ TEST_P(DynamicModuleHttpLanguageTests, StatsCallbacks) {
             (std::vector<uint64_t>{1}));
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -261,12 +261,14 @@ TEST_P(DynamicModuleHttpLanguageTests, HeaderCallbacks) {
   filter->initializeInModuleFilter();
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
   EXPECT_CALL(downstream_callbacks, clearRouteCache());
+  EXPECT_CALL(downstream_callbacks, refreshRouteCluster());
   EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
-      .WillOnce(testing::Return(OptRef(downstream_callbacks)));
+      .WillRepeatedly(
+          testing::Return(OptRef<DownstreamStreamFilterCallbacks>(downstream_callbacks)));
   filter->setDecoderFilterCallbacks(decoder_callbacks);
 
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
@@ -325,14 +327,14 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
 
   auto route = std::make_shared<NiceMock<Router::MockRoute>>();
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
 
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(route));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(callbacks.cluster_info_));
+  stream_info.route_ = route;
+  EXPECT_CALL(callbacks, clusterInfo()).Times(testing::AnyNumber());
 
   Envoy::Config::Metadata::mutableMetadataValue(callbacks.cluster_info_->metadata_, "metadata",
                                                 "cluster_key")
@@ -430,7 +432,7 @@ TEST_P(DynamicModuleHttpLanguageTests, FilterStateCallbacks) {
   filter->initializeInModuleFilter();
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -511,7 +513,7 @@ TEST_P(DynamicModuleHttpLanguageTests, TypedFilterStateCallbacks) {
   filter->initializeInModuleFilter();
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -526,6 +528,63 @@ TEST_P(DynamicModuleHttpLanguageTests, TypedFilterStateCallbacks) {
   ASSERT_NE(typed_value, nullptr);
   EXPECT_EQ(typed_value->serializeAsString(), "typed_value");
 
+  filter->onDestroy();
+}
+
+TEST_P(DynamicModuleTestLanguages, WillNotMoveDataAutomatically) {
+  const std::string filter_name = "foo";
+  const std::string filter_config = "bar";
+
+  const auto language = GetParam();
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config,
+          Envoy::Extensions::DynamicModules::HttpFilters::DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_store.createScope(""), context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_store.symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffered_request_data("buffered data");
+  EXPECT_CALL(decoder_callbacks, addDecodedData(_, _)).Times(0); // should not be called.
+
+  Buffer::OwnedImpl new_request_data1("new data 1"); // 10 bytes
+  EXPECT_EQ(FilterDataStatus::Continue, filter->decodeData(new_request_data1, false));
+  EXPECT_EQ(10U, new_request_data1.length());
+  Buffer::OwnedImpl new_request_data2("new data 2"); // 10 bytes
+  EXPECT_EQ(FilterDataStatus::Continue, filter->decodeData(new_request_data2, true));
+  EXPECT_EQ(10U, new_request_data2.length());
+
+  // Complete response lifecycle (needed for Rust no_op module lifecycle assertions).
+  TestResponseHeaderMapImpl response_headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl buffered_response_data("buffered data");
+  EXPECT_CALL(encoder_callbacks, addEncodedData(_, _)).Times(0); // should not be called.
+
+  Buffer::OwnedImpl new_response_data1("new data 1"); // 10 bytes
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(new_response_data1, false));
+  EXPECT_EQ(10U, new_response_data1.length());
+  Buffer::OwnedImpl new_response_data2("new data 2"); // 10 bytes
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(new_response_data2, true));
+  EXPECT_EQ(10U, new_response_data2.length());
+
+  filter->onStreamComplete();
   filter->onDestroy();
 }
 
@@ -558,12 +617,8 @@ TEST_P(DynamicModuleHttpLanguageTests, BodyCallbacks) {
   filter->setEncoderFilterCallbacks(encoder_callbacks);
   Buffer::OwnedImpl request_body;
   EXPECT_CALL(decoder_callbacks, decodingBuffer()).WillRepeatedly(testing::Return(&request_body));
-  EXPECT_CALL(decoder_callbacks, addDecodedData(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> void {}));
   Buffer::OwnedImpl response_body;
   EXPECT_CALL(encoder_callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&response_body));
-  EXPECT_CALL(encoder_callbacks, addEncodedData(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> void {}));
   EXPECT_CALL(decoder_callbacks, modifyDecodingBuffer(_))
       .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(request_body);

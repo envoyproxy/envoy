@@ -1,0 +1,39 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "regex"
+    domains: "regex.lyft.com"
+    routes {
+      match {
+        safe_regex {
+          regex: "/regex"
+        }
+      }
+      route {
+        cluster: "some-cluster"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "regex.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/regex"
+  }
+  headers {
+    key: ":scheme"
+    value: "https"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "https"
+  }
+  headers {
+    key: "x-envoy-internal"
+    value: "false"
+  }
+}
