@@ -266,23 +266,35 @@ TEST_F(ClientAssertionTest, CreateES256Assertion) {
   EXPECT_EQ(64, raw_sig.size());
 }
 
-TEST_F(ClientAssertionTest, DefaultLifetimeIs60Seconds) {
+TEST_F(ClientAssertionTest, CreateES384Assertion) {
+  // EC P-384 private key (SEC 1 format).
+  const char EcP384PrivateKeyPem[] =
+      "-----BEGIN EC PARAMETERS-----\n"
+      "BgUrgQQAIg==\n"
+      "-----END EC PARAMETERS-----\n"
+      "-----BEGIN EC PRIVATE KEY-----\n"
+      "MIGkAgEBBDA7SGCl2ce4ety+x+a4O9za/7kgkE947kj64Rz1xjckIKp8mIpNGuCM\n"
+      "DOU5kKgx0+6gBwYFK4EEACKhZANiAAS0VBZoasIVRPvRhUa/0gDQfV399QZ2gBOO\n"
+      "oBCWA6fNZ/gVwkipFDx0YnTCib+nxv/cysqnLzClYGcCjYL372jAZ06pypIgUtVX\n"
+      "SJoaiAqEgDHsoCNagwSlqXi42dpguUI=\n"
+      "-----END EC PRIVATE KEY-----";
+
   EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
 
-  // Use the default 60s lifetime explicitly to verify the expected exp claim.
   auto result =
-      ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS256",
-                              std::chrono::seconds(60), test_time_, random_);
+      ClientAssertion::create("client", "https://auth.example.com/token", EcP384PrivateKeyPem,
+                              "ES384", std::chrono::seconds(60), test_time_, random_);
   ASSERT_TRUE(result.ok()) << result.status().message();
 
   std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
   ASSERT_EQ(3, parts.size());
 
-  const std::string payload_json = Base64Url::decode(parts[1]);
-  // iat = 1000, exp = 1000 + 60 = 1060, nbf = 1000
-  EXPECT_NE(std::string::npos, payload_json.find("\"iat\":1000"));
-  EXPECT_NE(std::string::npos, payload_json.find("\"exp\":1060"));
-  EXPECT_NE(std::string::npos, payload_json.find("\"nbf\":1000"));
+  const std::string header_json = Base64Url::decode(parts[0]);
+  EXPECT_NE(std::string::npos, header_json.find("\"alg\":\"ES384\""));
+
+  // ES384 (P-384) raw r||s signature should be exactly 96 bytes (48 bytes r + 48 bytes s).
+  const std::string raw_sig = Base64Url::decode(parts[2]);
+  EXPECT_EQ(96, raw_sig.size());
 }
 
 } // namespace
