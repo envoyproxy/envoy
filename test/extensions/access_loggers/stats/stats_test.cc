@@ -17,6 +17,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/hash/hash_testing.h"
@@ -201,6 +202,8 @@ TEST(StatsAccessLogConfigTest, ValidationFailBothEmpty) {
 }
 
 TEST(StatsAccessLogConfigTest, ValidationFailBothSet) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   envoy::extensions::access_loggers::stats::v3::Config config;
   config.set_stat_prefix("prefix");

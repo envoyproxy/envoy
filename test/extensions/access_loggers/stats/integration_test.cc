@@ -50,7 +50,8 @@ TEST_P(StatsAccessLogIntegrationTest, Basic) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 counters:
                   - stat:
                       name: fixedcounter
@@ -105,7 +106,8 @@ TEST_P(StatsAccessLogIntegrationTest, Concurrency) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 counters:
                   - stat:
                       name: formatcounter
@@ -150,7 +152,8 @@ TEST_P(StatsAccessLogIntegrationTest, PercentHistogram) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 histograms:
                   - stat:
                       name: testhistogram
@@ -186,7 +189,8 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 gauges:
                   - stat:
                       name: active_requests
@@ -238,7 +242,8 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
                   types: [DownstreamEnd]
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 gauges:
                   - stat:
                       name: active_requests
@@ -280,7 +285,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeInterleavedOpsWithEviction) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 gauges:
                   - stat:
                       name: active_requests
@@ -369,7 +375,8 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGaugeEvictedWhileInflight) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 gauges:
                   - stat:
                       name: active_requests
@@ -440,7 +447,8 @@ TEST_P(StatsAccessLogIntegrationTest, GaugeCleanupOnDestructor) {
               name: envoy.access_loggers.stats
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
+                stats_scope:
+                  prefix: test_stat_prefix
                 gauges:
                   - stat:
                       name: active_requests
@@ -560,7 +568,8 @@ typed_config:
     - name: envoy.access_loggers.stats
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-        stat_prefix: test_stat_prefix
+        stats_scope:
+          prefix: test_stat_prefix
         gauges:
           - stat:
               name: active_connections

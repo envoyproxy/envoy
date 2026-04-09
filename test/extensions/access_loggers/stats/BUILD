@@ -44,6 +44,7 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/hash:hash_testing",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
