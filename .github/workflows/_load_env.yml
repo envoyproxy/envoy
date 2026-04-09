@@ -1,3 +1,4 @@
+
 name: Request/load
 
 permissions:
@@ -60,6 +61,7 @@ jobs:
     outputs:
       build-image: ${{ toJSON(fromJSON(steps.env.outputs.data).request.build-image) }}
       build-image-mobile: ${{ fromJSON(steps.env.outputs.data).request.build-image-mobile }}
+      caches: ${{ steps.caches.outputs.value }}
       request: ${{ steps.env.outputs.data }}
       trusted: true
     steps:
@@ -101,6 +103,33 @@ jobs:
         ref: ${{ fromJSON(steps.env.outputs.data).request.ref }}
         sha: ${{ fromJSON(steps.env.outputs.data).request.sha }}
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
+        
+    - name: Check Docker cache (x64)
+      id: cache-exists-docker-x64
+      uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
+      with:
+        lookup-only: true
+        path: /tmp/cache
+        key: ${{ fromJSON(steps.env.outputs.data).request.build-image.default }}-x64
+        
+    - name: Check Docker cache (arm64)
+      id: cache-exists-docker-arm64
+      uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
+      with:
+        lookup-only: true
+        path: /tmp/cache
+        key: ${{ fromJSON(steps.env.outputs.data).request.build-image.default }}-arm64
+
+    - name: Caches
+      uses: envoyproxy/toolshed/actions/jq@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+      id: caches
+      with:
+        input-format: yaml
+        filter: .
+        input: |
+          docker:
+            x64: "${{ steps.cache-exists-docker-x64.outputs.cache-hit || 'false' }}"
+            arm64: "${{ steps.cache-exists-docker-arm64.outputs.cache-hit || 'false' }}"
 
   cache:
     secrets:
@@ -110,5 +139,5 @@ jobs:
     needs: request
     if: ${{ inputs.cache-docker }}
     with:
-      request: ${{ toJSON(needs.request.outputs) }}
+      caches: ${{ needs.request.outputs.caches }}
       image-tag: ${{ fromJSON(needs.request.outputs.build-image).default }}
