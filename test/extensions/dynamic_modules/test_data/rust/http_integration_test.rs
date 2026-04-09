@@ -787,7 +787,7 @@ impl SendResponseHttpFilterConfig {
       b"on_request_headers" => SendResponseHttpFilter::RequestHeader,
       b"on_request_body" => SendResponseHttpFilter::RequestBody,
       b"on_response_headers" => SendResponseHttpFilter::ResponseHeader,
-      _ => panic!("Unknown filter name: {:?}", config),
+      _ => panic!("Unknown filter name: {config:?}"),
     };
     Self { f }
   }

@@ -1065,29 +1065,17 @@ impl<EHF: EnvoyHttpFilter> std::io::Write for BodyWriter<'_, EHF> {
     if self.request {
       if self.received {
         if !self.envoy_filter.append_received_request_body(buf) {
-          return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Buffer is not available",
-          ));
+          return Err(std::io::Error::other("Buffer is not available"));
         }
       } else if !self.envoy_filter.append_buffered_request_body(buf) {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          "Buffer is not available",
-        ));
+        return Err(std::io::Error::other("Buffer is not available"));
       }
     } else if self.received {
       if !self.envoy_filter.append_received_response_body(buf) {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          "Buffer is not available",
-        ));
+        return Err(std::io::Error::other("Buffer is not available"));
       }
     } else if !self.envoy_filter.append_buffered_response_body(buf) {
-      return Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "Buffer is not available",
-      ));
+      return Err(std::io::Error::other("Buffer is not available"));
     }
 
     Ok(buf.len())
