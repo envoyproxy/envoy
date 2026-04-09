@@ -578,6 +578,7 @@ EXTENSIONS = {
     # Load balancing policies for upstream
     #
     "envoy.load_balancing_policies.least_request":     "//source/extensions/load_balancing_policies/least_request:config",
+    "envoy.load_balancing_policies.load_aware_locality": "//source/extensions/load_balancing_policies/load_aware_locality:config",
     "envoy.load_balancing_policies.random":            "//source/extensions/load_balancing_policies/random:config",
     "envoy.load_balancing_policies.round_robin":       "//source/extensions/load_balancing_policies/round_robin:config",
     "envoy.load_balancing_policies.maglev":            "//source/extensions/load_balancing_policies/maglev:config",
