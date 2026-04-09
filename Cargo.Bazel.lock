@@ -1,5 +1,5 @@
 {
-  "checksum": "34fdc9d46c59177eae589e3f49ffa469b4ac61ba3b74774200be9594b2097f13",
+  "checksum": "8a020cdfb525b78c43df9dea09dc5c99c34712aa21a6a985feb2ec220306924a",
   "crates": {
     "aho-corasick 1.1.4": {
       "name": "aho-corasick",
@@ -1047,14 +1047,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "deranged 0.3.11": {
+    "deranged 0.5.8": {
       "name": "deranged",
-      "version": "0.3.11",
+      "version": "0.5.8",
       "package_url": "https://github.com/jhpratt/deranged",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/deranged/0.3.11/download",
-          "sha256": "b42b6fa04a440b495c8b04d0e71b707c585f83cb9cb28cf8cd0d976c315e31b4"
+          "url": "https://static.crates.io/crates/deranged/0.5.8/download",
+          "sha256": "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
         }
       },
       "targets": [
@@ -1078,9 +1078,8 @@
         ],
         "crate_features": {
           "common": [
-            "alloc",
-            "powerfmt",
-            "std"
+            "default",
+            "powerfmt"
           ],
           "selects": {}
         },
@@ -1094,7 +1093,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.3.11"
+        "version": "0.5.8"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -1329,7 +1328,7 @@
               "target": "serde_json"
             },
             {
-              "id": "time 0.3.36",
+              "id": "time 0.3.47",
               "target": "time"
             },
             {
@@ -2717,7 +2716,7 @@
               "target": "thiserror"
             },
             {
-              "id": "time 0.3.36",
+              "id": "time 0.3.47",
               "target": "time"
             },
             {
@@ -4817,14 +4816,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "num-conv 0.1.0": {
+    "num-conv 0.2.1": {
       "name": "num-conv",
-      "version": "0.1.0",
+      "version": "0.2.1",
       "package_url": "https://github.com/jhpratt/num-conv",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/num-conv/0.1.0/download",
-          "sha256": "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
+          "url": "https://static.crates.io/crates/num-conv/0.2.1/download",
+          "sha256": "c6673768db2d862beb9b39a78fdcb1a69439615d5794a1be50caa9bc92c81967"
         }
       },
       "targets": [
@@ -4847,7 +4846,7 @@
           "**"
         ],
         "edition": "2021",
-        "version": "0.1.0"
+        "version": "0.2.1"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -7872,14 +7871,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "time 0.3.36": {
+    "time 0.3.47": {
       "name": "time",
-      "version": "0.3.36",
+      "version": "0.3.47",
       "package_url": "https://github.com/time-rs/time",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/time/0.3.36/download",
-          "sha256": "5dfd88e563464686c916c7e46e623e520ddc6d79fa6641390f2e3fa86e83e885"
+          "url": "https://static.crates.io/crates/time/0.3.47/download",
+          "sha256": "743bd48c283afc0388f9b8827b976905fb217ad9e647fae3a379a9283c4def2c"
         }
       },
       "targets": [
@@ -7912,11 +7911,11 @@
         "deps": {
           "common": [
             {
-              "id": "deranged 0.3.11",
+              "id": "deranged 0.5.8",
               "target": "deranged"
             },
             {
-              "id": "num-conv 0.1.0",
+              "id": "num-conv 0.2.1",
               "target": "num_conv"
             },
             {
@@ -7924,14 +7923,14 @@
               "target": "powerfmt"
             },
             {
-              "id": "time-core 0.1.2",
+              "id": "time-core 0.1.8",
               "target": "time_core"
             }
           ],
           "selects": {}
         },
-        "edition": "2021",
-        "version": "0.3.36"
+        "edition": "2024",
+        "version": "0.3.47"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -7940,14 +7939,14 @@
       ],
       "license_file": "LICENSE-Apache"
     },
-    "time-core 0.1.2": {
+    "time-core 0.1.8": {
       "name": "time-core",
-      "version": "0.1.2",
+      "version": "0.1.8",
       "package_url": "https://github.com/time-rs/time",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/time-core/0.1.2/download",
-          "sha256": "ef927ca75afb808a4d64dd374f00a2adf8d0fcff8e7b184af886c3c87ec4a3f3"
+          "url": "https://static.crates.io/crates/time-core/0.1.8/download",
+          "sha256": "7694e1cfe791f8d31026952abf09c69ca6f6fa4e1a1229e18988f06a04a12dca"
         }
       },
       "targets": [
@@ -7969,8 +7968,8 @@
         "compile_data_glob": [
           "**"
         ],
-        "edition": "2021",
-        "version": "0.1.2"
+        "edition": "2024",
+        "version": "0.1.8"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -12018,7 +12017,7 @@
     "mockall 0.13.1",
     "serde 1.0.228",
     "serde_json 1.0.149",
-    "time 0.3.36",
+    "time 0.3.47",
     "tokio 1.50.0",
     "url 2.5.8"
   ],
