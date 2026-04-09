@@ -30,6 +30,7 @@ envoy_cc_library(
 envoy_cc_contrib_extension(
     name = "config",
     deps = [
+        "//contrib/reverse_tunnel_reporter/source/clients:clients_lib",
         "//contrib/reverse_tunnel_reporter/source/reporters:reporters_lib",
     ],
 )
