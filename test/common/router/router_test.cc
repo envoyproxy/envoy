@@ -5466,12 +5466,11 @@ TEST_F(RouterTest, InternalRedirectNoDoubleCountWhenDecodingBufferIsData) {
   Buffer::OwnedImpl body_data("fifteen_bytes!!");
   ASSERT_EQ(15, body_data.length());
 
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
-      .WillRepeatedly(Return(20));
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(20));
   // Return a pointer to the SAME buffer to simulate the buffer filter having
   // already buffered the data into the shared decoding buffer.
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&body_data));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(1);
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
 
   enableRedirects();
   sendRequest(false);

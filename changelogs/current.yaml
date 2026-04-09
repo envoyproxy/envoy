@@ -135,6 +135,11 @@ bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: router
   change: |
+    Fixed a bug where the router's buffer overflow check double-counted the request body size when an
+    upstream filter (e.g. the buffer filter) had already buffered all data. This caused requests with
+    body size between half and full buffer limit to incorrectly cancel internal redirects.
+- area: router
+  change: |
     Fixed a crash in scoped RDS when on-demand update is triggered for a scope that uses inline
     ``route_configuration`` instead of ``route_configuration_name``. The null RDS provider dereference
     is now guarded and the on-demand callback returns false for inline-config scopes.
