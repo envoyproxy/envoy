@@ -3167,11 +3167,17 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
       Http::Protocol::Http2, time_system, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain};
   stream_info_no_requested_name.setRequestHeaders(request_header);
 
+  Http::TestRequestHeaderMapImpl empty_request_header;
+  StreamInfo::StreamInfoImpl stream_info_no_requested_name_no_headers{
+      Http::Protocol::Http2, time_system, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain};
+  stream_info_no_requested_name_no_headers.setRequestHeaders(empty_request_header);
+
   {
     auto providers = *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME%"));
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3180,6 +3186,7 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3188,6 +3195,7 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3196,6 +3204,7 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3204,6 +3213,16 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST:ORIG)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3212,6 +3231,16 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(HOST_FIRST:ORIG)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 
   {
@@ -3220,6 +3249,7 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name_no_headers));
   }
 }
 

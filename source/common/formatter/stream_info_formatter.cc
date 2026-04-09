@@ -723,20 +723,29 @@ absl::optional<std::string> RequestedServerNameFormatter::getSNIFromStreamInfo(
 absl::optional<std::string>
 RequestedServerNameFormatter::getHostFromHeaders(const StreamInfo::StreamInfo& stream_info) const {
   absl::optional<std::string> result;
-  const auto& headers = stream_info.getRequestHeaders();
+  const auto* headers = stream_info.getRequestHeaders();
   if (headers != nullptr) {
     switch (option_) {
-    case HostOnly:
-      result = headers->Host()->value().getStringView();
+    case HostOnly: {
+      if (auto host = headers->Host(); host != nullptr) {
+        result = host->value().getStringView();
+      }
       break;
-    case OriginalHostOnly:
-      result = headers->EnvoyOriginalHost()->value().getStringView();
+    }
+    case OriginalHostOnly: {
+      if (auto orig = headers->EnvoyOriginalHost(); orig != nullptr) {
+        result = orig->value().getStringView();
+      }
       break;
-    case OriginalHostOrHost:
-      result = headers->EnvoyOriginalHost() != nullptr
-                   ? headers->EnvoyOriginalHost()->value().getStringView()
-                   : headers->Host()->value().getStringView();
+    }
+    case OriginalHostOrHost: {
+      if (auto orig = headers->EnvoyOriginalHost(); orig != nullptr) {
+        result = orig->value().getStringView();
+      } else if (auto host = headers->Host(); host != nullptr) {
+        result = host->value().getStringView();
+      }
       break;
+    }
     }
   }
   return result;
