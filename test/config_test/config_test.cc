@@ -16,6 +16,7 @@
 #include "source/server/options_impl.h"
 
 #include "test/integration/server.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_component_factory.h"
 #include "test/mocks/server/worker.h"
