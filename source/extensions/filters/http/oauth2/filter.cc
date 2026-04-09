@@ -477,6 +477,12 @@ FilterConfig::FilterConfig(
                                                              DEFAULT_CSRF_TOKEN_EXPIRES_IN)),
       code_verifier_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
           proto_config, code_verifier_token_expires_in, DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN)),
+      jwt_signing_algorithm_(proto_config.has_private_key_jwt() &&
+                                     !proto_config.private_key_jwt().signing_algorithm().empty()
+                                 ? proto_config.private_key_jwt().signing_algorithm()
+                                 : "RS256"),
+      jwt_assertion_lifetime_(std::chrono::seconds(
+          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config.private_key_jwt(), assertion_lifetime, 60))),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
@@ -484,12 +490,6 @@ FilterConfig::FilterConfig(
       disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
       disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()),
       disable_token_encryption_(proto_config.disable_token_encryption()),
-      jwt_signing_algorithm_(proto_config.has_private_key_jwt() &&
-                                     !proto_config.private_key_jwt().signing_algorithm().empty()
-                                 ? proto_config.private_key_jwt().signing_algorithm()
-                                 : "RS256"),
-      jwt_assertion_lifetime_(std::chrono::seconds(
-          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config.private_key_jwt(), assertion_lifetime, 60))),
       bearer_token_cookie_settings_(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_bearer_token_cookie_config())
@@ -786,7 +786,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       // try to update access token by refresh token
       auto client_credential = getClientCredential();
       if (!client_credential.ok()) {
-        sendUnauthorizedResponse(fmt::format("Failed to create client assertion: {}",
+        sendUnauthorizedResponse(fmt::format("Failed to obtain client credential: {}",
                                              client_credential.status().message()));
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -852,8 +852,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   auto client_credential = getClientCredential();
   if (!client_credential.ok()) {
-    sendUnauthorizedResponse(
-        fmt::format("Failed to create client assertion: {}", client_credential.status().message()));
+    sendUnauthorizedResponse(fmt::format("Failed to obtain client credential: {}",
+                                         client_credential.status().message()));
     return Http::FilterHeadersStatus::StopIteration;
   }
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), client_credential.value(),

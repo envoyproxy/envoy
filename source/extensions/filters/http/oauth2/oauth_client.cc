@@ -93,8 +93,9 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   case AuthType::PrivateKeyJwt:
     // For private_key_jwt, the secret parameter contains the pre-built JWT assertion.
     body = fmt::format(UrlBodyTemplateWithAssertionForAuthCode, auth_code,
-                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"), secret,
-                       encoded_cb_url, code_verifier);
+                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"),
+                       Http::Utility::PercentEncoding::encode(secret, ":/=&?"), encoded_cb_url,
+                       code_verifier);
     break;
   }
 
@@ -141,7 +142,8 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
     // For private_key_jwt, the secret parameter contains the pre-built JWT assertion.
     body = fmt::format(UrlBodyTemplateWithAssertionForRefreshToken,
                        Http::Utility::PercentEncoding::encode(refresh_token, ":/=&?"),
-                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"), secret);
+                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"),
+                       Http::Utility::PercentEncoding::encode(secret, ":/=&?"));
     break;
   }
 

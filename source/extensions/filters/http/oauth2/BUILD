@@ -44,6 +44,7 @@ envoy_cc_library(
     name = "client_assertion_lib",
     srcs = ["client_assertion.cc"],
     hdrs = ["client_assertion.h"],
+    external_deps = ["ssl"],
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/crypto:utility_lib",

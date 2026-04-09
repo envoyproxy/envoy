@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <string>
 
@@ -14,7 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 
-inline constexpr absl::string_view kSupportedPrivateKeyJwtAlgorithms[] = {
+inline constexpr std::array<absl::string_view, 6> kSupportedPrivateKeyJwtAlgorithms = {
     "RS256", "RS384", "RS512", "ES256", "ES384", "ES512"};
 
 /**

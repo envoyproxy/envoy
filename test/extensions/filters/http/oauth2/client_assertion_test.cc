@@ -20,6 +20,17 @@ namespace HttpFilters {
 namespace Oauth2 {
 namespace {
 
+// EC P-256 private key for testing (SEC 1 format).
+const char EcP256PrivateKeyPem[] =
+    "-----BEGIN EC PARAMETERS-----\n"
+    "BggqhkjOPQMBBw==\n"
+    "-----END EC PARAMETERS-----\n"
+    "-----BEGIN EC PRIVATE KEY-----\n"
+    "MHcCAQEEICPNKnvfgPAhjnjnMlUySprYpl6SNTmzFIxKGi6+aTqCoAoGCCqGSM49\n"
+    "AwEHoUQDQgAEL3Oq1iNuYLd+J1DTtB+YW6/zqtpKnfIvrqVHQopvtlPUxCz4+geW\n"
+    "YLBQLvjIJoURlW2ay5X/cQTeruuUIZk1NQ==\n"
+    "-----END EC PRIVATE KEY-----";
+
 // RSA private key for testing (PKCS#8 format).
 const char RsaPrivateKeyPem[] = "-----BEGIN PRIVATE KEY-----\n"
                                 "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDOeQHCllT34E4I\n"
@@ -86,9 +97,10 @@ TEST_F(ClientAssertionTest, CreateRS256Assertion) {
   EXPECT_NE(std::string::npos, payload_json.find("\"sub\":\"my-client-id\""));
   EXPECT_NE(std::string::npos, payload_json.find("\"aud\":\"https://auth.example.com/token\""));
   EXPECT_NE(std::string::npos, payload_json.find("\"jti\":\"test-jti-uuid\""));
-  // iat = 1000, exp = 1060
+  // iat = 1000, exp = 1060, nbf = 1000
   EXPECT_NE(std::string::npos, payload_json.find("\"iat\":1000"));
   EXPECT_NE(std::string::npos, payload_json.find("\"exp\":1060"));
+  EXPECT_NE(std::string::npos, payload_json.find("\"nbf\":1000"));
 
   // Signature should not be empty.
   EXPECT_FALSE(parts[2].empty());
@@ -221,6 +233,56 @@ TEST_F(ClientAssertionTest, TwoAssertionsHaveDifferentJti) {
   const std::string payload2 = Base64Url::decode(parts2[1]);
   EXPECT_NE(std::string::npos, payload1.find("\"jti\":\"uuid-1\""));
   EXPECT_NE(std::string::npos, payload2.find("\"jti\":\"uuid-2\""));
+}
+
+TEST_F(ClientAssertionTest, CreateES256Assertion) {
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
+
+  auto result =
+      ClientAssertion::create("my-client-id", "https://auth.example.com/token", EcP256PrivateKeyPem,
+                              "ES256", std::chrono::seconds(60), test_time_, random_);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  const std::string& jwt = result.value();
+
+  // JWT should have three parts separated by dots.
+  std::vector<std::string> parts = absl::StrSplit(jwt, '.');
+  ASSERT_EQ(3, parts.size());
+
+  // Decode and verify header.
+  const std::string header_json = Base64Url::decode(parts[0]);
+  EXPECT_NE(std::string::npos, header_json.find("\"alg\":\"ES256\""));
+  EXPECT_NE(std::string::npos, header_json.find("\"typ\":\"JWT\""));
+
+  // Decode and verify payload claims.
+  const std::string payload_json = Base64Url::decode(parts[1]);
+  EXPECT_NE(std::string::npos, payload_json.find("\"iss\":\"my-client-id\""));
+  EXPECT_NE(std::string::npos, payload_json.find("\"sub\":\"my-client-id\""));
+  EXPECT_NE(std::string::npos, payload_json.find("\"aud\":\"https://auth.example.com/token\""));
+  EXPECT_NE(std::string::npos, payload_json.find("\"nbf\":1000"));
+
+  // ES256 (P-256) raw r||s signature should be exactly 64 bytes (32 bytes r + 32 bytes s).
+  const std::string raw_sig = Base64Url::decode(parts[2]);
+  EXPECT_EQ(64, raw_sig.size());
+}
+
+TEST_F(ClientAssertionTest, DefaultLifetimeIs60Seconds) {
+  EXPECT_CALL(random_, uuid()).WillOnce(Return("test-jti-uuid"));
+
+  // Use the default 60s lifetime explicitly to verify the expected exp claim.
+  auto result =
+      ClientAssertion::create("client", "https://auth.example.com/token", RsaPrivateKeyPem, "RS256",
+                              std::chrono::seconds(60), test_time_, random_);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  std::vector<std::string> parts = absl::StrSplit(result.value(), '.');
+  ASSERT_EQ(3, parts.size());
+
+  const std::string payload_json = Base64Url::decode(parts[1]);
+  // iat = 1000, exp = 1000 + 60 = 1060, nbf = 1000
+  EXPECT_NE(std::string::npos, payload_json.find("\"iat\":1000"));
+  EXPECT_NE(std::string::npos, payload_json.find("\"exp\":1060"));
+  EXPECT_NE(std::string::npos, payload_json.find("\"nbf\":1000"));
 }
 
 } // namespace

@@ -265,6 +265,9 @@ private:
   const std::chrono::seconds default_refresh_token_expires_in_;
   const std::chrono::seconds csrf_token_expires_in_;
   const std::chrono::seconds code_verifier_token_expires_in_;
+  // Always initialized even for non-JWT auth types; minimal overhead (a string + 8 bytes).
+  const std::string jwt_signing_algorithm_;
+  const std::chrono::seconds jwt_assertion_lifetime_;
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
@@ -272,8 +275,6 @@ private:
   const bool disable_access_token_set_cookie_ : 1;
   const bool disable_refresh_token_set_cookie_ : 1;
   const bool disable_token_encryption_ : 1;
-  const std::string jwt_signing_algorithm_;
-  const std::chrono::seconds jwt_assertion_lifetime_;
   Router::RetryPolicyConstSharedPtr retry_policy_;
   const CookieSettings bearer_token_cookie_settings_;
   const CookieSettings hmac_cookie_settings_;
