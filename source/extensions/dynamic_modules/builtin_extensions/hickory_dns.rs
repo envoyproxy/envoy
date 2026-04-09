@@ -116,7 +116,7 @@ fn parse_proto_duration(s: &str) -> Option<std::time::Duration> {
   if let Some(stripped) = s.strip_suffix('s') {
     if let Some((whole, frac)) = stripped.split_once('.') {
       let secs: u64 = whole.parse().ok()?;
-      let nanos: u32 = format!("{:0<9}", frac)[.. 9].parse().ok()?;
+      let nanos: u32 = format!("{:0<9}", frac)[..9].parse().ok()?;
       Some(std::time::Duration::new(secs, nanos))
     } else {
       let secs: u64 = stripped.parse().ok()?;

@@ -41,6 +41,7 @@ paths:
   - bazel/external/http_parser/
   - bazel/rbe/toolchains/configs/
   - bazel-
+  - compat/openssl/
   - build
   - contrib/contrib_build_config.bzl
   - examples/wasm-cc
@@ -104,6 +105,7 @@ paths:
     - source/extensions/watchdog/profile_action/config.cc
     - source/common/router/route_config_update_receiver_impl.cc
     - source/common/upstream/upstream_impl.cc
+    - source/common/matcher/actions/string_returning_action.cc
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
@@ -332,6 +334,8 @@ paths:
     - contrib/istio/filters/network/metadata_exchange/source/metadata_exchange.cc
     - contrib/istio/filters/network/metadata_exchange/test/metadata_exchange_test.cc
     - contrib/istio/filters/http/peer_metadata/source/peer_metadata.cc
+    - contrib/istio/filters/network/peer_metadata/source/peer_metadata.cc
+    - contrib/istio/filters/network/peer_metadata/test/peer_metadata_test.cc
     - source/common/protobuf/utility.h
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc

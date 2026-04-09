@@ -222,6 +222,13 @@ message Listener {
       [(validate.rules).duration = {gte {}}];
 
   // Listener metadata.
+  //
+  // The following pre-defined metadata could be used by Envoy to manipulate the listener behavior:
+  //
+  // * ``envoy.stats_matcher``: this metadata could be used to customize the stats emitted by the
+  //   listener. See :ref:`well-known metadata <well_known_metadata_envoy_stats_matcher>` for more
+  //   details.
+  //
   core.v3.Metadata metadata = 6;
 
   // [#not-implemented-hide:]

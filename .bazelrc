@@ -235,6 +235,15 @@ common:aws-lc-fips --@envoy//bazel:ssl=@aws_lc//:ssl
 common:aws-lc-fips --@envoy//bazel:crypto=@aws_lc//:crypto
 common:aws-lc-fips --@envoy//bazel:http3=False
 
+# OpenSSL
+common:openssl --//bazel:ssl=//compat/openssl:ssl
+common:openssl --//bazel:crypto=//compat/openssl:crypto
+common:openssl --copt=-DENVOY_SSL_OPENSSL
+common:openssl --host_copt=-DENVOY_SSL_OPENSSL
+common:openssl --@envoy//bazel:http3=False
+common:openssl --test_tag_filters=-nofips
+common:openssl --build_tag_filters=-nofips
+
 
 #############################################################################
 # sanitizers
@@ -385,7 +394,7 @@ build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Clang-tidy
 build:clang-tidy --@envoy_toolshed//format/clang_tidy:executable=@envoy//tools/clang-tidy
-build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=//:clang_tidy_config
+build:clang-tidy --@envoy_toolshed//format/clang_tidy:config=@envoy//:clang_tidy_config
 build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 build:clang-tidy --output_groups=report
 build:clang-tidy --build_tag_filters=-notidy
