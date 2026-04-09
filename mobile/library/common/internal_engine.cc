@@ -193,7 +193,15 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
         }
       }
 
-      main_common = std::make_unique<EngineCommon>(options);
+      main_common = std::make_unique<EngineCommon>(options, [this]() {
+        if (use_worker_thread_) {
+          auto* api_mgr =
+              dynamic_cast<Server::ApiListenerManagerImpl*>(&server_->listenerManager());
+          ASSERT(api_mgr != nullptr);
+          http_client_handle_ = &api_mgr->httpClient();
+          request_dispatcher_->drain(api_mgr->httpClientDispatcher());
+        }
+      });
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
 
@@ -276,17 +284,6 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           callbacks_->on_engine_running_();
         });
   } // mutex_
-  if (use_worker_thread_) {
-    startup_callback_handler_ = main_common->server()->lifecycleNotifier().registerCallback(
-        Envoy::Server::ServerLifecycleNotifier::Stage::Startup, [this]() -> void {
-          ASSERT(Thread::MainThread::isMainOrTestThread());
-          auto* api_mgr =
-              dynamic_cast<Server::ApiListenerManagerImpl*>(&server_->listenerManager());
-          ASSERT(api_mgr != nullptr);
-          http_client_handle_ = &api_mgr->httpClient();
-          request_dispatcher_->drain(api_mgr->httpClientDispatcher());
-        });
-  }
 
   // The main run loop must run without holding the mutex, so that the destructor can acquire it.
   bool run_success = main_common->run();

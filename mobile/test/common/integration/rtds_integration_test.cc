@@ -5,6 +5,8 @@
 
 #include "test/common/integration/xds_integration_test.h"
 #include "test/test_common/environment.h"
+#include "extension_registry.h"
+#include "source/common/tls/server_context_impl.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -34,7 +36,8 @@ public:
     xds_builder.addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1)
         .setSslRootCerts(getUpstreamCert());
     builder_.setXds(std::move(xds_builder));
-    // builder_.setLogLevel(Logger::Logger::trace);
+    builder_.setLogLevel(Logger::Logger::trace);
+    builder_.enforceTrustChainVerification(false);
     XdsIntegrationTest::createEnvoy();
   }
 

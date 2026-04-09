@@ -261,7 +261,6 @@ private:
   Logger::EventTrackingDelegatePtr log_delegate_ptr_{};
   Server::Instance* server_{};
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
-  Server::ServerLifecycleNotifier::HandlePtr startup_callback_handler_;
   // main_thread_ should be destroyed first, hence it is the last member variable. Objects with
   // instructions scheduled on the main_thread_ need to have a longer lifetime.
   Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.
