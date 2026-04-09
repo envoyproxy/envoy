@@ -176,6 +176,9 @@ message Vhds {
   // which is supported only in the xDS incremental protocol variants.
   //
   // Envoy currently supports only glob collections.
+  //
+  // If unspecified or empty, Envoy defaults to sending empty subscriptions
+  // (``resource_names_subscribe: []``).
   string default_virtual_host_resource_name = 2;
 
   // The virtual host resource name to use for on-demand VHDS requests.
@@ -184,5 +187,8 @@ message Vhds {
   // "xdstp://authority/vhds/on-demand/{domain}", if VHDS needs the domain for
   // "example.com", it will subscribe to the resource
   // "xdstp://authority/vhds/on-demand/example.com".
+  //
+  // If unspecified or empty, Envoy will default to subscribing
+  // to non-xdstp resource ``<route configuration name>/<domain>``.
   string on_demand_virtual_host_resource_name = 3;
 }
