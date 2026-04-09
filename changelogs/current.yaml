@@ -874,7 +874,7 @@ new_features:
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
 - area: formatter
   change: |
-    Added support for ``%TRACE_ID%`` in the custom response policy filter's local response policy to allow 
+    Added support for ``%TRACE_ID%`` in the custom response policy filter's local response policy to allow
     trace ID to be substituted into the response body.
 - area: redis
   change: |
