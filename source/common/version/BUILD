@@ -82,12 +82,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
-    copts = select({
-        "//bazel:using_boringssl_fips": ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
-        "//bazel:using_aws_lc": ["-DENVOY_SSL_VERSION=\\\"AWS-LC-FIPS\\\""],
-        "//bazel:using_openssl": ["-DENVOY_SSL_VERSION=\\\"OpenSSL\\\""],
-        "//conditions:default": ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
-    }),
     external_deps = ["ssl"],
     tags = ["notidy"],
     deps = [

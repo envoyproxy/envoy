@@ -37,23 +37,9 @@ const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
 
 bool VersionInfo::sslFipsCompliant() { return FIPS_mode() == 1; }
 
-const std::string& VersionInfo::buildType() {
-#ifdef NDEBUG
-  static const std::string release_type = "RELEASE";
-#else
-  static const std::string release_type = "DEBUG";
-#endif
-  return release_type;
-}
+const std::string& VersionInfo::buildType() { return envoyBuildType(); }
 
-const std::string& VersionInfo::sslVersion() {
-#ifdef ENVOY_SSL_VERSION
-  static const std::string ssl_version = ENVOY_SSL_VERSION;
-#else
-  static const std::string ssl_version = "no-ssl";
-#endif
-  return ssl_version;
-}
+const std::string& VersionInfo::sslVersion() { return envoySSLVersion(); }
 
 envoy::config::core::v3::BuildVersion VersionInfo::makeBuildVersion(const char* version) {
   envoy::config::core::v3::BuildVersion result;

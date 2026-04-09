@@ -10,4 +10,10 @@ namespace Envoy {
 // circular BUILD dependency through protobuf.
 const std::string& envoyVersionString();
 
+// Returns the build type string: "RELEASE" or "DEBUG".
+const std::string& envoyBuildType();
+
+// Returns the SSL library version string (e.g. "BoringSSL", "OpenSSL").
+const std::string& envoySSLVersion();
+
 } // namespace Envoy
