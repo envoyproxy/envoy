@@ -50,10 +50,10 @@ public:
 
   ~DynamicModuleInputMatcher() override;
 
-  ::Envoy::Matcher::MatchResult match(const ::Envoy::Matcher::MatchingDataType& input) override;
+  ::Envoy::Matcher::MatchResult match(const ::Envoy::Matcher::DataInputGetResult& input) override;
 
-  absl::flat_hash_set<std::string> supportedDataInputTypes() const override {
-    return absl::flat_hash_set<std::string>{"dynamic_module_data_input"};
+  bool supportsDataInputType(absl::string_view data_type) const override {
+    return data_type == "dynamic_module_data_input";
   }
 
 private:

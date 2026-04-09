@@ -12,15 +12,11 @@ using ::Envoy::Matcher::MatchResult;
 Matcher::Matcher(const Envoy::Matchers::ValueMatcherConstSharedPtr value_matcher, const bool invert)
     : value_matcher_(value_matcher), invert_(invert) {}
 
-MatchResult Matcher::match(const Envoy::Matcher::MatchingDataType& input) {
-  if (auto* ptr = absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&input);
-      ptr != nullptr) {
-    const Matching::Http::MetadataInput::MetadataMatchData* match_data =
-        dynamic_cast<const Matching::Http::MetadataInput::MetadataMatchData*>(ptr->get());
-    if (match_data != nullptr) {
-      if (value_matcher_->match(match_data->value_) ^ invert_) {
-        return MatchResult::Matched;
-      }
+MatchResult Matcher::match(const Envoy::Matcher::DataInputGetResult& input) {
+  if (auto match_data = input.customData<Matching::Http::MetadataInput::MetadataMatchData>();
+      match_data) {
+    if (value_matcher_->match(match_data->value_) ^ invert_) {
+      return MatchResult::Matched;
     }
   }
   return MatchResult::NoMatch;

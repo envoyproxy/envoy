@@ -23,7 +23,8 @@ public:
   createFilterFactoryFromProtoTyped(const FilterConfig& proto_config,
                                     const std::string& stat_prefix, DualInfo dual_info,
                                     Server::Configuration::ServerFactoryContext& context) override {
-    return createFilterFactory(proto_config, stat_prefix, context, dual_info.scope);
+    return createFilterFactory(proto_config, stat_prefix, context, dual_info.scope,
+                               &dual_info.init_manager);
   }
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
       const FilterConfig& proto_config, const std::string& stat_prefix,
@@ -31,7 +32,8 @@ public:
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const FilterConfig& proto_config, const std::string& stat_prefix,
-                      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
+                      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+                      Init::Manager* init_manager = nullptr);
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
@@ -44,6 +46,13 @@ public:
                                     Server::Configuration::ServerFactoryContext&) override {
     return proto_config.terminal_filter();
   }
+
+private:
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromRemoteSource(
+      const FilterConfig& proto_config,
+      const envoy::extensions::dynamic_modules::v3::DynamicModuleConfig& module_config,
+      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+      Init::Manager& init_manager);
 };
 using UpstreamDynamicModuleConfigFactory = DynamicModuleConfigFactory;
 

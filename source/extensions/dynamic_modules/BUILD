@@ -17,7 +17,21 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/common:exception_lib",
+        "//source/common/common:utility_lib",
         "//source/extensions/dynamic_modules/abi",
+    ],
+)
+
+envoy_cc_library(
+    name = "background_fetch_manager_lib",
+    srcs = ["background_fetch_manager.cc"],
+    hdrs = ["background_fetch_manager.h"],
+    deps = [
+        ":dynamic_modules_lib",
+        "//envoy/singleton:manager_interface",
+        "//source/common/config:remote_data_fetcher_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

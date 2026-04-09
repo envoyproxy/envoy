@@ -26,6 +26,40 @@ class TcpListenerFilterConfigProviderManagerImpl;
 namespace Server {
 
 /**
+ * ListenerUpdateCallbacks provide a way to expose Listener lifecycle events in the
+ * ListenerManager.
+ */
+class ListenerUpdateCallbacks {
+public:
+  virtual ~ListenerUpdateCallbacks() = default;
+
+  /**
+   * onListenerAddOrUpdate is called when a new listener is added or an existing listener
+   * is updated in the ListenerManager.
+   * @param listener_name the name of the changed listener.
+   * @param listener_config the ListenerConfig that represents the updated listener.
+   */
+  virtual void onListenerAddOrUpdate(absl::string_view listener_name,
+                                     const Network::ListenerConfig& listener_config) PURE;
+  /**
+   * onListenerRemoval is called when a listener is removed; the argument is the listener name.
+   * @param listener_name is the name of the removed listener.
+   */
+  virtual void onListenerRemoval(const std::string& listener_name) PURE;
+};
+
+/**
+ * ListenerUpdateCallbacksHandle is a RAII wrapper for a ListenerUpdateCallbacks. Deleting
+ * the ListenerUpdateCallbacksHandle will remove the callbacks from ListenerManager in O(1).
+ */
+class ListenerUpdateCallbacksHandle {
+public:
+  virtual ~ListenerUpdateCallbacksHandle() = default;
+};
+
+using ListenerUpdateCallbacksHandlePtr = std::unique_ptr<ListenerUpdateCallbacksHandle>;
+
+/**
  * Interface for an LDS API provider.
  */
 class LdsApi {
@@ -272,6 +306,17 @@ public:
    * @return TRUE if the worker has started or FALSE if not.
    */
   virtual bool isWorkerStarted() PURE;
+
+  /**
+   * This method allows to register callbacks for listener lifecycle events in the
+   * ListenerManager.
+   *
+   * @param callbacks are the ListenerUpdateCallbacks to add or remove to the listener manager.
+   * @return ListenerUpdateCallbacksHandlePtr a RAII that needs to be deleted to
+   * unregister the callback.
+   */
+  virtual ListenerUpdateCallbacksHandlePtr
+  addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) PURE;
 };
 
 // overload operator| to allow ListenerManager::listeners(ListenerState) to be called using a

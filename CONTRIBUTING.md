@@ -47,10 +47,12 @@ following guidelines for all code, APIs, and documentation:
 
 ## What is allowed
 
-Use of generative AI to assist in writing code or tests, as long as the submitter fully understands
-the code being submitted.
+* Use of generative AI to assist in writing code or tests, as long as the submitter fully understands
+  the code being submitted.
+* Use of generative AI to assist in reviewing of PRs, as long as the reviewer fully understands review
+  comments produced by the AI review agent. AI review agent is an aid to the reviewer, not to the PR author.
 
-All of the following are required:
+All of the following are required for AI assisted code:
 
 * You understand the change you are submitting.
 * You respond to questions and comments from the reviewer. If you use generative AI to help in your
@@ -63,12 +65,19 @@ All of the following are required:
 * All generated code must be released under the same [license](LICENSE) as Envoy. You are responsible
   for ensuring that the tools you use to generate code do not add any additional licensing restrictions.
 
+All of the following are required for AI assisted PR reviews:
+
+* Remove, or resolve, hallucinated or low value PR comments from AI review agent.
+* Respond to the comments from the PR author in case they require clarification or disagree with AI findings.
+  It is recommended to proactively clarify why you think AI generated comments needs to be addressed.
+
 ## What is not allowed
 
 * PRs which the submitter does not understand or take full ownership of.
 * Code comments should be valuable to the codebase. Any comments which only help the AI interact with
   the code must be removed before the PR is submitted. Comments which explain what straightforward code
   does are not useful.
+* "Drive-by" invocation of AI review agents on PRs without the intention to follow up on produced review.
 
 # Breaking change policy
 

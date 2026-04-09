@@ -99,11 +99,9 @@ void TracerUtility::finalizeSpan(Span& span, const StreamInfo::StreamInfo& strea
   }
 
   // Cluster info.
-  if (auto cluster_info = stream_info.upstreamClusterInfo();
-      cluster_info.has_value() && cluster_info.value() != nullptr) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info.value()->name());
-    span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                cluster_info.value()->observabilityName());
+  if (const auto cluster_info = stream_info.upstreamClusterInfo()) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info->name());
+    span.setTag(Tracing::Tags::get().UpstreamClusterName, cluster_info->observabilityName());
   }
 
   // Upstream info.

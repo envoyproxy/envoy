@@ -78,21 +78,10 @@ public:
   void markSocketDead(const int fd);
 
   /**
-   * Ping all active reverse connections for health checks.
+   * Send a ping keepalive for a single reverse connection.
+   * @param fd the file descriptor of the connection to ping.
    */
-  void pingConnections();
-
-  /**
-   * Ping reverse connections for a specific node.
-   * @param node_id the node ID whose connections should be pinged.
-   */
-  void pingConnections(const std::string& node_id);
-
-  /**
-   * Enable the ping timer if not already enabled.
-   * @param ping_interval the interval at which ping keepalives should be sent.
-   */
-  void tryEnablePingTimer(const std::chrono::seconds& ping_interval);
+  void sendPingForConnection(int fd);
 
   /**
    * Clean up stale node entries when no active sockets remain.
@@ -154,6 +143,19 @@ private:
    */
   bool hasAnySocketsForNode(const std::string& node_id);
 
+  /**
+   * Compute the ping interval in milliseconds with 15% jitter applied.
+   * @return jittered interval in milliseconds.
+   */
+  uint64_t pingIntervalWithJitterMs();
+
+  /**
+   * Re-arm the per-connection ping send timer for the given fd with jitter.
+   * No-op if the fd has no entry in fd_to_ping_send_timer_map_.
+   * @param fd the file descriptor whose send timer to re-arm.
+   */
+  void rearmPingSendTimer(int fd);
+
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
   Random::RandomGeneratorPtr random_generator_;
@@ -165,6 +167,9 @@ private:
   // Map from file descriptor to node ID. An entry is added when a reverse tunnel is accepted from a
   // node and is removed when the socket dies.
   absl::flat_hash_map<int, std::string> fd_to_node_map_;
+
+  // Map from FD to its iterator in accepted_reverse_connections_, used to avoid linear scans.
+  absl::flat_hash_map<int, std::list<Network::ConnectionSocketPtr>::iterator> fd_to_socket_it_map_;
 
   // Map from file descriptor to cluster ID. An entry is added when a reverse tunnel is accepted
   // from a node and is removed when the socket dies.
@@ -190,14 +195,19 @@ private:
   absl::flat_hash_map<int, Event::FileEventPtr> fd_to_event_map_;
   absl::flat_hash_map<int, Event::TimerPtr> fd_to_timer_map_;
 
+  // Per-connection send timers that schedule individual ping sends with jitter.
+  absl::flat_hash_map<int, Event::TimerPtr> fd_to_ping_send_timer_map_;
+
   // Track consecutive ping misses per file descriptor.
   absl::flat_hash_map<int, uint32_t> fd_to_miss_count_;
   // Miss threshold before declaring a socket dead.
   static constexpr uint32_t kDefaultMissThreshold = 3;
   uint32_t miss_threshold_{kDefaultMissThreshold};
 
-  Event::TimerPtr ping_timer_;
   std::chrono::seconds ping_interval_{0};
+
+  // Per node counter for total active FDs.
+  absl::flat_hash_map<std::string, uint32_t> node_to_active_fd_count_;
 
   // Upstream extension for stats integration.
   ReverseTunnelAcceptorExtension* extension_;

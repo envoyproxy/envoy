@@ -31,6 +31,13 @@ public:
   MOCK_METHOD(void, endListenerUpdate, (ListenerManager::FailureStates&&));
   MOCK_METHOD(ApiListenerOptRef, apiListener, ());
   MOCK_METHOD(bool, isWorkerStarted, ());
+
+  ListenerUpdateCallbacksHandlePtr
+  addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override {
+    return ListenerUpdateCallbacksHandlePtr{addListenerUpdateCallbacks_(callbacks)};
+  }
+  MOCK_METHOD(ListenerUpdateCallbacksHandle*, addListenerUpdateCallbacks_,
+              (ListenerUpdateCallbacks & callbacks));
 };
 } // namespace Server
 } // namespace Envoy

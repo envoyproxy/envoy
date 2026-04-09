@@ -4,13 +4,17 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
 
+#include "source/common/common/non_copyable.h"
+
 #include "absl/container/flat_hash_set.h"
+#include "absl/functional/overload.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/variant.h"
@@ -32,9 +36,6 @@ class CustomMatchData {
 public:
   virtual ~CustomMatchData() = default;
 };
-
-using MatchingDataType =
-    absl::variant<absl::monostate, std::string, std::shared_ptr<CustomMatchData>>;
 
 inline constexpr absl::string_view DefaultMatchingDataType = "string";
 
@@ -243,6 +244,8 @@ protected:
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
 
+class DataInputGetResult;
+
 // InputMatcher provides the interface for determining whether an input value matches.
 class InputMatcher {
 public:
@@ -250,10 +253,10 @@ public:
 
   /**
    * Whether the provided input is a match.
-   * @param Matcher::MatchingDataType the value to match on. Will be absl::monostate() if the
+   * @param input is the input result. Will be absl::monostate() if the
    * lookup failed.
    */
-  virtual MatchResult match(const Matcher::MatchingDataType& input) PURE;
+  virtual MatchResult match(const DataInputGetResult& input) PURE;
 
   /**
    * A set of data input types supported by InputMatcher.
@@ -263,8 +266,8 @@ public:
    *
    * Override this function to provide matcher specific supported data input types.
    */
-  virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const {
-    return absl::flat_hash_set<std::string>{std::string(DefaultMatchingDataType)};
+  virtual bool supportsDataInputType(absl::string_view data_type) const {
+    return data_type == DefaultMatchingDataType;
   }
 };
 
@@ -283,6 +286,15 @@ public:
   std::string category() const override { return "envoy.matching.input_matchers"; }
 };
 
+enum class DataAvailability {
+  // The data is not yet available.
+  NotAvailable,
+  // Some data is available, but more might arrive.
+  MoreDataMightBeAvailable,
+  // All the data is available.
+  AllDataAvailable
+};
+
 // The result of retrieving data from a DataInput. As the data is generally made available
 // over time (e.g. as more of the stream reaches the proxy), data might become increasingly
 // available. This return type allows the DataInput to indicate this, as this might influence
@@ -291,39 +303,98 @@ public:
 // Conceptually the data availability should start at being NotAvailable, transition to
 // MoreDataMightBeAvailable (optional, this doesn't make sense for all data) and finally
 // AllDataAvailable as the data becomes available.
-struct DataInputGetResult {
-  enum class DataAvailability {
-    // The data is not yet available.
-    NotAvailable,
-    // Some data is available, but more might arrive.
-    MoreDataMightBeAvailable,
-    // All the data is available.
-    AllDataAvailable
-  };
+//
+// This is non-copyable because its lifetime has a definite upper bound by the backing
+// string data and by the matching procedure.
+class DataInputGetResult : public NonCopyable {
+public:
+  DataAvailability availability() const { return data_availability_; }
 
+  /**
+   * @return the default "string" data or nil. Life time must be bound by "this".
+   */
+  absl::optional<absl::string_view> stringData() const {
+    return absl::visit(
+        absl::Overload{
+            [](const std::string& arg) { return absl::make_optional<absl::string_view>(arg); },
+            [](const absl::string_view& arg) {
+              return absl::make_optional<absl::string_view>(arg);
+            },
+            [](const auto&) { return absl::optional<absl::string_view>(); }},
+        data_);
+  }
+
+  /**
+   * @return the default custom data of the expected type or nil. Life time must be bound by "this".
+   */
+  template <class T> OptRef<const T> customData() const {
+    return absl::visit(absl::Overload{[](const std::shared_ptr<CustomMatchData>& arg) {
+                                        const T* data = dynamic_cast<const T*>(arg.get());
+                                        return makeOptRefFromPtr<const T>(data);
+                                      },
+                                      [](const auto&) { return OptRef<const T>(); }},
+                       data_);
+  }
+
+  static DataInputGetResult
+  NoData(DataAvailability data_availability = DataAvailability::AllDataAvailable) {
+    return DataInputGetResult(absl::monostate(), data_availability);
+  }
+
+  /**
+   * Returns a string view match result. The input must ensure the backing data stays alive for the
+   *duration of matching. Use CreateString when a string must be constructed.
+   **/
+  static DataInputGetResult
+  CreateStringView(absl::string_view data,
+                   DataAvailability data_availability = DataAvailability::AllDataAvailable) {
+    return DataInputGetResult(data, data_availability);
+  }
+
+  static DataInputGetResult
+  CreateString(std::string&& data,
+               DataAvailability data_availability = DataAvailability::AllDataAvailable) {
+    return DataInputGetResult(std::move(data), data_availability);
+  }
+
+  static DataInputGetResult
+  CreateCustom(std::shared_ptr<CustomMatchData>&& data,
+               DataAvailability data_availability = DataAvailability::AllDataAvailable) {
+    return DataInputGetResult(std::move(data), data_availability);
+  }
+
+private:
   DataAvailability data_availability_;
   // The resulting data. This will be absl::monostate() if we don't have sufficient data available
   // (as per data_availability_) or because no value was extracted. For example, consider a
   // DataInput which attempts to look a key up in the map: if we don't have access to the map yet,
   // we return absl::monostate() with NotAvailable. If we have the entire map, but the key doesn't
   // exist in the map, we return absl::monostate() with AllDataAvailable.
+  using MatchingDataType = absl::variant<absl::monostate, std::string, absl::string_view,
+                                         std::shared_ptr<CustomMatchData>>;
   MatchingDataType data_;
 
+  DataInputGetResult(MatchingDataType&& data, DataAvailability data_availability)
+      : data_availability_(data_availability), data_(std::move(data)) {}
+
+public:
   // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
-    out << "data input: "
-        << (absl::holds_alternative<std::string>(result.data_)
-                ? absl::get<std::string>(result.data_)
-                : "n/a");
+    out << "data input: ";
+    absl::visit(absl::Overload{[&](const std::string& arg) { out << arg; },
+                               [&](const absl::string_view& arg) { out << arg; },
+                               [&](const std::shared_ptr<CustomMatchData>&) { out << "(custom)"; },
+                               [&](const auto&) { out << "n/a"; }},
+                result.data_);
 
     switch (result.data_availability_) {
-    case DataInputGetResult::DataAvailability::NotAvailable:
+    case DataAvailability::NotAvailable:
       out << " (not available)";
       break;
-    case DataInputGetResult::DataAvailability::MoreDataMightBeAvailable:
+    case DataAvailability::MoreDataMightBeAvailable:
       out << " (more data available)";
       break;
-    case DataInputGetResult::DataAvailability::AllDataAvailable:;
+    case DataAvailability::AllDataAvailable:;
     }
     return out;
   }
@@ -384,7 +455,7 @@ public:
 class CommonProtocolInput {
 public:
   virtual ~CommonProtocolInput() = default;
-  virtual MatchingDataType get() PURE;
+  virtual DataInputGetResult get() PURE;
 };
 using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
 using CommonProtocolInputFactoryCb = std::function<CommonProtocolInputPtr()>;

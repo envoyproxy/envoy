@@ -12,6 +12,11 @@
 
 namespace Envoy {
 
+namespace Platform {
+class NetworkChangeListener;
+class NetworkChangeMonitor;
+} // namespace Platform
+
 namespace test {
 class SystemHelperPeer;
 } // namespace test
@@ -47,6 +52,12 @@ public:
   virtual int64_t getDefaultNetworkHandle() PURE;
 
   virtual std::vector<std::pair<int64_t, ConnectionType>> getAllConnectedNetworks() PURE;
+
+  /**
+   * Creates and returns a platform-specific network change monitor.
+   */
+  virtual std::unique_ptr<Platform::NetworkChangeMonitor>
+  initializeNetworkChangeMonitor(Platform::NetworkChangeListener& network_change_listener) PURE;
 
   /**
    * Binds the given socket to the network interface associated with the handle.

@@ -255,6 +255,32 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, IgnoreCloseAndShutdown) {
   EXPECT_EQ(shutdown_wr.errno_, 0);
 }
 
+TEST_F(DownstreamReverseConnectionIOHandleTest, OnPingMessageWritesRpingToSocket) {
+  int fds[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds), 0);
+
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  auto mock_io_handle = std::make_unique<Network::IoSocketHandleImpl>(fds[0]);
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+
+  auto* io_handle_ptr = mock_io_handle.release();
+  mock_socket->io_handle_.reset(io_handle_ptr);
+
+  auto socket_ptr = Network::ConnectionSocketPtr(mock_socket.release());
+  auto handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::move(socket_ptr), io_handle_.get(), "test_ping_key");
+
+  handle->onPingMessage();
+
+  const std::string expected = std::string(ReverseConnectionUtility::PING_MESSAGE);
+  char peer_buffer[16];
+  const ssize_t read_bytes = read(fds[1], peer_buffer, sizeof(peer_buffer));
+  ASSERT_EQ(read_bytes, static_cast<ssize_t>(expected.size()));
+  EXPECT_EQ(std::string(peer_buffer, read_bytes), expected);
+
+  close(fds[1]);
+}
+
 // Test read() method with real socket pairs to validate RPING handling.
 TEST_F(DownstreamReverseConnectionIOHandleTest, ReadRpingEchoScenarios) {
   const std::string rping_msg = std::string(ReverseConnectionUtility::PING_MESSAGE);

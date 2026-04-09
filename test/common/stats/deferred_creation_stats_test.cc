@@ -22,7 +22,7 @@ MAKE_STATS_STRUCT(AwesomeStats, AwesomeStatNames, AWESOME_STATS);
 class DeferredCreationStatsTest : public testing::Test {
 public:
   SymbolTableImpl symbol_table_;
-  AllocatorImpl allocator_{symbol_table_};
+  Allocator allocator_{symbol_table_};
   ThreadLocalStoreImpl store_{allocator_};
   AwesomeStatNames stats_names_{symbol_table_};
 };

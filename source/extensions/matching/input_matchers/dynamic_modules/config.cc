@@ -54,7 +54,7 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   // Parse the matcher config.
   std::string matcher_config_str;
   if (proto_config.has_matcher_config()) {
-    auto config_or_error = MessageUtil::anyToBytes(proto_config.matcher_config());
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.matcher_config());
     if (!config_or_error.ok()) {
       throw EnvoyException("Failed to parse matcher config: " +
                            std::string(config_or_error.status().message()));

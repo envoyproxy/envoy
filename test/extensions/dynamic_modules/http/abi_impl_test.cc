@@ -776,12 +776,13 @@ TEST(ABIImpl, metadata) {
 
   // No namespace.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -898,12 +899,13 @@ TEST(ABIImpl, metadata_bool) {
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -972,12 +974,13 @@ TEST(ABIImpl, metadata_keys) {
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -1034,12 +1037,13 @@ TEST(ABIImpl, metadata_namespaces) {
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
-  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
@@ -1077,11 +1081,176 @@ TEST(ABIImpl, metadata_namespaces) {
   EXPECT_EQ(ns_names.count("ns3"), 1);
 }
 
+TEST(ABIImpl, metadata_list) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  const std::string ns = "ns";
+  const std::string num_key = "num_key";
+  const std::string str_key = "str_key";
+  const std::string bool_key = "bool_key";
+  const std::string non_list_key = "non_list_key";
+
+  // No stream info: add operations are no-ops and get operations return false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+      &filter, {ns.data(), ns.size()}, {num_key.data(), num_key.size()}, 1.0));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+      &filter, {ns.data(), ns.size()}, {str_key.data(), str_key.size()}, {"hello", 5}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+      &filter, {ns.data(), ns.size()}, {bool_key.data(), bool_key.size()}, true));
+
+  size_t list_size = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_size(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, &list_size));
+
+  // With stream info.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(callbacks, clusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  // No namespace yet: get_metadata_list_size returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_size(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, &list_size));
+
+  // Add non-list value under the key.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+      &filter, {ns.data(), ns.size()}, {non_list_key.data(), non_list_key.size()}, 42.0);
+
+  // Add numbers and verify size and values.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+      &filter, {ns.data(), ns.size()}, {num_key.data(), num_key.size()}, 1.0));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+      &filter, {ns.data(), ns.size()}, {num_key.data(), num_key.size()}, 2.0));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+      &filter, {ns.data(), ns.size()}, {num_key.data(), num_key.size()}, 3.0));
+
+  // Get list size on a non-list key returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_size(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {non_list_key.data(), non_list_key.size()}, &list_size));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_size(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, &list_size));
+  EXPECT_EQ(list_size, 3);
+
+  double num_result = 0;
+  // Get list elements from the non-list key returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_number(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {non_list_key.data(), non_list_key.size()}, 0, &num_result));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_number(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, 0, &num_result));
+  EXPECT_EQ(num_result, 1.0);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_number(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, 1, &num_result));
+  EXPECT_EQ(num_result, 2.0);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_number(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, 2, &num_result));
+  EXPECT_EQ(num_result, 3.0);
+  // Out-of-range index.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_number(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, 3, &num_result));
+
+  // Add strings and verify.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+      &filter, {ns.data(), ns.size()}, {str_key.data(), str_key.size()}, {"hello", 5}));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+      &filter, {ns.data(), ns.size()}, {str_key.data(), str_key.size()}, {"world", 5}));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_size(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {str_key.data(), str_key.size()}, &list_size));
+  EXPECT_EQ(list_size, 2);
+
+  envoy_dynamic_module_type_envoy_buffer str_result = {nullptr, 0};
+  // Get list elements from the non-list key returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {non_list_key.data(), non_list_key.size()}, 0, &str_result));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {str_key.data(), str_key.size()}, 0, &str_result));
+  EXPECT_EQ(absl::string_view(str_result.ptr, str_result.length), "hello");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {str_key.data(), str_key.size()}, 1, &str_result));
+  EXPECT_EQ(absl::string_view(str_result.ptr, str_result.length), "world");
+  // Out-of-range index.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {str_key.data(), str_key.size()}, 2, &str_result));
+
+  // Add bools and verify.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+      &filter, {ns.data(), ns.size()}, {bool_key.data(), bool_key.size()}, true));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+      &filter, {ns.data(), ns.size()}, {bool_key.data(), bool_key.size()}, false));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_size(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {bool_key.data(), bool_key.size()}, &list_size));
+  EXPECT_EQ(list_size, 2);
+
+  bool bool_result = false;
+  // Get list elements from the non-list key returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_bool(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {non_list_key.data(), non_list_key.size()}, 0, &bool_result));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_bool(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {bool_key.data(), bool_key.size()}, 0, &bool_result));
+  EXPECT_TRUE(bool_result);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_list_bool(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {bool_key.data(), bool_key.size()}, 1, &bool_result));
+  EXPECT_FALSE(bool_result);
+  // Out-of-range index.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_bool(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {bool_key.data(), bool_key.size()}, 2, &bool_result));
+
+  // Type mismatch: try to get number list element as string/bool.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, 0, &str_result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_bool(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {num_key.data(), num_key.size()}, 0, &bool_result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_number(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {bool_key.data(), bool_key.size()}, 0, &num_result));
+
+  // Cannot add to a key that already holds a non-list value.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(&filter, {ns.data(), ns.size()},
+                                                                 {"scalar_key", 10}, 99.0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+      &filter, {ns.data(), ns.size()}, {"scalar_key", 10}, 1.0));
+  // get_metadata_list_size on a non-list key returns false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_list_size(
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
+      {"scalar_key", 10}, &list_size));
+}
+
 TEST(ABIImpl, attribute_bool) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
 
@@ -1137,7 +1306,7 @@ TEST(ABIImpl, filter_state) {
   // With stream info but non existing key.
   const std::string non_existing_key = "non_existing";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1170,7 +1339,7 @@ TEST(ABIImpl, filter_state_typed) {
 
   // With stream info.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1191,7 +1360,7 @@ TEST(ABIImpl, filter_state_typed_no_factory) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1207,7 +1376,7 @@ TEST(ABIImpl, filter_state_typed_bad_value) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1223,7 +1392,7 @@ TEST(ABIImpl, filter_state_typed_non_existing_key) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1239,7 +1408,7 @@ TEST(ABIImpl, filter_state_typed_non_serializable) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
@@ -1270,7 +1439,7 @@ TEST(ABIImpl, RequestBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
 
@@ -1384,7 +1553,7 @@ TEST(ABIImpl, BufferedRequestBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
 
@@ -1493,7 +1662,7 @@ TEST(ABIImpl, ResponseBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   Http::MockStreamEncoderFilterCallbacks callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setEncoderFilterCallbacks(callbacks);
 
@@ -1607,7 +1776,7 @@ TEST(ABIImpl, BufferedResponseBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   Http::MockStreamEncoderFilterCallbacks callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setEncoderFilterCallbacks(callbacks);
 
@@ -1718,7 +1887,7 @@ TEST(ABIImpl, ClearRouteCache) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
@@ -1733,7 +1902,7 @@ TEST(ABIImpl, GetAttributes) {
   DynamicModuleHttpFilter filter_without_callbacks{nullptr, symbol_table, 0};
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
@@ -2547,7 +2716,8 @@ TEST_F(DynamicModuleHttpFilterTest, GetClusterNameNoCallbacks) {
 
 TEST_F(DynamicModuleHttpFilterTest, GetClusterNameNoCluster) {
   // When clusterInfo returns nullptr.
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(testing::Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
 
   envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_name(filter_.get(), &result));
@@ -2577,7 +2747,8 @@ TEST_F(DynamicModuleHttpFilterTest, GetClusterHostCountNoCallbacks) {
 
 TEST_F(DynamicModuleHttpFilterTest, GetClusterHostCountNoCluster) {
   // When clusterInfo returns nullptr.
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(testing::Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(testing::Return(OptRef<const Upstream::ClusterInfo>{}));
 
   size_t total = 0, healthy = 0, degraded = 0;
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 0, &total,
@@ -2612,8 +2783,8 @@ TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostSuccess) {
   std::string host = "10.0.0.1:8080";
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(testing::_))
       .WillOnce(testing::Invoke([&host](Upstream::LoadBalancerContext::OverrideHost override_host) {
-        EXPECT_EQ(override_host.first, host);
-        EXPECT_TRUE(override_host.second);
+        EXPECT_EQ(override_host.host, host);
+        EXPECT_TRUE(override_host.strict);
       }));
 
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_upstream_override_host(
@@ -2624,8 +2795,8 @@ TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostNonStrict) {
   std::string host = "192.168.1.1:9000";
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(testing::_))
       .WillOnce(testing::Invoke([&host](Upstream::LoadBalancerContext::OverrideHost override_host) {
-        EXPECT_EQ(override_host.first, host);
-        EXPECT_FALSE(override_host.second);
+        EXPECT_EQ(override_host.host, host);
+        EXPECT_FALSE(override_host.strict);
       }));
 
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_upstream_override_host(
@@ -3183,7 +3354,7 @@ TEST(ABIImpl, ReceivedBufferedRequestBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
 
@@ -3207,7 +3378,7 @@ TEST(ABIImpl, ReceivedBufferedResponseBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   NiceMock<Http::MockStreamEncoderFilterCallbacks> callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setEncoderFilterCallbacks(callbacks);
 

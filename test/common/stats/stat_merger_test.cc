@@ -305,7 +305,7 @@ TEST_F(StatMergerDynamicTest, DynamicsWithRealSymbolTable) {
 class StatMergerThreadLocalTest : public testing::Test {
 protected:
   SymbolTableImpl symbol_table_;
-  AllocatorImpl alloc_{symbol_table_};
+  Allocator alloc_{symbol_table_};
   ThreadLocalStoreImpl store_{alloc_};
 };
 

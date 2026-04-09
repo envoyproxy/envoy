@@ -48,8 +48,8 @@ public:
         data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
         maybe_response_trailers.ptr());
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::make_unique<CelMatchData>(std::move(activation))};
+    return Matcher::DataInputGetResult::CreateCustom(
+        std::make_shared<CelMatchData>(std::move(activation)));
   }
 
   absl::string_view dataInputType() const override { return "cel_data_input"; }

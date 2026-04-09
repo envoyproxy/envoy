@@ -27,6 +27,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/cert_compression.h"
 
 #include "absl/numeric/int128.h"
 #include "absl/strings/str_cat.h"
@@ -442,6 +443,14 @@ quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte) {
   // bits of the TOS byte of the IP header.
   constexpr uint8_t kEcnMask = 0b00000011;
   return static_cast<quic::QuicEcnCodepoint>(tos_byte & kEcnMask);
+}
+
+void registerCertCompression(SSL_CTX* ssl_ctx) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.tls_certificate_compression_brotli")) {
+    Extensions::TransportSockets::Tls::CertCompression::registerBrotli(ssl_ctx);
+  }
+  Extensions::TransportSockets::Tls::CertCompression::registerZlib(ssl_ctx);
 }
 
 } // namespace Quic

@@ -6,6 +6,7 @@ Pending Release
 
 Breaking changes:
 
+- api: remove ``setNetworkMonitoringMode`` API. Use ``enableNetworkChangeMonitor`` instead.
 - api: The ``enableGzip`` and ``enableBrotli`` APIs were renamed to ``enableGzipDecompression`` and ``enableBrotliDecompression`` (:issue:`#25352 <25352>`)
 - ios/android: remove ``addH2RawDomains`` method. (:issue: `#2590 <2590>`)
 - build: building on macOS now requires Xcode 14.1. (:issue:`#2664 <2664>`)
@@ -65,7 +66,6 @@ Breaking changes:
 - net: enable happy eyeballs by default (:issue:`#2272 <2272>`)
 - iOS: remove support for installing via CocoaPods, which had not worked since 2020 (:issue:`#2215 <2215>`)
 - iOS: enable usage of ``NWPathMonitor`` by default (:issue:`#2329 <2329>`)
-- iOS: replace ``enableNetworkPathMonitor`` with a new ``setNetworkMonitoringMode`` API to allow disabling monitoring (:issue:`#2345 <2345>`)
 - iOS: release artifacts no longer embed bitcode
 - api: engines are no longer a singleton, you may need to update your code to only create engines once and hold on to them.
   You also cannot assume that an `envoy_engine_t` value of `1` will return the default engine.

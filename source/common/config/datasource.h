@@ -274,7 +274,6 @@ public:
 
 private:
   DataSourceProvider(DataType&& data) : data_(std::make_shared<DataType>(std::move(data))) {}
-  template <class... Args>
   DataSourceProvider(std::unique_ptr<DynamicData<DataType>> data) : data_(std::move(data)) {}
 
   absl::variant<std::shared_ptr<DataType>, std::unique_ptr<DynamicData<DataType>>> data_;

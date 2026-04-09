@@ -33,9 +33,11 @@
 #include "test/common/listener_manager/config.pb.validate.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/matcher/mocks.h"
+#include "test/mocks/server/listener_update_callbacks.h"
 #include "test/server/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/escaping.h"
@@ -517,6 +519,46 @@ per_connection_buffer_limit_bytes: 8192
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   EXPECT_EQ(8192U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, BufferHighWatermarkTimeoutConfigured) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  auto config = parseListenerFromV3Yaml(yaml);
+  config.mutable_per_connection_buffer_high_watermark_timeout()->set_seconds(5);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(config);
+  EXPECT_EQ(std::chrono::seconds(5),
+            manager_->listeners().back().get().perConnectionBufferHighWatermarkTimeout());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, ZeroBufferHighWatermarkTimeout) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  auto config = parseListenerFromV3Yaml(yaml);
+  config.mutable_per_connection_buffer_high_watermark_timeout()->set_seconds(0);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(config);
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            manager_->listeners().back().get().perConnectionBufferHighWatermarkTimeout());
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, TlsTransportSocket) {
@@ -3460,6 +3502,186 @@ filter_chains:
   manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
 
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.test_prefix.foo").value());
+}
+
+// Listener without stats matcher metadata: all stats are created normally.
+TEST_P(ListenerManagerImplTest, StatsMatcherNoMetadata) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // Without a stats matcher, any stat name is accepted.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  EXPECT_NE("", scope.counterFromString("bar").name());
+}
+
+TEST_P(ListenerManagerImplTest, StatsMatcherMetadataButNoMatcherAndDisableStrictCheck) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strict_stats_matcher_unpacked", "false"}});
+
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        fields:
+          foo:
+            string_value: "bar"
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // The presence of metadata that does not conform to a stats matcher should not impact stat
+  // creation.
+  // This is edge case that should never happen in practice but we want to make sure that
+  // it doesn't cause any problems if it does.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  EXPECT_NE("", scope.counterFromString("bar").name());
+}
+
+// Listener has metadata but no stats matcher, this should be rejected.
+TEST_P(ListenerManagerImplTest, StatsMatcherMetadataButNoMatcher) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        fields:
+          foo:
+            string_value: "bar"
+filter_chains:
+- filters: []
+  )EOF";
+
+  EXPECT_THROW(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException);
+}
+
+// Invalid stats matcher configuration will be rejected.
+TEST_P(ListenerManagerImplTest, StatsMatcherInvalidConfig) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      exclusion_list:
+        patterns: []
+filter_chains:
+- filters: []
+  )EOF";
+
+  // PGV will throw an exception if the config is invalid.
+  EXPECT_THROW(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException);
+}
+
+// Listener with reject_all stats matcher: no stats are created.
+TEST_P(ListenerManagerImplTest, StatsMatcherRejectAll) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      reject_all: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // With reject_all, no stats are created for this listener.
+  EXPECT_EQ("", scope.counterFromString("foo").name());
+  EXPECT_EQ("", scope.counterFromString("bar").name());
+}
+
+// Listener with inclusion list: only stats matching the prefix are created.
+TEST_P(ListenerManagerImplTest, StatsMatcherInclusionList) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      inclusion_list:
+        patterns:
+          - prefix: "listener.test_prefix.foo"
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // "listener.test_prefix.foo" matches the inclusion prefix — accepted.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  // "listener.test_prefix.bar" does not match the inclusion prefix — rejected.
+  EXPECT_EQ("", scope.counterFromString("bar").name());
+}
+
+// Listener with exclusion list: stats matching the prefix are not created.
+TEST_P(ListenerManagerImplTest, StatsMatcherExclusionList) {
+  const std::string yaml = R"EOF(
+stat_prefix: test_prefix
+address:
+  socket_address:
+    address: "::1"
+    port_value: 10000
+metadata:
+  typed_filter_metadata:
+    envoy.stats_matcher:
+      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
+      exclusion_list:
+        patterns:
+          - prefix: "listener.test_prefix.bar"
+filter_chains:
+- filters: []
+  )EOF";
+
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto& scope = manager_->listeners().front().get().listenerScope();
+
+  // "listener.test_prefix.foo" does not match the exclusion prefix — accepted.
+  EXPECT_NE("", scope.counterFromString("foo").name());
+  // "listener.test_prefix.bar" matches the exclusion prefix — rejected.
+  EXPECT_EQ("", scope.counterFromString("bar").name());
 }
 
 TEST_P(ListenerManagerImplTest, DuplicateAddressDontBind) {
@@ -8827,6 +9049,314 @@ TEST_P(ListenerManagerImplTest, CustomSocketInterfaceTcpListenSocketBindToPort) 
         ListenerComponentFactory::BindType::ReusePort, creation_options, 0);
     EXPECT_TRUE(socket_result.ok());
   }
+}
+
+// Tests for ListenerUpdateCallbacks.
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksAddBeforeWorkersStarted) {
+  auto callbacks = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, false);
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksAddAndRemove) {
+  auto callbacks = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  EXPECT_CALL(*callbacks, onListenerRemoval("foo"));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(manager_->removeListener("foo"));
+}
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksWarmComplete) {
+  auto callbacks = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+
+  EXPECT_CALL(*worker_, start(_, _));
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  // The callback should NOT be called during add because the listener goes to warming.
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(_, _)).Times(0);
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(0U, manager_->listeners().size());
+  EXPECT_EQ(1U, manager_->listeners(ListenerManager::WARMING).size());
+  testing::Mock::VerifyAndClearExpectations(callbacks.get());
+
+  // The callback should be called when the listener finishes warming.
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // Cleanup.
+  EXPECT_CALL(*callbacks, onListenerRemoval("foo"));
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+}
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksHandleRAII) {
+  auto callbacks = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  // Destroy the handle to unregister the callback.
+  cb_handle.reset();
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, false);
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(_, _)).Times(0);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksRemovalDuringIteration) {
+  auto callbacks = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _))
+      .WillOnce(Invoke(
+          [&cb_handle](absl::string_view, const Network::ListenerConfig&) { cb_handle.reset(); }));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // Removal callback should not be called since the handle was destroyed.
+  EXPECT_CALL(*callbacks, onListenerRemoval(_)).Times(0);
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(manager_->removeListener("foo"));
+}
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksMultipleCallbacks) {
+  auto callbacks1 = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
+  auto callbacks2 = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle1 = manager_->addListenerUpdateCallbacks(*callbacks1);
+  auto cb_handle2 = manager_->addListenerUpdateCallbacks(*callbacks2);
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(*callbacks1, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_CALL(*callbacks2, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  EXPECT_CALL(*callbacks1, onListenerRemoval("foo"));
+  EXPECT_CALL(*callbacks2, onListenerRemoval("foo"));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(manager_->removeListener("foo"));
+}
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksWarmingListenerRemoval) {
+  auto callbacks = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+
+  EXPECT_CALL(*worker_, start(_, _));
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  // Add listener - it goes to warming (not active), so no add callback.
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(_, _)).Times(0);
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  EXPECT_EQ(0U, manager_->listeners().size());
+  EXPECT_EQ(1U, manager_->listeners(ListenerManager::WARMING).size());
+  testing::Mock::VerifyAndClearExpectations(callbacks.get());
+
+  // Remove the warming listener before it warms. Should still fire the removal callback.
+  EXPECT_CALL(*callbacks, onListenerRemoval("foo"));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(manager_->removeListener("foo"));
+  EXPECT_EQ(0U, manager_->listeners(ListenerManager::WARMING).size());
+}
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksInPlaceFilterChainUpdate) {
+  InSequence s;
+
+  auto callbacks = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+
+  const std::string listener_foo_yaml = R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+filter_chains: {}
+  )EOF";
+
+  // Add the initial listener (workers not started, goes directly to active).
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1", true));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Start workers - the active listener is added to the worker.
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_CALL(*worker_, start(_, _));
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+  worker_->callAddCompletion();
+
+  // In-place filter chain update (same address, different filter chain).
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  filter_chain_match:
+    destination_port: 1234
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(false);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  auto* timer = new Event::MockTimer(dynamic_cast<Event::MockDispatcher*>(&server_.dispatcher()));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+
+  worker_->callAddCompletion();
+
+  EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
+  timer->invokeCallback();
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callDrainFilterChainsComplete();
+
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, ListenerUpdateCallbacksGetListenerConfig) {
+  auto callbacks = std::make_unique<NiceMock<MockListenerUpdateCallbacks>>();
+  auto cb_handle = manager_->addListenerUpdateCallbacks(*callbacks);
+
+  const std::string yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, false);
+  EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _))
+      .WillOnce(Invoke([](absl::string_view, const Network::ListenerConfig& listener_config) {
+        EXPECT_EQ("foo", listener_config.name());
+      }));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  EXPECT_CALL(*listener_foo, onDestroy());
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));

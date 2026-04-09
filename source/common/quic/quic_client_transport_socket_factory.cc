@@ -4,9 +4,8 @@
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.validate.h"
 
-#include "source/common/quic/cert_compression.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
-#include "source/common/runtime/runtime_features.h"
+#include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/tls/context_config_impl.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
@@ -92,7 +91,7 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
         std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context), accept_untrusted),
         std::make_unique<quic::QuicClientSessionCache>());
 
-    CertCompression::registerSslContext(tls_config.crypto_config_->ssl_ctx());
+    registerCertCompression(tls_config.crypto_config_->ssl_ctx());
   }
   // Return the latest crypto config.
   return tls_config.crypto_config_;

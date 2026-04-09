@@ -4,6 +4,8 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -11,8 +13,9 @@ namespace DynamicModules {
 
 DynamicModuleAccessLogConfig::DynamicModuleAccessLogConfig(
     const absl::string_view logger_name, const absl::string_view logger_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope)
-    : stats_scope_(stats_scope.createScope(std::string(AccessLogStatsNamespace) + ".")),
+    : stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
       stat_name_pool_(stats_scope_->symbolTable()), logger_name_(logger_name),
       logger_config_(logger_config), dynamic_module_(std::move(dynamic_module)) {}
 
@@ -24,6 +27,7 @@ DynamicModuleAccessLogConfig::~DynamicModuleAccessLogConfig() {
 
 absl::StatusOr<DynamicModuleAccessLogConfigSharedPtr> newDynamicModuleAccessLogConfig(
     const absl::string_view logger_name, const absl::string_view logger_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
@@ -53,7 +57,7 @@ absl::StatusOr<DynamicModuleAccessLogConfigSharedPtr> newDynamicModuleAccessLogC
       "envoy_dynamic_module_on_access_logger_flush");
 
   auto config = std::make_shared<DynamicModuleAccessLogConfig>(
-      logger_name, logger_config, std::move(dynamic_module), stats_scope);
+      logger_name, logger_config, metrics_namespace, std::move(dynamic_module), stats_scope);
 
   // Store the resolved function pointers.
   config->on_config_destroy_ = on_config_destroy.value();

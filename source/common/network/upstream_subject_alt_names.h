@@ -2,6 +2,8 @@
 
 #include "envoy/stream_info/filter_state.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -14,6 +16,9 @@ public:
   explicit UpstreamSubjectAltNames(const std::vector<std::string>& upstream_subject_alt_names)
       : upstream_subject_alt_names_(upstream_subject_alt_names) {}
   const std::vector<std::string>& value() const { return upstream_subject_alt_names_; }
+  absl::optional<std::string> serializeAsString() const override {
+    return absl::StrJoin(upstream_subject_alt_names_, ",");
+  }
   static const std::string& key();
 
 private:

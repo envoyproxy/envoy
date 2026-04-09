@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"runtime"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
@@ -33,6 +34,8 @@ func init() {
 		"http_config_scheduler":        &ConfigSchedulerConfigFactory{},
 		"http_config_callout":          &HttpConfigCalloutConfigFactory{},
 		"http_config_stream":           &HttpConfigStreamConfigFactory{},
+		"http_struct_config":           &HttpStructConfigFactory{},
+		"list_metadata_callbacks":      &ListMetadataCallbacksConfigFactory{},
 	})
 }
 
@@ -55,11 +58,10 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 	sharedStatus := new(atomic.Bool)
 	sharedStatus.Store(false)
 
-	// TODO(wbpcode): to support the actual config scheduler in golang SDK.
-	go func() {
+	handle.GetScheduler().Schedule(func() {
 		time.Sleep(100 * time.Millisecond)
 		sharedStatus.Store(true)
-	}()
+	})
 
 	return &ConfigSchedulerFilterFactory{sharedStatus: sharedStatus}, nil
 }
@@ -67,6 +69,10 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 type ConfigSchedulerFilterFactory struct {
 	shared.EmptyHttpFilterFactory
 	sharedStatus *atomic.Bool
+}
+
+func (f *ConfigSchedulerFilterFactory) OnDestroy() {
+	runtime.GC()
 }
 
 func (f *ConfigSchedulerFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
@@ -1296,4 +1302,116 @@ func (p *HttpConfigStreamFilter) OnRequestHeaders(headers shared.HeaderMap,
 		p.handle.SendLocalResponse(503, [][2]string{{"x-config-stream", "pending"}}, nil, "")
 	}
 	return shared.HeadersStatusStop
+}
+
+type HttpStructConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *HttpStructConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	// Parse config as JSON
+	var cfg map[string]string = make(map[string]string)
+	err := json.Unmarshal(config, &cfg)
+	if err != nil {
+		return nil, fmt.Errorf("invalid JSON config: %v", err)
+	}
+	return &HttpStructFilterFactory{cfg: cfg}, nil
+}
+
+type HttpStructFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	cfg map[string]string
+}
+
+func (f *HttpStructFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	for k, v := range f.cfg {
+		handle.RequestHeaders().Set(k, v)
+	}
+	return &shared.EmptyHttpFilter{}
+}
+
+// -----------------------------------------------------------------------------
+// ListMetadataCallbacks
+// -----------------------------------------------------------------------------
+
+type ListMetadataCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *ListMetadataCallbacksConfigFactory) Create(_ shared.HttpFilterConfigHandle, _ []byte) (shared.HttpFilterFactory, error) {
+	return &ListMetadataCallbacksFilterFactory{}, nil
+}
+
+type ListMetadataCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *ListMetadataCallbacksFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &ListMetadataCallbacksFilter{handle: handle}
+}
+
+type ListMetadataCallbacksFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (f *ListMetadataCallbacksFilter) OnRequestHeaders(_ shared.HeaderMap, _ bool) shared.HeadersStatus {
+	// Build a number list: [10.0, 20.0, 30.0]
+	f.handle.AddMetadataListNumber("ns", "numbers", 10.0)
+	f.handle.AddMetadataListNumber("ns", "numbers", 20.0)
+	f.handle.AddMetadataListNumber("ns", "numbers", 30.0)
+	// Build a string list: ["hello", "world"]
+	f.handle.AddMetadataListString("ns", "strings", "hello")
+	f.handle.AddMetadataListString("ns", "strings", "world")
+	// Build a bool list: [true, false]
+	f.handle.AddMetadataListBool("ns", "bools", true)
+	f.handle.AddMetadataListBool("ns", "bools", false)
+	return shared.HeadersStatusContinue
+}
+
+func (f *ListMetadataCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap, _ bool) shared.HeadersStatus {
+	source := shared.MetadataSourceTypeDynamic
+
+	// Expose number list via response headers.
+	numSize, ok := f.handle.GetMetadataListSize(source, "ns", "numbers")
+	if ok {
+		headers.Set("x-list-num-size", strconv.Itoa(numSize))
+		for i := 0; i < numSize; i++ {
+			val, ok := f.handle.GetMetadataListNumber(source, "ns", "numbers", i)
+			if ok {
+				headers.Set(fmt.Sprintf("x-list-num-%d", i), strconv.Itoa(int(val)))
+			}
+		}
+	}
+
+	// Expose string list via response headers.
+	strSize, ok := f.handle.GetMetadataListSize(source, "ns", "strings")
+	if ok {
+		headers.Set("x-list-str-size", strconv.Itoa(strSize))
+		for i := 0; i < strSize; i++ {
+			val, ok := f.handle.GetMetadataListString(source, "ns", "strings", i)
+			if ok {
+				headers.Set(fmt.Sprintf("x-list-str-%d", i), string(val.ToBytes()))
+			}
+		}
+	}
+
+	// Expose bool list via response headers.
+	boolSize, ok := f.handle.GetMetadataListSize(source, "ns", "bools")
+	if ok {
+		headers.Set("x-list-bool-size", strconv.Itoa(boolSize))
+		for i := 0; i < boolSize; i++ {
+			val, ok := f.handle.GetMetadataListBool(source, "ns", "bools", i)
+			if ok {
+				if val {
+					headers.Set(fmt.Sprintf("x-list-bool-%d", i), "true")
+				} else {
+					headers.Set(fmt.Sprintf("x-list-bool-%d", i), "false")
+				}
+			}
+		}
+	}
+
+	return shared.HeadersStatusContinue
 }

@@ -1,3 +1,4 @@
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -116,6 +117,36 @@ TEST(JsonEscapeTest, Escape) {
   expect_json_escape("\x1d", "\\u001d");
   expect_json_escape("\x1e", "\\u001e");
   expect_json_escape("\x1f", "\\u001f");
+}
+
+// Regression test for off-by-one write when control characters appear at the end of input.
+TEST(JsonEscapeTest, NulTerminatorIntegrity) {
+  const auto verify_nul_terminator = [](absl::string_view input) {
+    std::string escaped = JsonEscaper::escapeString(input, JsonEscaper::extraSpace(input));
+
+    // Verify the null terminator is intact.
+    EXPECT_EQ('\0', escaped.c_str()[escaped.size()])
+        << "null terminator corrupted for input ending with control character";
+
+    // Verify strlen matches the size. A corrupted null terminator would cause strlen
+    // to read past the string boundary.
+    EXPECT_EQ(escaped.size(), std::strlen(escaped.c_str()))
+        << "strlen mismatch indicates NUL terminator corruption";
+  };
+
+  // Test control characters at the end of input. These would trigger the buggy code path.
+  verify_nul_terminator("\x01");                           // Single control char.
+  verify_nul_terminator("\x00");                           // Single NUL.
+  verify_nul_terminator("test\x01");                       // Trailing control char.
+  verify_nul_terminator(absl::string_view("test\x00", 5)); // Trailing NUL.
+  verify_nul_terminator("\x01\x02");                       // Multiple control chars.
+  verify_nul_terminator("test\x01\x02");                   // Multiple trailing control chars.
+  verify_nul_terminator(std::string(100, 'A') + "\x1f");   // Large string ending with control char.
+
+  // Test control characters not at the end. These should always work.
+  verify_nul_terminator("\x01test");         // Leading control char.
+  verify_nul_terminator("te\x01st");         // Middle control char.
+  verify_nul_terminator("\x01test\x02more"); // Multiple control chars in middle.
 }
 
 class LoggerCustomFlagsTest : public testing::TestWithParam<spdlog::logger*> {

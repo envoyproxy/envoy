@@ -19,9 +19,9 @@ namespace Matching {
 namespace InputMatchers {
 namespace CelMatcher {
 
+using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::InputMatcher;
 using ::Envoy::Matcher::InputMatcherFactoryCb;
-using ::Envoy::Matcher::MatchingDataType;
 
 using CelMatcher = ::xds::type::matcher::v3::CelMatcher;
 using BaseActivationPtr = std::unique_ptr<google::api::expr::runtime::BaseActivation>;
@@ -32,11 +32,11 @@ public:
   CelInputMatcher(CelMatcherSharedPtr cel_matcher,
                   Filters::Common::Expr::BuilderInstanceSharedConstPtr builder);
 
-  Matcher::MatchResult match(const MatchingDataType& input) override;
+  Matcher::MatchResult match(const DataInputGetResult& input) override;
 
   // TODO(tyxia) Formalize the validation approach. Use fixed string for now.
-  absl::flat_hash_set<std::string> supportedDataInputTypes() const override {
-    return absl::flat_hash_set<std::string>{"cel_data_input"};
+  bool supportsDataInputType(absl::string_view data_type) const override {
+    return data_type == "cel_data_input";
   }
 
 private:

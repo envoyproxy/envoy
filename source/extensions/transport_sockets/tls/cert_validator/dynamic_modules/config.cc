@@ -319,7 +319,7 @@ absl::StatusOr<CertValidatorPtr> DynamicModuleCertValidatorFactory::createCertVa
 
   std::string validator_config_str;
   if (proto_config.has_validator_config()) {
-    auto config_or_error = MessageUtil::anyToBytes(proto_config.validator_config());
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.validator_config());
     RETURN_IF_NOT_OK_REF(config_or_error.status());
     validator_config_str = std::move(config_or_error.value());
   }

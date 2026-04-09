@@ -44,3 +44,23 @@ envoy_cc_test(
         "//library/common/network:synthetic_address_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "apple_network_change_monitor_impl_test",
+    srcs = select({
+        "@envoy//bazel:apple": [
+            "apple_network_change_monitor_impl_test.mm",
+        ],
+        "//conditions:default": [],
+    }),
+    repository = "@envoy",
+    deps = select({
+        "@envoy//bazel:apple": [
+            "//library/common/api:c_types",
+            "//library/common/network:apple_network_change_monitor_lib",
+            "//test/test_common:utility_lib",
+            "@envoy//test/test_common:utility_lib",
+        ],
+        "//conditions:default": [],
+    }),
+)

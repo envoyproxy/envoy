@@ -56,15 +56,10 @@ TEST(HttpDynamicModuleDataInputTest, GetWithAllHeaders) {
   data.onResponseTrailers(response_trailers);
 
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_,
-            ::Envoy::Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.availability(), ::Envoy::Matcher::DataAvailability::AllDataAvailable);
 
-  auto* custom_data =
-      absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&result.data_);
-  ASSERT_NE(nullptr, custom_data);
-
-  auto* match_data = dynamic_cast<DynamicModuleMatchData*>(custom_data->get());
-  ASSERT_NE(nullptr, match_data);
+  auto match_data = result.customData<DynamicModuleMatchData>();
+  ASSERT_NE(absl::nullopt, match_data);
 
   EXPECT_NE(nullptr, match_data->request_headers_);
   EXPECT_NE(nullptr, match_data->response_headers_);
@@ -79,15 +74,9 @@ TEST(HttpDynamicModuleDataInputTest, GetWithRequestHeadersOnly) {
   data.onRequestHeaders(request_headers);
 
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_,
-            ::Envoy::Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
-
-  auto* custom_data =
-      absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&result.data_);
-  ASSERT_NE(nullptr, custom_data);
-
-  auto* match_data = dynamic_cast<DynamicModuleMatchData*>(custom_data->get());
-  ASSERT_NE(nullptr, match_data);
+  EXPECT_EQ(result.availability(), ::Envoy::Matcher::DataAvailability::AllDataAvailable);
+  auto match_data = result.customData<DynamicModuleMatchData>();
+  ASSERT_NE(absl::nullopt, match_data);
 
   EXPECT_NE(nullptr, match_data->request_headers_);
   EXPECT_EQ(nullptr, match_data->response_headers_);
@@ -99,15 +88,10 @@ TEST(HttpDynamicModuleDataInputTest, GetWithNoHeaders) {
   ::Envoy::Http::Matching::HttpMatchingDataImpl data(createStreamInfo());
 
   auto result = input.get(data);
-  EXPECT_EQ(result.data_availability_,
-            ::Envoy::Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.availability(), ::Envoy::Matcher::DataAvailability::AllDataAvailable);
 
-  auto* custom_data =
-      absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&result.data_);
-  ASSERT_NE(nullptr, custom_data);
-
-  auto* match_data = dynamic_cast<DynamicModuleMatchData*>(custom_data->get());
-  ASSERT_NE(nullptr, match_data);
+  auto match_data = result.customData<DynamicModuleMatchData>();
+  ASSERT_NE(absl::nullopt, match_data);
 
   EXPECT_EQ(nullptr, match_data->request_headers_);
   EXPECT_EQ(nullptr, match_data->response_headers_);

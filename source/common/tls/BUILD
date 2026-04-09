@@ -150,6 +150,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
@@ -162,6 +163,7 @@ envoy_cc_library(
     deps = [
         ":context_config_lib",
         ":server_context_lib",
+        "//source/common/ssl:ssl_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
@@ -182,6 +184,7 @@ envoy_cc_library(
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
+        ":cert_compression_lib",
         ":stats_lib",
         ":utility_lib",
         "//envoy/ssl:context_config_interface",
@@ -254,8 +257,25 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:hex_lib",
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/ssl:ssl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "cert_compression_lib",
+    srcs = ["cert_compression.cc"],
+    hdrs = ["cert_compression.h"],
+    external_deps = ["ssl"],
+    deps = [
+        "//bazel:zlib",
+        "//envoy/ssl:context_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "@brotli//:brotlidec",
+        "@brotli//:brotlienc",
     ],
 )

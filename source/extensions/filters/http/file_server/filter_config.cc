@@ -6,6 +6,7 @@
 
 #include "source/common/common/thread.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_split.h"
 
 namespace Envoy {
@@ -98,6 +99,7 @@ absl::string_view FileServerConfig::contentTypeForPath(const std::filesystem::pa
     // Remove the dot.
     suffix = suffix.substr(1);
   }
+  absl::AsciiStrToLower(&suffix);
   auto it = content_types_.find(suffix);
   if (it == content_types_.end()) {
     return default_content_type_;

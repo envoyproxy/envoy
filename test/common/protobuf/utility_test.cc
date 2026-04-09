@@ -1441,6 +1441,38 @@ TEST_F(ProtobufUtilityTest, AnyBytes) {
   }
 }
 
+TEST_F(ProtobufUtilityTest, KnownAnyToBytes) {
+  {
+    Protobuf::StringValue source;
+    source.set_value("abc");
+    Protobuf::Any source_any;
+    source_any.PackFrom(source);
+    EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), "abc");
+  }
+  {
+    Protobuf::BytesValue source;
+    source.set_value("\x01\x02\x03");
+    Protobuf::Any source_any;
+    source_any.PackFrom(source);
+    EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), "\x01\x02\x03");
+  }
+  {
+    Protobuf::Struct source;
+    (*source.mutable_fields())["key"].set_string_value("value");
+    Protobuf::Any source_any;
+    source_any.PackFrom(source);
+    auto result = MessageUtil::knownAnyToBytes(source_any);
+    ASSERT_TRUE(result.ok());
+    EXPECT_EQ(*result, R"({"key":"value"})");
+  }
+  {
+    envoy::config::cluster::v3::Filter filter;
+    Protobuf::Any source_any;
+    source_any.PackFrom(filter);
+    EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), source_any.value());
+  }
+}
+
 // MessageUtility::anyConvert() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   Protobuf::Duration source_duration;

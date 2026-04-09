@@ -34,10 +34,10 @@ envoy_dynamic_module_type_cluster_module_ptr envoy_dynamic_module_on_cluster_new
 }
 
 void envoy_dynamic_module_on_cluster_init(
-    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
-    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
-  (void)cluster_module_ptr;
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr) {
   (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
 }
 
 void envoy_dynamic_module_on_cluster_destroy(
@@ -58,10 +58,36 @@ void envoy_dynamic_module_on_cluster_lb_destroy(
   (void)lb_module_ptr;
 }
 
-envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_on_cluster_lb_choose_host(
+void envoy_dynamic_module_on_cluster_lb_choose_host(
     envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
-    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr) {
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* host_out,
+    envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr* async_handle_out) {
   (void)lb_module_ptr;
   (void)context_envoy_ptr;
-  return NULL;
+  *host_out = NULL;
+  *async_handle_out = NULL;
+}
+
+void envoy_dynamic_module_on_cluster_server_initialized(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr) {
+  (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
+}
+
+void envoy_dynamic_module_on_cluster_drain_started(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr) {
+  (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
+}
+
+void envoy_dynamic_module_on_cluster_shutdown(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_event_cb completion_callback, void* completion_context) {
+  (void)cluster_envoy_ptr;
+  (void)cluster_module_ptr;
+  completion_callback(completion_context);
 }

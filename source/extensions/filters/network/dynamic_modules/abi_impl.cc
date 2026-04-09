@@ -626,6 +626,54 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
   return true;
 }
 
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, bool value) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto& stream_info = filter->connection().streamInfo();
+
+  std::string namespace_str(filter_namespace.ptr, filter_namespace.length);
+  absl::string_view key_view(key.ptr, key.length);
+
+  // Get or create the metadata for this namespace.
+  Protobuf::Struct metadata(
+      (*stream_info.dynamicMetadata().mutable_filter_metadata())[namespace_str]);
+  auto& fields = *metadata.mutable_fields();
+  fields[std::string(key_view)].set_bool_value(value);
+  stream_info.setDynamicMetadata(namespace_str, metadata);
+}
+
+bool envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, bool* result) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto& stream_info = filter->connection().streamInfo();
+
+  std::string namespace_str(filter_namespace.ptr, filter_namespace.length);
+  std::string key_str(key.ptr, key.length);
+
+  const auto& metadata_map = stream_info.dynamicMetadata().filter_metadata();
+  auto namespace_it = metadata_map.find(namespace_str);
+  if (namespace_it == metadata_map.end()) {
+    return false;
+  }
+
+  const auto& fields = namespace_it->second.fields();
+  auto field_it = fields.find(key_str);
+  if (field_it == fields.end()) {
+    return false;
+  }
+
+  if (!field_it->second.has_bool_value()) {
+    return false;
+  }
+
+  *result = field_it->second.bool_value();
+  return true;
+}
+
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_network_filter_http_callout(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,

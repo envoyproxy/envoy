@@ -38,8 +38,7 @@ public:
     match_data->request_headers_ = data.requestHeaders().ptr();
     match_data->response_headers_ = data.responseHeaders().ptr();
     match_data->response_trailers_ = data.responseTrailers().ptr();
-    return {::Envoy::Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::move(match_data)};
+    return ::Envoy::Matcher::DataInputGetResult::CreateCustom(std::move(match_data));
   }
 
   absl::string_view dataInputType() const override { return "dynamic_module_data_input"; }

@@ -1734,6 +1734,211 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCa
 }
 
 // =============================================================================
+// Tests for set/get dynamic_metadata_number.
+// =============================================================================
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetAndGetDynamicMetadataNumber) {
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(callbacks_, setDynamicMetadata(std::string("test_ns"), testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())["test_ns"]));
+
+  char ns[] = "test_ns";
+  char key[] = "num_key";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 7};
+
+  // Set a number value.
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(filterPtr(), ns_buf,
+                                                                            key_buf, 42.5);
+
+  // Verify by reading it back.
+  double result = 0.0;
+  bool ok = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+      filterPtr(), ns_buf, key_buf, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_DOUBLE_EQ(42.5, result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNumberOverwrite) {
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(callbacks_, setDynamicMetadata(std::string("test_ns"), testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())["test_ns"]));
+
+  char ns[] = "test_ns";
+  char key[] = "num_key";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 7};
+
+  // Set initial value.
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(filterPtr(), ns_buf,
+                                                                            key_buf, 1.0);
+
+  double result = 0.0;
+  bool ok = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+      filterPtr(), ns_buf, key_buf, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_DOUBLE_EQ(1.0, result);
+
+  // Overwrite with a different value.
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(filterPtr(), ns_buf,
+                                                                            key_buf, -99.9);
+
+  ok = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+      filterPtr(), ns_buf, key_buf, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_DOUBLE_EQ(-99.9, result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNumberZero) {
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(callbacks_, setDynamicMetadata(std::string("test_ns"), testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())["test_ns"]));
+
+  char ns[] = "test_ns";
+  char key[] = "zero_key";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 8};
+
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(filterPtr(), ns_buf,
+                                                                            key_buf, 0.0);
+
+  double result = 999.0;
+  bool ok = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+      filterPtr(), ns_buf, key_buf, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_DOUBLE_EQ(0.0, result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNumberNamespaceNotFound) {
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+
+  char ns[] = "missing_ns";
+  char key[] = "key1";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 10};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
+
+  double result = 0.0;
+  bool ok = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+      filterPtr(), ns_buf, key_buf, &result);
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNumberKeyNotFound) {
+  envoy::config::core::v3::Metadata metadata;
+  (*metadata.mutable_filter_metadata())["test_ns"]
+      .mutable_fields()
+      ->operator[]("other_key")
+      .set_number_value(123.0);
+
+  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+
+  char ns[] = "test_ns";
+  char key[] = "missing_key";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 11};
+
+  double result = 0.0;
+  bool ok = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+      filterPtr(), ns_buf, key_buf, &result);
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNumberWrongType) {
+  envoy::config::core::v3::Metadata metadata;
+  (*metadata.mutable_filter_metadata())["test_ns"]
+      .mutable_fields()
+      ->operator[]("key1")
+      .set_string_value("not_a_number");
+
+  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+
+  char ns[] = "test_ns";
+  char key[] = "key1";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
+
+  double result = 0.0;
+  bool ok = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+      filterPtr(), ns_buf, key_buf, &result);
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNumberNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  char ns[] = "test_ns";
+  char key[] = "key1";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
+
+  double result = 0.0;
+  bool ok = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+      static_cast<void*>(filter.get()), ns_buf, key_buf, &result);
+  EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNumberNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  char ns[] = "test_ns";
+  char key[] = "num_key";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 7};
+  // Should not crash.
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
+      static_cast<void*>(filter.get()), ns_buf, key_buf, 42.0);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNumberNullNamespace) {
+  char key[] = "num_key";
+  envoy_dynamic_module_type_module_buffer ns_buf = {nullptr, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 7};
+  // Should not crash with null namespace.
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(filterPtr(), ns_buf,
+                                                                            key_buf, 42.0);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNumberNullKey) {
+  char ns[] = "test_ns";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {nullptr, 7};
+  // Should not crash with null key.
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(filterPtr(), ns_buf,
+                                                                            key_buf, 42.0);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataStringWrongTypeNumber) {
+  envoy::config::core::v3::Metadata metadata;
+  (*metadata.mutable_filter_metadata())["test_ns"]
+      .mutable_fields()
+      ->operator[]("key1")
+      .set_number_value(123.0);
+
+  EXPECT_CALL(callbacks_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+
+  char ns[] = "test_ns";
+  char key[] = "key1";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
+  envoy_dynamic_module_type_envoy_buffer value_out = {nullptr, 0};
+
+  // Try to get a number value as string. It should fail.
+  bool found = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
+      filterPtr(), ns_buf, key_buf, &value_out);
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, value_out.ptr);
+  EXPECT_EQ(0, value_out.length);
+}
+
+// =============================================================================
 // Tests for max_read_bytes.
 // =============================================================================
 

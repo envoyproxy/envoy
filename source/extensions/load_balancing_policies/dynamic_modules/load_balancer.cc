@@ -14,7 +14,19 @@ DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(DynamicModuleLbConfigShared
   in_module_lb_ = config_->on_lb_new_(config_->in_module_config_, this);
   if (in_module_lb_ == nullptr) {
     ENVOY_LOG(error, "failed to create in-module load balancer instance");
+    return;
   }
+
+  // Register for host membership updates.
+  member_update_cb_ = priority_set_.addMemberUpdateCb(
+      [this](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
+        hosts_added_ = &hosts_added;
+        hosts_removed_ = &hosts_removed;
+        config_->on_host_membership_update_(this, in_module_lb_, hosts_added.size(),
+                                            hosts_removed.size());
+        hosts_added_ = nullptr;
+        hosts_removed_ = nullptr;
+      });
 }
 
 DynamicModuleLoadBalancer::~DynamicModuleLoadBalancer() {

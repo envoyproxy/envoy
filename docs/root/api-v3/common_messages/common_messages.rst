@@ -12,6 +12,7 @@ Common messages
   ../config/core/v3/base.proto
   ../config/core/v3/cel.proto
   ../extensions/filters/common/matcher/action/v3/skip_action.proto
+  ../extensions/matching/actions/transform_stat/v3/transform_stat.proto
   ../extensions/matching/common_inputs/network/v3/network_inputs.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto
   ../extensions/matching/common_inputs/stats/v3/stats.proto

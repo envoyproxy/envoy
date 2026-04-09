@@ -12,10 +12,10 @@ namespace Matching {
 Matcher::DataInputGetResult ApplicationProtocolInput::get(const MatchingData& data) const {
   const auto& protocols = data.socket().requestedApplicationProtocols();
   if (!protocols.empty()) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            absl::StrCat("'", absl::StrJoin(protocols, "','"), "'")};
+    return Matcher::DataInputGetResult::CreateString(
+        absl::StrCat("'", absl::StrJoin(protocols, "','"), "'"));
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+  return Matcher::DataInputGetResult::NoData();
 }
 
 REGISTER_FACTORY(ApplicationProtocolInputFactory, Matcher::DataInputFactory<MatchingData>);

@@ -17,6 +17,8 @@ namespace NetworkFilters {
 namespace GenericProxy {
 namespace {
 
+using ::Envoy::Matcher::DataInputGetResult;
+
 TEST(ServiceMatchDataInputTest, ServiceMatchDataInputTest) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   ServiceMatchDataInputFactory factory;
@@ -28,11 +30,13 @@ TEST(ServiceMatchDataInputTest, ServiceMatchDataInputTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", absl::get<std::string>(input->get(match_input).data_));
+  auto result = input->get(match_input);
+  EXPECT_EQ("", result.stringData().value());
 
   request.host_ = "fake_host_as_service";
 
-  EXPECT_EQ("fake_host_as_service", absl::get<std::string>(input->get(match_input).data_));
+  auto result2 = input->get(match_input);
+  EXPECT_EQ("fake_host_as_service", result2.stringData().value());
 }
 
 TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
@@ -46,11 +50,13 @@ TEST(HostMatchDataInputTest, HostMatchDataInputTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", absl::get<std::string>(input->get(match_input).data_));
+  auto result = input->get(match_input);
+  EXPECT_EQ("", result.stringData().value());
 
   request.host_ = "fake_host_as_service";
 
-  EXPECT_EQ("fake_host_as_service", absl::get<std::string>(input->get(match_input).data_));
+  auto result2 = input->get(match_input);
+  EXPECT_EQ("fake_host_as_service", result2.stringData().value());
 }
 
 TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
@@ -64,11 +70,13 @@ TEST(PathMatchDataInputTest, PathMatchDataInputTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", absl::get<std::string>(input->get(match_input).data_));
+  auto result = input->get(match_input);
+  EXPECT_EQ("", result.stringData().value());
 
   request.path_ = "fake_path";
 
-  EXPECT_EQ("fake_path", absl::get<std::string>(input->get(match_input).data_));
+  auto result2 = input->get(match_input);
+  EXPECT_EQ("fake_path", result2.stringData().value());
 }
 
 TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
@@ -82,11 +90,13 @@ TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_EQ("", absl::get<std::string>(input->get(match_input).data_));
+  auto result = input->get(match_input);
+  EXPECT_EQ("", result.stringData().value());
 
   request.method_ = "fake_method";
 
-  EXPECT_EQ("fake_method", absl::get<std::string>(input->get(match_input).data_));
+  auto result2 = input->get(match_input);
+  EXPECT_EQ("fake_method", result2.stringData().value());
 }
 
 TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
@@ -105,11 +115,13 @@ TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(input->get(match_input).data_));
+  auto result = input->get(match_input);
+  EXPECT_EQ(absl::nullopt, result.stringData());
 
   request.data_["key_0"] = "value_0";
 
-  EXPECT_EQ("value_0", absl::get<std::string>(input->get(match_input).data_));
+  auto result2 = input->get(match_input);
+  EXPECT_EQ("value_0", result2.stringData().value());
 }
 
 TEST(RequestMatchDataInputTest, RequestMatchDataInputTest) {
@@ -130,9 +142,10 @@ TEST(RequestMatchDataInputTest, RequestMatchDataInputTest) {
   EXPECT_EQ(&stream_info, &match_input.streamInfo());
   EXPECT_EQ(MatchAction::RouteAction, match_input.expectAction());
 
-  auto custom_match_data =
-      absl::get<std::shared_ptr<Matcher::CustomMatchData>>(input->get(match_input).data_);
-  EXPECT_EQ(&match_input, &dynamic_cast<const RequestMatchData*>(custom_match_data.get())->data());
+  auto result = input->get(match_input);
+  auto custom_match_data = result.customData<RequestMatchData>();
+  ASSERT_TRUE(custom_match_data.has_value());
+  EXPECT_EQ(&match_input, &custom_match_data->data());
 }
 
 class FakeCustomMatchData : public Matcher::CustomMatchData {};
@@ -144,22 +157,20 @@ TEST(RequestMatchInputMatcherTest, RequestMatchInputMatcherTest) {
   auto matcher =
       factory.createInputMatcherFactoryCb(*proto_config, factory_context.serverFactoryContext())();
 
-  EXPECT_EQ(*matcher->supportedDataInputTypes().begin(),
-            "Envoy::Extensions::NetworkFilters::GenericProxy::RequestMatchData");
+  EXPECT_TRUE(matcher->supportsDataInputType(
+      "Envoy::Extensions::NetworkFilters::GenericProxy::RequestMatchData"));
+
+  { EXPECT_EQ(matcher->match(DataInputGetResult::NoData()), Matcher::MatchResult::NoMatch); }
 
   {
-    Matcher::MatchingDataType input;
-    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::NoMatch);
+    EXPECT_EQ(matcher->match(DataInputGetResult::CreateString("fake_data")),
+              Matcher::MatchResult::NoMatch);
   }
 
   {
-    Matcher::MatchingDataType input = std::string("fake_data");
-    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::NoMatch);
-  }
-
-  {
-    Matcher::MatchingDataType input = std::make_shared<FakeCustomMatchData>();
-    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::NoMatch);
+    EXPECT_EQ(
+        matcher->match(DataInputGetResult::CreateCustom(std::make_shared<FakeCustomMatchData>())),
+        Matcher::MatchResult::NoMatch);
   }
 
   {
@@ -167,8 +178,9 @@ TEST(RequestMatchInputMatcherTest, RequestMatchInputMatcherTest) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
-    Matcher::MatchingDataType input = std::make_shared<RequestMatchData>(match_input);
-    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::Matched);
+    EXPECT_EQ(matcher->match(DataInputGetResult::CreateCustom(
+                  std::make_shared<RequestMatchData>(match_input))),
+              Matcher::MatchResult::Matched);
   }
 }
 

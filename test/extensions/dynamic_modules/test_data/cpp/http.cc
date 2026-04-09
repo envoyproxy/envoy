@@ -13,7 +13,7 @@ namespace DynamicModules {
 
 class ConfigInitFailureConfigFactory : public HttpFilterConfigFactory {
 public:
-  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, absl::string_view) override {
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
     // Return null to simulate failure.
     return nullptr;
   }
@@ -122,7 +122,7 @@ private:
 class StatsCallbacksConfigFactory : public HttpFilterConfigFactory {
 public:
   std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
-                                            absl::string_view) override {
+                                            std::string_view) override {
     return std::make_unique<StatsCallbacksFactory>(handle);
   }
 };
@@ -137,6 +137,7 @@ public:
 
   HeadersStatus onRequestHeaders(HeaderMap& headers, bool) override {
     handle_.clearRouteCache();
+    handle_.refreshRouteCluster();
 
     testHeaders(headers);
 
@@ -230,7 +231,7 @@ public:
 
 class HeaderCallbacksConfigFactory : public HttpFilterConfigFactory {
 public:
-  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, absl::string_view) override {
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
     return std::make_unique<HeaderCallbacksFactory>();
   }
 };
@@ -272,7 +273,7 @@ public:
 
 class SendResponseConfigFactory : public HttpFilterConfigFactory {
 public:
-  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, absl::string_view) override {
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
     return std::make_unique<SendResponseFactory>();
   }
 };
@@ -419,6 +420,15 @@ public:
     assert(ns_set.count("ns_keys_test") && "missing ns_keys_test in namespaces");
     assert(ns_set.count("ns_res_body_bool") && "missing ns_res_body_bool in namespaces");
 
+    // Test list metadata.
+    handle_.addMetadataList("ns_list", "list_key", 1.0);
+    handle_.addMetadataList("ns_list", "list_key", 2.0);
+    handle_.addMetadataList("ns_list", "list_key", 3.0);
+    handle_.addMetadataList("ns_list", "str_list_key", "hello");
+    handle_.addMetadataList("ns_list", "str_list_key", "world");
+    handle_.addMetadataList("ns_list", "bool_list_key", true);
+    handle_.addMetadataList("ns_list", "bool_list_key", false);
+
     return BodyStatus::Continue;
   }
 
@@ -440,7 +450,7 @@ public:
 
 class DynamicMetadataCallbacksConfigFactory : public HttpFilterConfigFactory {
 public:
-  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, absl::string_view) override {
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
     return std::make_unique<DynamicMetadataCallbacksFactory>();
   }
 };
@@ -491,7 +501,7 @@ public:
   void onDestroy() override {}
 
 private:
-  void testFilterState(absl::string_view key, absl::string_view value) {
+  void testFilterState(std::string_view key, std::string_view value) {
     handle_.setFilterState(key, value);
     if (auto val = handle_.getFilterState(key); !val || *val != value) {
       assert(false && "filter state mismatch");
@@ -513,7 +523,7 @@ public:
 
 class FilterStateCallbacksConfigFactory : public HttpFilterConfigFactory {
 public:
-  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, absl::string_view) override {
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
     return std::make_unique<FilterStateCallbacksFactory>();
   }
 };
@@ -596,7 +606,7 @@ public:
 
 class BodyCallbacksConfigFactory : public HttpFilterConfigFactory {
 public:
-  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, absl::string_view) override {
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
     return std::make_unique<BodyCallbacksFactory>();
   }
 };

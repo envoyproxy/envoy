@@ -32,6 +32,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
     "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
+    "envoy.filters.network.peer_metadata":                      "//contrib/istio/filters/network/peer_metadata/source:config",
 
     #
     # Listener filters
@@ -45,6 +46,12 @@ CONTRIB_EXTENSIONS = {
 
     "envoy.filters.network.sip_proxy":                          "//contrib/sip_proxy/filters/network/source:config",
     "envoy.filters.sip.router":                                 "//contrib/sip_proxy/filters/network/source/router:config",
+
+    #
+    # Stat sinks
+    #
+
+    "envoy.stat_sinks.kafka":                            "//contrib/kafka/stat_sinks/source:config_lib",
 
     #
     # Tap sinks

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/callback.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
@@ -37,11 +38,22 @@ public:
   bool setHostData(uint32_t priority, size_t index, uintptr_t data);
   bool getHostData(uint32_t priority, size_t index, uintptr_t* data) const;
 
+  // Accessors for hosts added/removed during the on_host_membership_update callback.
+  const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
+  const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
+
 private:
   DynamicModuleLbConfigSharedPtr config_;
   const Upstream::PrioritySet& priority_set_;
   std::string cluster_name_;
   envoy_dynamic_module_type_lb_module_ptr in_module_lb_;
+
+  // Handle for the member update callback registration. Automatically unregisters on destruction.
+  Envoy::Common::CallbackHandlePtr member_update_cb_;
+
+  // Temporary pointers to host vectors, valid only during on_host_membership_update callback.
+  const Upstream::HostVector* hosts_added_{};
+  const Upstream::HostVector* hosts_removed_{};
 
   // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
   absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;

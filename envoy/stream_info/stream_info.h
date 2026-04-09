@@ -293,6 +293,7 @@ struct LocalCloseReasonValues {
       "closing_upstream_tcp_connection_due_to_downstream_reset_close";
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
+  const std::string BufferHighWatermarkTimeout = "buffer_high_watermark_timeout_reached";
 };
 
 using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
@@ -923,15 +924,26 @@ public:
   virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
 
   /**
-   * @return const Router::RouteConstSharedPtr Get the route selected for this request.
+   * @return OptRef<const Router::Route> Get the route selected for this request.
    */
-  virtual Router::RouteConstSharedPtr route() const PURE;
+  virtual OptRef<const Router::Route> route() const PURE;
 
   /**
-   * @return const Router::VirtualHostConstSharedPtr& Get the virtual host selected for this
-   * request.
+   * @return Router::RouteConstSharedPtr Get the route selected for this request, extended to
+   * allow a caller to extend or transfer ownership.
    */
-  virtual const Router::VirtualHostConstSharedPtr& virtualHost() const PURE;
+  virtual Router::RouteConstSharedPtr routeSharedPtr() const PURE;
+
+  /**
+   * @return OptRef<const Router::VirtualHost> Get the virtual host selected for this request.
+   */
+  virtual OptRef<const Router::VirtualHost> virtualHost() const PURE;
+
+  /**
+   * @return Router::VirtualHostConstSharedPtr Get the virtual host selected for this request,
+   * extended to allow a caller to extend or transfer ownership.
+   */
+  virtual Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
@@ -981,11 +993,15 @@ public:
   setUpstreamClusterInfo(const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) PURE;
 
   /**
-   * @return Upstream Connection's ClusterInfo.
-   * This returns an optional to differentiate between unset(absl::nullopt),
-   * no route or cluster does not exist(nullptr), and set to a valid cluster(not nullptr).
+   * @return OptRef<const Upstream::ClusterInfo> Get the cluster info for this request.
    */
-  virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
+  virtual OptRef<const Upstream::ClusterInfo> upstreamClusterInfo() const PURE;
+
+  /**
+   * @return Upstream::ClusterInfoConstSharedPtr Get the cluster info for this request, extended to
+   * allow a caller to extend or transfer ownership.
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr upstreamClusterInfoSharedPtr() const PURE;
 
   /**
    * @param provider The unique id implementation this stream uses.

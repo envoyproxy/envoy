@@ -35,8 +35,9 @@ public:
         Extensions::DynamicModules::testSharedObjectPath("access_log_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto config = newDynamicModuleAccessLogConfig(
-        "test_logger", "config", std::move(dynamic_module.value()), *stats_.rootScope());
+    auto config =
+        newDynamicModuleAccessLogConfig("test_logger", "config", DefaultMetricsNamespace,
+                                        std::move(dynamic_module.value()), *stats_.rootScope());
     EXPECT_TRUE(config.ok()) << config.status().message();
     config_ = std::move(config.value());
   }
@@ -226,8 +227,9 @@ TEST_F(DynamicModuleAccessLogTest, FactoryFunctionMissingSymbol) {
       false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto config = newDynamicModuleAccessLogConfig(
-      "test_logger", "config", std::move(dynamic_module.value()), *stats_.rootScope());
+  auto config =
+      newDynamicModuleAccessLogConfig("test_logger", "config", DefaultMetricsNamespace,
+                                      std::move(dynamic_module.value()), *stats_.rootScope());
   EXPECT_FALSE(config.ok());
   EXPECT_THAT(config.status().message(), testing::HasSubstr("config_new"));
 }
@@ -242,8 +244,9 @@ TEST_F(DynamicModuleAccessLogTest, FactoryFunctionModuleReturnsNull) {
     GTEST_SKIP() << "Test module access_log_config_new_fail not available";
   }
 
-  auto config = newDynamicModuleAccessLogConfig(
-      "test_logger", "config", std::move(dynamic_module.value()), *stats_.rootScope());
+  auto config =
+      newDynamicModuleAccessLogConfig("test_logger", "config", DefaultMetricsNamespace,
+                                      std::move(dynamic_module.value()), *stats_.rootScope());
   EXPECT_FALSE(config.ok());
   EXPECT_THAT(config.status().message(), testing::HasSubstr("Failed to initialize"));
 }
@@ -263,7 +266,7 @@ TEST_F(DynamicModuleAccessLogTest, MetricsCounterDefineAndIncrement) {
                 static_cast<void*>(config_.get()), counter_id, 5));
 
   // Verify the counter value.
-  auto counter = TestUtility::findCounter(stats_, "dynamic_module_access_logger.test_counter");
+  auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.test_counter");
   ASSERT_NE(nullptr, counter);
   EXPECT_EQ(5, counter->value());
 }
@@ -291,7 +294,7 @@ TEST_F(DynamicModuleAccessLogTest, MetricsGaugeDefineAndManipulate) {
                 static_cast<void*>(config_.get()), gauge_id, 5));
 
   // Verify the gauge value: 100 + 10 - 5 = 105.
-  auto gauge = TestUtility::findGauge(stats_, "dynamic_module_access_logger.test_gauge");
+  auto gauge = TestUtility::findGauge(stats_, "dynamicmodulescustom.test_gauge");
   ASSERT_NE(nullptr, gauge);
   EXPECT_EQ(105, gauge->value());
 }

@@ -39,8 +39,7 @@ inline constexpr absl::string_view GenericRequestMatcheInputType =
 class ServiceMatchDataInput : public Matcher::DataInput<MatchInput> {
 public:
   Matcher::DataInputGetResult get(const MatchInput& data) const override {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.requestHeader().host())};
+    return Matcher::DataInputGetResult::CreateString(std::string(data.requestHeader().host()));
   }
 };
 
@@ -63,8 +62,7 @@ public:
 class HostMatchDataInput : public Matcher::DataInput<MatchInput> {
 public:
   Matcher::DataInputGetResult get(const MatchInput& data) const override {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.requestHeader().host())};
+    return Matcher::DataInputGetResult::CreateString(std::string(data.requestHeader().host()));
   }
 };
 
@@ -87,8 +85,7 @@ public:
 class PathMatchDataInput : public Matcher::DataInput<MatchInput> {
 public:
   Matcher::DataInputGetResult get(const MatchInput& data) const override {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.requestHeader().path())};
+    return Matcher::DataInputGetResult::CreateString(std::string(data.requestHeader().path()));
   }
 };
 
@@ -111,8 +108,7 @@ public:
 class MethodMatchDataInput : public Matcher::DataInput<MatchInput> {
 public:
   Matcher::DataInputGetResult get(const MatchInput& data) const override {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(data.requestHeader().method())};
+    return Matcher::DataInputGetResult::CreateString(std::string(data.requestHeader().method()));
   }
 };
 
@@ -138,10 +134,8 @@ public:
 
   Matcher::DataInputGetResult get(const MatchInput& data) const override {
     const auto value = data.requestHeader().get(name_);
-    Matcher::MatchingDataType matching_data =
-        value.has_value() ? Matcher::MatchingDataType(std::string(value.value()))
-                          : absl::monostate();
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, matching_data};
+    return value.has_value() ? Matcher::DataInputGetResult::CreateString(std::string(value.value()))
+                             : Matcher::DataInputGetResult::NoData();
   }
 
 private:
@@ -185,9 +179,7 @@ public:
   RequestMatchDataInput() = default;
 
   Matcher::DataInputGetResult get(const MatchInput& data) const override {
-    auto request = std::make_shared<RequestMatchData>(data);
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            Matcher::MatchingDataType{std::move(request)}};
+    return Matcher::DataInputGetResult::CreateCustom(std::make_shared<RequestMatchData>(data));
   }
 
   absl::string_view dataInputType() const override { return GenericRequestMatcheInputType; }
@@ -214,11 +206,11 @@ public:
   RequestMatchInputMatcher(const RequestMatcherProto& config,
                            Server::Configuration::CommonFactoryContext& context);
 
-  Matcher::MatchResult match(const Matcher::MatchingDataType& input) override;
+  Matcher::MatchResult match(const Matcher::DataInputGetResult& input) override;
   Matcher::MatchResult match(const RequestHeaderFrame& request);
 
-  absl::flat_hash_set<std::string> supportedDataInputTypes() const override {
-    return absl::flat_hash_set<std::string>{std::string(GenericRequestMatcheInputType)};
+  bool supportsDataInputType(absl::string_view data_type) const override {
+    return data_type == GenericRequestMatcheInputType;
   }
 
 private:

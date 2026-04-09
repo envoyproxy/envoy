@@ -67,7 +67,7 @@ LedsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& 
     const auto& added_resource_name = added_resource.get().name();
     ENVOY_LOG(trace, "Adding/Updating endpoint {} using LEDS update.", added_resource_name);
     envoy::config::endpoint::v3::LbEndpoint lb_endpoint =
-        dynamic_cast<const envoy::config::endpoint::v3::LbEndpoint&>(
+        static_cast<const envoy::config::endpoint::v3::LbEndpoint&>(
             added_resource.get().resource());
     endpoints_map_[added_resource_name] = std::move(lb_endpoint);
   }

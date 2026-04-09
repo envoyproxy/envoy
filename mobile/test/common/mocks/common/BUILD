@@ -14,6 +14,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     repository = "@envoy",
     deps = [
+        "//library/cc:network_change_monitor_interface",
         "//library/common/system:system_helper_lib",
     ],
 )

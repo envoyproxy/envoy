@@ -127,12 +127,13 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
   return absl::StrJoin(parts, "");
 }
 
-MatchResult Matcher::match(const ::Envoy::Matcher::MatchingDataType& input) {
-  if (absl::holds_alternative<absl::monostate>(input)) {
+MatchResult Matcher::match(const ::Envoy::Matcher::DataInputGetResult& input) {
+  auto string_data = input.stringData();
+  if (!string_data) {
     return MatchResult::NoMatch;
   }
 
-  return static_cast<Envoy::Regex::CompiledMatcher*>(this)->match(absl::get<std::string>(input))
+  return static_cast<Envoy::Regex::CompiledMatcher*>(this)->match(*string_data)
              ? MatchResult::Matched
              : MatchResult::NoMatch;
 }

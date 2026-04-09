@@ -5,8 +5,12 @@
 
 #include "envoy/extensions/filters/http/a2a/v3/a2a.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/a2a/a2a_json_parser.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -75,10 +79,14 @@ private:
   bool shouldRejectRequest() const;
   uint32_t getMaxRequestBodySize() const;
 
+  void handleParseError(absl::string_view error_msg);
+  Http::FilterDataStatus completeParsing();
+
   const A2aFilterConfigSharedPtr config_;
   std::unique_ptr<A2aJsonParser> parser_;
+  uint32_t bytes_parsed_{0};
+  bool parsing_complete_{false};
   bool is_a2a_request_{false};
-  bool is_json_post_request_{false};
 };
 
 } // namespace A2a

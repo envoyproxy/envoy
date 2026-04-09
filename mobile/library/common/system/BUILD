@@ -42,6 +42,7 @@ envoy_cc_library(
         "//conditions:default": [],
     }) + select({
         "@envoy//bazel:apple": [
+            "//library/common/network:apple_network_change_monitor_lib",
             "//library/common/network:apple_platform_cert_verifier",
         ],
         "//conditions:default": [],

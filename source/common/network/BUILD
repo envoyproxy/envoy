@@ -609,6 +609,7 @@ envoy_cc_library(
         "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

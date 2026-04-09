@@ -909,6 +909,62 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
   callbacks->setDynamicMetadata(ns, metadata);
 }
 
+bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double* result) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || filter_namespace.ptr == nullptr || key.ptr == nullptr) {
+    return false;
+  }
+
+  std::string ns(filter_namespace.ptr, filter_namespace.length);
+  std::string key_str(key.ptr, key.length);
+
+  const auto& metadata = callbacks->dynamicMetadata();
+  const auto& fields = metadata.filter_metadata();
+  auto ns_it = fields.find(ns);
+
+  if (ns_it == fields.end()) {
+    return false;
+  }
+
+  const auto& ns_fields = ns_it->second.fields();
+  auto field_it = ns_fields.find(key_str);
+
+  if (field_it == ns_fields.end() ||
+      field_it->second.kind_case() != Protobuf::Value::kNumberValue) {
+    return false;
+  }
+
+  *result = field_it->second.number_value();
+  return true;
+}
+
+void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || filter_namespace.ptr == nullptr || key.ptr == nullptr) {
+    // TODO(wbpcode): These should never happen and may be converted to asserts.
+    return;
+  }
+
+  std::string ns(filter_namespace.ptr, filter_namespace.length);
+  std::string key_str(key.ptr, key.length);
+
+  Protobuf::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+  fields[key_str].set_number_value(value);
+
+  callbacks->setDynamicMetadata(ns, metadata);
+}
+
 size_t envoy_dynamic_module_callback_listener_filter_max_read_bytes(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);

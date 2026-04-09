@@ -31,6 +31,7 @@ constexpr absl::string_view kFilterNamespace = "meta_matcher";
 constexpr absl::string_view kMetadataKey = "service_name";
 constexpr absl::string_view kMetadataValue = "test_service";
 
+using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::HasNoMatch;
 using ::Envoy::Matcher::HasStringAction;
 
@@ -142,11 +143,8 @@ TEST_F(MetadataMatcherTest, BadData) {
   const auto& v = matcher_config.value();
   auto value_matcher = Envoy::Matchers::ValueMatcher::create(v, factory_context_);
 
-  ::Envoy::Matcher::MatchingDataType data = absl::monostate();
-  EXPECT_NO_THROW(Matcher(value_matcher, false).match(data));
-
-  ::Envoy::Matcher::MatchingDataType data2 = std::string("test");
-  EXPECT_NO_THROW(Matcher(value_matcher, false).match(data2));
+  EXPECT_NO_THROW(Matcher(value_matcher, false).match(DataInputGetResult::NoData()));
+  EXPECT_NO_THROW(Matcher(value_matcher, false).match(DataInputGetResult::CreateString("test")));
 }
 
 } // namespace Metadata

@@ -26,6 +26,14 @@ Network::FilterStatus SetFilterState::onNewConnection() {
   return Network::FilterStatus::Continue;
 }
 
+Network::FilterStatus SetFilterState::onData(Buffer::Instance&, bool) {
+  if (on_downstream_data_ != nullptr && waiting_for_downstream_data_) {
+    waiting_for_downstream_data_ = false;
+    on_downstream_data_->updateFilterState({}, read_callbacks_->connection().streamInfo());
+  }
+  return Network::FilterStatus::Continue;
+}
+
 void SetFilterState::onEvent(Network::ConnectionEvent event) {
   // For SSL connections the Connected event is raised after the downstream TLS handshake completes.
   // Mirror tcp_proxy's behavior: only run the TLS hook for downstream TLS connections and only
@@ -79,10 +87,17 @@ private:
               StreamInfo::FilterState::LifeSpan::Connection, context);
     }
 
-    return [on_new_connection_config,
-            on_downstream_tls_handshake_config](Network::FilterManager& filter_manager) -> void {
+    Filters::Common::SetFilterState::ConfigSharedPtr on_downstream_data_config;
+    if (!proto_config.on_downstream_data().empty()) {
+      on_downstream_data_config = std::make_shared<Filters::Common::SetFilterState::Config>(
+          proto_config.on_downstream_data(), StreamInfo::FilterState::LifeSpan::Connection,
+          context);
+    }
+
+    return [on_new_connection_config, on_downstream_tls_handshake_config,
+            on_downstream_data_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<SetFilterState>(
-          on_new_connection_config, on_downstream_tls_handshake_config));
+          on_new_connection_config, on_downstream_tls_handshake_config, on_downstream_data_config));
     };
   }
 

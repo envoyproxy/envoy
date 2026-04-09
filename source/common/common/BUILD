@@ -181,8 +181,7 @@ envoy_cc_library(
         "//envoy/filesystem:filesystem_interface",
         "//source/common/config:ttl_lib",
         "@abseil-cpp//absl/cleanup",
-        "@quiche//:quic_platform",
-        "@quiche//:quiche_common_lib",
+        "@abseil-cpp//absl/container:linked_hash_map",
     ],
 )
 

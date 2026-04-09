@@ -52,12 +52,6 @@ absl::Status validateProto(const ProtoFileServerConfig& config) {
       directory_tried = true;
     }
   }
-  for (const auto& content_type_pair : config.content_types()) {
-    if (content_type_pair.first.find(".") != std::string::npos) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "file suffix in content_types may not contain a period: ", content_type_pair.first));
-    }
-  }
   return absl::OkStatus();
 }
 } // namespace

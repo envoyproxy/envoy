@@ -9,6 +9,8 @@ namespace Matching {
 namespace InputMatchers {
 namespace Hyperscan {
 
+using ::Envoy::Matcher::DataInputGetResult;
+
 class ConfigTest : public ::testing::Test {
 protected:
   void setup(const std::string& yaml) {
@@ -45,10 +47,14 @@ regexes:
 - regex: ^/asdf/.+
 )EOF");
 
-  EXPECT_EQ(matcher_->match("/asdf/1"), ::Envoy::Matcher::MatchResult::Matched);
-  EXPECT_EQ(matcher_->match("/ASDF/1"), ::Envoy::Matcher::MatchResult::NoMatch);
-  EXPECT_EQ(matcher_->match("/asdf/\n"), ::Envoy::Matcher::MatchResult::NoMatch);
-  EXPECT_EQ(matcher_->match("\n/asdf/1"), ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/ASDF/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/\n")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("\n/asdf/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that matching will be performed case-insensitively.
@@ -59,10 +65,14 @@ regexes:
   caseless: true
 )EOF");
 
-  EXPECT_EQ(matcher_->match("/asdf/1"), ::Envoy::Matcher::MatchResult::Matched);
-  EXPECT_EQ(matcher_->match("/ASDF/1"), ::Envoy::Matcher::MatchResult::Matched);
-  EXPECT_EQ(matcher_->match("/asdf/\n"), ::Envoy::Matcher::MatchResult::NoMatch);
-  EXPECT_EQ(matcher_->match("\n/asdf/1"), ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/ASDF/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/\n")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("\n/asdf/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that matching a `.` will not exclude newlines.
@@ -73,10 +83,14 @@ regexes:
   dot_all: true
 )EOF");
 
-  EXPECT_EQ(matcher_->match("/asdf/1"), ::Envoy::Matcher::MatchResult::Matched);
-  EXPECT_EQ(matcher_->match("/ASDF/1"), ::Envoy::Matcher::MatchResult::NoMatch);
-  EXPECT_EQ(matcher_->match("/asdf/\n"), ::Envoy::Matcher::MatchResult::Matched);
-  EXPECT_EQ(matcher_->match("\n/asdf/1"), ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/ASDF/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/\n")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("\n/asdf/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
 }
 
 // Verify that `^` and `$` anchors match any newlines in data.
@@ -87,10 +101,14 @@ regexes:
   multiline: true
 )EOF");
 
-  EXPECT_EQ(matcher_->match("/asdf/1"), ::Envoy::Matcher::MatchResult::Matched);
-  EXPECT_EQ(matcher_->match("/ASDF/1"), ::Envoy::Matcher::MatchResult::NoMatch);
-  EXPECT_EQ(matcher_->match("/asdf/\n"), ::Envoy::Matcher::MatchResult::NoMatch);
-  EXPECT_EQ(matcher_->match("\n/asdf/1"), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/ASDF/1")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("/asdf/\n")),
+            ::Envoy::Matcher::MatchResult::NoMatch);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("\n/asdf/1")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that expressions which can match against an empty string.
@@ -101,7 +119,8 @@ regexes:
   allow_empty: true
 )EOF");
 
-  EXPECT_EQ(matcher_->match(""), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that treating the pattern as a sequence of UTF-8 characters.
@@ -112,7 +131,8 @@ regexes:
   utf8: true
 )EOF");
 
-  EXPECT_EQ(matcher_->match("😀"), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("😀")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that using Unicode properties for character classes.
@@ -124,7 +144,8 @@ regexes:
   ucp: true
 )EOF");
 
-  EXPECT_EQ(matcher_->match("Á"), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("Á")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 
 // Verify that using logical combination.
@@ -141,7 +162,8 @@ regexes:
   combination: true
 )EOF");
 
-  EXPECT_EQ(matcher_->match("a"), ::Envoy::Matcher::MatchResult::Matched);
+  EXPECT_EQ(matcher_->match(DataInputGetResult::CreateString("a")),
+            ::Envoy::Matcher::MatchResult::Matched);
 }
 #endif
 

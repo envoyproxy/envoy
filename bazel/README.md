@@ -98,14 +98,13 @@ for how to update or override dependencies.
     ```
 
     ### Linux
-    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) for Clang 18.
-
-    Extract the tar.xz and run the following:
+    Envoy uses a hermetic Clang toolchain that is automatically downloaded by Bazel, so you do not
+    need to install Clang manually. To use it, add `--config=clang` to your build command:
     ```console
-    bazel/setup_clang.sh <PATH_TO_EXTRACTED_CLANG_LLVM>
+    bazel build --config=clang envoy
     ```
 
-    This will setup a `clang.bazelrc` file in Envoy source root. If you want to make clang as default, run the following:
+    If you want to make clang the default, add it to your `user.bazelrc`:
     ```console
     echo "build --config=clang" >> user.bazelrc
     ```

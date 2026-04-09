@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
+#include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
@@ -85,9 +86,13 @@ public:
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
    * that the metrics are not stored by reference.
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
+   * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
+   * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
+   * unless another matcher is explicitly set.
    */
   virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
-                                     const ScopeStatsLimitSettings& limits = {}) PURE;
+                                     const ScopeStatsLimitSettings& limits = {},
+                                     StatsMatcherSharedPtr matcher = nullptr) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -98,9 +103,13 @@ public:
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
    * that the metrics are not stored by reference.
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
+   * @param matcher optional per-scope stats matcher; replaces the store-level matcher when set.
+   * NOTE: If the scope specific matcher is set, then the sub scope will inherit the same matcher
+   * unless another matcher is explicitly set.
    */
   virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
-                                           const ScopeStatsLimitSettings& limits = {}) PURE;
+                                           const ScopeStatsLimitSettings& limits = {},
+                                           StatsMatcherSharedPtr matcher = nullptr) PURE;
 
   /**
    * Creates a Counter from the stat name. Tag extraction will be performed on the name.

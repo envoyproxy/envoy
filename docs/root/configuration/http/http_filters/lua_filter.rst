@@ -1345,6 +1345,50 @@ Objects that support field access can have specific fields retrieved using the o
     end
   end
 
+``set()``
+^^^^^^^^^
+
+.. code-block:: lua
+
+  filterState:set(objectKey, factoryKey, payload)
+
+Sets a filter state object by name using a registered :ref:`object factory <well_known_filter_state>`.
+
+* ``objectKey`` is a string that specifies the name under which the object is stored in filter state.
+* ``factoryKey`` is a string that specifies the registered ``ObjectFactory`` name used to create the object. See :ref:`well-known filter state objects <well_known_filter_state>` for the list of available factory keys.
+* ``payload`` is a string passed to the factory's ``createFromBytes`` method.
+
+The object is stored as read-only with filter chain lifespan and no upstream sharing.
+
+Raises a Lua error if the factory key is not registered or if the factory fails to create an object from the given payload.
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local filter_state = request_handle:streamInfo():filterState()
+
+    -- Set a simple string value using the generic string factory.
+    filter_state:set("my.custom.key", "envoy.string", "my-value")
+
+    -- Override upstream SNI.
+    filter_state:set("envoy.network.upstream_server_name", "envoy.network.upstream_server_name", "upstream.example.com")
+
+    -- Override upstream SAN validation with a comma-separated list.
+    filter_state:set("envoy.network.upstream_subject_alt_names", "envoy.network.upstream_subject_alt_names", "san1.example.com,san2.example.com")
+
+    -- Read back the SANs that were just set.
+    local sans = filter_state:get("envoy.network.upstream_subject_alt_names")
+    if sans then
+      request_handle:logInfo("Upstream SANs: " .. sans)
+    end
+
+    -- Read back a value that was just set.
+    local value = filter_state:get("my.custom.key")
+    if value then
+      request_handle:headers():add("x-custom-value", value)
+    end
+  end
+
 .. _config_http_filters_lua_connection_wrapper:
 
 Connection object API
@@ -1464,6 +1508,35 @@ certificate, or no serial number.
 
 Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
 peer certificate, or no issuer.
+
+``sha256PeerCertificateIssuerDigest()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sha256PeerCertificateIssuerDigest()
+
+Returns the hex-encoded SHA-256 fingerprint of the direct issuer certificate from the
+validated peer certificate chain. The issuer is the second certificate in the validated chain
+(i.e., the certificate that directly signed the peer leaf certificate), as determined by
+BoringSSL during the TLS handshake. Requires the peer certificate chain to have been
+successfully validated (e.g., mTLS with ``require_client_certificate: true`` and a
+``validation_context``). Returns ``""`` if there is no validated peer certificate chain or
+the validated chain contains fewer than two certificates.
+
+``serialNumberPeerCertificateIssuer()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:serialNumberPeerCertificateIssuer()
+
+Returns the serial number of the direct issuer certificate from the validated peer certificate
+chain. The issuer is the second certificate in the validated chain (i.e., the certificate that
+directly signed the peer leaf certificate), as determined by BoringSSL during the TLS handshake.
+Requires the peer certificate chain to have been successfully validated (e.g., mTLS with
+``require_client_certificate: true`` and a ``validation_context``). Returns ``""`` if there is
+no validated peer certificate chain or the validated chain contains fewer than two certificates.
 
 ``subjectPeerCertificate()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

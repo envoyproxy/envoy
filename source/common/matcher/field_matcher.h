@@ -125,13 +125,10 @@ class SingleFieldMatcher : public FieldMatcher<DataType>, Logger::Loggable<Logge
 public:
   static absl::StatusOr<std::unique_ptr<SingleFieldMatcher<DataType>>>
   create(DataInputPtr<DataType>&& data_input, InputMatcherPtr&& input_matcher) {
-    auto supported_input_types = input_matcher->supportedDataInputTypes();
-    if (supported_input_types.find(data_input->dataInputType()) == supported_input_types.end()) {
-      std::string supported_types =
-          absl::StrJoin(supported_input_types.begin(), supported_input_types.end(), ", ");
+    const bool supported = input_matcher->supportsDataInputType(data_input->dataInputType());
+    if (!supported) {
       return absl::InvalidArgumentError(
-          absl::StrCat("Unsupported data input type: ", data_input->dataInputType(),
-                       ". The matcher supports input type: ", supported_types));
+          absl::StrCat("Unsupported data input type: ", data_input->dataInputType()));
     }
 
     return std::unique_ptr<SingleFieldMatcher<DataType>>{
@@ -141,14 +138,13 @@ public:
   MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
 
-    if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
+    if (input.availability() == DataAvailability::NotAvailable) {
       return MatchResult::InsufficientData;
     }
 
-    MatchResult current_match = input_matcher_->match(input.data_);
+    MatchResult current_match = input_matcher_->match(input);
     if (current_match != MatchResult::Matched &&
-        input.data_availability_ ==
-            DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
+        input.availability() == DataAvailability::MoreDataMightBeAvailable) {
       return MatchResult::InsufficientData;
     }
 

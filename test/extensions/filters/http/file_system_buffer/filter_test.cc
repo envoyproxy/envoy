@@ -96,8 +96,7 @@ protected:
     auto config = configFromYaml(yaml);
     filter_ = std::make_shared<FileSystemBufferFilter>(config);
     // By default return empty route so we use default config.
-    ON_CALL(decoder_callbacks_, route())
-        .WillByDefault(Return(std::shared_ptr<Router::MockRoute>()));
+    ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>{}));
     ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
         .WillByDefault([this](Buffer::Instance& out, bool) { request_sent_on_ += out.toString(); });
     ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
@@ -784,7 +783,8 @@ TEST_F(FileSystemBufferFilterTest, MergesRouteConfig) {
         fully_buffer: {}
   )");
   auto mock_route = std::make_shared<Router::MockRoute>();
-  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(mock_route));
+  EXPECT_CALL(decoder_callbacks_, route())
+      .WillOnce(Return(makeOptRefFromPtr<const Router::Route>(mock_route.get())));
   EXPECT_CALL(*mock_route, perFilterConfigs(_))
       .WillOnce(
           [vhost_config, route_config](absl::string_view) -> Router::RouteSpecificFilterConfigs {

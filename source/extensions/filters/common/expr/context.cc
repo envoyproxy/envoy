@@ -423,12 +423,9 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
              return CelValue::CreateUint64(wrapper.info_.attemptCount().value_or(0));
            }},
           {UpstreamNumEndpoints, [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
-             if (wrapper.info_.upstreamClusterInfo().value_or(nullptr) != nullptr) {
-               return CelValue::CreateUint64(wrapper.info_.upstreamClusterInfo()
-                                                 .value()
-                                                 .get()
-                                                 ->endpointStats()
-                                                 .membership_total_.value());
+             if (const auto cluster_info = wrapper.info_.upstreamClusterInfo()) {
+               return CelValue::CreateUint64(
+                   cluster_info->endpointStats().membership_total_.value());
              }
              return {};
            }}});
@@ -452,8 +449,8 @@ const XDSLookupValues& XDSLookupValues::get() {
                return {};
              }
              const auto cluster_info = wrapper.info_->upstreamClusterInfo();
-             if (cluster_info && cluster_info.value()) {
-               return CelValue::CreateString(&cluster_info.value()->name());
+             if (cluster_info) {
+               return CelValue::CreateString(&cluster_info->name());
              }
              return {};
            }},
@@ -463,9 +460,8 @@ const XDSLookupValues& XDSLookupValues::get() {
                return {};
              }
              const auto cluster_info = wrapper.info_->upstreamClusterInfo();
-             if (cluster_info && cluster_info.value()) {
-               return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(),
-                                                     &wrapper.arena_);
+             if (cluster_info) {
+               return CelProtoWrapper::CreateMessage(&cluster_info->metadata(), &wrapper.arena_);
              }
              return {};
            }},
@@ -489,8 +485,8 @@ const XDSLookupValues& XDSLookupValues::get() {
              if (wrapper.info_ == nullptr) {
                return {};
              }
-             const auto& vhost = wrapper.info_->virtualHost();
-             if (vhost == nullptr) {
+             const auto vhost = wrapper.info_->virtualHost();
+             if (!vhost) {
                return {};
              }
              return CelValue::CreateString(&vhost->name());
@@ -500,8 +496,8 @@ const XDSLookupValues& XDSLookupValues::get() {
              if (wrapper.info_ == nullptr) {
                return {};
              }
-             const auto& vhost = wrapper.info_->virtualHost();
-             if (vhost == nullptr) {
+             const auto vhost = wrapper.info_->virtualHost();
+             if (!vhost) {
                return {};
              }
              return CelProtoWrapper::CreateMessage(&vhost->metadata(), &wrapper.arena_);

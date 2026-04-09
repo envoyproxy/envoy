@@ -10,8 +10,11 @@ envoy_package()
 
 envoy_cc_library(
     name = "allocator_lib",
-    srcs = ["allocator_impl.cc"],
-    hdrs = ["allocator_impl.h"],
+    srcs = ["allocator.cc"],
+    hdrs = [
+        "allocator.h",
+        "allocator_impl.h",
+    ],
     deps = [
         ":metric_impl_lib",
         ":stat_merger_lib",
@@ -33,6 +36,7 @@ envoy_cc_library(
         ":stats_matcher_lib",
         "//envoy/registry",
         "//envoy/stats:stats_interface",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/matching/common_inputs/stats/v3:pkg_cc_proto",
     ],
 )
