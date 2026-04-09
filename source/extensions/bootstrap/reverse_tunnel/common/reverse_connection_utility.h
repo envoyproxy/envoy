@@ -49,6 +49,8 @@ public:
   static std::string buildTenantScopedIdentifier(absl::string_view tenant,
                                                  absl::string_view identifier);
 
+  static void applySslQuietClose(Network::Connection& conn);
+
 private:
   ReverseConnectionUtility() = delete;
 };

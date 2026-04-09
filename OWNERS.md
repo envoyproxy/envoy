@@ -41,7 +41,7 @@ routing PRs, questions, etc. to the right place.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
   * Caches, file filters, and file I/O.
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
-  * Load balancing, GeoIP, overload manager, security.
+  * Load balancing, data plane, overload manager.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
   * ext_proc, data plane, flow control, CEL.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
@@ -65,10 +65,10 @@ The following Envoy maintainers have final say over any changes only affecting /
 
 * Ali Beyad ([abeyad](https://github.com/abeyad)) (abeyad@google.com)
   * xDS, C++ integration tests.
-* Fredy Wijaya ([fredyw](https://github.com/fredyw)) (fredyw@google.com)
-  * Android, Java, Kotlin, JNI.
 * Dan Zhang ([danzh2010](https://github.com/danzh2010)) (danzh@google.com)
   * Envoy Mobile, QUIC, HTTP/3.
+* Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
+  * Language APIs, xDS.
 
 # Senior extension maintainers
 

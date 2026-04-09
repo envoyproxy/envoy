@@ -112,7 +112,7 @@ public:
   TagVector fixed_tags_;
 
 protected:
-  ScopeSharedPtr makeScope(StatName name) override;
+  ScopeSharedPtr makeScope(StatName name, StatsMatcherSharedPtr matcher = nullptr) override;
 
 private:
   friend class TestScope;
@@ -128,6 +128,7 @@ class TestScope : public IsolatedScopeImpl {
 public:
   TestScope(const std::string& prefix, TestStore& store);
   TestScope(StatName prefix, TestStore& store);
+  TestScope(StatName prefix, TestStore& store, StatsMatcherSharedPtr matcher);
 
   // Override the Stats::Store methods for name-based lookup of stats, to use
   // and update the string-maps in this class. Note that IsolatedStoreImpl

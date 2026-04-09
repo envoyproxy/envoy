@@ -6,6 +6,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
@@ -38,13 +39,27 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
     extension_config_str = std::move(config_or_error.value());
   }
 
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace = module_config.metrics_namespace().empty()
+                                            ? std::string(DefaultMetricsNamespace)
+                                            : module_config.metrics_namespace();
+
   auto extension_config = newDynamicModuleBootstrapExtensionConfig(
-      proto_config.extension_name(), extension_config_str, std::move(dynamic_module.value()),
-      context.mainThreadDispatcher(), context, context.serverScope().store());
+      proto_config.extension_name(), extension_config_str, metrics_namespace,
+      std::move(dynamic_module.value()), context.mainThreadDispatcher(), context,
+      context.serverScope().store());
 
   if (!extension_config.ok()) {
     throwEnvoyExceptionOrPanic("Failed to create extension config: " +
                                std::string(extension_config.status().message()));
+  }
+
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
   }
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(extension_config.value());

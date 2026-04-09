@@ -3,6 +3,7 @@
 #include "envoy/server/factory_context.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
@@ -75,6 +76,11 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
                                                   module_name, module_or_error.status().message()));
   }
 
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace = module_config.metrics_namespace().empty()
+                                            ? std::string(DefaultMetricsNamespace)
+                                            : module_config.metrics_namespace();
+
   // Create the load balancer configuration.
   std::string config_bytes;
   if (typed_config.has_lb_policy_config()) {
@@ -83,12 +89,20 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext& context,
     config_bytes = std::move(config_or_error.value());
   }
   auto lb_config_or_error =
-      DynamicModuleLbConfig::create(typed_config.lb_policy_name(), config_bytes,
+      DynamicModuleLbConfig::create(typed_config.lb_policy_name(), config_bytes, metrics_namespace,
                                     std::move(module_or_error.value()), context.serverScope());
   if (!lb_config_or_error.ok()) {
     return absl::InvalidArgumentError(
         fmt::format("failed to create load balancer config for module '{}': {}", module_name,
                     lb_config_or_error.status().message()));
+  }
+
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
   }
 
   return std::make_unique<TypedDynamicModuleLbConfig>(std::move(lb_config_or_error.value()));

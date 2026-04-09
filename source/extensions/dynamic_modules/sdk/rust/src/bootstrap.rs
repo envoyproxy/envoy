@@ -1,18 +1,9 @@
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi,
-  drop_wrapped_c_void_ptr,
-  str_to_module_buffer,
-  wrap_into_c_void_ptr,
-  EnvoyCounterId,
-  EnvoyCounterVecId,
-  EnvoyGaugeId,
-  EnvoyGaugeVecId,
-  EnvoyHistogramId,
-  EnvoyHistogramVecId,
-  NewBootstrapExtensionConfigFunction,
-  NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
+  abi, drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr, EnvoyCounterId,
+  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  NewBootstrapExtensionConfigFunction, NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
 };
 use mockall::*;
 
@@ -190,6 +181,19 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// This must be called on the main thread.
   fn new_timer(&self) -> Box<dyn EnvoyBootstrapExtensionTimer>;
 
+  /// Watch a file or directory for changes. Each call creates a new watcher for the given path.
+  /// The watcher lifetime is managed by Envoy and tied to the config — all watchers are
+  /// automatically destroyed when the config is destroyed.
+  ///
+  /// When a change is detected, [`BootstrapExtensionConfig::on_file_changed`] is called on the
+  /// main thread.
+  ///
+  /// Returns `true` if the watch was successfully added, `false` otherwise (e.g. file does not
+  /// exist).
+  ///
+  /// This must be called on the main thread.
+  fn add_file_watch(&self, path: &str, events: u32) -> bool;
+
   /// Register a custom admin HTTP endpoint.
   ///
   /// When the endpoint is requested, [`BootstrapExtensionConfig::on_admin_request`] is called.
@@ -219,6 +223,28 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// This must be called on the main thread.
   fn remove_admin_handler(&self, path_prefix: &str) -> bool;
+
+  /// Enable cluster lifecycle event notifications. When enabled, the module will receive
+  /// [`BootstrapExtensionConfig::on_cluster_add_or_update`] and
+  /// [`BootstrapExtensionConfig::on_cluster_removal`] callbacks when clusters are added, updated,
+  /// or removed from the ClusterManager.
+  ///
+  /// This must be called on the main thread, typically during or after `on_server_initialized`,
+  /// since the ClusterManager is not available until that point.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`.
+  fn enable_cluster_lifecycle(&self) -> bool;
+
+  /// Enable listener lifecycle event notifications. When enabled, the module will receive
+  /// [`BootstrapExtensionConfig::on_listener_add_or_update`] and
+  /// [`BootstrapExtensionConfig::on_listener_removal`] callbacks when listeners are added, updated,
+  /// or removed from the ListenerManager.
+  ///
+  /// This must be called on the main thread, typically during or after `on_server_initialized`,
+  /// since the ListenerManager is not available until that point.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`.
+  fn enable_listener_lifecycle(&self) -> bool;
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -314,6 +340,21 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) {
   }
 
+  /// This is called when a file watched via
+  /// [`EnvoyBootstrapExtensionConfig::add_file_watch`] changes.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `path` is the path that was registered via `add_file_watch` that triggered the change.
+  /// * `events` is the bitmask of events that occurred ([`FILE_WATCHER_EVENT_MOVED_TO`],
+  ///   [`FILE_WATCHER_EVENT_MODIFIED`]).
+  fn on_file_changed(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _path: &str,
+    _events: u32,
+  ) {
+  }
+
   /// This is called when an admin endpoint registered via
   /// [`EnvoyBootstrapExtensionConfig::register_admin_handler`] is requested.
   ///
@@ -332,6 +373,66 @@ pub trait BootstrapExtensionConfig: Send + Sync {
   ) -> (u32, String) {
     (404, String::new())
   }
+
+  /// This is called when a cluster is added to or updated in the ClusterManager.
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_cluster_lifecycle`]. The callback is invoked on the
+  /// main thread.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `cluster_name` is the name of the cluster that was added or updated.
+  fn on_cluster_add_or_update(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _cluster_name: &str,
+  ) {
+  }
+
+  /// This is called when a cluster is removed from the ClusterManager.
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_cluster_lifecycle`]. The callback is invoked on the
+  /// main thread.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `cluster_name` is the name of the cluster that was removed.
+  fn on_cluster_removal(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _cluster_name: &str,
+  ) {
+  }
+
+  /// This is called when a listener is added to or updated in the ListenerManager.
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_listener_lifecycle`]. The callback is invoked on the
+  /// main thread.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `listener_name` is the name of the listener that was added or updated.
+  fn on_listener_add_or_update(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _listener_name: &str,
+  ) {
+  }
+
+  /// This is called when a listener is removed from the ListenerManager.
+  ///
+  /// This is only called if the module has opted in via
+  /// [`EnvoyBootstrapExtensionConfig::enable_listener_lifecycle`]. The callback is invoked on the
+  /// main thread.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `listener_name` is the name of the listener that was removed.
+  fn on_listener_removal(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _listener_name: &str,
+  ) {
+  }
 }
 
 /// A completion callback that must be invoked exactly once to signal that an asynchronous
@@ -349,6 +450,13 @@ unsafe impl Send for CompletionCallback {}
 unsafe impl Sync for CompletionCallback {}
 
 impl CompletionCallback {
+  pub(crate) fn new(
+    callback: abi::envoy_dynamic_module_type_event_cb,
+    context: *mut std::os::raw::c_void,
+  ) -> Self {
+    Self { callback, context }
+  }
+
   /// Signal that the asynchronous operation is complete. This must be called exactly once.
   pub fn done(self) {
     unsafe {
@@ -577,6 +685,11 @@ impl EnvoyBootstrapExtensionTimer for Box<dyn EnvoyBootstrapExtensionTimer> {
     (**self).enabled()
   }
 }
+
+/// File watcher event: file was moved to the watched path (e.g. atomic rename).
+pub const FILE_WATCHER_EVENT_MOVED_TO: u32 = 0x1;
+/// File watcher event: file content was modified.
+pub const FILE_WATCHER_EVENT_MODIFIED: u32 = 0x2;
 
 // Implementation of EnvoyBootstrapExtensionConfig
 
@@ -993,6 +1106,16 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
+  fn add_file_watch(&self, path: &str, events: u32) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+        self.raw,
+        str_to_module_buffer(path),
+        events,
+      )
+    }
+  }
+
   fn register_admin_handler(
     &self,
     path_prefix: &str,
@@ -1017,6 +1140,18 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
         self.raw,
         str_to_module_buffer(path_prefix),
       )
+    }
+  }
+
+  fn enable_cluster_lifecycle(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(self.raw)
+    }
+  }
+
+  fn enable_listener_lifecycle(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(self.raw)
     }
   }
 }
@@ -1278,10 +1413,7 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
 ) {
   let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
   let extension = unsafe { &mut *extension };
-  let completion = CompletionCallback {
-    callback: completion_callback,
-    context: completion_context,
-  };
+  let completion = CompletionCallback::new(completion_callback, completion_context);
   extension.on_shutdown(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr), completion);
 }
 
@@ -1371,6 +1503,31 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
   );
 }
 
+/// Event hook called by Envoy when a watched file changes for a bootstrap extension.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_file_changed(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  path: abi::envoy_dynamic_module_type_envoy_buffer,
+  events: u32,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let path_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      path.ptr as *const u8,
+      path.length,
+    ))
+  };
+
+  extension_config.on_file_changed(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    path_str,
+    events,
+  );
+}
+
 /// Event hook called by Envoy when an admin endpoint registered by a bootstrap extension is
 /// requested.
 ///
@@ -1428,4 +1585,116 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_reque
   }
 
   status_code
+}
+
+/// Event hook called by Envoy when a cluster is added to or updated in the ClusterManager.
+///
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let cluster_name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      cluster_name.ptr as *const u8,
+      cluster_name.length,
+    ))
+  };
+
+  extension_config.on_cluster_add_or_update(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    cluster_name_str,
+  );
+}
+
+/// Event hook called by Envoy when a cluster is removed from the ClusterManager.
+///
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let cluster_name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      cluster_name.ptr as *const u8,
+      cluster_name.length,
+    ))
+  };
+
+  extension_config.on_cluster_removal(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    cluster_name_str,
+  );
+}
+
+/// Event hook called by Envoy when a listener is added to or updated in the ListenerManager.
+///
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  listener_name: abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let listener_name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      listener_name.ptr as *const u8,
+      listener_name.length,
+    ))
+  };
+
+  extension_config.on_listener_add_or_update(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    listener_name_str,
+  );
+}
+
+/// Event hook called by Envoy when a listener is removed from the ListenerManager.
+///
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  listener_name: abi::envoy_dynamic_module_type_envoy_buffer,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let listener_name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      listener_name.ptr as *const u8,
+      listener_name.length,
+    ))
+  };
+
+  extension_config.on_listener_removal(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    listener_name_str,
+  );
 }

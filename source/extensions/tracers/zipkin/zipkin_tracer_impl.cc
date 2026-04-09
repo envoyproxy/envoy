@@ -70,11 +70,9 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       collector_->endpoint_ = path;
     }
 
-    // Parse headers from HttpService
-    for (const auto& header_option : http_service.request_headers_to_add()) {
-      const auto& header_value = header_option.header();
-      collector_->request_headers_.emplace_back(header_value.key(), header_value.value());
-    }
+    // Parse headers from HttpService using the applicator.
+    collector_->headers_applicator_ =
+        Http::HttpServiceHeadersApplicator::createOrThrow(http_service, context);
   } else {
     if (zipkin_config.collector_cluster().empty() || zipkin_config.collector_endpoint().empty()) {
       throw EnvoyException(
@@ -88,8 +86,10 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                                 : zipkin_config.collector_cluster();
     collector_->endpoint_ = zipkin_config.collector_endpoint();
 
-    // Legacy configuration has no custom headers support
-    // Custom headers are only available through HttpService.
+    // Legacy configuration: create an empty applicator (no custom headers).
+    envoy::config::core::v3::HttpService empty_http_service;
+    collector_->headers_applicator_ =
+        Http::HttpServiceHeadersApplicator::createOrThrow(empty_http_service, context);
   }
 
   // Validate cluster exists
@@ -211,10 +211,7 @@ void ReporterImpl::flushSpans() {
             : Http::Headers::get().ContentTypeValues.Json);
 
     // Add custom headers from collector configuration
-    for (const auto& header : collector_->request_headers_) {
-      // Replace any existing header with the configured value
-      message->headers().setCopy(header.first, header.second);
-    }
+    collector_->headers_applicator_->apply(message->headers());
 
     message->body().add(request_body);
 

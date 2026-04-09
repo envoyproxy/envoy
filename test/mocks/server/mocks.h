@@ -17,6 +17,8 @@
 #include "test/mocks/server/listener_component_factory.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/mocks/server/listener_manager.h"
+#include "test/mocks/server/listener_update_callbacks.h"
+#include "test/mocks/server/listener_update_callbacks_handle.h"
 #include "test/mocks/server/main.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/server/overload_manager.h"

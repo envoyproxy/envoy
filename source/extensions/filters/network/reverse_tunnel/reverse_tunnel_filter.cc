@@ -463,7 +463,9 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 
   // Close the connection if configured to do so after handling the request.
   if (parent_.config_->autoCloseConnections()) {
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    auto& connection = parent_.read_callbacks_->connection();
+    Bootstrap::ReverseConnection::ReverseConnectionUtility::applySslQuietClose(connection);
+    connection.close(Network::ConnectionCloseType::FlushWrite);
   }
 }
 
@@ -530,7 +532,7 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 
   ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
   socket_manager->addConnectionSocket(socket_node_id, socket_cluster_id, std::move(wrapped_socket),
-                                      ping_seconds);
+                                      ping_seconds, false /* rebalanced */);
   ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                  connection);
 

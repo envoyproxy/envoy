@@ -1,10 +1,14 @@
 #include <string>
 
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
+#include "source/common/stats/stats_matcher_impl.h"
+
+#include "test/mocks/server/server_factory_context.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -362,6 +366,147 @@ TEST_F(StatsIsolatedStoreImplTest, SharedScopes) {
   EXPECT_EQ("", store_->symbolTable().toString(scopes[0]->prefix())); // default scope
   EXPECT_EQ("scope1", store_->symbolTable().toString(scopes[1]->prefix()));
   EXPECT_EQ("scope2", store_->symbolTable().toString(scopes[2]->prefix()));
+}
+
+class IsolatedStoreScopeMatcherTest : public testing::Test {
+protected:
+  IsolatedStoreScopeMatcherTest()
+      : store_(std::make_unique<IsolatedStoreImpl>(symbol_table_)), pool_(symbol_table_),
+        scope_(store_->rootScope()) {}
+  ~IsolatedStoreScopeMatcherTest() override {
+    pool_.clear();
+    scope_.reset();
+    store_.reset();
+    EXPECT_EQ(0, symbol_table_.numSymbols());
+  }
+
+  // Builds a matcher that rejects stats whose full name starts with the given prefix.
+  StatsMatcherSharedPtr makePrefixMatcher(absl::string_view prefix) {
+    envoy::config::metrics::v3::StatsConfig cfg;
+    cfg.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+        std::string(prefix));
+    return std::make_shared<StatsMatcherImpl>(cfg, symbol_table_, context_);
+  }
+
+  SymbolTableImpl symbol_table_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  std::unique_ptr<IsolatedStoreImpl> store_;
+  StatNamePool pool_;
+  ScopeSharedPtr scope_;
+};
+
+// Tests that a scope-level matcher rejects the appropriate stat types and accepts others.
+TEST_F(IsolatedStoreScopeMatcherTest, ScopeMatcherRejectsAllStatTypes) {
+  // Create a scope whose matcher rejects everything prefixed "scope.rejected.".
+  ScopeSharedPtr my_scope =
+      scope_->createScope("scope", false, {}, makePrefixMatcher("scope.rejected."));
+
+  // Rejected counter returns null counter (empty name, value always 0).
+  Counter& rejected_counter = my_scope->counterFromString("rejected.foo");
+  EXPECT_EQ("", rejected_counter.name());
+  rejected_counter.inc();
+  EXPECT_EQ(0, rejected_counter.value());
+
+  // Accepted counter is real.
+  Counter& accepted_counter = my_scope->counterFromString("accepted.foo");
+  EXPECT_EQ("scope.accepted.foo", accepted_counter.name());
+  accepted_counter.inc();
+  EXPECT_EQ(1, accepted_counter.value());
+
+  // Rejected gauge returns null gauge.
+  Gauge& rejected_gauge = my_scope->gaugeFromString("rejected.g", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("", rejected_gauge.name());
+  rejected_gauge.set(42);
+  EXPECT_EQ(0, rejected_gauge.value());
+
+  // Accepted gauge is real.
+  Gauge& accepted_gauge = my_scope->gaugeFromString("accepted.g", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("scope.accepted.g", accepted_gauge.name());
+
+  // Rejected histogram returns null histogram (Unit::Null, used() == false).
+  Histogram& rejected_histogram =
+      my_scope->histogramFromString("rejected.h", Histogram::Unit::Unspecified);
+  EXPECT_EQ(Histogram::Unit::Null, rejected_histogram.unit());
+  EXPECT_FALSE(rejected_histogram.used());
+
+  // Accepted histogram is real.
+  Histogram& accepted_histogram =
+      my_scope->histogramFromString("accepted.h", Histogram::Unit::Unspecified);
+  EXPECT_EQ(Histogram::Unit::Unspecified, accepted_histogram.unit());
+
+  // Rejected text readout returns null text readout (empty name, value always "").
+  TextReadout& rejected_tr = my_scope->textReadoutFromString("rejected.tr");
+  EXPECT_EQ("", rejected_tr.name());
+  rejected_tr.set("hello");
+  EXPECT_EQ("", rejected_tr.value());
+
+  // Accepted text readout is real.
+  TextReadout& accepted_tr = my_scope->textReadoutFromString("accepted.tr");
+  EXPECT_EQ("scope.accepted.tr", accepted_tr.name());
+}
+
+// Tests that a scope without a matcher accepts all stats (no filtering).
+TEST_F(IsolatedStoreScopeMatcherTest, ScopeWithNoMatcherAcceptsAll) {
+  ScopeSharedPtr my_scope = scope_->createScope("scope");
+
+  Counter& c = my_scope->counterFromString("foo");
+  EXPECT_EQ("scope.foo", c.name());
+
+  Gauge& g = my_scope->gaugeFromString("bar", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("scope.bar", g.name());
+
+  Histogram& h = my_scope->histogramFromString("baz", Histogram::Unit::Unspecified);
+  EXPECT_EQ("scope.baz", h.name());
+
+  TextReadout& tr = my_scope->textReadoutFromString("qux");
+  EXPECT_EQ("scope.qux", tr.name());
+}
+
+// Tests that child scopes inherit the parent scope's matcher.
+TEST_F(IsolatedStoreScopeMatcherTest, ChildScopeInheritsMatcher) {
+  // Parent matcher rejects full names starting with "parent.child.".
+  ScopeSharedPtr parent_scope =
+      scope_->createScope("parent", false, {}, makePrefixMatcher("parent.child."));
+
+  // Stats directly in parent are not rejected.
+  Counter& parent_counter = parent_scope->counterFromString("direct");
+  EXPECT_EQ("parent.direct", parent_counter.name());
+
+  // Child created without an explicit matcher inherits parent's matcher.
+  ScopeSharedPtr child_scope = parent_scope->createScope("child");
+
+  // Stats in child (full name "parent.child.*") are rejected.
+  Counter& child_rejected = child_scope->counterFromString("foo");
+  EXPECT_EQ("", child_rejected.name());
+
+  Gauge& child_gauge_rejected = child_scope->gaugeFromString("bar", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("", child_gauge_rejected.name());
+
+  Histogram& child_histogram_rejected =
+      child_scope->histogramFromString("baz", Histogram::Unit::Unspecified);
+  EXPECT_EQ(Histogram::Unit::Null, child_histogram_rejected.unit());
+
+  TextReadout& child_tr_rejected = child_scope->textReadoutFromString("qux");
+  EXPECT_EQ("", child_tr_rejected.name());
+}
+
+// Tests that an explicit matcher on a child scope overrides the inherited parent matcher.
+TEST_F(IsolatedStoreScopeMatcherTest, ChildScopeOverridesMatcher) {
+  // Parent rejects "parent.child.rejected_by_parent.".
+  ScopeSharedPtr parent_scope = scope_->createScope(
+      "parent", false, {}, makePrefixMatcher("parent.child.rejected_by_parent."));
+
+  // Child gets its own matcher that rejects "parent.child.rejected_by_child." instead.
+  ScopeSharedPtr child_scope = parent_scope->createScope(
+      "child", false, {}, makePrefixMatcher("parent.child.rejected_by_child."));
+
+  // "rejected_by_parent" prefix is NOT rejected — child's matcher replaced parent's.
+  Counter& not_rejected = child_scope->counterFromString("rejected_by_parent.foo");
+  EXPECT_EQ("parent.child.rejected_by_parent.foo", not_rejected.name());
+
+  // "rejected_by_child" prefix IS rejected by the child's own matcher.
+  Counter& rejected = child_scope->counterFromString("rejected_by_child.foo");
+  EXPECT_EQ("", rejected.name());
 }
 
 } // namespace Stats

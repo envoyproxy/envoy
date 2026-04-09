@@ -342,6 +342,13 @@ EngineBuilder& EngineBuilder::addNativeFilter(const std::string& name,
   return *this;
 }
 
+#if defined(__APPLE__)
+EngineBuilder& EngineBuilder::enableNetworkChangeMonitor(bool network_change_monitor_on) {
+  enable_network_change_monitor_ = network_change_monitor_on;
+  return *this;
+}
+#endif
+
 std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
 #ifdef ENVOY_ENABLE_FULL_PROTOS
   return absl::StrCat("[type.googleapis.com/"
@@ -1160,6 +1167,10 @@ EngineSharedPtr EngineBuilder::build() {
   options->setLogLevel(static_cast<spdlog::level::level_enum>(log_level_));
   options->setConcurrency(1);
   envoy_engine->run(options);
+
+  if (enable_network_change_monitor_) {
+    engine->initializeNetworkChangeMonitor();
+  }
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend

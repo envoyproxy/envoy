@@ -2,20 +2,10 @@ use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use crate::utility::HeaderPairSlice;
 use crate::{
-  abi,
-  bytes_to_module_buffer,
-  str_to_module_buffer,
-  ClusterHostCount,
-  EnvoyCounterId,
-  EnvoyCounterVecId,
-  EnvoyGaugeId,
-  EnvoyGaugeVecId,
-  EnvoyHistogramId,
-  EnvoyHistogramVecId,
-  NewHttpFilterConfigFunction,
-  NewHttpFilterPerRouteConfigFunction,
-  NEW_HTTP_FILTER_CONFIG_FUNCTION,
-  NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
+  abi, bytes_to_module_buffer, str_to_module_buffer, ClusterHostCount, EnvoyCounterId,
+  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  NewHttpFilterConfigFunction, NewHttpFilterPerRouteConfigFunction,
+  NEW_HTTP_FILTER_CONFIG_FUNCTION, NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
 };
 use mockall::*;
 use std::any::Any;
@@ -938,6 +928,70 @@ pub trait EnvoyHttpFilter {
     source: abi::envoy_dynamic_module_type_metadata_source,
   ) -> Option<Vec<EnvoyBuffer<'a>>>;
 
+  /// Append a number value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
+
+  /// Append a string value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+
+  /// Append a bool value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool;
+
+  /// Get the number of elements in the metadata list stored under the given namespace and key.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// or the value is not a list.
+  fn get_metadata_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<usize>;
+
+  /// Get the number value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a number.
+  fn get_metadata_list_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<f64>;
+
+  /// Get the string value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a string.
+  ///
+  /// The returned buffer's lifetime is tied to the current event hook.
+  fn get_metadata_list_string<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the bool value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a bool.
+  fn get_metadata_list_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<bool>;
+
   /// Get the bytes-typed filter state value with the given key.
   /// If the filter state is not found or is the wrong type, this returns `None`.
   fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
@@ -1505,7 +1559,13 @@ pub trait EnvoyHttpFilter {
   /// only perform increases to the buffer limit, to avoid potentially conflicting with the
   /// buffer requirements of other filters in the chain. For example:
   ///
-  /// ```ignore
+  /// ```
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  ///
+  /// let mut envoy_filter = MockEnvoyHttpFilter::default();
+  /// envoy_filter.expect_get_buffer_limit().return_const(0u64);
+  /// envoy_filter.expect_set_buffer_limit().return_const(());
+  /// let desired_limit: u64 = 1024;
   /// if desired_limit > envoy_filter.get_buffer_limit() {
   ///   envoy_filter.set_buffer_limit(desired_limit);
   /// }
@@ -1962,21 +2022,21 @@ pub struct EnvoyHttpFilterImpl {
 }
 
 impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
-  fn get_request_header_value(&self, key: &str) -> Option<EnvoyBuffer> {
+  fn get_request_header_value(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
     self.get_header_value_impl(
       key,
       abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
     )
   }
 
-  fn get_request_header_values(&self, key: &str) -> Vec<EnvoyBuffer> {
+  fn get_request_header_values(&self, key: &str) -> Vec<EnvoyBuffer<'_>> {
     self.get_header_values_impl(
       key,
       abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
     )
   }
 
-  fn get_request_headers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
+  fn get_request_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     self.get_headers_impl(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
   }
 
@@ -2002,21 +2062,21 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_request_trailer_value(&self, key: &str) -> Option<EnvoyBuffer> {
+  fn get_request_trailer_value(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
     self.get_header_value_impl(
       key,
       abi::envoy_dynamic_module_type_http_header_type::RequestTrailer,
     )
   }
 
-  fn get_request_trailer_values(&self, key: &str) -> Vec<EnvoyBuffer> {
+  fn get_request_trailer_values(&self, key: &str) -> Vec<EnvoyBuffer<'_>> {
     self.get_header_values_impl(
       key,
       abi::envoy_dynamic_module_type_http_header_type::RequestTrailer,
     )
   }
 
-  fn get_request_trailers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
+  fn get_request_trailers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     self.get_headers_impl(abi::envoy_dynamic_module_type_http_header_type::RequestTrailer)
   }
 
@@ -2042,21 +2102,21 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_response_header_value(&self, key: &str) -> Option<EnvoyBuffer> {
+  fn get_response_header_value(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
     self.get_header_value_impl(
       key,
       abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
     )
   }
 
-  fn get_response_header_values(&self, key: &str) -> Vec<EnvoyBuffer> {
+  fn get_response_header_values(&self, key: &str) -> Vec<EnvoyBuffer<'_>> {
     self.get_header_values_impl(
       key,
       abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
     )
   }
 
-  fn get_response_headers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
+  fn get_response_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     self.get_headers_impl(abi::envoy_dynamic_module_type_http_header_type::ResponseHeader)
   }
 
@@ -2082,21 +2142,21 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_response_trailer_value(&self, key: &str) -> Option<EnvoyBuffer> {
+  fn get_response_trailer_value(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
     self.get_header_value_impl(
       key,
       abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
     )
   }
 
-  fn get_response_trailer_values(&self, key: &str) -> Vec<EnvoyBuffer> {
+  fn get_response_trailer_values(&self, key: &str) -> Vec<EnvoyBuffer<'_>> {
     self.get_header_values_impl(
       key,
       abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
     )
   }
 
-  fn get_response_trailers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
+  fn get_response_trailers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     self.get_headers_impl(abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer)
   }
 
@@ -2237,7 +2297,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
     key: &str,
-  ) -> Option<EnvoyBuffer> {
+  ) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -2307,7 +2367,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
-  ) -> Option<Vec<EnvoyBuffer>> {
+  ) -> Option<Vec<EnvoyBuffer<'_>>> {
     let count = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_keys_count(
         self.raw_ptr,
@@ -2348,7 +2408,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn get_metadata_namespaces(
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
-  ) -> Option<Vec<EnvoyBuffer>> {
+  ) -> Option<Vec<EnvoyBuffer<'_>>> {
     let count = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_namespaces_count(self.raw_ptr, source)
     };
@@ -2381,7 +2441,141 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer> {
+  fn add_dynamic_metadata_list_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn add_dynamic_metadata_list_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn add_dynamic_metadata_list_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_metadata_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<usize> {
+    let mut result: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_size(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<f64> {
+    let mut value: f64 = 0f64;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_number(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_string(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_string(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<bool> {
+    let mut value: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_bool(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -2420,7 +2614,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_filter_state_typed(&self, key: &[u8]) -> Option<EnvoyBuffer> {
+  fn get_filter_state_typed(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -2439,7 +2633,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_received_request_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
+  fn get_received_request_body(&mut self) -> Option<Vec<EnvoyMutBuffer<'_>>> {
     let size = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks_size(
         self.raw_ptr,
@@ -2549,7 +2743,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_received_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
+  fn get_received_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer<'_>>> {
     let size = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks_size(
         self.raw_ptr,
@@ -2730,7 +2924,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn get_attribute_string(
     &self,
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
-  ) -> Option<EnvoyBuffer> {
+  ) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -3387,7 +3581,7 @@ impl EnvoyHttpFilterImpl {
   fn get_headers_impl(
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
-  ) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
+  ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
     let count = unsafe {
       abi::envoy_dynamic_module_callback_http_get_headers_size(self.raw_ptr, header_type)
     };
@@ -3418,7 +3612,7 @@ impl EnvoyHttpFilterImpl {
     &self,
     key: &str,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
-  ) -> Option<EnvoyBuffer> {
+  ) -> Option<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -3449,7 +3643,7 @@ impl EnvoyHttpFilterImpl {
     &self,
     key: &str,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
-  ) -> Vec<EnvoyBuffer> {
+  ) -> Vec<EnvoyBuffer<'_>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -3477,7 +3671,7 @@ impl EnvoyHttpFilterImpl {
     // At this point, we assume at least one value is present.
     results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
     // So, we iterate from 1 to count - 1.
-    for i in 1 .. count {
+    for i in 1..count {
       let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: std::ptr::null(),
         length: 0,

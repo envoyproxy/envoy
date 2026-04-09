@@ -144,18 +144,19 @@ std::pair<HostConstSharedPtr, bool> HostUtility::selectOverrideHost(const HostMa
     return {nullptr, false};
   }
 
-  auto override_host = context->overrideHostToSelect();
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> override_host =
+      context->overrideHostToSelect();
   if (!override_host.has_value()) {
     return {nullptr, false};
   }
 
-  const bool strict_mode = override_host.value().second;
+  const bool strict_mode = override_host->strict;
 
   if (host_map == nullptr) {
     return {nullptr, strict_mode};
   }
 
-  auto host_iter = host_map->find(override_host.value().first);
+  auto host_iter = host_map->find(override_host->host);
 
   // The override host cannot be found in the host map.
   if (host_iter == host_map->end()) {
@@ -175,15 +176,15 @@ void HostUtility::forEachHostMetric(
     const ClusterManager& cluster_manager,
     const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
     const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb) {
-  for (const auto& [unused_name, cluster_ref] : cluster_manager.clusters().active_clusters_) {
-    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster_ref.get().info();
+  cluster_manager.forEachActiveCluster([&](const Cluster& cluster) {
+    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     if (cluster_info->perEndpointStatsEnabled()) {
       const std::string cluster_name =
           Stats::Utility::sanitizeStatsName(cluster_info->observabilityName());
 
       const Stats::TagVector& fixed_tags = cluster_info->statsScope().store().fixedTags();
 
-      for (auto& host_set : cluster_ref.get().prioritySet().hostSetsPerPriority()) {
+      for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
         for (auto& host : host_set->hosts()) {
 
           Stats::TagVector tags;
@@ -234,7 +235,7 @@ void HostUtility::forEachHostMetric(
         }
       }
     }
-  }
+  });
 }
 
 } // namespace Upstream

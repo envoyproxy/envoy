@@ -161,6 +161,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/network/dns_resolver/apple/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/network/dns_resolver/cares/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg_cc_proto_descriptor",
+        "@envoy_api//envoy/extensions/network/dns_resolver/hickory/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/path/match/uri_template/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/path/rewrite/uri_template/v3:pkg_cc_proto_descriptor",

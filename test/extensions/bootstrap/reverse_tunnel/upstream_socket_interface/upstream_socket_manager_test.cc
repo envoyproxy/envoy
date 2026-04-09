@@ -1492,6 +1492,47 @@ TEST_F(TestUpstreamSocketManagerRebalancing, RebalancingSkippedWhenAlreadyRebala
   EXPECT_EQ(getNodeConnCount(socket_manager3_.get(), node_id), 10);
 }
 
+TEST_F(TestUpstreamSocketManagerRebalancing, MainThreadExcludedFromRebalancing) {
+  // Create a socket manager on a "main_thread" dispatcher. It should not be
+  // registered in the static socket_managers_ list and therefore never receive
+  // rebalanced sockets.
+  NiceMock<Event::MockDispatcher> main_dispatcher("main_thread");
+  setupDispatcher(main_dispatcher);
+  auto main_socket_manager =
+      std::make_unique<UpstreamSocketManager>(main_dispatcher, extension_.get());
+
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Make all worker managers heavily loaded so the main_thread manager would
+  // be selected as the least loaded target if it were registered.
+  setNodeConnCount(socket_manager1_.get(), node_id, 100);
+  setNodeConnCount(socket_manager2_.get(), node_id, 100);
+  setNodeConnCount(socket_manager3_.get(), node_id, 100);
+
+  // post() must never be called on the main_thread dispatcher.
+  EXPECT_CALL(main_dispatcher, post(_)).Times(0);
+
+  // All workers are tied at 100, so the socket stays on the calling manager
+  // (worker_0 / socket_manager1_). No post() on any dispatcher.
+  EXPECT_CALL(dispatcher1_, post(_)).Times(0);
+  EXPECT_CALL(dispatcher2_, post(_)).Times(0);
+  EXPECT_CALL(dispatcher3_, post(_)).Times(0);
+
+  auto socket = createMockSocket(555);
+  socket_manager1_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval,
+                                        false /* rebalanced */);
+
+  // Socket stays on worker_0, not moved to main_thread despite it having 0 connections.
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(socket_manager1_.get(), node_id), 1);
+  EXPECT_EQ(verifyAcceptedReverseConnectionsMap(main_socket_manager.get(), node_id), 0);
+
+  // Verify connection count was incremented only on worker_0.
+  EXPECT_EQ(getNodeConnCount(socket_manager1_.get(), node_id), 101);
+  EXPECT_EQ(getNodeConnCount(main_socket_manager.get(), node_id), 0);
+}
+
 } // namespace ReverseConnection.
 } // namespace Bootstrap.
 } // namespace Extensions.

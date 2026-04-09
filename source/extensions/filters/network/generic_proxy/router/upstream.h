@@ -8,7 +8,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/generic_proxy/interface/codec.h"
 
-#include "quiche/common/quiche_linked_hash_map.h"
+#include "absl/container/linked_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -388,7 +388,7 @@ private:
   // generic proxy will send requests to server in order. Finally, the upstream server of these
   // protocols will send responses in order. We also assume that the L7 filter chain of these
   // protocols will not change the processing order.
-  using LinkedAbslHashMap = quiche::QuicheLinkedHashMap<uint64_t, UpstreamRequestCallbacks*>;
+  using LinkedAbslHashMap = absl::linked_hash_map<uint64_t, UpstreamRequestCallbacks*>;
   LinkedAbslHashMap pending_requests_;
   bool saw_connection_close_event_ = false;
 };

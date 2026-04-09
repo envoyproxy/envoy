@@ -470,7 +470,7 @@ public:
     std::function<void()> on_delete_callback_for_test_only;
 
     // Optional upstream override host for bypassing load balancer selection
-    absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
+    Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
   };
 
   /**

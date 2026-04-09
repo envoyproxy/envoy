@@ -323,6 +323,19 @@ public:
    * Set true to disable active health check for the host.
    */
   virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
+
+  /**
+   * Store the HTTP status code from the last active health check response.
+   * Used by HDS to report richer health state to the control plane.
+   * 0 means no response has been recorded yet.
+   */
+  virtual void setLastHealthCheckHttpStatus(uint64_t) PURE;
+
+  /**
+   * @return the HTTP status code from the last active health check response, or
+   * 0 if no response has been recorded.
+   */
+  virtual absl::optional<uint64_t> lastHealthCheckHttpStatus() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -1036,6 +1049,12 @@ public:
    * @return soft limit on size of the cluster's connections read and write buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;
+
+  /**
+   * @return how long an upstream connection is allowed to remain above the buffer high watermark
+   * before being closed. A zero duration disables the timeout.
+   */
+  virtual std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const PURE;
 
   /**
    * @return uint64_t features supported by the cluster. @see Features.

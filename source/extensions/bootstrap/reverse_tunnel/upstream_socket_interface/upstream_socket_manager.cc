@@ -16,6 +16,8 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
+constexpr absl::string_view kMainThreadDispatcherName = "main_thread";
+
 std::vector<UpstreamSocketManager*> UpstreamSocketManager::socket_managers_{};
 absl::Mutex UpstreamSocketManager::socket_manager_lock{};
 
@@ -26,9 +28,16 @@ UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
       extension_(extension) {
   ENVOY_LOG(debug, "reverse_tunnel: creating socket manager with stats integration.");
 
-  // Register this socket manager instance for rebalancing.
-  absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
-  UpstreamSocketManager::socket_managers_.push_back(this);
+  // Only worker threads should handle data plane connections; skip the main thread.
+  const std::string& dispatcher_name = dispatcher_.name();
+  if (dispatcher_name != kMainThreadDispatcherName) {
+    absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
+    UpstreamSocketManager::socket_managers_.push_back(this);
+    ENVOY_LOG(debug, "reverse_tunnel: registered socket manager for dispatcher: {}",
+              dispatcher_name);
+  } else {
+    ENVOY_LOG(debug, "reverse_tunnel: skipping socket manager registration for main thread");
+  }
 }
 
 UpstreamSocketManager&

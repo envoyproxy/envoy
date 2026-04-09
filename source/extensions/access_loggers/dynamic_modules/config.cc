@@ -4,6 +4,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/access_loggers/dynamic_modules/access_log.h"
 
 namespace Envoy {
@@ -39,13 +40,27 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
     logger_config_str = std::move(config_or_error.value());
   }
 
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace = module_config.metrics_namespace().empty()
+                                            ? std::string(DefaultMetricsNamespace)
+                                            : module_config.metrics_namespace();
+
   auto access_log_config = newDynamicModuleAccessLogConfig(
-      proto_config.logger_name(), logger_config_str, std::move(dynamic_module_or_error.value()),
-      context.serverFactoryContext().scope());
+      proto_config.logger_name(), logger_config_str, metrics_namespace,
+      std::move(dynamic_module_or_error.value()), context.serverFactoryContext().scope());
 
   if (!access_log_config.ok()) {
     throw EnvoyException("Failed to create access logger config: " +
                          std::string(access_log_config.status().message()));
+  }
+
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
+        metrics_namespace);
   }
 
   return std::make_shared<DynamicModuleAccessLog>(std::move(filter),

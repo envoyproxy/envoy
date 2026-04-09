@@ -37,6 +37,10 @@ class EchoServerHandler(BaseHTTPRequestHandler):
     def _serve_echo(self):
         content_length = self.headers.get("content-length")
         charset = self.headers.get("charset") or "utf8"
+        path = self.path or "/"
+        if path == "/notfound":
+            self.send_error(404, "Not Found")
+            return
         if content_length is not None:
             content_length = int(content_length)
             body = self.rfile.read(content_length).decode(charset)

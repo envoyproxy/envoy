@@ -84,6 +84,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.ext_authz"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/ssl:ssl_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/extensions/filters/network/ext_authz",

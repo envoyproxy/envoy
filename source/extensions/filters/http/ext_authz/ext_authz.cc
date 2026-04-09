@@ -370,9 +370,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
   // Fill route_metadata_context from the selected route's metadata.
   envoy::config::core::v3::Metadata route_metadata_context;
-  if (decoder_callbacks_->route() != nullptr) {
-    fillMetadataContext({&decoder_callbacks_->route()->metadata()},
-                        config_->routeMetadataContextNamespaces(),
+  if (const auto route = decoder_callbacks_->route(); route) {
+    fillMetadataContext({&route->metadata()}, config_->routeMetadataContextNamespaces(),
                         config_->routeTypedMetadataContextNamespaces(), route_metadata_context);
   }
 
@@ -390,7 +389,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
                                                // going to invoke check call.
-  cluster_ = decoder_callbacks_->clusterInfo();
+  cluster_ = decoder_callbacks_->clusterInfoSharedPtr();
   initiating_call_ = true;
   client_->check(*this, check_request_, decoder_callbacks_->activeSpan(),
                  decoder_callbacks_->streamInfo());
@@ -398,8 +397,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-  const auto per_route_flags = getPerRouteFlags(route);
+  const auto per_route_flags = getPerRouteFlags(decoder_callbacks_->route());
   skip_check_ = per_route_flags.skip_check_;
   if (skip_check_) {
     return Http::FilterHeadersStatus::Continue;
@@ -608,10 +606,8 @@ void Filter::updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& g
   if (stream_info->upstreamInfo().has_value()) {
     logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
   }
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      stream_info->upstreamClusterInfo();
-  if (cluster_info) {
-    logging_info_->setClusterInfo(std::move(*cluster_info));
+  if (const auto cluster_info = stream_info->upstreamClusterInfo()) {
+    logging_info_->setClusterInfo(stream_info->upstreamClusterInfoSharedPtr());
   }
 }
 
@@ -1157,8 +1153,8 @@ void Filter::continueDecoding() {
   }
 }
 
-Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr& route) const {
-  if (route == nullptr) {
+Filter::PerRouteFlags Filter::getPerRouteFlags(OptRef<const Router::Route> route) const {
+  if (!route) {
     return PerRouteFlags{true /*skip_check_*/, defaultCheckSettings()};
   }
 

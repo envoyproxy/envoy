@@ -1,5 +1,6 @@
 #import "library/objective-c/EnvoyEngine.h"
 #import "library/objective-c/EnvoyBridgeUtility.h"
+#include <memory>
 #import "library/objective-c/EnvoyHTTPFilterCallbacksImpl.h"
 #import "library/objective-c/EnvoyKeyValueStoreBridgeImpl.h"
 
@@ -8,7 +9,9 @@
 #import "library/common/types/c_types.h"
 #import "library/common/extensions/key_value/platform/c_types.h"
 #import "library/cc/engine_builder.h"
+#import "library/cc/network_change_monitor.h"
 #import "library/common/internal_engine.h"
+#include "library/common/system/system_helper.h"
 
 #include "library/common/network/apple_proxy_resolution.h"
 
@@ -354,6 +357,24 @@ static void ios_http_filter_release(const void *context) {
   return;
 }
 
+namespace {
+class EnvoyEngineNetworkChangeListener : public Envoy::Platform::NetworkChangeListener {
+public:
+  EnvoyEngineNetworkChangeListener(Envoy::InternalEngine *engine) : engine_(engine) {}
+
+  void onDefaultNetworkChangeEvent(int network) override {
+    engine_->onDefaultNetworkChangeEvent(network);
+  }
+
+  void onDefaultNetworkAvailable() override { engine_->onDefaultNetworkAvailable(); }
+
+  void onDefaultNetworkUnavailable() override { engine_->onDefaultNetworkUnavailable(); }
+
+private:
+  Envoy::InternalEngine *engine_;
+};
+} // namespace
+
 static envoy_data ios_get_string(const void *context) {
   EnvoyStringAccessor *accessor = (__bridge EnvoyStringAccessor *)context;
   return toManagedNativeString(accessor.getEnvoyString());
@@ -362,13 +383,13 @@ static envoy_data ios_get_string(const void *context) {
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
   Envoy::InternalEngine *_engine;
-  EnvoyNetworkMonitor *_networkMonitor;
+  std::unique_ptr<Envoy::Platform::NetworkChangeListener> _networkChangeListener;
+  std::unique_ptr<Envoy::Platform::NetworkChangeMonitor> _networkChangeMonitor;
 }
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSInteger, NSString *))logger
-                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
-                  networkMonitoringMode:(int)networkMonitoringMode {
+                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker {
   self = [super init];
   if (!self) {
     return nil;
@@ -425,10 +446,11 @@ static envoy_data ios_get_string(const void *context) {
                                       std::move(native_event_tracker));
   _engineHandle = reinterpret_cast<envoy_engine_t>(_engine);
 
-  if (networkMonitoringMode == 1) {
-    [_networkMonitor startReachability];
-  } else if (networkMonitoringMode == 2) {
-    [_networkMonitor startPathMonitor];
+  _networkChangeListener = std::make_unique<EnvoyEngineNetworkChangeListener>(_engine);
+  _networkChangeMonitor =
+      Envoy::SystemHelper::getInstance().initializeNetworkChangeMonitor(*_networkChangeListener);
+  if (_networkChangeMonitor != nullptr) {
+    _networkChangeMonitor->start();
   }
 
   return self;

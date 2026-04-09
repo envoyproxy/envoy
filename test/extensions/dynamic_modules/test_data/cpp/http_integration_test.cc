@@ -1655,5 +1655,93 @@ private:
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(HttpConfigStreamConfigFactory, "http_config_stream");
 
+// -----------------------------------------------------------------------------
+// ListMetadataCallbacks
+// -----------------------------------------------------------------------------
+
+class ListMetadataCallbacksFilter : public HttpFilter {
+public:
+  ListMetadataCallbacksFilter(HttpFilterHandle& handle) : handle_(handle) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool end_stream) override {
+    // Build a number list: [10.0, 20.0, 30.0]
+    handle_.addMetadataList("ns", "numbers", 10.0);
+    handle_.addMetadataList("ns", "numbers", 20.0);
+    handle_.addMetadataList("ns", "numbers", 30.0);
+    // Build a string list: ["hello", "world"]
+    handle_.addMetadataList("ns", "strings", "hello");
+    handle_.addMetadataList("ns", "strings", "world");
+    // Build a bool list: [true, false]
+    handle_.addMetadataList("ns", "bools", true);
+    handle_.addMetadataList("ns", "bools", false);
+    return HeadersStatus::Continue;
+  }
+
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool end_stream) override {
+    // Expose number list via response headers.
+    auto num_size = handle_.getMetadataListSize("ns", "numbers");
+    assert(num_size.has_value());
+    headers.set("x-list-num-size", std::to_string(*num_size));
+    for (size_t i = 0; i < *num_size; i++) {
+      auto val = handle_.getMetadataListNumber("ns", "numbers", i);
+      assert(val.has_value());
+      headers.set("x-list-num-" + std::to_string(i), std::to_string(static_cast<int>(*val)));
+    }
+    // Expose string list via response headers.
+    auto str_size = handle_.getMetadataListSize("ns", "strings");
+    assert(str_size.has_value());
+    headers.set("x-list-str-size", std::to_string(*str_size));
+    for (size_t i = 0; i < *str_size; i++) {
+      auto val = handle_.getMetadataListString("ns", "strings", i);
+      assert(val.has_value());
+      headers.set("x-list-str-" + std::to_string(i), std::string(*val));
+    }
+    // Expose bool list via response headers.
+    auto bool_size = handle_.getMetadataListSize("ns", "bools");
+    assert(bool_size.has_value());
+    headers.set("x-list-bool-size", std::to_string(*bool_size));
+    for (size_t i = 0; i < *bool_size; i++) {
+      auto val = handle_.getMetadataListBool("ns", "bools", i);
+      assert(val.has_value());
+      headers.set("x-list-bool-" + std::to_string(i), *val ? "true" : "false");
+    }
+    return HeadersStatus::Continue;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onRequestTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  BodyStatus onResponseBody(BodyBuffer& body, bool end_stream) override {
+    return BodyStatus::Continue;
+  }
+  TrailersStatus onResponseTrailers(HeaderMap& trailers) override {
+    return TrailersStatus::Continue;
+  }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+};
+
+class ListMetadataCallbacksFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<ListMetadataCallbacksFilter>(handle);
+  }
+};
+
+class ListMetadataCallbacksConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<ListMetadataCallbacksFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(ListMetadataCallbacksConfigFactory, "list_metadata_callbacks");
+
 } // namespace DynamicModules
 } // namespace Envoy
