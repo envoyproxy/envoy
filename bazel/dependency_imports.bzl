@@ -249,5 +249,4 @@ def crates_repositories():
         cargo_lockfile = "@envoy//:Cargo.lock",
         lockfile = Label("@envoy//:Cargo.Bazel.lock"),
         manifests = ["@envoy//:Cargo.toml"],
-
     )
