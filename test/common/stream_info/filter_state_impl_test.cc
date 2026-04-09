@@ -157,44 +157,6 @@ TEST_F(FilterStateImplTest, SimpleTypeMutable) {
   EXPECT_EQ(200, filterState().getDataReadOnly<SimpleType>("test_2")->access());
 }
 
-TEST_F(FilterStateImplTest, NameConflictReadOnly) {
-  // read only data cannot be overwritten (by any state type)
-  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
-                        FilterState::LifeSpan::FilterChain);
-  EXPECT_ENVOY_BUG(filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                                         FilterState::StateType::ReadOnly,
-                                         FilterState::LifeSpan::FilterChain),
-                   "FilterStateAccessViolation: FilterState::setData<T> called twice on "
-                   "same ReadOnly state: test_1.");
-  EXPECT_ENVOY_BUG(filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                                         FilterState::StateType::Mutable,
-                                         FilterState::LifeSpan::FilterChain),
-                   "FilterStateAccessViolation: FilterState::setData<T> called twice on "
-                   "same ReadOnly state: test_1.");
-  EXPECT_EQ(1, filterState().getDataReadOnly<SimpleType>("test_1")->access());
-}
-
-TEST_F(FilterStateImplTest, NameConflictDifferentTypesReadOnly) {
-  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::ReadOnly,
-                        FilterState::LifeSpan::FilterChain);
-  EXPECT_ENVOY_BUG(
-      filterState().setData("test_1", std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr),
-                            FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain),
-      "FilterStateAccessViolation: FilterState::setData<T> called twice on "
-      "same ReadOnly state: test_1.");
-}
-
-TEST_F(FilterStateImplTest, NameConflictMutableAndReadOnly) {
-  // Mutable data cannot be overwritten by read only data.
-  filterState().setData("test_1", std::make_unique<SimpleType>(1), FilterState::StateType::Mutable,
-                        FilterState::LifeSpan::FilterChain);
-  EXPECT_ENVOY_BUG(filterState().setData("test_1", std::make_unique<SimpleType>(2),
-                                         FilterState::StateType::ReadOnly,
-                                         FilterState::LifeSpan::FilterChain),
-                   "FilterStateAccessViolation: FilterState::setData<T> called twice with "
-                   "different state types: test_1.");
-}
-
 TEST_F(FilterStateImplTest, NoNameConflictMutableAndMutable) {
   // Mutable data can be overwritten by another mutable data of same or different type.
 
@@ -224,18 +186,6 @@ TEST_F(FilterStateImplTest, WrongTypeGet) {
                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(5, filterState().getDataReadOnly<TestStoredTypeTracking>("test_name")->access());
   EXPECT_EQ(nullptr, filterState().getDataReadOnly<SimpleType>("test_name"));
-}
-
-TEST_F(FilterStateImplTest, ErrorAccessingReadOnlyAsMutable) {
-  // Accessing read only data as mutable should throw error
-  filterState().setData("test_name", std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr),
-                        FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
-  EXPECT_ENVOY_BUG(filterState().getDataMutable<TestStoredTypeTracking>("test_name"),
-                   "FilterStateAccessViolation: FilterState accessed immutable "
-                   "data as mutable: test_name.");
-  EXPECT_ENVOY_BUG(filterState().getDataSharedMutableGeneric("test_name"),
-                   "FilterStateAccessViolation: FilterState accessed "
-                   "immutable data as mutable: test_name.");
 }
 
 namespace {
@@ -294,16 +244,9 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromParent) {
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_4"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_5"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_6"));
-  EXPECT_ENVOY_BUG(new_filter_state.getDataMutable<SimpleType>("test_3"),
-                   "FilterStateAccessViolation: FilterState accessed "
-                   "immutable data as mutable: test_3.");
-
+  EXPECT_EQ(3, new_filter_state.getDataMutable<SimpleType>("test_3")->access());
   EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4")->access());
-
-  EXPECT_ENVOY_BUG(new_filter_state.getDataMutable<SimpleType>("test_5"),
-                   "FilterStateAccessViolation: FilterState accessed "
-                   "immutable data as mutable: test_5.");
-
+  EXPECT_EQ(5, new_filter_state.getDataMutable<SimpleType>("test_5")->access());
   EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6")->access());
 }
 
@@ -329,9 +272,7 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromGrandparent) {
   EXPECT_FALSE(new_filter_state.hasDataWithName("test_4"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_5"));
   EXPECT_TRUE(new_filter_state.hasDataWithName("test_6"));
-  EXPECT_ENVOY_BUG(new_filter_state.getDataMutable<SimpleType>("test_5"),
-                   "FilterStateAccessViolation: FilterState accessed "
-                   "immutable data as mutable: test_5.");
+  EXPECT_EQ(5, new_filter_state.getDataMutable<SimpleType>("test_5")->access());
   EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6")->access());
 }
 
@@ -383,20 +324,16 @@ TEST_F(FilterStateImplTest, SharedWithUpstream) {
   std::sort(objects->begin(), objects->end(),
             [](const auto& lhs, const auto& rhs) -> bool { return lhs.name_ < rhs.name_; });
   EXPECT_EQ(objects->at(0).name_, "shared_1");
-  EXPECT_EQ(objects->at(0).state_type_, FilterState::StateType::ReadOnly);
   EXPECT_EQ(objects->at(0).stream_sharing_,
             StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   EXPECT_EQ(objects->at(0).data_.get(), shared.get());
   EXPECT_EQ(objects->at(1).name_, "shared_4");
-  EXPECT_EQ(objects->at(1).state_type_, FilterState::StateType::Mutable);
   EXPECT_EQ(objects->at(1).stream_sharing_,
             StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   EXPECT_EQ(objects->at(2).name_, "shared_5");
-  EXPECT_EQ(objects->at(2).state_type_, FilterState::StateType::ReadOnly);
   EXPECT_EQ(objects->at(2).stream_sharing_,
             StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   EXPECT_EQ(objects->at(3).name_, "shared_7");
-  EXPECT_EQ(objects->at(3).state_type_, FilterState::StateType::ReadOnly);
   EXPECT_EQ(objects->at(3).stream_sharing_, StreamSharingMayImpactPooling::None);
 }
 

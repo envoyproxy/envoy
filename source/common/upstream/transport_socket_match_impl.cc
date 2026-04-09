@@ -143,7 +143,7 @@ TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolveUsingMatche
       filter_state = std::make_shared<StreamInfo::FilterStateImpl>(
           StreamInfo::FilterState::LifeSpan::Connection);
       for (const auto& object : shared_objects) {
-        filter_state->setData(object.name_, object.data_, object.state_type_,
+        filter_state->setData(object.name_, object.data_,
                               StreamInfo::FilterState::LifeSpan::Connection,
                               object.stream_sharing_);
       }
