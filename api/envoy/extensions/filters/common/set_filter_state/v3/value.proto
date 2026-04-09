@@ -4,6 +4,7 @@ package envoy.extensions.filters.common.set_filter_state.v3;
 
 import "envoy/config/core/v3/substitution_format_string.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -92,7 +93,7 @@ message FilterStateValue {
   }
 
   // This field is deprecated and its value has no effect.
-  bool read_only = 3 [deprecated = true];
+  bool read_only = 3 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configures the object to be shared with the upstream internal connections. See :ref:`internal upstream
   // transport <config_internal_upstream_transport>` for more details on the filter state sharing with
