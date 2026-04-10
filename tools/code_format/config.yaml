@@ -343,6 +343,7 @@ paths:
     - source/extensions/http/cache_v2/file_system_http_cache/cache_file_header_proto_util.cc
     - test/common/grpc/codec_fuzz_test.cc
     - test/common/grpc/codec_test.cc
+    - test/common/orca/orca_oob_session_test.cc
     - test/common/protobuf/utility_test.cc
     - source/extensions/common/tap/tap_config_base.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc

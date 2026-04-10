@@ -357,6 +357,7 @@ public:
 
   struct {
     const std::string EnvoyHealthChecker{"Envoy/HC"};
+    const std::string EnvoyOrcaOob{"Envoy/OrcaOob"};
     const std::string GoBrowser{"Go-browser"};
   } UserAgentValues;
 
