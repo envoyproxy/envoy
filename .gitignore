@@ -46,6 +46,7 @@ clang.bazelrc
 compile_commands.json
 user.bazelrc
 *.bzlc
+Cargo.Bazel.lock.ignore
 
 #############################
 # Build artifacts and tooling
