@@ -30,6 +30,7 @@ jobs:
 
   android-release:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: >-
