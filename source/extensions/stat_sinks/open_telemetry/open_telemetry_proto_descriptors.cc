@@ -2,6 +2,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/common/opentelemetry/sdk/metrics/constants.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,7 +10,8 @@ namespace StatSinks {
 namespace OpenTelemetry {
 
 void validateProtoDescriptors() {
-  const auto method = "opentelemetry.proto.collector.metrics.v1.MetricsService.Export";
+  const auto method = std::string(
+      Envoy::Extensions::OpenTelemetry::Sdk::Metrics::Constants::kMetricsServiceExportMethod);
 
   RELEASE_ASSERT(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr,
                  "");

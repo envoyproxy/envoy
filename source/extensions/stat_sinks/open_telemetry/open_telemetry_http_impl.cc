@@ -5,7 +5,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
+#include "source/extensions/common/opentelemetry/exporters/otlp/environment.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,7 +44,8 @@ void OpenTelemetryHttpMetricsExporter::send(MetricsExportRequestPtr&& metrics) {
   message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Protobuf);
 
   // User-Agent header follows the OTLP specification.
-  message->headers().setReferenceUserAgent(AccessLoggers::OpenTelemetry::getOtlpUserAgentHeader());
+  message->headers().setReferenceUserAgent(
+      ::Envoy::Extensions::OpenTelemetry::Exporters::Otlp::GetUserAgent());
 
   // Add custom headers from config.
   headers_applicator_->apply(message->headers());

@@ -10,6 +10,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/access_loggers/common/grpc_access_logger_clients.h"
 #include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
+#include "source/extensions/common/opentelemetry/sdk/logs/constants.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -37,7 +38,8 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
                                                             ExportLogsServiceResponse>>(
               client,
               *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                  "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
+                  std::string(Envoy::Extensions::OpenTelemetry::Sdk::Logs::Constants::
+                                  kLogsServiceExportMethod)),
               GrpcCommon::optionalRetryPolicy(config.common_config()), genOTelCallbacksFactory())),
       stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(
           scope, absl::StrCat(OtlpAccessLogStatsPrefix, config.stat_prefix())))}) {

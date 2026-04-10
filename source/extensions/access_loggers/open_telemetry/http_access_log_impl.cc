@@ -88,7 +88,8 @@ void HttpAccessLoggerImpl::flush() {
   message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Protobuf);
 
   // User-Agent header follows the OTLP specification.
-  message->headers().setReferenceUserAgent(getOtlpUserAgentHeader());
+  message->headers().setReferenceUserAgent(
+      Envoy::Extensions::OpenTelemetry::Exporters::Otlp::GetUserAgent());
 
   // Adds all custom headers to the request.
   headers_applicator_->apply(message->headers());

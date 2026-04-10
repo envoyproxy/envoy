@@ -11,20 +11,11 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/common/version/version.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace OpenTelemetry {
-
-opentelemetry::proto::common::v1::KeyValue getStringKeyValue(const std::string& key,
-                                                             const std::string& value) {
-  opentelemetry::proto::common::v1::KeyValue keyValue;
-  keyValue.set_key(key);
-  keyValue.mutable_value()->set_string_value(value);
-  return keyValue;
-}
 
 ::opentelemetry::proto::common::v1::KeyValueList
 packBody(const ::opentelemetry::proto::common::v1::AnyValue& body) {
@@ -39,12 +30,6 @@ packBody(const ::opentelemetry::proto::common::v1::AnyValue& body) {
 unpackBody(const ::opentelemetry::proto::common::v1::KeyValueList& value) {
   ASSERT(value.values().size() == 1 && value.values(0).key() == BodyKey);
   return value.values(0).value();
-}
-
-// User-Agent header follows the OTLP specification:
-// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.52.0/specification/protocol/exporter.md#user-agent
-const std::string& getOtlpUserAgentHeader() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "OTel-OTLP-Exporter-Envoy/" + VersionInfo::version());
 }
 
 void populateTraceContext(opentelemetry::proto::logs::v1::LogRecord& log_entry,

@@ -37,6 +37,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: opentelemetry
+  change: |
+    Refactored shared OpenTelemetry OTLP code into ``source/extensions/common/opentelemetry/``,
+    consolidating exporter utilities, constants, and include paths. No functional behavior changes.
 - area: geoip
   change: |
     :ref:`Envoy Http Geoip filter extension

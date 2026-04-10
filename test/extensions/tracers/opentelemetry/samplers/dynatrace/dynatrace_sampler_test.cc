@@ -14,6 +14,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "opentelemetry/nostd/variant.h"
 
 namespace Envoy {
 namespace Extensions {
