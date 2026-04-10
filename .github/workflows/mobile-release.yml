@@ -222,7 +222,6 @@ jobs:
     permissions: 
       contents: read
       id-token: write
-      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
