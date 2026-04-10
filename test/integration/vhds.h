@@ -134,14 +134,24 @@ vhds:
           cluster_name: xds_cluster
 )EOF";
 
+enum class RouteConfigType { Rds, Static };
+
+using VhdsIntegrationTestParam = std::tuple<Network::Address::IpVersion, Grpc::ClientType,
+                                            Grpc::LegacyOrUnified, RouteConfigType>;
+
 class VhdsIntegrationTest : public HttpIntegrationTest,
-                            public Grpc::UnifiedOrLegacyMuxIntegrationParamTest {
+                            public testing::TestWithParam<VhdsIntegrationTestParam> {
 public:
   VhdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
     config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
                                       isUnified() ? "true" : "false");
   }
+
+  Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const { return std::get<1>(GetParam()); }
+  bool isUnified() const { return std::get<2>(GetParam()) == Grpc::LegacyOrUnified::Unified; }
+  RouteConfigType routeConfigType() const { return std::get<3>(GetParam()); }
 
   void TearDown() override { cleanUpXdsConnection(); }
 
@@ -173,6 +183,18 @@ public:
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
   void initialize() override {
+    if (routeConfigType() == RouteConfigType::Static) {
+      // Static route config - remove the "rds" configuration in the HCM, and
+      // set the contents statically in "route_config".
+      config_helper_.addConfigModifier(
+          [&](envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager& hcm) -> void {
+            hcm.clear_rds();
+            auto* route_config = hcm.mutable_route_config();
+            route_config->CopyFrom(rdsConfig());
+          });
+    }
+
     // Controls how many addFakeUpstream() will happen in
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
@@ -197,14 +219,17 @@ public:
     AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
-    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
-    RELEASE_ASSERT(result, result.message());
-    xds_stream_->startGrpcStream();
 
-    EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
-                                            {"my_route"}, true));
-    sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-        Config::TestTypeUrl::get().RouteConfiguration, {rdsConfig()}, "1");
+    if (routeConfigType() == RouteConfigType::Rds) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                              {"my_route"}, true));
+      sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+          Config::TestTypeUrl::get().RouteConfiguration, {rdsConfig()}, "1");
+    }
 
     result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
     RELEASE_ASSERT(result, result.message());
@@ -283,5 +308,32 @@ public:
   FakeStreamPtr vhds_stream_;
   bool use_rds_with_vhosts{false};
 };
+
+// VHDS Integration tests are similar to other xDS-dynamic config tests, but
+// also validate a dynamic-route config update (RDS) and a static-route config
+// settings.
+// TODO(adisuissa): enable the 'RouteConfigType::Static' testing option once its
+// support is added.
+/*
+#define VHDS_INTEGRATION_PARAMS                                                                    \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
+                   testing::Values(Grpc::LegacyOrUnified::Legacy, Grpc::LegacyOrUnified::Unified), \
+                   testing::Values(RouteConfigType::Rds, RouteConfigType::Static))
+*/
+#define VHDS_INTEGRATION_PARAMS                                                                    \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
+                   testing::Values(Grpc::LegacyOrUnified::Legacy, Grpc::LegacyOrUnified::Unified), \
+                   testing::Values(RouteConfigType::Rds))
+
+inline std::string
+vhdsTestParamsToString(const testing::TestParamInfo<VhdsIntegrationTestParam>& info) {
+  return absl::StrCat(
+      (std::get<0>(info.param) == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+      (std::get<1>(info.param) == Grpc::ClientType::EnvoyGrpc ? "EnvoyGrpc_" : "GoogleGrpc_"),
+      (std::get<2>(info.param) == Grpc::LegacyOrUnified::Unified ? "Unified_" : "Legacy_"),
+      (std::get<3>(info.param) == RouteConfigType::Rds ? "Rds" : "Static"));
+}
 
 } // namespace Envoy

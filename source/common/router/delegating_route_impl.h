@@ -47,8 +47,9 @@ public:
     return base_route_->filterDisabled(name);
   }
   const std::string& routeName() const override { return base_route_->routeName(); }
-  const VirtualHostConstSharedPtr& virtualHost() const override {
-    return base_route_->virtualHost();
+  const VirtualHost& virtualHost() const override { return base_route_->virtualHost(); }
+  VirtualHostConstSharedPtr virtualHostSharedPtr() const override {
+    return base_route_->virtualHostSharedPtr();
   }
 
 protected:

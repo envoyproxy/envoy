@@ -6,13 +6,13 @@
 #include <memory>
 #include <string>
 
-#include "envoy/stats/allocator.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/lock_guard.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
@@ -914,7 +914,7 @@ bool ParentHistogramImpl::decRefCount() {
     // decrement it, and we'll wind up with a dtor/update race. To avoid this we
     // must hold the lock until the histogram is removed from the map.
     //
-    // See also StatsSharedImpl::decRefCount() in allocator_impl.cc, which has
+    // See also StatsSharedImpl::decRefCount() in allocator.cc, which has
     // the same issue.
     ret = thread_local_store_.decHistogramRefCount(*this, ref_count_);
   }
@@ -1130,15 +1130,22 @@ void ThreadLocalStoreImpl::evictUnused() {
         MetricBag metrics(scope->scope_id_);
         CentralCacheEntrySharedPtr& central_cache = scope->centralCacheMutableNoThreadAnalysis();
         auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
-          return [&unused_metrics](std::pair<StatName, T> kv) {
+          return [&unused_metrics](const std::pair<const StatName, T>& kv) {
             const auto& [name, metric] = kv;
+            // Evictable scopes can contain counters, gauges, text-readouts, and histograms. For all
+            // the gauges we find in one, we treat them as up/down counters that become evictable
+            // when they hit zero.
+            if constexpr (std::is_same_v<T, GaugeSharedPtr>) {
+              if (metric->value() != 0) {
+                return false;
+              }
+            }
             if (metric->used()) {
               metric->markUnused();
               return false;
-            } else {
-              unused_metrics.try_emplace(name, metric);
-              return true;
             }
+            unused_metrics.try_emplace(name, metric);
+            return true;
           };
         };
         absl::erase_if(central_cache->counters_, filter_unused(metrics.counters_));

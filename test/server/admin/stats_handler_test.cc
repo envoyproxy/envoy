@@ -130,7 +130,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
   Upstream::PerEndpointMetricsTestHelper endpoints_helper_;
-  Stats::AllocatorImpl alloc_;
+  Stats::Allocator alloc_;
   Stats::MockSink sink_;
   Stats::ThreadLocalStoreImplPtr store_;
   Stats::CustomStatNamespacesImpl custom_namespaces_;
@@ -1302,7 +1302,7 @@ protected:
   Thread::RealThreadsTestHelper real_threads_;
   Stats::SymbolTableImpl symbol_table_;
   Stats::StatNamePool pool_;
-  Stats::AllocatorImpl alloc_;
+  Stats::Allocator alloc_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   std::vector<Stats::ScopeSharedPtr> scopes_{NumScopes};

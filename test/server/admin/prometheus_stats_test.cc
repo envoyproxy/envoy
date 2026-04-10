@@ -133,7 +133,7 @@ protected:
   }
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::AllocatorImpl alloc_;
+  Stats::Allocator alloc_;
   Stats::StatNamePool pool_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
@@ -1746,7 +1746,7 @@ public:
   }
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::AllocatorImpl alloc_;
+  Stats::Allocator alloc_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
   Stats::Scope& scope_;

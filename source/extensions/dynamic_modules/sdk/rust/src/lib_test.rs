@@ -1,7 +1,7 @@
 #![allow(clippy::unnecessary_cast)]
 use crate::*;
 #[cfg(test)]
-use std::sync::atomic::{AtomicBool, AtomicUsize}; // These are used for testing, not for actual concurrency.
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize};
 
 #[test]
 fn test_loggers() {
@@ -2429,6 +2429,15 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_delete
 ) {
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path: abi::envoy_dynamic_module_type_module_buffer,
+  _events: u32,
+) -> bool {
+  false
+}
+
 // Thread-local used by the test mock to capture the response body set via the callback.
 thread_local! {
   static TEST_ADMIN_RESPONSE: std::cell::RefCell<String> =
@@ -2474,6 +2483,13 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_remove_admin
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
 ) -> bool {
   false
@@ -2915,6 +2931,94 @@ fn test_bootstrap_extension_timer_fired_identity() {
 
   // The two timer ids must be different.
   assert_ne!(fake_timer_a as usize, fake_timer_b as usize);
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_file_changed() {
+  // Verify that path and events are correctly passed through on_file_changed.
+  static FIRED_PATH: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+  static FIRED_EVENTS: AtomicU32 = AtomicU32::new(0);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_file_changed(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      path: &str,
+      events: u32,
+    ) {
+      *FIRED_PATH.lock().unwrap() = path.to_string();
+      FIRED_EVENTS.store(events, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  // Fire with MovedTo event.
+  let path = "test/path_a.txt";
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    std::ptr::null_mut(),
+    config_ptr,
+    path_buf,
+    FILE_WATCHER_EVENT_MOVED_TO,
+  );
+  assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_a.txt");
+  assert_eq!(
+    FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
+    FILE_WATCHER_EVENT_MOVED_TO
+  );
+
+  // Fire with Modified event on different path.
+  let path2 = "test/path_b.txt";
+  let path_buf2 = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path2.as_ptr() as *mut _,
+    length: path2.len(),
+  };
+  envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    std::ptr::null_mut(),
+    config_ptr,
+    path_buf2,
+    FILE_WATCHER_EVENT_MODIFIED,
+  );
+  assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_b.txt");
+  assert_eq!(
+    FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
+    FILE_WATCHER_EVENT_MODIFIED
+  );
 
   // Clean up.
   unsafe {
@@ -3502,6 +3606,299 @@ fn test_lb_config_vec_metric_invalid_id() {
   assert!(mock_config
     .record_histogram_value_vec(EnvoyHistogramVecId(999), &["v1"], 1)
     .is_err());
+}
+
+// =============================================================================
+// CatchUnwind Tests
+// =============================================================================
+
+static SEND_RESPONSE_STATUS_CODE: AtomicU32 = AtomicU32::new(0);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_send_response(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  status_code: u32,
+  _headers_vector: *mut abi::envoy_dynamic_module_type_module_http_header,
+  _headers_vector_size: usize,
+  _body: abi::envoy_dynamic_module_type_module_buffer,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  SEND_RESPONSE_STATUS_CODE.store(status_code, std::sync::atomic::Ordering::SeqCst);
+}
+
+static RESET_STREAM_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _reason: abi::envoy_dynamic_module_type_http_filter_stream_reset_reason,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+static NETWORK_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_close(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  _close_type: abi::envoy_dynamic_module_type_network_connection_close_type,
+) {
+  NETWORK_CLOSE_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+static LISTENER_CLOSE_SOCKET_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_listener_filter_close_socket(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  _details: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  LISTENER_CLOSE_SOCKET_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_catch_unwind_http_filter_panic() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  SEND_RESPONSE_STATUS_CODE.store(0, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+  assert_eq!(
+    SEND_RESPONSE_STATUS_CODE.load(std::sync::atomic::Ordering::SeqCst),
+    500,
+  );
+}
+
+#[test]
+fn test_catch_unwind_network_filter_panic() {
+  struct PanicFilter;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for PanicFilter {
+    fn on_read(
+      &mut self,
+      _envoy_filter: &mut ENF,
+      _data_length: usize,
+      _end_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      panic!("intentional panic in on_read");
+    }
+  }
+
+  NETWORK_CLOSE_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = network::EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = NetworkFilter::on_read(&mut wrapper, &mut envoy_filter, 0, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration,
+  );
+  assert!(NETWORK_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_listener_filter_panic() {
+  struct PanicFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for PanicFilter {
+    fn on_accept(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      panic!("intentional panic in on_accept");
+    }
+  }
+
+  LISTENER_CLOSE_SOCKET_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = listener::EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = ListenerFilter::on_accept(&mut wrapper, &mut envoy_filter);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration,
+  );
+  assert!(LISTENER_CLOSE_SOCKET_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_http_response_headers_panic() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_response_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+      panic!("intentional panic in on_response_headers");
+    }
+  }
+
+  RESET_STREAM_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_response_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration,
+  );
+  assert!(RESET_STREAM_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_network_on_write_panic() {
+  struct PanicFilter;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for PanicFilter {
+    fn on_write(
+      &mut self,
+      _envoy_filter: &mut ENF,
+      _data_length: usize,
+      _end_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      panic!("intentional panic in on_write");
+    }
+  }
+
+  NETWORK_CLOSE_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = network::EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = NetworkFilter::on_write(&mut wrapper, &mut envoy_filter, 0, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration,
+  );
+  assert!(NETWORK_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_listener_on_data_panic() {
+  struct PanicFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for PanicFilter {
+    fn on_data(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      panic!("intentional panic in on_data");
+    }
+  }
+
+  LISTENER_CLOSE_SOCKET_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+
+  let mut envoy_filter = listener::EnvoyListenerFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = ListenerFilter::on_data(&mut wrapper, &mut envoy_filter);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration,
+  );
+  assert!(LISTENER_CLOSE_SOCKET_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_catch_unwind_http_callout_done_after_poison_is_skipped() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    HttpFilter::on_http_callout_done(
+      &mut wrapper,
+      &mut envoy_filter,
+      1,
+      abi::envoy_dynamic_module_type_http_callout_result::Success,
+      None,
+      None,
+    );
+  }));
+  assert!(
+    result.is_ok(),
+    "late on_http_callout_done should be skipped after CatchUnwind is poisoned",
+  );
+}
+
+#[test]
+fn test_catch_unwind_http_scheduled_after_poison_is_skipped() {
+  struct PanicFilter;
+  impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PanicFilter {
+    fn on_request_headers(
+      &mut self,
+      _envoy_filter: &mut EHF,
+      _end_of_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+      panic!("intentional panic in on_request_headers");
+    }
+  }
+
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  let mut wrapper = CatchUnwind::new(PanicFilter);
+
+  let status = HttpFilter::on_request_headers(&mut wrapper, &mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration,
+  );
+
+  let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    HttpFilter::on_scheduled(&mut wrapper, &mut envoy_filter, 1);
+  }));
+  assert!(
+    result.is_ok(),
+    "late on_scheduled should be skipped after CatchUnwind is poisoned",
+  );
 }
 
 // =============================================================================
@@ -4687,7 +5084,7 @@ fn test_async_host_selection_with_stored_completion() {
 fn test_bootstrap_extension_cluster_add_or_update() {
   use std::sync::atomic::{AtomicBool, Ordering};
   static CLUSTER_ADDED: AtomicBool = AtomicBool::new(false);
-  static mut CLUSTER_NAME_RECEIVED: String = String::new();
+  static CLUSTER_NAME_RECEIVED: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -4704,9 +5101,7 @@ fn test_bootstrap_extension_cluster_add_or_update() {
       cluster_name: &str,
     ) {
       CLUSTER_ADDED.store(true, Ordering::SeqCst);
-      unsafe {
-        CLUSTER_NAME_RECEIVED = cluster_name.to_string();
-      }
+      *CLUSTER_NAME_RECEIVED.lock().unwrap() = cluster_name.to_string();
     }
   }
 
@@ -4746,9 +5141,7 @@ fn test_bootstrap_extension_cluster_add_or_update() {
   }
 
   assert!(CLUSTER_ADDED.load(Ordering::SeqCst));
-  unsafe {
-    assert_eq!(CLUSTER_NAME_RECEIVED, "test_cluster");
-  }
+  assert_eq!(*CLUSTER_NAME_RECEIVED.lock().unwrap(), "test_cluster");
 
   // Clean up.
   unsafe {
@@ -4760,7 +5153,7 @@ fn test_bootstrap_extension_cluster_add_or_update() {
 fn test_bootstrap_extension_cluster_removal() {
   use std::sync::atomic::{AtomicBool, Ordering};
   static CLUSTER_REMOVED: AtomicBool = AtomicBool::new(false);
-  static mut REMOVED_CLUSTER_NAME: String = String::new();
+  static REMOVED_CLUSTER_NAME: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -4777,9 +5170,7 @@ fn test_bootstrap_extension_cluster_removal() {
       cluster_name: &str,
     ) {
       CLUSTER_REMOVED.store(true, Ordering::SeqCst);
-      unsafe {
-        REMOVED_CLUSTER_NAME = cluster_name.to_string();
-      }
+      *REMOVED_CLUSTER_NAME.lock().unwrap() = cluster_name.to_string();
     }
   }
 
@@ -4819,9 +5210,7 @@ fn test_bootstrap_extension_cluster_removal() {
   }
 
   assert!(CLUSTER_REMOVED.load(Ordering::SeqCst));
-  unsafe {
-    assert_eq!(REMOVED_CLUSTER_NAME, "removed_cluster");
-  }
+  assert_eq!(*REMOVED_CLUSTER_NAME.lock().unwrap(), "removed_cluster");
 
   // Clean up.
   unsafe {
@@ -4878,6 +5267,202 @@ fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
       std::ptr::null_mut(),
       config_ptr,
       cluster_name_buf,
+    );
+  }
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_listener_add_or_update() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static LISTENER_ADDED: AtomicBool = AtomicBool::new(false);
+  static LISTENER_NAME_RECEIVED: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_listener_add_or_update(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      listener_name: &str,
+    ) {
+      LISTENER_ADDED.store(true, Ordering::SeqCst);
+      *LISTENER_NAME_RECEIVED.lock().unwrap() = listener_name.to_string();
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let listener_name = "test_listener";
+  let listener_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: listener_name.as_ptr() as *const _,
+    length: listener_name.len(),
+  };
+
+  LISTENER_ADDED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+  }
+
+  assert!(LISTENER_ADDED.load(Ordering::SeqCst));
+  assert_eq!(*LISTENER_NAME_RECEIVED.lock().unwrap(), "test_listener");
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_listener_removal() {
+  use std::sync::atomic::{AtomicBool, Ordering};
+  static LISTENER_REMOVED: AtomicBool = AtomicBool::new(false);
+  static REMOVED_LISTENER_NAME: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_listener_removal(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      listener_name: &str,
+    ) {
+      LISTENER_REMOVED.store(true, Ordering::SeqCst);
+      *REMOVED_LISTENER_NAME.lock().unwrap() = listener_name.to_string();
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let listener_name = "removed_listener";
+  let listener_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: listener_name.as_ptr() as *const _,
+    length: listener_name.len(),
+  };
+
+  LISTENER_REMOVED.store(false, Ordering::SeqCst);
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+  }
+
+  assert!(LISTENER_REMOVED.load(Ordering::SeqCst));
+  assert_eq!(*REMOVED_LISTENER_NAME.lock().unwrap(), "removed_listener");
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_listener_lifecycle_default_noop() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let listener_name = "test_listener";
+  let listener_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: listener_name.as_ptr() as *const _,
+    length: listener_name.len(),
+  };
+
+  // Calling listener lifecycle hooks with default implementations should not panic.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
+    );
+    envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+      std::ptr::null_mut(),
+      config_ptr,
+      listener_name_buf,
     );
   }
 

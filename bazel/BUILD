@@ -227,6 +227,16 @@ config_setting(
     values = {"define": "tcmalloc=gperftools"},
 )
 
+bool_flag(
+    name = "jemalloc",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "jemalloc_enabled",
+    flag_values = {":jemalloc": "True"},
+)
+
 config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
@@ -524,6 +534,11 @@ config_setting(
 config_setting(
     name = "using_aws_lc",
     flag_values = {":ssl": "@aws_lc//:ssl"},
+)
+
+config_setting(
+    name = "using_openssl",
+    flag_values = {":ssl": "//compat/openssl:ssl"},
 )
 
 # Convenience grouping for any FIPS SSL library

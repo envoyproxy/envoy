@@ -1,15 +1,19 @@
 #include "envoy/config/core/v3/address.pb.h"
+#include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/connect.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -50,6 +54,11 @@ public:
   // Initialize the test with the proxy address provided via endpoint metadata.
   void initializeWithMetadataProxyAddr(bool with_hostname = false) {
     initializeInternal(false, true, {}, with_hostname);
+  }
+
+  // Initialize the test with the proxy address provided via default proxy address.
+  void initializeWithDefaultProxy(bool with_hostname = false) {
+    initializeInternal(false, false, {}, with_hostname, true);
   }
 
   void setAddress() {
@@ -96,7 +105,8 @@ public:
 
 private:
   void initializeInternal(bool no_proxy_protocol, bool use_metadata_proxy_addr,
-                          absl::optional<uint32_t> target_port, bool with_hostname = false) {
+                          absl::optional<uint32_t> target_port, bool with_hostname = false,
+                          bool use_default_proxy_addr = false) {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
     Network::Address::InstanceConstSharedPtr address =
@@ -106,6 +116,7 @@ private:
     const std::string proxy_info_hostname = absl::StrCat("www.foo.com", port);
     auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
     std::unique_ptr<Network::TransportSocketOptions::Http11ProxyInfo> info;
+    absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> default_proxy_info;
 
     if (!no_proxy_protocol) {
       if (use_metadata_proxy_addr) {
@@ -142,6 +153,8 @@ private:
               Buffer::OwnedImpl{fmt::format("CONNECT {} HTTP/1.1\r\nHost: {}\r\n\r\n",
                                             address->asStringView(), address->asStringView())};
         }
+      } else if (use_default_proxy_addr) {
+        default_proxy_info.emplace(proxy_info_hostname, address);
       } else {
         info = std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>(
             proxy_info_hostname, address);
@@ -160,8 +173,8 @@ private:
 
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
 
-    connect_socket_ =
-        std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options_, host);
+    connect_socket_ = std::make_unique<UpstreamHttp11ConnectSocket>(
+        std::move(inner_socket), options_, host, default_proxy_info);
     connect_socket_->setTransportSocketCallbacks(transport_callbacks_);
     connect_socket_->onConnected();
   }
@@ -188,6 +201,12 @@ TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnceEndpointMetadata) {
 // Test injects CONNECT with host header using hostname when available.
 TEST_P(Http11ConnectTest, InjectsHeaderWithHostnameFromMetadata) {
   initializeWithMetadataProxyAddr(true);
+  injectHeaderOnceTest();
+}
+
+// Test injects CONNECT only once. Configured via default proxy address.
+TEST_P(Http11ConnectTest, InjectsHeaderWithDefaultProxyAddr) {
+  initializeWithDefaultProxy();
   injectHeaderOnceTest();
 }
 
@@ -454,6 +473,26 @@ TEST_F(SocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
   initialize();
   EXPECT_CALL(*inner_factory_, createTransportSocket(_, _)).WillOnce(testing::ReturnNull());
   ASSERT_EQ(nullptr, factory_->createTransportSocket(nullptr, nullptr));
+}
+
+class SocketConfigFactoryTest : public testing::Test {
+public:
+  void initialize() { factory_ = std::make_unique<UpstreamHttp11ConnectSocketConfigFactory>(); }
+
+  std::unique_ptr<UpstreamHttp11ConnectSocketConfigFactory> factory_;
+};
+
+// Test createTransportSocketFactory handles absent transport_socket config.
+TEST_F(SocketConfigFactoryTest, CreateSocketFactoryWithoutTransportSocket) {
+  initialize();
+
+  // Inner transport socket is absent.
+  envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport config;
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
+  auto factory_or_error = factory_->createTransportSocketFactory(config, context);
+  EXPECT_TRUE(factory_or_error.status().ok());
+  EXPECT_NE(nullptr, factory_or_error.value());
 }
 
 TEST(ParseTest, TestValidResponse) {

@@ -39,7 +39,7 @@ private:
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::AllocatorImpl stats_allocator_;
+  Stats::Allocator stats_allocator_;
 };
 } // namespace Server
 } // namespace Envoy

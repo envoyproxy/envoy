@@ -61,7 +61,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 38]
+// [#next-free-field: 39]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -215,7 +215,20 @@ message Listener {
   google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
+  // Optional timeout that controls how long a connection is allowed to stay above the configured
+  // buffer high watermark before it is closed. If this timeout is not specified, or explicitly set
+  // to 0, connections will not be closed due to buffer high watermark usage.
+  google.protobuf.Duration per_connection_buffer_high_watermark_timeout = 38
+      [(validate.rules).duration = {gte {}}];
+
   // Listener metadata.
+  //
+  // The following pre-defined metadata could be used by Envoy to manipulate the listener behavior:
+  //
+  // * ``envoy.stats_matcher``: this metadata could be used to customize the stats emitted by the
+  //   listener. See :ref:`well-known metadata <well_known_metadata_envoy_stats_matcher>` for more
+  //   details.
+  //
   core.v3.Metadata metadata = 6;
 
   // [#not-implemented-hide:]

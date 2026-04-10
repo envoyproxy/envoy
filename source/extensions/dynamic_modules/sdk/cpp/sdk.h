@@ -599,6 +599,15 @@ public:
   virtual void clearRouteCache() = 0;
 
   /**
+   * Clear only the cluster selection for the current route without clearing the entire route cache.
+   *
+   * This is a subset of clearRouteCache(). Use this when a filter modifies headers that affect
+   * cluster selection but not the route itself. This is more efficient than clearing the entire
+   * route cache.
+   */
+  virtual void refreshRouteCluster() = 0;
+
+  /**
    * Returns reference to request headers.
    * @return Reference to StreamHeaderMap containing request headers.
    */

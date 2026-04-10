@@ -46,8 +46,10 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
+        "//source/common/common:thread_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/cpu_utilization:config",
+        "//source/extensions/resource_monitors/cpu_utilization:linux_cpu_stats_reader",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:options_mocks",

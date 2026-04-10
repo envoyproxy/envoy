@@ -79,6 +79,8 @@ public:
                  const std::chrono::microseconds min_latency)
         : call_count_(call_count), last_call_status_(call_status), total_latency_(total_latency),
           max_latency_(max_latency), min_latency_(min_latency) {}
+    // The number of completed GRPC calls. This will be the number of body responses sent by the
+    // external processor.
     uint32_t call_count_;
     Grpc::Status::GrpcStatus last_call_status_;
     std::chrono::microseconds total_latency_;
@@ -147,6 +149,10 @@ public:
   processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
+  void incrementRequestBodySentCount() { request_body_sent_++; }
+  void incrementResponseBodySentCount() { response_body_sent_++; }
+  uint32_t requestBodySentCount() const { return request_body_sent_; }
+  uint32_t responseBodySentCount() const { return response_body_sent_; }
 
   ProtobufTypes::MessagePtr serializeAsProto() const override;
 
@@ -167,6 +173,9 @@ private:
   // The following stats are populated for ext_proc filters using Envoy gRPC only.
   // The bytes sent and received are for the entire stream.
   uint64_t bytes_sent_{0}, bytes_received_{0};
+  // The number of body ProcessingRequests sent to the external processor. This number may not be
+  // equal to call_count_ if using FULL_DUPLEX_STREAMED_MODE.
+  uint32_t request_body_sent_{0}, response_body_sent_{0};
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.

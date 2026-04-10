@@ -47,6 +47,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_http_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
     ],

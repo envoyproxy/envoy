@@ -92,6 +92,14 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
 }
 
+// This test verifies that the Rust bootstrap extension can register, retrieve, and overwrite
+// shared data via the process-wide shared data registry.
+TEST_P(DynamicModulesBootstrapIntegrationTest, SharedDataRegistryRust) {
+  EXPECT_LOG_CONTAINS(
+      "info", "Bootstrap shared data registry test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_shared_data_test"));
+}
+
 // This test verifies that Envoy automatically registers an init target for every bootstrap
 // extension and that the module can signal readiness to unblock startup.
 TEST_P(DynamicModulesBootstrapIntegrationTest, InitTargetRust) {
@@ -108,6 +116,24 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, TimerRust) {
   EXPECT_LOG_CONTAINS(
       "info", "Bootstrap timer test completed successfully!",
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_timer_test"));
+}
+
+// This test verifies that the Rust bootstrap extension file watcher API works correctly.
+// Two files are watched via separate add_file_watch calls. Three timed writes occur: file_a twice
+// and file_b once. on_file_changed tracks per-path counts, and signals init complete only after
+// file_a has been seen at least 2 times and file_b at least 1 time.
+TEST_P(DynamicModulesBootstrapIntegrationTest, FileWatcherRust) {
+  // Create two temporary files for the watcher to monitor.
+  const std::string path_a =
+      TestEnvironment::writeStringToFileForTest("file_watcher_test_a", "initial a");
+  const std::string path_b =
+      TestEnvironment::writeStringToFileForTest("file_watcher_test_b", "initial b");
+  // Pass both paths separated by |.
+  const std::string config = path_a + "|" + path_b;
+
+  EXPECT_LOG_CONTAINS("info", "Bootstrap file watcher test completed successfully!",
+                      initializeWithBootstrapExtension(
+                          testDataDir("rust"), "bootstrap_file_watcher_test", "test", config));
 }
 
 // This test verifies that the Rust bootstrap extension can register a custom admin HTTP endpoint
@@ -142,6 +168,15 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterLifecycleRust) {
       Envoy::ExpectedLogMessages({{"info", "Bootstrap cluster lifecycle test: server initialized"},
                                   {"info", "Cluster lifecycle enabled: true"}}),
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_cluster_lifecycle_test"));
+}
+
+// This test verifies that the Rust bootstrap extension can receive listener lifecycle events
+// (add/update and removal) via the ListenerUpdateCallbacks mechanism.
+TEST_P(DynamicModulesBootstrapIntegrationTest, ListenerLifecycleRust) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Bootstrap listener lifecycle test: server initialized"},
+                                  {"info", "Listener lifecycle enabled: true"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_listener_lifecycle_test"));
 }
 
 // This test verifies that a bootstrap extension can register a function in the process-wide

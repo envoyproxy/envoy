@@ -495,7 +495,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           route.route().has_host_rewrite_path_regex()
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
-      vhost_(vhost), vhost_copy_(vhost), cluster_name_(route.route().cluster()),
+      vhost_(vhost), cluster_name_(route.route().cluster()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
       runtime_(loadRuntimeData(route.match())),

@@ -209,6 +209,21 @@ TEST_F(ExtensionConfigTest, MissingTimerFired) {
               testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_timer_fired"));
 }
 
+TEST_F(ExtensionConfigTest, MissingFileChanged) {
+  // Test that config creation fails when
+  // envoy_dynamic_module_on_bootstrap_extension_file_changed symbol is missing.
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_no_file_changed.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  EXPECT_FALSE(config.ok());
+  EXPECT_THAT(config.status().message(),
+              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_file_changed"));
+}
+
 TEST_F(ExtensionConfigTest, MissingAdminRequest) {
   // Test that config creation fails when
   // envoy_dynamic_module_on_bootstrap_extension_admin_request symbol is missing.
@@ -253,6 +268,37 @@ TEST_F(ExtensionConfigTest, MissingClusterRemoval) {
   EXPECT_FALSE(config.ok());
   EXPECT_THAT(config.status().message(),
               testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_cluster_removal"));
+}
+
+TEST_F(ExtensionConfigTest, MissingListenerAddOrUpdate) {
+  // Test that config creation fails when
+  // envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update symbol is missing.
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_no_listener_add_or_update.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  EXPECT_FALSE(config.ok());
+  EXPECT_THAT(
+      config.status().message(),
+      testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update"));
+}
+
+TEST_F(ExtensionConfigTest, MissingListenerRemoval) {
+  // Test that config creation fails when
+  // envoy_dynamic_module_on_bootstrap_extension_listener_removal symbol is missing.
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_no_listener_removal.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  EXPECT_FALSE(config.ok());
+  EXPECT_THAT(config.status().message(),
+              testing::HasSubstr("envoy_dynamic_module_on_bootstrap_extension_listener_removal"));
 }
 
 } // namespace DynamicModules

@@ -10,7 +10,7 @@
 #include "envoy/stats/store.h"
 
 #include "source/common/common/utility.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
@@ -292,7 +292,7 @@ private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
 
   SymbolTablePtr symbol_table_storage_;
-  AllocatorImpl alloc_;
+  Allocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;

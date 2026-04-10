@@ -10,10 +10,15 @@
 #include "source/extensions/resource_monitors/cpu_utilization/cpu_paths.h"
 #include "source/extensions/resource_monitors/cpu_utilization/cpu_stats_reader.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
+
+constexpr absl::string_view NoSupportedCGroupMessage =
+    "No supported cgroup CPU implementation found";
 
 // Internal struct for LinuxCpuStatsReader and CgroupV1CpuStatsReader
 // (shared implementation without effective_cores)

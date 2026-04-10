@@ -184,6 +184,33 @@ absl::optional<std::string> TraceIDFormatter::format(const Context& context,
   return trace_id;
 }
 
+Protobuf::Value SpanIDFormatter::formatValue(const Context& context,
+                                             const StreamInfo::StreamInfo&) const {
+  const auto active_span = context.activeSpan();
+  if (!active_span.has_value()) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  auto span_id = active_span->getSpanId();
+  if (span_id.empty()) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return ValueUtil::stringValue(span_id);
+}
+
+absl::optional<std::string> SpanIDFormatter::format(const Context& context,
+                                                    const StreamInfo::StreamInfo&) const {
+  const auto active_span = context.activeSpan();
+  if (!active_span.has_value()) {
+    return absl::nullopt;
+  }
+
+  auto span_id = active_span->getSpanId();
+  if (span_id.empty()) {
+    return absl::nullopt;
+  }
+  return span_id;
+}
+
 GrpcStatusFormatter::Format GrpcStatusFormatter::parseFormat(absl::string_view format) {
   if (format.empty() || format == "CAMEL_STRING") {
     return GrpcStatusFormatter::CamelString;
@@ -531,6 +558,11 @@ BuiltInHttpCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::COMMAND_ONLY,
          [](absl::string_view, absl::optional<size_t>) {
            return std::make_unique<TraceIDFormatter>();
+         }}},
+       {"SPAN_ID",
+        {CommandSyntaxChecker::COMMAND_ONLY,
+         [](absl::string_view, absl::optional<size_t>) {
+           return std::make_unique<SpanIDFormatter>();
          }}},
        {"QUERY_PARAM",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
