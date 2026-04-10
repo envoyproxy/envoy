@@ -17,6 +17,9 @@ bug_fixes:
   change: |
     Fixed a bug where the internal redirect logic may hang up a request when the request buffer is
     overflowed.
+- area: docker
+  change: |
+    Updates/fixes for release images.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
