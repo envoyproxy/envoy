@@ -1050,9 +1050,7 @@ TEST_P(LoadStatsIntegrationTest, ReportLoadForNonZeroStatsSuccessOnly) {
 
   ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 1, 0, 0, 1)}));
 
-  // In the next interval, there are no new requests, but the previous success should not prevent a
-  // report.
-  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 0, 0)}));
+  // In the next interval, there are no new requests and no active requests, so no report is sent.
 
   cleanupLoadStatsConnection();
 }
@@ -1076,11 +1074,14 @@ TEST_P(LoadStatsIntegrationTest, ReportLoadForNonZeroStatsCustomMetricOnly) {
 
   sendAndReceiveUpstream(0, 200, true);
 
-  ASSERT_TRUE(waitForLoadStatsRequest({localityStatsWithCustomMetrics("winter", 1, 0, 0, 1)}));
+  auto expected_uls = localityStats("winter", 1, 0, 0, 1);
+  auto* metric = expected_uls.add_load_metric_stats();
+  metric->set_metric_name("cpu_utilization");
+  metric->set_num_requests_finished_with_metric(1);
+  metric->set_total_metric_value(0.3);
+  ASSERT_TRUE(waitForLoadStatsRequest({expected_uls}));
 
-  // In the next interval, there are no new requests, but the custom metric from the previous
-  // response exists.
-  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 0, 0)}));
+  // In the next interval, there are no new requests and no custom metrics, so no report is sent.
 
   cleanupLoadStatsConnection();
 }
