@@ -309,8 +309,11 @@ void DnsSrvCluster::ResolveTarget::startResolve() {
 
 void DnsSrvCluster::ResolveTarget::addResolvedTarget(
     Network::Address::InstanceConstSharedPtr address) {
-  resolved_targets_.push_back(std::move(address));
-  parent_.targetResolved(this, std::chrono::seconds::max());
+  resolve_status_ = Network::DnsResolver::ResolutionStatus::Completed;
+  resolve_status_details_ = "srv target is an IP address";
+  resolved_targets_.push_back(Network::Utility::getAddressWithPort(*address, dns_port_));
+
+  parent_.maybeAllResolved();
 }
 
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>

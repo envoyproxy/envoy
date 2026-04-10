@@ -18,6 +18,14 @@
 #include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
+
+namespace Extensions {
+namespace Clusters {
+  class DnsSrvClusterTest;
+  class DnsSrvClusterTest_CreateClusterWithMinimalConfig_Test;
+}
+}
+
 namespace Upstream {
 
 class DnsSrvClusterFactory;
@@ -142,6 +150,8 @@ public:
 
 private:
   friend class DnsSrvClusterTest;
+  friend class ::Envoy::Extensions::Clusters::DnsSrvClusterTest;
+  friend class ::Envoy::Extensions::Clusters::DnsSrvClusterTest_CreateClusterWithMinimalConfig_Test;
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(
       const envoy::config::cluster::v3::Cluster& cluster,
