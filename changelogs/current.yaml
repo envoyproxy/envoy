@@ -945,6 +945,9 @@ new_features:
 - area: ratelimit
   change: |
     Support populating rate limit descriptors from cluster metadata.
+- area: ratelimit
+  change: |
+    Support populating rate limit descriptors from cluster locality metadata.
 
 - area: contrib
   change: |
