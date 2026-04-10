@@ -477,7 +477,7 @@ using DynamicModuleHttpPerRouteFilterConfigConstSharedPtr =
     std::shared_ptr<const DynamicModuleHttpPerRouteFilterConfig>;
 
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
-newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name,
+newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
                                    Extensions::DynamicModules::DynamicModulePtr dynamic_module);
 

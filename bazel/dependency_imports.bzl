@@ -65,7 +65,7 @@ def envoy_dependency_imports(
     )
     rules_rust_dependencies()
     rust_register_toolchains(
-        versions = ["1.86.0"],
+        versions = ["1.88.0"],
         extra_target_triples = [
             "wasm32-unknown-unknown",
             "wasm32-wasi",
@@ -247,20 +247,6 @@ def crates_repositories():
     crates_repository(
         name = "envoy_rust_crate_index",
         cargo_lockfile = "@envoy//:Cargo.lock",
-        # TODO: Ideally we should uncomment the below to make using the Rust SDK via rules_rust reproducible.
-        # However, rules_rust has a bug that when this Envoy repo is used as a dependency in another Bazel workspace,
-        # the lockfile is not properly propagated, which causes the build to fail without CARGO_BAZEL_REPIN=true, which
-        # ends up changing the content of this Envoy repository.
-        #
-        # In practice, the Rust SDK is only used in the tests in our repository (i.e. non main code) as well as
-        # people usually use the native cargo toolchain, which already uses the Cargo.lock file, so this comment-out
-        # is not an issue for now.
-        #
-        # Please refer to the following issues and PR for more details:
-        # * https://github.com/bazelbuild/rules_rust/issues/3521
-        # * https://github.com/envoyproxy/envoy/issues/38951
-        # * https://github.com/bazelbuild/rules_rust/pull/3866
-        #
-        # lockfile = Label("@envoy//:Cargo.Bazel.lock"),
+        lockfile = Label("@envoy//:Cargo.Bazel.lock"),
         manifests = ["@envoy//:Cargo.toml"],
     )

@@ -140,8 +140,77 @@ TEST_P(HttpUpstreamTest, DownstreamDisconnect) {
 TEST_P(HttpUpstreamTest, UpstreamReset) {
   this->setupUpstream();
   EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
-  EXPECT_CALL(this->callbacks_, onEvent(_));
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   this->upstream_->onResetStream(Http::StreamResetReason::ConnectionTermination, "");
+  EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
+}
+
+// Remote-originated reset reasons should produce RemoteClose (default behavior).
+TEST_P(HttpUpstreamTest, UpstreamRemoteResetProducesRemoteClose) {
+  this->setupUpstream();
+  testing::Mock::VerifyAndClearExpectations(&this->encoder_);
+  EXPECT_CALL(this->encoder_, getStream()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, encodeHeaders(_, false)).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, enableTcpTunneling()).Times(AnyNumber());
+
+  const Http::StreamResetReason remote_reasons[] = {
+      Http::StreamResetReason::RemoteReset,
+      Http::StreamResetReason::RemoteRefusedStreamReset,
+      Http::StreamResetReason::RemoteConnectionFailure,
+  };
+
+  for (const auto reason : remote_reasons) {
+    this->setupUpstream();
+    EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+    EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+    this->upstream_->onResetStream(reason, "");
+    EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::RemoteReset);
+  }
+}
+
+// Local-originated reset reasons should produce LocalClose.
+TEST_P(HttpUpstreamTest, UpstreamLocalResetProducesLocalClose) {
+  this->setupUpstream();
+  testing::Mock::VerifyAndClearExpectations(&this->encoder_);
+  EXPECT_CALL(this->encoder_, getStream()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, encodeHeaders(_, false)).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
+  EXPECT_CALL(this->encoder_, enableTcpTunneling()).Times(AnyNumber());
+
+  const Http::StreamResetReason local_reasons[] = {
+      Http::StreamResetReason::LocalReset,
+      Http::StreamResetReason::LocalRefusedStreamReset,
+      Http::StreamResetReason::LocalConnectionFailure,
+      Http::StreamResetReason::ConnectionTimeout,
+      Http::StreamResetReason::ConnectionTermination,
+      Http::StreamResetReason::ConnectError,
+      Http::StreamResetReason::Overflow,
+      Http::StreamResetReason::ProtocolError,
+      Http::StreamResetReason::OverloadManager,
+      Http::StreamResetReason::Http1PrematureUpstreamHalfClose,
+  };
+
+  for (const auto reason : local_reasons) {
+    this->setupUpstream();
+    EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+    EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+    this->upstream_->onResetStream(reason, "");
+    EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
+  }
+}
+
+// When the runtime guard is disabled, all reset reasons (including remote) should produce
+// LocalClose with Normal close type.
+TEST_P(HttpUpstreamTest, UpstreamResetWithGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.map_http_stream_reset_to_tcp_rst", "false"}});
+  this->setupUpstream();
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  this->upstream_->onResetStream(Http::StreamResetReason::RemoteReset, "");
+  EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
 }
 
 TEST_P(HttpUpstreamTest, UpstreamWatermarks) {
