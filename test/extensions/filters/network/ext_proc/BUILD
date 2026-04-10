@@ -33,6 +33,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "ext_proc_integration_test",
     srcs = ["ext_proc_integration_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/http:codec_interface",
         "//source/extensions/filters/network/ext_proc:config",
