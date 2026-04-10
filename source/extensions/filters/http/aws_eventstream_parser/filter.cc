@@ -83,6 +83,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
     finalizeRules();
   }
 
+  writeMetadata();
   return Http::FilterDataStatus::Continue;
 }
 
@@ -104,11 +105,11 @@ void Filter::processBuffer() {
         Extensions::Common::Aws::Eventstream::EventstreamParser::parseMessage(buffer_view);
 
     if (!result.ok()) {
-      // Parse error - corrupt data
+      // Parse error - corrupt data. Stream framing is broken, so we can't recover.
       ENVOY_LOG(warn, "EventStream parse error: {}", result.status().message());
       config_->stats().eventstream_error_.inc();
-      // Drain the entire buffer on error - we can't recover
       buffer_.drain(buffer_.length());
+      processing_complete_ = true;
       return;
     }
 

@@ -188,6 +188,7 @@ comes from the owning HTTP connection manager, and ``<parser_prefix>`` comes fro
   resp.<parser_prefix>.parse_error, Counter, Total number of messages where the content parser failed to parse the payload
   resp.<parser_prefix>.preserved_existing_metadata, Counter, Total number of times metadata was not written due to preserve_existing_metadata_value being true
   resp.<parser_prefix>.eventstream_error, Counter, "Total number of EventStream protocol errors (CRC mismatch, invalid format)"
+  resp.<parser_prefix>.type_conversion_error, Counter, Total number of times a value could not be converted to a valid Protobuf Value type
 
 AWS EventStream Protocol
 ------------------------
