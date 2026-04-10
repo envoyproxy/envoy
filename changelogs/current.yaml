@@ -1,13 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: April 10, 2026
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: contrib
   change: |
     Fixed segfault from timer thread-safety violation, a ring buffer overflow and alpha calculation in
@@ -22,9 +15,6 @@ bug_fixes:
     Fixed a bug where the internal redirect logic may hang up a request when the request buffer is
     overflowed.
 
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
 new_features:
 - area: stats
   change: |
@@ -35,5 +25,3 @@ new_features:
     are enabled and reported at the cluster level. This the stats matcher could be configured via
     the xDS API dynamically on a per-cluster basis.
     See :ref:`envoy.stats_matcher <well_known_metadata_envoy_stats_matcher>` for more details.
-
-deprecated:
