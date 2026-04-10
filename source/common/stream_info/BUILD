@@ -69,8 +69,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "upstream_address_lib",
+    srcs = ["upstream_address.cc"],
     hdrs = ["upstream_address.h"],
     deps = [
+        "//envoy/network:address_interface",
         "//envoy/stream_info:filter_state_interface",
     ],
 )

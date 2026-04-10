@@ -99,3 +99,13 @@ envoy_cc_test(
         "//source/common/stream_info:bool_accessor_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "upstream_address_test",
+    srcs = ["upstream_address_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/stream_info:upstream_address_lib",
+    ],
+)

@@ -970,6 +970,6 @@ new_features:
   change: |
     The upstream address resolved by the DFP filter, when DFP is configured with ``save_upstream_address: true``,
     is now available for access logging through ``%FILTER_STATE(envoy.stream.upstream_address:PLAIN)%`` and attribute
-    access through ``filter_state['envoy.stream.upstream_address']``.    
+    access through ``filter_state['envoy.stream.upstream_address']``.
 
 deprecated:
