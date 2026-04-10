@@ -27,6 +27,9 @@ bug_fixes:
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
 
     Note: Release notes show this to be fixed on 1.37.1 branch, but it was not backported in that release.
+- area: docker
+  change: |
+    Updates/fixes for release images.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
