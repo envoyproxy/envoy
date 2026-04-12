@@ -156,6 +156,8 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
         case SSL_ERROR_SYSCALL:
           if (result.error_.value() == 0) {
             // Non-graceful shutdown by closing the underlying socket.
+            // Check for ECONNRESET even on EOF — the peer may have sent RST.
+            err_code = checkForConnectionReset();
             end_stream = true;
             break;
           }
