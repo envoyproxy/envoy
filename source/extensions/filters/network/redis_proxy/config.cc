@@ -102,11 +102,14 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
     Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
+    // Get zone from LocalInfo for fallback when client_zone not explicitly configured
+    const std::string& local_zone = server_context.localInfo().zoneName();
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, server_context.clusterManager(),
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
-        refresh_manager, filter_config->dns_cache_, aws_iam_config, aws_iam_authenticator);
+        refresh_manager, filter_config->dns_cache_, aws_iam_config, aws_iam_authenticator,
+        local_zone);
     conn_pool_ptr->init();
     upstreams.emplace(cluster, conn_pool_ptr);
   }

@@ -61,6 +61,18 @@ boringssl:
   license: "Mixed"
   license_url: "https://github.com/google/boringssl/blob/{version}/LICENSE"
 
+openssl:
+  project_name: "OpenSSL"
+  project_desc: "TLS/SSL and crypto library"
+  project_url: "https://github.com/openssl/openssl"
+  release_date: "2026-04-07"
+  use_category:
+  - controlplane
+  - dataplane_core
+  cpe: "cpe:2.3:a:openssl:openssl:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/openssl/openssl/blob/openssl-{version}/LICENSE.txt"
+
 build_bazel_rules_apple:
   project_name: "Apple Rules for Bazel"
   project_desc: "Bazel rules for Apple platforms"
@@ -284,7 +296,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-03-23"
+  release_date: "2026-04-09"
   use_category:
   - controlplane
   - dataplane_core
@@ -787,7 +799,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-03-11"
+  release_date: "2026-04-06"
   use_category:
   - build
   - controlplane

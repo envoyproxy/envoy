@@ -5457,6 +5457,37 @@ TEST_F(RouterTest, InternalRedirectWithRequestBodyBufferOverflow) {
                     .value());
 }
 
+// Regression test: when an upstream filter (e.g. the buffer filter) has already buffered all
+// request data, the decoding buffer and the data argument to decodeData() are the same object.
+// The buffer overflow check must not double-count the size in this case.
+TEST_F(RouterTest, InternalRedirectNoDoubleCountWhenDecodingBufferIsData) {
+  // Body is 15 bytes, limit is 20. Without the fix, the check would compute 15+15=30 > 20
+  // and incorrectly mark the request as buffer-overflowed.
+  Buffer::OwnedImpl body_data("fifteen_bytes!!");
+  ASSERT_EQ(15, body_data.length());
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(20));
+  // Return a pointer to the SAME buffer to simulate the buffer filter having
+  // already buffered the data into the shared decoding buffer.
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&body_data));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+
+  enableRedirects();
+  sendRequest(false);
+
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
+
+  // Data should be buffered (not rejected) since 15 < 20.
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(body_data, true));
+
+  // The redirect should proceed because the buffer did not overflow.
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+
+  router_->onDestroy();
+}
+
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   enableRedirects();
   sendRequest();
@@ -8103,6 +8134,7 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
 
 class TestOrcaLoadReportLbData : public Upstream::HostLbPolicyData {
 public:
+  bool receivesOrcaLoadReport() const override { return true; }
   MOCK_METHOD(absl::Status, onOrcaLoadReport,
               (const Upstream::OrcaLoadReport&, const StreamInfo::StreamInfo&), (override));
 };
@@ -8123,7 +8155,7 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   // Configure the HostLbData to receive the report.
   auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
@@ -8177,7 +8209,7 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   // Configure the HostLbData to receive the report.
   auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
@@ -8218,11 +8250,89 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
   // called for invalid orca header.
   auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _)).Times(0);
 
   // Send report with invalid ORCA proto.
   std::string proto_string = "Invalid ORCA proto value";
+  std::string orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, OrcaLoadReportCallbacksFanOutToMultipleHostDataEntries) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  auto first_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto* first_lb_policy_data_raw_ptr = first_lb_policy_data.get();
+  auto second_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto* second_lb_policy_data_raw_ptr = second_lb_policy_data.get();
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(first_lb_policy_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(second_lb_policy_data));
+
+  EXPECT_CALL(*first_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
+      .WillOnce(Return(absl::OkStatus()));
+  EXPECT_CALL(*second_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
+      .WillOnce(Return(absl::OkStatus()));
+
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_cpu_utilization(0.5);
+  orca_load_report.mutable_named_metrics()->insert({"good", 0.7});
+  std::string proto_string = TestUtility::getProtobufBinaryStringFromMessage(orca_load_report);
+  std::string orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, OrcaLoadReportSkipsEntriesNotInterestedInOrca) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // First entry opts out of ORCA reports.
+  class NonOrcaLbData : public Upstream::HostLbPolicyData {
+  public:
+    bool receivesOrcaLoadReport() const override { return false; }
+    MOCK_METHOD(absl::Status, onOrcaLoadReport,
+                (const Upstream::OrcaLoadReport&, const StreamInfo::StreamInfo&), (override));
+  };
+
+  auto non_orca_data = std::make_unique<NonOrcaLbData>();
+  auto* non_orca_data_raw_ptr = non_orca_data.get();
+  auto orca_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto* orca_data_raw_ptr = orca_data.get();
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(non_orca_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(orca_data));
+
+  // Non-ORCA entry should never be called, ORCA entry should be called.
+  EXPECT_CALL(*non_orca_data_raw_ptr, onOrcaLoadReport(_, _)).Times(0);
+  EXPECT_CALL(*orca_data_raw_ptr, onOrcaLoadReport(_, _)).WillOnce(Return(absl::OkStatus()));
+
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_cpu_utilization(0.5);
+  std::string proto_string = TestUtility::getProtobufBinaryStringFromMessage(orca_load_report);
   std::string orca_load_report_header_bin =
       Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
   Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{

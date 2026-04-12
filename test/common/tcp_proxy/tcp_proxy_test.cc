@@ -370,6 +370,58 @@ TEST_P(TcpProxyTest, UpstreamRemoteDisconnect) {
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test that upstream RemoteClose propagates AbortReset (default behavior)
+// when upstream detected close type is RemoteReset.
+TEST_P(TcpProxyTest, UpstreamRemoteCloseWithRstPropagation) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+
+  auto upstream_info = upstream_connections_.at(0)->stream_info_.upstreamInfo();
+  EXPECT_CALL(*dynamic_cast<StreamInfo::MockUpstreamInfo*>(upstream_info.get()),
+              upstreamDetectedCloseType())
+      .WillRepeatedly(testing::Return(StreamInfo::DetectedCloseType::RemoteReset));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::AbortReset));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_TRUE(
+      filter_->getStreamInfo().hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset));
+}
+
+// Test that upstream LocalClose still uses FlushWrite (FIN).
+TEST_P(TcpProxyTest, UpstreamLocalCloseStillUsesFin) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+}
+
+// Test that upstream RemoteClose uses FlushWrite (FIN) when runtime guard is disabled.
+TEST_P(TcpProxyTest, UpstreamRemoteCloseUsesFinWhenRstGuardDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy", "false"}});
+
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that upstream RemoteClose with Normal close type uses FlushWrite.
+TEST_P(TcpProxyTest, UpstreamRemoteCloseNormalCloseTypeUsesFin) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Test that reconnect is attempted after a local connect failure, backoff options not configured.
 TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailNoBackoffOptions) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
