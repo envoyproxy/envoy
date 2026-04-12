@@ -335,6 +335,12 @@ bug_fixes:
   change: |
     Fixed an issue where a userspace IO socket could fail to drain the write buffer of a connection
     when the peer had closed for reads, causing the connection to remain open indefinitely.
+- area: config_validation
+  change: |
+    Fixed ``--mode validate`` to create bootstrap extensions during config validation. Previously,
+    bootstrap extensions were completely skipped in validation mode, which meant their configs were
+    not validated and any providers or singletons they register were unavailable to downstream config
+    elements that depend on them.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
