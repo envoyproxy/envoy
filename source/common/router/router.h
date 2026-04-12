@@ -27,6 +27,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/filter_chain_helper.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/sidestream_watermark.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/context_impl.h"
@@ -204,15 +205,15 @@ public:
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     for (const auto& header : strict_check_headers) {
       const std::string lower_header = absl::AsciiStrToLower(header);
-      if (lower_header == "x-envoy-upstream-rq-timeout-ms") {
+      if (lower_header == Http::Headers::get().EnvoyUpstreamRequestTimeoutMs.get()) {
         strict_check_headers_.envoy_upstream_rq_timeout_ms_ = true;
-      } else if (lower_header == "x-envoy-upstream-rq-per-try-timeout-ms") {
+      } else if (lower_header == Http::Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs.get()) {
         strict_check_headers_.envoy_upstream_rq_per_try_timeout_ms_ = true;
-      } else if (lower_header == "x-envoy-max-retries") {
+      } else if (lower_header == Http::Headers::get().EnvoyMaxRetries.get()) {
         strict_check_headers_.envoy_max_retries_ = true;
-      } else if (lower_header == "x-envoy-retry-on") {
+      } else if (lower_header == Http::Headers::get().EnvoyRetryOn.get()) {
         strict_check_headers_.envoy_retry_on_ = true;
-      } else if (lower_header == "x-envoy-retry-grpc-on") {
+      } else if (lower_header == Http::Headers::get().EnvoyRetryGrpcOn.get()) {
         strict_check_headers_.envoy_retry_grpc_on_ = true;
       }
     }
