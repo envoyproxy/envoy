@@ -36,6 +36,8 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
 
+#include "absl/container/inlined_vector.h"
+#include "absl/strings/ascii.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -62,22 +64,8 @@ public:
       const Http::HeaderEntry* entry_;
     };
 
-    /**
-     * Determine whether a given header's value passes the strict validation
-     * defined for that header.
-     * @param headers supplies the headers from which to get the target header.
-     * @param target_header is the header to be validated.
-     * @return HeaderCheckResult containing the entry for @param target_header
-     *         and valid_ set to FALSE if @param target_header is set to an
-     *         invalid value. If @param target_header doesn't appear in
-     *         @param headers, return a result with valid_ set to TRUE.
-     */
-    static const HeaderCheckResult checkHeader(Http::RequestHeaderMap& headers,
-                                               const Http::LowerCaseString& target_header);
-
     using ParseRetryFlagsFunc = std::function<std::pair<uint32_t, bool>(absl::string_view)>;
 
-  private:
     static HeaderCheckResult hasValidRetryFields(const Http::HeaderEntry* header_entry,
                                                  const ParseRetryFlagsFunc& parse_fn) {
       HeaderCheckResult r;
@@ -214,10 +202,18 @@ public:
         reject_connect_request_early_data_(reject_connect_request_early_data),
         http_context_(http_context), zone_name_(factory_context.localInfo().zoneStatName()),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
-    if (!strict_check_headers.empty()) {
-      strict_check_headers_ = std::make_unique<HeaderVector>();
-      for (const auto& header : strict_check_headers) {
-        strict_check_headers_->emplace_back(Http::LowerCaseString(header));
+    for (const auto& header : strict_check_headers) {
+      const std::string lower_header = absl::AsciiStrToLower(header);
+      if (lower_header == "x-envoy-upstream-rq-timeout-ms") {
+        strict_check_headers_.envoy_upstream_rq_timeout_ms_ = true;
+      } else if (lower_header == "x-envoy-upstream-rq-per-try-timeout-ms") {
+        strict_check_headers_.envoy_upstream_rq_per_try_timeout_ms_ = true;
+      } else if (lower_header == "x-envoy-max-retries") {
+        strict_check_headers_.envoy_max_retries_ = true;
+      } else if (lower_header == "x-envoy-retry-on") {
+        strict_check_headers_.envoy_retry_on_ = true;
+      } else if (lower_header == "x-envoy-retry-grpc-on") {
+        strict_check_headers_.envoy_retry_grpc_on_ = true;
       }
     }
   }
@@ -265,13 +261,19 @@ public:
   FilterStats default_stats_;
   FilterStats async_stats_;
   Random::RandomGenerator& random_;
-  const bool emit_dynamic_stats_;
-  const bool start_child_span_;
-  const bool suppress_envoy_headers_;
-  const bool respect_expected_rq_timeout_;
-  const bool suppress_grpc_request_failure_code_stats_;
-  // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
-  HeaderVectorPtr strict_check_headers_;
+  const bool emit_dynamic_stats_ : 1;
+  const bool start_child_span_ : 1;
+  const bool suppress_envoy_headers_ : 1;
+  const bool respect_expected_rq_timeout_ : 1;
+  const bool suppress_grpc_request_failure_code_stats_ : 1;
+  struct StrictCheckHeaders {
+    bool envoy_upstream_rq_timeout_ms_ : 1;
+    bool envoy_upstream_rq_per_try_timeout_ms_ : 1;
+    bool envoy_max_retries_ : 1;
+    bool envoy_retry_on_ : 1;
+    bool envoy_retry_grpc_on_ : 1;
+  };
+  StrictCheckHeaders strict_check_headers_{};
   const bool flush_upstream_log_on_upstream_stream_;
   const bool reject_connect_request_early_data_;
   absl::optional<std::chrono::milliseconds> upstream_log_flush_interval_;
@@ -659,7 +661,7 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_from_upstream_lb_;
-  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_;
+  absl::InlinedVector<std::reference_wrapper<const ShadowPolicy>, 2> active_shadow_policies_;
   std::unique_ptr<Http::RequestHeaderMap> shadow_headers_;
   std::unique_ptr<Http::RequestTrailerMap> shadow_trailers_;
   // The stream lifetime configured by request header.

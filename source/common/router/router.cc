@@ -354,25 +354,6 @@ Filter::~Filter() {
   ASSERT(!retry_state_);
 }
 
-const FilterUtility::StrictHeaderChecker::HeaderCheckResult
-FilterUtility::StrictHeaderChecker::checkHeader(Http::RequestHeaderMap& headers,
-                                                const Http::LowerCaseString& target_header) {
-  if (target_header == Http::Headers::get().EnvoyUpstreamRequestTimeoutMs) {
-    return isInteger(headers.EnvoyUpstreamRequestTimeoutMs());
-  } else if (target_header == Http::Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs) {
-    return isInteger(headers.EnvoyUpstreamRequestPerTryTimeoutMs());
-  } else if (target_header == Http::Headers::get().EnvoyMaxRetries) {
-    return isInteger(headers.EnvoyMaxRetries());
-  } else if (target_header == Http::Headers::get().EnvoyRetryOn) {
-    return hasValidRetryFields(headers.EnvoyRetryOn(), &Router::RetryStateImpl::parseRetryOn);
-  } else if (target_header == Http::Headers::get().EnvoyRetryGrpcOn) {
-    return hasValidRetryFields(headers.EnvoyRetryGrpcOn(),
-                               &Router::RetryStateImpl::parseRetryGrpcOn);
-  }
-  // Should only validate headers for which we have implemented a validator.
-  PANIC("unexpectedly reached");
-}
-
 Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionOptConstRef upstream_host) {
   return upstream_host ? upstream_host->localityZoneStatName() : config_->empty_stat_name_;
 }
@@ -550,10 +531,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.getPathValue());
 
-  if (config_->strict_check_headers_ != nullptr) {
-    for (const auto& header : *config_->strict_check_headers_) {
-      const auto res = FilterUtility::StrictHeaderChecker::checkHeader(headers, header);
-      if (!res.valid_) {
+  auto handle_invalid_header =
+      [this](const FilterUtility::StrictHeaderChecker::HeaderCheckResult& res) {
         callbacks_->streamInfo().setResponseFlag(
             StreamInfo::CoreResponseFlag::InvalidEnvoyRequestHeaders);
         const std::string body = fmt::format("invalid header '{}' with value '{}'",
@@ -565,7 +544,40 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         callbacks_->sendLocalReply(Http::Code::BadRequest, body, modify_headers_, absl::nullopt,
                                    details);
         return Http::FilterHeadersStatus::StopIteration;
-      }
+      };
+
+  if (config_->strict_check_headers_.envoy_upstream_rq_timeout_ms_) {
+    const auto res =
+        FilterUtility::StrictHeaderChecker::isInteger(headers.EnvoyUpstreamRequestTimeoutMs());
+    if (!res.valid_) {
+      return handle_invalid_header(res);
+    }
+  }
+  if (config_->strict_check_headers_.envoy_upstream_rq_per_try_timeout_ms_) {
+    const auto res = FilterUtility::StrictHeaderChecker::isInteger(
+        headers.EnvoyUpstreamRequestPerTryTimeoutMs());
+    if (!res.valid_) {
+      return handle_invalid_header(res);
+    }
+  }
+  if (config_->strict_check_headers_.envoy_max_retries_) {
+    const auto res = FilterUtility::StrictHeaderChecker::isInteger(headers.EnvoyMaxRetries());
+    if (!res.valid_) {
+      return handle_invalid_header(res);
+    }
+  }
+  if (config_->strict_check_headers_.envoy_retry_on_) {
+    const auto res = FilterUtility::StrictHeaderChecker::hasValidRetryFields(
+        headers.EnvoyRetryOn(), &Router::RetryStateImpl::parseRetryOn);
+    if (!res.valid_) {
+      return handle_invalid_header(res);
+    }
+  }
+  if (config_->strict_check_headers_.envoy_retry_grpc_on_) {
+    const auto res = FilterUtility::StrictHeaderChecker::hasValidRetryFields(
+        headers.EnvoyRetryGrpcOn(), &Router::RetryStateImpl::parseRetryGrpcOn);
+    if (!res.valid_) {
+      return handle_invalid_header(res);
     }
   }
 
