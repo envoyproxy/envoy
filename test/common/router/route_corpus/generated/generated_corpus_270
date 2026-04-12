@@ -1,0 +1,70 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "path_pattern"
+    domains: "*"
+    routes {
+      match {
+        case_sensitive {
+        }
+        path_match_policy {
+          name: "envoy.path.match.uri_template.uri_template_matcher"
+          typed_config {
+            [type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig] {
+              path_template: "/one/{two}/{code===na/*}"
+            }
+          }
+        }
+      }
+      route {
+        cluster: "path-pattern-cluster-one"
+        path_rewrite_policy {
+          name: "envoy.path.rewrite.uri_template.uri_template_rewriter"
+          typed_config {
+            [type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig] {
+              path_template_rewrite: "/{code}/{two}"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "path.prefix.com"
+  }
+  headers {
+    key: ":path"
+    value: "/one/two/==na/three"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

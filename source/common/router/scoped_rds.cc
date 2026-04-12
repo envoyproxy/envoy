@@ -577,8 +577,20 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
       thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(true); });
     };
     std::string scope_name = iter->second;
+    // Guard against scopes with inline route_configuration (e.g. default_routes)
+    // which have an entry in scope_name_by_hash_ but not in route_provider_by_scope_.
+    // Using find() instead of operator[] to avoid inserting a null unique_ptr.
+    auto provider_iter = route_provider_by_scope_.find(scope_name);
+    if (provider_iter == route_provider_by_scope_.end() || provider_iter->second == nullptr) {
+      ENVOY_LOG(debug,
+                "srds: scope '{}' has no RDS provider (inline config), "
+                "returning false to on-demand callback",
+                scope_name);
+      thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
+      return;
+    }
     // On demand initialization inside main thread.
-    route_provider_by_scope_[scope_name]->addOnDemandUpdateCallback(thread_local_updated_callback);
+    provider_iter->second->addOnDemandUpdateCallback(thread_local_updated_callback);
   });
 }
 

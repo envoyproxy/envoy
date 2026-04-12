@@ -183,7 +183,8 @@ private:
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
                    absl::string_view transport_failure_reason = "") override;
-  Router::RouteConstSharedPtr route() override { return route_; }
+  OptRef<const Router::Route> route() override { return makeOptRefFromPtr(route_.get()); }
+  Router::RouteConstSharedPtr routeSharedPtr() override { return route_; }
   OptRef<const Upstream::ClusterInfo> clusterInfo() override {
     return makeOptRefFromPtr(parent_.cluster_.get());
   }

@@ -234,8 +234,7 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
 
 TEST_F(UpstreamRequestTest, TestSetStreamInfoFields) {
   initialize();
-  EXPECT_EQ(upstream_request_->streamInfo().routeSharedPtr(),
-            router_filter_interface_.callbacks_.route());
+  EXPECT_EQ(upstream_request_->streamInfo().route(), router_filter_interface_.callbacks_.route());
 }
 
 TEST_F(UpstreamRequestTest, TestSetStreamInfoHost) {

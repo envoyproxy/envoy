@@ -7,7 +7,6 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
-    "envoy_directory_genrule",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -15,6 +14,16 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+# Generated fuzz config corpus
+#
+# you can regenerate these with the following commands:
+#
+# rm -rf test/common/router/route_corpus/generated
+# mkdir test/common/router/route_corpus/generated
+# bazel build //test/common/router:corpus_from_config_impl
+# tar xf bazel-bin/test/common/router/corpus_from_config_impl.tar.gz -C test/common/router/route_corpus/generated
+# git add test/common/router/route_corpus/generated
 
 envoy_cc_test(
     name = "config_impl_test",
@@ -49,6 +58,51 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
+)
+
+# envoy_cc_test_binary is generating mostly static binary regardless of config
+envoy_cc_test_binary(
+    name = "config_impl_test_static",
+    rbe_pool = "6gig",
+    deps = [
+        ":config_impl_test_lib",
+        "//test:main",
+    ],
+)
+
+sh_binary(
+    name = "corpus_from_config_impl_sh",
+    srcs = ["corpus_from_config_impl.sh"],
+)
+
+genrule(
+    name = "corpus_from_config_impl",
+    testonly = 1,
+    srcs = [
+        # This is deliberately in srcs, since we run into host/target confusion
+        # otherwise in oss-fuzz builds.
+        ":config_impl_test_static",
+    ],
+    outs = ["corpus_from_config_impl.tar.gz"],
+    cmd = """
+    export GENRULE_OUTPUT_DIR=$$(mktemp -d)
+    $(location corpus_from_config_impl_sh) \
+      $(location //test/common/router:config_impl_test_static)
+    # normalize the output as the test build side effect is not deterministic.
+    sed -i 's/[[:space:]]*$$//' $$GENRULE_OUTPUT_DIR/*
+    sed -i 's|^goo\\.gle/debug[a-z]*|goo.gle/debugproto|' $$GENRULE_OUTPUT_DIR/*
+    # Dedupe the resulting corpus files.
+    # Files are saved in the root of the tarball (have their dirs stripped)
+    md5sum $$GENRULE_OUTPUT_DIR/* \
+      | sort -k1,1 -u \
+      | cut -d' ' -f3- \
+      | tar -czf $@ --transform='s|.*/||' -T -
+    """,
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {"Pool": "6gig"},
+        "//conditions:default": {},
+    }),
+    tools = [":corpus_from_config_impl_sh"],
 )
 
 envoy_cc_test(
@@ -240,52 +294,10 @@ envoy_proto_library(
     ],
 )
 
-# envoy_cc_test_binary is generating mostly static binary regardless of config
-envoy_cc_test_binary(
-    name = "config_impl_test_static",
-    rbe_pool = "6gig",
-    deps = [
-        ":config_impl_test_lib",
-        "//test:main",
-    ],
-)
-
-sh_binary(
-    name = "corpus_from_config_impl_sh",
-    srcs = ["corpus_from_config_impl.sh"],
-)
-
-envoy_directory_genrule(
-    name = "corpus_from_config_impl",
-    testonly = 1,
-    srcs = [
-        # This is deliberately in srcs, since we run into host/target confusion
-        # otherwise in oss-fuzz builds.
-        ":config_impl_test_static",
-    ],
-    cmd = " ".join([
-        "$(location corpus_from_config_impl_sh)",
-        "$(location //test/common/router:config_impl_test_static)",
-    ]),
-    exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {"Pool": "6gig"},
-        "//conditions:default": {},
-    }),
-    tools = [":corpus_from_config_impl_sh"],
-)
-
 filegroup(
     name = "route_corpus",
     testonly = 1,
-    srcs = select({
-        # TODO(asraa): Clean this up for cross-compilation. Right now we assume
-        # the host and target are the same on x86 builds, so we only execute the
-        # corpus generation binary on x86 platforms.
-        "//bazel:x86": [":corpus_from_config_impl"],
-        "//conditions:default": [],
-    }) + glob([
-        "route_corpus/**",
-    ]),
+    srcs = glob(["route_corpus/**"]),
 )
 
 envoy_cc_fuzz_test(
@@ -294,8 +306,6 @@ envoy_cc_fuzz_test(
     srcs = ["route_fuzz_test.cc"],
     corpus = ":route_corpus",
     rbe_pool = "6gig",
-    # The :config_impl_test_static target does not build with coverage
-    tags = ["nocoverage"],
     deps = [
         ":route_fuzz_proto_cc_proto",
         "//source/common/router:config_lib",

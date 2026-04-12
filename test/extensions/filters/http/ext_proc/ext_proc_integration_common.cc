@@ -224,6 +224,34 @@ name: stream-info-to-headers-filter
   }
 }
 
+void ExtProcIntegrationTest::twoExtProcFiltersFullDuplexConfig() {
+  two_ext_proc_filters_ = true;
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
+    // Filter-1
+    proto_config_1_.mutable_processing_mode()->Clear();
+    auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
+    processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode_1->set_response_header_mode(ProcessingMode::SEND);
+    processing_mode_1->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    processing_mode_1->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    processing_mode_1->set_request_trailer_mode(ProcessingMode::SEND);
+    processing_mode_1->set_response_trailer_mode(ProcessingMode::SEND);
+    addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
+                               "envoy.filters.http.ext_proc_1");
+    // Filter-0
+    proto_config_.mutable_processing_mode()->Clear();
+    auto* processing_mode = proto_config_.mutable_processing_mode();
+    processing_mode->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode->set_response_header_mode(ProcessingMode::SEND);
+    processing_mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    processing_mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    processing_mode->set_request_trailer_mode(ProcessingMode::SEND);
+    processing_mode->set_response_trailer_mode(ProcessingMode::SEND);
+    addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
+                               "envoy.filters.http.ext_proc");
+  });
+}
+
 void ExtProcIntegrationTest::setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg) {
   Any cfg_any;
   ASSERT_TRUE(cfg_any.PackFrom(cfg));
@@ -815,15 +843,24 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
     ProcessingRequest body_request;
     EXPECT_TRUE(processor_stream->waitForGrpcMessage(*dispatcher_, body_request));
     if (response) {
-      EXPECT_TRUE(body_request.has_response_body());
-      body_received = absl::StrCat(body_received, body_request.response_body().body());
-      end_stream = body_request.response_body().end_of_stream();
+      if (body_request.has_response_trailers()) {
+        end_stream = true;
+      } else {
+        EXPECT_TRUE(body_request.has_response_body());
+        body_received = absl::StrCat(body_received, body_request.response_body().body());
+        end_stream = body_request.response_body().end_of_stream();
+        total_req_body_msg++;
+      }
     } else {
-      EXPECT_TRUE(body_request.has_request_body());
-      body_received = absl::StrCat(body_received, body_request.request_body().body());
-      end_stream = body_request.request_body().end_of_stream();
+      if (body_request.has_request_trailers()) {
+        end_stream = true;
+      } else {
+        EXPECT_TRUE(body_request.has_request_body());
+        body_received = absl::StrCat(body_received, body_request.request_body().body());
+        end_stream = body_request.request_body().end_of_stream();
+        total_req_body_msg++;
+      }
     }
-    total_req_body_msg++;
   }
   EXPECT_TRUE(end_stream);
   if (compare_body) {
@@ -900,15 +937,27 @@ void ExtProcIntegrationTest::serverSendBodyRespDuplexStreamed(uint32_t total_res
   }
 }
 
-void ExtProcIntegrationTest::serverSendTrailerRespDuplexStreamed() {
+void ExtProcIntegrationTest::serverSendTrailerRespDuplexStreamed(FakeStreamPtr& processor_stream,
+                                                                 bool response) {
   ProcessingResponse response_trailer;
-  auto* trailer_resp = response_trailer.mutable_request_trailers()->mutable_header_mutation();
-  auto* sh = trailer_resp->add_set_headers();
+  TrailersResponse* trailer_resp;
+  if (!response) {
+    trailer_resp = response_trailer.mutable_request_trailers();
+  } else {
+    trailer_resp = response_trailer.mutable_response_trailers();
+  }
+  auto* header_mutation = trailer_resp->mutable_header_mutation();
+  auto* sh = header_mutation->add_set_headers();
   sh->mutable_append()->set_value(false);
   auto* header = sh->mutable_header();
-  header->set_key("x-new-trailer");
-  header->set_raw_value("new");
-  processor_stream_->sendGrpcMessage(response_trailer);
+  if (processor_stream == processor_stream_) {
+    header->set_key("x-new-trailer");
+    header->set_raw_value("new");
+  } else {
+    header->set_key("x-new-trailer_1");
+    header->set_raw_value("new_1");
+  }
+  processor_stream->sendGrpcMessage(response_trailer);
 }
 
 void ExtProcIntegrationTest::prependExtProcCompositeFilter(const Protobuf::Message& match_input) {
