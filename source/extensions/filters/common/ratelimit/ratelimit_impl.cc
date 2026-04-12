@@ -69,6 +69,9 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
     if (descriptor.hits_addend_.has_value()) {
       new_descriptor->mutable_hits_addend()->set_value(descriptor.hits_addend_.value());
     }
+    if (descriptor.is_negative_hits_) {
+      new_descriptor->set_is_negative_hits(true);
+    }
   }
 }
 

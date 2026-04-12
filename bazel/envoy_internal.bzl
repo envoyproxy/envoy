@@ -92,6 +92,7 @@ def envoy_copts(repository, test = False):
                _repo("//bazel:disable_tcmalloc"): ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                _repo("//bazel:debug_tcmalloc"): ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
                _repo("//bazel:gperftools_tcmalloc"): ["-DGPERFTOOLS_TCMALLOC"],
+               _repo("//bazel:jemalloc_enabled"): ["-DJEMALLOC"],
                (
                    "@platforms//cpu:x86_64",
                    "@platforms//cpu:aarch64",
@@ -197,6 +198,7 @@ def tcmalloc_external_dep(repository):
             _repo("//bazel:debug_tcmalloc"),
             _repo("//bazel:gperftools_tcmalloc"),
         ): _repo("//bazel/external:gperftools"),
+        (_repo("//bazel:jemalloc_enabled"),): _repo("//bazel/foreign_cc:jemalloc"),
         "//conditions:default": _repo("//bazel:tcmalloc_lib"),
     })
 

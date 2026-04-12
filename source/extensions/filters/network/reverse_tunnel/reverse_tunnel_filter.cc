@@ -463,7 +463,9 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 
   // Close the connection if configured to do so after handling the request.
   if (parent_.config_->autoCloseConnections()) {
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    auto& connection = parent_.read_callbacks_->connection();
+    Bootstrap::ReverseConnection::ReverseConnectionUtility::applySslQuietClose(connection);
+    connection.close(Network::ConnectionCloseType::FlushWrite);
   }
 }
 

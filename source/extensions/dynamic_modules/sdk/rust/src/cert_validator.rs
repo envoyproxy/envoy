@@ -6,9 +6,9 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use envoy_proxy_dynamic_modules_rust_sdk::*;
+//! ```
 //! use envoy_proxy_dynamic_modules_rust_sdk::cert_validator::*;
+//! use envoy_proxy_dynamic_modules_rust_sdk::*;
 //!
 //! fn program_init() -> bool {
 //!   true

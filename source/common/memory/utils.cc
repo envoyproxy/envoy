@@ -7,6 +7,10 @@
 #include "tcmalloc/malloc_extension.h"
 #elif defined(GPERFTOOLS_TCMALLOC)
 #include "gperftools/malloc_extension.h"
+#elif defined(JEMALLOC)
+#include <jemalloc/jemalloc.h>
+
+#include <cstdio>
 #endif
 
 namespace Envoy {
@@ -19,6 +23,13 @@ void Utils::releaseFreeMemory(uint64_t max_unfreed_bytes) {
 #elif defined(GPERFTOOLS_TCMALLOC)
   UNREFERENCED_PARAMETER(max_unfreed_bytes);
   MallocExtension::instance()->ReleaseFreeMemory();
+#elif defined(JEMALLOC)
+  UNREFERENCED_PARAMETER(max_unfreed_bytes);
+  // Purge all arenas to release dirty pages back to the OS.
+  // `MALLCTL_ARENAS_ALL` is jemalloc's pseudo-index for addressing all arenas at once.
+  char purge_cmd[32];
+  snprintf(purge_cmd, sizeof(purge_cmd), "arena.%u.purge", MALLCTL_ARENAS_ALL);
+  mallctl(purge_cmd, nullptr, nullptr, nullptr, 0);
 #else
   UNREFERENCED_PARAMETER(max_unfreed_bytes);
 #endif
@@ -31,7 +42,7 @@ void Utils::releaseFreeMemory(uint64_t max_unfreed_bytes) {
   Ref: https://github.com/envoyproxy/envoy/pull/9471#discussion_r363825985
 */
 void Utils::tryShrinkHeap() {
-#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC) || defined(JEMALLOC)
   auto total_physical_bytes = Stats::totalPhysicalBytes();
   auto allocated_size_by_app = Stats::totalCurrentlyAllocated();
   const uint64_t threshold = maxUnfreedMemoryBytes();

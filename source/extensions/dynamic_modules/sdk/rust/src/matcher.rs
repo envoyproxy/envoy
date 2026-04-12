@@ -170,27 +170,28 @@ pub trait MatcherConfig: Sized + Send + Sync + 'static {
 ///
 /// # Example
 ///
-/// ```ignore
-/// use envoy_dynamic_modules_rust_sdk::{matcher::*, declare_matcher};
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::declare_matcher;
+/// use envoy_proxy_dynamic_modules_rust_sdk::matcher::*;
 ///
 /// struct MyMatcherConfig {
-///     expected_value: String,
+///   expected_value: String,
 /// }
 ///
 /// impl MatcherConfig for MyMatcherConfig {
-///     fn new(_name: &str, config: &[u8]) -> Result<Self, String> {
-///         Ok(Self {
-///             expected_value: String::from_utf8_lossy(config).to_string(),
-///         })
-///     }
+///   fn new(_name: &str, config: &[u8]) -> Result<Self, String> {
+///     Ok(Self {
+///       expected_value: String::from_utf8_lossy(config).to_string(),
+///     })
+///   }
 ///
-///     fn on_matcher_match(&self, ctx: &MatchContext) -> bool {
-///         if let Some(value) = ctx.get_request_header("x-match-header") {
-///             value == self.expected_value.as_bytes()
-///         } else {
-///             false
-///         }
+///   fn on_matcher_match(&self, ctx: &MatchContext) -> bool {
+///     if let Some(value) = ctx.get_request_header("x-match-header") {
+///       value == self.expected_value.as_bytes()
+///     } else {
+///       false
 ///     }
+///   }
 /// }
 ///
 /// declare_matcher!(MyMatcherConfig);
