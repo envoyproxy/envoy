@@ -41,6 +41,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/compression/gzip/decompressor:config",
+        "//source/extensions/compression/zstd/decompressor:config",
         "//source/extensions/filters/http/decompressor:config",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
