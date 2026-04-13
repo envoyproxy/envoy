@@ -137,10 +137,10 @@ public:
   virtual const absl::string_view filterConfigName() const PURE;
 
   /**
-   * @return Stats::ScopeSharedPtr the stats scope for creating custom Lua stats. The scope
+   * @return Stats::Scope& the stats scope for creating custom Lua stats. The scope
    * is pre-configured with the appropriate lua stat prefix.
    */
-  virtual Stats::ScopeSharedPtr statsScope() PURE;
+  virtual Stats::Scope& statsScope() PURE;
 };
 
 class Filter;
@@ -471,7 +471,7 @@ public:
   bool clearRouteCache() const { return clear_route_cache_; }
 
   const LuaFilterStats& stats() const { return stats_; }
-  Stats::ScopeSharedPtr luaStatsScope() const { return lua_stats_scope_; }
+  Stats::Scope& luaStatsScope() const { return *lua_stats_scope_; }
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -486,8 +486,7 @@ private:
   PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
-  // Sub-scope pre-configured with the lua stat prefix. Held as a shared_ptr to ensure the
-  // scope outlives any StatsScopeWrapper instances created from it.
+  // Sub-scope pre-configured with the lua stat prefix.
   Stats::ScopeSharedPtr lua_stats_scope_;
 };
 
@@ -609,7 +608,7 @@ private:
     const absl::string_view filterConfigName() const override {
       return callbacks_->filterConfigName();
     }
-    Stats::ScopeSharedPtr statsScope() override { return parent_.config_->luaStatsScope(); }
+    Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -643,7 +642,7 @@ private:
     const absl::string_view filterConfigName() const override {
       return callbacks_->filterConfigName();
     }
-    Stats::ScopeSharedPtr statsScope() override { return parent_.config_->luaStatsScope(); }
+    Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};

@@ -1003,7 +1003,7 @@ int StreamHandleWrapper::luaStats(lua_State* state) {
     stats_scope_wrapper_.pushStack();
   } else {
     stats_scope_wrapper_.reset(
-        StatsScopeWrapper::create(state, *callbacks_.statsScope()), true);
+        StatsScopeWrapper::create(state, callbacks_.statsScope()), true);
   }
   return 1;
 }
