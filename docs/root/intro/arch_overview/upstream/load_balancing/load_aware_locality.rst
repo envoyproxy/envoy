@@ -1,3 +1,5 @@
+:orphan:
+
 .. _arch_overview_load_balancing_load_aware_locality:
 
 Load-aware locality load balancing
@@ -81,7 +83,7 @@ Full configuration with all tuning parameters:
           weight_update_period: 2s
           utilization_variance_threshold: 0.15
           ewma_alpha: 0.4
-          probe_percentage: 0.05
+          remote_probe_fraction: 0.05
           weight_expiration_period: 120s
 
 Configuration parameters
@@ -97,7 +99,7 @@ Configuration parameters
    * - ``endpoint_picking_policy``
      - (required)
      - Child LB policy for selecting an endpoint within the chosen locality.
-       Any endpoint-picking policy can be used, regardless of wehther the policy
+       Any endpoint-picking policy can be used, regardless of whether the policy
        implements ORCA handling (e.g. least request).
    * - ``weight_update_period``
      - 1 s
@@ -121,7 +123,7 @@ Configuration parameters
      - 0.3
      - EWMA smoothing factor. Higher values react faster; lower values are more
        stable. Range: (0, 1].
-   * - ``probe_percentage``
+   * - ``remote_probe_fraction``
      - 0.03
      - Minimum fraction of traffic sent to non-local localities to keep ORCA data
        fresh. The deficit is redistributed proportionally to host count. Set to
@@ -190,16 +192,16 @@ data. ORCA reports can be delivered in two ways:
 - **Per-request reports:** Utilization data is piggybacked on response trailers.
   The Envoy router processes these reports and stores the utilization value in a
   per-host slot so that the main-thread weight computation can read it without
-  locking. This is the mechanism used by this policy today.
+  locking. This is the mechanism used by the initial implementation.
 - **Out-of-band (OOB) reports:** A periodic gRPC stream from the backend to
   Envoy. OOB reporting is not yet integrated with this policy but could
-  eliminate the need for ``probe_percentage`` in the future, since utilization
-  data would arrive independently of traffic.
+  eliminate the need for ``remote_probe_fraction`` in the future, since
+  utilization data would arrive independently of traffic.
 
 Because the policy currently relies on per-request reports, it can only receive
 fresh utilization data from localities that are actively receiving traffic. This
-is why the ``probe_percentage`` parameter exists: it ensures a minimum fraction
-of traffic is sent to non-local localities to keep their ORCA data fresh.
+is why the ``remote_probe_fraction`` parameter exists: it ensures a minimum
+fraction of traffic is sent to non-local localities to keep their ORCA data fresh.
 
 Endpoints should report at least one of:
 
@@ -251,7 +253,7 @@ default 1 s) recomputes per-locality routing weights using the following steps:
    *less* loaded than the remote average (by any amount), all-local routing
    always triggers. The threshold only governs how much *hotter* the local zone
    can be before spillover begins.
-5. Enforce a ``probe_percentage`` (default 3 %) minimum share of traffic to
+5. Enforce a ``remote_probe_fraction`` (default 3 %) minimum share of traffic to
    non-local localities so ORCA data stays fresh even when local routing is
    dominant. When the remote localities' combined weight is below this minimum,
    the deficit is subtracted from the local locality's weight and redistributed
@@ -284,12 +286,12 @@ In pseudo-formula notation:
   # Local-preference check (one-sided: local must not be too far ABOVE remote)
   remote_weighted_avg = sum(smoothed_util(R_i) * host_count(R_i)) / sum(host_count(R_i))
   if smoothed_util(local) <= remote_weighted_avg + utilization_variance_threshold:
-      route 100% to local (subject to probe_percentage below)
+      route 100% to local (subject to remote_probe_fraction below)
 
-  # Probe percentage enforcement
+  # Remote probe fraction enforcement
   remote_share = sum(weight(R_i)) / sum(weight(L_i) for all L_i)
-  if remote_share < probe_percentage:
-      deficit = probe_percentage * total_weight - sum(weight(R_i))
+  if remote_share < remote_probe_fraction:
+      deficit = remote_probe_fraction * total_weight - sum(weight(R_i))
       weight(local) -= deficit
       for each remote R_i:
           weight(R_i) += deficit * host_count(R_i) / sum(host_count(R_j))
@@ -325,7 +327,7 @@ hot local zone toward localities with more headroom.
 Now suppose load rebalances and all localities converge to roughly 0.45
 utilization. The remote average is 0.45, and locality A is within the variance
 threshold (``0.45 <= 0.45 + 0.1``). The policy snaps to **100 % local
-routing** (minus the 3 % probe percentage), avoiding unnecessary cross-zone
+routing** (minus the 3 % remote probe fraction), avoiding unnecessary cross-zone
 hops.
 
 Asymmetric host count example
@@ -343,7 +345,7 @@ The host-count-weighted remote average is
 would be ``(0.40 + 0.60) / 2 = 0.50`` -- a very different value. Because
 locality A's utilization (0.50) is within the variance threshold of the weighted
 remote average (``0.50 <= 0.44 + 0.1 = 0.54``), the policy routes **100 %
-locally** (minus probe percentage).
+locally** (minus the remote probe fraction).
 
 Headroom weights if spillover were active:
 
@@ -354,12 +356,12 @@ Headroom weights if spillover were active:
 Notice that locality B's larger host count amplifies its weight even though its
 per-host headroom (0.60) is less than A's (0.50).
 
-Local preference and probe percentage
-""""""""""""""""""""""""""""""""""""""
+Local preference and remote probing
+""""""""""""""""""""""""""""""""""""
 
-The ``utilization_variance_threshold`` and ``probe_percentage`` parameters work
-together to balance two goals: minimizing cross-zone traffic and maintaining
-fresh ORCA data.
+The ``utilization_variance_threshold`` and ``remote_probe_fraction`` parameters
+work together to balance two goals: minimizing cross-zone traffic and
+maintaining fresh ORCA data.
 
 - When the local zone's utilization is **at most** ``utilization_variance_threshold``
   **above** the host-count-weighted remote average, the policy routes 100 % of
@@ -367,13 +369,13 @@ fresh ORCA data.
   than remote zones, all-local routing always applies regardless of how large
   the gap is. The threshold only limits how much *hotter* the local zone can be
   before spillover begins.
-- Even in this "all-local" mode, ``probe_percentage`` (default 3 %) ensures
+- Even in this "all-local" mode, ``remote_probe_fraction`` (default 3 %) ensures
   that a small fraction of traffic still reaches remote localities. The
   implementation subtracts the deficit from the local locality's weight and
   distributes it to remote localities proportionally to their host count (not
   headroom). Without this probing, the policy would have no fresh ORCA data for
   remote zones and would be blind to load changes there.
-- Setting ``probe_percentage`` to 0 disables probing entirely. This is safe
+- Setting ``remote_probe_fraction`` to 0 disables probing entirely. This is safe
   only if out-of-band ORCA reporting is available or if cross-zone traffic must
   be strictly avoided; be aware that the policy may react slowly to remote load
   changes without it.
@@ -526,7 +528,7 @@ an immutable ``RoutingWeightsSnapshot`` to workers via a
     |       - Average per locality, apply EWMA smoothing
     |       - Compute weight = host_count * (1 - smoothed_utilization)
     |       - Check variance threshold for local-zone preference
-    |       - Apply probe percentage minimum
+    |       - Apply remote probe fraction minimum
     |       - Publish immutable snapshot to workers via TLS
     |
     +-- WorkerLocalLbFactory (shared across all workers)
@@ -549,6 +551,6 @@ ORCA reports arrive via the router filter which calls ``onOrcaLoadReport()`` on
 the host's ``lbPolicyData()`` slot for this policy (a separate slot from any
 CSWRR slot on the same host). Utilization values are stored via lock-free
 atomics (``std::atomic<double>``) so the main-thread weight computation can
-read them without locking. This is why ``probe_percentage`` is needed: because
-ORCA data arrives only on the request path, remote localities that receive no
-traffic yield no data.
+read them without locking. This is why ``remote_probe_fraction`` is needed:
+because ORCA data arrives only on the request path, remote localities that
+receive no traffic yield no data.

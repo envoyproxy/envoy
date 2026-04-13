@@ -78,7 +78,7 @@ new_features:
     that uses ORCA utilization data to distribute traffic across localities based on real-time
     headroom. The policy computes per-locality EWMA utilization from endpoint ORCA reports and
     shifts traffic away from overloaded localities while respecting a configurable variance
-    threshold and probe percentage to keep telemetry fresh.
+    threshold and remote probe fraction to keep telemetry fresh.
 - area: tls
   change: |
     Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),

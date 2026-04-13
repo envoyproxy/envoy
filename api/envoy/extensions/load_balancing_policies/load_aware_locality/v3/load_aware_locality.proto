@@ -57,10 +57,12 @@ message LoadAwareLocality {
   // Defaults to 0.3.
   google.protobuf.DoubleValue ewma_alpha = 5 [(validate.rules).double = {lte: 1.0 gt: 0.0}];
 
-  // Minimum fraction of traffic sent to non-local localities to keep
-  // ORCA data fresh. Applied even in all_local mode. Must be in [0, 1).
+  // Minimum fraction of traffic sent to non-local localities to keep ORCA
+  // data fresh. Applied even when the local-preference check would otherwise
+  // route 100% of traffic to the local locality. Must be in [0, 1).
   // Set to 0 to disable. Defaults to 0.03 (3%).
-  google.protobuf.DoubleValue probe_percentage = 6 [(validate.rules).double = {lt: 1.0 gte: 0.0}];
+  google.protobuf.DoubleValue remote_probe_fraction = 6
+      [(validate.rules).double = {lt: 1.0 gte: 0.0}];
 
   // If a given endpoint has not reported load metrics in this long, then we
   // stop using the reported weight. This ensures that we do not continue to

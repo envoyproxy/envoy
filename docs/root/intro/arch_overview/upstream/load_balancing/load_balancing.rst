@@ -14,7 +14,6 @@ Load Balancing
   excluded
   original_dst
   zone_aware
-  load_aware_locality
   subsets
   slow_start
   override_host
