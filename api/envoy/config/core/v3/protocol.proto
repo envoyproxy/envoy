@@ -177,7 +177,8 @@ message QuicProtocolOptions {
   // Timeout for a QUIC connection to schedule memory reduction callback when the network has been idle for a while.
   // This value should be smaller than the idle timeout to take effect.
   // If not specified, memory reduction is set to infinite by QUIC connection (disabled).
-  google.protobuf.Duration memory_reduction_timeout = 12 [(validate.rules).duration = {gte {seconds: 1}}];
+  google.protobuf.Duration memory_reduction_timeout = 12
+      [(validate.rules).duration = {gte {seconds: 1}}];
 }
 
 message UpstreamHttpProtocolOptions {
