@@ -61,6 +61,14 @@ ConfigImpl::ConfigImpl(
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::ANY:
     read_policy_ = ReadPolicy::Any;
     break;
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
+      LOCAL_ZONE_AFFINITY:
+    read_policy_ = ReadPolicy::LocalZoneAffinity;
+    break;
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
+      LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY:
+    read_policy_ = ReadPolicy::LocalZoneAffinityReplicasAndPrimary;
+    break;
   }
 
   if (config.has_connection_rate_limit()) {

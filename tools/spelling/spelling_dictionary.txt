@@ -9,6 +9,7 @@ NUMPAT
 PUBSUB
 RANDOMKEY
 SLOWLOG
+addend
 addrlen
 defragmentation
 dp
@@ -66,6 +67,7 @@ CIO
 cbegin
 cend
 constness
+consume
 cstr
 deadcode
 DFP
@@ -181,6 +183,7 @@ DST
 DW
 DWORD
 EAGAIN
+EINTR
 ECDH
 ECDHE
 ECDS
@@ -381,6 +384,7 @@ middlewildcard
 monostate
 mpd
 msan
+multicluster
 mutators
 mybucket
 myobject
@@ -508,6 +512,7 @@ STDSTRING
 STL
 STRLEN
 STS
+subcluster
 SUBCOMMAND
 SVG
 SVID
@@ -547,6 +552,7 @@ UTC
 UTF
 UUID
 UUIDs
+Valkey
 VC
 VCHAR
 VCL
@@ -933,6 +939,7 @@ healths
 healthz
 hermeticity
 highp
+hit
 hoc
 hostname
 hostnames
@@ -1291,6 +1298,7 @@ refcount
 referencee
 referer
 refetch
+refill
 reframed
 refvec
 regex
@@ -1449,6 +1457,7 @@ submessages
 subnet
 subnets
 suboptimal
+subprocess
 subsecond
 subseconds
 subsegment
@@ -1506,6 +1515,7 @@ timestamps
 timeval
 tmp
 tmpfile
+token
 tokenize
 tokenized
 tokenizes

@@ -435,6 +435,40 @@ TEST_F(RateLimitConfigTest, MultipleActionsAndStringHitsAddend) {
   }
 }
 
+TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndIsNegative) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_addend:
+      format: "%BYTES_RECEIVED%"
+      is_negative_hits: true
+  - actions:
+    - destination_cluster: {}
+    hits_addend:
+      number: 3
+      is_negative_hits: true
+  )EOF";
+
+  setupTest(yaml);
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+  stream_info_.bytes_received_ = 321;
+  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+  std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
+      {{{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}},
+      {{{"destination_cluster", "fake_cluster"}}}};
+
+  EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
+  EXPECT_EQ(321, descriptors[0].hits_addend_.value());
+  EXPECT_TRUE(descriptors[0].is_negative_hits_);
+  EXPECT_EQ(3, descriptors[1].hits_addend_.value());
+  EXPECT_TRUE(descriptors[1].is_negative_hits_);
+}
+
 class RateLimitPolicyTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {

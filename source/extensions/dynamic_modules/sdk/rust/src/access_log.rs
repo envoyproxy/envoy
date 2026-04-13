@@ -268,20 +268,20 @@ pub struct BytesInfo {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum AccessLogType {
-  NotSet               = 0,
+  NotSet = 0,
   TcpUpstreamConnected = 1,
-  TcpPeriodic          = 2,
-  TcpConnectionEnd     = 3,
-  DownstreamStart      = 4,
-  DownstreamPeriodic   = 5,
-  DownstreamEnd        = 6,
-  UpstreamPoolReady    = 7,
-  UpstreamPeriodic     = 8,
-  UpstreamEnd          = 9,
+  TcpPeriodic = 2,
+  TcpConnectionEnd = 3,
+  DownstreamStart = 4,
+  DownstreamPeriodic = 5,
+  DownstreamEnd = 6,
+  UpstreamPoolReady = 7,
+  UpstreamPeriodic = 8,
+  UpstreamEnd = 9,
   DownstreamTunnelSuccessfullyEstablished = 10,
   UdpTunnelUpstreamConnected = 11,
-  UdpPeriodic          = 12,
-  UdpSessionEnd        = 13,
+  UdpPeriodic = 12,
+  UdpSessionEnd = 13,
 }
 
 impl AccessLogType {
