@@ -155,8 +155,17 @@ public:
     /**
      * @param number A number to encode in a variable length byte-array.
      * @return The number of bytes it would take to encode the number.
+     *
+     * Defined inline in the header to allow the compiler to inline on hot paths.
      */
-    static size_t encodingSizeBytes(uint64_t number);
+    static size_t encodingSizeBytes(uint64_t number) {
+      size_t num_bytes = 0;
+      do {
+        ++num_bytes;
+        number >>= 7;
+      } while (number != 0);
+      return num_bytes;
+    }
 
     /**
      * @param num_data_bytes The number of bytes in a data-block.
@@ -192,13 +201,31 @@ public:
      *
      * @param The encoded byte array, written previously by appendEncoding.
      * @return A pair containing the decoded number, and the number of bytes consumed from encoding.
+     *
+     * Defined inline in the header to allow the compiler to inline on hot paths.
      */
-    static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding);
+    static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding) {
+      uint64_t number = 0;
+      uint64_t uc = kSpilloverMask;
+      const uint8_t* start = encoding;
+      for (uint32_t shift = 0; (uc & kSpilloverMask) != 0; ++encoding, shift += 7) {
+        uc = static_cast<uint32_t>(*encoding);
+        number |= (uc & kLow7Bits) << shift;
+      }
+      return std::make_pair(number, encoding - start);
+    }
 
   private:
     friend class StatName;
     friend class SymbolTable;
     class TokenIter;
+
+    // Masks used for variable-length encoding of arbitrary-sized integers into a
+    // uint8-array. The integers are typically small, so we try to store them in as
+    // few bytes as possible. The bottom 7 bits hold values, and the top bit is used
+    // to determine whether another byte is needed for more data.
+    static constexpr uint32_t kSpilloverMask = 0x80;
+    static constexpr uint32_t kLow7Bits = 0x7f;
 
     size_t data_bytes_required_{0};
     MemBlockBuilder<uint8_t> mem_block_;
@@ -595,7 +622,12 @@ public:
    * @return size_t the number of bytes in the symbol array, excluding the
    *                overhead for the size itself.
    */
-  size_t dataSize() const;
+  size_t dataSize() const {
+    if (size_and_data_ == nullptr) {
+      return 0;
+    }
+    return SymbolTable::Encoding::decodeNumber(size_and_data_).first;
+  }
 
   /**
    * @return size_t the number of bytes in the symbol array, including the
