@@ -8238,7 +8238,7 @@ TEST_P(SslSocketTest, CertificateCompressionDisabled) {
   testUtilV2(test_options);
 }
 
-// Verify that SslSocket detects connection reset via the BIO error queue and reports RemoteReset.
+// Verify that SslSocket detects ECONNRESET via the BIO error queue and reports RemoteReset.
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
 TEST_P(SslSocketTest, TlsConnectionResetDetection) {
   const std::string server_ctx_yaml = R"EOF(

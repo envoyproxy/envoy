@@ -156,7 +156,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
         case SSL_ERROR_SYSCALL:
           if (result.error_.value() == 0) {
             // Non-graceful shutdown by closing the underlying socket.
-            // Check for connection reset even on EOF — the peer may have sent RST.
+            // Check for ECONNRESET even on EOF — the peer may have sent RST.
             err_code = checkForConnectionReset();
             end_stream = true;
             break;
@@ -186,7 +186,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
-  // Fallback: if inline detection didn't catch it, check if drainErrorQueue() found a reset.
+  // Fallback: if inline detection didn't catch it, check if drainErrorQueue() found ECONNRESET.
   if (action == PostIoAction::Close && !err_code.has_value()) {
     err_code = detected_io_error_;
   }
