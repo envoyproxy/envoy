@@ -671,7 +671,11 @@ public:
    * @param mem_block_builder the builder to receive the storage.
    */
   void appendDataToMemBlock(MemBlockBuilder<uint8_t>& storage) {
-    storage.appendData(absl::MakeSpan(data(), dataSize()));
+    if (size_and_data_ == nullptr) {
+      return;
+    }
+    const auto [data_size, prefix_size] = SymbolTable::Encoding::decodeNumber(size_and_data_);
+    storage.appendData(absl::MakeSpan(size_and_data_ + prefix_size, data_size));
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -685,7 +689,7 @@ public:
     if (size_and_data_ == nullptr) {
       return nullptr;
     }
-    return size_and_data_ + SymbolTable::Encoding::encodingSizeBytes(dataSize());
+    return size_and_data_ + SymbolTable::Encoding::decodeNumber(size_and_data_).second;
   }
 
   const uint8_t* dataIncludingSize() const { return size_and_data_; }
@@ -716,8 +720,12 @@ private:
    * hasher and comparator.
    */
   absl::string_view dataAsStringView() const {
-    return {reinterpret_cast<const char*>(data()),
-            static_cast<absl::string_view::size_type>(dataSize())};
+    if (size_and_data_ == nullptr) {
+      return {};
+    }
+    const auto [data_size, prefix_size] = SymbolTable::Encoding::decodeNumber(size_and_data_);
+    return {reinterpret_cast<const char*>(size_and_data_ + prefix_size),
+            static_cast<absl::string_view::size_type>(data_size)};
   }
 
   const uint8_t* size_and_data_{nullptr};
