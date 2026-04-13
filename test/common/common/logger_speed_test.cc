@@ -12,7 +12,7 @@ namespace Envoy {
  * Benchmark for the main slow path, i.e. new logger creation here.
  */
 static void fineGrainLogSlowPath(benchmark::State& state) {
-  FINE_GRAIN_LOG(info, "Slow path test begins.");
+  FINE_GRAIN_LOG(info, "", "Slow path test begins.");
   std::atomic<spdlog::logger*> logger;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
@@ -23,7 +23,7 @@ static void fineGrainLogSlowPath(benchmark::State& state) {
   }
 }
 
-#define FL FINE_GRAIN_LOG(trace, "Default")
+#define FL FINE_GRAIN_LOG(trace, "", "Default")
 #define FL_8                                                                                       \
   FL;                                                                                              \
   FL;                                                                                              \
@@ -41,7 +41,7 @@ static void fineGrainLogSlowPath(benchmark::State& state) {
  * Benchmark for medium path, i.e. new site initialization within the same file.
  */
 static void fineGrainLogMediumPath(benchmark::State& state) {
-  FINE_GRAIN_LOG(info, "Medium path test begins.");
+  FINE_GRAIN_LOG(info, "", "Medium path test begins.");
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     // create different call sites for medium path
@@ -62,7 +62,7 @@ static void fineGrainLogFastPath(benchmark::State& state) {
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
-      FINE_GRAIN_LOG(trace, "Fast path: {}", msg);
+      FINE_GRAIN_LOG(trace, "", "Fast path: {}", msg);
     }
   }
 }
@@ -86,7 +86,7 @@ static void envoyNormal(benchmark::State& state) {
  * Benchmark for a large number of level setting.
  */
 static void fineGrainLogLevelSetting(benchmark::State& state) {
-  FINE_GRAIN_LOG(info, "Level setting test begins.");
+  FINE_GRAIN_LOG(info, "", "Level setting test begins.");
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {

@@ -198,6 +198,10 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                         "If fine grain logging is enabled, use __FILE__ or a glob experision as "
                         "the logger name. "
                         "For example, source/common*:warning"},
+                       {Admin::ParamDescriptor::Type::String, "group",
+                        "Change given logger group to desired level, set to "
+                        "<logger_group_name>:<desired_level>. "
+                        "logger_group_name can be a logger name or a glob expression."},
                        {Admin::ParamDescriptor::Type::Enum, "level",
                         "desired logging level, this will change all loggers's level",
                         prepend("", LogsHandler::levelStrings())}}),

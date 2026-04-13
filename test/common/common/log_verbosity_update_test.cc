@@ -5,6 +5,7 @@
 
 #include "test/test_common/logging.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
@@ -37,15 +38,15 @@ TEST(FineGrainLog, safeFileNameMatch) {
 
 TEST(FineGrainLog, updateCurrentFilePath) {
   Logger::Context::enableFineGrainLogger();
-  FINE_GRAIN_LOG(critical, "critical: initialize a fine grain logger for test.");
+  FINE_GRAIN_LOG(critical, "", "critical: initialize a fine grain logger for test.");
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::info);
-  FINE_GRAIN_LOG(debug, "Debug: you shouldn't see this message!");
+  FINE_GRAIN_LOG(debug, "", "Debug: you shouldn't see this message!");
 
   const std::pair<absl::string_view, int> update =
       std::make_pair(__FILE__, static_cast<int>(spdlog::level::debug));
   getFineGrainLogContext().updateVerbositySetting({update});
 
-  FINE_GRAIN_LOG(debug, "Debug: now level is debug");
+  FINE_GRAIN_LOG(debug, "", "Debug: now level is debug");
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::debug);
@@ -53,8 +54,8 @@ TEST(FineGrainLog, updateCurrentFilePath) {
 
 TEST(FineGrainLog, verbosityDefaultLevelUpdate) {
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::info);
-  FINE_GRAIN_LOG(info, "Info: verbosityDefaultLevelUpdate test begins.");
-  FINE_GRAIN_LOG(debug, "Debug: you shouldn't see this message!");
+  FINE_GRAIN_LOG(info, "", "Info: verbosityDefaultLevelUpdate test begins.");
+  FINE_GRAIN_LOG(debug, "", "Debug: you shouldn't see this message!");
 
   EXPECT_EQ(getFineGrainLogContext().getVerbosityDefaultLevel(),
             Logger::Context::getFineGrainDefaultLevel());
@@ -63,7 +64,7 @@ TEST(FineGrainLog, verbosityDefaultLevelUpdate) {
   getFineGrainLogContext().updateVerbositySetting({});
   getFineGrainLogContext().updateVerbosityDefaultLevel(spdlog::level::debug);
 
-  FINE_GRAIN_LOG(debug, "Debug: now level is debug");
+  FINE_GRAIN_LOG(debug, "", "Debug: now level is debug");
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::debug);
@@ -75,8 +76,8 @@ TEST(FineGrainLog, verbosityDefaultLevelUpdate) {
 
 TEST(FineGrainLog, verbosityUpdatePriority) {
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::info);
-  FINE_GRAIN_LOG(info, "Info: verbosityUpdatePriority test begins.");
-  FINE_GRAIN_LOG(debug, "Debug: you shouldn't see this message!");
+  FINE_GRAIN_LOG(info, "", "Info: verbosityUpdatePriority test begins.");
+  FINE_GRAIN_LOG(debug, "", "Debug: you shouldn't see this message!");
   // Clear verbosity update info at first.
 
   absl::string_view file_path = __FILE__;
@@ -87,7 +88,7 @@ TEST(FineGrainLog, verbosityUpdatePriority) {
   // This will also try to clear the verbosity update by changing the default level.
   getFineGrainLogContext().updateVerbosityDefaultLevel(spdlog::level::trace);
 
-  FINE_GRAIN_LOG(trace, "Trace: you should see this message");
+  FINE_GRAIN_LOG(trace, "", "Trace: you should see this message");
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::trace);
@@ -96,8 +97,8 @@ TEST(FineGrainLog, verbosityUpdatePriority) {
 TEST(FineGrainLog, updateBasename) {
   Logger::Context::enableFineGrainLogger();
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::info);
-  FINE_GRAIN_LOG(info, "Info: verbosityUpdateBasename test begins.");
-  FINE_GRAIN_LOG(debug, "Debug: you shouldn't see this message!");
+  FINE_GRAIN_LOG(info, "", "Info: verbosityUpdateBasename test begins.");
+  FINE_GRAIN_LOG(debug, "", "Debug: you shouldn't see this message!");
 
   absl::string_view file_path = __FILE__;
   file_path.remove_suffix(3);
@@ -108,7 +109,7 @@ TEST(FineGrainLog, updateBasename) {
       std::make_pair(file_path, static_cast<int>(spdlog::level::debug));
   getFineGrainLogContext().updateVerbositySetting({update});
 
-  FINE_GRAIN_LOG(debug, "Debug: now level is debug");
+  FINE_GRAIN_LOG(debug, "", "Debug: now level is debug");
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::debug);
@@ -302,6 +303,105 @@ TEST(FineGrainLog, invalidGlobLevelUpdate) {
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(file_1);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), getFineGrainLogContext().getVerbosityDefaultLevel());
+}
+
+TEST(FineGrainLog, updateWithLoggerName) {
+  Logger::Context::enableFineGrainLogger();
+  const std::string key = absl::StrCat(__FILE__, ":misc");
+  getFineGrainLogContext().setFineGrainLogger(key, spdlog::level::info);
+  ENVOY_LOG_MISC(debug, "debug message");
+  const std::pair<absl::string_view, int> update =
+      std::make_pair(__FILE__, static_cast<int>(spdlog::level::debug));
+  getFineGrainLogContext().updateVerbositySetting({update});
+  ENVOY_LOG_MISC(debug, "debug message");
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(key);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::debug);
+}
+
+TEST(FineGrainLog, updateWithBasenameAndLoggerName) {
+  Logger::Context::enableFineGrainLogger();
+  const std::string key = absl::StrCat(__FILE__, ":misc");
+  getFineGrainLogContext().setFineGrainLogger(key, spdlog::level::info);
+  ENVOY_LOG_MISC(debug, "debug message");
+  absl::string_view file_path = __FILE__;
+  file_path.remove_suffix(3);
+  const size_t position = file_path.rfind('/');
+  file_path.remove_prefix(position + 1);
+  const std::pair<absl::string_view, int> update =
+      std::make_pair(file_path, static_cast<int>(spdlog::level::debug));
+  getFineGrainLogContext().updateVerbositySetting({update});
+  ENVOY_LOG_MISC(debug, "debug message");
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(key);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::debug);
+}
+
+TEST(FineGrainLog, updateWithGlobAndLoggerName) {
+  const std::string key1 = "envoy/src/foo.cc:misc";
+  const std::string key2 = "envoy/src/bar.cc:misc";
+  std::atomic<spdlog::logger*> flogger{nullptr};
+  getFineGrainLogContext().initFineGrainLogger(key1, flogger);
+  getFineGrainLogContext().initFineGrainLogger(key2, flogger);
+  const std::pair<absl::string_view, int> update =
+      std::make_pair("envoy/*", static_cast<int>(spdlog::level::warn));
+  getFineGrainLogContext().updateVerbositySetting({update});
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(key1);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::warn);
+  p = getFineGrainLogContext().getFineGrainLogEntry(key2);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::warn);
+}
+
+TEST(FineGrainLog, updateWithSameFileAndDifferentLoggerName) {
+  const std::string key1 = "envoy/src/foo.cc:logger1";
+  const std::string key2 = "envoy/src/foo.cc:logger2";
+  std::atomic<spdlog::logger*> flogger{nullptr};
+  getFineGrainLogContext().initFineGrainLogger(key1, flogger);
+  getFineGrainLogContext().initFineGrainLogger(key2, flogger);
+  const std::pair<absl::string_view, int> update =
+      std::make_pair("foo", static_cast<int>(spdlog::level::warn));
+  getFineGrainLogContext().updateVerbositySetting({update});
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(key1);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::warn);
+  p = getFineGrainLogContext().getFineGrainLogEntry(key2);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::warn);
+}
+
+TEST(FineGrainLog, updateWithLoggerNameOnly) {
+  getFineGrainLogContext().updateVerbositySetting({});
+  getFineGrainLogContext().updateVerbosityDefaultLevel(spdlog::level::info);
+  const std::string key1 = "envoy/src/foo.cc:logger1";
+  const std::string key2 = "envoy/src/bar.cc:logger1";
+  const std::string key3 = "envoy/src/foo.cc:logger2";
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(key1);
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(key2);
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(key3);
+  std::atomic<spdlog::logger*> flogger{nullptr};
+  getFineGrainLogContext().initFineGrainLogger(key1, flogger);
+  getFineGrainLogContext().initFineGrainLogger(key2, flogger);
+  getFineGrainLogContext().initFineGrainLogger(key3, flogger);
+
+  SpdLoggerSharedPtr p1 = getFineGrainLogContext().getFineGrainLogEntry(key1);
+  SpdLoggerSharedPtr p2 = getFineGrainLogContext().getFineGrainLogEntry(key2);
+  SpdLoggerSharedPtr p3 = getFineGrainLogContext().getFineGrainLogEntry(key3);
+  ASSERT_NE(p1, nullptr);
+  ASSERT_NE(p2, nullptr);
+  ASSERT_NE(p3, nullptr);
+  ASSERT_EQ(p1->level(), spdlog::level::info);
+  ASSERT_EQ(p2->level(), spdlog::level::info);
+  ASSERT_EQ(p3->level(), spdlog::level::info);
+
+  const std::pair<absl::string_view, int> update =
+      std::make_pair("logger1", static_cast<int>(spdlog::level::warn));
+  getFineGrainLogContext().updateVerbositySetting({update});
+
+  EXPECT_EQ(p1->level(), spdlog::level::warn);
+  EXPECT_EQ(p2->level(), spdlog::level::warn);
+  EXPECT_EQ(p3->level(), spdlog::level::info);
 }
 
 } // namespace Envoy

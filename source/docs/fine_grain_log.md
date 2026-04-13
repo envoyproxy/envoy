@@ -7,8 +7,8 @@ Fine-Grain Logger is a logger with finer grained log level control and runtime l
 ### Basic Usage
 The basic usage of Fine-Grain Logger is to explicitly call its macros:
 ```
-  FINE_GRAIN_LOG(info, "Hello world! Here's a line of fine-grain log!");
-  FINE_GRAIN_LOG(error, "FineGrainLog Error! Here's the second message!");
+  FINE_GRAIN_LOG(info, "", "Hello world! Here's a line of fine-grain log!");
+  FINE_GRAIN_LOG(error, "", "FineGrainLog Error! Here's the second message!");
 ```
 If the level of log message is higher than that of the file, macros above will print messages with the file name like this:
 ```

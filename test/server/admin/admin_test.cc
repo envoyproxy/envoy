@@ -172,6 +172,7 @@ TEST_P(AdminInstanceTest, Help) {
       format: File format to use; One of (text, json)
   /logging (POST): query/change logging levels
       paths: Change multiple logging levels by setting to <logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>. If fine grain logging is enabled, use __FILE__ or a glob experision as the logger name. For example, source/common*:warning
+      group: Change given logger group to desired level, set to <logger_group_name>:<desired_level>. logger_group_name can be a logger name or a glob expression.
       level: desired logging level, this will change all loggers's level; One of (, trace, debug, info, warning, error, critical, off)
   /memory: print current allocation/heap usage
   /memory/tcmalloc: print TCMalloc stats

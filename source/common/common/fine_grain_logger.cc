@@ -1,6 +1,7 @@
 #include "source/common/common/fine_grain_logger.h"
 
 #include <atomic>
+#include <cstddef>
 #include <memory>
 #include <tuple>
 
@@ -209,9 +210,17 @@ void FineGrainLogContext::appendVerbosityLogUpdate(absl::string_view update_patt
   verbosity_update_info_.emplace_back(std::string(update_pattern), update_is_path, log_level);
 }
 
-level_enum FineGrainLogContext::getLogLevel(absl::string_view file) const {
+level_enum FineGrainLogContext::getLogLevel(absl::string_view key) const {
   if (verbosity_update_info_.empty()) {
     return verbosity_default_level_;
+  }
+
+  absl::string_view file = key;
+  absl::string_view logger_name;
+  const size_t colon = file.rfind(':');
+  if (colon != file.npos) {
+    logger_name = file.substr(colon + 1);
+    file = file.substr(0, colon);
   }
 
   // Get basename for file.
@@ -236,8 +245,13 @@ level_enum FineGrainLogContext::getLogLevel(absl::string_view file) const {
       if (safeFileNameMatch(info.update_pattern, file)) {
         return info.log_level;
       }
-    } else if (safeFileNameMatch(info.update_pattern, stem_basename)) {
-      return info.log_level;
+    } else {
+      if (safeFileNameMatch(info.update_pattern, stem_basename)) {
+        return info.log_level;
+      }
+      if (!logger_name.empty() && safeFileNameMatch(info.update_pattern, logger_name)) {
+        return info.log_level;
+      }
     }
   }
 
