@@ -350,6 +350,10 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: dynamic_modules
+  change: |
+    Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
+    modules to check if the server is running in config validation mode.
 - area: ratelimit
   change: |
     Added ``is_negative_hits`` boolean to the ``hits_addend``
