@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
 
 class DecompressorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
@@ -425,4 +426,100 @@ TEST_P(DecompressorIntegrationTest, LimitMaxDecompressOutputSize) {
       "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 1);
 }
 
+// Construct a zstd RLE bomb frame (RFC 8878 sec 3.1.1.2.2).
+//
+// Zstd frame layout (RFC 8878):
+//   Magic_Number (4 bytes, LE): 0xFD2FB528
+//   Frame_Header_Descriptor (1 byte): 0x00
+//     - Single_Segment_flag=0 → Window_Descriptor present
+//     - FCS_flag=0 → no Frame_Content_Size
+//   Window_Descriptor (1 byte): encodes window_log
+//     - Exponent = (window_log - 10), Mantissa = 0
+//   Blocks: sequence of RLE blocks
+//     Block_Header (3 bytes LE):
+//       bit 0:    Last_Block
+//       bits 1-2: Block_Type = 01 (RLE_Block)
+//       bits 3-23: Block_Size = repeat count
+//     Block_Content (1 byte): literal to repeat
+std::vector<uint8_t> buildZstdRleBomb(uint32_t target_wire_size = 16384) {
+  constexpr uint32_t kZstdMagic = 0xFD2FB528;
+  constexpr uint32_t kBlockSizeMax = 131072; // 128 KiB per RFC 8878
+  constexpr uint32_t kWindowLog = 17;        // minimum that permits 128KB blocks
+  constexpr uint8_t kLiteral = 0x41;         // 'A'
+
+  std::vector<uint8_t> frame;
+
+  // Magic number (4 bytes, little-endian).
+  frame.push_back(static_cast<uint8_t>(kZstdMagic & 0xFF));
+  frame.push_back(static_cast<uint8_t>((kZstdMagic >> 8) & 0xFF));
+  frame.push_back(static_cast<uint8_t>((kZstdMagic >> 16) & 0xFF));
+  frame.push_back(static_cast<uint8_t>((kZstdMagic >> 24) & 0xFF));
+
+  // Frame_Header_Descriptor: 0x00
+  frame.push_back(0x00);
+
+  // Window_Descriptor: exponent = window_log - 10 = 7, mantissa = 0
+  frame.push_back(static_cast<uint8_t>((kWindowLog - 10) << 3));
+
+  // How many 4-byte RLE blocks fit in the remaining space.
+  const uint32_t header_size = static_cast<uint32_t>(frame.size());
+  const uint32_t n_blocks = (target_wire_size - header_size) / 4;
+
+  for (uint32_t i = 0; i < n_blocks; ++i) {
+    bool last_block = (i == n_blocks - 1);
+    // Block_Header: Last_Block | (Block_Type=RLE << 1) | (Block_Size << 3)
+    uint32_t block_header = (last_block ? 1u : 0u) | (0x01u << 1) | (kBlockSizeMax << 3);
+    frame.push_back(static_cast<uint8_t>(block_header & 0xFF));
+    frame.push_back(static_cast<uint8_t>((block_header >> 8) & 0xFF));
+    frame.push_back(static_cast<uint8_t>((block_header >> 16) & 0xFF));
+    frame.push_back(kLiteral);
+  }
+
+  return frame;
+}
+
+TEST_P(DecompressorIntegrationTest, LimitZstdDecompression) {
+  initializeFilter(R"EOF(
+  name: envoy.filters.http.decompressor
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
+    decompressor_library:
+      name: bomb
+      typed_config:
+        "@type": "type.googleapis.com/envoy.extensions.compression.zstd.decompressor.v3.Zstd"
+  )EOF");
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {"content-encoding", "zstd"},
+                                                                 {":authority", "host"}});
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  const std::vector<uint8_t> bomb_bytes = buildZstdRleBomb();
+  Buffer::OwnedImpl bomb(bomb_bytes.data(), bomb_bytes.size());
+  codec_client_->sendData(*request_encoder, bomb, true);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  const double ratio = static_cast<double>(upstream_request_->bodyLength()) / bomb_bytes.size();
+
+  // MaxInflateRatio is 100; overshoot is at most one chunk (131072 bytes).
+  EXPECT_LT(ratio, 200.0) << "Bomb protection should have limited output. "
+                          << "Wire: " << bomb_bytes.size() << " bytes, "
+                          << "Decompressed: " << upstream_request_->bodyLength() << " bytes.";
+
+  test_server_->waitForCounterGe(
+      "http.config_test.decompressor.bomb.zstd.decompressor_library.zstd_generic_error", 1);
+
+  // Complete the stream cleanly.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+} // namespace
 } // namespace Envoy
