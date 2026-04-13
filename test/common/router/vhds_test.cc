@@ -316,6 +316,202 @@ vhds:
               "vhost_vhds1" == actual_vhost_2.name());
 }
 
+// verify that when RDS and VHDS define virtual hosts with the same name, VHDS takes precedence
+TEST_F(VhdsTest, VhdsOverridesRdsVirtualHostWithSameName) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+virtual_hosts:
+- name: overlapping_vhost
+  domains: ["vhost.rds.domain"]
+  routes:
+  - match: { prefix: "/rds" }
+    route: { cluster: rds_service }
+- name: vhost_rds_only
+  domains: ["vhost.rds.only"]
+  routes:
+  - match: { prefix: "/rdsonly" }
+    route: { cluster: rds_only_service }
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  VhdsSubscriptionPtr subscription = VhdsSubscription::createVhdsSubscription(
+                                         config_update_info, factory_context_, context_, provider_)
+                                         .value();
+  EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+
+  // Add a VHDS virtual host with the same name as one of the RDS virtual hosts
+  auto vhost = buildVirtualHost("overlapping_vhost", "vhost.vhds.domain");
+  const auto& added_resources = buildAddedResources({vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  const Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
+                  .ok());
+
+  // Should have 2 virtual hosts: vhost_rds_only from RDS + overlapping_vhost from VHDS
+  EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+
+  // Verify the VHDS version of the overlapping vhost is used (with vhds domain, not rds domain)
+  bool found_vhds_version = false;
+  bool found_rds_only = false;
+  for (int i = 0; i < config_update_info->protobufConfigurationCast().virtual_hosts_size(); ++i) {
+    const auto& vh = config_update_info->protobufConfigurationCast().virtual_hosts(i);
+    if (vh.name() == "overlapping_vhost") {
+      // The VHDS version should have "vhost.vhds.domain", not "vhost.rds.domain"
+      EXPECT_EQ("vhost.vhds.domain", vh.domains(0));
+      found_vhds_version = true;
+    } else if (vh.name() == "vhost_rds_only") {
+      found_rds_only = true;
+    }
+  }
+  EXPECT_TRUE(found_vhds_version) << "VHDS version of overlapping_vhost not found";
+  EXPECT_TRUE(found_rds_only) << "vhost_rds_only not found";
+}
+
+// verify VHDS precedence is maintained after an RDS update
+TEST_F(VhdsTest, VhdsOverridesRdsVirtualHostAfterRdsUpdate) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+virtual_hosts:
+- name: overlapping_vhost
+  domains: ["vhost.rds.domain"]
+  routes:
+  - match: { prefix: "/rds" }
+    route: { cluster: rds_service }
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  VhdsSubscriptionPtr subscription = VhdsSubscription::createVhdsSubscription(
+                                         config_update_info, factory_context_, context_, provider_)
+                                         .value();
+
+  // Add a VHDS virtual host with the same name
+  auto vhost = buildVirtualHost("overlapping_vhost", "vhost.vhds.domain");
+  const auto& added_resources = buildAddedResources({vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  const Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
+                  .ok());
+
+  // Now trigger an RDS update that still has the same-named vhost
+  const auto updated_route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+virtual_hosts:
+- name: overlapping_vhost
+  domains: ["vhost.rds.updated"]
+  routes:
+  - match: { prefix: "/rds-updated" }
+    route: { cluster: rds_updated_service }
+- name: vhost_rds_new
+  domains: ["vhost.rds.new"]
+  routes:
+  - match: { prefix: "/rdsnew" }
+    route: { cluster: rds_new_service }
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  )EOF");
+  config_update_info->onRdsUpdate(updated_route_config, "2");
+
+  // Should have 2: vhost_rds_new from RDS + overlapping_vhost from VHDS
+  EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+
+  // Verify VHDS version still takes precedence after RDS update
+  bool found_vhds_version = false;
+  for (int i = 0; i < config_update_info->protobufConfigurationCast().virtual_hosts_size(); ++i) {
+    const auto& vh = config_update_info->protobufConfigurationCast().virtual_hosts(i);
+    if (vh.name() == "overlapping_vhost") {
+      EXPECT_EQ("vhost.vhds.domain", vh.domains(0));
+      found_vhds_version = true;
+    }
+  }
+  EXPECT_TRUE(found_vhds_version) << "VHDS version of overlapping_vhost not found after RDS update";
+}
+
+// verify that removing a VHDS virtual host that was overriding an RDS one causes the RDS vhost to
+// reappear
+TEST_F(VhdsTest, RemovingVhdsVirtualHostRestoresRdsVirtualHost) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+virtual_hosts:
+- name: overlapping_vhost
+  domains: ["vhost.rds.domain"]
+  routes:
+  - match: { prefix: "/rds" }
+    route: { cluster: rds_service }
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  VhdsSubscriptionPtr subscription = VhdsSubscription::createVhdsSubscription(
+                                         config_update_info, factory_context_, context_, provider_)
+                                         .value();
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+
+  // Add a VHDS virtual host with the same name as the RDS one
+  auto vhost = buildVirtualHost("overlapping_vhost", "vhost.vhds.domain");
+  const auto& added_resources = buildAddedResources({vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
+                  .ok());
+
+  // VHDS version should override
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ("vhost.vhds.domain",
+            config_update_info->protobufConfigurationCast().virtual_hosts(0).domains(0));
+
+  // Now remove the VHDS virtual host
+  const auto no_added_resources = buildAddedResources({});
+  const auto no_decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(no_added_resources);
+  Protobuf::RepeatedPtrField<std::string> resources_to_remove;
+  *resources_to_remove.Add() = "overlapping_vhost";
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(no_decoded_resources.refvec_, resources_to_remove, "2")
+                  .ok());
+
+  // The RDS virtual host should reappear
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ("overlapping_vhost",
+            config_update_info->protobufConfigurationCast().virtual_hosts(0).name());
+  EXPECT_EQ("vhost.rds.domain",
+            config_update_info->protobufConfigurationCast().virtual_hosts(0).domains(0));
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
