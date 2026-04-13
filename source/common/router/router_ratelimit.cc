@@ -212,6 +212,11 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
     metadata_source = route ? &route->metadata() : nullptr;
     break;
   }
+  case envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_ENTRY: {
+    OptRef<const Upstream::ClusterInfo> cluster_info = info.upstreamClusterInfo();
+    metadata_source = cluster_info.has_value() ? &cluster_info.ref().metadata() : nullptr;
+    break;
+  }
   }
 
   const std::string metadata_string_value =

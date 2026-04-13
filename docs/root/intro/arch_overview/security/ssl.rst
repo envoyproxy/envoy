@@ -33,7 +33,12 @@ Underlying implementation
 -------------------------
 
 Currently Envoy is written to use `BoringSSL <https://boringssl.googlesource.com/boringssl>`_ as the
-TLS provider.
+default TLS provider.
+
+`OpenSSL <https://openssl.org>`_ can also be used as an alternative, when Envoy is built using
+the ``--config=openssl`` Bazel option. OpenSSL libraries are not statically linked into the main Envoy executable;
+they must be present at runtime and are loaded dynamically. HTTP/3 (QUIC) is not available with OpenSSL builds.
+OpenSSL builds are not currently covered by the :repo:`Envoy security policy <SECURITY.md>`.
 
 .. _arch_overview_ssl_fips:
 
@@ -49,7 +54,7 @@ using ``--config=boringssl-fips`` Bazel option. Currently, the BoringSSL/FIPS bu
 AWS-LC FIPS can also be used with ``--config=aws-lc-fips``, and has wider architecture support.
 
 When Envoy has been built for FIPS, you should see ``BoringSSL-FIPS`` or ``AWS-LC-FIPS``
-in the :option:`--version` output.
+in the :option:`--version` output. When built with OpenSSL, the output will show ``OpenSSL``.
 
 It's important to note that while using FIPS-compliant module is necessary for FIPS compliance,
 it's not sufficient by itself, and depending on the context, additional steps might be necessary.

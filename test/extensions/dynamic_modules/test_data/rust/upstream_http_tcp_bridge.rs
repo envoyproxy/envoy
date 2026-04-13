@@ -52,7 +52,7 @@ impl UpstreamHttpTcpBridge for TestBridge {
       BridgeMode::Streaming => {
         if let (Some(method), _) = envoy_bridge.get_request_header_value(":method", 0) {
           let method_str = std::str::from_utf8(&method).unwrap_or("?");
-          let prefix = format!("METHOD={} ", method_str);
+          let prefix = format!("METHOD={method_str} ");
           envoy_bridge.send_upstream_data(prefix.as_bytes(), false);
         }
       },

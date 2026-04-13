@@ -49,7 +49,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "typed_filter_state_callbacks" => Some(Box::new(TypedFilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     "config_init_failure" => None,
-    _ => panic!("Unknown filter name: {}", name),
+    _ => panic!("Unknown filter name: {name}"),
   }
 }
 
@@ -1065,29 +1065,17 @@ impl<EHF: EnvoyHttpFilter> std::io::Write for BodyWriter<'_, EHF> {
     if self.request {
       if self.received {
         if !self.envoy_filter.append_received_request_body(buf) {
-          return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Buffer is not available",
-          ));
+          return Err(std::io::Error::other("Buffer is not available"));
         }
       } else if !self.envoy_filter.append_buffered_request_body(buf) {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          "Buffer is not available",
-        ));
+        return Err(std::io::Error::other("Buffer is not available"));
       }
     } else if self.received {
       if !self.envoy_filter.append_received_response_body(buf) {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          "Buffer is not available",
-        ));
+        return Err(std::io::Error::other("Buffer is not available"));
       }
     } else if !self.envoy_filter.append_buffered_response_body(buf) {
-      return Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "Buffer is not available",
-      ));
+      return Err(std::io::Error::other("Buffer is not available"));
     }
 
     Ok(buf.len())
