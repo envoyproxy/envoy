@@ -57,7 +57,7 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message QuicProtocolOptions {
   // Config for QUIC connection migration across network interfaces, i.e. cellular to WIFI, upon
   // network change events from the platform, i.e. the current network gets
@@ -173,6 +173,11 @@ message QuicProtocolOptions {
   // If absent, the feature will be disabled.
   // [#not-implemented-hide:]
   ConnectionMigrationSettings connection_migration = 11;
+
+  // Timeout for a QUIC connection to schedule memory reduction callback when the network has been idle for a while.
+  // This value should be smaller than the idle timeout to take effect.
+  // If not specified, memory reduction is set to infinite by QUIC connection (disabled).
+  google.protobuf.Duration memory_reduction_timeout = 12 [(validate.rules).duration = {gte {seconds: 1}}];
 }
 
 message UpstreamHttpProtocolOptions {
