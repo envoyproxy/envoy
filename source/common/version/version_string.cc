@@ -4,7 +4,6 @@
 #include "source/common/common/macros.h"
 #include "source/common/version/version_number.h"
 
-// Provided by the linkstamp (version_linkstamp.cc / test_version_linkstamp.cc).
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
 extern const char build_version_suffix[];
