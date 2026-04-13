@@ -94,3 +94,5 @@ areas:
     title: tls
   wasm:
     title: wasm
+  zstd:
+    title: zstd
