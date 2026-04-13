@@ -969,7 +969,6 @@ new_features:
 - area: ratelimit
   change: |
     Support populating rate limit descriptors from cluster metadata.
-
 - area: contrib
   change: |
     Added a new :ref:`Kafka stats sink <config_stat_sinks_kafka>` contrib extension
@@ -981,7 +980,6 @@ new_features:
     tag-as-label emission, and full librdkafka producer tuning (including TLS and SASL
     authentication) are supported via
     :ref:`KafkaStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig>`.
-
 - area: tls
   change: |
     Added support for building Envoy with OpenSSL as an alternative to the default BoringSSL.
@@ -990,5 +988,9 @@ new_features:
     ``--config=openssl``. HTTP/3 (QUIC) is disabled for OpenSSL builds. Note that OpenSSL builds are
     not currently covered by the `Envoy security policy <https://github.com/envoyproxy/envoy/blob/main/SECURITY.md>`_.
     See :repo:`bazel/SSL.md <bazel/SSL.md>` for details.
+- area: dynamic_modules
+  change: |
+    Promoted the dynamic modules HTTP filter (``envoy.filters.http.dynamic_modules``) from alpha
+    to stable.
 
 deprecated:
