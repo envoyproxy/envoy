@@ -618,7 +618,18 @@ public:
   uint64_t hash() const { return absl::Hash<StatName>()(*this); }
 
   bool operator==(const StatName& rhs) const {
-    return dataAsStringView() == rhs.dataAsStringView();
+    if (size_and_data_ == rhs.size_and_data_) {
+      return true;
+    }
+
+    if (size_and_data_ == nullptr || rhs.size_and_data_ == nullptr) {
+      return empty() && rhs.empty();
+    }
+
+    const auto [lhs_sz, lhs_prefix] = SymbolTable::Encoding::decodeNumber(size_and_data_);
+    const auto [rhs_sz, rhs_prefix] = SymbolTable::Encoding::decodeNumber(rhs.size_and_data_);
+    return lhs_sz == rhs_sz &&
+           memcmp(size_and_data_ + lhs_prefix, rhs.size_and_data_ + rhs_prefix, lhs_sz) == 0;
   }
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
 
@@ -682,7 +693,11 @@ public:
   /**
    * @return whether this is empty.
    */
-  bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
+  bool empty() const {
+    // Avoid a full varint decode: it is sufficient to know the first byte,
+    // since 0x00 uniquely encodes zero
+    return size_and_data_ == nullptr || size_and_data_[0] == 0;
+  }
 
   /**
    * Determines whether this starts with the prefix. Note: dynamic segments

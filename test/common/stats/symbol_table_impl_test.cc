@@ -726,6 +726,23 @@ TEST_F(StatNameTest, StatNameEmptyEquivalent) {
   EXPECT_NE(empty2.hash(), non_empty.hash());
 }
 
+TEST_F(StatNameTest, StatNameEqualityFastPaths) {
+  // Pointer-identity: same backing storage compares equal without memcmp.
+  StatName a = makeStat("foo.bar");
+  StatName alias(a.dataIncludingSize());
+  EXPECT_EQ(a, alias);
+
+  // Null vs zero-length: both are empty() and must compare equal in both directions.
+  StatName null_name;
+  StatName zero_length = makeStat("");
+  EXPECT_EQ(null_name, zero_length);
+  EXPECT_EQ(zero_length, null_name);
+
+  // Null vs non-empty: must not compare equal.
+  EXPECT_NE(null_name, a);
+  EXPECT_NE(a, null_name);
+}
+
 TEST_F(StatNameTest, StartsWith) {
   StatName prefix = makeStat("prefix");
   EXPECT_TRUE(prefix.startsWith(prefix));
