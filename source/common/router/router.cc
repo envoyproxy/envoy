@@ -420,6 +420,60 @@ void Filter::chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionOptCon
   chargeUpstreamCode(response_status_code, *fake_response_headers, upstream_host, dropped);
 }
 
+Http::FilterHeadersStatus Filter::checkStrictHeaders(const Http::RequestHeaderMap& headers) {
+  auto handle_invalid_header =
+      [this](const FilterUtility::StrictHeaderChecker::HeaderCheckResult& res) {
+        callbacks_->streamInfo().setResponseFlag(
+            StreamInfo::CoreResponseFlag::InvalidEnvoyRequestHeaders);
+        const std::string body = fmt::format("invalid header '{}' with value '{}'",
+                                             std::string(res.entry_->key().getStringView()),
+                                             std::string(res.entry_->value().getStringView()));
+        const std::string details =
+            absl::StrCat(StreamInfo::ResponseCodeDetails::get().InvalidEnvoyRequestHeaders, "{",
+                         StringUtil::replaceAllEmptySpace(res.entry_->key().getStringView()), "}");
+        callbacks_->sendLocalReply(Http::Code::BadRequest, body, modify_headers_, absl::nullopt,
+                                   details);
+        return Http::FilterHeadersStatus::StopIteration;
+      };
+
+  if (config_->envoy_upstream_rq_timeout_ms_) {
+    const auto res =
+        FilterUtility::StrictHeaderChecker::isInteger(headers.EnvoyUpstreamRequestTimeoutMs());
+    if (!res.valid_) {
+      return handle_invalid_header(res);
+    }
+  }
+  if (config_->envoy_upstream_rq_per_try_timeout_ms_) {
+    const auto res = FilterUtility::StrictHeaderChecker::isInteger(
+        headers.EnvoyUpstreamRequestPerTryTimeoutMs());
+    if (!res.valid_) {
+      return handle_invalid_header(res);
+    }
+  }
+  if (config_->envoy_max_retries_) {
+    const auto res = FilterUtility::StrictHeaderChecker::isInteger(headers.EnvoyMaxRetries());
+    if (!res.valid_) {
+      return handle_invalid_header(res);
+    }
+  }
+  if (config_->envoy_retry_on_) {
+    const auto res = FilterUtility::StrictHeaderChecker::hasValidRetryFields(
+        headers.EnvoyRetryOn(), &Router::RetryStateImpl::parseRetryOn);
+    if (!res.valid_) {
+      return handle_invalid_header(res);
+    }
+  }
+  if (config_->envoy_retry_grpc_on_) {
+    const auto res = FilterUtility::StrictHeaderChecker::hasValidRetryFields(
+        headers.EnvoyRetryGrpcOn(), &Router::RetryStateImpl::parseRetryGrpcOn);
+    if (!res.valid_) {
+      return handle_invalid_header(res);
+    }
+  }
+
+  return Http::FilterHeadersStatus::Continue;
+}
+
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   downstream_headers_ = &headers;
 
@@ -531,54 +585,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.getPathValue());
 
-  auto handle_invalid_header =
-      [this](const FilterUtility::StrictHeaderChecker::HeaderCheckResult& res) {
-        callbacks_->streamInfo().setResponseFlag(
-            StreamInfo::CoreResponseFlag::InvalidEnvoyRequestHeaders);
-        const std::string body = fmt::format("invalid header '{}' with value '{}'",
-                                             std::string(res.entry_->key().getStringView()),
-                                             std::string(res.entry_->value().getStringView()));
-        const std::string details =
-            absl::StrCat(StreamInfo::ResponseCodeDetails::get().InvalidEnvoyRequestHeaders, "{",
-                         StringUtil::replaceAllEmptySpace(res.entry_->key().getStringView()), "}");
-        callbacks_->sendLocalReply(Http::Code::BadRequest, body, modify_headers_, absl::nullopt,
-                                   details);
-        return Http::FilterHeadersStatus::StopIteration;
-      };
-
-  if (config_->strict_check_headers_.envoy_upstream_rq_timeout_ms_) {
-    const auto res =
-        FilterUtility::StrictHeaderChecker::isInteger(headers.EnvoyUpstreamRequestTimeoutMs());
-    if (!res.valid_) {
-      return handle_invalid_header(res);
-    }
-  }
-  if (config_->strict_check_headers_.envoy_upstream_rq_per_try_timeout_ms_) {
-    const auto res = FilterUtility::StrictHeaderChecker::isInteger(
-        headers.EnvoyUpstreamRequestPerTryTimeoutMs());
-    if (!res.valid_) {
-      return handle_invalid_header(res);
-    }
-  }
-  if (config_->strict_check_headers_.envoy_max_retries_) {
-    const auto res = FilterUtility::StrictHeaderChecker::isInteger(headers.EnvoyMaxRetries());
-    if (!res.valid_) {
-      return handle_invalid_header(res);
-    }
-  }
-  if (config_->strict_check_headers_.envoy_retry_on_) {
-    const auto res = FilterUtility::StrictHeaderChecker::hasValidRetryFields(
-        headers.EnvoyRetryOn(), &Router::RetryStateImpl::parseRetryOn);
-    if (!res.valid_) {
-      return handle_invalid_header(res);
-    }
-  }
-  if (config_->strict_check_headers_.envoy_retry_grpc_on_) {
-    const auto res = FilterUtility::StrictHeaderChecker::hasValidRetryFields(
-        headers.EnvoyRetryGrpcOn(), &Router::RetryStateImpl::parseRetryGrpcOn);
-    if (!res.valid_) {
-      return handle_invalid_header(res);
-    }
+  const Http::FilterHeadersStatus status = checkStrictHeaders(headers);
+  if (status != Http::FilterHeadersStatus::Continue) {
+    return status;
   }
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();

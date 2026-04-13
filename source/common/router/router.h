@@ -37,7 +37,6 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
 
-#include "absl/container/inlined_vector.h"
 #include "absl/strings/ascii.h"
 #include "absl/types/optional.h"
 
@@ -206,15 +205,15 @@ public:
     for (const auto& header : strict_check_headers) {
       const std::string lower_header = absl::AsciiStrToLower(header);
       if (lower_header == Http::Headers::get().EnvoyUpstreamRequestTimeoutMs.get()) {
-        strict_check_headers_.envoy_upstream_rq_timeout_ms_ = true;
+        envoy_upstream_rq_timeout_ms_ = true;
       } else if (lower_header == Http::Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs.get()) {
-        strict_check_headers_.envoy_upstream_rq_per_try_timeout_ms_ = true;
+        envoy_upstream_rq_per_try_timeout_ms_ = true;
       } else if (lower_header == Http::Headers::get().EnvoyMaxRetries.get()) {
-        strict_check_headers_.envoy_max_retries_ = true;
+        envoy_max_retries_ = true;
       } else if (lower_header == Http::Headers::get().EnvoyRetryOn.get()) {
-        strict_check_headers_.envoy_retry_on_ = true;
+        envoy_retry_on_ = true;
       } else if (lower_header == Http::Headers::get().EnvoyRetryGrpcOn.get()) {
-        strict_check_headers_.envoy_retry_grpc_on_ = true;
+        envoy_retry_grpc_on_ = true;
       }
     }
   }
@@ -267,14 +266,11 @@ public:
   const bool suppress_envoy_headers_ : 1;
   const bool respect_expected_rq_timeout_ : 1;
   const bool suppress_grpc_request_failure_code_stats_ : 1;
-  struct StrictCheckHeaders {
-    bool envoy_upstream_rq_timeout_ms_ : 1;
-    bool envoy_upstream_rq_per_try_timeout_ms_ : 1;
-    bool envoy_max_retries_ : 1;
-    bool envoy_retry_on_ : 1;
-    bool envoy_retry_grpc_on_ : 1;
-  };
-  StrictCheckHeaders strict_check_headers_{};
+  bool envoy_upstream_rq_timeout_ms_ : 1 = false;
+  bool envoy_upstream_rq_per_try_timeout_ms_ : 1 = false;
+  bool envoy_max_retries_ : 1 = false;
+  bool envoy_retry_on_ : 1 = false;
+  bool envoy_retry_grpc_on_ : 1 = false;
   const bool flush_upstream_log_on_upstream_stream_;
   const bool reject_connect_request_early_data_;
   absl::optional<std::chrono::milliseconds> upstream_log_flush_interval_;
@@ -566,6 +562,7 @@ private:
                           Upstream::HostDescriptionOptConstRef upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionOptConstRef upstream_host,
                           bool dropped);
+  Http::FilterHeadersStatus checkStrictHeaders(const Http::RequestHeaderMap& headers);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
@@ -662,7 +659,7 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_from_upstream_lb_;
-  absl::InlinedVector<std::reference_wrapper<const ShadowPolicy>, 2> active_shadow_policies_;
+  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_;
   std::unique_ptr<Http::RequestHeaderMap> shadow_headers_;
   std::unique_ptr<Http::RequestTrailerMap> shadow_trailers_;
   // The stream lifetime configured by request header.
