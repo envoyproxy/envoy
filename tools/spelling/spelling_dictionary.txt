@@ -4,6 +4,7 @@
 # are allowed for any otherwise correctly spelled word.
 
 Allshard
+FCS
 FLUSHALL
 NUMPAT
 PUBSUB
