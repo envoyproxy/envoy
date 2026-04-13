@@ -78,7 +78,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # sni_dynamic_forward_proxy extension
 /*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @UNOWNED
 # tracers.datadog extension
-/*/extensions/tracers/datadog @dmehala @mattklein123
+/*/extensions/tracers/datadog @xlamorlette-datadog @zacharycmontoya @mattklein123
 # tracers.xray extension
 /*/extensions/tracers/xray @mattklein123 @nbaws
 # tracers.skywalking extension
