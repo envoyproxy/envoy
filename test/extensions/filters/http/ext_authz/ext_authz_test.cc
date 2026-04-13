@@ -5002,7 +5002,7 @@ TEST_F(HttpFilterTest, NullRouteSkipsCheck) {
   prepareCheck();
 
   // Set up a null route return value.
-  ON_CALL(decoder_filter_callbacks_, route()).WillByDefault(Return(nullptr));
+  ON_CALL(decoder_filter_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>()));
 
   // With null route, no authorization check should be performed.
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);

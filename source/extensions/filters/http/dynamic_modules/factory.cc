@@ -4,6 +4,7 @@
 
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/wasm/remote_async_datasource.h"
+#include "source/extensions/dynamic_modules/background_fetch_manager.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
@@ -97,6 +98,8 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
         dynamic_module = Extensions::DynamicModules::newDynamicModule(
             cached_path, module_config.do_not_close(), module_config.load_globally());
         if (dynamic_module.ok()) {
+          Extensions::DynamicModules::BackgroundFetchManager::singleton(context.singletonManager())
+              ->erase(sha256);
           return buildFilterFactoryCallback(std::move(dynamic_module.value()), proto_config,
                                             module_config, context, scope);
         }
@@ -104,6 +107,15 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
         // identical bytes, so there is no point in falling through to the remote path.
         return absl::InvalidArgumentError("Cached remote module failed to load: " +
                                           std::string(dynamic_module.status().message()));
+      }
+
+      // In NACK mode, reject the config and kick off a background fetch. The control
+      // plane will retry, and the next attempt picks up the cached file above.
+      if (module_config.nack_on_cache_miss()) {
+        Extensions::DynamicModules::BackgroundFetchManager::singleton(context.singletonManager())
+            ->fetchIfNeeded(sha256, context.clusterManager(), module_config.module().remote());
+        return absl::InvalidArgumentError(
+            "Remote module not cached; background fetch in progress. SHA256: " + sha256);
       }
 
       // No cached file — need async fetch, which requires init_manager.
@@ -238,11 +250,16 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
     config = std::move(config_or_error.value());
   }
 
+  absl::string_view filter_name = proto_config.filter_name();
+  if (filter_name.empty()) {
+    filter_name = proto_config.per_route_config_name();
+  }
+
   absl::StatusOr<Envoy::Extensions::DynamicModules::HttpFilters::
                      DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-              proto_config.per_route_config_name(), config, std::move(dynamic_module.value()));
+              filter_name, config, std::move(dynamic_module.value()));
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create pre-route filter config: " +

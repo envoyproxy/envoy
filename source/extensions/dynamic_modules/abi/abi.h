@@ -495,6 +495,19 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
  */
 uint32_t envoy_dynamic_module_callback_get_concurrency();
 
+// ----------------------------- Server Mode -----------------------------------
+
+/**
+ * envoy_dynamic_module_callback_is_validation_mode may be called by the dynamic
+ * module to check if the server is running in config validation mode (--mode validate).
+ * This allows modules to optimize by only parsing and validating their config without
+ * performing expensive operations such as provider lookups or loading external resources.
+ * NOTE: This function must be called on the main thread.
+ *
+ * @return true if the server is in validation mode, false otherwise.
+ */
+bool envoy_dynamic_module_callback_is_validation_mode();
+
 // ----------------------------- Function Registry -----------------------------
 
 /**
@@ -7327,6 +7340,15 @@ typedef void* envoy_dynamic_module_type_bootstrap_extension_config_scheduler_mod
  */
 typedef void* envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr;
 
+/**
+ * File watcher event constants. These correspond to Envoy's Filesystem::Watcher::Events.
+ * These are bitmask values that can be OR'd together.
+ */
+typedef enum envoy_dynamic_module_type_file_watcher_event {
+  envoy_dynamic_module_type_file_watcher_event_MovedTo = 0x1,
+  envoy_dynamic_module_type_file_watcher_event_Modified = 0x2,
+} envoy_dynamic_module_type_file_watcher_event;
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
@@ -7484,6 +7506,25 @@ void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_file_changed is called when a file watched by
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch changes on the main
+ * thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param path is the path that was registered via
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch that triggered the
+ * change. This is owned by the callback closure and valid only for the duration of this call.
+ * @param events is the bitmask of events that occurred (MovedTo = 0x1, Modified = 0x2).
+ */
+void envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer path, uint32_t events);
 
 /**
  * envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update is called when a cluster is
@@ -8044,6 +8085,29 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
  */
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - File Watcher --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch is called by the module
+ * to watch a file or directory. Each call creates a new watcher for the given path. The watcher
+ * lifetime is managed by Envoy and tied to the config — all watchers are automatically destroyed
+ * when the config is destroyed.
+ *
+ * When the watched path changes, envoy_dynamic_module_on_bootstrap_extension_file_changed is called
+ * on the main thread with the path and events.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path is the path to the file or directory to watch.
+ * @param events is the bitmask of events to watch for (MovedTo = 0x1, Modified = 0x2).
+ * @return true if the watch was successfully added, false otherwise (e.g. file does not exist).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path, uint32_t events);
 
 // -------------------- Bootstrap Extension Callbacks - Admin Handler --------------------
 
@@ -11729,6 +11793,413 @@ envoy_dynamic_module_callback_dns_resolver_config_record_histogram_value(
     envoy_dynamic_module_type_dns_resolver_config_envoy_ptr config_envoy_ptr, size_t id,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value);
+
+// =============================================================================
+// =========================== Transport Socket ================================
+// =============================================================================
+
+// =============================================================================
+// Transport Socket Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr is a raw pointer to the
+ * transport socket factory configuration object in Envoy. This is passed to the module when
+ * creating a new in-module transport socket factory configuration.
+ *
+ * This has 1:1 correspondence with
+ * envoy_dynamic_module_type_transport_socket_factory_config_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_factory_config_module_ptr is a pointer to an in-module
+ * transport socket factory configuration object. This is created by the module via
+ * envoy_dynamic_module_on_transport_socket_factory_config_new and passed back to the module in
+ * subsequent calls.
+ *
+ * This has 1:1 correspondence with
+ * envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of this pointer. Envoy will call
+ * envoy_dynamic_module_on_transport_socket_factory_config_destroy when the configuration is no
+ * longer needed.
+ */
+typedef const void* envoy_dynamic_module_type_transport_socket_factory_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_envoy_ptr is a raw pointer to the transport socket
+ * object in Envoy. This is passed to the module when a new transport socket is created for a
+ * connection and is used to call back into Envoy (e.g., buffer and I/O handle operations).
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_transport_socket_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The module must not free it. It remains valid until
+ * envoy_dynamic_module_on_transport_socket_destroy is called for the corresponding in-module
+ * transport socket.
+ */
+typedef void* envoy_dynamic_module_type_transport_socket_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_module_ptr is a pointer to an in-module transport
+ * socket instance. This is created by the module via envoy_dynamic_module_on_transport_socket_new.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of this pointer. Envoy will call
+ * envoy_dynamic_module_on_transport_socket_destroy when the transport socket is no longer needed.
+ */
+typedef const void* envoy_dynamic_module_type_transport_socket_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_post_io_action specifies what should happen on the
+ * connection after an I/O operation. This corresponds to Network::PostIoAction in Envoy.
+ */
+typedef enum envoy_dynamic_module_type_transport_socket_post_io_action {
+  envoy_dynamic_module_type_transport_socket_post_io_action_KeepOpen,
+  envoy_dynamic_module_type_transport_socket_post_io_action_Close,
+} envoy_dynamic_module_type_transport_socket_post_io_action;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_io_result is the result of a transport socket read or
+ * write operation. This corresponds to Network::IoResult in Envoy.
+ */
+typedef struct envoy_dynamic_module_type_transport_socket_io_result {
+  envoy_dynamic_module_type_transport_socket_post_io_action action;
+  uint64_t bytes_processed;
+  bool end_stream_read;
+} envoy_dynamic_module_type_transport_socket_io_result;
+
+// =============================================================================
+// Transport Socket Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_transport_socket_factory_config_new is called by the main thread when a
+ * transport socket factory configuration referencing this module is loaded. The module should parse
+ * the configuration and return a pointer to the in-module factory configuration object.
+ *
+ * @param factory_config_envoy_ptr is the pointer to the Envoy transport socket factory
+ * configuration object.
+ * @param socket_name is the name identifying the transport socket implementation within the module.
+ * @param socket_config is the configuration bytes for the module.
+ * @param is_upstream is true if this factory is for upstream connections, false for downstream.
+ * @return envoy_dynamic_module_type_transport_socket_factory_config_module_ptr is the pointer to
+ * the in-module factory configuration. Returning nullptr indicates a failure, and the configuration
+ * will be rejected.
+ */
+envoy_dynamic_module_type_transport_socket_factory_config_module_ptr
+envoy_dynamic_module_on_transport_socket_factory_config_new(
+    envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr factory_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer socket_name,
+    envoy_dynamic_module_type_envoy_buffer socket_config, bool is_upstream);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_factory_config_destroy is called when the transport
+ * socket factory configuration is destroyed. The module should release any resources associated
+ * with the configuration.
+ *
+ * @param factory_config_ptr is the pointer to the in-module transport socket factory
+ * configuration.
+ */
+void envoy_dynamic_module_on_transport_socket_factory_config_destroy(
+    envoy_dynamic_module_type_transport_socket_factory_config_module_ptr factory_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_new is called when a new transport socket is created
+ * for a connection.
+ *
+ * @param factory_config_ptr is the pointer to the in-module transport socket factory
+ * configuration.
+ * @param transport_socket_envoy_ptr is the Envoy-side transport socket pointer, used by the module
+ * when calling transport socket callbacks.
+ * @return envoy_dynamic_module_type_transport_socket_module_ptr is the pointer to the in-module
+ * transport socket. Returning nullptr indicates a failure to create the transport socket, and the
+ * connection will be closed.
+ */
+envoy_dynamic_module_type_transport_socket_module_ptr envoy_dynamic_module_on_transport_socket_new(
+    envoy_dynamic_module_type_transport_socket_factory_config_module_ptr factory_config_ptr,
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_destroy is called when the transport socket is
+ * destroyed. The module should release the in-module transport socket and any associated
+ * resources.
+ *
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ */
+void envoy_dynamic_module_on_transport_socket_destroy(
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_set_callbacks is called once to supply the transport
+ * socket with its Envoy callbacks before any I/O operations occur.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ */
+void envoy_dynamic_module_on_transport_socket_set_callbacks(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_on_connected is called when the underlying transport is
+ * established.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ */
+void envoy_dynamic_module_on_transport_socket_on_connected(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_do_read is called when data is to be read from the
+ * connection and decrypted or transformed into the read buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @return envoy_dynamic_module_type_transport_socket_io_result is the result of the read operation.
+ */
+envoy_dynamic_module_type_transport_socket_io_result
+envoy_dynamic_module_on_transport_socket_do_read(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_do_write is called when data is to be written to the
+ * connection from the write buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @param write_buffer_length is the length of the write buffer at the time of the call.
+ * @param end_stream is true if this is the end of the stream (half-close after a full write).
+ * @return envoy_dynamic_module_type_transport_socket_io_result is the result of the write
+ * operation.
+ */
+envoy_dynamic_module_type_transport_socket_io_result
+envoy_dynamic_module_on_transport_socket_do_write(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr,
+    size_t write_buffer_length, bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_close is called when the transport socket is being
+ * closed.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @param event is the connection event that caused the close.
+ */
+void envoy_dynamic_module_on_transport_socket_close(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr,
+    envoy_dynamic_module_type_network_connection_event event);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_get_protocol is called to obtain the negotiated
+ * application-level protocol (e.g., ALPN), if any.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @param result is filled by the module with the protocol string as an
+ * envoy_dynamic_module_type_module_buffer. An empty buffer means no protocol was negotiated.
+ */
+void envoy_dynamic_module_on_transport_socket_get_protocol(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr,
+    envoy_dynamic_module_type_module_buffer* result);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_get_failure_reason is called to obtain a description
+ * of the last failure on the transport socket, if any.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @param result is filled by the module with the failure reason as an
+ * envoy_dynamic_module_type_module_buffer. An empty buffer means there is no failure reason.
+ */
+void envoy_dynamic_module_on_transport_socket_get_failure_reason(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr,
+    envoy_dynamic_module_type_module_buffer* result);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_can_flush_close is called to determine whether the
+ * socket may be flushed and closed.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @return true if the socket can be flushed and closed, false otherwise.
+ */
+bool envoy_dynamic_module_on_transport_socket_can_flush_close(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+// =============================================================================
+// Transport Socket Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_get_io_handle returns an opaque pointer to the
+ * underlying I/O handle for raw socket operations.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return an opaque I/O handle pointer for use with
+ * envoy_dynamic_module_callback_transport_socket_io_handle_read and
+ * envoy_dynamic_module_callback_transport_socket_io_handle_write.
+ */
+void* envoy_dynamic_module_callback_transport_socket_get_io_handle(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_io_handle_read reads data from the raw socket
+ * into the supplied buffer.
+ *
+ * @param io_handle is the opaque handle returned by
+ * envoy_dynamic_module_callback_transport_socket_get_io_handle.
+ * @param buffer is the buffer to read into.
+ * @param length is the maximum number of bytes to read.
+ * @param bytes_read is set to the number of bytes actually read. Must not be null.
+ * @return 0 on success, or a negative system errno value on failure (e.g., -EAGAIN).
+ */
+int64_t envoy_dynamic_module_callback_transport_socket_io_handle_read(void* io_handle, char* buffer,
+                                                                      size_t length,
+                                                                      size_t* bytes_read);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_io_handle_write writes data to the raw socket
+ * from the supplied buffer.
+ *
+ * @param io_handle is the opaque handle returned by
+ * envoy_dynamic_module_callback_transport_socket_get_io_handle.
+ * @param buffer is the buffer to write from.
+ * @param length is the number of bytes to write.
+ * @param bytes_written is set to the number of bytes actually written. Must not be null.
+ * @return 0 on success, or a negative system errno value on failure (e.g., -EAGAIN).
+ */
+int64_t envoy_dynamic_module_callback_transport_socket_io_handle_write(void* io_handle,
+                                                                       const char* buffer,
+                                                                       size_t length,
+                                                                       size_t* bytes_written);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_io_handle_fd returns the native OS file descriptor
+ * for the I/O handle, or -1 if the handle does not wrap a native socket.
+ *
+ * @param io_handle is the opaque handle returned by
+ * envoy_dynamic_module_callback_transport_socket_get_io_handle.
+ * @return the native file descriptor, or -1 if unavailable.
+ */
+int envoy_dynamic_module_callback_transport_socket_io_handle_fd(void* io_handle);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_read_buffer_drain drains bytes from the beginning
+ * of the connection read buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param length is the number of bytes to drain.
+ */
+void envoy_dynamic_module_callback_transport_socket_read_buffer_drain(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_read_buffer_add appends data to the connection
+ * read buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param data is a pointer to the data to add.
+ * @param length is the length of the data in bytes.
+ */
+void envoy_dynamic_module_callback_transport_socket_read_buffer_add(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    const char* data, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_read_buffer_length returns the current length of
+ * the connection read buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return the length of the read buffer in bytes.
+ */
+size_t envoy_dynamic_module_callback_transport_socket_read_buffer_length(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_write_buffer_drain drains bytes from the beginning
+ * of the connection write buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param length is the number of bytes to drain.
+ */
+void envoy_dynamic_module_callback_transport_socket_write_buffer_drain(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices copies or queries write
+ * buffer slices. If slices is NULL, the function runs in query mode: slices_count is set to the
+ * total number of slices available. Otherwise, up to slices_count slices are written into slices,
+ * and slices_count is set to the number of slices returned.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param slices is the output array of envoy_dynamic_module_type_envoy_buffer, or NULL for query
+ * mode.
+ * @param slices_count is the maximum number of slices to return on input, and the actual count on
+ * output.
+ */
+void envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* slices, size_t* slices_count);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_write_buffer_length returns the current length of
+ * the connection write buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return the length of the write buffer in bytes.
+ */
+size_t envoy_dynamic_module_callback_transport_socket_write_buffer_length(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_raise_event raises a connection event on the
+ * connection (e.g., Connected after TLS handshake).
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param event is the connection event to raise.
+ */
+void envoy_dynamic_module_callback_transport_socket_raise_event(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_network_connection_event event);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer returns whether the read
+ * buffer should be drained to enforce read limits and yielding.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return true if the read buffer should be drained, false otherwise.
+ */
+bool envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_set_is_readable marks the transport socket as
+ * readable so that a read will be scheduled on a future event loop iteration.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ */
+void envoy_dynamic_module_callback_transport_socket_set_is_readable(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_flush_write_buffer attempts to drain a non-empty
+ * write buffer to the underlying transport.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ */
+void envoy_dynamic_module_callback_transport_socket_flush_write_buffer(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
 
 #ifdef __cplusplus
 }

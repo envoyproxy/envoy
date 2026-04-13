@@ -336,6 +336,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:inputs_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",

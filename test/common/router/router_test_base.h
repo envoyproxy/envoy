@@ -7,6 +7,7 @@
 
 #include "source/common/http/context_impl.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/router/context_impl.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 
@@ -35,8 +36,7 @@ public:
   using Filter::Filter;
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
-                                 const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 RouteStatsContextOptRef,
+                                 const Upstream::ClusterInfo&,
                                  Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
@@ -135,6 +135,9 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> upstream_stream_info_;
   std::string redirect_records_data_ = "some data";
   MetadataMatchCriteriaImplConstPtr route_criteria_;
+  // Route-level stats context wired into callbacks_.route_->route_entry_.routeStatsContext().
+  std::unique_ptr<RouteStatNames> route_stat_names_;
+  std::unique_ptr<RouteStatsContextImpl> route_stats_context_impl_;
 };
 
 } // namespace Router

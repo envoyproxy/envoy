@@ -1,13 +1,48 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace {
+
+// =============================================================================
+// Validation Mode Tests
+// =============================================================================
+
+TEST(CommonAbiImplTest, IsValidationModeReturnsTrueInValidateMode) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::Validate));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_TRUE(envoy_dynamic_module_callback_is_validation_mode());
+}
+
+TEST(CommonAbiImplTest, IsValidationModeReturnsFalseInServeMode) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::Serve));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode());
+}
+
+TEST(CommonAbiImplTest, IsValidationModeReturnsFalseInInitOnlyMode) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::InitOnly));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode());
+}
+
+// =============================================================================
+// Function Registry Tests
+// =============================================================================
 
 // Test registering and retrieving a function.
 TEST(CommonAbiImplTest, FunctionRegistryRegisterAndGet) {
@@ -1175,6 +1210,39 @@ WEAK_STUB(DnsResolverConfigDefineHistogram,
 WEAK_STUB(DnsResolverConfigRecordHistogramValue,
           envoy_dynamic_module_callback_dns_resolver_config_record_histogram_value(nullptr, 0,
                                                                                    nullptr, 0, 0))
+
+WEAK_STUB(TransportSocketGetIoHandle,
+          envoy_dynamic_module_callback_transport_socket_get_io_handle(nullptr))
+WEAK_STUB(TransportSocketIoHandleRead,
+          envoy_dynamic_module_callback_transport_socket_io_handle_read(nullptr, nullptr, 0,
+                                                                        nullptr))
+WEAK_STUB(TransportSocketIoHandleWrite,
+          envoy_dynamic_module_callback_transport_socket_io_handle_write(nullptr, nullptr, 0,
+                                                                         nullptr))
+WEAK_STUB(TransportSocketIoHandleFd,
+          envoy_dynamic_module_callback_transport_socket_io_handle_fd(nullptr))
+WEAK_STUB(TransportSocketReadBufferDrain,
+          envoy_dynamic_module_callback_transport_socket_read_buffer_drain(nullptr, 0))
+WEAK_STUB(TransportSocketReadBufferAdd,
+          envoy_dynamic_module_callback_transport_socket_read_buffer_add(nullptr, nullptr, 0))
+WEAK_STUB(TransportSocketReadBufferLength,
+          envoy_dynamic_module_callback_transport_socket_read_buffer_length(nullptr))
+WEAK_STUB(TransportSocketWriteBufferDrain,
+          envoy_dynamic_module_callback_transport_socket_write_buffer_drain(nullptr, 0))
+WEAK_STUB(TransportSocketWriteBufferGetSlices,
+          envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(nullptr, nullptr,
+                                                                                 nullptr))
+WEAK_STUB(TransportSocketWriteBufferLength,
+          envoy_dynamic_module_callback_transport_socket_write_buffer_length(nullptr))
+WEAK_STUB(TransportSocketRaiseEvent,
+          envoy_dynamic_module_callback_transport_socket_raise_event(
+              nullptr, envoy_dynamic_module_type_network_connection_event_Connected))
+WEAK_STUB(TransportSocketShouldDrainReadBuffer,
+          envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer(nullptr))
+WEAK_STUB(TransportSocketSetIsReadable,
+          envoy_dynamic_module_callback_transport_socket_set_is_readable(nullptr))
+WEAK_STUB(TransportSocketFlushWriteBuffer,
+          envoy_dynamic_module_callback_transport_socket_flush_write_buffer(nullptr))
 
 } // namespace
 } // namespace DynamicModules

@@ -146,7 +146,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // Http::StreamFilterCallbacks
   OptRef<const Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
-  Router::RouteConstSharedPtr route() override;
+  OptRef<const Router::Route> route() override;
+  Router::RouteConstSharedPtr routeSharedPtr() override;
   void resetStream(Http::StreamResetReason reset_reason,
                    absl::string_view transport_failure_reason) override;
   OptRef<const Upstream::ClusterInfo> clusterInfo() override;
@@ -195,7 +196,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     return saved_response_metadata_.get();
   }
 
-  Router::RouteConstSharedPtr getRoute() const;
+  Router::RouteConstSharedPtr getRouteSharedPtr() const;
+  OptRef<const Router::Route> getRoute() const;
 
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,

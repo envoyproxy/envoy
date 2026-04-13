@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_package",
 )
 load(
@@ -22,9 +24,11 @@ envoy_extension_cc_test(
         "//source/common/stats:thread_local_store_lib",
         "//source/extensions/access_loggers/stats:stats_lib",
         "//source/extensions/matching/actions/transform_stat:config",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:logging_lib",
+        "@abseil-cpp//absl/hash:hash_testing",
     ],
 )
 
@@ -36,9 +40,31 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/stats:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/matching/actions/transform_stat:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "stats_speed_test",
+    srcs = [
+        "stats_speed_test.cc",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "//source/extensions/access_loggers/stats:stats_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "stats_speed_test_benchmark_test",
+    benchmark_binary = "stats_speed_test",
 )

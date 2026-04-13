@@ -1,3 +1,3 @@
 [workspace]
-members = ["source/extensions/dynamic_modules/sdk/rust", "test/extensions/dynamic_modules/test_data/rust"]
+members = ["source/extensions/dynamic_modules/sdk/rust", "source/extensions/dynamic_modules/builtin_extensions", "test/extensions/dynamic_modules/test_data/rust"]
 resolver = "2"
