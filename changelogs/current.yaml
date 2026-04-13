@@ -77,6 +77,11 @@ minor_behavior_changes:
     making per-host comparison O(1). In rare cases where two semantically equivalent metadata messages
     have different serializations, this may cause a spurious metadata update (false positive) but will
     never miss an actual change.
+- area: upstream
+  change: |
+    ``ProdClusterInfoFactory`` now honors ``alt_stat_name`` when creating cluster stats scopes, so
+    stats emitted through that path use the alternate cluster name consistently with other upstream
+    cluster implementations.
 - area: histograms
   change: |
     Updated libcircllhist to 0.3.2, which changes how bucket bounds are interpreted. This should not impact
@@ -300,6 +305,11 @@ bug_fixes:
   change: |
     Fixed an out-of-bounds issue in ThreadAwareLoadBalancerBase that could occur during mid-batch EDS host updates
     due to eagerly calling refresh() before the deferred priority state resize.
+- area: upstream
+  change: |
+    Fixed ``ProdClusterInfoFactory`` of HDS to honor ``alt_stat_name`` when creating cluster stats scopes, so
+    stats emitted through that path now use the alternate cluster name consistently with other upstream
+    cluster implementations.
 - area: access_log
   change: |
     Fixed a crash on listener removal with a process-level access log rate limiter
