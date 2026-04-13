@@ -96,3 +96,5 @@ areas:
     title: upstream
   wasm:
     title: wasm
+  zstd:
+    title: zstd
