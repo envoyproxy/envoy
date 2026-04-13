@@ -99,7 +99,8 @@ static void bmJoinElements(benchmark::State& state) {
 BENCHMARK(bmJoinElements);
 
 static std::vector<Envoy::Stats::StatName> prepareNames(Envoy::Stats::StatNamePool& pool,
-                                                        uint32_t num_words) {
+                                                        uint32_t num_words,
+                                                        uint32_t num_tokens_per_word = 4) {
   const std::vector<absl::string_view> all_tokens = {
       "alpha", "beta",  "gamma",  "delta",   "epsilon", "zeta", "eta",     "theta",
       "iota",  "kappa", "lambda", "mu",      "nu",      "xi",   "omicron", "pi",
@@ -107,8 +108,7 @@ static std::vector<Envoy::Stats::StatName> prepareNames(Envoy::Stats::StatNamePo
   };
   std::vector<Envoy::Stats::StatName> names;
 
-  // Form 64 4-token names selecting pseudo-randomly from the above set.
-  const uint32_t num_tokens_per_word = 4;
+  // Form token combinations selecting psuedo-randomly from the above set.
   for (uint32_t i = 0; i < num_words; ++i) {
     std::vector<absl::string_view> tokens;
     for (uint32_t j = 0; j < num_tokens_per_word; ++j) {
@@ -173,6 +173,78 @@ static void bmStdSort(benchmark::State& state) {
   }
 }
 BENCHMARK(bmStdSort);
+
+// Benchmarks StatName as a map key, exercising hash() + operator== on lookup.
+// This covers the hot path in thread_local_store where counters/gauges are
+// stored in StatNameHashMap and looked up via MetricHelper::statName().
+// Uses 1000 entries with 20-token names to reflect production-scale stat names.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmStatNameMapLookup(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = prepareNames(pool, 2000, 24);
+
+  Envoy::Stats::StatNameHashMap<uint64_t> map;
+  for (uint64_t i = 0; i < names.size(); ++i) {
+    map[names[i]] = i;
+  }
+
+  // Lookup each name -- the key is the same StatName pointer that was inserted,
+  // so operator== hits the pointer-equal fast path.
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    benchmark::DoNotOptimize(map.find(names[index++ % names.size()]));
+  }
+}
+BENCHMARK(bmStatNameMapLookup);
+
+// Same as above but the lookup key is a different StatName with identical
+// encoding, forcing operator== through the memcmp path.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmStatNameMapLookupDifferentPointer(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool_a(symbol_table);
+  Envoy::Stats::StatNamePool pool_b(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names_a = prepareNames(pool_a, 2000, 24);
+  const std::vector<Envoy::Stats::StatName> names_b = prepareNames(pool_b, 2000, 24);
+
+  Envoy::Stats::StatNameHashMap<uint64_t> map;
+  for (uint64_t i = 0; i < names_a.size(); ++i) {
+    map[names_a[i]] = i;
+  }
+
+  // Lookup using names from pool_b -- same encoding but different pointers.
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    benchmark::DoNotOptimize(map.find(names_b[index++ % names_b.size()]));
+  }
+}
+BENCHMARK(bmStatNameMapLookupDifferentPointer);
+
+// Measures the hash+miss path where the key is not in the map.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmStatNameMapLookupMiss(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool_map(symbol_table);
+  Envoy::Stats::StatNamePool pool_miss(symbol_table);
+  const std::vector<Envoy::Stats::StatName> map_names = prepareNames(pool_map, 2000, 24);
+  // Different token count produces names that won't be in the map.
+  const std::vector<Envoy::Stats::StatName> miss_names = prepareNames(pool_miss, 2000, 25);
+
+  Envoy::Stats::StatNameHashMap<uint64_t> map;
+  for (uint64_t i = 0; i < map_names.size(); ++i) {
+    map[map_names[i]] = i;
+  }
+
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    benchmark::DoNotOptimize(map.find(miss_names[index++ % miss_names.size()]));
+  }
+}
+BENCHMARK(bmStatNameMapLookupMiss);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void bmSortStrings(benchmark::State& state) {
