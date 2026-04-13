@@ -32,14 +32,7 @@ MetricHelper::MetricHelper(StatName name, StatName tag_extracted_name,
   symbol_table.populateList(names.begin(), num_names, stat_names_);
 }
 
-StatName MetricHelper::statName() const {
-  StatName stat_name;
-  stat_names_.iterate([&stat_name](StatName s) -> bool {
-    stat_name = s;
-    return false; // Returning 'false' stops the iteration.
-  });
-  return stat_name;
-}
+StatName MetricHelper::statName() const { return stat_names_.front(); }
 
 StatName MetricHelper::tagExtractedStatName() const {
   // The name is the first element in stat_names_. The second is the

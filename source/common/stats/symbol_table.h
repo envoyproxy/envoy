@@ -899,6 +899,14 @@ public:
    */
   void clear(SymbolTable& symbol_table);
 
+  /**
+   * @return the first StatName in the list. List must be populated.
+   */
+  StatName front() const {
+    ASSERT(populated());
+    return StatName(&storage_[1]);
+  }
+
 private:
   friend class SymbolTable;
 
