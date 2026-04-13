@@ -838,10 +838,10 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
       clear_route_cache_(
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
       stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
-      lua_stats_scope_(scope.createScope(
-          proto_config.stat_prefix().empty()
-              ? absl::StrCat(stats_prefix, "lua")
-              : absl::StrCat(stats_prefix, "lua.", proto_config.stat_prefix()))) {
+      lua_stats_scope_(
+          scope.createScope(proto_config.stat_prefix().empty()
+                                ? absl::StrCat(stats_prefix, "lua")
+                                : absl::StrCat(stats_prefix, "lua.", proto_config.stat_prefix()))) {
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
       throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
@@ -1002,8 +1002,7 @@ int StreamHandleWrapper::luaStats(lua_State* state) {
   if (stats_scope_wrapper_.get() != nullptr) {
     stats_scope_wrapper_.pushStack();
   } else {
-    stats_scope_wrapper_.reset(
-        StatsScopeWrapper::create(state, callbacks_.statsScope()), true);
+    stats_scope_wrapper_.reset(StatsScopeWrapper::create(state, callbacks_.statsScope()), true);
   }
   return 1;
 }

@@ -603,8 +603,7 @@ int HistogramWrapper::luaRecordValue(lua_State* state) {
 
 int StatsScopeWrapper::luaCounter(lua_State* state) {
   const char* name = luaL_checkstring(state, 2);
-  Stats::Counter& counter =
-      Stats::Utility::counterFromElements(scope_, {Stats::DynamicName(name)});
+  Stats::Counter& counter = Stats::Utility::counterFromElements(scope_, {Stats::DynamicName(name)});
   CounterWrapper::create(state, counter);
   return 1;
 }
@@ -613,9 +612,8 @@ int StatsScopeWrapper::luaGauge(lua_State* state) {
   const char* name = luaL_checkstring(state, 2);
   // Use NeverImport mode - Lua gauges track local state and should not be
   // accumulated across hot restarts.
-  Stats::Gauge& gauge =
-      Stats::Utility::gaugeFromElements(scope_, {Stats::DynamicName(name)},
-                                        Stats::Gauge::ImportMode::NeverImport);
+  Stats::Gauge& gauge = Stats::Utility::gaugeFromElements(scope_, {Stats::DynamicName(name)},
+                                                          Stats::Gauge::ImportMode::NeverImport);
   GaugeWrapper::create(state, gauge);
   return 1;
 }
