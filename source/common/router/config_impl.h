@@ -951,7 +951,6 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-public:
   friend class RouteCreator;
 
   UriTemplateMatcherRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
@@ -987,7 +986,6 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-public:
   friend class RouteCreator;
 
   PrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
@@ -1023,7 +1021,6 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-public:
   friend class RouteCreator;
 
   PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
@@ -1058,7 +1055,6 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-public:
   friend class RouteCreator;
 
   RegexRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
@@ -1126,7 +1122,6 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-public:
   friend class RouteCreator;
 
   PathSeparatedPrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
