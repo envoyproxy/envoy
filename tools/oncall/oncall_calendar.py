@@ -6,7 +6,7 @@ import yaml
 
 from tools.oncall.gen_ical_lib import ical_file_format, IcalEvent, IcalOverrideEvent, IcalRecurringEvent
 
-ROTATION_DAY = 6  # 0 is monday, 6 is sunday
+_ROTATION_DAY = 6  # 0 is monday, 6 is sunday
 
 _YAML_HEADER_COMMENT = "# In general, modify this through options to bazel run tools/oncall:rotation\n"
 _YAML_OVERRIDES_COMMENT = """
@@ -27,7 +27,7 @@ _YAML_OVERRIDES_COMMENT = """
 def _recent_rotation_day(day: date) -> date:
     """Walk start_of_this_week back to a rotation start day. We could do math for
     this but up to 6 iterations is cheap and readable."""
-    while day.weekday() != ROTATION_DAY:
+    while day.weekday() != _ROTATION_DAY:
         day -= timedelta(days=1)
     return day
 
