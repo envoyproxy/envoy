@@ -108,6 +108,8 @@ protected:
   void setPerHostConfig(VirtualHost& vh, const ExtProcPerRoute& cfg);
   void protocolConfigEncoding(ProcessingRequest& request);
 
+  void twoExtProcFiltersFullDuplexConfig();
+
   IntegrationStreamDecoderPtr sendDownstreamRequest(
       absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers);
   IntegrationStreamDecoderPtr sendDownstreamRequestWithBody(
@@ -193,7 +195,7 @@ protected:
   void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg,
                                         FakeStreamPtr& processor_stream, bool end_of_stream = true,
                                         bool response = false, absl::string_view body_sent = "");
-  void serverSendTrailerRespDuplexStreamed();
+  void serverSendTrailerRespDuplexStreamed(FakeStreamPtr& processor_stream, bool response = false);
   void initializeLogConfig(std::string& access_log_path);
   void prependExtProcCompositeFilter(const Protobuf::Message& match_input);
 

@@ -55,8 +55,9 @@ private:
 class ApiListenerManagerFactoryImpl : public ListenerManagerFactory {
 public:
   std::unique_ptr<ListenerManager>
-  createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&&,
-                        WorkerFactory&, bool, Quic::QuicStatNames&) override {
+  createListenerManager(const Protobuf::Message&, Instance& server,
+                        std::unique_ptr<ListenerComponentFactory>&&, WorkerFactory&, bool,
+                        Quic::QuicStatNames&) override {
     return std::make_unique<ApiListenerManagerImpl>(server);
   }
   std::string name() const override { return "envoy.listener_manager_impl.api"; }

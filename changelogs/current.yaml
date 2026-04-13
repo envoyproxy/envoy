@@ -37,6 +37,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: load_balancing
+  change: |
+    Changed the default behavior of ``OrcaWeightManager`` to prefer named metrics over application
+    utilization when computing utilization. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.orca_weight_manager_use_named_metrics_first`` to ``false``.
 - area: compressor
   change: |
     Strong ``ETag`` removal when compressing now uses the same weak ``W/`` check as
@@ -104,6 +109,10 @@ minor_behavior_changes:
     Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
     serialize the ``google.protobuf.Struct`` configuration message to JSON string and pass it to the
     dynamic module side as the configuration.
+- area: oauth2
+  change: |
+    Added :ref:`per-route configuration support <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2PerRoute>`
+    to the OAuth2 HTTP filter.
 - area: proto_api_scrubber
   change: |
     If :ref:`scrub_unknown_fields
@@ -129,6 +138,16 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: router
+  change: |
+    Fixed a bug where the router's buffer overflow check double-counted the request body size when an
+    upstream filter (e.g. the buffer filter) had already buffered all data. This caused requests with
+    body size between half and full buffer limit to incorrectly cancel internal redirects.
+- area: router
+  change: |
+    Fixed a crash in scoped RDS when on-demand update is triggered for a scope that uses inline
+    ``route_configuration`` instead of ``route_configuration_name``. The null RDS provider dereference
+    is now guarded and the on-demand callback returns false for inline-config scopes.
 - area: hot_restart
   change: |
     Fixed hot restart for listeners with a network namespace in the address. Previously, socket
@@ -153,6 +172,10 @@ bug_fixes:
 - area: http
   change: |
     Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.
+- area: http
+  change: |
+    Fixed a bug where the internal redirect logic may hang up a request when the request buffer is
+    overflowed.
 - area: load_report
   change: |
     Fixed a race condition during load-report shutdown with the ADS stream by introducing proper cleanup
@@ -321,6 +344,25 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: ratelimit
+  change: |
+    Added ``is_negative_hits`` boolean to the ``hits_addend``
+    configuration in the rate limit API. This allows rate limit
+    requests to add to the rate limit budget (refill previously
+    consumed tokens) via
+    :ref:`HitsAddend.is_negative_hits
+    <envoy_v3_api_field_config.route.v3.RateLimit.HitsAddend.is_negative_hits>`,
+    or per descriptor in
+    :ref:`RateLimitDescriptor.is_negative_hits
+    <envoy_v3_api_field_extensions.common.ratelimit.v3.RateLimitDescriptor.is_negative_hits>`.
+- area: redis
+  change: |
+    Added zone-aware routing support for Redis Cluster proxy. New read policies
+    ``LOCAL_ZONE_AFFINITY`` and ``LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY`` route read requests
+    to replicas in the same availability zone. Zone discovery is enabled via
+    :ref:`enable_zone_discovery
+    <envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.enable_zone_discovery>`.
+    Note: This feature currently works with Valkey only.
 - area: overload_manager
   change: |
     Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed
@@ -357,6 +399,14 @@ new_features:
     and added brotli and zlib to TCP TLS. Controlled by runtime flag
     ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
     When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
+- area: tls
+  change: |
+    Exposed the SHA-256 fingerprint and serial number of the verified issuer (CA) certificate from
+    the validated downstream mTLS peer certificate chain. Accessible via the
+    ``%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%`` and ``%DOWNSTREAM_PEER_ISSUER_SERIAL%``
+    :ref:`access log formatters <config_access_log_format>`, and via the
+    ``sha256PeerCertificateIssuerDigest()`` and ``serialNumberPeerCertificateIssuer()`` methods on
+    :ref:`downstreamSslConnection() <config_http_filters_lua_ssl_socket_info>` in the Lua filter.
 - area: dynamic_modules
   change: |
     Added custom metrics (counters, gauges, histograms) support to load balancer dynamic modules.
@@ -456,6 +506,18 @@ new_features:
     are enabled and reported at the cluster level. This the stats matcher could be configured via
     the xDS API dynamically on a per-cluster basis.
     See :ref:`envoy.stats_matcher <well_known_metadata_envoy_stats_matcher>` for more details.
+- area: stats
+  change: |
+    Added support for listener-level stats matcher via ``typed_filter_metadata`` key
+    ``envoy.stats_matcher`` in the listener's
+    :ref:`metadata <envoy_v3_api_field_config.listener.v3.Listener.metadata>`. When present,
+    the provided :ref:`StatsMatcher <envoy_v3_api_msg_config.metrics.v3.StatsMatcher>` replaces
+    the global stats matcher for that listener's stats scope, allowing fine-grained control over
+    which listener stats are created.
+    If the value of ``envoy.stats_matcher`` is set but does not contain a valid ``StatsMatcher``
+    message, this will be treated as an invalid configuration and the listener will fail to start.
+    This strict validation can be disabled temporarily by setting the runtime guard
+    ``envoy.reloadable_features.strict_stats_matcher_unpacked`` to ``false``.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
@@ -616,6 +678,12 @@ new_features:
     Added SSE (Server-Sent Events) streaming support for MCP backend responses. The router now handles
     SSE responses from backends for ``tools/call`` with direct pass-through streaming, and supports SSE
     aggregation for fanout operations (``tools/list``, ``initialize``) with incremental event parsing.
+- area: http
+  change: |
+    Added an optional :ref:`JSON format <config_http_conn_man_headers_x-forwarded-client-cert_json>`
+    for the :ref:`x-forwarded-client-cert <config_http_conn_man_headers_x-forwarded-client-cert>`
+    (XFCC) header. The format can be configured via :ref:`format
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.SetCurrentClientCertDetails.format>`.
 - area: dynamic_modules
   change: |
     Added :ref:`load balancing policies
@@ -819,6 +887,10 @@ new_features:
     Added :ref:`allow_content_length_header
     <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
     the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
+- area: cluster
+  change: |
+    Added :ref:`MCP multi cluster <arch_overview_mcp_multicluster>` extension that combines multiple MCP services
+    into a single one. This cluster type is primarily intended to support aggregation of multiple MCP services into one.
 - area: tls
   change: |
     Enhanced TLS certificate validation failure messages for CRL-related errors in access logs. The
@@ -841,6 +913,10 @@ new_features:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: formatter
+  change: |
+    Added support for ``%TRACE_ID%`` in the custom response policy filter's local response policy to allow
+    trace ID to be substituted into the response body.
 - area: redis
   change: |
     Added support for ``BITFIELD_RO`` in ``redis_proxy``.
@@ -851,6 +927,14 @@ new_features:
     :ref:`envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_data`)
     to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
     connection filter state to be populated after first receiving data from the downstream connection.
+- area: oauth2
+  change: |
+    Added :ref:`allow_failed_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.allow_failed_matcher>`
+    to allow requests to proceed to upstream as unauthenticated when OAuth validation fails (missing, invalid, or expired
+    credentials) and the request matches the configured matchers. This enables graceful degradation patterns where services
+    can handle both authenticated and unauthenticated requests. When triggered, all OAuth cookies are stripped and context
+    headers ``x-envoy-oauth-status: failed`` and ``x-envoy-oauth-failure-reason`` are added. The matcher evaluation follows
+    priority order: ``pass_through_matcher`` > ``allow_failed_matcher`` > ``deny_redirect_matcher`` > default OAuth behavior.
 - area: mcp_json_rest_bridge
   change: |
     Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
@@ -860,6 +944,43 @@ new_features:
     Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
     ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
     This is necessary if the route configuration may depend on the filter state values set.
+- area: tcp_proxy
+  change: |
+    Propagate upstream TCP RST to downstream when detected close type is RemoteReset.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy`` to false.
+- area: tcp_proxy
+  change: |
+    HttpUpstream now maps remote-originated HTTP stream reset reasons (RemoteReset,
+    RemoteRefusedStreamReset, RemoteConnectionFailure) to RemoteClose with
+    DetectedCloseType::RemoteReset, enabling RST propagation through tunneled tcp_proxy.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.map_http_stream_reset_to_tcp_rst`` to false.
+- area: ratelimit
+  change: |
+    Support populating rate limit descriptors from cluster metadata.
+
+- area: contrib
+  change: |
+    Added a new :ref:`Kafka stats sink <config_stat_sinks_kafka>` contrib extension
+    (``envoy.stat_sinks.kafka``) that produces metrics directly to an Apache Kafka topic
+    using librdkafka. Supports both JSON and Protobuf serialization formats; the Protobuf
+    format uses the same ``StreamMetricsMessage`` wire format as the gRPC
+    :ref:`metrics_service <envoy_v3_api_msg_config.metrics.v3.MetricsServiceConfig>` sink,
+    allowing consumers to reuse existing deserializers. Configurable batching, delta counters,
+    tag-as-label emission, and full librdkafka producer tuning (including TLS and SASL
+    authentication) are supported via
+    :ref:`KafkaStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig>`.
+
+- area: tls
+  change: |
+    Added support for building Envoy with OpenSSL as an alternative to the default BoringSSL.
+    This is achieved through a BoringSSL compatibility layer (``bssl-compat``) that translates BoringSSL
+    API calls to OpenSSL, allowing Envoy's TLS code to remain unchanged. To build with OpenSSL, use
+    ``--config=openssl``. HTTP/3 (QUIC) is disabled for OpenSSL builds. Note that OpenSSL builds are
+    not currently covered by the `Envoy security policy <https://github.com/envoyproxy/envoy/blob/main/SECURITY.md>`_.
+    See :repo:`bazel/SSL.md <bazel/SSL.md>` for details.
+
 - area: tcp_proxy
   change: |
     Added ``envoy.reloadable_features.tcp_proxy_delay_route_selection`` to delay selecting a route until just before the upstream

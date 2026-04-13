@@ -94,6 +94,18 @@ public:
   virtual const std::string& issuerPeerCertificate() const PURE;
 
   /**
+   * @return std::string the SHA-256 digest of the verified issuer certificate in the peer
+   *certificate. Returns "" if there is no peer certificate chain or no issuer certificate.
+   **/
+  virtual const std::string& sha256PeerCertificateIssuerDigest() const PURE;
+
+  /**
+   * @return std::string the serial number of the verified issuer certificate in the peer
+   *certificate. Returns "" if there is no peer certificate chain or no issuer certificate.
+   **/
+  virtual const std::string& serialNumberPeerCertificateIssuer() const PURE;
+
+  /**
    * @return std::string the subject field of the peer certificate in RFC 2253 format. Returns "" if
    *         there is no peer certificate, or no subject.
    **/
@@ -118,6 +130,12 @@ public:
   virtual const std::string& urlEncodedPemEncodedPeerCertificate() const PURE;
 
   /**
+   * @return std::string the PEM-encoded representation of the peer certificate. Returns
+   *         "" if there is no peer certificate or encoding fails.
+   **/
+  virtual const std::string& pemEncodedPeerCertificate() const PURE;
+
+  /**
    * @return std::string the URL-encoded PEM-encoded representation of the full peer certificate
    *         chain including the leaf certificate. Returns "" if there is no peer certificate or
    *         encoding fails.
@@ -126,6 +144,16 @@ public:
    *       may include certificates that are not part of the validated chain.
    **/
   virtual const std::string& urlEncodedPemEncodedPeerCertificateChain() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the PEM-encoded representation of each certificate in the
+   *         peer certificate chain, as individual strings. Returns {} if there is no peer
+   *         certificate or encoding fails.
+   *
+   * @note This is the peer-provided certificate chain, not the validated certificate chain. This
+   *       may include certificates that are not part of the validated chain.
+   **/
+  virtual absl::Span<const std::string> pemEncodedPeerCertificateChain() const PURE;
 
   /**
    * @return bool whether the provided matcher matches a SAN in the peer certificate.

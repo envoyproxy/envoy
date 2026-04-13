@@ -39,6 +39,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Router {
 namespace {
@@ -997,38 +999,37 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   const bool retry_enabled = retry_state_ && retry_state_->enabled();
   const bool redirect_enabled = route_entry_ && route_entry_->internalRedirectPolicy().enabled();
-  const bool is_redirect_only = redirect_enabled && !retry_enabled;
   const uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
 
-  bool buffering = retry_enabled || redirect_enabled;
+  bool buffering = (retry_enabled || redirect_enabled) && (!request_buffer_overflowed_);
 
   // Check if we would exceed buffer limits, regardless of current buffering state
   // This ensures error details are set even if retry state was cleared due to upstream reset.
-  const bool would_exceed_buffer =
-      (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
+  // When an upstream filter (e.g. the buffer filter) has already buffered all data,
+  // the decoding buffer and `data` may be the same object. Avoid double-counting in that case.
+  const Buffer::Instance* decoding_buffer = callbacks_->decodingBuffer();
+  const uint64_t payload_length =
+      (decoding_buffer != &data) ? getLength(decoding_buffer) + data.length() : data.length();
+  const bool would_exceed_buffer = (payload_length > effective_buffer_limit);
 
-  // Handle retry buffer overflow, excluding redirect-only scenarios.
-  // For redirect scenarios, buffer overflow should only affect redirect processing, not initial
-  // request.
-  if (would_exceed_buffer && retry_enabled && !is_redirect_only && !request_buffer_overflowed_) {
+  // Handle buffer overflow.
+  if (buffering && would_exceed_buffer) {
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. "
               "Giving up on buffering.",
-              getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
-
+              payload_length, effective_buffer_limit);
     cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
-    ENVOY_LOG(debug, "retry or shadow overflow: retry_state_ reset, buffering set to false");
+    ENVOY_LOG(debug, "retry or redirect buffer overflow: skipping buffering");
     buffering = false;
-    active_shadow_policies_.clear();
+    request_buffer_overflowed_ = true;
 
     // Only send local reply and cleanup if we're in a retry waiting state (no active upstream
     // requests). If there are active upstream requests, let the normal upstream failure handling
     // take precedence.
     if (upstream_requests_.empty()) {
-      request_buffer_overflowed_ = true;
-      ENVOY_LOG(debug,
-                "retry or shadow overflow: No upstream requests, resetting and calling cleanup()");
+      ENVOY_LOG(debug, "retry or redirect buffer overflow: No upstream requests, resetting and "
+                       "calling cleanup()");
       resetAll();
       cleanup();
       callbacks_->streamInfo().setResponseCodeDetails(
@@ -1039,23 +1040,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
           StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     } else {
-      ENVOY_LOG(debug, "retry or shadow overflow: Upstream requests exist, deferring to normal "
-                       "upstream failure handling");
+      ENVOY_LOG(debug,
+                "retry or redirect buffer overflow: Upstream requests exist, deferring to normal "
+                "upstream failure handling");
     }
-  }
-
-  // Handle redirect-only buffer overflow when retry/shadow is not active.
-  // For redirect scenarios, buffer overflow should only affect redirect processing, not initial
-  // request.
-  if (would_exceed_buffer && is_redirect_only && !request_buffer_overflowed_) {
-    ENVOY_LOG(debug,
-              "The request payload has at least {} bytes data which exceeds buffer limit {}. "
-              "Marking request as buffer overflowed to cancel internal redirects.",
-              getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
-
-    // Set the flag to cancel internal redirect processing, but allow the request to proceed
-    // normally.
-    request_buffer_overflowed_ = true;
   }
 
   for (auto* shadow_stream : shadow_streams_) {
@@ -1449,13 +1437,6 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::CoreResponseFlag respo
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   callbacks_->streamInfo().setResponseFlag(response_flags);
-
-  // Check if buffer overflow occurred and override error details accordingly
-  if (request_buffer_overflowed_) {
-    code = Http::Code::InsufficientStorage;
-    body = "exceeded request buffer limit while retrying upstream";
-    details = StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit;
-  }
 
   // This will destroy any created retry timers.
   cleanup();
@@ -2033,8 +2014,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
   const uint64_t status_code = Http::Utility::getResponseStatus(headers);
 
   // Redirects are not supported for streaming requests yet.
-  if (downstream_end_stream_ && (!request_buffer_overflowed_ || !callbacks_->decodingBuffer()) &&
-      location != nullptr &&
+  if (downstream_end_stream_ && (!request_buffer_overflowed_) && location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, headers, *location,
                                                status_code) &&
       callbacks_->recreateStream(&headers)) {
@@ -2409,13 +2389,20 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   // the response headers/trailers from the upstream host.
   ASSERT(upstream_host.has_value(), "upstream host is not available for upstream request");
 
-  OptRef<Upstream::HostLbPolicyData> host_lb_policy_data = upstream_host->lbPolicyData();
+  // Inline capacity of 2 covers the typical case of 1-2 LB policies per host.
+  absl::InlinedVector<Upstream::HostLbPolicyData*, 2> orca_recipients;
+  for (size_t i = 0; i < upstream_host->lbPolicyDataCount(); ++i) {
+    auto host_lb_policy_data = upstream_host->lbPolicyDataAt(i);
+    if (host_lb_policy_data.has_value() && host_lb_policy_data->receivesOrcaLoadReport()) {
+      orca_recipients.push_back(host_lb_policy_data.ptr());
+    }
+  }
 
-  if (!cluster_->lrsReportMetricNames().has_value() && !host_lb_policy_data.has_value()) {
+  if (!cluster_->lrsReportMetricNames().has_value() && orca_recipients.empty()) {
     // If the cluster doesn't have LRS metric names configured then there is no need to
     // extract the stats for LRS.
-    // If the host doesn't have LB policy data then that means the LB policy doesn't care
-    // about the ORCA load report.
+    // If the host doesn't have any LB policy data interested in ORCA reports then
+    // the LB policy doesn't care about the ORCA load report.
     // Return early here to avoid parsing the ORCA load report because no one is interested
     // in it.
     return;
@@ -2437,15 +2424,17 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
     Envoy::Orca::addOrcaLoadReportToLoadMetricStats(
         *cluster_->lrsReportMetricNames(), *orca_load_report, upstream_host->loadMetricStats());
   }
-  if (host_lb_policy_data.has_value()) {
+  if (!orca_recipients.empty()) {
     ENVOY_STREAM_LOG(trace, "orca_load_report for {} report = {}", *callbacks_,
                      upstream_host->address()->asString(), orca_load_report->DebugString());
-    const absl::Status status =
-        host_lb_policy_data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
-    if (!status.ok()) {
-      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
-                         "LB policy onOrcaLoadReport failed: {} for load report {}",
-                         status.message(), orca_load_report->DebugString());
+    for (auto* data : orca_recipients) {
+      const absl::Status status =
+          data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
+      if (!status.ok()) {
+        ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                           "LB policy onOrcaLoadReport failed: {} for load report {}",
+                           status.message(), orca_load_report->DebugString());
+      }
     }
   }
 }
