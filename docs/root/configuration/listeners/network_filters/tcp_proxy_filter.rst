@@ -111,9 +111,9 @@ The ``envoy.reloadable_features.tcp_proxy_delay_route_selection`` runtime guard 
 route selection until the filter needs to establish the upstream connection. When unset, the filter will select a
 route on new connection.
 
-The momemt the selection occurs depends on the connection mode:
+The moment the selection occurs depends on the connection mode:
 
-* ``IMMEDIATE`` with route selection delay: It has no effect. Route selection still happens on new connection
+* ``IMMEDIATE`` with route selection delay: It has no effect. Route selection still happens on a new connection
 * ``ON_DOWNSTREAM_DATA`` with route selection delay: Route selection will happen when the filter first receives
   data from downstream
 * ``ON_DOWNSTREAM_TLS_HANDSHAKE`` with route selection delay: Route selection will happen when the downstream TLS
