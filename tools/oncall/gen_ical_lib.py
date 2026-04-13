@@ -47,6 +47,10 @@ class IcalEvent:
     def extra_lines(self) -> list[str]:
         return []
 
+    @property
+    def day_str(self) -> str:
+        return ["MO", "TU", "WE", "TH", "FR", "SA", "SU"][self.start_date.weekday()]
+
     def __str__(self) -> str:
         return "\n".join(["BEGIN:VEVENT", *self.lines, "END:VEVENT"])
 
@@ -76,7 +80,7 @@ class IcalRecurringEvent(IcalEvent):
 
     @property
     def _rrule(self) -> str:
-        return f"RRULE:FREQ=WEEKLY;INTERVAL={self.every_n_weeks};BYDAY=SU"
+        return f"RRULE:FREQ=WEEKLY;INTERVAL={self.every_n_weeks};BYDAY={self.day_str}"
 
     @property
     def duration(self) -> str:

@@ -6,6 +6,8 @@ import yaml
 
 from tools.oncall.gen_ical_lib import ical_file_format, IcalEvent, IcalOverrideEvent, IcalRecurringEvent
 
+ROTATION_DAY = 6  # 0 is monday, 6 is sunday
+
 _YAML_HEADER_COMMENT = "# In general, modify this through options to bazel run tools/oncall:rotation\n"
 _YAML_OVERRIDES_COMMENT = """
 # You can modify overrides manually to add or remove on-call overrides.
@@ -22,10 +24,10 @@ _YAML_OVERRIDES_COMMENT = """
 """
 
 
-def _recent_sunday(day: date) -> date:
-    """Walk start_of_this_week back to a Sunday. We could do math for this but
-    up to 6 iterations is cheap and readable."""
-    while day.weekday() != 6:
+def _recent_rotation_day(day: date) -> date:
+    """Walk start_of_this_week back to a rotation start day. We could do math for
+    this but up to 6 iterations is cheap and readable."""
+    while day.weekday() != ROTATION_DAY:
         day -= timedelta(days=1)
     return day
 
@@ -135,7 +137,7 @@ class OncallCalendar:
         index = self.rotation.index(current)
         new_rotation = [*self.rotation]
         new_rotation.insert(index, new)
-        new_calendar = OncallCalendar(start_date=_recent_sunday(today),
+        new_calendar = OncallCalendar(start_date=_recent_rotation_day(today),
                                       updated=today,
                                       rotation=new_rotation)
         # Walk the new start_date back a week at a time until the current oncall is also current
@@ -155,7 +157,7 @@ class OncallCalendar:
         current = self.who_is_oncall(today)
         new_rotation = [*self.rotation]
         new_rotation.remove(remove)
-        new_calendar = OncallCalendar(start_date=_recent_sunday(today),
+        new_calendar = OncallCalendar(start_date=_recent_rotation_day(today),
                                       updated=today,
                                       rotation=new_rotation)
         if remove == current:
@@ -194,7 +196,7 @@ class OncallCalendar:
         ) != original_oncall_after_disruption_week:
             new_calendar.start_date -= timedelta(weeks=1)
         # Then add overrides up to that week to keep the cycle unchanged until then.
-        start_of_this_week = _recent_sunday(today)
+        start_of_this_week = _recent_rotation_day(today)
         override_week = start_of_this_week
         while override_week < start_of_this_week + timedelta(
                 weeks=disruption_week - 1):
@@ -237,7 +239,7 @@ class OncallCalendar:
         today = date.today()
         for i, oncall in enumerate(self.rotation):
             events.append(
-                IcalRecurringEvent(updated=today,
+                IcalRecurringEvent(updated=self.updated,
                                    start_date=self.start_date +
                                    timedelta(weeks=i),
                                    uid=f"envoy-oncall-{oncall}",
