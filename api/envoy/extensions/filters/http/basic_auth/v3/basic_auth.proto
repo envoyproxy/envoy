@@ -59,7 +59,7 @@ message BasicAuth {
   // authenticated the request. Requires ``emit_dynamic_metadata`` to be set to ``true``.
   bool allow_missing = 4;
 
-  // If set to true, the filter emits dynamic metadata on successful authentication under the
+  // If set to ``true``, the filter emits dynamic metadata on successful authentication under the
   // ``envoy.filters.http.basic_auth`` namespace with key ``username`` set to the authenticated
   // username.
   //
