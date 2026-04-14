@@ -555,6 +555,9 @@ macro_rules! declare_network_filter_init_functions {
 /// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
 /// - `upstream_http_tcp_bridge:` — [`NewUpstreamHttpTcpBridgeConfigFunction`] for upstream HTTP TCP
 ///   bridges
+/// - `http_per_route:` — [`NewHttpFilterPerRouteConfigFunction`] for HTTP per-route configs
+/// - `load_balancer:` — [`NewLoadBalancerConfigFunction`] for load balancer policies
+/// - `cluster:` — [`NewClusterConfigFunction`] for custom clusters
 /// - `tracer:` — [`NewTracerConfigFunction`] for tracers
 /// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
 /// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
@@ -661,6 +664,10 @@ macro_rules! declare_all_init_functions {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
+  (@register http_per_route : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
   (@register network : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
       .get_or_init(|| $fn);
@@ -675,6 +682,14 @@ macro_rules! declare_all_init_functions {
   };
   (@register bootstrap : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register load_balancer : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_LOAD_BALANCER_CONFIG_FUNCTION
+      .get_or_init(|| $fn);
+  };
+  (@register cluster : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_CONFIG_FUNCTION
       .get_or_init(|| $fn);
   };
   (@register cert_validator : $fn:expr) => {
