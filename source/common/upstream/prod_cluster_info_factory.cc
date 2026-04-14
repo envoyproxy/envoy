@@ -12,8 +12,7 @@ namespace Upstream {
 
 ClusterInfoConstSharedPtr
 ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params) {
-  Envoy::Stats::ScopeSharedPtr scope =
-      generateStatsScope(params.cluster_, params.server_context_, false);
+  Envoy::Stats::ScopeSharedPtr scope = generateStatsScope(params.cluster_, params.server_context_);
 
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       params.server_context_, *scope, params.server_context_.messageValidationVisitor());

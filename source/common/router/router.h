@@ -565,12 +565,12 @@ private:
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
-  virtual RetryStatePtr
-  createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
-                   const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                   RouteStatsContextOptRef route_stats_context,
-                   Server::Configuration::CommonFactoryContext& context,
-                   Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
+  virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
+                                         Http::RequestHeaderMap& request_headers,
+                                         const Upstream::ClusterInfo& cluster,
+                                         Server::Configuration::CommonFactoryContext& context,
+                                         Event::Dispatcher& dispatcher,
+                                         Upstream::ResourcePriority priority) PURE;
 
   std::unique_ptr<GenericConnPool>
   createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -615,6 +615,8 @@ private:
   void continueDoRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry,
                        Upstream::HostConstSharedPtr&& host, Upstream::ThreadLocalCluster& cluster,
                        absl::string_view host_selection_details);
+  void updateStatsOnNoRetry(RetryStatus retry_status);
+  void updateStatsOnDoRetry(RetryState::DoRetryType do_retry_type);
 
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
   // Returns the effective retry policy to use for this request.
@@ -703,8 +705,6 @@ private:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                                  const Upstream::ClusterInfo& cluster,
-                                 const VirtualCluster* vcluster,
-                                 RouteStatsContextOptRef route_stats_context,
                                  Server::Configuration::CommonFactoryContext& context,
                                  Event::Dispatcher& dispatcher,
                                  Upstream::ResourcePriority priority) override;

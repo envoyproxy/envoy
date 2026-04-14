@@ -262,6 +262,18 @@ function bazel_envoy_api_go_build() {
     done
 }
 
+function build_openssl() {
+    BAZEL_BUILD_OPTIONS+=("--config=openssl")
+    # shellcheck disable=SC2207
+    # Append OpenSSL compat tests, and exclude quiche tests
+    TEST_TARGETS=("//compat/openssl/test/..." $(printf "%s\n" "${TEST_TARGETS[@]}" | grep -Fxv "@quiche//:ci_tests"))
+    setup_clang_toolchain
+    echo "Bazel fastbuild build with OpenSSL..."
+    bazel_envoy_binary_build fastbuild
+    echo "Testing ${TEST_TARGETS[*]} with OpenSSL..."
+    bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+}
+
 shift
 
 if [[ "$CI_TARGET" =~ bazel.* ]]; then
@@ -776,7 +788,15 @@ case $CI_TARGET in
         ;;
 
     openssl)
-        echo "Nothing to do right now, this is a placeholder for any OpenSSL-specific build or test steps that may be needed in the future."
+        # This whole boilerplate is to not fail the entire CI if there is an issue with the OpenSSL build or tests,
+        # as this is not a blocker for other work.
+        set +e
+        (set -e; build_openssl)
+        rc=$?
+        set -e
+        if [[ $rc -ne 0 ]]; then
+            echo "ERROR: OpenSSL build or test failed" >&2
+        fi
         ;;
 
     publish)
@@ -937,6 +957,12 @@ case $CI_TARGET in
         ;;
 
     verify-distroless)
+        DISTROLESS_TEST_TARGET="${DISTROLESS_TEST_TARGET:-distroless-dev}"
+        distroless_user="$(docker inspect --format '{{.Config.User}}' envoyproxy/envoy:"${DISTROLESS_TEST_TARGET}")"
+        if [[ "$distroless_user" == 0 ]]; then
+            echo "FAIL: Distroless container uses the root user" >&2
+            exit 1
+        fi
         docker build -f ci/Dockerfile-distroless-testing --target=envoy-distroless -t distroless-testing .
         docker run --rm distroless-testing
         docker build -f ci/Dockerfile-distroless-testing --target=envoy-contrib-distroless -t distroless-contrib-testing .
@@ -952,6 +978,8 @@ case $CI_TARGET in
         bazel run --config=ci \
                   --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
                   --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --action_env="CARGO_BAZEL_REPIN=true" \
+                  --host_action_env="CARGO_BAZEL_REPIN=true" \
                   --sandbox_writable_path="${HOME}/.docker/" \
                   --sandbox_writable_path="$HOME" \
                   @envoy-examples//:verify_examples

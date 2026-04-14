@@ -36,6 +36,7 @@ envoy_cc_test_library(
         "//source/extensions/config_subscription/rest:http_subscription_lib",
         "//source/extensions/filters/http/match_delegate:config",
         "//test/config:v2_link_hacks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],

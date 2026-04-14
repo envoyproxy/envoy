@@ -1,0 +1,36 @@
+date: April 10, 2026
+
+bug_fixes:
+- area: contrib
+  change: |
+    Fixed segfault from timer thread-safety violation, a ring buffer overflow and alpha calculation in
+    peak_ewma loadbalancer.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module filter may result in a incomplete body being sent to upstream
+    or downstream when some filters before or after the dynamic module filter in the chain
+    buffered the body and the dynamic module filter did not.
+- area: http
+  change: |
+    Fixed a bug where the internal redirect logic may hang up a request when the request buffer is
+    overflowed.
+- area: access_log
+  change: |
+    Fixed a crash on listener removal with a process-level access log rate limiter
+    :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+
+    Note: Release notes show this to be fixed on 1.37.1 branch, but it was not backported in that release.
+- area: docker
+  change: |
+    Updates/fixes for release images.
+
+new_features:
+- area: stats
+  change: |
+    Added support to limit the number of stats stored in each stats scope in the stats libarary.
+- area: stats
+  change: |
+    Added support for cluster-level stats matcher, allowing more granular control over which stats
+    are enabled and reported at the cluster level. This the stats matcher could be configured via
+    the xDS API dynamically on a per-cluster basis.
+    See :ref:`envoy.stats_matcher <well_known_metadata_envoy_stats_matcher>` for more details.

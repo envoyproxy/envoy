@@ -1,0 +1,67 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/foo"
+      }
+      route {
+        cluster: "www2"
+        request_mirror_policies {
+          cluster: "some_cluster"
+          trace_sampled {
+          }
+        }
+        request_mirror_policies {
+          cluster: "some_cluster2"
+          trace_sampled {
+            value: true
+          }
+        }
+        request_mirror_policies {
+          cluster: "some_cluster3"
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.databricks.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

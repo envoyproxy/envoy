@@ -74,6 +74,13 @@ uint32_t envoy_dynamic_module_callback_get_concurrency() {
   return context->options().concurrency();
 }
 
+bool envoy_dynamic_module_callback_is_validation_mode() {
+  using namespace Envoy;
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+  return context->options().mode() == Server::Mode::Validate;
+}
+
 // ---------------------- Function registry callbacks --------------------------------
 
 bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_module_buffer key,
@@ -385,6 +392,14 @@ __attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_tim
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr) {
   IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_timer_delete: "
                "not implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, uint32_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch: "
+               "not implemented in this context");
+  return false;
 }
 
 __attribute__((weak)) bool

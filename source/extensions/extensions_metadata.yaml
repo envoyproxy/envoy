@@ -180,6 +180,13 @@ envoy.clusters.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+envoy.clusters.mcp_multicluster:
+  categories:
+  - envoy.clusters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.clusters.mcp_multicluster.v3.ClusterConfig
 envoy.clusters.static:
   categories:
   - envoy.clusters
@@ -649,6 +656,7 @@ envoy.filters.http.oauth2:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.oauth2.v3.OAuth2
+  - envoy.extensions.filters.http.oauth2.v3.OAuth2PerRoute
 envoy.filters.http.on_demand:
   categories:
   - envoy.filters.http
@@ -884,6 +892,13 @@ envoy.filters.network.reverse_tunnel:
   status: alpha
   type_urls:
   - envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
+envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.reverse_tunnel.v3.DrainAwareHttpConnectionManager
 envoy.filters.network.http_connection_manager:
   categories:
   - envoy.filters.network
@@ -945,6 +960,13 @@ envoy.filters.network.sni_dynamic_forward_proxy:
   status: alpha
   type_urls:
   - envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
+envoy.filters.network.tcp_bandwidth_limit:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.tcp_bandwidth_limit.v3.TcpBandwidthLimit
 envoy.filters.network.tcp_proxy:
   categories:
   - envoy.filters.network
@@ -1771,6 +1793,13 @@ envoy.network.dns_resolver.getaddrinfo:
   status: stable
   type_urls:
   - envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+envoy.network.dns_resolver.hickory:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.network.dns_resolver.hickory.v3.HickoryDnsResolverConfig
 envoy.resolvers.reverse_connection:
   categories:
   - envoy.resolvers
@@ -2302,9 +2331,9 @@ envoy.filters.http.dynamic_modules:
   categories:
   - envoy.filters.http
   - envoy.filters.http.upstream
-  security_posture: unknown
-  status: alpha
-  status_upstream: alpha
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+  status_upstream: stable
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
 envoy.tls.certificate_selectors.on_demand_secret:

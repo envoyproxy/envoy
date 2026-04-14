@@ -47,8 +47,6 @@ public:
   // Filter
   Router::RetryStatePtr createRetryState(const Router::RetryPolicy&, RequestHeaderMap&,
                                          const Upstream::ClusterInfo&,
-                                         const Router::VirtualCluster*,
-                                         Router::RouteStatsContextOptRef,
                                          Server::Configuration::CommonFactoryContext&,
                                          Event::Dispatcher&, Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);

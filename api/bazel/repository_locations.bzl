@@ -6,15 +6,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
     ),
     com_envoyproxy_protoc_gen_validate = dict(
-        sha256 = "0ce70c9d0bc3381e2fde48e169589f477522cb3adcbb8be327b069d0071430aa",
-        version = "1.3.0",
+        sha256 = "20da84f8efe8f53c10cbde79d2cdd1e63365b0ae1ad9de22af56aa1a49d59330",
+        version = "1.3.3",
         urls = ["https://github.com/bufbuild/protoc-gen-validate/archive/refs/tags/v{version}.zip"],
         strip_prefix = "protoc-gen-validate-{version}",
     ),
     rules_jvm_external = dict(
-        version = "6.8",
+        version = "6.10",
         strip_prefix = "rules_jvm_external-{version}",
-        sha256 = "704a0197e4e966f96993260418f2542568198490456c21814f647ae7091f56f2",
+        sha256 = "e5f83b8f2678d2b26441e5eafefb1b061826608417b8d24e5e8e15e585eab1ba",
         urls = ["https://github.com/bazelbuild/rules_jvm_external/releases/download/{version}/rules_jvm_external-{version}.tar.gz"],
     ),
     xds = dict(
@@ -56,8 +56,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_proto/archive/refs/tags/{version}.tar.gz"],
     ),
     opentelemetry_proto = dict(
-        version = "1.9.0",
-        sha256 = "2d2220db196bdfd0aec872b75a5e614458f8396557fc718b28017e1a08db49e4",
+        version = "1.10.0",
+        sha256 = "52c85df79badc45da7e6a8735e8090b05a961b0208756187e1492a40db2d1f5f",
         strip_prefix = "opentelemetry-proto-{version}",
         urls = ["https://github.com/open-telemetry/opentelemetry-proto/archive/v{version}.tar.gz"],
     ),
@@ -74,8 +74,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.31",
-        sha256 = "e6878f21ab2c7e80d6600a4c597fe5a95f196f534a8a4b9588e35c0e8d901717",
+        version = "0.3.32",
+        sha256 = "c97a787075422f9748ff3cf28eb160b8ef8b17e27c44083205ed6473d3945ae9",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),

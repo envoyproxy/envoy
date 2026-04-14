@@ -634,6 +634,21 @@ envoy_benchmark_test(
     benchmark_binary = "inline_map_speed_test",
 )
 
+envoy_cc_benchmark_binary(
+    name = "linked_object_speed_test",
+    srcs = ["linked_object_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:linked_object",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "linked_object_speed_test_benchmark_test",
+    benchmark_binary = "linked_object_speed_test",
+)
+
 envoy_cc_test(
     name = "execution_context_test",
     srcs = ["execution_context_test.cc"],
