@@ -186,7 +186,7 @@ message Vhds {
   // the domain being fetched. For example, if set to
   // ``xdstp://authority/vhds/on-demand/{domain}``, if VHDS needs the domain for
   // "example.com", it will subscribe to the resource
-  // "xdstp://authority/vhds/on-demand/example.com".
+  // ``xdstp://authority/vhds/on-demand/example.com``.
   //
   // If unspecified or empty, Envoy will default to subscribing
   // to non-xdstp resource ``<route configuration name>/<domain>``.
