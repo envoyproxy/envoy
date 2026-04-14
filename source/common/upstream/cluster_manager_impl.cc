@@ -1,5 +1,6 @@
 #include "source/common/upstream/cluster_manager_impl.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -1971,14 +1972,28 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   // starting with something simpler.
   auto upstream_protocols = host->cluster().upstreamHttpProtocol(downstream_protocol);
 
-  // For auto_config (ALPN) clusters: if this is a WebSocket upgrade and HTTP/2 extended
-  // CONNECT is disabled, force HTTP/1.1 to avoid the upgrade-to-CONNECT transformation
-  // that would otherwise occur in the HTTP/2 codec.
-  if ((host->cluster().features() & Upstream::ClusterInfo::Features::USE_ALPN) && context &&
+  // For auto_config (ALPN) clusters: if this is a WebSocket upgrade, filter out
+  // protocols where extended CONNECT is disabled, to avoid the
+  // upgrade-to-CONNECT transformation in the HTTP/2 or HTTP/3 codec.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.alpn_filter_websocket_protocols") &&
+      (host->cluster().features() & Upstream::ClusterInfo::Features::USE_ALPN) && context &&
       context->downstreamHeaders() &&
-      Http::Utility::isWebSocketUpgradeRequest(*context->downstreamHeaders()) &&
-      !host->cluster().httpProtocolOptions().http2Options().allow_connect()) {
-    upstream_protocols = {Http::Protocol::Http11};
+      Http::Utility::isWebSocketUpgradeRequest(*context->downstreamHeaders())) {
+    const auto& http_opts = host->cluster().httpProtocolOptions();
+    upstream_protocols.erase(
+        std::remove_if(upstream_protocols.begin(), upstream_protocols.end(),
+                       [&http_opts](Http::Protocol p) {
+                         switch (p) {
+                         case Http::Protocol::Http2:
+                           return !http_opts.http2Options().allow_connect();
+                         case Http::Protocol::Http3:
+                           return !http_opts.http3Options().allow_extended_connect();
+                         default:
+                           return false;
+                         }
+                       }),
+        upstream_protocols.end());
   }
 
   std::vector<uint8_t> hash_key;
