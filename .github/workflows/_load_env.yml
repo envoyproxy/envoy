@@ -110,5 +110,5 @@ jobs:
     needs: request
     if: ${{ inputs.cache-docker }}
     with:
-      request: ${{ toJSON(needs.request.outputs) }}
+      caches: ${{ needs.request.outputs.caches }}
       image-tag: ${{ fromJSON(needs.request.outputs.build-image).default }}

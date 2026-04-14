@@ -714,7 +714,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // well as handling unsupported asynchronous host selection by treating it
     // as host selection failure and calling sendNoHealthyUpstreamResponse.
     continueDecodeHeaders(cluster, headers, end_stream, std::move(host_selection_response.host),
-                          host_selection_response.details);
+                          host_selection_response.details, host_selection_response.failure_status);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -756,13 +756,14 @@ void Filter::onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::stri
 bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
                                    Http::RequestHeaderMap& headers, bool end_stream,
                                    Upstream::HostConstSharedPtr&& selected_host,
-                                   absl::string_view host_selection_details) {
+                                   absl::string_view host_selection_details,
+                                   absl::optional<Http::Code> failure_status) {
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
 
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster, selected_host);
   if (!generic_conn_pool) {
-    sendNoHealthyUpstreamResponse(host_selection_details);
+    sendNoHealthyUpstreamResponse(host_selection_details, failure_status);
     return false;
   }
   Upstream::HostDescriptionConstSharedPtr host = generic_conn_pool->host();
@@ -952,14 +953,16 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalClu
                                         callbacks_->streamInfo().protocol(), this, *message);
 }
 
-void Filter::sendNoHealthyUpstreamResponse(absl::string_view optional_details) {
+void Filter::sendNoHealthyUpstreamResponse(absl::string_view optional_details,
+                                           absl::optional<Http::Code> failure_status) {
+  const Http::Code status_code = failure_status.value_or(Http::Code::ServiceUnavailable);
   callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
-  chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, false);
+  chargeUpstreamCode(status_code, {}, false);
   absl::string_view details = optional_details.empty()
                                   ? StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream
                                   : optional_details;
-  callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", modify_headers_,
-                             absl::nullopt, details);
+  callbacks_->sendLocalReply(status_code, "no healthy upstream", modify_headers_, absl::nullopt,
+                             details);
 }
 
 uint64_t Filter::calculateEffectiveBufferLimit() const {
@@ -1005,15 +1008,19 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   // Check if we would exceed buffer limits, regardless of current buffering state
   // This ensures error details are set even if retry state was cleared due to upstream reset.
-  const bool would_exceed_buffer =
-      (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
+  // When an upstream filter (e.g. the buffer filter) has already buffered all data,
+  // the decoding buffer and `data` may be the same object. Avoid double-counting in that case.
+  const Buffer::Instance* decoding_buffer = callbacks_->decodingBuffer();
+  const uint64_t payload_length =
+      (decoding_buffer != &data) ? getLength(decoding_buffer) + data.length() : data.length();
+  const bool would_exceed_buffer = (payload_length > effective_buffer_limit);
 
   // Handle buffer overflow.
   if (buffering && would_exceed_buffer) {
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. "
               "Giving up on buffering.",
-              getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
+              payload_length, effective_buffer_limit);
     cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     ENVOY_LOG(debug, "retry or redirect buffer overflow: skipping buffering");
@@ -1868,6 +1875,17 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
+  //
+  // Strip upstream hop-by-hop Keep-Alive header before applying user-configured response headers.
+  // This ensures that Keep-Alive headers added via response_headers_to_add are preserved, since
+  // HCM sanitization (mutateResponseHeaders) will skip removing Keep-Alive when this flag is on.
+  // Only relevant for HTTP/1.x downstream connections.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_downstream_keepalive")) {
+    const auto protocol = callbacks_->streamInfo().protocol();
+    if (protocol.has_value() && *protocol <= Http::Protocol::Http11) {
+      headers->removeKeepAlive();
+    }
+  }
   const Formatter::Context formatter_context(downstream_headers_, headers.get(), {}, {}, {},
                                              &callbacks_->activeSpan());
   route_entry_->finalizeResponseHeaders(*headers, formatter_context, callbacks_->streamInfo());
@@ -2241,7 +2259,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     // as host selection failure).
     continueDoRetry(can_send_early_data, can_use_http3, is_timeout_retry,
                     std::move(host_selection_response.host), *cluster,
-                    host_selection_response.details);
+                    host_selection_response.details, host_selection_response.failure_status);
   }
 
   ENVOY_STREAM_LOG(debug, "Handling asynchronous host selection for retry\n", *callbacks_);
@@ -2259,12 +2277,13 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
                              TimeoutRetry is_timeout_retry, Upstream::HostConstSharedPtr&& host,
                              Upstream::ThreadLocalCluster& cluster,
-                             absl::string_view host_selection_details) {
+                             absl::string_view host_selection_details,
+                             absl::optional<Http::Code> failure_status) {
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(cluster, host);
   if (!generic_conn_pool) {
-    sendNoHealthyUpstreamResponse(host_selection_details);
+    sendNoHealthyUpstreamResponse(host_selection_details, failure_status);
     cleanup();
     return;
   }

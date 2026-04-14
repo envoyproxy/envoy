@@ -85,8 +85,7 @@ using UpstreamNetworkFilterConfigProviderManager =
 
 Stats::ScopeSharedPtr
 generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
-                   Server::Configuration::ServerFactoryContext& server_context,
-                   bool use_alt_stat_name = true);
+                   Server::Configuration::ServerFactoryContext& server_context);
 
 class LegacyLbPolicyConfigHelper {
 public:
