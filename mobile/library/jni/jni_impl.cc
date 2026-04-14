@@ -1142,7 +1142,7 @@ void configureBuilder(
     jlong dns_failure_refresh_seconds_max, jlong dns_query_timeout_seconds,
     jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jint dns_num_retries,
-    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jstring http3_connection_options,
+    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jboolean enable_early_data, jstring http3_connection_options,
     jstring http3_client_connection_options, jobjectArray quic_hints,
     jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
     jboolean enable_brotli_decompression, jint num_timeouts_to_trigger_port_migration,
@@ -1183,6 +1183,7 @@ void configureBuilder(
   builder.enableBrotliDecompression(enable_brotli_decompression == JNI_TRUE);
   builder.enableSocketTagging(enable_socket_tagging == JNI_TRUE);
   builder.enableHttp3(enable_http3 == JNI_TRUE);
+  builder.enableEarlyData(enable_early_data == JNI_TRUE);
   builder.setHttp3ConnectionOptions(
       Envoy::JNI::javaStringToCppString(jni_helper, http3_connection_options));
   builder.setHttp3ClientConnectionOptions(
@@ -1248,7 +1249,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jint dns_num_retries,
-    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jstring http3_connection_options,
+    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jboolean enable_early_data, jstring http3_connection_options,
     jstring http3_client_connection_options, jobjectArray quic_hints,
     jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
     jboolean enable_brotli_decompression, jint num_timeouts_to_trigger_port_migration,
@@ -1270,7 +1271,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       disable_dns_refresh_on_network_change, dns_refresh_seconds, dns_failure_refresh_seconds_base,
       dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
       dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds, dns_num_retries,
-      enable_drain_post_dns_refresh, enable_http3, http3_connection_options,
+      enable_drain_post_dns_refresh, enable_http3, enable_early_data, http3_connection_options,
       http3_client_connection_options, quic_hints, quic_canonical_suffixes,
       enable_gzip_decompression, enable_brotli_decompression,
       num_timeouts_to_trigger_port_migration, enable_socket_tagging, enable_interface_binding,
