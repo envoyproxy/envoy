@@ -276,10 +276,9 @@ TEST(CertCompressionWireTest, BrotliReducesBytesOnWire) {
 }
 
 TEST(CertCompressionWireTest, ZlibReducesBytesOnWire) {
-  verifyCompressionReducesBytes(
-      [](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
-      [](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
-      [](int bytes_saved) { EXPECT_EQ(ZLIB_BYTES_SAVED, bytes_saved); });
+  verifyCompressionReducesBytes([](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
+                                [](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
+                                [](int bytes_saved) { EXPECT_EQ(ZLIB_BYTES_SAVED, bytes_saved); });
 }
 
 TEST(CertCompressionWireTest, BothRegisteredBrotliFirstPrefersBrotli) {
@@ -357,33 +356,29 @@ TEST(CertCompressionWireTest, NegotiatesCommonAlgorithmClientSubset) {
 }
 
 TEST(CertCompressionWireTest, NegotiatesCommonAlgorithmServerSubset) {
-  verifyCompressionReducesBytes(
-      [](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
-      [](SSL_CTX* ctx) {
-        CertCompression::registerBrotli(ctx);
-        CertCompression::registerZlib(ctx);
-      },
-      [](int bytes_saved) { EXPECT_EQ(ZLIB_BYTES_SAVED, bytes_saved); });
+  verifyCompressionReducesBytes([](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
+                                [](SSL_CTX* ctx) {
+                                  CertCompression::registerBrotli(ctx);
+                                  CertCompression::registerZlib(ctx);
+                                },
+                                [](int bytes_saved) { EXPECT_EQ(ZLIB_BYTES_SAVED, bytes_saved); });
 
-  verifyCompressionReducesBytes(
-      [](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
-      [](SSL_CTX* ctx) {
-        CertCompression::registerZlib(ctx);
-        CertCompression::registerBrotli(ctx);
-      },
-      [](int bytes_saved) { EXPECT_EQ(ZLIB_BYTES_SAVED, bytes_saved); });
+  verifyCompressionReducesBytes([](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
+                                [](SSL_CTX* ctx) {
+                                  CertCompression::registerZlib(ctx);
+                                  CertCompression::registerBrotli(ctx);
+                                },
+                                [](int bytes_saved) { EXPECT_EQ(ZLIB_BYTES_SAVED, bytes_saved); });
 }
 
 TEST(CertCompressionWireTest, NoCommonAlgorithmNoCompression) {
-  verifyCompressionReducesBytes(
-      [](SSL_CTX* ctx) { CertCompression::registerBrotli(ctx); },
-      [](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
-      [](int bytes_saved) { EXPECT_EQ(0, bytes_saved); });
+  verifyCompressionReducesBytes([](SSL_CTX* ctx) { CertCompression::registerBrotli(ctx); },
+                                [](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
+                                [](int bytes_saved) { EXPECT_EQ(0, bytes_saved); });
 
-  verifyCompressionReducesBytes(
-      [](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
-      [](SSL_CTX* ctx) { CertCompression::registerBrotli(ctx); },
-      [](int bytes_saved) { EXPECT_EQ(0, bytes_saved); });
+  verifyCompressionReducesBytes([](SSL_CTX* ctx) { CertCompression::registerZlib(ctx); },
+                                [](SSL_CTX* ctx) { CertCompression::registerBrotli(ctx); },
+                                [](int bytes_saved) { EXPECT_EQ(0, bytes_saved); });
 }
 
 TEST(CertCompressionWireTest, NoClientCompressionNoCompression) {
@@ -396,13 +391,12 @@ TEST(CertCompressionWireTest, NoClientCompressionNoCompression) {
 }
 
 TEST(CertCompressionWireTest, NoServerCompressionNoCompression) {
-  verifyCompressionReducesBytes(
-      [](SSL_CTX*) {},
-      [](SSL_CTX* ctx) {
-        CertCompression::registerBrotli(ctx);
-        CertCompression::registerZlib(ctx);
-      },
-      [](int bytes_saved) { EXPECT_EQ(0, bytes_saved); });
+  verifyCompressionReducesBytes([](SSL_CTX*) {},
+                                [](SSL_CTX* ctx) {
+                                  CertCompression::registerBrotli(ctx);
+                                  CertCompression::registerZlib(ctx);
+                                },
+                                [](int bytes_saved) { EXPECT_EQ(0, bytes_saved); });
 }
 
 } // namespace Tls
