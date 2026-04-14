@@ -44,7 +44,7 @@ message StatefulSession {
   // The HTTP status code to return when ``strict`` mode is enabled and the requested destination
   // is not found in the set of available endpoints. This does not apply when the destination exists
   // but is unhealthy. This field has no effect when ``strict`` is set to ``false`` and will be
-  // ignored. Defaults to 503 (Service Unavailable) if not specified or set to 0.
+  // ignored. Defaults to ``503`` (Service Unavailable) if not specified or set to ``0``.
   uint32 status_on_strict_destination_not_found = 4;
 }
 
