@@ -172,7 +172,7 @@ message Vhds {
 
   // The xdstp resource name of a default virtual host collection to subscribe to.
   //
-  // If the name ends in ``/*``, it indicates an VirtualHost glob collection,
+  // If the name ends in ``/*``, it indicates a ``VirtualHost`` glob collection,
   // which is supported only in the xDS incremental protocol variants.
   //
   // Envoy currently supports only glob collections.
