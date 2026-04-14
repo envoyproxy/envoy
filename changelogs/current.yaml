@@ -371,9 +371,11 @@ bug_fixes:
     elements that depend on them.
 - area: websockets
   change: |
-    Fixed a bug where WebSocket connections would be upgraded to HTTP/2 extended ``CONNECT`` even
-    when the upstream http/2 protocol options were not set to allow extended ``CONNECT`` when the
-    cluster used ``auto_config`` for protocol selection.
+    Fixed a bug where WebSocket connections on ``auto_config`` clusters would be upgraded to
+    HTTP/2 or HTTP/3 extended ``CONNECT`` even when the corresponding protocol options did not
+    enable it. Protocols that do not allow extended ``CONNECT`` are now filtered from the
+    upstream protocol list for WebSocket upgrades. This behavior can be reverted by setting the
+    runtime guard ``envoy.reloadable_features.alpn_filter_websocket_protocols`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
