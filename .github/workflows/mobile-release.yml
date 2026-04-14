@@ -35,10 +35,10 @@ jobs:
       packages: read
     if: >-
       github.repository == 'envoyproxy/envoy'
-      && (github.event.schedule 
+      && (github.event.schedule
              || !contains(github.actor, '[bot]'))
-      && (github.event.inputs.job_to_run == 'all' 
-             || github.event.inputs.job_to_run == 'android' 
+      && (github.event.inputs.job_to_run == 'all'
+             || github.event.inputs.job_to_run == 'android'
              || github.event_name == 'schedule')
     needs: env
     uses: ./.github/workflows/_mobile_container_ci.yml
@@ -159,7 +159,7 @@ jobs:
             ${{ matrix.output }}-pom.xml.asc \
             ${{ matrix.output }}-sources.jar.asc \
             ${{ matrix.output }}-javadoc.jar.asc
-            
+
   python-release:
     permissions:
       actions: read
@@ -170,7 +170,7 @@ jobs:
       && (github.event_name == 'workflow_dispatch')
       && (github.event.inputs.job_to_run == 'all'
              || github.event.inputs.job_to_run == 'python')
-    needs: env      
+    needs: env
     name: Build and Publish Python Wheel
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
@@ -184,7 +184,7 @@ jobs:
           run: |
             mkdir -p /tmp/dist
             WHEEL_PATH=$(find /tmp/container-output/build -name "*.whl" | head -n 1)
-            
+
             if [[ -z "$WHEEL_PATH" ]]; then
                 echo "Error: No wheel file found in /tmp/container-output/build"
                 ls -R /tmp/container-output/
@@ -193,7 +193,7 @@ jobs:
             python3 -m venv envoy_wheel
             source envoy_wheel/bin/activate
             pip install patchelf auditwheel
-            
+
             auditwheel repair "$WHEEL_PATH" --wheel-dir /tmp/dist
           shell: bash
       target: ${{ matrix.target }}
@@ -212,7 +212,7 @@ jobs:
             -c opt --strip=always
             //library/python:envoy_mobile_wheel
             --//library/python:python_platform="manylinux2014_x86_64"
-            
+
   python-publish:
     needs: python-release
     if: >-
@@ -220,7 +220,7 @@ jobs:
         && (github.event.inputs.job_to_run == 'all'
                || github.event.inputs.job_to_run == 'python')
         && (needs.python-release.result == 'success')
-    permissions: 
+    permissions:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
