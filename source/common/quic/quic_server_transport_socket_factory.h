@@ -58,11 +58,13 @@ public:
             config_->capabilities().handles_session_resumption};
   }
 
-  // Processes a session ticket encrypt or decrypt operation by delegating to the
-  // underlying ServerContextImpl. Returns 0 on failure, 1 on success, 2 on
-  // success with key renewal (decrypt only).
-  int processSessionTicket(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
-                           HMAC_CTX* hmac_ctx, int encrypt) const;
+  // Returns the current ServerContextImpl, pinning a shared_ptr so it
+  // remains valid for the caller's lifetime. May return null before
+  // initialize() completes or if context creation failed.
+  Ssl::ServerContextSharedPtr sslCtx() const {
+    absl::ReaderMutexLock l(ssl_ctx_mu_);
+    return ssl_ctx_;
+  }
 
 protected:
   QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,

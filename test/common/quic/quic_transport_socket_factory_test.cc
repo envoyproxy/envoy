@@ -162,30 +162,6 @@ downstream_tls_context:
   EXPECT_FALSE(config.handles_session_resumption);
 }
 
-TEST_F(QuicServerTransportSocketFactoryConfigTest, SessionTicketProcessNullCtx) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
-downstream_tls_context:
-  common_tls_context:
-    tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-)EOF");
-
-  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
-  Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
-      config_factory_.createTransportSocketFactory(proto_config, context_, {}),
-      Network::DownstreamTransportSocketFactoryPtr);
-  auto& quic_factory = static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory);
-  // Before initialization, ssl_ctx_ is null, so processSessionTicket returns 0.
-  EXPECT_EQ(0, quic_factory.processSessionTicket(nullptr, nullptr, nullptr, nullptr, nullptr, 0));
-}
-
 class QuicClientTransportSocketFactoryTest : public testing::Test {
 public:
   QuicClientTransportSocketFactoryTest() {

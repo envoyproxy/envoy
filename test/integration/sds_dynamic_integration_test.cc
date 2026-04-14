@@ -246,22 +246,14 @@ public:
           auto quic_config = MessageUtil::anyConvert<
               envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
               *ts->mutable_typed_config());
-          auto* sds_config = quic_config.mutable_downstream_tls_context()
-                                 ->mutable_session_ticket_keys_sds_secret_config();
-          sds_config->set_name(session_ticket_keys_secret_);
-          auto* config_source = sds_config->mutable_sds_config();
-          config_source->mutable_path_config_source()->set_path(session_ticket_keys_sds_path_);
-          config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+          configureSdsSecretConfig(quic_config.mutable_downstream_tls_context()
+                                       ->mutable_session_ticket_keys_sds_secret_config());
           ts->mutable_typed_config()->PackFrom(quic_config);
         } else {
           auto tls_context = MessageUtil::anyConvert<
               envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext>(
               *ts->mutable_typed_config());
-          auto* sds_config = tls_context.mutable_session_ticket_keys_sds_secret_config();
-          sds_config->set_name(session_ticket_keys_secret_);
-          auto* config_source = sds_config->mutable_sds_config();
-          config_source->mutable_path_config_source()->set_path(session_ticket_keys_sds_path_);
-          config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+          configureSdsSecretConfig(tls_context.mutable_session_ticket_keys_sds_secret_config());
           ts->mutable_typed_config()->PackFrom(tls_context);
         }
       });
@@ -391,6 +383,14 @@ resources:
           client_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
     }
     return makeClientConnectionWithOptions(port, nullptr);
+  }
+
+  void configureSdsSecretConfig(
+      envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig* sds_config) {
+    sds_config->set_name(session_ticket_keys_secret_);
+    auto* config_source = sds_config->mutable_sds_config();
+    config_source->mutable_path_config_source()->set_path(session_ticket_keys_sds_path_);
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
   }
 
   void writeSessionTicketKeysSdsYaml(const std::string& inline_key_bytes) {
@@ -716,15 +716,11 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, SessionTicketKeysRemovedViaSds) {
   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
   cleanupUpstreamAndDownstream();
 
-  // Update SDS file to remove session ticket keys — should not crash.
+  // Update SDS file to remove session ticket keys.
   writeEmptySessionTicketKeysSdsYaml();
-  test_server_->waitForCounterGe(
-      listenerStatPrefix(test_quic_
-                             ? "quic_server_transport_socket_factory.context_config_update_by_sds"
-                             : "server_ssl_socket_factory.ssl_context_update_by_sds"),
-      2);
-
-  // Connection should still succeed (falls back to full handshake without tickets).
+  // Do not wait for SDS update; let the 2nd request race to verify no crash.
+  // The connection may resume (old keys still pinned) or do a full handshake
+  // (new empty-keys context pinned with resumption disabled). Both are valid.
   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 }
 

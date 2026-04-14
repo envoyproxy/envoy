@@ -374,13 +374,6 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailAlgorithmMismatch) {
       std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
 }
 
-TEST_F(EnvoyQuicProofSourceTest, TransportSocketFactoryExDataIndex) {
-  // transportSocketFactoryExDataIndex() should return a valid (non-negative) index and be stable.
-  int index = EnvoyQuicProofSource::transportSocketFactoryExDataIndex();
-  EXPECT_GE(index, 0);
-  EXPECT_EQ(index, EnvoyQuicProofSource::transportSocketFactoryExDataIndex());
-}
-
 // Smoke test: verify OnNewSslCtx installs the ticket key callback when the
 // runtime guard is enabled. We cannot directly inspect the callback, but we
 // verify the call completes without error.
@@ -401,40 +394,6 @@ TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxWithSessionTicketSupportDisabled) {
   bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
   ASSERT_NE(ssl_ctx, nullptr);
   proof_source_.OnNewSslCtx(ssl_ctx.get());
-}
-
-// Verify that ticketKeyCallback returns 0 and fires ENVOY_BUG when no transport socket
-// factory is stored in SSL ex_data.
-TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackNullTransportSocketFactory) {
-  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
-  ASSERT_NE(ssl_ctx, nullptr);
-  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
-  ASSERT_NE(ssl, nullptr);
-  // No ex_data set → triggers ENVOY_BUG and returns 0.
-  EXPECT_ENVOY_BUG(EXPECT_EQ(0, EnvoyQuicProofSource::ticketKeyCallback(ssl.get(), nullptr, nullptr,
-                                                                        nullptr, nullptr, 0)),
-                   "QUIC session ticket callback invoked without transport socket factory");
-}
-
-// Verify that ticketKeyCallback delegates to the transport socket factory's
-// processSessionTicket when a transport socket factory is present in SSL ex_data.
-TEST_F(EnvoyQuicProofSourceTest, TicketKeyCallbackWithTransportSocketFactory) {
-  loadCertsIntoFactory(expected_certs_, true);
-
-  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
-  ASSERT_NE(ssl_ctx, nullptr);
-  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
-  ASSERT_NE(ssl, nullptr);
-
-  // Store transport socket factory pointer in SSL ex_data at the well-known index.
-  SSL_set_ex_data(ssl.get(), EnvoyQuicProofSource::transportSocketFactoryExDataIndex(),
-                  transport_socket_factory_.get());
-
-  // With decrypt mode (encrypt=0) and no session ticket keys configured, the
-  // ServerContextImpl returns 0 (no matching key).
-  uint8_t key_name[16] = {};
-  EXPECT_EQ(0, EnvoyQuicProofSource::ticketKeyCallback(ssl.get(), key_name, nullptr, nullptr,
-                                                       nullptr, 0));
 }
 
 } // namespace Quic
