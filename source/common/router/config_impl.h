@@ -951,7 +951,6 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-private:
   friend class RouteCreator;
 
   UriTemplateMatcherRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
@@ -960,6 +959,7 @@ private:
                                    ProtobufMessage::ValidationVisitor& validator,
                                    absl::Status& creation_status);
 
+private:
   const std::string uri_template_;
 };
 
@@ -986,14 +986,15 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-private:
   friend class RouteCreator;
+
   PrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                        const envoy::config::route::v3::Route& route,
                        Server::Configuration::ServerFactoryContext& factory_context,
                        ProtobufMessage::ValidationVisitor& validator,
                        absl::Status& creation_status);
 
+private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1020,13 +1021,14 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-private:
   friend class RouteCreator;
+
   PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
 
+private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1053,13 +1055,14 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-private:
   friend class RouteCreator;
+
   RegexRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                       const envoy::config::route::v3::Route& route,
                       Server::Configuration::ServerFactoryContext& factory_context,
                       ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
 
+private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1087,8 +1090,8 @@ public:
 
   bool supportsPathlessHeaders() const override { return true; }
 
-private:
   friend class RouteCreator;
+
   ConnectRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                         const envoy::config::route::v3::Route& route,
                         Server::Configuration::ServerFactoryContext& factory_context,
@@ -1119,14 +1122,15 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-private:
   friend class RouteCreator;
+
   PathSeparatedPrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                     const envoy::config::route::v3::Route& route,
                                     Server::Configuration::ServerFactoryContext& factory_context,
                                     ProtobufMessage::ValidationVisitor& validator,
                                     absl::Status& creation_status);
 
+private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
