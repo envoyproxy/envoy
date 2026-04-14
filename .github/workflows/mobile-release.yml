@@ -229,7 +229,7 @@ jobs:
       fail-fast: false
     environment:
       name: pypi
-      url: https://pypi.org/p/envoy-mobile
+      url: https://pypi.org/p/envoy-mobile-client
     steps:
     - uses: actions/download-artifact@v4
       with:
