@@ -200,6 +200,7 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
+  Http::ClientCertFormat clientCertFormat() const override { return Http::ClientCertFormat::Text; }
   const Matcher::MatchTreePtr<Http::HttpMatchingData>& forwardClientCertMatcher() const override {
     return forward_client_cert_matcher_;
   }

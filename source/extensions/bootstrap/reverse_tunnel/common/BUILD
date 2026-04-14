@@ -21,6 +21,7 @@ envoy_cc_extension(
         "//source/common/common:logger_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/tls:ssl_handshaker_lib",
     ],
 )
 

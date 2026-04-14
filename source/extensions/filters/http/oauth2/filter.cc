@@ -51,7 +51,7 @@ constexpr const char* OIDCLogoutUrlFormatString =
     "{0}?id_token_hint={1}&client_id={2}&post_logout_redirect_uri={3}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
-
+constexpr absl::string_view ServiceUnavailableBodyMessage = "Service Unavailable";
 constexpr absl::string_view queryParamsError = "error";
 constexpr absl::string_view queryParamsCode = "code";
 constexpr absl::string_view queryParamsState = "state";
@@ -462,6 +462,7 @@ FilterConfig::FilterConfig(
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher(), context)),
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
+      allow_failed_header_matchers_(headerMatchers(proto_config.allow_failed_matcher(), context)),
       cookie_names_(proto_config.credentials().cookie_names()),
       cookie_domain_(proto_config.credentials().cookie_domain()),
       auth_type_(getAuthType(proto_config.auth_type())),
@@ -607,20 +608,35 @@ bool OAuth2CookieValidator::timestampIsValid() const {
 
 bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
-OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
-                           std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source,
+OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr default_config,
+                           OAuth2ClientFactory oauth_client_factory,
+                           ValidatorFactory validator_factory, TimeSource& time_source,
                            Random::RandomGenerator& random)
-    : validator_(std::make_shared<OAuth2CookieValidator>(time_source, config->cookieNames(),
-                                                         config->cookieDomain())),
-      oauth_client_(std::move(oauth_client)), config_(std::move(config)), time_source_(time_source),
-      random_(random) {
-
-  oauth_client_->setCallbacks(*this);
+    : default_config_(std::move(default_config)),
+      oauth_client_factory_(std::move(oauth_client_factory)),
+      validator_factory_(std::move(validator_factory)), time_source_(time_source), random_(random) {
 }
 
-void OAuth2Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  PassThroughDecoderFilter::setDecoderFilterCallbacks(callbacks);
-  oauth_client_->setDecoderFilterCallbacks(callbacks);
+void OAuth2Filter::resolveAndSetActiveConfig() {
+  const auto* route_specific_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
+  const FilterConfig* config =
+      route_specific_config != nullptr ? route_specific_config : default_config_.get();
+
+  if (config == nullptr) {
+    return;
+  }
+  if (config_ == config) {
+    return;
+  }
+
+  config_ = config;
+  validator_ = validator_factory_(time_source_, *config_);
+
+  oauth_client_ = oauth_client_factory_(*config_);
+  oauth_client_->setCallbacks(*this);
+  ASSERT(decoder_callbacks_ != nullptr);
+  oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
 }
 
 /**
@@ -632,6 +648,20 @@ void OAuth2Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&
  * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Sanitize OAuth status headers unconditionally at the start of the filter to prevent clients
+  // from spoofing them. These headers are only supposed to be set by the OAuth2 filter itself.
+  headers.remove(OAuth2Headers::get().OAuthStatus);
+  headers.remove(OAuth2Headers::get().OAuthFailureReason);
+
+  // Resolve the active configuration for the request. Per-route configuration can override the
+  // default filter configuration, so this step is necessary to determine which configuration to use
+  // for the current request.
+  resolveAndSetActiveConfig();
+  // If no config is set, OAuth2 is disabled for this request.
+  if (config_ == nullptr) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   // Skip Filter and continue chain if a Passthrough header is matching.
   // Only increment counters here; do not modify request headers, as there may be
   // other instances of this filter configured that still need to process the request.
@@ -640,6 +670,11 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       config_->stats().oauth_passthrough_.inc();
       return Http::FilterHeadersStatus::Continue;
     }
+  }
+
+  if (!config_->requiredSecretsAvailable()) {
+    sendSecretsNotReadyResponse("OAuth2 secrets are not ready");
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   // Decrypt the OAuth tokens and update the corresponding cookies in the request headers
@@ -741,17 +776,28 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       // try to update access token by refresh token
       oauth_client_->asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
                                              config_->clientSecret(), config_->authType());
+      const auto state = oauth_client_->getState();
+      if (state == OAuth2Client::OAuthState::FailureContinue) {
+        return Http::FilterHeadersStatus::Continue;
+      } else if (state == OAuth2Client::OAuthState::FailureStop) {
+        return Http::FilterHeadersStatus::StopIteration;
+      }
       // pause while we await the next step from the OAuth server
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     }
 
-    if (canRedirectToOAuthServer(headers)) {
-      ENVOY_STREAM_LOG(debug, "redirecting to OAuth server: {}", *decoder_callbacks_, path_str);
-      redirectToOAuthServer(headers);
-      return Http::FilterHeadersStatus::StopIteration;
-    } else {
+    if (shouldAllowFailed(headers)) {
+      continueWithFailedOAuth(fmt::format(
+          "Unauthorized, and forwarding as unauthorized because OAuth failure is allowed: {}",
+          path_str));
+      return Http::FilterHeadersStatus::Continue;
+    } else if (shouldDenyRedirect(headers)) {
       sendUnauthorizedResponse(fmt::format(
           "Unauthorized, and redirecting to OAuth server is not allowed: {}", path_str));
+      return Http::FilterHeadersStatus::StopIteration;
+    } else {
+      ENVOY_STREAM_LOG(debug, "redirecting to OAuth server: {}", *decoder_callbacks_, path_str);
+      redirectToOAuthServer(headers);
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
@@ -790,6 +836,12 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
                                      redirect_uri, code_verifier, config_->authType());
+  const auto state = oauth_client_->getState();
+  if (state == OAuth2Client::OAuthState::FailureContinue) {
+    return Http::FilterHeadersStatus::Continue;
+  } else if (state == OAuth2Client::OAuthState::FailureStop) {
+    return Http::FilterHeadersStatus::StopIteration;
+  }
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
@@ -892,16 +944,6 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
     return encrypted_token;
   }
   return decrypt_result.plaintext;
-}
-
-bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const {
-  for (const auto& matcher : config_->denyRedirectMatchers()) {
-    if (matcher->matchesHeaders(headers)) {
-      ENVOY_STREAM_LOG(debug, "redirect is denied for this request", *decoder_callbacks_);
-      return false;
-    }
-  }
-  return true;
 }
 
 void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
@@ -1278,16 +1320,21 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   decoder_callbacks_->continueDecoding();
 }
 
-void OAuth2Filter::onRefreshAccessTokenFailure() {
+Http::FilterHeadersStatus OAuth2Filter::onRefreshAccessTokenFailure() {
   config_->stats().oauth_refreshtoken_failure_.inc();
-  // We failed to get an access token via the refresh token, so send the user to the oauth
-  // endpoint.
-  if (canRedirectToOAuthServer(*request_headers_)) {
-    redirectToOAuthServer(*request_headers_);
-  } else {
+  // We failed to get an access token via the refresh token. Forward the request based on the
+  // matcher configuration.
+  if (shouldAllowFailed(*request_headers_)) {
+    continueWithFailedOAuth("Failed to refresh the access token, and forwarding as unauthorized "
+                            "because OAuth failure is allowed");
+    return Http::FilterHeadersStatus::Continue;
+  } else if (shouldDenyRedirect(*request_headers_)) {
     sendUnauthorizedResponse(
         "Failed to refresh the access token, and redirecting to OAuth server is not allowed");
+  } else {
+    redirectToOAuthServer(*request_headers_);
   }
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 void OAuth2Filter::setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
@@ -1403,6 +1450,68 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
         }
       },
       absl::nullopt, details);
+}
+
+void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
+  ENVOY_STREAM_LOG(warn, "Responding with 503 Service Unavailable. Cause: {}", *decoder_callbacks_,
+                   details);
+  config_->stats().oauth_failure_.inc();
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, ServiceUnavailableBodyMessage,
+                                     nullptr, absl::nullopt, details);
+}
+
+bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) const {
+  // Never allow failed for OAuth callback endpoint - callback requests must always return 401
+  // on failure since the callback path is "hosted" by Envoy itself and shouldn't reach upstream.
+  const Http::HeaderEntry* path_header = headers.Path();
+  if (path_header != nullptr) {
+    const absl::string_view path = path_header->value().getStringView();
+    if (config_->redirectPathMatcher().match(path)) {
+      return false;
+    }
+  }
+
+  for (const auto& matcher : config_->allowFailedMatchers()) {
+    if (matcher->matchesHeaders(headers)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool OAuth2Filter::shouldDenyRedirect(const Http::RequestHeaderMap& headers) const {
+  for (const auto& matcher : config_->denyRedirectMatchers()) {
+    if (matcher->matchesHeaders(headers)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void OAuth2Filter::continueWithFailedOAuth(const std::string& reason,
+                                           const std::string& extra_details) {
+  removeOAuthTokenCookies(*request_headers_);
+  removeOAuthFlowCookies(*request_headers_);
+  request_headers_->setCopy(OAuth2Headers::get().OAuthStatus, "failed");
+  request_headers_->setCopy(OAuth2Headers::get().OAuthFailureReason, reason);
+  config_->stats().oauth_allow_failed_passthrough_.inc();
+  const std::string log_details =
+      extra_details.empty() ? reason : absl::StrCat(reason, ": ", extra_details);
+  ENVOY_STREAM_LOG(debug, "allow_failed_matcher matched, continuing as unauthorized: {}",
+                   *decoder_callbacks_, log_details);
+}
+
+Http::FilterHeadersStatus OAuth2Filter::handleOAuthFailure(const std::string& reason,
+                                                           const std::string& extra_details) {
+  if (shouldAllowFailed(*request_headers_)) {
+    continueWithFailedOAuth(reason, extra_details);
+    return Http::FilterHeadersStatus::Continue;
+  } else {
+    const std::string details =
+        extra_details.empty() ? reason : absl::StrCat(reason, ": ", extra_details);
+    sendUnauthorizedResponse(details);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
 }
 
 // Validates the OAuth callback request.
@@ -1555,6 +1664,28 @@ void OAuth2Filter::removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const
     std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
     headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
   }
+}
+
+// Removes OAuth token cookies from the request headers.
+// This is used in allow_failed mode where requests with failed/invalid OAuth credentials
+// should pass through to upstream as unauthenticated requests.
+// Removes bearer_token, id_token, oauth_hmac, oauth_expires, and refresh_token cookies.
+void OAuth2Filter::removeOAuthTokenCookies(Http::RequestHeaderMap& headers) const {
+  absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
+  if (cookies.empty()) {
+    return;
+  }
+  const CookieNames& cookie_names = config_->cookieNames();
+
+  // Remove all authentication credential cookies.
+  cookies.erase(cookie_names.bearer_token_);
+  cookies.erase(cookie_names.id_token_);
+  cookies.erase(cookie_names.oauth_hmac_);
+  cookies.erase(cookie_names.oauth_expires_);
+  cookies.erase(cookie_names.refresh_token_);
+
+  std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
+  headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
 }
 
 } // namespace Oauth2

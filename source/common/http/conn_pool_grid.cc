@@ -417,6 +417,7 @@ ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool(bool attempt_alter
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
   pool.addIdleCallback([this]() { onIdleReceived(); });
+  pool.setLifetimeCallbacks(makeOptRefFromPtr(this), hash_key_);
 }
 
 bool ConnectivityGrid::hasActiveConnections() const {
@@ -608,6 +609,26 @@ void ConnectivityGrid::onHandshakeComplete() {
 void ConnectivityGrid::onZeroRttHandshakeFailed() {
   ENVOY_LOG(trace, "Marking HTTP/3 failed for host '{}'.", host_->hostname());
   getHttp3StatusTracker().markHttp3FailedRecently();
+}
+
+void ConnectivityGrid::onConnectionOpen(ConnectionPool::Instance&, std::vector<uint8_t>&,
+                                        const Network::Connection& connection) {
+  if (callbacks_.has_value()) {
+    callbacks_->onConnectionOpen(*this, hash_key_, connection);
+  }
+}
+
+void ConnectivityGrid::onConnectionDraining(ConnectionPool::Instance&, std::vector<uint8_t>&,
+                                            const Network::Connection& connection) {
+  if (callbacks_.has_value()) {
+    callbacks_->onConnectionDraining(*this, hash_key_, connection);
+  }
+}
+
+void ConnectivityGrid::setLifetimeCallbacks(
+    OptRef<ConnectionPool::ConnectionLifetimeCallbacks> callbacks, std::vector<uint8_t> hash_key) {
+  callbacks_ = callbacks;
+  hash_key_ = std::move(hash_key);
 }
 
 } // namespace Http

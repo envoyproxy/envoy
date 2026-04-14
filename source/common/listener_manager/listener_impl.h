@@ -138,7 +138,8 @@ public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const envoy::config::listener::v3::Listener& config,
-                                 Server::DrainManagerPtr drain_manager);
+                                 Server::DrainManagerPtr drain_manager, Stats::ScopeSharedPtr scope,
+                                 Stats::ScopeSharedPtr listener_scope);
 
   Init::Manager& initManager() override;
   Network::DrainDecision& drainDecision() override;
@@ -167,7 +168,8 @@ public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
-                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager);
+                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager,
+                                Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope);
 
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
@@ -359,7 +361,8 @@ public:
 private:
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, absl::Status& creation_status);
+               bool workers_started, uint64_t hash, Stats::ScopeSharedPtr scope,
+               Stats::ScopeSharedPtr listener_scope, absl::Status& creation_status);
   struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
     UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
         : config_(config) {}

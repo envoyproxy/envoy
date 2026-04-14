@@ -4,6 +4,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
@@ -49,6 +50,8 @@ using OnBootstrapExtensionHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_http_callout_done);
 using OnBootstrapExtensionTimerFiredType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_timer_fired);
+using OnBootstrapExtensionFileChangedType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_file_changed);
 using OnBootstrapExtensionAdminRequestType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_admin_request);
 using OnBootstrapExtensionClusterAddOrUpdateType =
@@ -183,6 +186,7 @@ public:
   OnBootstrapExtensionConfigScheduledType on_bootstrap_extension_config_scheduled_ = nullptr;
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
   OnBootstrapExtensionTimerFiredType on_bootstrap_extension_timer_fired_ = nullptr;
+  OnBootstrapExtensionFileChangedType on_bootstrap_extension_file_changed_ = nullptr;
   OnBootstrapExtensionAdminRequestType on_bootstrap_extension_admin_request_ = nullptr;
   OnBootstrapExtensionClusterAddOrUpdateType on_bootstrap_extension_cluster_add_or_update_ =
       nullptr;
@@ -196,6 +200,11 @@ public:
 
   // The main thread dispatcher.
   Event::Dispatcher& main_thread_dispatcher_;
+
+  // File watchers created by
+  // envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch. Envoy owns the
+  // lifetime — watchers are destroyed when the config is destroyed.
+  std::vector<Filesystem::WatcherPtr> file_watchers_;
 
   // The server factory context for accessing cluster manager lazily. ClusterManager is not
   // available during bootstrap extension creation, so we store the context and access it when
