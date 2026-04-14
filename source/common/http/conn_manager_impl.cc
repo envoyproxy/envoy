@@ -190,8 +190,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
         std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             read_callbacks_->connection().connectionInfoProvider().remoteAddress(),
             read_callbacks_->connection().connectionInfoProvider().localAddress()}),
-        StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   if (config_->idleTimeout()) {
