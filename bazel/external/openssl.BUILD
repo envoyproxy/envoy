@@ -16,7 +16,24 @@ configure_make(
     }),
     configure_command = "Configure",
     configure_in_place = True,
-    configure_options = ["--libdir=lib"],
+    configure_options = [
+        "--libdir=lib",
+        "enable-brotli",
+        "--with-brotli-include=$$EXT_BUILD_DEPS/include",
+        "--with-brotli-lib=$$EXT_BUILD_DEPS/lib",
+        "enable-zlib",
+        "--with-zlib-include=$$EXT_BUILD_DEPS/include",
+        "--with-zlib-lib=$$EXT_BUILD_DEPS/lib",
+    ] + select({
+        "@envoy//bazel:dbg_build": ["--debug"],
+        "//conditions:default": [],
+    }),
+    # Ensure OpenSSL will link in the brotli & zlib *.a (not *.so) files.
+    configure_prefix = "rm -f $$EXT_BUILD_DEPS/lib/libbrotli*.so && " +
+                       "ln -sf libzlib-ng.a $$EXT_BUILD_DEPS/lib/libz.a && ",
+    env = {
+        "CC": "$$EXT_BUILD_ROOT$$/$(CC)",
+    },
     lib_source = ":all",
     out_lib_dir = "lib",
     out_shared_libs = [
@@ -29,6 +46,12 @@ configure_make(
         "install_sw",
     ],
     visibility = ["//visibility:public"],
+    deps = [
+        "@brotli//:brotlicommon",
+        "@brotli//:brotlidec",
+        "@brotli//:brotlienc",
+        "@zlib-ng//:zlib-ng",
+    ],
 )
 
 filegroup(

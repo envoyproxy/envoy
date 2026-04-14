@@ -40,6 +40,8 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl CBB_add_asn1 \
   --uncomment-func-decl CBB_add_bytes \
   --uncomment-func-decl CBB_add_space \
+  --uncomment-func-decl CBB_reserve \
+  --uncomment-func-decl CBB_did_write \
   --uncomment-func-decl CBB_add_u8 \
   --uncomment-func-decl CBB_add_u16 \
   --uncomment-using ScopedCBB \

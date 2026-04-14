@@ -307,9 +307,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cert_compression_test",
     srcs = ["cert_compression_test.cc"],
+    data = [
+        "//test/common/tls/test_data:certs",
+    ],
     external_deps = ["ssl"],
     deps = [
         "//source/common/tls:cert_compression_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
     ],
 )

@@ -79,6 +79,9 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_CTX_set_alpn_select_cb \
   --uncomment-func-decl SSL_CTX_set_alpn_protos \
   --uncomment-typedef SSL_new_session_cb \
+  --uncomment-typedef ssl_cert_compression_func_t \
+  --uncomment-typedef ssl_cert_decompression_func_t \
+  --uncomment-func-decl SSL_CTX_add_cert_compression_alg \
   --uncomment-func-decl SSL_CTX_sess_set_new_cb \
   --uncomment-func-decl SSL_CTX_new \
   --uncomment-func-decl SSL_CTX_up_ref \

@@ -29,6 +29,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl BIO_clear_retry_flags \
   --uncomment-func-decl BIO_printf \
   --uncomment-func-decl BIO_read_asn1 \
+  --uncomment-func-decl BIO_number_written \
   --uncomment-func-decl BIO_s_mem \
   --uncomment-func-decl BIO_new_mem_buf \
   --uncomment-func-decl BIO_mem_contents \

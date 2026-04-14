@@ -5,6 +5,8 @@ set -euo pipefail
 uncomment.sh "$1" --comment -h \
   --uncomment-macro-redef 'TLSEXT_TYPE_[[:alnum:]_]*' \
   --sed 's/ossl_TLSEXT_TYPE_psk_key_exchange_modes/ossl_TLSEXT_TYPE_psk_kex_modes/' \
+  --uncomment-macro TLSEXT_cert_compression_zlib \
+  --uncomment-macro TLSEXT_cert_compression_brotli \
   --uncomment-macro TLS1_CK_PSK_WITH_AES_128_CBC_SHA \
   --uncomment-macro TLS1_CK_PSK_WITH_AES_256_CBC_SHA \
   --uncomment-macro TLS1_CK_ECDHE_PSK_WITH_AES_128_CBC_SHA \

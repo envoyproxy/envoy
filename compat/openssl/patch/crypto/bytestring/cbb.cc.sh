@@ -20,6 +20,8 @@ uncomment.sh "$1" --comment \
   --uncomment-func-impl CBB_add_asn1 \
   --uncomment-func-impl CBB_add_bytes \
   --uncomment-func-impl CBB_add_space \
+  --uncomment-func-impl CBB_reserve \
+  --uncomment-func-impl CBB_did_write \
   --uncomment-func-impl cbb_add_u \
   --uncomment-func-impl CBB_add_u8 \
   --uncomment-func-impl CBB_add_u16 \
