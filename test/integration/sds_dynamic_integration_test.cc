@@ -1417,6 +1417,130 @@ TEST_P(SdsDynamicClusterIntegrationTest, CdsSdsCyclicDependency) {
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
 }
 
+// This test verifies that health checks do NOT start before SDS secrets are delivered.
+// Regression test of: https://github.com/envoyproxy/envoy/issues/43116
+TEST_P(SdsDynamicClusterIntegrationTest, ClusterWarmingWhileHealthCheckBlocksOnSds) {
+  defer_listener_finalization_ = true;
+
+  on_server_init_function_ = [this]() {
+    AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    xds_stream_->startGrpcStream();
+
+    // Add health check to the dynamic cluster.
+    auto* health_check = dynamic_cluster_.add_health_checks();
+    health_check->mutable_timeout()->set_seconds(5);
+    health_check->mutable_interval()->CopyFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(100));
+    health_check->mutable_no_traffic_interval()->CopyFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(100));
+    health_check->mutable_unhealthy_threshold()->set_value(1);
+    health_check->mutable_healthy_threshold()->set_value(1);
+    health_check->mutable_tcp_health_check();
+
+    // Send CDS response with both SDS cluster and dynamic cluster.
+    // The dynamic cluster will start warming, waiting for SDS.
+    sendCdsResponse();
+
+    // Wait for SDS connection to be established.
+    result = sdsUpstream()->waitForHttpConnection(*dispatcher_, sds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    sds_stream_->startGrpcStream();
+
+    // Do NOT send SDS response yet - cluster should remain warming.
+  };
+  sds_cluster_name_ = "sds_dynamic_cluster.lyft.com";
+
+  // The defer_listener_finalization_ = true above ensures that initialize() does not block
+  // even though the dynamic cluster is warming while waiting for SDS.
+  initialize();
+
+  // Wait for the dynamic cluster to exist and be in warming state.
+  test_server_->waitForGaugeEq("cluster.dynamic.warming_state", 1);
+
+  // Health checks must NOT have started while cluster is warming.
+  // Note: The counter may exist but its value should be 0.
+  auto counter = test_server_->counter("cluster.dynamic.health_check.attempt");
+  uint64_t attempt_count = counter ? counter->value() : 0;
+  EXPECT_EQ(0, attempt_count) << "Health checks started before SDS secrets were delivered!";
+
+  // Now send the SDS response with actual client certificate.
+  sendSdsResponse2(getClientSecret(), *sds_stream_);
+
+  // After SDS secrets are delivered, health checks should start.
+  test_server_->waitForCounterGe("cluster.dynamic.health_check.attempt", 1);
+
+  // Clean up.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {}, "42");
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
+}
+
+// This test verifies that with the runtime guard DISABLED, health checks starts and cluster becomes
+// unhealthy immediately.
+TEST_P(SdsDynamicClusterIntegrationTest, ClusterWarmingWhileHealthCheckBlocksOnSdsDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.health_check_after_cluster_warming",
+                                    "false");
+  defer_listener_finalization_ = true;
+
+  on_server_init_function_ = [this]() {
+    AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    xds_stream_->startGrpcStream();
+
+    // Add health check to the dynamic cluster.
+    auto* health_check = dynamic_cluster_.add_health_checks();
+    health_check->mutable_timeout()->set_seconds(5);
+    health_check->mutable_interval()->CopyFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(100));
+    health_check->mutable_no_traffic_interval()->CopyFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(100));
+    health_check->mutable_unhealthy_threshold()->set_value(1);
+    health_check->mutable_healthy_threshold()->set_value(1);
+    health_check->mutable_tcp_health_check();
+
+    // Send CDS response with both SDS cluster and dynamic cluster.
+    // The dynamic cluster will start warming, waiting for SDS.
+    sendCdsResponse();
+
+    // Wait for SDS connection to be established.
+    result = sdsUpstream()->waitForHttpConnection(*dispatcher_, sds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    sds_stream_->startGrpcStream();
+
+    // Do NOT send SDS response yet - cluster should remain warming.
+  };
+  sds_cluster_name_ = "sds_dynamic_cluster.lyft.com";
+
+  // The defer_listener_finalization_ = true above ensures that initialize() does not block
+  // even though the dynamic cluster is warming while waiting for SDS.
+  initialize();
+
+  // Wait for the dynamic cluster to exist and be in warming state.
+  test_server_->waitForGaugeEq("cluster.dynamic.warming_state", 1);
+
+  // With the runtime guard DISABLED, health checks start immediately (old behavior).
+  test_server_->waitForCounterGe("cluster.dynamic.health_check.attempt", 1);
+  test_server_->waitForGaugeEq("cluster.dynamic.membership_healthy", 0);
+
+  // Now send the SDS response with actual client certificate.
+  sendSdsResponse2(getClientSecret(), *sds_stream_);
+
+  // After SDS secrets are delivered, the cluster finishes warming.
+  test_server_->waitForGaugeEq("cluster.dynamic.warming_state", 0);
+
+  // Clean up.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {}, "42");
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
+}
+
 class SdsDynamicDownstreamPrivateKeyIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
 public:
   envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {

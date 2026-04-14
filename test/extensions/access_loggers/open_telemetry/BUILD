@@ -56,9 +56,11 @@ envoy_extension_cc_test(
     extension_names = ["envoy.access_loggers.open_telemetry"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/http:http_service_headers_lib",
         "//source/extensions/access_loggers/open_telemetry:http_access_log_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",

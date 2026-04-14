@@ -82,6 +82,8 @@ By *default* response compression is enabled, but it will be *skipped* when:
 - Response size is smaller than 30 bytes (only applicable when ``transfer-encoding``
   is not chunked).
 - A response code is on the list of uncompressible response codes, which is empty by default.
+- A response contains an ``ETag`` header and ``disable_on_etag_header`` is enabled (see
+  :ref:`ETag handling <config_http_filters_compressor_etag>`).
 
 Please note that in case the filter is configured to use a compression library extension
 other than gzip it looks for content encoding in the ``accept-encoding`` header provided by
@@ -93,6 +95,7 @@ When response compression is *applied*:
 - Response headers contain ``transfer-encoding: chunked``, and
   ``content-encoding`` with the compression scheme used (e.g., ``gzip``).
 - The ``vary: accept-encoding`` header is inserted on every response.
+- The ``ETag`` header is handled as described in :ref:`ETag handling <config_http_filters_compressor_etag>`.
 
 Also the ``vary: accept-encoding`` header may be inserted even if compression is **not**
 applied due to incompatible ``accept-encoding`` header in a request. This happens
@@ -106,6 +109,44 @@ When request compression is *applied*:
 - ``content-length`` is removed from request headers.
 - ``content-encoding`` with the compression scheme used (e.g., ``gzip``) is added to
   request headers.
+
+.. _config_http_filters_compressor_etag:
+
+ETag handling
+-------------
+
+When a response has an ``ETag`` header, the filter's behavior depends on
+``response_direction_config``:
+
+- **When both ``disable_on_etag_header`` and ``weaken_etag_on_compress`` are ``true``** —
+  ``weaken_etag_on_compress`` takes precedence. Compression is applied and the strong
+  ``ETag`` is weakened.
+
+- **``disable_on_etag_header: true``** (and ``weaken_etag_on_compress`` is ``false``) —
+  Compression is *skipped* for responses that contain an ``ETag``. The response is sent
+  unchanged (including the original ``ETag``). This avoids changing the entity tag when
+  the body would be modified by compression.
+
+- **``disable_on_etag_header: false``** (default) — Compression is allowed. When compression
+  is applied:
+
+  - **``weaken_etag_on_compress: false``** (default) — Weak ``ETag`` values (RFC 7232: ``W/`` prefix,
+    case-insensitive ``W``) are preserved. Any other value is treated as strong and is *removed*
+    from the response when compressing, since it would no longer match the compressed body.
+
+  - **``weaken_etag_on_compress: true``** — Weak ``ETag`` values are preserved. Strong
+    ``ETag`` values are *weakened* by prepending ``W/`` to the value (e.g. ``"abc123"``
+    becomes ``W/"abc123"``) instead of being removed. This allows caches and conditional
+    requests to keep working while indicating that the representation was modified by
+    compression. This behavior matches common practice in other proxies (e.g. Varnish).
+
+To weaken strong ETags when compressing instead of removing them, set
+``weaken_etag_on_compress`` in ``response_direction_config``:
+
+.. code-block:: yaml
+
+  response_direction_config:
+    weaken_etag_on_compress: true
 
 Compression Status Header
 -------------------------
@@ -128,7 +169,8 @@ Possible status values:
    - Additional Parameter: ``OriginalLength=<value>``, where ``<value>`` is the original value of the ``Content-Length`` header before compression.
 - ``ContentLengthTooSmall``: Compression was skipped because the content length is below the configured minimum threshold.
 - ``ContentTypeNotAllowed``: Compression was skipped because the response ``Content-Type`` is not in the allowed list.
-- ``EtagNotAllowed``: Compression was skipped because the response contains an ``ETag`` header and the ``disable_on_etag_header`` option is enabled.
+- ``EtagNotAllowed``: Compression was skipped because the response contains an ``ETag``
+  header and ``disable_on_etag_header`` is enabled (see :ref:`ETag handling <config_http_filters_compressor_etag>`).
 - ``StatusCodeNotAllowed``: Compression was skipped because the response status code is in the list of uncompressible status codes.
 
 Behavior Notes:
@@ -214,7 +256,8 @@ specific to responses only:
   header_compressor_overshadowed, Counter, Number of requests skipped by this filter instance because they were handled by another filter in the same filter chain.
   header_wildcard, Counter, Number of requests sent with ``\*`` set as the ``accept-encoding``.
   header_not_valid, Counter, Number of requests sent with a not valid ``accept-encoding`` header (aka ``q=0`` or an unsupported encoding type).
-  not_compressed_etag, Counter, Number of requests that were not compressed due to the etag header. ``disable_on_etag_header`` must be turned on for this to happen.
+  not_compressed_etag, Counter, Number of responses that were not compressed because they
+  contained an ``ETag`` header and ``disable_on_etag_header`` is enabled.
 
 .. attention::
 

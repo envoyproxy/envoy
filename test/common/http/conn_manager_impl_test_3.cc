@@ -1313,8 +1313,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
         EXPECT_EQ(nullptr, decoder_filters_[0]->callbacks_->route());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost(), nullptr);
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), nullptr);
+        EXPECT_FALSE(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().has_value());
+        EXPECT_FALSE(decoder_filters_[0]->callbacks_->streamInfo().route().has_value());
 
         // Clear route and next call on callbacks_->route() will trigger a re-snapping of the
         // snapped_route_config_.
@@ -1322,12 +1322,13 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
 
         // Now route config provider returns something.
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        EXPECT_EQ(fake_cluster1->info().get(),
+                  decoder_filters_[0]->callbacks_->clusterInfo().ptr());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost(),
-                  route1->virtual_host_);
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), route1);
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr(),
+                  route1->virtual_host_.get());
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route().ptr(), route1.get());
 
         return FilterHeadersStatus::StopIteration;
 
@@ -1394,9 +1395,9 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost(),
-                  route1->virtual_host_);
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), route1);
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr(),
+                  route1->virtual_host_.get());
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route().ptr(), route1.get());
 
         auto& test_headers = dynamic_cast<TestRequestHeaderMapImpl&>(headers);
         // Clear cached route and change scope key to "bar".
@@ -1413,9 +1414,9 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
         EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost(),
-                  route2->virtual_host_);
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), route2);
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr(),
+                  route2->virtual_host_.get());
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route().ptr(), route2.get());
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -1461,12 +1462,13 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        EXPECT_EQ(fake_cluster1->info().get(),
+                  decoder_filters_[0]->callbacks_->clusterInfo().ptr());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost(),
-                  route1->virtual_host_);
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), route1);
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr(),
+                  route1->virtual_host_.get());
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route().ptr(), route1.get());
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -2809,8 +2811,8 @@ TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteClusterWithoutRouteCache) 
         filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(filter->callbacks_->streamInfo().virtualHost(), nullptr);
-        EXPECT_EQ(filter->callbacks_->streamInfo().route(), nullptr);
+        EXPECT_FALSE(filter->callbacks_->streamInfo().virtualHost().has_value());
+        EXPECT_FALSE(filter->callbacks_->streamInfo().route().has_value());
 
         return FilterHeadersStatus::StopIteration;
       }));
@@ -2859,8 +2861,9 @@ TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteCluster) {
         EXPECT_CALL(cluster_manager_, getThreadLocalCluster("cluster_after_refrsh"));
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(filter->callbacks_->streamInfo().virtualHost(), mock_route_0->virtual_host_);
-        EXPECT_EQ(filter->callbacks_->streamInfo().route(), mock_route_0);
+        EXPECT_EQ(filter->callbacks_->streamInfo().virtualHost().ptr(),
+                  mock_route_0->virtual_host_.get());
+        EXPECT_EQ(filter->callbacks_->streamInfo().route().ptr(), mock_route_0.get());
 
         filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();
         return FilterHeadersStatus::StopIteration;

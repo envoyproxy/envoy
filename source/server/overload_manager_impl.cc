@@ -516,6 +516,12 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
         return;
       }
       makeCounter(api.rootScope(), OverloadActionStatsNames::get().ResetStreamsCount);
+    } else if (name == OverloadActionNames::get().ShrinkHeap) {
+      if (action.has_typed_config()) {
+        shrink_heap_config_ =
+            MessageUtil::anyConvertAndValidate<envoy::config::overload::v3::ShrinkHeapConfig>(
+                action.typed_config(), validation_visitor);
+      }
     } else if (action.has_typed_config()) {
       creation_status = absl::InvalidArgumentError(fmt::format(
           "Overload action \"{}\" has an unexpected value for the typed_config field", name));

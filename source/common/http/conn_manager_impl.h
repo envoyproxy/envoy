@@ -298,7 +298,8 @@ private:
     void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
                      absl::string_view transport_failure_reason = "") override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
-    Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
+    OptRef<const Upstream::ClusterInfo> clusterInfo() override;
+    Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;

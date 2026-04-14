@@ -332,7 +332,7 @@ public:
   void disableRouteTimeoutForWebsocketUpgrade() override {}
   Http::StreamDecoderFilterCallbacks* callbacks() override { return &decoder_filter_callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override {
-    return decoder_filter_callbacks_.clusterInfo();
+    return decoder_filter_callbacks_.clusterInfoSharedPtr();
   }
   Router::FilterConfig& config() override {
     return const_cast<Router::FilterConfig&>(config_.routerFilterConfig());

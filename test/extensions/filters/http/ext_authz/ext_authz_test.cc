@@ -4884,8 +4884,7 @@ TEST_P(HttpFilterTestParam, OnDestroyCancelsDefaultClient) {
 // Test that ext_authz filter is not in noop mode when cluster is not specified per route
 // (this could be the case when route is configured with redirect or direct response action).
 TEST_P(HttpFilterTestParam, NoCluster) {
-
-  ON_CALL(decoder_filter_callbacks_, clusterInfo()).WillByDefault(Return(nullptr));
+  decoder_filter_callbacks_.cluster_info_ = nullptr;
 
   // Place something in the context extensions on the route.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settingsroute;

@@ -34,6 +34,7 @@ envoy_extension_cc_test(
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
         "//source/extensions/filters/network/reverse_tunnel:reverse_tunnel_filter_lib",
+        "//test/common/tls:mock_ssl_handshaker_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/reverse_tunnel_reporting_service:reporter_mocks",

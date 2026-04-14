@@ -1011,7 +1011,7 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.mostSpecificPerFilterConfig());
   EXPECT_NO_THROW(stream_decoder_callbacks.account());
   EXPECT_NO_THROW(stream_decoder_callbacks.setUpstreamOverrideHost(
-      Upstream::LoadBalancerContext::OverrideHost(std::make_pair("foo", true))));
+      Upstream::LoadBalancerContext::OverrideHost{"foo", true}));
   EXPECT_NO_THROW(stream_decoder_callbacks.http1StreamEncoderOptions());
   EXPECT_NO_THROW(stream_decoder_callbacks.downstreamCallbacks());
   EXPECT_NO_THROW(stream_decoder_callbacks.upstreamCallbacks());

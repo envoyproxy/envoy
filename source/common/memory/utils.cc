@@ -12,11 +12,15 @@
 namespace Envoy {
 namespace Memory {
 
-void Utils::releaseFreeMemory() {
+void Utils::releaseFreeMemory(uint64_t max_unfreed_bytes) {
 #if defined(TCMALLOC)
-  tcmalloc::MallocExtension::ReleaseMemoryToSystem(maxUnfreedMemoryBytes());
+  uint64_t threshold = max_unfreed_bytes > 0 ? max_unfreed_bytes : maxUnfreedMemoryBytes();
+  tcmalloc::MallocExtension::ReleaseMemoryToSystem(threshold);
 #elif defined(GPERFTOOLS_TCMALLOC)
+  UNREFERENCED_PARAMETER(max_unfreed_bytes);
   MallocExtension::instance()->ReleaseFreeMemory();
+#else
+  UNREFERENCED_PARAMETER(max_unfreed_bytes);
 #endif
 }
 

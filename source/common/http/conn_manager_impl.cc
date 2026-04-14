@@ -2275,7 +2275,16 @@ OptRef<const Tracing::Config> ConnectionManagerImpl::ActiveStream::tracingConfig
 
 const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
 
-Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
+OptRef<const Upstream::ClusterInfo> ConnectionManagerImpl::ActiveStream::clusterInfo() {
+  // NOTE: Refreshing route caches clusterInfo as well.
+  if (!cached_route_.has_value()) {
+    refreshCachedRoute();
+  }
+
+  return makeOptRefFromPtr(cached_cluster_info_.value().get());
+}
+
+Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfoSharedPtr() {
   // NOTE: Refreshing route caches clusterInfo as well.
   if (!cached_route_.has_value()) {
     refreshCachedRoute();
@@ -2296,7 +2305,7 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
 void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
   Router::VirtualHostRoute vhost_route;
   if (route != nullptr) {
-    vhost_route.vhost = route->virtualHost();
+    vhost_route.vhost = route->virtualHostSharedPtr();
     vhost_route.route = std::move(route);
   }
   setVirtualHostRoute(std::move(vhost_route));

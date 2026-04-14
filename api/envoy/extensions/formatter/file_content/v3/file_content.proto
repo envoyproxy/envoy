@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package envoy.extensions.formatter.file_content.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.formatter.file_content.v3";
+option java_outer_classname = "FileContentProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/file_content/v3;file_contentv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Formatter extension for reading file contents]
+// [#extension: envoy.formatter.file_content]
+
+// FileContent formatter extension implements the ``%FILE_CONTENT(/path/to/file)%`` command operator
+// that reads the contents of the specified file. File-based data is automatically re-read when the
+// file is modified on disk.
+//
+// Optionally, a directory to watch for changes can be specified with a
+// colon followed by the directory to watch, eg ``%FILE_CONTENT(/path/to/file:/path/to/watch)%``.
+// See :ref:`watched_directory <envoy_v3_api_field_config.core.v3.DataSource.watched_directory>` for
+// detailed semantics.
+message FileContent {
+}

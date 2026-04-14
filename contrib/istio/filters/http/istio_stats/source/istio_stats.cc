@@ -982,15 +982,15 @@ private:
       service_host_name = "PassthroughCluster";
     } else {
       const auto cluster_info = info.upstreamClusterInfo();
-      if (cluster_info && cluster_info.value()) {
-        const auto& cluster_name = cluster_info.value()->name();
+      if (cluster_info) {
+        const auto& cluster_name = cluster_info->name();
         if (cluster_name == "BlackHoleCluster" || cluster_name == "PassthroughCluster" ||
             cluster_name == "InboundPassthroughCluster" ||
             cluster_name == "InboundPassthroughClusterIpv4" ||
             cluster_name == "InboundPassthroughClusterIpv6") {
           service_host_name = cluster_name;
         } else {
-          const auto& filter_metadata = cluster_info.value()->metadata().filter_metadata();
+          const auto& filter_metadata = cluster_info->metadata().filter_metadata();
           const auto& it = filter_metadata.find("istio");
           if (it != filter_metadata.end()) {
             const auto& services_it = it->second.fields().find("services");

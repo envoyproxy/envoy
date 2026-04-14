@@ -218,6 +218,14 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "mock_ssl_handshaker_lib",
+    hdrs = ["mock_ssl_handshaker.h"],
+    deps = [
+        "//source/common/tls:ssl_handshaker_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "test_private_key_method_provider_test_lib",
     srcs = [
         "test_private_key_method_provider.cc",

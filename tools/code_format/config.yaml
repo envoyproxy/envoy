@@ -126,6 +126,7 @@ paths:
     - source/common/secret/sds_api.cc
     - source/exe/stripped_main_base.cc
     - source/common/http/header_utility.cc
+    - source/common/http/http_service_headers.cc
     - source/common/common/matchers.cc
     - source/server/options_impl.cc
     - source/server/config_validation/server.cc
@@ -450,6 +451,7 @@ unsorted_flags:
 # https://github.com/envoyproxy/envoy/issues/9953
 # PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
 visibility_excludes:
+- source/extensions/access_loggers/open_telemetry/BUILD
 - source/extensions/clusters/eds/
 - source/extensions/clusters/strict_dns/
 - source/extensions/clusters/static/
@@ -461,6 +463,7 @@ visibility_excludes:
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD
 - source/extensions/filters/network/generic_proxy/interface/BUILD
+- source/extensions/formatter/file_content/BUILD
 - source/extensions/http/header_validators/envoy_default/BUILD
 - source/extensions/transport_sockets/common/BUILD
 - source/extensions/transport_sockets/tap/BUILD

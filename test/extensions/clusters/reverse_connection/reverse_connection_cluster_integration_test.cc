@@ -151,7 +151,7 @@ protected:
     // Configure the reverse tunnel filter.
     envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
     rt_config.mutable_ping_interval()->set_seconds(60);
-    rt_config.set_auto_close_connections(false);
+    rt_config.set_auto_close_connections(true);
     rt_config.set_request_path("/reverse_connections/request");
     rt_config.set_request_method(envoy::config::core::v3::GET);
     rt_filter->mutable_typed_config()->PackFrom(rt_config);
@@ -251,6 +251,7 @@ protected:
     // using the rc:// address format.
     auto* init_listener = bootstrap.mutable_static_resources()->add_listeners();
     init_listener->set_name("reverse_conn_listener");
+    init_listener->set_stat_prefix("reverse_conn_listener");
     init_listener->mutable_listener_filters_timeout()->set_seconds(0);
 
     // Use rc:// address format to encode reverse connection metadata.
@@ -343,6 +344,9 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTest) {
 
   // Wait for reverse tunnel to establish.
   test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1,
+                                 std::chrono::milliseconds(5000));
+  // Wait for the listener to accept a downstream connection.
+  test_server_->waitForCounterGe("listener.reverse_conn_listener.downstream_cx_total", 1,
                                  std::chrono::milliseconds(5000));
 
   // Verify reverse tunnel stats.
@@ -599,6 +603,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, EndToEndReverseTunnelTestWithMut
   // Wait for reverse tunnel to establish with mTLS.
   test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1,
                                  std::chrono::milliseconds(5000));
+  test_server_->waitForCounterGe("listener.reverse_conn_listener.downstream_cx_total", 1,
+                                 std::chrono::milliseconds(5000));
 
   // Verify reverse tunnel stats.
   test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.test-node-id", 1);
@@ -729,6 +735,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
     auto build_initiator_listener = [&](envoy::config::listener::v3::Listener& listener, int node,
                                         int cloud) {
       listener.set_name(fmt::format("node_{}_to_cloud_{}", node, cloud));
+      listener.set_stat_prefix("reverse_conn_listener");
       listener.mutable_listener_filters_timeout()->set_seconds(0);
       listener.set_drain_type(envoy::config::listener::v3::Listener::DEFAULT);
 
@@ -786,7 +793,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, ReverseTunnelResiliencyTest) {
 
       envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
       rt_config.mutable_ping_interval()->set_seconds(60);
-      rt_config.set_auto_close_connections(false);
+      rt_config.set_auto_close_connections(true);
       rt_config.set_request_path("/reverse_connections/request");
       rt_config.set_request_method(envoy::config::core::v3::GET);
       rt_filter->mutable_typed_config()->PackFrom(rt_config);
@@ -925,6 +932,8 @@ typed_config:
   // Wait for all 4 tunnels (2 nodes x 2 clouds).
   test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 4,
                                  std::chrono::milliseconds(10000));
+  test_server_->waitForCounterGe("listener.reverse_conn_listener.downstream_cx_total", 4,
+                                 std::chrono::milliseconds(5000));
 
   test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.node-1", 2);
   test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.node-2", 2);
@@ -1022,6 +1031,8 @@ typed_config:
   ENVOY_LOG_MISC(info, "Waiting for node-1 tunnels to re-establish.");
   test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 6,
                                  std::chrono::milliseconds(10000)); // 4 initial + 2 reconnect
+  test_server_->waitForCounterGe("listener.reverse_conn_listener.downstream_cx_total", 6,
+                                 std::chrono::milliseconds(5000));
 
   test_server_->waitForGaugeGe("reverse_tunnel_acceptor.nodes.node-1", 2);
   test_server_->waitForGaugeEq("reverse_tunnel_acceptor.nodes.node-2", 2);
@@ -1127,6 +1138,8 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
   // Each of the 4 workers should establish 1 connection, so we expect 4 total handshakes.
   test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 4,
                                  std::chrono::milliseconds(10000));
+  test_server_->waitForCounterGe("listener.reverse_conn_listener.downstream_cx_total", 4,
+                                 std::chrono::milliseconds(5000));
 
   // Verify total node connections. Since all workers use the same node-id (test-node-id),
   // the acceptor should show 4 connections from the same logical node.

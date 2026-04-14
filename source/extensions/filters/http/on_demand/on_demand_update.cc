@@ -174,7 +174,7 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeader
 void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
                                             Upstream::OdCdsApiHandle& odcds,
                                             std::chrono::milliseconds timeout) {
-  if (callbacks_->clusterInfo() != nullptr) {
+  if (callbacks_->clusterInfo().has_value()) {
     // Cluster already exists, so nothing to do here.
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return;

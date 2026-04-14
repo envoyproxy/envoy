@@ -27,6 +27,8 @@ public:
 
   absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
   getHttpRule(absl::string_view tool_name) const;
+  absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+  getToolsListHttpRule() const;
 
 private:
   absl::flat_hash_map<std::string,
@@ -90,7 +92,7 @@ private:
     OperationFailed = 6,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
-  absl::optional<int> session_id_;
+  absl::optional<nlohmann::json> session_id_;
   std::string server_name_;
   Buffer::OwnedImpl request_body_;
   std::string request_body_str_;

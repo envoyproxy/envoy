@@ -168,11 +168,11 @@ ClusterMetadataFormatter::ClusterMetadataFormatter(absl::string_view filter_name
     : MetadataFormatter(filter_namespace, path, max_length,
                         [](const StreamInfo::StreamInfo& stream_info)
                             -> const envoy::config::core::v3::Metadata* {
-                          auto cluster_info = stream_info.upstreamClusterInfo();
-                          if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+                          const auto cluster_info = stream_info.upstreamClusterInfo();
+                          if (!cluster_info) {
                             return nullptr;
                           }
-                          return &cluster_info.value()->metadata();
+                          return &cluster_info->metadata();
                         }) {}
 
 UpstreamHostMetadataFormatter::UpstreamHostMetadataFormatter(
@@ -1504,11 +1504,9 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<StreamInfoStringFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        std::string upstream_cluster_name;
-                                       if (stream_info.upstreamClusterInfo().has_value() &&
-                                           stream_info.upstreamClusterInfo().value() != nullptr) {
-                                         upstream_cluster_name = stream_info.upstreamClusterInfo()
-                                                                     .value()
-                                                                     ->observabilityName();
+                                       if (const auto cluster_info =
+                                               stream_info.upstreamClusterInfo()) {
+                                         upstream_cluster_name = cluster_info->observabilityName();
                                        }
 
                                        return upstream_cluster_name.empty()
@@ -1523,10 +1521,9 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<StreamInfoStringFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        std::string upstream_cluster_name;
-                                       if (stream_info.upstreamClusterInfo().has_value() &&
-                                           stream_info.upstreamClusterInfo().value() != nullptr) {
-                                         upstream_cluster_name =
-                                             stream_info.upstreamClusterInfo().value()->name();
+                                       if (const auto cluster_info =
+                                               stream_info.upstreamClusterInfo()) {
+                                         upstream_cluster_name = cluster_info->name();
                                        }
 
                                        return upstream_cluster_name.empty()
