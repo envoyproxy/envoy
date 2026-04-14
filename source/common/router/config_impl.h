@@ -418,10 +418,11 @@ public:
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
   absl::optional<bool> traceSampled() const override { return trace_sampled_; }
   bool disableShadowHostSuffixAppend() const override {
-    return disable_shadow_host_suffix_append_ || !host_rewrite_literal_.empty();
+    return disable_shadow_host_suffix_append_ || !host_rewrite_literal_.empty() || auto_host_rewrite_;
   }
   const Http::HeaderEvaluator& headerEvaluator() const override;
   absl::string_view hostRewriteLiteral() const override { return host_rewrite_literal_; }
+  bool autoHostRewrite() const override { return auto_host_rewrite_; }
 
 private:
   explicit ShadowPolicyImpl(const RequestMirrorPolicy& config,
@@ -435,6 +436,7 @@ private:
   absl::optional<bool> trace_sampled_;
   const bool disable_shadow_host_suffix_append_;
   const std::string host_rewrite_literal_;
+  const bool auto_host_rewrite_;
   HeaderMutationsPtr request_headers_mutations_;
 };
 

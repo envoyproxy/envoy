@@ -852,7 +852,7 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing doesn't support HTTP CONNECT and upgrades.
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
@@ -920,6 +920,23 @@ message RouteAction {
     // is implicitly enabled if this field is set.
     string host_rewrite_literal = 8
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // Indicates that the host header of the mirrored request should be rewritten to the hostname
+    // of the upstream host chosen by the shadow cluster's load balancer. This has the same
+    // semantics as :ref:`auto_host_rewrite
+    // <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>` on the main route.
+    // If the selected upstream host has no hostname (e.g. a STATIC cluster with only IP endpoints),
+    // the host header is left unchanged.
+    //
+    // This field is mutually exclusive with
+    // :ref:`host_rewrite_literal
+    // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.host_rewrite_literal>`.
+    // If both are set, ``host_rewrite_literal`` takes precedence.
+    //
+    // :ref:`disable_shadow_host_suffix_append
+    // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
+    // is implicitly enabled if this field is set.
+    google.protobuf.BoolValue auto_host_rewrite = 9;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer

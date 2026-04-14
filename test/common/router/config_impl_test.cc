@@ -4802,6 +4802,52 @@ virtual_hosts:
   EXPECT_EQ("existing-value", headers.get_("x-existing-header"));
 }
 
+// Test that auto_host_rewrite is correctly parsed and reflected in the shadow policy, and that it
+// implicitly disables the "-shadow" suffix append (similar to host_rewrite_literal).
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesAutoHostRewrite) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/auto-rewrite"
+    route:
+      request_mirror_policies:
+        - cluster: some_cluster
+          auto_host_rewrite: true
+      cluster: www2
+  - match:
+      prefix: "/no-rewrite"
+    route:
+      request_mirror_policies:
+        - cluster: some_cluster
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2", "some_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  const auto& auto_rewrite_policies =
+      config.route(genHeaders("www.lyft.com", "/auto-rewrite", "GET"), 0)
+          ->routeEntry()
+          ->shadowPolicies();
+  ASSERT_EQ(1, auto_rewrite_policies.size());
+  EXPECT_TRUE(auto_rewrite_policies[0]->autoHostRewrite());
+  // auto_host_rewrite implicitly disables the "-shadow" suffix.
+  EXPECT_TRUE(auto_rewrite_policies[0]->disableShadowHostSuffixAppend());
+
+  const auto& no_rewrite_policies =
+      config.route(genHeaders("www.lyft.com", "/no-rewrite", "GET"), 0)
+          ->routeEntry()
+          ->shadowPolicies();
+  ASSERT_EQ(1, no_rewrite_policies.size());
+  EXPECT_FALSE(no_rewrite_policies[0]->autoHostRewrite());
+  EXPECT_FALSE(no_rewrite_policies[0]->disableShadowHostSuffixAppend());
+}
+
 // Test if the higher level mirror policies are properly applied when routes
 // don't have one and not applied when they do.
 // In this test case, request_mirror_policies is set in route config level.

@@ -601,6 +601,12 @@ public:
    * @return the literal value to rewrite the host header with, or empty if no rewrite.
    */
   virtual absl::string_view hostRewriteLiteral() const PURE;
+
+  /**
+   * @return true if the host header should be rewritten to the hostname of the upstream host
+   *         selected by the shadow cluster's load balancer.
+   */
+  virtual bool autoHostRewrite() const PURE;
 };
 
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;

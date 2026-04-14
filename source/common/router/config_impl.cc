@@ -351,7 +351,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
                                    absl::Status& creation_status)
     : cluster_(config.cluster()), cluster_header_(config.cluster_header()),
       disable_shadow_host_suffix_append_(config.disable_shadow_host_suffix_append()),
-      host_rewrite_literal_(config.host_rewrite_literal()) {
+      host_rewrite_literal_(config.host_rewrite_literal()),
+      auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, auto_host_rewrite, false)) {
   SET_AND_RETURN_IF_NOT_OK(validateMirrorClusterSpecifier(config), creation_status);
 
   if (config.has_runtime_fraction()) {

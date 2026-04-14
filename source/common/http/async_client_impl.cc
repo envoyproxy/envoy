@@ -150,7 +150,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
 
   auto route_or_error = NullRouteImpl::create(
       parent_.cluster_->name(), std::move(retry_policy), parent_.factory_context_.regexEngine(),
-      options.timeout, options.hash_policy, metadata_matching_criteria);
+      options.timeout, options.hash_policy, metadata_matching_criteria, options.auto_host_rewrite);
   SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
   route_ = std::move(*route_or_error);
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);

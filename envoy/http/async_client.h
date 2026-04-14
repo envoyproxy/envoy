@@ -370,6 +370,11 @@ public:
       return *this;
     }
 
+    StreamOptions& setAutoHostRewrite(bool r) {
+      auto_host_rewrite = r;
+      return *this;
+    }
+
     StreamOptions& setParentSpan(Tracing::Span& parent_span) {
       parent_span_ = &parent_span;
       return *this;
@@ -446,6 +451,9 @@ public:
     bool is_shadow{false};
 
     bool is_shadow_suffixed_disabled{false};
+
+    bool auto_host_rewrite{false};
+
     bool discard_response_body{false};
 
     // The parent span that child spans are created under to trace egress requests/responses.

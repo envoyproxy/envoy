@@ -6,10 +6,14 @@
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
+
 #include "test/integration/filters/repick_cluster_filter.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/socket_interface_swap.h"
+#include "test/integration/utility.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 namespace Envoy {
 namespace {
@@ -1118,6 +1122,86 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowWithHeaderManipulation) {
   EXPECT_EQ(upstream_headers_->getHostValue(), "sni.lyft.com");
 
   cleanupUpstreamAndDownstream();
+}
+
+// When auto_host_rewrite is set on a mirror policy with a LOGICAL_DNS cluster, the Host header of
+// the mirrored request should be rewritten to the cluster's upstream hostname.
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterAutoHostRewriteLogicalDns) {
+  // TODO(#27132): auto_host_rewrite is broken for IPv6 addresses (UHV validation failure).
+  if (version_ == Network::Address::IpVersion::v6) {
+    return;
+  }
+
+  OsSysCallsWithMockedDns mock_os_sys_calls;
+  mock_os_sys_calls.setIpVersion(version_);
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&mock_os_sys_calls};
+
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Convert cluster_1 (index 1, added by initialConfigSetup) to LOGICAL_DNS and set an explicit
+    // endpoint hostname. ConfigHelper will still rewrite the socket address to the loopback IP,
+    // so DNS resolution succeeds, but the logical host's hostname comes from the endpoint field.
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(1);
+    cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
+    cluster->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
+    auto* typed_dns_resolver_config = cluster->mutable_typed_dns_resolver_config();
+    typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        getaddrinfo_config;
+    typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
+    // Set endpoint hostname so LogicalDnsCluster::hostname_ is "shadow.example.com" rather than
+    // the raw DNS address.
+    cluster->mutable_load_assignment()
+        ->mutable_endpoints(0)
+        ->mutable_lb_endpoints(0)
+        ->mutable_endpoint()
+        ->set_hostname("shadow.example.com");
+  });
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_1");
+        mirror_policy->mutable_auto_host_rewrite()->set_value(true);
+      });
+
+  initialize();
+  sendRequestAndValidateResponse();
+
+  EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
+  // The mirrored request's Host header should be rewritten to the shadow cluster's upstream
+  // hostname, not the downstream request's host and not the "-shadow"-suffixed version.
+  EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "shadow.example.com");
+}
+
+// When auto_host_rewrite is set on a mirror policy with a STATIC cluster (which has no hostname),
+// the "-shadow" suffix should be suppressed (same as disable_shadow_host_suffix_append) and the
+// Host header should remain unchanged since there is no upstream hostname to rewrite to.
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterAutoHostRewriteStaticCluster) {
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_1");
+        mirror_policy->mutable_auto_host_rewrite()->set_value(true);
+      });
+
+  initialize();
+  sendRequestAndValidateResponse();
+
+  // auto_host_rewrite on a STATIC cluster suppresses the "-shadow" suffix (no hostname to rewrite
+  // to, so the host header is preserved as-is from the downstream request).
+  EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
+  EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com");
 }
 
 } // namespace

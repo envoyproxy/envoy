@@ -870,6 +870,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
             .setSampled(shadow_policy.traceSampled())
             .setIsShadow(true)
             .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
+            .setAutoHostRewrite(shadow_policy.autoHostRewrite())
             .setBufferAccount(callbacks_->account())
             // Calculate effective buffer limit for shadow streams using the same logic as main
             // request. A buffer limit of 1 is set in the case that the effective limit == 0,

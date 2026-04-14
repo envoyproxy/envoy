@@ -95,11 +95,11 @@ struct RouteEntryImpl : public Router::RouteEntry {
          const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
              hash_policy,
          Router::RetryPolicyConstSharedPtr retry_policy, Regex::Engine& regex_engine,
-         const Router::MetadataMatchCriteria* metadata_match) {
+         const Router::MetadataMatchCriteria* metadata_match, bool auto_host_rewrite = false) {
     absl::Status creation_status = absl::OkStatus();
     auto ret = std::unique_ptr<RouteEntryImpl>(
         new RouteEntryImpl(cluster_name, timeout, hash_policy, std::move(retry_policy),
-                           regex_engine, creation_status, metadata_match));
+                           regex_engine, creation_status, metadata_match, auto_host_rewrite));
     RETURN_IF_NOT_OK(creation_status);
     return ret;
   }
@@ -110,9 +110,10 @@ protected:
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
           hash_policy,
       Router::RetryPolicyConstSharedPtr retry_policy, Regex::Engine& regex_engine,
-      absl::Status& creation_status, const Router::MetadataMatchCriteria* metadata_match)
+      absl::Status& creation_status, const Router::MetadataMatchCriteria* metadata_match,
+      bool auto_host_rewrite = false)
       : metadata_match_(metadata_match), retry_policy_(std::move(retry_policy)),
-        cluster_name_(cluster_name), timeout_(timeout) {
+        cluster_name_(cluster_name), timeout_(timeout), auto_host_rewrite_(auto_host_rewrite) {
     if (!hash_policy.empty()) {
       auto policy_or_error = HashPolicyImpl::create(hash_policy, regex_engine);
       SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
@@ -195,7 +196,7 @@ protected:
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
-  bool autoHostRewrite() const override { return false; }
+  bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool appendXfh() const override { return false; }
   bool includeVirtualHostRateLimits() const override { return true; }
   const Router::PathMatchCriterion& pathMatchCriterion() const override {
@@ -227,6 +228,7 @@ protected:
   Router::RouteEntry::UpgradeMap upgrade_map_;
   const std::string cluster_name_;
   absl::optional<std::chrono::milliseconds> timeout_;
+  const bool auto_host_rewrite_;
   static const ConnectConfigOptRef connect_config_nullopt_;
   // Pass early data option config through StreamOptions.
   std::unique_ptr<Router::EarlyDataPolicy> early_data_policy_{
@@ -239,11 +241,12 @@ struct NullRouteImpl : public Router::Route {
          Regex::Engine& regex_engine, const absl::optional<std::chrono::milliseconds>& timeout = {},
          const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
              hash_policy = {},
-         const Router::MetadataMatchCriteria* metadata_match = nullptr) {
+         const Router::MetadataMatchCriteria* metadata_match = nullptr,
+         bool auto_host_rewrite = false) {
     absl::Status creation_status;
     auto ret = std::unique_ptr<NullRouteImpl>(
         new NullRouteImpl(cluster_name, std::move(retry_policy), regex_engine, timeout, hash_policy,
-                          creation_status, metadata_match));
+                          creation_status, metadata_match, auto_host_rewrite));
     RETURN_IF_NOT_OK(creation_status);
     return ret;
   }
@@ -281,9 +284,11 @@ protected:
                 const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
                     hash_policy,
                 absl::Status& creation_status,
-                const Router::MetadataMatchCriteria* metadata_match) {
-    auto entry_or_error = RouteEntryImpl::create(
-        cluster_name, timeout, hash_policy, std::move(retry_policy), regex_engine, metadata_match);
+                const Router::MetadataMatchCriteria* metadata_match,
+                bool auto_host_rewrite = false) {
+    auto entry_or_error = RouteEntryImpl::create(cluster_name, timeout, hash_policy,
+                                                 std::move(retry_policy), regex_engine,
+                                                 metadata_match, auto_host_rewrite);
     SET_AND_RETURN_IF_NOT_OK(entry_or_error.status(), creation_status);
     route_entry_ = std::move(*entry_or_error);
   }
