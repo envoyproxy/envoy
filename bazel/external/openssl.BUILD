@@ -33,6 +33,7 @@ configure_make(
                        "ln -sf libzlib-ng.a $$EXT_BUILD_DEPS/lib/libz.a && ",
     env = {
         "CC": "$$EXT_BUILD_ROOT$$/$(CC)",
+        "AR": "$$EXT_BUILD_ROOT$$/$(AR)",
     },
     lib_source = ":all",
     out_lib_dir = "lib",
