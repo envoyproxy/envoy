@@ -37,6 +37,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: load_balancing
+  change: |
+    Changed the default behavior of ``OrcaWeightManager`` to prefer named metrics over application
+    utilization when computing utilization. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.orca_weight_manager_use_named_metrics_first`` to ``false``.
 - area: compressor
   change: |
     Strong ``ETag`` removal when compressing now uses the same weak ``W/`` check as
@@ -72,6 +77,11 @@ minor_behavior_changes:
     making per-host comparison O(1). In rare cases where two semantically equivalent metadata messages
     have different serializations, this may cause a spurious metadata update (false positive) but will
     never miss an actual change.
+- area: upstream
+  change: |
+    ``ProdClusterInfoFactory`` now honors ``alt_stat_name`` when creating cluster stats scopes, so
+    stats emitted through that path use the alternate cluster name consistently with other upstream
+    cluster implementations.
 - area: histograms
   change: |
     Updated libcircllhist to 0.3.2, which changes how bucket bounds are interpreted. This should not impact
@@ -104,6 +114,10 @@ minor_behavior_changes:
     Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
     serialize the ``google.protobuf.Struct`` configuration message to JSON string and pass it to the
     dynamic module side as the configuration.
+- area: oauth2
+  change: |
+    Added :ref:`per-route configuration support <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2PerRoute>`
+    to the OAuth2 HTTP filter.
 - area: proto_api_scrubber
   change: |
     If :ref:`scrub_unknown_fields
@@ -126,9 +140,26 @@ minor_behavior_changes:
     and the caller does not want to manage shared pointer ownership. The new shared pointer methods
     are intended for use cases where the caller needs to keep the ownerships to the route, cluster,
     or virtual host.
+- area: http
+  change: |
+    ``StreamRateLimiter`` constructor was updated to always take a pre-constructed and initialized
+    ``TokenBucket``, and remove the first argument ``max_buffered_data`` and the ``TimeSource&``
+    argument.
+    The ``write_stats_cb`` callback signature was changed from taking a ``bool`` argument
+    "something is buffered" to a ``uint64_t`` "how many bytes are buffered".
+    If already initializing with a ``TokenBucket``, you may need to call ``maybeReset`` on that
+    bucket before passing it to ``StreamRateLimiter`` to ensure equivalent initialization.
+    If previously constructing a ``StreamRateLimiter`` using ``max_buffered_data``, use
+    ``StreamRateLimiter::simpleTokenBucket(limit_kbps, time_source)`` to initialize an equivalent
+    ``TokenBucket``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: router
+  change: |
+    Fixed a bug where the router's buffer overflow check double-counted the request body size when an
+    upstream filter (e.g. the buffer filter) had already buffered all data. This caused requests with
+    body size between half and full buffer limit to incorrectly cancel internal redirects.
 - area: router
   change: |
     Fixed a crash in scoped RDS when on-demand update is triggered for a scope that uses inline
@@ -158,6 +189,12 @@ bug_fixes:
 - area: http
   change: |
     Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.
+- area: http
+  change: |
+    Allow ``Keep-Alive`` response headers added via ``response_headers_to_add`` to be preserved instead
+    of being stripped by HCM sanitization. Upstream ``Keep-Alive`` headers are now stripped in the router
+    before user-configured response headers are applied, so user-added ``Keep-Alive`` headers survive.
+    Protected by runtime guard ``envoy.reloadable_features.preserve_downstream_keepalive``.
 - area: http
   change: |
     Fixed a bug where the internal redirect logic may hang up a request when the request buffer is
@@ -286,6 +323,11 @@ bug_fixes:
   change: |
     Fixed an out-of-bounds issue in ThreadAwareLoadBalancerBase that could occur during mid-batch EDS host updates
     due to eagerly calling refresh() before the deferred priority state resize.
+- area: upstream
+  change: |
+    Fixed ``ProdClusterInfoFactory`` of HDS to honor ``alt_stat_name`` when creating cluster stats scopes, so
+    stats emitted through that path now use the alternate cluster name consistently with other upstream
+    cluster implementations.
 - area: access_log
   change: |
     Fixed a crash on listener removal with a process-level access log rate limiter
@@ -321,6 +363,12 @@ bug_fixes:
   change: |
     Fixed an issue where a userspace IO socket could fail to drain the write buffer of a connection
     when the peer had closed for reads, causing the connection to remain open indefinitely.
+- area: config_validation
+  change: |
+    Fixed ``--mode validate`` to create bootstrap extensions during config validation. Previously,
+    bootstrap extensions were completely skipped in validation mode, which meant their configs were
+    not validated and any providers or singletons they register were unavailable to downstream config
+    elements that depend on them.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -330,6 +378,21 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: dynamic_modules
+  change: |
+    Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
+    modules to check if the server is running in config validation mode.
+- area: ratelimit
+  change: |
+    Added ``is_negative_hits`` boolean to the ``hits_addend``
+    configuration in the rate limit API. This allows rate limit
+    requests to add to the rate limit budget (refill previously
+    consumed tokens) via
+    :ref:`HitsAddend.is_negative_hits
+    <envoy_v3_api_field_config.route.v3.RateLimit.HitsAddend.is_negative_hits>`,
+    or per descriptor in
+    :ref:`RateLimitDescriptor.is_negative_hits
+    <envoy_v3_api_field_extensions.common.ratelimit.v3.RateLimitDescriptor.is_negative_hits>`.
 - area: redis
   change: |
     Added zone-aware routing support for Redis Cluster proxy. New read policies
@@ -481,6 +544,18 @@ new_features:
     are enabled and reported at the cluster level. This the stats matcher could be configured via
     the xDS API dynamically on a per-cluster basis.
     See :ref:`envoy.stats_matcher <well_known_metadata_envoy_stats_matcher>` for more details.
+- area: stats
+  change: |
+    Added support for listener-level stats matcher via ``typed_filter_metadata`` key
+    ``envoy.stats_matcher`` in the listener's
+    :ref:`metadata <envoy_v3_api_field_config.listener.v3.Listener.metadata>`. When present,
+    the provided :ref:`StatsMatcher <envoy_v3_api_msg_config.metrics.v3.StatsMatcher>` replaces
+    the global stats matcher for that listener's stats scope, allowing fine-grained control over
+    which listener stats are created.
+    If the value of ``envoy.stats_matcher`` is set but does not contain a valid ``StatsMatcher``
+    message, this will be treated as an invalid configuration and the listener will fail to start.
+    This strict validation can be disabled temporarily by setting the runtime guard
+    ``envoy.reloadable_features.strict_stats_matcher_unpacked`` to ``false``.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
@@ -850,6 +925,10 @@ new_features:
     Added :ref:`allow_content_length_header
     <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_content_length_header>` to allow
     the ext_proc filter to preserve the original ``Content-Length`` header or let ext_proc server modify it as needed.
+- area: cluster
+  change: |
+    Added :ref:`MCP multi cluster <arch_overview_mcp_multicluster>` extension that combines multiple MCP services
+    into a single one. This cluster type is primarily intended to support aggregation of multiple MCP services into one.
 - area: tls
   change: |
     Enhanced TLS certificate validation failure messages for CRL-related errors in access logs. The
@@ -872,6 +951,10 @@ new_features:
     destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
     had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
     ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: formatter
+  change: |
+    Added support for ``%TRACE_ID%`` in the custom response policy filter's local response policy to allow
+    trace ID to be substituted into the response body.
 - area: redis
   change: |
     Added support for ``BITFIELD_RO`` in ``redis_proxy``.
@@ -899,6 +982,15 @@ new_features:
     Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
     ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
     This is necessary if the route configuration may depend on the filter state values set.
+- area: stateful_session
+  change: |
+    Added :ref:`status_on_strict_destination_not_found
+    <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.status_on_strict_destination_not_found>`
+    to the :ref:`stateful session filter <config_http_filters_stateful_session>`. When
+    :ref:`strict <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.strict>`
+    mode is enabled and the requested destination is not found in the set of available endpoints, Envoy
+    will return the configured HTTP status code instead of the default ``503``. This does not apply when
+    the destination exists but is unhealthy.
 - area: tcp_proxy
   change: |
     Propagate upstream TCP RST to downstream when detected close type is RemoteReset.
@@ -911,6 +1003,9 @@ new_features:
     DetectedCloseType::RemoteReset, enabling RST propagation through tunneled tcp_proxy.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.map_http_stream_reset_to_tcp_rst`` to false.
+- area: ratelimit
+  change: |
+    Support populating rate limit descriptors from cluster metadata.
 - area: http
   change: |
     Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
@@ -928,7 +1023,6 @@ new_features:
     tag-as-label emission, and full librdkafka producer tuning (including TLS and SASL
     authentication) are supported via
     :ref:`KafkaStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig>`.
-
 - area: tls
   change: |
     Added support for building Envoy with OpenSSL as an alternative to the default BoringSSL.
@@ -937,5 +1031,9 @@ new_features:
     ``--config=openssl``. HTTP/3 (QUIC) is disabled for OpenSSL builds. Note that OpenSSL builds are
     not currently covered by the `Envoy security policy <https://github.com/envoyproxy/envoy/blob/main/SECURITY.md>`_.
     See :repo:`bazel/SSL.md <bazel/SSL.md>` for details.
+- area: dynamic_modules
+  change: |
+    Promoted the dynamic modules HTTP filter (``envoy.filters.http.dynamic_modules``) from alpha
+    to stable.
 
 deprecated:

@@ -153,7 +153,8 @@ SecretManagerImpl::findOrCreateTlsSessionTicketKeysContextProvider(
 
 GenericSecretConfigProviderSharedPtr SecretManagerImpl::findOrCreateGenericSecretProvider(
     const envoy::config::core::v3::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::ServerFactoryContext& server_context, Init::Manager& init_manager) {
+    Server::Configuration::ServerFactoryContext& server_context,
+    OptRef<Init::Manager> init_manager) {
   return generic_secret_providers_.findOrCreate(sds_config_source, config_name, server_context,
                                                 init_manager, true);
 }

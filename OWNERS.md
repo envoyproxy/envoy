@@ -101,6 +101,7 @@ without further review.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
 * Antonio Leonti ([antoniovleonti](https://github.com/antoniovleonti)) (leonti@google.com)
 * Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (tyoneda@netflix.com)
+* Reuben Tanner ([reubent-goog](https://github.com/reubent-goog)) (reubent@google.com)
 
 # Emeritus maintainers
 

@@ -2,6 +2,7 @@
 
 #include "test/config/v2_link_hacks.h"
 #include "test/config_test/config_test.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -10,6 +11,12 @@
 namespace Envoy {
 
 TEST(ExampleConfigsTest, All) {
+  // If an example config yaml in docs uses a CELFormatterCommandParser, the
+  // ServerFactoryContext singleton must be initialized, as that parser gets
+  // its context from the singleton.
+  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context_;
+  ScopedThreadLocalServerContextSetter server_context_singleton_setter_{
+      mock_factory_context_.server_factory_context_};
   TestEnvironment::exec({TestEnvironment::runfilesPath("test/config_test/configs_test_setup.sh")});
   Filesystem::InstanceImpl file_system;
   const auto config_file_count = std::stoi(

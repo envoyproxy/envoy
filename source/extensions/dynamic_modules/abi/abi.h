@@ -495,6 +495,19 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
  */
 uint32_t envoy_dynamic_module_callback_get_concurrency();
 
+// ----------------------------- Server Mode -----------------------------------
+
+/**
+ * envoy_dynamic_module_callback_is_validation_mode may be called by the dynamic
+ * module to check if the server is running in config validation mode (--mode validate).
+ * This allows modules to optimize by only parsing and validating their config without
+ * performing expensive operations such as provider lookups or loading external resources.
+ * NOTE: This function must be called on the main thread.
+ *
+ * @return true if the server is in validation mode, false otherwise.
+ */
+bool envoy_dynamic_module_callback_is_validation_mode();
+
 // ----------------------------- Function Registry -----------------------------
 
 /**
@@ -7327,6 +7340,15 @@ typedef void* envoy_dynamic_module_type_bootstrap_extension_config_scheduler_mod
  */
 typedef void* envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr;
 
+/**
+ * File watcher event constants. These correspond to Envoy's Filesystem::Watcher::Events.
+ * These are bitmask values that can be OR'd together.
+ */
+typedef enum envoy_dynamic_module_type_file_watcher_event {
+  envoy_dynamic_module_type_file_watcher_event_MovedTo = 0x1,
+  envoy_dynamic_module_type_file_watcher_event_Modified = 0x2,
+} envoy_dynamic_module_type_file_watcher_event;
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
@@ -7484,6 +7506,25 @@ void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_file_changed is called when a file watched by
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch changes on the main
+ * thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param path is the path that was registered via
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch that triggered the
+ * change. This is owned by the callback closure and valid only for the duration of this call.
+ * @param events is the bitmask of events that occurred (MovedTo = 0x1, Modified = 0x2).
+ */
+void envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer path, uint32_t events);
 
 /**
  * envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update is called when a cluster is
@@ -8044,6 +8085,29 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
  */
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - File Watcher --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch is called by the module
+ * to watch a file or directory. Each call creates a new watcher for the given path. The watcher
+ * lifetime is managed by Envoy and tied to the config — all watchers are automatically destroyed
+ * when the config is destroyed.
+ *
+ * When the watched path changes, envoy_dynamic_module_on_bootstrap_extension_file_changed is called
+ * on the main thread with the path and events.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path is the path to the file or directory to watch.
+ * @param events is the bitmask of events to watch for (MovedTo = 0x1, Modified = 0x2).
+ * @return true if the watch was successfully added, false otherwise (e.g. file does not exist).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path, uint32_t events);
 
 // -------------------- Bootstrap Extension Callbacks - Admin Handler --------------------
 

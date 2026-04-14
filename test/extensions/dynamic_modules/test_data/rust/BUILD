@@ -42,6 +42,8 @@ test_program(name = "bootstrap_init_target_test")
 
 test_program(name = "bootstrap_timer_test")
 
+test_program(name = "bootstrap_file_watcher_test")
+
 test_program(name = "bootstrap_admin_handler_test")
 
 test_program(name = "bootstrap_cluster_lifecycle_test")
