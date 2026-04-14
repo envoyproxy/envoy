@@ -505,8 +505,8 @@ int VirtualHostWrapper::luaMetadata(lua_State* state) {
 }
 
 const Protobuf::Struct& RouteWrapper::getMetadata() const {
-  const auto& route = stream_info_.route();
-  if (route == nullptr) {
+  const auto route = stream_info_.route();
+  if (!route) {
     return Protobuf::Struct::default_instance();
   }
 

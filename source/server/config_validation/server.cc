@@ -136,10 +136,26 @@ void ValidationInstance::initialize(const Options& options,
   AdminFactoryContext factory_context(*this, std::make_shared<ListenerInfoImpl>());
   initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-                          Config::ServerExtensionValues::get().VALIDATION_LISTENER)
-                          .createListenerManager(*this, nullptr, *this, false, quic_stat_names_);
+  auto& validation_factory = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+      Config::ServerExtensionValues::get().VALIDATION_LISTENER);
+  auto empty_config = validation_factory.createEmptyConfigProto();
+  listener_manager_ = validation_factory.createListenerManager(*empty_config, *this, nullptr, *this,
+                                                               false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
+
+  // Create bootstrap extensions to validate their configs and register any providers
+  // or singletons needed by downstream config elements.
+  // Note: Any lifecycle callbacks are intentionally not invoked as they are serving-time callbacks
+  // with side effects not appropriate for validation.
+  for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
+    auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
+        bootstrap_extension);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    bootstrap_extensions_.push_back(
+        factory.createBootstrapExtension(*config, serverFactoryContext()));
+  }
 
   runtime_ = component_factory.createRuntime(*this, initial_config);
   ENVOY_BUG(runtime_ != nullptr,

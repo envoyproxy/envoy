@@ -90,7 +90,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
     } else {
       const auto* local_object = cb.filterState().getDataReadOnly<Network::AddressObject>(
           FilterNames::get().LocalFilterStateKey);
-      if (local_object) {
+      if (local_object && local_object->address()) {
         ENVOY_LOG_MISC(debug, "original_dst: set destination from filter state to {}",
                        local_object->address()->asString());
         socket.connectionInfoProvider().restoreLocalAddress(local_object->address());
@@ -98,7 +98,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
     }
     const auto* remote_object = cb.filterState().getDataReadOnly<Network::AddressObject>(
         FilterNames::get().RemoteFilterStateKey);
-    if (remote_object) {
+    if (remote_object && remote_object->address()) {
       ENVOY_LOG_MISC(debug, "original_dst: set source from filter state to {}",
                      remote_object->address()->asString());
       socket.connectionInfoProvider().setRemoteAddress(remote_object->address());

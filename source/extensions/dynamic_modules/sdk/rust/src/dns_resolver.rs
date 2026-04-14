@@ -5,16 +5,8 @@
 //! for upstream cluster endpoint resolution.
 
 use crate::{
-  abi,
-  drop_wrapped_c_void_ptr,
-  str_to_module_buffer,
-  strs_to_module_buffers,
-  wrap_into_c_void_ptr,
-  EnvoyCounterId,
-  EnvoyCounterVecId,
-  EnvoyGaugeId,
-  EnvoyGaugeVecId,
-  EnvoyHistogramId,
+  abi, drop_wrapped_c_void_ptr, str_to_module_buffer, strs_to_module_buffers, wrap_into_c_void_ptr,
+  EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId,
   EnvoyHistogramVecId,
 };
 use std::panic::{catch_unwind, AssertUnwindSafe};

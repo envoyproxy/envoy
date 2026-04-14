@@ -268,20 +268,20 @@ pub struct BytesInfo {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum AccessLogType {
-  NotSet               = 0,
+  NotSet = 0,
   TcpUpstreamConnected = 1,
-  TcpPeriodic          = 2,
-  TcpConnectionEnd     = 3,
-  DownstreamStart      = 4,
-  DownstreamPeriodic   = 5,
-  DownstreamEnd        = 6,
-  UpstreamPoolReady    = 7,
-  UpstreamPeriodic     = 8,
-  UpstreamEnd          = 9,
+  TcpPeriodic = 2,
+  TcpConnectionEnd = 3,
+  DownstreamStart = 4,
+  DownstreamPeriodic = 5,
+  DownstreamEnd = 6,
+  UpstreamPoolReady = 7,
+  UpstreamPeriodic = 8,
+  UpstreamEnd = 9,
   DownstreamTunnelSuccessfullyEstablished = 10,
   UdpTunnelUpstreamConnected = 11,
-  UdpPeriodic          = 12,
-  UdpSessionEnd        = 13,
+  UdpPeriodic = 12,
+  UdpSessionEnd = 13,
 }
 
 impl AccessLogType {
@@ -368,27 +368,95 @@ impl LogContext {
     self.log_type
   }
 
-  /// Get the HTTP response code.
-  pub fn response_code(&self) -> Option<u32> {
-    let code =
-      unsafe { abi::envoy_dynamic_module_callback_access_logger_get_response_code(self.envoy_ptr) };
+  // ---------------------------------------------------------------------------
+  // Generic Attribute Accessors
+  // ---------------------------------------------------------------------------
 
-    if code != 0 {
-      Some(code)
+  /// Get the value of the attribute with the given ID as a string.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  pub fn get_attribute_string(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: ptr::null_mut(),
+      length: 0,
+    };
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_attribute_string(
+        self.envoy_ptr,
+        attribute_id,
+        &mut result,
+      )
+    } {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
     } else {
       None
     }
   }
 
+  /// Get the value of the attribute with the given ID as an integer.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  pub fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<u64> {
+    let mut result: u64 = 0;
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_attribute_int(
+        self.envoy_ptr,
+        attribute_id,
+        &mut result,
+      )
+    } {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  /// Get the value of the attribute with the given ID as a boolean.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  pub fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool> {
+    let mut result: bool = false;
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+        self.envoy_ptr,
+        attribute_id,
+        &mut result,
+      )
+    } {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Convenience Accessors
+  // ---------------------------------------------------------------------------
+
+  /// Get the HTTP response code.
+  pub fn response_code(&self) -> Option<u32> {
+    self
+      .get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseCode)
+      .map(|v| v as u32)
+  }
+
   /// Get the response code details string.
   pub fn response_code_details(&self) -> Option<EnvoyBuffer<'_>> {
-    self
-      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_response_code_details)
+    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::ResponseCodeDetails)
   }
 
   /// Get the request protocol (e.g., "HTTP/1.1", "HTTP/2").
   pub fn protocol(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_protocol)
+    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestProtocol)
   }
 
   /// Get timing information.
@@ -439,17 +507,19 @@ impl LogContext {
 
   /// Get the route name.
   pub fn route_name(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_route_name)
+    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsRouteName)
   }
 
   /// Get the virtual cluster name.
   pub fn virtual_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name)
+    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsVirtualHostName)
   }
 
   /// Check if this is a health check request.
   pub fn is_health_check(&self) -> bool {
-    unsafe { abi::envoy_dynamic_module_callback_access_logger_is_health_check(self.envoy_ptr) }
+    self
+      .get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::HealthCheck)
+      .unwrap_or(false)
   }
 
   /// Get the upstream cluster name.
@@ -464,18 +534,23 @@ impl LogContext {
 
   /// Get the connection ID, or 0 if not available.
   pub fn connection_id(&self) -> u64 {
-    unsafe { abi::envoy_dynamic_module_callback_access_logger_get_connection_id(self.envoy_ptr) }
+    self
+      .get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId)
+      .unwrap_or(0)
   }
 
   /// Check if mTLS was used for the connection.
   pub fn is_mtls(&self) -> bool {
-    unsafe { abi::envoy_dynamic_module_callback_access_logger_is_mtls(self.envoy_ptr) }
+    self
+      .get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls)
+      .unwrap_or(false)
   }
 
   /// Get the requested server name (SNI).
   pub fn requested_server_name(&self) -> Option<EnvoyBuffer<'_>> {
-    self
-      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_requested_server_name)
+    self.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::ConnectionRequestedServerName,
+    )
   }
 
   /// Check if the request was sampled for tracing.
@@ -602,13 +677,15 @@ impl LogContext {
 
   /// Get the upstream request attempt count, or 0 if not available.
   pub fn attempt_count(&self) -> u32 {
-    unsafe { abi::envoy_dynamic_module_callback_access_logger_get_attempt_count(self.envoy_ptr) }
+    self
+      .get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::UpstreamRequestAttemptCount)
+      .unwrap_or(0) as u32
   }
 
   /// Get the connection termination details.
   pub fn connection_termination_details(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(
-      abi::envoy_dynamic_module_callback_access_logger_get_connection_termination_details,
+    self.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::ConnectionTerminationDetails,
     )
   }
 
@@ -684,8 +761,8 @@ impl LogContext {
 
   /// Get the upstream transport failure reason.
   pub fn upstream_transport_failure_reason(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(
-      abi::envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason,
+    self.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::UpstreamTransportFailureReason,
     )
   }
 
@@ -701,8 +778,8 @@ impl LogContext {
 
   /// Get the downstream transport failure reason.
   pub fn downstream_transport_failure_reason(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(
-      abi::envoy_dynamic_module_callback_access_logger_get_downstream_transport_failure_reason,
+    self.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::ConnectionTransportFailureReason,
     )
   }
 
@@ -743,21 +820,20 @@ impl LogContext {
 
   /// Get the downstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
   pub fn downstream_tls_version(&self) -> Option<EnvoyBuffer<'_>> {
-    self
-      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_downstream_tls_version)
+    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::ConnectionTlsVersion)
   }
 
   /// Get the downstream peer certificate subject (e.g., "CN=client").
   pub fn downstream_peer_subject(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(
-      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject,
+    self.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::ConnectionSubjectPeerCertificate,
     )
   }
 
   /// Get the downstream peer certificate SHA-256 digest.
   pub fn downstream_peer_cert_digest(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(
-      abi::envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest,
+    self.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::ConnectionSha256PeerCertificateDigest,
     )
   }
 
@@ -798,8 +874,8 @@ impl LogContext {
 
   /// Get the downstream local certificate subject (Envoy's own certificate).
   pub fn downstream_local_subject(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(
-      abi::envoy_dynamic_module_callback_access_logger_get_downstream_local_subject,
+    self.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::ConnectionSubjectLocalCertificate,
     )
   }
 
@@ -884,7 +960,7 @@ impl LogContext {
 
   /// Get the upstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
   pub fn upstream_tls_version(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_tls_version)
+    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::UpstreamTlsVersion)
   }
 
   /// Get the upstream TLS cipher suite.
@@ -904,8 +980,9 @@ impl LogContext {
 
   /// Get the upstream peer certificate subject.
   pub fn upstream_peer_subject(&self) -> Option<EnvoyBuffer<'_>> {
-    self
-      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_subject)
+    self.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::UpstreamSubjectPeerCertificate,
+    )
   }
 
   /// Get the upstream peer certificate issuer.
@@ -916,14 +993,15 @@ impl LogContext {
   /// Get the upstream local certificate subject (Envoy's own certificate for the upstream
   /// connection).
   pub fn upstream_local_subject(&self) -> Option<EnvoyBuffer<'_>> {
-    self
-      .get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_upstream_local_subject)
+    self.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::UpstreamSubjectLocalCertificate,
+    )
   }
 
   /// Get the upstream peer certificate SHA-256 digest.
   pub fn upstream_peer_cert_digest(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(
-      abi::envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_digest,
+    self.get_attribute_string(
+      abi::envoy_dynamic_module_type_attribute_id::UpstreamSha256PeerCertificateDigest,
     )
   }
 
@@ -981,7 +1059,7 @@ impl LogContext {
 
   /// Get the request ID (stream ID).
   pub fn request_id(&self) -> Option<EnvoyBuffer<'_>> {
-    self.get_envoy_buffer(abi::envoy_dynamic_module_callback_access_logger_get_request_id)
+    self.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestId)
   }
 
   /// Get a response trailer value by key.
@@ -1161,51 +1239,57 @@ impl LogContext {
 ///
 /// # Example
 ///
-/// ```ignore
-/// use envoy_dynamic_modules_rust_sdk::{access_log::*, declare_access_logger};
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::access_log::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::declare_access_logger;
 ///
 /// struct MyLoggerConfig {
-///     format: String,
-///     logs_counter: CounterHandle,
-///     config_envoy_ptr: *mut std::ffi::c_void,
+///   format: String,
+///   logs_counter: CounterHandle,
+///   config_envoy_ptr: *mut std::ffi::c_void,
 /// }
 ///
 /// unsafe impl Send for MyLoggerConfig {}
 /// unsafe impl Sync for MyLoggerConfig {}
 ///
 /// impl AccessLoggerConfig for MyLoggerConfig {
-///     fn new(ctx: &ConfigContext, name: &str, config: &[u8]) -> Result<Self, String> {
-///         let logs_counter = ctx.define_counter("logs_total")
-///             .ok_or("Failed to define counter")?;
-///         Ok(Self {
-///             format: String::from_utf8_lossy(config).to_string(),
-///             logs_counter,
-///             config_envoy_ptr: ctx.envoy_ptr(),
-///         })
-///     }
+///   fn new(ctx: &ConfigContext, name: &str, config: &[u8]) -> Result<Self, String> {
+///     let logs_counter = ctx
+///       .define_counter("logs_total")
+///       .ok_or("Failed to define counter")?;
+///     Ok(Self {
+///       format: String::from_utf8_lossy(config).to_string(),
+///       logs_counter,
+///       config_envoy_ptr: ctx.envoy_ptr(),
+///     })
+///   }
 ///
-///     fn create_logger(&self, metrics: MetricsContext) -> Box<dyn AccessLogger> {
-///         Box::new(MyLogger {
-///             format: self.format.clone(),
-///             logs_counter: self.logs_counter,
-///             metrics,
-///         })
-///     }
+///   fn create_logger(
+///     &self,
+///     metrics: MetricsContext,
+///     _logger_envoy_ptr: *mut std::ffi::c_void,
+///   ) -> Box<dyn AccessLogger> {
+///     Box::new(MyLogger {
+///       format: self.format.clone(),
+///       logs_counter: self.logs_counter,
+///       metrics,
+///     })
+///   }
 /// }
 ///
 /// struct MyLogger {
-///     format: String,
-///     logs_counter: CounterHandle,
-///     metrics: MetricsContext,
+///   format: String,
+///   logs_counter: CounterHandle,
+///   metrics: MetricsContext,
 /// }
 ///
 /// impl AccessLogger for MyLogger {
-///     fn log(&mut self, ctx: &LogContext) {
-///         self.metrics.increment_counter(self.logs_counter, 1);
-///         if let Some(code) = ctx.response_code() {
-///             println!("Response: {}", code);
-///         }
+///   fn log(&mut self, ctx: &LogContext) {
+///     self.metrics.increment_counter(self.logs_counter, 1);
+///     if let Some(code) = ctx.response_code() {
+///       println!("Response: {}", code);
 ///     }
+///   }
 /// }
 ///
 /// declare_access_logger!(MyLoggerConfig);
