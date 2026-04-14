@@ -184,7 +184,7 @@ message Vhds {
   // The virtual host resource name to use for on-demand VHDS requests.
   // The string should contain the token ``{domain}``, which will be replaced with
   // the domain being fetched. For example, if set to
-  // "xdstp://authority/vhds/on-demand/{domain}", if VHDS needs the domain for
+  // ``xdstp://authority/vhds/on-demand/{domain}``, if VHDS needs the domain for
   // "example.com", it will subscribe to the resource
   // "xdstp://authority/vhds/on-demand/example.com".
   //
