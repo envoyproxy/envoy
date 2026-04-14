@@ -15,7 +15,7 @@ def envoy_toolchains():
         name = "llvm_toolchain",
         llvm_version = "18.1.8",
         # These libs are only included for cross-compile targets
-        cxx_lib = {
+        cxx_cross_lib = {
             "linux-aarch64": "@libcxx_libs_aarch64",
             "linux-x86_64": "@libcxx_libs_x86_64",
         },
