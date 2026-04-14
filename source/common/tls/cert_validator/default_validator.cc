@@ -551,7 +551,7 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     if (cert == nullptr) {
       break;
     }
-    X509_NAME* name = X509_get_subject_name(cert.get());
+    const X509_NAME* name = X509_get_subject_name(cert.get());
     if (name == nullptr) {
       return absl::InvalidArgumentError(absl::StrCat(
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));
@@ -561,7 +561,8 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
       continue;
     }
 
-    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
+    // const_cast needed because AWS-LC's X509_NAME_dup takes non-const input.
+    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(const_cast<X509_NAME*>(name)));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
       return absl::InvalidArgumentError(absl::StrCat(
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));
