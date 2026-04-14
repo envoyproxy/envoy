@@ -95,24 +95,24 @@ services:
   envoy-build:
     <<: *envoy-build-base
     volumes:
-    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build${MOUNT_ACCESS_MODE:-}
-    - ${SOURCE_DIR:-..}:/source${MOUNT_ACCESS_MODE:-}
-    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}${MOUNT_ACCESS_MODE:-}
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build${MOUNT_ACCESS_MODE:-}:z
+    - ${SOURCE_DIR:-..}:/source${MOUNT_ACCESS_MODE:-}:z
+    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}${MOUNT_ACCESS_MODE:-}:z
 
   envoy-build-gpg:
     <<: *envoy-build-base
     volumes:
-    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
-    - ${SOURCE_DIR:-..}:/source
-    - ${ENVOY_GPG_DIR-${HOME}/.gnupg}:/build/.gnupg
-    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build:z
+    - ${SOURCE_DIR:-..}:/source:z
+    - ${ENVOY_GPG_DIR-${HOME}/.gnupg}:/build/.gnupg:z
+    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}:z
 
   envoy-build-dind:
     privileged: true
     <<: *envoy-build-base
     volumes:
-    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
-    - ${SOURCE_DIR:-..}:/source
-    - /var/run/docker.sock:/var/run/docker.sock
-    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
-    - ${ENVOY_ENTRYPOINT_EXTRA:-./docker-entrypoint-extra.sh}:/entrypoint-extra.sh
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build:z
+    - ${SOURCE_DIR:-..}:/source:z
+    - /var/run/docker.sock:/var/run/docker.sock:z
+    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}:z
+    - ${ENVOY_ENTRYPOINT_EXTRA:-./docker-entrypoint-extra.sh}:/entrypoint-extra.sh:z
