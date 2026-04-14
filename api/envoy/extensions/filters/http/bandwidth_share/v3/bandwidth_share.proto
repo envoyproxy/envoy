@@ -104,6 +104,12 @@ message BandwidthShare {
   bool enable_response_trailers = 4;
 
   // The prefix for the response trailers. Empty string is a valid prefix.
+  //
+  // If set, ``enable_response_trailers`` must be true.
+  //
+  // For example, if this value is ``x-banana-`` then the trailer keys will be
+  // ``x-banana-bandwidth-request-delay-ms``, ``x-banana-bandwidth-response-duration-ms``,
+  // etc.
   string response_trailer_prefix = 5
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
