@@ -2773,7 +2773,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(nullptr);
     StreamInfoFormatter upstream_format("UPSTREAM_TLS_GROUP");
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
@@ -2783,7 +2783,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     StreamInfoFormatter upstream_format("UPSTREAM_TLS_GROUP");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, tlsGroupString).WillRepeatedly(Return("X25519MLKEM768"));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ("X25519MLKEM768", upstream_format.format({}, stream_info));
   }
   {
@@ -2791,7 +2791,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     StreamInfoFormatter upstream_format("UPSTREAM_TLS_GROUP");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, tlsGroupString).WillRepeatedly(Return(""));
-    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    stream_info.upstreamInfo()->setUpstreamSslConnection(connection_info);
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
