@@ -134,6 +134,18 @@ pub unsafe fn get_server_concurrency() -> u32 {
   unsafe { abi::envoy_dynamic_module_callback_get_concurrency() }
 }
 
+/// Check if the server is running in config validation mode (`--mode validate`).
+///
+/// This allows modules to optimize by only parsing and validating their config without
+/// performing expensive operations such as provider lookups or loading external resources.
+///
+/// # Safety
+///
+/// This function must be called on the main thread.
+pub unsafe fn is_validation_mode() -> bool {
+  unsafe { abi::envoy_dynamic_module_callback_is_validation_mode() }
+}
+
 /// Register a function pointer under a name in the process-wide function registry.
 ///
 /// This allows modules loaded in the same process to expose functions that other modules can

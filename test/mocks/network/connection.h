@@ -153,6 +153,8 @@ public:
   MOCK_METHOD(StreamBuffer, getWriteBuffer, ());
   MOCK_METHOD(void, rawWrite, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, closeConnection, (ConnectionCloseAction close_action));
+  MOCK_METHOD(void, onFilterAboveHighWatermark, ());
+  MOCK_METHOD(void, onFilterBelowLowWatermark, ());
 };
 
 } // namespace Network

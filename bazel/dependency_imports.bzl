@@ -38,7 +38,12 @@ def envoy_dependency_imports(
         jq_version = JQ_VERSION,
         yq_version = YQ_VERSION,
         buf_sha = BUF_SHA,
-        buf_version = BUF_VERSION):
+        buf_version = BUF_VERSION,
+        # This allows the downstream repo to point to a different locally re-generated lockfile,
+        # which can be used to workaround a rules_rust bug. See:
+        # - https://github.com/bazelbuild/rules_rust/issues/3521
+        # - https://github.com/envoyproxy/envoy/issues/38951
+        cargo_bazel_lockfile = "@envoy//:Cargo.Bazel.lock"):
     compatibility_proxy_repo()
     rules_foreign_cc_dependencies()
     go_rules_dependencies()
@@ -76,7 +81,7 @@ def envoy_dependency_imports(
         ],
     )
     crate_universe_dependencies()
-    crates_repositories()
+    crates_repositories(cargo_bazel_lockfile = cargo_bazel_lockfile)
     grcov_repository()
     shellcheck_dependencies()
     proxy_wasm_rust_sdk_dependencies()
@@ -243,10 +248,10 @@ def envoy_download_go_sdks(go_version):
         version = go_version,
     )
 
-def crates_repositories():
+def crates_repositories(cargo_bazel_lockfile):
     crates_repository(
         name = "envoy_rust_crate_index",
         cargo_lockfile = "@envoy//:Cargo.lock",
-        lockfile = Label("@envoy//:Cargo.Bazel.lock"),
+        lockfile = Label(cargo_bazel_lockfile),
         manifests = ["@envoy//:Cargo.toml"],
     )

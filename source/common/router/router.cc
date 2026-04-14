@@ -1005,15 +1005,19 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   // Check if we would exceed buffer limits, regardless of current buffering state
   // This ensures error details are set even if retry state was cleared due to upstream reset.
-  const bool would_exceed_buffer =
-      (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
+  // When an upstream filter (e.g. the buffer filter) has already buffered all data,
+  // the decoding buffer and `data` may be the same object. Avoid double-counting in that case.
+  const Buffer::Instance* decoding_buffer = callbacks_->decodingBuffer();
+  const uint64_t payload_length =
+      (decoding_buffer != &data) ? getLength(decoding_buffer) + data.length() : data.length();
+  const bool would_exceed_buffer = (payload_length > effective_buffer_limit);
 
   // Handle buffer overflow.
   if (buffering && would_exceed_buffer) {
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. "
               "Giving up on buffering.",
-              getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
+              payload_length, effective_buffer_limit);
     cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     ENVOY_LOG(debug, "retry or redirect buffer overflow: skipping buffering");

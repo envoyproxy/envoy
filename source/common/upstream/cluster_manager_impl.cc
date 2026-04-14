@@ -2023,6 +2023,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
           parent.httpConnPoolIsIdle(host, priority, hash_key);
         });
 
+        pool->setLifetimeCallbacks(lb_->lifetimeCallbacks(), hash_key);
+
         return pool;
       });
 

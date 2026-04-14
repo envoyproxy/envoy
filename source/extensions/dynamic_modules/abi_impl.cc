@@ -74,6 +74,13 @@ uint32_t envoy_dynamic_module_callback_get_concurrency() {
   return context->options().concurrency();
 }
 
+bool envoy_dynamic_module_callback_is_validation_mode() {
+  using namespace Envoy;
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+  return context->options().mode() == Server::Mode::Validate;
+}
+
 // ---------------------- Function registry callbacks --------------------------------
 
 bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_module_buffer key,
