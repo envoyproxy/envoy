@@ -1975,8 +1975,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   // For auto_config (ALPN) clusters: if this is a WebSocket upgrade, filter out
   // protocols where extended CONNECT is disabled, to avoid the
   // upgrade-to-CONNECT transformation in the HTTP/2 or HTTP/3 codec.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.alpn_filter_websocket_protocols") &&
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.alpn_filter_websocket_protocols") &&
       (host->cluster().features() & Upstream::ClusterInfo::Features::USE_ALPN) && context &&
       context->downstreamHeaders() &&
       Http::Utility::isWebSocketUpgradeRequest(*context->downstreamHeaders())) {

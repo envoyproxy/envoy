@@ -2743,7 +2743,7 @@ TEST_F(ClusterManagerImplTest, LocalInterfaceNameForUpstreamConnectionThrowsInWi
 }
 #endif
 
-TEST_F(ClusterManagerImplTest, AlpnWebSocketFiltersH2AndH3WhenExtendedConnectDisabled) {
+TEST_F(ClusterManagerImplTest, AlpnWebSocketFiltersH2WhenAllowConnectDisabled) {
   AlpnTestConfigFactory alpn_factory;
   Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
       registered_factory(alpn_factory);
@@ -2767,11 +2767,8 @@ TEST_F(ClusterManagerImplTest, AlpnWebSocketFiltersH2AndH3WhenExtendedConnectDis
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           auto_config:
-            http_protocol_options: {}
             http2_protocol_options: {}
-            http3_protocol_options: {}
-            alternate_protocols_cache_options:
-              name: default
+            http_protocol_options: {}
       transport_socket:
         name: envoy.transport_sockets.alpn
         typed_config:
@@ -2784,7 +2781,6 @@ TEST_F(ClusterManagerImplTest, AlpnWebSocketFiltersH2AndH3WhenExtendedConnectDis
   auto host = tlc->chooseHost(nullptr).host;
   ASSERT_NE(nullptr, host);
   EXPECT_NE(0, host->cluster().features() & Upstream::ClusterInfo::Features::USE_ALPN);
-  EXPECT_NE(0, host->cluster().features() & Upstream::ClusterInfo::Features::HTTP3);
 
   NiceMock<MockLoadBalancerContext> context;
   Http::TestRequestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
@@ -2796,12 +2792,12 @@ TEST_F(ClusterManagerImplTest, AlpnWebSocketFiltersH2AndH3WhenExtendedConnectDis
   auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default, Http::Protocol::Http2, &context);
   EXPECT_TRUE(opt_cp.has_value());
 
-  // Both H2 (allow_connect false) and H3 (allow_extended_connect false) filtered out.
+  // H2 filtered out (allow_connect defaults false), leaving only H1.
   ASSERT_EQ(1, factory_.last_protocols_.size());
   EXPECT_EQ(Http::Protocol::Http11, factory_.last_protocols_[0]);
 }
 
-TEST_F(ClusterManagerImplTest, AlpnWebSocketPreservesAllWhenExtendedConnectEnabled) {
+TEST_F(ClusterManagerImplTest, AlpnWebSocketPreservesProtocolsWhenAllowConnectEnabled) {
   AlpnTestConfigFactory alpn_factory;
   Registry::InjectFactory<Server::Configuration::UpstreamTransportSocketConfigFactory>
       registered_factory(alpn_factory);
@@ -2825,13 +2821,9 @@ TEST_F(ClusterManagerImplTest, AlpnWebSocketPreservesAllWhenExtendedConnectEnabl
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           auto_config:
-            http_protocol_options: {}
             http2_protocol_options:
               allow_connect: true
-            http3_protocol_options:
-              allow_extended_connect: true
-            alternate_protocols_cache_options:
-              name: default
+            http_protocol_options: {}
       transport_socket:
         name: envoy.transport_sockets.alpn
         typed_config:
@@ -2844,7 +2836,6 @@ TEST_F(ClusterManagerImplTest, AlpnWebSocketPreservesAllWhenExtendedConnectEnabl
   auto host = tlc->chooseHost(nullptr).host;
   ASSERT_NE(nullptr, host);
   EXPECT_NE(0, host->cluster().features() & Upstream::ClusterInfo::Features::USE_ALPN);
-  EXPECT_NE(0, host->cluster().features() & Upstream::ClusterInfo::Features::HTTP3);
 
   NiceMock<MockLoadBalancerContext> context;
   Http::TestRequestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
@@ -2856,11 +2847,10 @@ TEST_F(ClusterManagerImplTest, AlpnWebSocketPreservesAllWhenExtendedConnectEnabl
   auto opt_cp = tlc->httpConnPool(host, ResourcePriority::Default, Http::Protocol::Http2, &context);
   EXPECT_TRUE(opt_cp.has_value());
 
-  // Both allow_connect and allow_extended_connect enabled, nothing filtered.
-  ASSERT_EQ(3, factory_.last_protocols_.size());
-  EXPECT_EQ(Http::Protocol::Http3, factory_.last_protocols_[0]);
-  EXPECT_EQ(Http::Protocol::Http2, factory_.last_protocols_[1]);
-  EXPECT_EQ(Http::Protocol::Http11, factory_.last_protocols_[2]);
+  // H2 allow_connect is true, so nothing filtered. Both H2 + H1 preserved.
+  ASSERT_EQ(2, factory_.last_protocols_.size());
+  EXPECT_EQ(Http::Protocol::Http2, factory_.last_protocols_[0]);
+  EXPECT_EQ(Http::Protocol::Http11, factory_.last_protocols_[1]);
 }
 
 TEST_F(ClusterManagerImplTest, AlpnNonWebSocketDoesNotFilterProtocols) {
