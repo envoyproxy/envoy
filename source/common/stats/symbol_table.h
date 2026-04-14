@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <bit>
 #include <memory>
 #include <stack>
 #include <string>
@@ -159,16 +160,10 @@ public:
      * Defined inline in the header to allow the compiler to inline on hot paths.
      */
     static size_t encodingSizeBytes(uint64_t number) {
-      // fast-path for the case 127 or less
-      if (number < kSpilloverMask) {
-        return 1;
-      }
-      size_t num_bytes = 0;
-      do {
-        ++num_bytes;
-        number >>= 7;
-      } while (number != 0);
-      return num_bytes;
+      // Branch-free: compute number of 7-bit groups needed via leading-zero count.
+      // appendEncoding() always emits at least one byte (i.e. a 0 length), so the
+      // value 0 requires 1 byte. number|1 ensures we have a floor of 1 byte.
+      return (64 - std::countl_zero(number | 1) + 6) / 7;
     }
 
     /**
