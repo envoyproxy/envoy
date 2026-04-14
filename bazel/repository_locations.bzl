@@ -720,21 +720,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-arm64.tar.gz"],
     ),
-
     fips_clang_ppc64le = dict(
         version = "14.0.0",
         sha256 = "2d504c4920885c86b306358846178bc2232dfac83b47c3b1d05861a8162980e6",
         strip_prefix = "clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/clang+llvm-{version}-powerpc64le-linux-ubuntu-18.04.tar.xz"],
     ),
-
     fips_go_ppc64le = dict(
         version = "1.18.1",
         sha256 = "33db623d1eecf362fe365107c12efc90eff0b9609e0b3345e258388019cb552a",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-ppc64le.tar.gz"],
     ),
-
     fips_cmake_src = dict(
         version = "4.2.3",
         sha256 = "7efaccde8c5a6b2968bad6ce0fe60e19b6e10701a12fce948c2bf79bac8a11e9",

@@ -1,5 +1,5 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@envoy//bazel/external:aws_lc_build.bzl", "aws_lc_build_command")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -98,27 +98,27 @@ genrule(
         "@envoy//bazel/external:aws_lc.genrule_cmd",
     ] + select({
         "@platforms//cpu:x86_64": [
-            "@llvm_toolchain_llvm//:bin/clang",
-            "@llvm_toolchain_llvm//:bin/clang++",
-            "@fips_go_linux_amd64//:all",
-            "@fips_go_linux_amd64//:bin/go",
             "@fips_cmake_linux_x86_64//:all",
             "@fips_cmake_linux_x86_64//:bin/cmake",
-         ],
-        "@platforms//cpu:aarch64": [
+            "@fips_go_linux_amd64//:all",
+            "@fips_go_linux_amd64//:bin/go",
             "@llvm_toolchain_llvm//:bin/clang",
             "@llvm_toolchain_llvm//:bin/clang++",
-            "@fips_go_linux_arm64//:all",
-            "@fips_go_linux_arm64//:bin/go",
+        ],
+        "@platforms//cpu:aarch64": [
             "@fips_cmake_linux_aarch64//:all",
             "@fips_cmake_linux_aarch64//:bin/cmake",
+            "@fips_go_linux_arm64//:all",
+            "@fips_go_linux_arm64//:bin/go",
+            "@llvm_toolchain_llvm//:bin/clang",
+            "@llvm_toolchain_llvm//:bin/clang++",
         ],
         "@platforms//cpu:ppc64le": [
+            ":cmake_bin",
             "@fips_clang_ppc64le//:bin/clang",
             "@fips_clang_ppc64le//:bin/clang++",
             "@fips_go_ppc64le//:all",
             "@fips_go_ppc64le//:bin/go",
-            ":cmake_bin",
         ],
         "//conditions:default": [],
     }),

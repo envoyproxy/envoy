@@ -309,7 +309,6 @@ def _aws_lc():
         name = "aws_lc",
         build_file = "@envoy//bazel/external:aws_lc.BUILD",
     )
-    NINJA_BUILD_CONTENT = "%s\nexports_files([\"configure.py\"])" % BUILD_ALL_CONTENT
     CMAKE_SOURCE_BUILD_CONTENT = "%s\nexports_files([\"bootstrap\"])" % BUILD_ALL_CONTENT
     external_http_archive(
         name = "fips_cmake_src",

@@ -1,4 +1,3 @@
-
 AWS_LC_BUILD_CMD = """
 set -eo pipefail
 export CLANG_BIN_DIR="$$(cd $$(dirname $(location %s)) && pwd)"
