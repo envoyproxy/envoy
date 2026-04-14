@@ -159,6 +159,10 @@ public:
      * Defined inline in the header to allow the compiler to inline on hot paths.
      */
     static size_t encodingSizeBytes(uint64_t number) {
+      // fast-path for the case 127 or less
+      if (number < kSpilloverMask) {
+        return 1;
+      }
       size_t num_bytes = 0;
       do {
         ++num_bytes;
@@ -205,6 +209,11 @@ public:
      * Defined inline in the header to allow the compiler to inline on hot paths.
      */
     static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding) {
+      // fast-path for the case 127 or less
+      if (encoding[0] < kSpilloverMask) {
+        return {encoding[0], 1};
+      }
+
       uint64_t number = 0;
       uint64_t uc = kSpilloverMask;
       const uint8_t* start = encoding;
