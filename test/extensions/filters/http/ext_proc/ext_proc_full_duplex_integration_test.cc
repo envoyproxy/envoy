@@ -987,6 +987,55 @@ TEST_P(ExtProcIntegrationTest,
   EXPECT_THAT(response->headers(), ContainsHeader("x-new-header_1", "new_1"));
 }
 
+// test for: mode_override changes response_body_mode from BUFFERED to
+// FULL_DUPLEX_STREAMED, but the upstream has already sent a chunked empty body (0-byte DATA frame
+// with end_stream=true) before the ext_proc server responds to the response headers.
+TEST_P(ExtProcIntegrationTest, ModeOverrideBufferedToFullDuplexChunkedEmptyResponseBody) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  // GET request with no body.
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  // ext_proc processes request headers (first gRPC message on the side stream).
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+
+  // Upstream connection: send response headers with end_stream=false (simulating chunked
+  // transfer encoding), then immediately send an empty DATA frame with end_stream=true.
+  // Both frames arrive *before* the ext_proc server responds to the response headers.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(0, true);
+
+  // ext_proc now receives the response headers message. Respond with mode_override that changes
+  // response_body_mode from BUFFERED to FULL_DUPLEX_STREAMED.
+  processGenericMessage(
+      *grpc_upstreams_[0], false, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        EXPECT_TRUE(req.has_response_headers());
+        resp.mutable_response_headers();
+        resp.mutable_mode_override()->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        return true;
+      });
+
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        EXPECT_EQ(body.body().size(), 0);
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body("");
+        streamed_response->set_end_of_stream(true);
+        return true;
+      });
+
+  // Downstream should receive the response without hanging.
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

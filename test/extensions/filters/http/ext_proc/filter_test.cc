@@ -6219,7 +6219,7 @@ TEST_F(HttpFilterTest, ModeOverrideBufferedToFullDuplexChunkedEmptyBody) {
   // Process response headers with mode_override changing response_body_mode to
   // FULL_DUPLEX_STREAMED.
   EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _)).Times(AnyNumber());
-  processResponseHeaders(false,
+  processResponseHeaders(true,
                          [](const HttpHeaders&, ProcessingResponse& response, HeadersResponse&) {
                            auto mode = response.mutable_mode_override();
                            mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
