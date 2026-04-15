@@ -378,6 +378,13 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: router
+  change: |
+    Added :ref:`auto_host_rewrite
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.auto_host_rewrite>`
+    support to :ref:`RequestMirrorPolicy
+    <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`, allowing mirrored
+    requests to rewrite the host header to the upstream host.
 - area: dynamic_modules
   change: |
     Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
