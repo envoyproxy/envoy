@@ -352,10 +352,6 @@ case $CI_TARGET in
             exit 1
         fi
         ENVOY_CACHE_OUTPUT_BASE="${ENVOY_CACHE_OUTPUT_BASE:-base}"
-        # workaround rules_rust bug for docs and external workspaces
-        if [[ "${ENVOY_CACHE_OUTPUT_BASE}" == "docs" || "${ENVOY_CACHE_OUTPUT_BASE}" == "external" ]]; then
-            export CARGO_BAZEL_REPIN=true
-        fi
         setup_clang_toolchain
         echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
         if [[ -n "${ENVOY_CACHE_WORKING_DIR}" ]]; then
