@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.original_dst.v3;
+
+import "envoy/type/metadata/v3/metadata.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.original_dst.v3";
+option java_outer_classname = "OriginalDstProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/original_dst/v3;original_dstv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Original Destination Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.original_dst]
+
+// This configuration allows the built-in Original Destination LB policy to be configured via the
+// LB policy extension point. See the :ref:`load balancing architecture overview
+// <arch_overview_load_balancing_types>` for more information.
+message OriginalDst {
+  // When true, a HTTP header can be used to override the original dst address. The default header is
+  // :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>`.
+  //
+  // .. attention::
+  //
+  //   This header isn't sanitized by default, so enabling this feature allows HTTP clients to
+  //   route traffic to arbitrary hosts and/or ports, which may have serious security
+  //   consequences.
+  //
+  // .. note::
+  //
+  //   If the header appears multiple times only the first value is used.
+  bool use_http_header = 1;
+
+  // The http header to override destination address if :ref:`use_http_header
+  // <envoy_v3_api_field_extensions.load_balancing_policies.original_dst.v3.OriginalDst.use_http_header>`
+  // is set to true. If the value is empty,
+  // :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` will be used.
+  string http_header_name = 2;
+
+  // The port to override for the original dst address. This port
+  // will take precedence over filter state and header override ports.
+  google.protobuf.UInt32Value upstream_port_override = 3 [(validate.rules).uint32 = {lte: 65535}];
+
+  // The dynamic metadata key to override destination address.
+  // First the request metadata is considered, then the connection one.
+  type.metadata.v3.MetadataKey metadata_key = 4;
+}

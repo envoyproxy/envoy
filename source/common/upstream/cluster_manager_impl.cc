@@ -891,7 +891,8 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   // case.
   TypedLoadBalancerFactory& typed_lb_factory = cluster_info->loadBalancerFactory();
   const bool cluster_provided_lb =
-      typed_lb_factory.name() == "envoy.load_balancing_policies.cluster_provided";
+      typed_lb_factory.name() == "envoy.load_balancing_policies.cluster_provided" ||
+      typed_lb_factory.name() == "envoy.load_balancing_policies.original_dst";
 
   if (cluster_provided_lb && lb == nullptr) {
     return absl::InvalidArgumentError(

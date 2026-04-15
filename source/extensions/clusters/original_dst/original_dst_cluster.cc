@@ -322,10 +322,13 @@ void OriginalDstCluster::cleanup() {
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 OriginalDstClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                              ClusterFactoryContext& context) {
-  if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+  // Accept CLUSTER_PROVIDED (legacy) or load_balancing_policy with original_dst extension.
+  if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED &&
+      !cluster.has_load_balancing_policy()) {
     return absl::InvalidArgumentError(
         fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
-                    "'CLUSTER_PROVIDED' is allowed with cluster type 'ORIGINAL_DST'",
+                    "'CLUSTER_PROVIDED' or 'load_balancing_policy' with original_dst is allowed "
+                    "with cluster type 'ORIGINAL_DST'",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()),
                     envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
   }
