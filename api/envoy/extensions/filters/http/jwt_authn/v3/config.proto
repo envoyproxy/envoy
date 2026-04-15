@@ -630,7 +630,8 @@ message ExtractOnlyWithoutValidation {
   // Downstream filters (RBAC, ext_authz) SHOULD check this header before
   // trusting any JWT-derived claim headers for authorization decisions.
   //
-  // Default (unset or empty): "x-jwt-signature-verified"
+  // Default (unset or empty): ``x-jwt-signature-verified``
+  //
   // Custom value: uses the specified header name
   //
   // This header is set by default, but its creation is guarded by the
