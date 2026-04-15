@@ -639,7 +639,9 @@ message ExtractOnlyWithoutValidation {
   // If removal is needed downstream, use header mutation in a subsequent filter.
   //
   // Example: with the default, all requests processed by this mode will have:
-  //   x-jwt-signature-verified: false
+  // .. code-block:: yaml
+  //
+  //    x-jwt-signature-verified: false
   //
   string verification_status_header = 1;
 }
