@@ -254,7 +254,7 @@ Extract-Only Mode Security Considerations
    When this mode is active, Envoy sets a verification status header on
    every request:
 
-   .. code-block:: text
+   .. code-block:: yaml
 
       x-jwt-signature-verified: false
 
