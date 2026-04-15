@@ -203,16 +203,17 @@ public:
         http_context_(http_context), zone_name_(factory_context.localInfo().zoneStatName()),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     for (const auto& header : strict_check_headers) {
-      const std::string lower_header = absl::AsciiStrToLower(header);
-      if (lower_header == Http::Headers::get().EnvoyUpstreamRequestTimeoutMs.get()) {
+      if (absl::EqualsIgnoreCase(header,
+                                 Http::Headers::get().EnvoyUpstreamRequestTimeoutMs.get())) {
         envoy_upstream_rq_timeout_ms_ = true;
-      } else if (lower_header == Http::Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs.get()) {
+      } else if (absl::EqualsIgnoreCase(
+                     header, Http::Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs.get())) {
         envoy_upstream_rq_per_try_timeout_ms_ = true;
-      } else if (lower_header == Http::Headers::get().EnvoyMaxRetries.get()) {
+      } else if (absl::EqualsIgnoreCase(header, Http::Headers::get().EnvoyMaxRetries.get())) {
         envoy_max_retries_ = true;
-      } else if (lower_header == Http::Headers::get().EnvoyRetryOn.get()) {
+      } else if (absl::EqualsIgnoreCase(header, Http::Headers::get().EnvoyRetryOn.get())) {
         envoy_retry_on_ = true;
-      } else if (lower_header == Http::Headers::get().EnvoyRetryGrpcOn.get()) {
+      } else if (absl::EqualsIgnoreCase(header, Http::Headers::get().EnvoyRetryGrpcOn.get())) {
         envoy_retry_grpc_on_ = true;
       }
     }
