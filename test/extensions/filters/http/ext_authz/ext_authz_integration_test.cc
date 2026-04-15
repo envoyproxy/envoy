@@ -53,6 +53,7 @@ struct GrpcInitializeConfigOpts {
   bool stats_expect_response_bytes = true;
   bool enforce_response_header_limits = false;
   uint32_t status_on_error_code = 0;
+  bool shadow_mode = false;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -152,6 +153,10 @@ public:
 
       if (opts.enforce_response_header_limits) {
         proto_config_.set_enforce_response_header_limits(true);
+      }
+
+      if (opts.shadow_mode) {
+        proto_config_.set_shadow_mode(true);
       }
 
       if (opts.status_on_error_code > 0) {
@@ -3464,6 +3469,36 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
     EXPECT_EQ("403", response->headers().getStatusValue());
     cleanup();
   }
+}
+
+// Verify that in shadow mode a denied response does not terminate the request — the request
+// reaches the upstream and the client gets a 200.
+TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedReachesUpstream) {
+  GrpcInitializeConfigOpts opts;
+  opts.shadow_mode = true;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::PERMISSION_DENIED;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  // Auth server denies the request.
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  check_response.mutable_denied_response()->mutable_status()->set_code(
+      envoy::type::v3::StatusCode::Forbidden);
+  check_response.mutable_denied_response()->set_body("you shall not pass");
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  // In shadow mode the request should reach the upstream despite the deny.
+  waitForSuccessfulUpstreamResponse("200");
+
+  cleanup();
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/17344

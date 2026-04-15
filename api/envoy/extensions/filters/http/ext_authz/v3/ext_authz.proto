@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 32]
+// [#next-free-field: 33]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -359,6 +359,27 @@ message ExtAuthz {
   //
   // Defaults to ``false``.
   bool enforce_response_header_limits = 31;
+
+  // When set to ``true``, the filter operates in shadow mode. In shadow mode the
+  // filter still calls the external authorization service and processes the response,
+  // but never terminates the request. Instead of sending a local reply on a denied or
+  // error response, the filter writes the authorization decision and associated response
+  // attributes (status code, body, headers) into dynamic metadata under the
+  // ``envoy.filters.http.ext_authz`` namespace so that a subsequent filter can read and
+  // optionally enforce them.
+  //
+  // Header and query-parameter mutations from an OK response are still applied to the
+  // request as usual.
+  //
+  // The following metadata keys are set in shadow mode:
+  //
+  // - ``shadow_engine_result``: one of ``ok``, ``denied``, or ``error``.
+  // - ``shadow_status_code``: the HTTP status code from the auth server (denied/error only).
+  // - ``shadow_body``: the response body from the auth server (denied/error only, if non-empty).
+  // - ``shadow_response_headers``: headers the auth server wanted set on the response (denied only).
+  //
+  // Defaults to ``false``.
+  bool shadow_mode = 32;
 }
 
 // Configuration for buffering the request data.

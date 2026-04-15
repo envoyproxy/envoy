@@ -6521,6 +6521,344 @@ TEST_F(HttpFilterTest, MultipleSetCookieHeadersOnSuccess) {
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
+// Shadow mode tests: when shadow_mode is enabled, the filter should never send a local reply.
+// Instead it writes the authorization decision into dynamic metadata and continues.
+
+// Verify that in shadow mode a Denied response sets metadata and continues (no local reply).
+TEST_F(HttpFilterTest, ShadowModeDeniedSetsMetadataAndContinues) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  shadow_mode: true
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // The response flag should NOT be set in shadow mode.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  // Expect shadow metadata to be set (second call — first is the auth server's own
+  // dynamic_metadata which is empty here so it won't fire).
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns,
+                          const Protobuf::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
+        EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_engine_result").string_value(),
+                  "denied");
+        EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_status_code").number_value(), 401);
+        EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_body").string_value(),
+                  "Access denied");
+        EXPECT_TRUE(returned_dynamic_metadata.fields().contains("shadow_response_headers"));
+        const auto& headers_struct =
+            returned_dynamic_metadata.fields().at("shadow_response_headers").struct_value();
+        EXPECT_EQ(headers_struct.fields().at("x-auth-reason").string_value(), "unauthorized");
+      }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Unauthorized;
+  response.body = "Access denied";
+  response.headers_to_set = {{"x-auth-reason", "unauthorized"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+  // In shadow mode, denied stats are still incremented (the decision was deny).
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+  // Denied response headers should NOT be applied to the request (they are response-destined
+  // headers like WWW-Authenticate). They are available in dynamic metadata instead.
+  EXPECT_EQ("", request_headers_.get_("x-auth-reason"));
+}
+
+// Verify that in shadow mode an Error response sets metadata and continues (no local reply).
+TEST_F(HttpFilterTest, ShadowModeErrorSetsMetadataAndContinues) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  shadow_mode: true
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns,
+                          const Protobuf::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
+        EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_engine_result").string_value(),
+                  "error");
+        // Default status_on_error is 403.
+        EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_status_code").number_value(), 403);
+        EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_body").string_value(),
+                  "auth service error");
+      }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  response.body = "auth service error";
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().shadow_error_.value());
+  // In shadow mode, error stats are still incremented (the auth service returned an error).
+  EXPECT_EQ(1U, config_->stats().error_.value());
+}
+
+// Verify that in shadow mode an OK response sets metadata and continues as normal.
+TEST_F(HttpFilterTest, ShadowModeOkSetsMetadata) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  shadow_mode: true
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(
+          Invoke([](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
+            EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
+            EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_engine_result").string_value(),
+                      "ok");
+          }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_error_.value());
+}
+
+// Verify that in shadow mode + deny_at_disable, the filter sets metadata and continues
+// instead of sending a local reply.
+TEST_F(HttpFilterTest, ShadowModeDenyAtDisable) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  shadow_mode: true
+  filter_enabled:
+    runtime_key: "http.ext_authz.enabled"
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  deny_at_disable:
+    runtime_key: "http.ext_authz.deny_at_disable"
+    default_value:
+      value: true
+  )EOF");
+
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("http.ext_authz.enabled",
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
+      .WillByDefault(Return(false));
+
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("http.ext_authz.enabled", false))
+      .WillByDefault(Return(true));
+
+  // Check should NOT be called since the filter is disabled.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  // Should NOT send local reply.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+
+  // Should set shadow metadata.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([](const std::string& ns,
+                          const Protobuf::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
+        EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_engine_result").string_value(),
+                  "denied");
+        EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_status_code").number_value(), 403);
+      }));
+
+  // Filter should continue, not stop.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ(1U, config_->stats().disabled_.value());
+}
+
+// Verify that when shadow_mode is false (default), the filter sends local replies as before.
+TEST_F(HttpFilterTest, ShadowModeDisabledPreservesExistingBehaviour) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Forbidden;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  // Local reply should have been sent — denied counter should be incremented, not shadow_denied.
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+}
+
+// Verify that shadow mode works with the auth server's own dynamic_metadata alongside
+// shadow decision metadata.
+TEST_F(HttpFilterTest, ShadowModeDeniedWithAuthServerDynamicMetadata) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  shadow_mode: true
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // First call: auth server's own dynamic_metadata.
+  // Second call: shadow mode metadata.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(
+          Invoke([](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
+            EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
+            // This is the auth server's own metadata.
+            EXPECT_EQ(returned_dynamic_metadata.fields().at("custom_key").string_value(),
+                      "custom_value");
+          }))
+      .WillOnce(
+          Invoke([](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
+            EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
+            // This is the shadow decision metadata.
+            EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_engine_result").string_value(),
+                      "denied");
+          }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Forbidden;
+  (*response.dynamic_metadata.mutable_fields())["custom_key"] =
+      ValueUtil::stringValue("custom_value");
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+}
+
+// Verify shadow mode error with empty body (exercises the empty-body branch in
+// setShadowModeMetadata's Error case).
+TEST_F(HttpFilterTest, ShadowModeErrorEmptyBody) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  shadow_mode: true
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(
+          Invoke([](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
+            EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
+            EXPECT_EQ(returned_dynamic_metadata.fields().at("shadow_engine_result").string_value(),
+                      "error");
+            EXPECT_FALSE(returned_dynamic_metadata.fields().contains("shadow_body"));
+          }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  // No body set — exercises the empty-body branch.
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().shadow_error_.value());
+  EXPECT_EQ(1U, config_->stats().error_.value());
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters

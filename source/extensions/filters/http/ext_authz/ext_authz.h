@@ -50,7 +50,9 @@ namespace ExtAuthz {
   COUNTER(filter_state_name_collision)                                                             \
   COUNTER(omitted_response_headers)                                                                \
   COUNTER(request_header_limits_reached)                                                           \
-  COUNTER(response_header_limits_reached)
+  COUNTER(response_header_limits_reached)                                                          \
+  COUNTER(shadow_denied)                                                                           \
+  COUNTER(shadow_error)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -146,6 +148,8 @@ public:
   bool withRequestBody() const { return max_request_bytes_ > 0; }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
+
+  bool shadowMode() const { return shadow_mode_; }
 
   bool failureModeAllowHeaderAdd() const { return failure_mode_allow_header_add_; }
 
@@ -264,6 +268,7 @@ private:
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
   const bool failure_mode_allow_header_add_;
+  const bool shadow_mode_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const uint32_t max_denied_response_body_bytes_;
@@ -475,6 +480,9 @@ private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
+  // In shadow mode, writes the authorization decision and response attributes into
+  // dynamic metadata and increments the appropriate shadow stat counter.
+  void setShadowModeMetadata(const Filters::Common::ExtAuthz::ResponsePtr& response);
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
   void updateEffect(const Filters::Common::ProcessingEffect::Effect effect);
