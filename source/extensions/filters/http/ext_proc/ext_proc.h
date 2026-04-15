@@ -549,9 +549,9 @@ public:
   void encodeComplete() override {
     if (config_->observabilityMode()) {
       logStreamInfo();
-      // Always use the main downstream stream info as a fallback, since the gRPC stream to
-      // ext_proc may already be closed.
-      if (logging_info_ != nullptr) {
+      // Use the main downstream stream info as a fallback, since the gRPC stream to ext_proc
+      // may already be closed.
+      if (logging_info_ != nullptr && logging_info_->httpResponseCodeDetails().empty()) {
         logging_info_->setHttpResponseCodeDetails(
             decoder_callbacks_->streamInfo().responseCodeDetails());
       }
