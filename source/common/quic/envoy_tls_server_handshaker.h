@@ -23,9 +23,9 @@ public:
                            const quic::QuicCryptoServerConfig* crypto_config,
                            Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption);
 
-  // Session ticket key callback installed on QUICHE's SSL_CTX.
-  // Retrieves EnvoyTlsServerHandshaker from SSL ex_data and delegates to
-  // the pinned ServerContextImpl::sessionTicketProcess().
+  // Session ticket key callback installed on the QUICHE ssl context.
+  // Retrieves the handshaker from ssl ex_data and delegates to the pinned
+  // ServerContextImpl::sessionTicketProcess().
   static int ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                                HMAC_CTX* hmac_ctx, int encrypt);
 
