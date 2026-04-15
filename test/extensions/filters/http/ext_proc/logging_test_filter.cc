@@ -33,16 +33,15 @@ public:
         decoder_callbacks_->streamInfo().filterState();
     const ExtProcLoggingInfo* ext_proc_logging_info =
         filter_state->getDataReadOnly<ExtProcLoggingInfo>(logging_id_);
-    if (ext_proc_logging_info != nullptr) {
-      EXPECT_NE(ext_proc_logging_info->bytesSent(), 0);
-      if (check_received_bytes_) {
-        EXPECT_NE(ext_proc_logging_info->bytesReceived(), 0);
-      }
-      ASSERT_TRUE(ext_proc_logging_info->upstreamHost() != nullptr);
-      EXPECT_EQ(ext_proc_logging_info->upstreamHost()->cluster().name(), expected_cluster_name_);
-      EXPECT_EQ(ext_proc_logging_info->clusterInfo()->name(), expected_cluster_name_);
-      EXPECT_EQ(ext_proc_logging_info->httpResponseCodeDetails(), expected_rcd_);
+    ASSERT_NE(ext_proc_logging_info, nullptr);
+    EXPECT_NE(ext_proc_logging_info->bytesSent(), 0);
+    if (check_received_bytes_) {
+      EXPECT_NE(ext_proc_logging_info->bytesReceived(), 0);
     }
+    ASSERT_TRUE(ext_proc_logging_info->upstreamHost() != nullptr);
+    EXPECT_EQ(ext_proc_logging_info->upstreamHost()->cluster().name(), expected_cluster_name_);
+    EXPECT_EQ(ext_proc_logging_info->clusterInfo()->name(), expected_cluster_name_);
+    EXPECT_EQ(ext_proc_logging_info->httpResponseCodeDetails(), expected_rcd_);
   }
 
 private:

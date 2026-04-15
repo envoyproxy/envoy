@@ -549,6 +549,12 @@ public:
   void encodeComplete() override {
     if (config_->observabilityMode()) {
       logStreamInfo();
+      // Fall back to the downstream stream info for response code details when the gRPC
+      // side stream is already closed (stream_ == nullptr) and logStreamInfo() was a no-op.
+      if (logging_info_ != nullptr && logging_info_->httpResponseCodeDetails().empty()) {
+        logging_info_->setHttpResponseCodeDetails(
+            decoder_callbacks_->streamInfo().responseCodeDetails());
+      }
     }
   }
 

@@ -354,6 +354,11 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLoggingFailStream) {
 
   ConfigOptions config_option = {};
   config_option.add_logging_filter = true;
+  // In observability mode with fail-close, the gRPC error triggers sendImmediateResponse
+  // which sets response code details to the ext_proc error string on the downstream stream info.
+  config_option.logging_filter_config = LoggingTestFilterConfig();
+  config_option.logging_filter_config->set_http_rcd(
+      "ext_proc_error_gRPC_error_2{via_upstream}");
   initializeConfig(config_option);
   testGetAndFailStream();
 }
