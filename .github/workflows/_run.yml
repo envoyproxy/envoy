@@ -241,7 +241,7 @@ jobs:
           | . * {$config, $check}
 
     - run: |
-        mkdir ${{ runner.temp }}/container
+        mkdir "${RUNNER_TEMP}/container"
         MNT_AVAILABLE=false
         if mountpoint -q /mnt; then
             MNT_AVAILABLE=true
@@ -380,9 +380,11 @@ jobs:
       if: >-
         ${{ fromJSON(inputs.request).request.pr != '' }}
     - run: |
-        echo "${{ vars.ENVOY_CI_BAZELRC }}" > repo.bazelrc
+        echo "${BAZELRC_CONTENT}" > repo.bazelrc
       if: ${{ vars.ENVOY_CI_BAZELRC }}
       name: Configure repo Bazel settings
+      env:
+        BAZELRC_CONTENT: ${{ vars.ENVOY_CI_BAZELRC }}
 
     # NOTE: This is where untrusted code can be run!!!
     #  It MUST be the last step in the workflow
@@ -438,3 +440,6 @@ jobs:
         MOUNT_GPG_HOME: ${{ inputs.import-gpg && 1 || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
         ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
+        ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
+        ENVOY_REPO: ${{ github.repository }}
+        ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}

@@ -87,14 +87,16 @@ jobs:
         gh api \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            /repos/${{ github.repository }}/actions/runs/${{ inputs.run-id }} \
+            "/repos/${GH_REPO}/actions/runs/${RUN_ID}" \
           | jq '.'
-        RUNID=$(gh run view ${{ inputs.run-id }} --repo ${{ github.repository }} --json databaseId | jq -r '.databaseId')
+        RUNID=$(gh run view "${RUN_ID}" --repo "${GH_REPO}" --json databaseId | jq -r '.databaseId')
         echo "value=${RUNID}" >> "$GITHUB_OUTPUT"
       id: run-id
       if: ${{ inputs.runs-after == true }}
       env:
         GH_TOKEN: ${{ github.token }}
+        RUN_ID: ${{ inputs.run-id }}
+        GH_REPO: ${{ github.repository }}
 
     # Load env data
     # Handle any failure in triggering job

@@ -121,10 +121,6 @@ jobs:
         include:
         - target: publish
           name: github
-          source: |
-            export ENVOY_COMMIT=${{ fromJSON(inputs.request).request.sha }}
-            export ENVOY_REPO=${{ github.repository }}
-            export ENVOY_PUBLISH_DRY_RUN=${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
 
   docs:
     # For normal commits to Envoy main this will trigger an update in the website repo,
