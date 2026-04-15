@@ -333,7 +333,8 @@ public:
 
   bool continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster, Http::RequestHeaderMap& headers,
                              bool end_stream, Upstream::HostConstSharedPtr&& host,
-                             absl::string_view host_selection_details = {});
+                             absl::string_view host_selection_details = {},
+                             absl::optional<Http::Code> failure_status = absl::nullopt);
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
@@ -603,7 +604,8 @@ private:
   // if a "good" response comes back and we return downstream, so there is no point in waiting
   // for the remaining upstream requests to return.
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
-  void sendNoHealthyUpstreamResponse(absl::string_view details);
+  void sendNoHealthyUpstreamResponse(absl::string_view details,
+                                     absl::optional<Http::Code> failure_status = absl::nullopt);
   bool setupRedirect(const Http::ResponseHeaderMap& headers);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
                                                 const Http::ResponseHeaderMap& upstream_headers,
@@ -614,7 +616,8 @@ private:
   void doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry);
   void continueDoRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry,
                        Upstream::HostConstSharedPtr&& host, Upstream::ThreadLocalCluster& cluster,
-                       absl::string_view host_selection_details);
+                       absl::string_view host_selection_details,
+                       absl::optional<Http::Code> failure_status = absl::nullopt);
   void updateStatsOnNoRetry(RetryStatus retry_status);
   void updateStatsOnDoRetry(RetryState::DoRetryType do_retry_type);
 

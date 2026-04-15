@@ -9,6 +9,7 @@ NUMPAT
 PUBSUB
 RANDOMKEY
 SLOWLOG
+addend
 addrlen
 defragmentation
 evictable
@@ -65,6 +66,7 @@ CIO
 cbegin
 cend
 constness
+consume
 cstr
 deadcode
 DFP
@@ -381,6 +383,7 @@ middlewildcard
 monostate
 mpd
 msan
+multicluster
 mutators
 mybucket
 myobject
@@ -508,6 +511,7 @@ STDSTRING
 STL
 STRLEN
 STS
+subcluster
 SUBCOMMAND
 SVG
 SVID
@@ -934,6 +938,7 @@ healths
 healthz
 hermeticity
 highp
+hit
 hoc
 hostname
 hostnames
@@ -1292,6 +1297,7 @@ refcount
 referencee
 referer
 refetch
+refill
 reframed
 refvec
 regex
@@ -1508,6 +1514,7 @@ timestamps
 timeval
 tmp
 tmpfile
+token
 tokenize
 tokenized
 tokenizes

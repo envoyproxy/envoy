@@ -2638,6 +2638,11 @@ message RateLimit {
     //
     // One of the ``number`` or ``format`` fields should be set but not both.
     string format = 2 [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
+
+    // If true, the hits addend value will be treated as negative, effectively adding to
+    // the rate limit budget instead of consuming from it. This can be used to refill previously consumed
+    // rate limit tokens.
+    bool is_negative_hits = 3;
   }
 
   // Refers to the stage set in the filter. The rate limit configuration only

@@ -155,6 +155,9 @@ public:
 
   bool connectCalled() const { return connect_called_; }
 
+  // Get the underlying connection of the codec client for lifetimeCallbacks.
+  const Network::Connection& connection() const { return *connection_; }
+
 protected:
   /**
    * Create a codec client and connect to a remote host/port.

@@ -82,9 +82,29 @@ struct McpRouterStats {
  */
 class McpRouterConfig {
 public:
-  McpRouterConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
-                  const std::string& stats_prefix, Stats::Scope& scope,
-                  Server::Configuration::FactoryContext& context);
+  virtual ~McpRouterConfig() = default;
+
+  virtual const std::vector<McpBackendConfig>& backends() const = 0;
+  virtual bool isMultiplexing() const = 0;
+  virtual const std::string& defaultBackendName() const = 0;
+  virtual Server::Configuration::FactoryContext& factoryContext() const = 0;
+  virtual const McpBackendConfig* findBackend(const std::string& name) const = 0;
+
+  virtual bool hasSessionIdentity() const = 0;
+  virtual const SubjectSource& subjectSource() const = 0;
+  virtual ValidationMode validationMode() const = 0;
+  virtual bool shouldEnforceValidation() const = 0;
+  virtual const std::string& metadataNamespace() const = 0;
+
+  virtual McpRouterStats& stats() = 0;
+};
+
+class McpRouterConfigImpl : public McpRouterConfig {
+public:
+  McpRouterConfigImpl(
+      const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
+      const std::string& stats_prefix, Stats::Scope& scope,
+      Server::Configuration::FactoryContext& context);
 
   const std::vector<McpBackendConfig>& backends() const { return backends_; }
   bool isMultiplexing() const { return backends_.size() > 1; }
