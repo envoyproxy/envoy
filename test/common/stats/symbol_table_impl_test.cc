@@ -743,6 +743,96 @@ TEST_F(StatNameTest, StatNameEqualityFastPaths) {
   EXPECT_NE(a, null_name);
 }
 
+TEST_F(StatNameTest, EqualityWithMultiByteVarint) {
+  // Build a name with 130 unique segments so encoded data > 127 bytes,
+  // exercising the multi-byte varint slow-path in decodeNumber when
+  // operator== and AbslHashValue decode the length prefix.
+  std::string long_name = "s0";
+  for (int i = 1; i < 130; ++i) {
+    absl::StrAppend(&long_name, ".s", i);
+  }
+  // Two pool entries for the same name: distinct backing storage, identical content.
+  StatName x = makeStat(long_name);
+  StatName y = makeStat(long_name);
+  // different pointers: ensure not fast-path
+  EXPECT_NE(x.dataIncludingSize(), y.dataIncludingSize());
+  // check equality and hash with slow path decode and memcmp
+  EXPECT_EQ(x, y);
+  EXPECT_EQ(x.hash(), y.hash());
+
+  // Same segment count (same encoded size) but shifted names — memcmp mismatch.
+  std::string long_name_alt = "s1";
+  for (int i = 2; i < 131; ++i) {
+    absl::StrAppend(&long_name_alt, ".s", i);
+  }
+  StatName z = makeStat(long_name_alt);
+  // slow-path: sizes match, memcmp fails
+  EXPECT_NE(x, z);
+}
+
+TEST_F(StatNameTest, EqualitySizeMismatch) {
+  // Two non-null, different-pointer names with different encoded sizes:
+  // exercises the early lhs_sz != rhs_sz exit in operator==.
+  StatName short_name = makeStat("foo.bar");
+  StatName long_name = makeStat("foo.bar.baz");
+  EXPECT_NE(short_name, long_name);
+  EXPECT_NE(long_name, short_name);
+}
+
+TEST_F(StatNameTest, EncodingSizeBytesAtBoundaries) {
+  // Verify the branch-free encodingSizeBytes formula at every varint boundary.
+  auto esb = SymbolTable::Encoding::encodingSizeBytes;
+  EXPECT_EQ(1, esb(0));
+  EXPECT_EQ(1, esb(1));
+  EXPECT_EQ(1, esb(126));
+  EXPECT_EQ(1, esb(127)); // last 1-byte value
+  EXPECT_EQ(2, esb(128)); // first 2-byte value
+  EXPECT_EQ(2, esb(129));
+  EXPECT_EQ(2, esb(16383)); // last 2-byte value (2^14 - 1)
+  EXPECT_EQ(3, esb(16384)); // first 3-byte value (2^14)
+  EXPECT_EQ(3, esb(16385));
+  EXPECT_EQ(3, esb((1 << 21) - 1)); // last 3-byte
+  EXPECT_EQ(4, esb(1 << 21));       // first 4-byte
+  EXPECT_EQ(4, esb((1 << 28) - 1)); // last 4-byte
+  EXPECT_EQ(5, esb(1 << 28));       // first 5-byte
+}
+
+TEST_F(StatNameTest, EqualityAtVarintBoundary) {
+  // Dynamic names give precise control over dataSize():
+  //   dataSize = 1 (LiteralStringIndicator) + varint_size(name.size()) + name.size()
+  // So name length 125 → dataSize 127 (1-byte varint, decodeNumber fast-path)
+  //    name length 126 → dataSize 128 (2-byte varint, decodeNumber slow-path)
+  StatNameDynamicPool dynamic(table_);
+  const std::string fast_str(125, 'a'); // dataSize = 127, fast-path
+  const std::string slow_str(126, 'a'); // dataSize = 128, slow-path
+
+  StatName fast1 = dynamic.add(fast_str);
+  StatName fast2 = dynamic.add(fast_str); // separate storage, same content
+  StatName slow1 = dynamic.add(slow_str);
+  StatName slow2 = dynamic.add(slow_str);
+
+  // Verify data sizes land where we expect (127 = last fast-path, 128 = first slow-path).
+  EXPECT_EQ(127, fast1.dataSize());
+  EXPECT_EQ(128, slow1.dataSize());
+
+  // Same-path equality and hash.
+  EXPECT_NE(fast1.dataIncludingSize(), fast2.dataIncludingSize()); // distinct storage
+  EXPECT_EQ(fast1, fast2);
+  EXPECT_EQ(fast1.hash(), fast2.hash());
+  EXPECT_NE(slow1.dataIncludingSize(), slow2.dataIncludingSize());
+  EXPECT_EQ(slow1, slow2);
+  EXPECT_EQ(slow1.hash(), slow2.hash());
+
+  // Cross-boundary: fast-path name != slow-path name.
+  EXPECT_NE(fast1, slow1);
+  EXPECT_NE(slow1, fast1);
+  EXPECT_NE(fast1.hash(), slow1.hash());
+
+  // Neither is empty.
+  EXPECT_FALSE(fast1.empty());
+  EXPECT_FALSE(slow1.empty());
+}
+
 TEST_F(StatNameTest, StartsWith) {
   StatName prefix = makeStat("prefix");
   EXPECT_TRUE(prefix.startsWith(prefix));
