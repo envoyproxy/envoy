@@ -339,7 +339,7 @@ public class JniLibrary {
       long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, int dnsNumRetries,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean enableEarlyData, String http3ConnectionOptions,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
       String http3ClientConnectionOptions, byte[][] quicHints, byte[][] quicCanonicalSuffixes,
       boolean enableGzipDecompression, boolean enableBrotliDecompression,
       int numTimeoutsToTriggerPortMigration, boolean enableSocketTagging,
