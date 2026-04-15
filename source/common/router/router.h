@@ -37,7 +37,7 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
 
-#include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
