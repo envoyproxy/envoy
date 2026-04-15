@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <bit>
 #include <memory>
 #include <stack>
 #include <string>
@@ -156,15 +155,8 @@ public:
     /**
      * @param number A number to encode in a variable length byte-array.
      * @return The number of bytes it would take to encode the number.
-     *
-     * Defined inline in the header to allow the compiler to inline on hot paths.
      */
-    static size_t encodingSizeBytes(uint64_t number) {
-      // Branch-free: compute number of 7-bit groups needed via leading-zero count.
-      // appendEncoding() always emits at least one byte (i.e. a 0 length), so the
-      // value 0 requires 1 byte. number|1 ensures we have a floor of 1 byte.
-      return (64 - std::countl_zero(number | 1) + 6) / 7;
-    }
+    static size_t encodingSizeBytes(uint64_t number);
 
     /**
      * @param num_data_bytes The number of bytes in a data-block.
@@ -637,12 +629,7 @@ public:
    * @return size_t the number of bytes in the symbol array, excluding the
    *                overhead for the size itself.
    */
-  size_t dataSize() const {
-    if (size_and_data_ == nullptr) {
-      return 0;
-    }
-    return SymbolTable::Encoding::decodeNumber(size_and_data_).first;
-  }
+  size_t dataSize() const;
 
   /**
    * @return size_t the number of bytes in the symbol array, including the

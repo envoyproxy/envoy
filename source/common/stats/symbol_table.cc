@@ -24,6 +24,13 @@ namespace Stats {
 static constexpr Symbol FirstValidSymbol = 1;
 static constexpr uint8_t LiteralStringIndicator = 0;
 
+size_t StatName::dataSize() const {
+  if (size_and_data_ == nullptr) {
+    return 0;
+  }
+  return SymbolTable::Encoding::decodeNumber(size_and_data_).first;
+}
+
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   // TODO(jmarantz): capture this functionality (always prints regardless of
@@ -51,6 +58,15 @@ SymbolTable::Encoding::~Encoding() {
   // Verifies that moveToMemBlock() was called on this encoding. Failure
   // to call moveToMemBlock() will result in leaks symbols.
   ASSERT(mem_block_.capacity() == 0);
+}
+
+size_t SymbolTable::Encoding::encodingSizeBytes(uint64_t number) {
+  size_t num_bytes = 0;
+  do {
+    ++num_bytes;
+    number >>= 7;
+  } while (number != 0);
+  return num_bytes;
 }
 
 void SymbolTable::Encoding::appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block) {
