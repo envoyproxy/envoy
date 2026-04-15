@@ -427,6 +427,7 @@ public:
     initiateClientConnection();
     waitForUpstreamResponse(endpoint_index, response_code, send_orca_load_report);
     cleanupUpstreamAndDownstream();
+    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
   }
 
   void updateDropOverloadConfig() {

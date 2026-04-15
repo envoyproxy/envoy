@@ -159,6 +159,8 @@ void OriginalMaglevTable::constructImplementationInternals(
   for (uint32_t iteration = 1; table_index < table_size_; ++iteration) {
     for (uint64_t i = 0; i < table_build_entries.size() && table_index < table_size_; i++) {
       TableBuildEntry& entry = table_build_entries[i];
+      ASSERT(entry.skip_ < table_size_, "skip must be less than table size");
+
       // To understand how target_weight_ and weight_ are used below, consider a host with weight
       // equal to max_normalized_weight. This would be picked on every single iteration. If it had
       // weight equal to max_normalized_weight / 3, then it would only be picked every 3 iterations,
@@ -167,14 +169,21 @@ void OriginalMaglevTable::constructImplementationInternals(
         continue;
       }
       entry.target_weight_ += max_normalized_weight;
-      uint64_t c = permutation(entry);
+      uint64_t c = entry.current_permutation_;
       while (table_[c] != nullptr) {
         entry.next_++;
-        c = permutation(entry);
+        c += entry.skip_;
+        if (c >= table_size_) {
+          c -= table_size_;
+        }
       }
 
       table_[c] = entry.host_;
       entry.next_++;
+      entry.current_permutation_ = c + entry.skip_;
+      if (entry.current_permutation_ >= table_size_) {
+        entry.current_permutation_ -= table_size_;
+      }
       entry.count_++;
       table_index++;
     }
@@ -209,6 +218,8 @@ void CompactMaglevTable::constructImplementationInternals(
   for (uint32_t iteration = 1; table_index < table_size_; ++iteration) {
     for (uint32_t i = 0; i < table_build_entries.size() && table_index < table_size_; i++) {
       TableBuildEntry& entry = table_build_entries[i];
+      ASSERT(entry.skip_ < table_size_, "skip must be less than table size");
+
       // To understand how target_weight_ and weight_ are used below, consider a host with weight
       // equal to max_normalized_weight. This would be picked on every single iteration. If it had
       // weight equal to max_normalized_weight / 3, then it would only be picked every 3 iterations,
@@ -219,10 +230,13 @@ void CompactMaglevTable::constructImplementationInternals(
       entry.target_weight_ += max_normalized_weight;
       // As we're using the compact implementation, our table size is limited to
       // 32-bit, hence static_cast here should be safe.
-      uint32_t c = static_cast<uint32_t>(permutation(entry));
+      uint32_t c = static_cast<uint32_t>(entry.current_permutation_);
       while (occupied[c]) {
         entry.next_++;
-        c = static_cast<uint32_t>(permutation(entry));
+        c += entry.skip_;
+        if (c >= table_size_) {
+          c -= table_size_;
+        }
       }
 
       // Record the index of the given host.
@@ -230,6 +244,10 @@ void CompactMaglevTable::constructImplementationInternals(
       occupied[c] = true;
 
       entry.next_++;
+      entry.current_permutation_ = c + entry.skip_;
+      if (entry.current_permutation_ >= table_size_) {
+        entry.current_permutation_ -= table_size_;
+      }
       entry.count_++;
       table_index++;
     }
@@ -290,10 +308,6 @@ HostSelectionResponse CompactMaglevTable::chooseHost(uint64_t hash, uint32_t att
   const uint32_t index = table_.get(hash % table_size_);
   ASSERT(index < host_table_.size(), "Compact MaglevTable index into host table out of range");
   return {host_table_[index]};
-}
-
-uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
-  return (entry.offset_ + (entry.skip_ * entry.next_)) % table_size_;
 }
 
 MaglevLoadBalancer::MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats,
