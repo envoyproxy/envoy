@@ -341,7 +341,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax,
         mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache,
         mDnsCacheSaveIntervalSeconds, mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh,
-        quicEnabled(), quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
+        quicEnabled(), true /* enableEarlyData */, quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
         quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(),
         numTimeoutsToTriggerPortMigration(), mEnableSocketTag, mEnableInterfaceBinding,
         mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
