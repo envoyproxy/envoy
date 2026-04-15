@@ -265,24 +265,9 @@ Extract-Only Mode Security Considerations
    verification status header. Example RBAC policy that only allows
    verified admin claims:
 
-   .. code-block:: yaml
-
-      policies:
-        admin_verified_only:
-          permissions:
-          - any: true
-          principals:
-          - and_ids:
-              ids:
-              - header:
-                  name: "x-jwt-claim-role"
-                  string_match:
-                    exact: "admin"
-              - not_id:
-                  header:
-                    name: "x-jwt-signature-verified"
-                    string_match:
-                      exact: "false"
+   .. literalinclude:: _include/jwt-authn-extract-only-rbac.yaml
+       :language: yaml
+       :caption: :download:`jwt-authn-extract-only-rbac.yaml <_include/jwt-authn-extract-only-rbac.yaml>`
 
    **Configuration:**
 

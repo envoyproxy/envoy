@@ -1,0 +1,19 @@
+# Example RBAC policy that only allows verified admin claims.
+# Use with extract_only_without_validation to ensure unverified
+# JWT claims are not trusted for authorization.
+policies:
+  admin_verified_only:
+    permissions:
+    - any: true
+    principals:
+    - and_ids:
+        ids:
+        - header:
+            name: "x-jwt-claim-role"
+            string_match:
+              exact: "admin"
+        - not_id:
+            header:
+              name: "x-jwt-signature-verified"
+              string_match:
+                exact: "false"
