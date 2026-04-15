@@ -118,6 +118,16 @@ TEST(JsonEscapeTest, Escape) {
   expect_json_escape("\x1d", "\\u001d");
   expect_json_escape("\x1e", "\\u001e");
   expect_json_escape("\x1f", "\\u001f");
+
+  const std::string high_bytes =
+      std::string(1, static_cast<char>(0x80)) + std::string(1, static_cast<char>(0xff));
+  expect_json_escape(high_bytes, high_bytes);
+
+  const std::string mixed_bytes =
+      std::string(1, static_cast<char>(0x80)) + "\x01" + std::string(1, static_cast<char>(0xff));
+  const std::string mixed_expected =
+      std::string(1, static_cast<char>(0x80)) + "\\u0001" + std::string(1, static_cast<char>(0xff));
+  expect_json_escape(mixed_bytes, mixed_expected);
 }
 
 // Regression test for off-by-one write when control characters appear at the end of input.

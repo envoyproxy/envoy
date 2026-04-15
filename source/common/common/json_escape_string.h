@@ -64,16 +64,15 @@ public:
         position += 2;
         break;
       default:
-        if (character == 0x00 || (character > 0x00 && character <= 0x1f)) {
-          // Print character as unicode hex.
-          sprintf(&result[position + 1], "u%04x", static_cast<int>(character));
+        const uint8_t byte = static_cast<uint8_t>(character);
+        if (byte <= 0x1f) {
+          // Print character as a Unicode escape sequence.
+          result[position + 1] = 'u';
+          result[position + 2] = '0';
+          result[position + 3] = '0';
+          result[position + 4] = hexDigit(byte >> 4);
+          result[position + 5] = hexDigit(byte);
           position += 6;
-          // Overwrite trailing null character from `sprintf`, but only if there are more characters
-          // to process. If this is the last character then we must not write past the end of the
-          // string.
-          if (position < result.size()) {
-            result[position] = '\\';
-          }
         } else {
           // All other characters are added as-is.
           result[position++] = character;
@@ -111,7 +110,7 @@ public:
       }
 
       default: {
-        if (character == 0x00 || (character > 0x00 && character <= 0x1f)) {
+        if (static_cast<uint8_t>(character) <= 0x1f) {
           // From character (1 byte) to unicode hex (6 bytes).
           result += 5;
         }
@@ -121,5 +120,8 @@ public:
     }
     return result;
   }
+
+private:
+  static constexpr char hexDigit(uint8_t value) { return "0123456789abcdef"[value & 0x0f]; }
 };
 } // namespace Envoy
