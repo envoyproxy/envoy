@@ -120,7 +120,7 @@ TEST_P(RtdsIntegrationTest, RtdsReloadWithoutDfpMixedScheme) {
 }
 
 TEST_P(RtdsIntegrationTest, RtdsReloadWithWorkerThread) {
-  builder_.setUseWorkerThread(true);
+  builder_.enableWorkerThread(true);
   runReloadTest();
 }
 
