@@ -157,7 +157,9 @@ public:
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
   EngineBuilder& enableHttp3(bool http3_on);
-  EngineBuilder& setUseWorkerThread(bool use_worker_thread);
+  // If true, all HTTP requests are handled on a dedicated worker thread instead of on the Envoy
+  // main thread which also handles all xDS requests.
+  EngineBuilder& enableWorkerThread(bool use_worker_thread);
   EngineBuilder& addQuicConnectionOption(std::string option);
   EngineBuilder& addQuicClientConnectionOption(std::string option);
   // Deprecated, use addQuicConnectionOption() instead.
@@ -265,8 +267,6 @@ public:
   EngineBuilder& respectSystemProxySettings(bool value, int refresh_interval_secs = 10);
   EngineBuilder& setIosNetworkServiceType(int ios_network_service_type);
 #endif
-
-  EngineBuilder& enableEarlyData(bool early_data_on);
 
   // This is separated from build() for the sake of testability
   virtual std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> generateBootstrap() const;
@@ -378,7 +378,7 @@ private:
   bool enable_stats_collection_ = true;
   bool use_worker_thread_{false};
   bool enable_network_change_monitor_{false};
-  bool enable_early_data_{true};
+
 #ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif // ENVOY_MOBILE_XDS

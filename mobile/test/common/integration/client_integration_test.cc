@@ -86,7 +86,7 @@ public:
   }
 
   void initialize() override {
-    builder_.setUseWorkerThread(getUseWorkerThread());
+    builder_.enableWorkerThread(getUseWorkerThread());
     if (getUseWorkerThread()) {
       builder_.enforceTrustChainVerification(false);
     }
@@ -425,10 +425,10 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
 }
 
 TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAndroid) {
+  expect_data_streams_ = false;
   builder_.enableQuicConnectionMigration(true);
   builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
   builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
-  builder_.enableEarlyData(false);
   // Refreshing DNS cache will revert the overridden lyft.com entry with actual
   // internet accessible address which is not intended.
   builder_.setDisableDnsRefreshOnNetworkChange(true);
@@ -1120,8 +1120,8 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
 }
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
+  expect_data_streams_ = false; // 0-RTT request might skip some fields in final stream intel.
   builder_.enableDrainPostDnsRefresh(true);
-  builder_.enableEarlyData(false);
   add_fake_dns_ = true;
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
