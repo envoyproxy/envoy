@@ -1109,6 +1109,8 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   builder_.enableDrainPostDnsRefresh(true);
+  // 0-RTT requests will not populate some of the final stream intel fields, so skip the validation.
+  expect_data_streams_ = false;
   add_fake_dns_ = true;
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
