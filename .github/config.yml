@@ -1,7 +1,7 @@
 agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
-  repo: docker.io/envoyproxy/envoy-build
+  repo: docker.io/envoyproxy/envoy-build; echo VULN
   repo-gcr: gcr.io/envoy-ci/envoy-build
   # default ci caching (ci)
   sha: 20656853fae51927cda557e7af80ccff175f5de6f84bd0f092cd8672b2a6e0fe
