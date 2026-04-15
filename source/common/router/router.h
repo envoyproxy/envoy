@@ -27,6 +27,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/filter_chain_helper.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/sidestream_watermark.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/context_impl.h"
@@ -36,6 +37,7 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
 
+#include "absl/strings/match.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -62,22 +64,8 @@ public:
       const Http::HeaderEntry* entry_;
     };
 
-    /**
-     * Determine whether a given header's value passes the strict validation
-     * defined for that header.
-     * @param headers supplies the headers from which to get the target header.
-     * @param target_header is the header to be validated.
-     * @return HeaderCheckResult containing the entry for @param target_header
-     *         and valid_ set to FALSE if @param target_header is set to an
-     *         invalid value. If @param target_header doesn't appear in
-     *         @param headers, return a result with valid_ set to TRUE.
-     */
-    static const HeaderCheckResult checkHeader(Http::RequestHeaderMap& headers,
-                                               const Http::LowerCaseString& target_header);
-
     using ParseRetryFlagsFunc = std::function<std::pair<uint32_t, bool>(absl::string_view)>;
 
-  private:
     static HeaderCheckResult hasValidRetryFields(const Http::HeaderEntry* header_entry,
                                                  const ParseRetryFlagsFunc& parse_fn) {
       HeaderCheckResult r;
@@ -214,10 +202,19 @@ public:
         reject_connect_request_early_data_(reject_connect_request_early_data),
         http_context_(http_context), zone_name_(factory_context.localInfo().zoneStatName()),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
-    if (!strict_check_headers.empty()) {
-      strict_check_headers_ = std::make_unique<HeaderVector>();
-      for (const auto& header : strict_check_headers) {
-        strict_check_headers_->emplace_back(Http::LowerCaseString(header));
+    for (const auto& header : strict_check_headers) {
+      if (absl::EqualsIgnoreCase(header,
+                                 Http::Headers::get().EnvoyUpstreamRequestTimeoutMs.get())) {
+        envoy_upstream_rq_timeout_ms_ = true;
+      } else if (absl::EqualsIgnoreCase(
+                     header, Http::Headers::get().EnvoyUpstreamRequestPerTryTimeoutMs.get())) {
+        envoy_upstream_rq_per_try_timeout_ms_ = true;
+      } else if (absl::EqualsIgnoreCase(header, Http::Headers::get().EnvoyMaxRetries.get())) {
+        envoy_max_retries_ = true;
+      } else if (absl::EqualsIgnoreCase(header, Http::Headers::get().EnvoyRetryOn.get())) {
+        envoy_retry_on_ = true;
+      } else if (absl::EqualsIgnoreCase(header, Http::Headers::get().EnvoyRetryGrpcOn.get())) {
+        envoy_retry_grpc_on_ = true;
       }
     }
   }
@@ -265,13 +262,16 @@ public:
   FilterStats default_stats_;
   FilterStats async_stats_;
   Random::RandomGenerator& random_;
-  const bool emit_dynamic_stats_;
-  const bool start_child_span_;
-  const bool suppress_envoy_headers_;
-  const bool respect_expected_rq_timeout_;
-  const bool suppress_grpc_request_failure_code_stats_;
-  // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
-  HeaderVectorPtr strict_check_headers_;
+  const bool emit_dynamic_stats_ : 1;
+  const bool start_child_span_ : 1;
+  const bool suppress_envoy_headers_ : 1;
+  const bool respect_expected_rq_timeout_ : 1;
+  const bool suppress_grpc_request_failure_code_stats_ : 1;
+  bool envoy_upstream_rq_timeout_ms_ : 1 = false;
+  bool envoy_upstream_rq_per_try_timeout_ms_ : 1 = false;
+  bool envoy_max_retries_ : 1 = false;
+  bool envoy_retry_on_ : 1 = false;
+  bool envoy_retry_grpc_on_ : 1 = false;
   const bool flush_upstream_log_on_upstream_stream_;
   const bool reject_connect_request_early_data_;
   absl::optional<std::chrono::milliseconds> upstream_log_flush_interval_;
@@ -564,6 +564,7 @@ private:
                           Upstream::HostDescriptionOptConstRef upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionOptConstRef upstream_host,
                           bool dropped);
+  Http::FilterHeadersStatus checkStrictHeaders(const Http::RequestHeaderMap& headers);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
