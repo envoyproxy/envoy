@@ -260,7 +260,7 @@ void verifyCompressionReducesBytes(void (*register_server_compression)(SSL_CTX*)
 // Based on the test certificate used in verifyCompressionReducesBytes(), these
 // are the expected number of bytes saved when compression is performed with
 // brotli or zlib respectively. Although the absolute number of bytes on the
-// wire will differ between BoringSSL and OpenSSL implemetations, because of
+// wire will differ between BoringSSL and OpenSSL implementations, because of
 // slightly different extensions etc, the number of bytes saved by applying
 // compression to the certificate, will be the same in both cases.
 const int BROTLI_BYTES_SAVED = 209;
