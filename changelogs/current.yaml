@@ -362,6 +362,11 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: lua
+  change: |
+    Added stats API support to the :ref:`Lua filter <config_http_filters_lua>`, allowing Lua
+    scripts to create and increment counters, gauges, and histograms via
+    ``handle:streamInfo():stats()``.
 - area: dynamic_modules
   change: |
     Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
