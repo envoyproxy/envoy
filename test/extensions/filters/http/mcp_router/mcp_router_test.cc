@@ -63,7 +63,7 @@ TEST_F(McpRouterConfigTest, MultipleBackendsEnablesMultiplexing) {
   server2->mutable_mcp_cluster()->set_cluster("calc_cluster");
   server2->mutable_mcp_cluster()->set_path("/mcp/calc");
 
-  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
 
   EXPECT_EQ(config.backends().size(), 2);
   EXPECT_TRUE(config.isMultiplexing());
@@ -90,7 +90,7 @@ TEST_F(McpRouterConfigTest, SingleBackendSetsDefaultName) {
   server->set_name("tools");
   server->mutable_mcp_cluster()->set_cluster("tools_cluster");
 
-  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
 
   EXPECT_EQ(config.backends().size(), 1);
   EXPECT_FALSE(config.isMultiplexing());
@@ -105,7 +105,7 @@ TEST_F(McpRouterConfigTest, DefaultPathWhenNotSpecified) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
 
   const McpBackendConfig* backend = config.findBackend("test");
   ASSERT_NE(backend, nullptr);
@@ -120,7 +120,7 @@ TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
   EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
 }
 
@@ -299,7 +299,7 @@ TEST_F(McpRouterConfigTest, SessionIdentityDisabledByDefault) {
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
   EXPECT_FALSE(config.hasSessionIdentity());
   EXPECT_FALSE(config.shouldEnforceValidation());
 }
@@ -314,7 +314,7 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithHeaderSource) {
   auto* identity = proto_config.mutable_session_identity();
   identity->mutable_identity()->mutable_header()->set_name("x-user-id");
 
-  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<HeaderSubjectSource>(config.subjectSource()));
   EXPECT_FALSE(config.shouldEnforceValidation()); // DISABLED by default
@@ -333,7 +333,7 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithMetadataSource) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<MetadataSubjectSource>(config.subjectSource()));
 }
@@ -351,7 +351,7 @@ TEST_F(McpRouterConfigTest, MetadataKeyPathParsed) {
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
 
-  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
   const auto& source = absl::get<MetadataSubjectSource>(config.subjectSource());
   EXPECT_EQ(source.filter, "jwt");
   ASSERT_EQ(source.path_keys.size(), 2);
@@ -371,7 +371,7 @@ TEST_F(McpRouterConfigTest, ValidationModeEnforce) {
   identity->mutable_validation()->set_mode(
       envoy::extensions::filters::http::mcp_router::v3::ValidationPolicy::ENFORCE);
 
-  McpRouterConfig config(proto_config, "test.", *store_.rootScope(), factory_context_);
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(config.shouldEnforceValidation());
   EXPECT_EQ(config.validationMode(), ValidationMode::Enforce);
@@ -388,8 +388,8 @@ protected:
 
   McpRouterConfigSharedPtr
   createConfig(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config) {
-    return std::make_shared<McpRouterConfig>(proto_config, std::string("test."),
-                                             *store_.rootScope(), factory_context_);
+    return std::make_shared<McpRouterConfigImpl>(proto_config, std::string("test."),
+                                                 *store_.rootScope(), factory_context_);
   }
 
   void setDynamicMetadata(const std::string& filter_name, const std::string& key,

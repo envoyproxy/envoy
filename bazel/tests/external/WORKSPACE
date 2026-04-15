@@ -36,7 +36,7 @@ envoy_python_dependencies()
 
 load("@envoy//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
-envoy_dependency_imports()
+envoy_dependency_imports(cargo_bazel_lockfile = "@external_test//:Cargo.Bazel.lock")
 
 load("@envoy//bazel:repo.bzl", "envoy_repo")
 
