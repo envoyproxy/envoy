@@ -1,3 +1,6 @@
+#include "envoy/extensions/clusters/mcp_multicluster/v3/cluster.pb.h"
+#include "envoy/http/async_client.h"
+
 #include "source/common/http/message_impl.h"
 #include "source/extensions/filters/http/mcp_router/mcp_router.h"
 
@@ -5,6 +8,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/upstream/cluster.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -16,6 +20,7 @@ namespace HttpFilters {
 namespace McpRouter {
 namespace {
 
+using testing::_;
 using testing::AnyNumber;
 using testing::NiceMock;
 using testing::ReturnRef;
@@ -122,6 +127,32 @@ TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
 
   McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(), factory_context_);
   EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
+}
+
+// Verifies McpRouterClusterConfigImpl parses ClusterConfig proto correctly.
+TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesProto) {
+  envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("cluster_backend");
+  server->mutable_mcp_cluster()->set_cluster("target_cluster");
+  server->mutable_mcp_cluster()->set_path("/custom_mcp");
+  server->mutable_mcp_cluster()->mutable_timeout()->set_seconds(10);
+
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
+  auto base_config = std::make_shared<McpRouterConfigImpl>(base_proto, "test.", *store_.rootScope(),
+                                                           factory_context_);
+
+  McpRouterClusterConfigImpl cluster_config(proto_config, base_config);
+
+  EXPECT_EQ(cluster_config.backends().size(), 1);
+  EXPECT_FALSE(cluster_config.isMultiplexing());
+
+  const McpBackendConfig* backend = cluster_config.findBackend("cluster_backend");
+  ASSERT_NE(backend, nullptr);
+  EXPECT_EQ(backend->name, "cluster_backend");
+  EXPECT_EQ(backend->cluster_name, "target_cluster");
+  EXPECT_EQ(backend->path, "/custom_mcp");
+  EXPECT_EQ(backend->timeout, std::chrono::milliseconds(10000));
 }
 
 class BackendStreamCallbacksTest : public testing::Test {};
@@ -434,6 +465,67 @@ protected:
   envoy::config::core::v3::Metadata dynamic_metadata_;
   Stats::TestUtil::TestStore store_;
 };
+
+TEST_F(McpRouterFilterTest, UsingClusterConfigForListOfServers) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  setMcpMethodMetadata("initialize");
+
+  auto config = createConfig(proto_config);
+
+  // These vectors have to outlive the filter object
+  std::vector<Http::AsyncClient::StreamCallbacks*> http_callbacks;
+  std::vector<std::unique_ptr<NiceMock<Http::MockAsyncClientStream>>> http_streams;
+
+  McpRouterFilter filter(config);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+
+  envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig cluster_config;
+  auto* backend = cluster_config.add_servers();
+  backend->set_name("backend");
+  backend->mutable_mcp_cluster()->set_cluster("backend_cluster");
+
+  (*decoder_callbacks_.cluster_info_->metadata_
+        .mutable_typed_filter_metadata())["envoy.clusters.mcp_multicluster"]
+      .PackFrom(cluster_config);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
+        EXPECT_NE("403", headers.getStatusValue());
+      }));
+
+  filter.decodeHeaders(headers, false);
+
+  // Add "backend_cluster" to the list of cluster manager.
+  factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"backend_cluster"});
+  // MCP router is expected to use list of servers from the cluster metadata, which contains
+  // "backend_cluster". If it does use cluster metadata, the cluster lookup will succeed and
+  // a new HTTP stream will be opened. Otherwise this expectation will fail.
+  EXPECT_CALL(
+      factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.async_client_,
+      start(_, _))
+      .WillRepeatedly(
+          [&http_callbacks, &http_streams](Http::AsyncClient::StreamCallbacks& callbacks,
+                                           const Http::AsyncClient::StreamOptions&) {
+            http_callbacks.push_back(&callbacks);
+            http_streams.emplace_back(std::make_unique<NiceMock<Http::MockAsyncClientStream>>());
+            return http_streams.back().get();
+          });
+
+  // This test only validates that correct cluster is selected.
+  const std::string body =
+      R"({"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-06-18"}})";
+  Buffer::OwnedImpl buffer(body);
+  filter.decodeData(buffer, true);
+}
 
 // Verifies subject extraction from dynamic metadata succeeds.
 TEST_F(McpRouterFilterTest, MetadataSubjectExtractionSuccess) {
