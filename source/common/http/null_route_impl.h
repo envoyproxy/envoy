@@ -283,12 +283,11 @@ protected:
                 const absl::optional<std::chrono::milliseconds>& timeout,
                 const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
                     hash_policy,
-                absl::Status& creation_status,
-                const Router::MetadataMatchCriteria* metadata_match,
+                absl::Status& creation_status, const Router::MetadataMatchCriteria* metadata_match,
                 bool auto_host_rewrite = false) {
-    auto entry_or_error = RouteEntryImpl::create(cluster_name, timeout, hash_policy,
-                                                 std::move(retry_policy), regex_engine,
-                                                 metadata_match, auto_host_rewrite);
+    auto entry_or_error =
+        RouteEntryImpl::create(cluster_name, timeout, hash_policy, std::move(retry_policy),
+                               regex_engine, metadata_match, auto_host_rewrite);
     SET_AND_RETURN_IF_NOT_OK(entry_or_error.status(), creation_status);
     route_entry_ = std::move(*entry_or_error);
   }

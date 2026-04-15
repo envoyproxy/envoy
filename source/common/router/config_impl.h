@@ -418,7 +418,8 @@ public:
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
   absl::optional<bool> traceSampled() const override { return trace_sampled_; }
   bool disableShadowHostSuffixAppend() const override {
-    return disable_shadow_host_suffix_append_ || !host_rewrite_literal_.empty() || auto_host_rewrite_;
+    return disable_shadow_host_suffix_append_ || !host_rewrite_literal_.empty() ||
+           auto_host_rewrite_;
   }
   const Http::HeaderEvaluator& headerEvaluator() const override;
   absl::string_view hostRewriteLiteral() const override { return host_rewrite_literal_; }
