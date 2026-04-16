@@ -34,6 +34,11 @@ absl::optional<Api::IoError::IoErrorCode> checkForConnectionReset() {
     if (ERR_GET_LIB(err) == ERR_LIB_SYS && ERR_GET_REASON(err) == SOCKET_ERROR_CONNRESET) {
       return Api::IoError::IoErrorCode::ConnectionReset;
     }
+    // Fallback: on some platforms (e.g. IPv6), the BIO may not capture the error in the
+    // error queue, but errno still reflects the connection reset from the last syscall.
+    if (errno == SOCKET_ERROR_CONNRESET) {
+      return Api::IoError::IoErrorCode::ConnectionReset;
+    }
   }
   return absl::nullopt;
 }
