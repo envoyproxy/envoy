@@ -889,6 +889,11 @@ public:
   virtual ~StreamFilterBase() = default;
 
   /**
+   * A name for the filter. Used for monitoring and disagnostics.
+   */
+  virtual absl::string_view name() { return {}; }
+
+  /**
    * This routine is called before the access log handlers' final log() is called. Filters can use
    * this callback to enrich the data passed in to the log handlers.
    */

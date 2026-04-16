@@ -1641,6 +1641,14 @@ std::string Utility::newUri(::Envoy::OptRef<const Utility::RedirectConfig> redir
   return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
 }
 
+absl::string_view Utility::nameWithFallback(StreamFilterBase& stream_filter) {
+  absl::string_view name = stream_filter.name();
+  if (!name.empty()) {
+    return name;
+  }
+  return typeid(stream_filter).name();
+}
+
 bool Utility::isValidRefererValue(absl::string_view value) {
 
   // First, we try to parse it as an absolute URL and

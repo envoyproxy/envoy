@@ -2055,5 +2055,29 @@ TEST(HeaderIsValidTest, SchemeIsHttps) {
   EXPECT_FALSE(Utility::schemeIsHttps("http"));
 }
 
+class ExampleFilterWithName : public PassThroughDecoderFilter {
+public:
+  virtual ~ExampleFilterWithName() = default;
+
+  static constexpr absl::string_view filter_name{"example_filter"};
+  absl::string_view name() override { return ExampleFilterWithName::filter_name; }
+};
+
+class ExampleFilterWithoutName : public PassThroughDecoderFilter {
+public:
+  virtual ~ExampleFilterWithoutName() = default;
+};
+
+TEST(TestNameWithFallback, ProvidesName) {
+  ExampleFilterWithName filter_with_name;
+  EXPECT_EQ(Utility::nameWithFallback(filter_with_name), "example_filter");
+
+  // Check that there is *some* name returned,  for the fallback case.
+  // Different compilers handle this differently --
+  // some return mangled names directly, others return human readable names.
+  ExampleFilterWithoutName filter_without_name;
+  EXPECT_FALSE(Utility::nameWithFallback(filter_without_name).empty());
+}
+
 } // namespace Http
 } // namespace Envoy

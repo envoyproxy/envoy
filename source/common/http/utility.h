@@ -728,6 +728,11 @@ bool schemeIsHttps(const absl::string_view scheme);
 std::string newUri(::Envoy::OptRef<const RedirectConfig> redirect_config,
                    const Http::RequestHeaderMap& headers);
 
+/*
+ * Returns the filter's name, if empty, resolves it using RTTI.
+ */
+absl::string_view nameWithFallback(StreamFilterBase& stream_filter);
+
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy
