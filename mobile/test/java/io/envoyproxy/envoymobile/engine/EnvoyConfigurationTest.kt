@@ -329,4 +329,15 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("QuicPlatformPacketWriterConfig")
     assertThat(resolvedTemplate).contains("connection_migration { migrate_idle_connections { } }")
   }
+
+  @Test
+  fun `configuration resolves early data policy when early data disabled`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      enableEarlyData = false
+    )
+
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
+    assertThat(resolvedTemplate).contains("envoy.route.early_data_policy.default")
+  }
 }
