@@ -194,7 +194,9 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
       }
 
       main_common = std::make_unique<EngineCommon>(options, [this]() {
+        ASSERT(Thread::MainThread::isMainOrTestThread());
         if (use_worker_thread_) {
+          ENVOY_LOG_MISC(info, "Worker thread has started.");
           auto* api_mgr =
               dynamic_cast<Server::ApiListenerManagerImpl*>(&server_->listenerManager());
           ASSERT(api_mgr != nullptr);
