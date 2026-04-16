@@ -127,9 +127,8 @@ TEST_F(McpFilterTest, PostWithoutProperAcceptHeaders) {
 
 // Test POST request with wildcard accept
 TEST_F(McpFilterTest, PostWithWildcardAccept) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"},
-                                         {"accept", "*/*"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {"content-type", "application/json"}, {"accept", "*/*"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
