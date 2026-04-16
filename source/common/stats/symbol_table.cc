@@ -24,13 +24,6 @@ namespace Stats {
 static constexpr Symbol FirstValidSymbol = 1;
 static constexpr uint8_t LiteralStringIndicator = 0;
 
-size_t StatName::dataSize() const {
-  if (size_and_data_ == nullptr) {
-    return 0;
-  }
-  return SymbolTable::Encoding::decodeNumber(size_and_data_).first;
-}
-
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   // TODO(jmarantz): capture this functionality (always prints regardless of

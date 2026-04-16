@@ -618,10 +618,7 @@ public:
       return empty() && rhs.empty();
     }
 
-    const auto [lhs_sz, lhs_prefix] = SymbolTable::Encoding::decodeNumber(size_and_data_);
-    const auto [rhs_sz, rhs_prefix] = SymbolTable::Encoding::decodeNumber(rhs.size_and_data_);
-    return lhs_sz == rhs_sz &&
-           memcmp(size_and_data_ + lhs_prefix, rhs.size_and_data_ + rhs_prefix, lhs_sz) == 0;
+    return dataAsStringView() == rhs.dataAsStringView();
   }
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
 
@@ -629,7 +626,7 @@ public:
    * @return size_t the number of bytes in the symbol array, excluding the
    *                overhead for the size itself.
    */
-  size_t dataSize() const;
+  size_t dataSize() const { return dataAsStringView().size(); }
 
   /**
    * @return size_t the number of bytes in the symbol array, including the
@@ -658,11 +655,8 @@ public:
    * @param mem_block_builder the builder to receive the storage.
    */
   void appendDataToMemBlock(MemBlockBuilder<uint8_t>& storage) {
-    if (size_and_data_ == nullptr) {
-      return;
-    }
-    const auto [data_size, prefix_size] = SymbolTable::Encoding::decodeNumber(size_and_data_);
-    storage.appendData(absl::MakeSpan(size_and_data_ + prefix_size, data_size));
+    auto sv = dataAsStringView();
+    storage.appendData(absl::MakeSpan(reinterpret_cast<const uint8_t*>(sv.data()), sv.size()));
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -673,10 +667,7 @@ public:
    * @return A pointer to the first byte of data (skipping over size bytes).
    */
   const uint8_t* data() const {
-    if (size_and_data_ == nullptr) {
-      return nullptr;
-    }
-    return size_and_data_ + SymbolTable::Encoding::decodeNumber(size_and_data_).second;
+    return reinterpret_cast<const uint8_t*>(dataAsStringView().data());
   }
 
   const uint8_t* dataIncludingSize() const { return size_and_data_; }
@@ -702,17 +693,16 @@ public:
 
 private:
   /**
-   * Casts the raw data as a string_view. Note that this string_view will not
-   * be in human-readable form, but it will be compatible with a string-view
-   * hasher and comparator.
+   * Casts the raw data as a string_view, decoding the varint length prefix.
+   * All accessors that need the data pointer and/or size should delegate to
+   * this method so the decode happens in exactly one place.
    */
   absl::string_view dataAsStringView() const {
     if (size_and_data_ == nullptr) {
       return {};
     }
     const auto [data_size, prefix_size] = SymbolTable::Encoding::decodeNumber(size_and_data_);
-    return {reinterpret_cast<const char*>(size_and_data_ + prefix_size),
-            static_cast<absl::string_view::size_type>(data_size)};
+    return {reinterpret_cast<const char*>(size_and_data_ + prefix_size), data_size};
   }
 
   const uint8_t* size_and_data_{nullptr};
