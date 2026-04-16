@@ -744,30 +744,56 @@ TEST_F(StatNameTest, StatNameEqualityFastPaths) {
 }
 
 TEST_F(StatNameTest, EqualityWithMultiByteVarint) {
-  // Build a name with 130 unique segments so encoded data > 127 bytes,
-  // exercising the multi-byte varint slow-path in decodeNumber when
-  // operator== and AbslHashValue decode the length prefix.
-  std::string long_name = "s0";
-  for (int i = 1; i < 130; ++i) {
-    absl::StrAppend(&long_name, ".s", i);
-  }
-  // Two pool entries for the same name: distinct backing storage, identical content.
-  StatName x = makeStat(long_name);
-  StatName y = makeStat(long_name);
-  // different pointers: ensure not fast-path
-  EXPECT_NE(x.dataIncludingSize(), y.dataIncludingSize());
-  // check equality and hash with slow path decode and memcmp
-  EXPECT_EQ(x, y);
-  EXPECT_EQ(x.hash(), y.hash());
+  // Sweep segment counts around the varint boundary to catch off-by-one
+  // errors in decodeNumber's fast-path vs slow-path. Each segment gets a
+  // unique symbol assigned sequentially. Symbols 1-127 encode as 1 byte
+  // each; symbol 128+ encodes as 2 bytes. Pre-allocating throwaway symbols
+  // shifts the numbering so that different padding values produce different
+  // dataSizes for the same segment count. We verify that the sweep covers
+  // both sides of the 128 boundary (the fast-path/slow-path transition in
+  // the length-prefix varint).
+  bool seen[150] = {};
 
-  // Same segment count (same encoded size) but shifted names — memcmp mismatch.
-  std::string long_name_alt = "s1";
-  for (int i = 2; i < 131; ++i) {
-    absl::StrAppend(&long_name_alt, ".s", i);
+  // Sweep a few potential padding numbers just to make sure we cover. This
+  // is over-testing but that's ok.
+  for (int padding = 0; padding <= 10; ++padding) {
+    for (int num_segments = 125; num_segments <= 135; ++num_segments) {
+      clearStorage();
+
+      // Pre-allocate throwaway symbols to shift symbol numbering.
+      for (int p = 0; p < padding; ++p) {
+        makeStat(absl::StrCat("pad", p));
+      }
+
+      std::string long_name = "s0";
+      for (int i = 1; i < num_segments; ++i) {
+        absl::StrAppend(&long_name, ".s", i);
+      }
+
+      // Two pool entries for the same name: distinct backing storage, identical content.
+      StatName x = makeStat(long_name);
+      StatName y = makeStat(long_name);
+      size_t ds = x.dataSize();
+      ASSERT_LT(ds, 150);
+      seen[ds] = true;
+      EXPECT_NE(x.dataIncludingSize(), y.dataIncludingSize())
+          << "padding=" << padding << " segments=" << num_segments;
+      EXPECT_EQ(x, y) << "padding=" << padding << " segments=" << num_segments;
+      EXPECT_EQ(x.hash(), y.hash()) << "padding=" << padding << " segments=" << num_segments;
+
+      // Same segment count but shifted names — memcmp mismatch.
+      std::string long_name_alt = "s1";
+      for (int i = 2; i < num_segments + 1; ++i) {
+        absl::StrAppend(&long_name_alt, ".s", i);
+      }
+      StatName z = makeStat(long_name_alt);
+      EXPECT_NE(x, z) << "padding=" << padding << " segments=" << num_segments;
+    }
   }
-  StatName z = makeStat(long_name_alt);
-  // slow-path: sizes match, memcmp fails
-  EXPECT_NE(x, z);
+  // Confirm every dataSize from 125 through 135 was exercised.
+  for (size_t i = 125; i <= 135; ++i) {
+    EXPECT_TRUE(seen[i]) << "dataSize " << i << " was never hit";
+  }
 }
 
 TEST_F(StatNameTest, EqualitySizeMismatch) {
