@@ -130,11 +130,6 @@ void ValidationInstance::initialize(const Options& options,
   AdminFactoryContext factory_context(*this, std::make_shared<ListenerInfoImpl>());
   initial_config.initAdminAccessLog(bootstrap_, factory_context);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  auto& validation_factory = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-      Config::ServerExtensionValues::get().VALIDATION_LISTENER);
-  auto empty_config = validation_factory.createEmptyConfigProto();
-  listener_manager_ = validation_factory.createListenerManager(*empty_config, *this, nullptr, *this,
-                                                               false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
   // Create bootstrap extensions to validate their configs and register any providers
@@ -163,9 +158,12 @@ void ValidationInstance::initialize(const Options& options,
       std::unique_ptr<OverloadManagerImpl>);
   null_overload_manager_ = std::make_unique<NullOverloadManager>(threadLocal(), false);
 
-  listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-                          Config::ServerExtensionValues::get().VALIDATION_LISTENER)
-                          .createListenerManager(*this, nullptr, *this, false, quic_stat_names_);
+  auto& listener_manager_factory =
+      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+          Config::ServerExtensionValues::get().VALIDATION_LISTENER);
+  listener_manager_ = listener_manager_factory.createListenerManager(
+      *listener_manager_factory.createEmptyConfigProto(), *this, nullptr, *this, false,
+      quic_stat_names_);
 
   THROW_IF_NOT_OK(runtime().onWorkerThreadsRegistered());
 
