@@ -108,7 +108,7 @@ static std::vector<Envoy::Stats::StatName> prepareNames(Envoy::Stats::StatNamePo
   };
   std::vector<Envoy::Stats::StatName> names;
 
-  // Form token combinations selecting psuedo-randomly from the above set.
+  // Form token combinations selecting pseudo-randomly from the above set.
   for (uint32_t i = 0; i < num_words; ++i) {
     std::vector<absl::string_view> tokens;
     for (uint32_t j = 0; j < num_tokens_per_word; ++j) {
