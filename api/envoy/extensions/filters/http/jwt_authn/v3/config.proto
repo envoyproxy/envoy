@@ -624,11 +624,18 @@ message JwtRequirement {
 // JWT claims were NOT cryptographically verified.
 //
 message ExtractOnlyWithoutValidation {
-  // Name of the HTTP header set to "false" on requests where JWT claims
-  // were extracted without signature verification.
+  // Name of the HTTP header set to "false" when a JWT is present but
+  // fails signature verification. The header is NOT set when:
+  //   - The JWT is valid (verification succeeded), or
+  //   - No JWT is present in the request.
   //
-  // Downstream filters (RBAC, ext_authz) SHOULD check this header before
-  // trusting any JWT-derived claim headers for authorization decisions.
+  // This means the header's presence is a meaningful signal to downstream
+  // filters: if set, the JWT was present but could not be verified, and
+  // any extracted claim headers should not be trusted for authorization.
+  //
+  // Downstream filters (RBAC, ext_authz) SHOULD check for the absence of
+  // this header (or its non-"false" value) before trusting JWT-derived
+  // claim headers for authorization decisions.
   //
   // Default (unset or empty): ``x-jwt-signature-verified``
   //

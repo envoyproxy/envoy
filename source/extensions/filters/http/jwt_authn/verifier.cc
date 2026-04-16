@@ -388,8 +388,8 @@ public:
     verification_status_header_ = Http::LowerCaseString(
         configured.empty() ? std::string(kDefaultVerificationStatusHeader) : configured);
     ENVOY_LOG(info,
-              "JWT filter configured for claim extraction only - signature validation disabled. "
-              "Setting '{}' to 'false' on all extract-only requests.",
+              "JWT filter configured for claim extraction only. "
+              "Header '{}' will be set to 'false' when JWT verification fails.",
               verification_status_header_.get());
   }
 
@@ -397,13 +397,6 @@ public:
     ENVOY_LOG(debug, "Extracting JWT claims without signature validation");
 
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-
-    // Set verification status header so downstream filters (RBAC, ext_authz)
-    // can distinguish unverified claims from cryptographically validated ones.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.jwt_authn_add_verification_status_header")) {
-      ctximpl.headers().setCopy(verification_status_header_, kVerificationStatusValue);
-    }
 
     auto auth = auth_factory_.create(nullptr, absl::nullopt,
                                      /*=allow failed*/ true,
@@ -418,6 +411,17 @@ public:
         [this, &ctximpl](const Status& status) {
           ENVOY_LOG(debug, "JWT extraction completed with status: {}, treating as success",
                     static_cast<int>(status));
+          // Set verification status header only when JWT signature verification
+          // was actually attempted and failed. Status::Ok means the JWT was
+          // valid; Status::JwtMissed means no JWT was present. In both cases we
+          // don't mark the request as having unverified claims. Any other
+          // status means verification was attempted but failed — in that case
+          // we signal downstream that the forwarded claims are unverified.
+          if (status != Status::Ok && status != Status::JwtMissed &&
+              Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.jwt_authn_add_verification_status_header")) {
+            ctximpl.headers().setCopy(verification_status_header_, kVerificationStatusValue);
+          }
           onComplete(Status::Ok, ctximpl);
         },
         [&ctximpl]() { ctximpl.callback()->clearRouteCache(); });

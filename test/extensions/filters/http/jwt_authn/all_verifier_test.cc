@@ -663,18 +663,38 @@ TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, TwoGoodJwts) {
 }
 
 
-// Test: Verification status header is set with default name.
-TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderDefaultName) {
+// Test: Verification status header is NOT set when JWT is valid.
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderNotSetOnGoodJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  // The verification status header should be set to "false" indicating
-  // claims were extracted without signature verification.
+  // Good JWT verified successfully — no "unverified" header should be set.
+  EXPECT_TRUE(headers.get_("x-jwt-signature-verified").empty());
+}
+
+// Test: Verification status header IS set when JWT fails verification.
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderSetOnBadJwt) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Expired JWT failed verification — header should be set to "false".
   EXPECT_EQ(headers.get_("x-jwt-signature-verified"), "false");
 }
 
-// Test: Verification status header uses custom name when configured.
+// Test: Verification status header is NOT set when no JWT is present.
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderNotSetOnMissingJwt) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // No JWT present — not a failure, header should not be set.
+  EXPECT_TRUE(headers.get_("x-jwt-signature-verified").empty());
+}
+
+// Test: Verification status header uses custom name when configured
+// and JWT verification fails.
 TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderCustomName) {
   // Reconfigure with a custom verification_status_header.
   proto_config_.mutable_rules(0)
@@ -684,10 +704,11 @@ TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHe
   createVerifier();
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
-  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
+  // Use ExpiredToken to trigger verification failure.
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
-  // Custom header should be set.
+  // Custom header should be set (verification failed).
   EXPECT_EQ(headers.get_("x-custom-verified"), "false");
   // Default header should NOT be set.
   EXPECT_TRUE(headers.get_("x-jwt-signature-verified").empty());
