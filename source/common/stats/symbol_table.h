@@ -913,7 +913,9 @@ public:
    * @return the first StatName in the list. List must be populated and non-empty.
    */
   StatName front() const {
-    ASSERT(populated());
+    // storage_[0] holds the element count, so if we are populated and non-empty
+    // the first byte will be greater than 0.
+    ASSERT(populated() && storage_[0] > 0);
     return StatName(&storage_[1]);
   }
 
