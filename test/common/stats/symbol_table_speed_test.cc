@@ -369,7 +369,7 @@ static std::pair<uint64_t, size_t> decodeNumberUnrolled(const uint8_t* p) {
   if (p[2] < SpilloverMask) {
     return {res | static_cast<uint64_t>(p[2]) << 14, 3};
   }
-  // Fall back to loop for 4+ byte varints (values >= 2^21).
+  // Fall back to loop for 4+ byte varint (values >= 2^21).
   res |= static_cast<uint64_t>(p[2] & Low7Bits) << 14;
   for (size_t i = 3; i < MaxVarintBytes; ++i) {
     if (p[i] < SpilloverMask) {
@@ -536,9 +536,10 @@ BENCHMARK(bmDecodeNumber_UnrolledMixed);
 // ---------------------------------------------------------------------------
 // encodingSizeBytes micro-benchmarks
 //
-// Compare implementations of the varint *size* calculation: loop, hybrid
-// (branch + clz), loop-with-early-exit, and pure clz (branch-free).
-// Two value distributions: short (1-byte varints) and mixed (1-5 byte).
+// Compare implementations of the varint size calculation: loop, hybrid
+// (branch + count-leading-zero), loop-with-early-exit, and pure count-
+// leading-zero (branch-free). Two value distributions: short (1-byte varint)
+// and mixed (1-5 byte).
 // ---------------------------------------------------------------------------
 
 static size_t encodingSizeBytesLoop(uint64_t number) {
