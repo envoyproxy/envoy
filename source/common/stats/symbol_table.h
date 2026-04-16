@@ -197,16 +197,16 @@ public:
      */
     static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding) {
       // fast-path for the case 127 or less
-      if (encoding[0] < kSpilloverMask) {
+      if (encoding[0] < SpilloverMask) {
         return {encoding[0], 1};
       }
 
       uint64_t number = 0;
-      uint64_t uc = kSpilloverMask;
+      uint64_t uc = SpilloverMask;
       const uint8_t* start = encoding;
-      for (uint32_t shift = 0; (uc & kSpilloverMask) != 0; ++encoding, shift += 7) {
+      for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
         uc = static_cast<uint32_t>(*encoding);
-        number |= (uc & kLow7Bits) << shift;
+        number |= (uc & Low7Bits) << shift;
       }
       return std::make_pair(number, encoding - start);
     }
@@ -220,8 +220,8 @@ public:
     // uint8-array. The integers are typically small, so we try to store them in as
     // few bytes as possible. The bottom 7 bits hold values, and the top bit is used
     // to determine whether another byte is needed for more data.
-    static constexpr uint32_t kSpilloverMask = 0x80;
-    static constexpr uint32_t kLow7Bits = 0x7f;
+    static constexpr uint32_t SpilloverMask = 0x80;
+    static constexpr uint32_t Low7Bits = 0x7f;
 
     size_t data_bytes_required_{0};
     MemBlockBuilder<uint8_t> mem_block_;

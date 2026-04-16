@@ -81,7 +81,7 @@ void SymbolTable::Encoding::appendEncoding(uint64_t number, MemBlockBuilder<uint
     if (number < (1 << 7)) {
       mem_block.appendOne(number); // number <= 127 gets encoded in one byte.
     } else {
-      mem_block.appendOne((number & kLow7Bits) | kSpilloverMask); // >= 128 need spillover bytes.
+      mem_block.appendOne((number & Low7Bits) | SpilloverMask); // >= 128 need spillover bytes.
     }
     number >>= 7;
   } while (number != 0);
