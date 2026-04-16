@@ -73,28 +73,28 @@ public:
     RouteEntryImplBaseConstSharedPtr route;
     switch (route_config.match().path_specifier_case()) {
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix:
-      route.reset(new PrefixRouteEntryImpl(vhost, route_config, factory_context, validator,
-                                           creation_status));
+      route = std::make_shared<PrefixRouteEntryImpl>(vhost, route_config, factory_context,
+                                                     validator, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath:
-      route.reset(
-          new PathRouteEntryImpl(vhost, route_config, factory_context, validator, creation_status));
+      route = std::make_shared<PathRouteEntryImpl>(vhost, route_config, factory_context, validator,
+                                                   creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex:
-      route.reset(new RegexRouteEntryImpl(vhost, route_config, factory_context, validator,
-                                          creation_status));
+      route = std::make_shared<RegexRouteEntryImpl>(vhost, route_config, factory_context, validator,
+                                                    creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher:
-      route.reset(new ConnectRouteEntryImpl(vhost, route_config, factory_context, validator,
-                                            creation_status));
+      route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, factory_context,
+                                                      validator, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathSeparatedPrefix:
-      route.reset(new PathSeparatedPrefixRouteEntryImpl(vhost, route_config, factory_context,
-                                                        validator, creation_status));
+      route = std::make_shared<PathSeparatedPrefixRouteEntryImpl>(
+          vhost, route_config, factory_context, validator, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy:
-      route.reset(new UriTemplateMatcherRouteEntryImpl(vhost, route_config, factory_context,
-                                                       validator, creation_status));
+      route = std::make_shared<UriTemplateMatcherRouteEntryImpl>(
+          vhost, route_config, factory_context, validator, creation_status);
       break;
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
       break; // return the error below.
@@ -495,7 +495,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           route.route().has_host_rewrite_path_regex()
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
-      vhost_(vhost), vhost_copy_(vhost), cluster_name_(route.route().cluster()),
+      vhost_(vhost), cluster_name_(route.route().cluster()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
       runtime_(loadRuntimeData(route.match())),

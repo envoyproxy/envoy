@@ -14,13 +14,14 @@ namespace McpJsonRestBridge {
  * Config factory for MCP JSON REST bridge filter.
  */
 class McpJsonRestBridgeFilterConfigFactory
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge> {
 public:
-  McpJsonRestBridgeFilterConfigFactory() : FactoryBase("envoy.filters.http.mcp_json_rest_bridge") {}
+  McpJsonRestBridgeFilterConfigFactory()
+      : ExceptionFreeFactoryBase("envoy.filters.http.mcp_json_rest_bridge") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
           proto_config,
       const std::string&, Server::Configuration::FactoryContext&) override;

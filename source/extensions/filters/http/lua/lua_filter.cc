@@ -107,7 +107,7 @@ void parseOptionsFromTable(lua_State* state, int index,
 }
 
 const Protobuf::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
-  if (callbacks->route() == nullptr) {
+  if (!callbacks->route()) {
     return Protobuf::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->metadata();
@@ -967,8 +967,8 @@ int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {
     strict = lua_toboolean(state, 3);
   }
 
-  // Set the upstream override host
-  callbacks_.setUpstreamOverrideHost(std::make_pair(std::string(host, len), strict));
+  callbacks_.setUpstreamOverrideHost(
+      Upstream::LoadBalancerContext::OverrideHost{std::string(host, len), strict});
 
   return 0;
 }

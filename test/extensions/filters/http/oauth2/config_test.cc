@@ -140,7 +140,7 @@ config:
   EXPECT_CALL(context.server_factory_context_, clusterManager()).Times(2);
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
-  EXPECT_CALL(context, initManager()).Times(2);
+  EXPECT_CALL(context, initManager());
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -335,8 +335,50 @@ TEST(ConfigTest, CreateFilterMissingConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   const auto result =
       config.createFilterFactoryFromProtoTyped(proto_config, "whatever", factory_context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(), "config must be present for global config");
+  // Empty config is valid, config can be provided at route level.
+  EXPECT_TRUE(result.ok());
+}
+
+TEST(ConfigTest, CreateRouteSpecificConfig) {
+  const std::string yaml = R"EOF(
+config:
+  token_endpoint:
+    cluster: foo
+    uri: oauth.com/token
+    timeout: 3s
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+    )EOF";
+
+  envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute route_config;
+  TestUtility::loadFromYaml(yaml, route_config);
+
+  OAuth2Config factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  context.cluster_manager_.initializeClusters({"foo"}, {});
+
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context, secretManager()).WillByDefault(ReturnRef(secret_manager));
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  auto& validation_visitor = ProtobufMessage::getNullValidationVisitor();
+  const auto result =
+      factory.createRouteSpecificFilterConfigTyped(route_config, context, validation_visitor);
+  EXPECT_TRUE(result.ok());
 }
 
 TEST(ConfigTest, WrongCookieName) {

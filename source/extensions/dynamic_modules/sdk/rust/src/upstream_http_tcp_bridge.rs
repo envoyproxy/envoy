@@ -1,9 +1,5 @@
 use crate::{
-  abi,
-  bytes_to_module_buffer,
-  drop_wrapped_c_void_ptr,
-  str_to_module_buffer,
-  wrap_into_c_void_ptr,
+  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr,
   NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
 };
 use mockall::*;
@@ -421,8 +417,11 @@ macro_rules! declare_upstream_http_tcp_bridge_init_functions {
   ($f:ident, $new_bridge_config_fn:expr) => {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION
-        .get_or_init(|| $new_bridge_config_fn);
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
+        $new_bridge_config_fn,
+        "NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION"
+      );
       if ($f()) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char

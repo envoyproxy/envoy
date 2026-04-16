@@ -1,9 +1,24 @@
 #include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
+#include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
+#include "envoy/grpc/status.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+
 #include "source/common/http/headers.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
 
+#include "absl/base/no_destructor.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "fmt/format.h"
 #include "utf8_validity.h"
 
 namespace Envoy {
@@ -15,25 +30,28 @@ namespace {
 using ::nlohmann::json;
 namespace McpConstants = Envoy::Extensions::Filters::Common::Mcp::McpConstants;
 
-absl::StatusOr<int> getSessionId(const json& json_rpc) {
+bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
+  static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> supported_mcp_versions({
+      McpConstants::LATEST_SUPPORTED_MCP_VERSION,
+      McpConstants::FALLBACK_PROTOCOL_VERSION,
+      McpConstants::MCP_VERSION_2024_11_05,
+      McpConstants::MCP_VERSION_2025_06_18,
+  });
+  return supported_mcp_versions->contains(protocol_version);
+}
+
+absl::StatusOr<json> getSessionId(const json& json_rpc) {
   if (auto it = json_rpc.find(McpConstants::ID_FIELD); it != json_rpc.end()) {
-    if (it->is_number_integer()) {
-      return it->get<int>();
+    if (it->is_number_integer() || it->is_string()) {
+      return *it;
     }
-    if (it->is_string()) {
-      int int_id;
-      // TODO(guoyilin42): Support non-numeric string IDs as MCP is JSON-RPC compliant.
-      if (absl::SimpleAtoi(it->get<std::string>(), &int_id)) {
-        return int_id;
-      }
-    }
-    return absl::InvalidArgumentError("JSON-RPC request ID is not an integer or a numeric string.");
+    return absl::InvalidArgumentError("JSON-RPC request ID is not an integer or a string.");
   }
   return absl::InvalidArgumentError("JSON-RPC request (except notification) does not have an ID.");
 }
 
-json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response, int session_id,
-                                        bool is_error) {
+json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response,
+                                        const json& session_id, bool is_error) {
   return json{
       {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
       {McpConstants::ID_FIELD, session_id},
@@ -47,13 +65,19 @@ json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response, in
   };
 }
 
-json generateInitializeResponse(int session_id, absl::string_view server_name) {
+json generateInitializeResponse(const json& session_id, absl::string_view server_name,
+                                absl::string_view protocol_version) {
+  absl::string_view negotiated_protocol_version = McpConstants::LATEST_SUPPORTED_MCP_VERSION;
+  if (isMcpProtocolVersionSupported(protocol_version)) {
+    negotiated_protocol_version = protocol_version;
+  }
+
   json ret;
   ret[McpConstants::JSONRPC_FIELD] = McpConstants::JSONRPC_VERSION;
   ret[McpConstants::ID_FIELD] = session_id;
 
   json result;
-  result[McpConstants::PROTOCOL_VERSION_FIELD] = McpConstants::LATEST_SUPPORTED_MCP_VERSION;
+  result[McpConstants::PROTOCOL_VERSION_FIELD] = negotiated_protocol_version;
   // TODO(guoyilin42): Support list_changed from ServerToolConfig and description from ServerInfo.
   result[McpConstants::CAPABILITIES_FIELD][McpConstants::TOOLS_FIELD]
         [McpConstants::LIST_CHANGED_FIELD] = false;
@@ -65,10 +89,10 @@ json generateInitializeResponse(int session_id, absl::string_view server_name) {
 }
 
 json generateErrorJsonResponse(int error_code, absl::string_view error_message) {
-  json error = json::object();
-  error[McpConstants::ERROR_CODE_FIELD] = error_code;
-  error[McpConstants::ERROR_MESSAGE_FIELD] = error_message;
-  return error;
+  return json{
+      {McpConstants::ERROR_CODE_FIELD, error_code},
+      {McpConstants::ERROR_MESSAGE_FIELD, error_message},
+  };
 }
 
 int getResponseCode(Http::ResponseHeaderMapOptConstRef response_headers) {
@@ -82,12 +106,34 @@ int getResponseCode(Http::ResponseHeaderMapOptConstRef response_headers) {
   return status_code;
 }
 
+bool validateRequestMcpVersion(absl::string_view method,
+                               Http::RequestHeaderMapOptConstRef request_headers,
+                               absl::string_view fallback_protocol_version) {
+  static const absl::NoDestructor<Http::LowerCaseString> mcp_protocol_version_header(
+      McpConstants::MCP_PROTOCOL_VERSION_HEADER);
+  // The initialize request is not expected to have MCP protocol version header.
+  // So we will not check the protocol version for this request.
+  if (method == McpConstants::Methods::INITIALIZE) {
+    return true;
+  }
+  absl::string_view protocol_version = fallback_protocol_version;
+  if (request_headers.has_value()) {
+    auto headers = request_headers->get(*mcp_protocol_version_header);
+    if (!headers.empty()) {
+      protocol_version = headers[0]->value().getStringView();
+    }
+  }
+  return isMcpProtocolVersionSupported(protocol_version);
+}
+
 } // namespace
 
 McpJsonRestBridgeFilterConfig::McpJsonRestBridgeFilterConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
         proto_config)
-    : proto_config_(proto_config) {
+    : proto_config_(proto_config), fallback_protocol_version_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                       proto_config_.server_info(), fallback_protocol_version,
+                                       std::string(McpConstants::FALLBACK_PROTOCOL_VERSION))) {
   for (const auto& tool : proto_config.tool_config().tools()) {
     tool_to_http_rule_[tool.name()] = tool.http_rule();
   }
@@ -104,10 +150,23 @@ McpJsonRestBridgeFilterConfig::getHttpRule(absl::string_view tool_name) const {
   return it->second;
 }
 
+absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
+McpJsonRestBridgeFilterConfig::getToolsListHttpRule() const {
+  if (!proto_config_.tool_config().has_tool_list_http_rule()) {
+    return absl::NotFoundError("tools_list_http_rule is not configured.");
+  }
+  return proto_config_.tool_config().tool_list_http_rule();
+}
+
 Http::FilterHeadersStatus
 McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
+  absl::string_view path = request_headers.getPathValue();
+  auto query_idx = path.find('?');
+  if (query_idx != absl::string_view::npos) {
+    path = path.substr(0, query_idx);
+  }
   // TODO(guoyilin42): Make the MCP endpoint configurable.
-  if (request_headers.getPathValue() != "/mcp") {
+  if (path != "/mcp") {
     // Only intercept /mcp requests and pass through other requests.
     return Http::FilterHeadersStatus::Continue;
   }
@@ -119,10 +178,13 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
   if (request_headers.getMethodValue() != Http::Headers::get().MethodValues.Post) {
     ENVOY_STREAM_LOG(warn, "Only POST method is supported for MCP. Received: {}",
                      *decoder_callbacks_, request_headers.getMethodValue());
-    // TODO(guoyilin42): Consider adding an Allow header when doing error handling.
-    decoder_callbacks_->sendLocalReply(Http::Code::MethodNotAllowed, "Method Not Allowed", nullptr,
-                                       Grpc::Status::WellKnownGrpcStatus::InvalidArgument,
-                                       "mcp_json_rest_bridge_filter_not_post");
+    decoder_callbacks_->sendLocalReply(
+        Http::Code::MethodNotAllowed, "Method Not Allowed",
+        [](Http::ResponseHeaderMap& response_headers) {
+          response_headers.addCopy(Http::LowerCaseString("allow"),
+                                   Http::Headers::get().MethodValues.Post);
+        },
+        Grpc::Status::WellKnownGrpcStatus::InvalidArgument, "mcp_json_rest_bridge_filter_not_post");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -156,8 +218,9 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  handleMcpMethod(request_body_json);
-  data.add(std::move(request_body_str_));
+  handleMcpMethod(request_body_json, decoder_callbacks_->requestHeaders());
+  data.add(request_body_str_);
+  request_body_str_.clear();
 
   if (mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
@@ -206,7 +269,8 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   }
 
   encodeJsonRpcData(encoder_callbacks_->responseHeaders());
-  data.add(std::move(response_body_str_));
+  data.add(response_body_str_);
+  response_body_str_.clear();
   return Http::FilterDataStatus::Continue;
 }
 
@@ -219,23 +283,59 @@ Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::Respons
   return Http::FilterTrailersStatus::Continue;
 }
 
-void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc) {
+void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
+                                              Http::RequestHeaderMapOptRef request_headers) {
   ENVOY_STREAM_LOG(debug, "Handling MCP JSON-RPC: {}", *decoder_callbacks_, json_rpc.dump());
   if (!validateJsonRpcIdAndMethod(json_rpc).ok()) {
     return;
   }
 
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
+  if (!validateRequestMcpVersion(method, request_headers, config_->fallbackProtocolVersion())) {
+    sendErrorResponse(Http::Code::BadRequest,
+                      "mcp_json_rest_bridge_filter_unsupported_protocol_version",
+                      generateErrorJsonResponse(-32602, "Unsupported protocol version").dump());
+    return;
+  }
+  // TODO(guoyilin42): Consider supporting local response for tools/list in addition to the GET.
   if (method == McpConstants::Methods::TOOLS_LIST) {
-    mcp_operation_ = McpOperation::ToolsList;
-    // TODO(guoyilin42): handle tools/list request.
+    absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
+        config_->getToolsListHttpRule();
+    if (http_rule.ok() && !http_rule->get().empty()) {
+      mcp_operation_ = McpOperation::ToolsList;
+      // We don't support pagination for the tools/list request for now.
+      if (request_headers.has_value()) {
+        request_headers->setPath(http_rule->get());
+        request_headers->setMethod(Http::Headers::get().MethodValues.Get);
+        request_headers->removeTransferEncoding();
+        request_headers->removeContentLength();
+        request_headers->removeContentType();
+        // Set AcceptEncoding to "identity" to prevent server encoding the response.
+        request_headers->setCopy(Http::CustomHeaders::get().AcceptEncoding,
+                                 Http::CustomHeaders::get().AcceptEncodingValues.Identity);
+      }
+
+      if (decoder_callbacks_->downstreamCallbacks().has_value()) {
+        decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+      }
+    } else {
+      // TODO(guoyilin42): Handle this more elegantly to avoid an unnecessary copy here. This can
+      // be addressed later when the JSON parser is updated.
+      mcp_operation_ = McpOperation::Unspecified;
+      request_body_str_ = json_rpc.dump();
+    }
   } else if (method == McpConstants::Methods::INITIALIZE) {
     mcp_operation_ = McpOperation::Initialization;
     if (json_rpc.contains(McpConstants::PARAMS_FIELD) &&
         json_rpc[McpConstants::PARAMS_FIELD].contains(McpConstants::PROTOCOL_VERSION_FIELD) &&
         json_rpc[McpConstants::PARAMS_FIELD][McpConstants::PROTOCOL_VERSION_FIELD].is_string()) {
       decoder_callbacks_->sendLocalReply(
-          Http::Code::OK, generateInitializeResponse(*session_id_, server_name_).dump(),
+          Http::Code::OK,
+          generateInitializeResponse(
+              *session_id_, server_name_,
+              json_rpc[McpConstants::PARAMS_FIELD][McpConstants::PROTOCOL_VERSION_FIELD]
+                  .get<std::string>())
+              .dump(),
           [](Http::ResponseHeaderMap& headers) {
             headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
           },
@@ -273,7 +373,26 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
                    absl::string_view(json_ptr, total_size));
   switch (mcp_operation_) {
   case McpOperation::ToolsList: {
-    // TODO(guoyilin42): handle tools/list response.
+    json tools = json::parse(json_ptr, json_ptr + total_size, /*parser_callback_t=*/nullptr,
+                             /*allow_exceptions=*/false);
+    if (tools.is_discarded() ||
+        getResponseCode(response_headers) >= static_cast<int>(Http::Code::BadRequest)) {
+      ENVOY_STREAM_LOG(error, "Tool list response is invalid or has error status code.",
+                       *encoder_callbacks_);
+      json ret = {
+          {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+          {McpConstants::ID_FIELD, *session_id_},
+          {McpConstants::ERROR_FIELD, generateErrorJsonResponse(-32000, "Server error")},
+      };
+      response_body_str_ = ret.dump();
+      break;
+    }
+    json ret = {
+        {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+        {McpConstants::ID_FIELD, *session_id_},
+        {McpConstants::RESULT_FIELD, tools},
+    };
+    response_body_str_ = ret.dump();
     break;
   }
   case McpOperation::ToolsCall: {
@@ -305,11 +424,10 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
       ENVOY_STREAM_LOG(error, "Failed to parse error response.", *encoder_callbacks_);
       return;
     }
-    json ret = {
-        {McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
-        // If the ID is missing in the request, the ID in the response should be null.
-        {McpConstants::ID_FIELD, session_id_.has_value() ? json(*session_id_) : json(nullptr)},
-        {McpConstants::ERROR_FIELD, error}};
+    json ret = {{McpConstants::JSONRPC_FIELD, McpConstants::JSONRPC_VERSION},
+                // If the ID is missing in the request, the ID in the response should be null.
+                {McpConstants::ID_FIELD, session_id_.has_value() ? *session_id_ : json(nullptr)},
+                {McpConstants::ERROR_FIELD, error}};
     response_body_str_ = ret.dump();
     break;
   }
@@ -318,11 +436,16 @@ void McpJsonRestBridgeFilter::encodeJsonRpcData(Http::ResponseHeaderMapOptRef re
   }
 
   if (response_headers.has_value()) {
-    // TODO(guoyilin42): Prevent CL.TE request smuggling by ensuring Content-Length and
-    // chunked Transfer-Encoding do not co-exist. Follow the existing response pattern:
-    // 1. If chunked Transfer-Encoding is present, remove the Content-Length header.
-    // 2. If Content-Length is present, update it with the new value.
-    response_headers->setContentLength(response_body_str_.size());
+    const auto transfer_encoding = response_headers->TransferEncoding();
+    const bool is_chunked =
+        transfer_encoding != nullptr &&
+        absl::EqualsIgnoreCase(transfer_encoding->value().getStringView(),
+                               Http::Headers::get().TransferEncodingValues.Chunked);
+    if (is_chunked) {
+      response_headers->removeContentLength();
+    } else {
+      response_headers->setContentLength(response_body_str_.size());
+    }
     response_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
   }
 }
@@ -374,7 +497,7 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   absl::StatusOr<HttpRequest> http_request = buildHttpRequest(*http_rule, arguments);
   if (!http_request.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build HTTP request for method: {} with status: {}",
-                     *decoder_callbacks_, tool_name, http_request.status().message());
+                     *decoder_callbacks_, tool_name, http_request.status());
     sendErrorResponse(Http::Code::BadRequest, "mcp_json_rest_bridge_filter_invalid_tool_arguments",
                       generateErrorJsonResponse(-32602, "Invalid tool arguments").dump());
     return;
@@ -388,11 +511,16 @@ void McpJsonRestBridgeFilter::mapMcpToolToApiBackend(const nlohmann::json& json_
   if (request_headers.has_value()) {
     request_headers->setPath(http_request->url);
     request_headers->setMethod(http_request->method);
-    // TODO(guoyilin42): Prevent CL.TE request smuggling by ensuring Content-Length and
-    // chunked Transfer-Encoding do not co-exist. Follow the existing response pattern:
-    // 1. If chunked Transfer-Encoding is present, remove the Content-Length header.
-    // 2. If Content-Length is present, update it with the new value.
-    request_headers->setContentLength(request_body_str_.size());
+    const auto transfer_encoding = request_headers->TransferEncoding();
+    const bool is_chunked =
+        transfer_encoding != nullptr &&
+        absl::EqualsIgnoreCase(transfer_encoding->value().getStringView(),
+                               Http::Headers::get().TransferEncodingValues.Chunked);
+    if (is_chunked) {
+      request_headers->removeContentLength();
+    } else {
+      request_headers->setContentLength(request_body_str_.size());
+    }
     request_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
     // Set AcceptEncoding to "identity" to prevent server encoding the response.
     request_headers->setCopy(Http::CustomHeaders::get().AcceptEncoding,
@@ -416,7 +544,7 @@ void McpJsonRestBridgeFilter::sendErrorResponse(Http::Code response_code,
 }
 
 absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc) {
-  absl::StatusOr<int> session_id = getSessionId(json_rpc);
+  absl::StatusOr<nlohmann::json> session_id = getSessionId(json_rpc);
   if (session_id.ok()) {
     session_id_ = *session_id;
   }

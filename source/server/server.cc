@@ -726,9 +726,18 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
         Config::ServerExtensionValues::get().DEFAULT_LISTENER);
   }
 
+  ProtobufTypes::MessagePtr listener_manager_config =
+      listener_manager_factory->createEmptyConfigProto();
+  if (bootstrap_.has_listener_manager()) {
+    listener_manager_config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_.listener_manager().typed_config(),
+        messageValidationContext().staticValidationVisitor(), *listener_manager_factory);
+  }
+
   // Workers get created first so they register for thread local updates.
   listener_manager_ = listener_manager_factory->createListenerManager(
-      *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+      *listener_manager_config, *this, nullptr, worker_factory_,
+      bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // Runtime is initialized before the overload manager so resource monitors can read runtime keys;
   // that means the first runtime snapshot is published before workers register for thread-local

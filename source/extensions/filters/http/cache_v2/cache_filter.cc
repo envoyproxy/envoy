@@ -71,8 +71,8 @@ void CacheFilter::onDestroy() {
 }
 
 absl::optional<absl::string_view> CacheFilter::clusterName() {
-  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-  const Router::RouteEntry* route_entry = (route == nullptr) ? nullptr : route->routeEntry();
+  const auto route = decoder_callbacks_->route();
+  const Router::RouteEntry* route_entry = route ? route->routeEntry() : nullptr;
   if (route_entry == nullptr) {
     return absl::nullopt;
   }

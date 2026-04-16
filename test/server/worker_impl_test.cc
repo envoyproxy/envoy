@@ -10,6 +10,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -157,6 +158,57 @@ TEST_F(WorkerImplTest, WorkerInvokesProvidedCallback) {
 
   callback_ran.WaitForNotification();
   worker_.stop();
+}
+
+class WorkerOverloadTest : public testing::Test, public Event::TestUsingSimulatedTime {
+public:
+  WorkerOverloadTest()
+      : api_(Api::createApiForTest(simTime())),
+        dispatcher_(api_->allocateDispatcher("worker_test")),
+        stat_names_(api_->rootScope().symbolTable()) {}
+
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  DefaultListenerHooks hooks_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  WorkerStatNames stat_names_;
+  NiceMock<MockOverloadManager> overload_manager_;
+};
+
+TEST_F(WorkerOverloadTest, CloseIdleHttpConnections) {
+  OverloadActionCb captured_cb;
+  EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
+      .WillRepeatedly(Invoke([&](const std::string& name, Event::Dispatcher&, OverloadActionCb cb) {
+        if (name == OverloadActionNames::get().CloseIdleHttpConnections) {
+          captured_cb = cb;
+        }
+        return true;
+      }));
+
+  auto* handler = new NiceMock<Network::MockConnectionHandler>();
+  auto* dispatcher_ptr = dispatcher_.get();
+  WorkerImpl worker(tls_, hooks_, std::move(dispatcher_), Network::ConnectionHandlerPtr{handler},
+                    overload_manager_, *api_, stat_names_);
+
+  ASSERT_TRUE(captured_cb != nullptr);
+
+  auto trigger_and_advance = [&](OverloadActionState state, std::chrono::milliseconds duration =
+                                                                std::chrono::milliseconds(100)) {
+    captured_cb(state);
+    simTime().advanceTimeAndRun(duration, *dispatcher_ptr, Event::Dispatcher::RunType::NonBlock);
+  };
+
+  // 1. Transition to scaling (active)
+  EXPECT_CALL(*handler, closeIdleHttpConnections(false));
+  trigger_and_advance(OverloadActionState(UnitFloat(0.5)));
+
+  // 2. Transition to saturated
+  EXPECT_CALL(*handler, closeIdleHttpConnections(true));
+  trigger_and_advance(OverloadActionState::saturated());
+
+  // 3. Transition back to inactive
+  EXPECT_CALL(*handler, closeIdleHttpConnections(_)).Times(0);
+  trigger_and_advance(OverloadActionState::inactive());
 }
 
 } // namespace

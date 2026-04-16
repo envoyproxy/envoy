@@ -135,6 +135,12 @@ public:
     return stream_ids;
   }
 
+  static std::unique_ptr<ConnectionImpl::Http2Options>
+  createHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                     uint32_t max_headers_kb) {
+    return std::make_unique<ConnectionImpl::Http2Options>(http2_options, max_headers_kb);
+  }
+
   static Http2SettingsTuple smallWindowHttp2Settings() {
     return std::make_tuple(CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE,
                            CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS,
@@ -211,11 +217,13 @@ public:
 
     // Ensure that tests driveToCompletion(). Some tests set `expect_buffered_data_on_teardown_` to
     // indicate that they purposefully leave buffered data.
-    if (expect_buffered_data_on_teardown_) {
-      EXPECT_TRUE(client_wrapper_->buffer_.length() > 0 || server_wrapper_->buffer_.length() > 0);
-    } else {
-      EXPECT_EQ(client_wrapper_->buffer_.length(), 0);
-      EXPECT_EQ(server_wrapper_->buffer_.length(), 0);
+    if (client_wrapper_ != nullptr && server_wrapper_ != nullptr) {
+      if (expect_buffered_data_on_teardown_) {
+        EXPECT_TRUE(client_wrapper_->buffer_.length() > 0 || server_wrapper_->buffer_.length() > 0);
+      } else {
+        EXPECT_EQ(client_wrapper_->buffer_.length(), 0);
+        EXPECT_EQ(server_wrapper_->buffer_.length(), 0);
+      }
     }
   }
 
@@ -569,6 +577,59 @@ protected:
     return false;
   }
 };
+
+TEST_P(Http2CodecImplTest, DisallowObsTextBehaviorDisallow) {
+  if (skipForUhv() || http2_implementation_ != Http2Impl::Oghttp2) {
+    return;
+  }
+
+  // With disallow_obs_text = true, the request is rejected.
+  server_http2_options_.mutable_disallow_obs_text()->set_value(true);
+  initialize();
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+
+  HeaderString header_name;
+  header_name.setCopy("custom-header");
+  HeaderString header_value;
+  setHeaderStringUnvalidated(header_value, "foo\x80");
+  request_headers.addViaMove(std::move(header_name), std::move(header_value));
+
+  // We don't expect onResetStream because the error might be detected before the stream is fully
+  // established on the server.
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  driveToCompletion();
+  EXPECT_FALSE(server_wrapper_->status_.ok());
+  // Drain the buffer as we expect a connection error and some data might be left.
+  server_wrapper_->buffer_.drain(server_wrapper_->buffer_.length());
+}
+
+TEST_P(Http2CodecImplTest, DisallowObsTextBehaviorAllow) {
+  if (skipForUhv() || http2_implementation_ != Http2Impl::Oghttp2) {
+    return;
+  }
+
+  // With disallow_obs_text = false, the request is accepted.
+  server_http2_options_.mutable_disallow_obs_text()->set_value(false);
+  initialize();
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+
+  HeaderString header_name;
+  header_name.setCopy("custom-header");
+  HeaderString header_value;
+  setHeaderStringUnvalidated(header_value, "foo\x80");
+  request_headers.addViaMove(std::move(header_name), std::move(header_value));
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  driveToCompletion();
+  EXPECT_TRUE(server_wrapper_->status_.ok());
+}
 
 TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
   initialize();

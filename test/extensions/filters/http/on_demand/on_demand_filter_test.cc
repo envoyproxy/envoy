@@ -50,7 +50,8 @@ public:
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButHasNoEntry) {
   setupWithCds();
   Http::TestRequestHeaderMapImpl headers;
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
   EXPECT_CALL(*decoder_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
@@ -75,7 +76,8 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableAndClusterIsAvaila
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterIsNotAvailable) {
   setupWithCds();
   Http::TestRequestHeaderMapImpl headers;
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
   EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
@@ -84,7 +86,8 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterNameIsEm
   setupWithCds();
   Http::TestRequestHeaderMapImpl headers;
   std::string empty_cluster_name;
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_, clusterName())
       .WillOnce(ReturnRef(empty_cluster_name));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
@@ -93,14 +96,14 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterNameIsEm
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteIsNotAvailableAndOdCdsIsEnabled) {
   setupWithCds();
   Http::TestRequestHeaderMapImpl headers;
-  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteIsNotAvailable) {
   Http::TestRequestHeaderMapImpl headers;
-  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }

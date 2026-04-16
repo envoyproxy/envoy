@@ -915,6 +915,10 @@ func (h *dymHttpFilterHandle) ClearRouteCache() {
 	C.envoy_dynamic_module_callback_http_clear_route_cache(h.hostPluginPtr)
 }
 
+func (h *dymHttpFilterHandle) RefreshRouteCluster() {
+	C.envoy_dynamic_module_callback_http_clear_route_cluster_cache(h.hostPluginPtr)
+}
+
 func (h *dymHttpFilterHandle) RequestHeaders() shared.HeaderMap {
 	return &h.requestHeaderMap
 }

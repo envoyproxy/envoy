@@ -38,9 +38,9 @@
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
-#include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -131,7 +131,8 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const std::string& routeName() const override { return EMPTY_STRING; }
-  const VirtualHostConstSharedPtr& virtualHost() const override { return virtual_host_; }
+  const VirtualHost& virtualHost() const override { return *virtual_host_; }
+  VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return virtual_host_; }
 
 private:
   const VirtualHostConstSharedPtr virtual_host_;
@@ -701,12 +702,8 @@ public:
     return getOptionalTimeout<OptionalTimeoutNames::GrpcTimeoutOffset>();
   }
 
-  const VirtualHostConstSharedPtr& virtualHost() const override {
-    // The method cannot return the vhost_ directly because the vhost_ has different type with
-    // the VirtualHostConstSharedPtr and will create a temporary copy implicitly and result in error
-    // of returning reference to local temporary object.
-    return vhost_copy_;
-  }
+  const VirtualHost& virtualHost() const override { return *vhost_; }
+  VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool appendXfh() const override { return append_xfh_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -877,9 +874,6 @@ private:
   // Keep an copy of the shared pointer to the shared part of the virtual host. This is needed
   // to keep the shared part alive while the route is alive.
   const CommonVirtualHostSharedPtr vhost_;
-  // Same with vhost_ but this could be returned as reference. vhost_ is kept to access the
-  // methods that not exposed in the VirtualHost.
-  const VirtualHostConstSharedPtr vhost_copy_;
   const std::string cluster_name_;
   RouteStatsContextPtr route_stats_context_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
@@ -957,7 +951,6 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-private:
   friend class RouteCreator;
 
   UriTemplateMatcherRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
@@ -966,6 +959,7 @@ private:
                                    ProtobufMessage::ValidationVisitor& validator,
                                    absl::Status& creation_status);
 
+private:
   const std::string uri_template_;
 };
 
@@ -992,14 +986,15 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-private:
   friend class RouteCreator;
+
   PrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                        const envoy::config::route::v3::Route& route,
                        Server::Configuration::ServerFactoryContext& factory_context,
                        ProtobufMessage::ValidationVisitor& validator,
                        absl::Status& creation_status);
 
+private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1026,13 +1021,14 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-private:
   friend class RouteCreator;
+
   PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
 
+private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1059,13 +1055,14 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-private:
   friend class RouteCreator;
+
   RegexRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                       const envoy::config::route::v3::Route& route,
                       Server::Configuration::ServerFactoryContext& factory_context,
                       ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
 
+private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1093,8 +1090,8 @@ public:
 
   bool supportsPathlessHeaders() const override { return true; }
 
-private:
   friend class RouteCreator;
+
   ConnectRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                         const envoy::config::route::v3::Route& route,
                         Server::Configuration::ServerFactoryContext& factory_context,
@@ -1125,14 +1122,15 @@ public:
                                          const Formatter::Context& context,
                                          const StreamInfo::StreamInfo& stream_info) const override;
 
-private:
   friend class RouteCreator;
+
   PathSeparatedPrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                     const envoy::config::route::v3::Route& route,
                                     Server::Configuration::ServerFactoryContext& factory_context,
                                     ProtobufMessage::ValidationVisitor& validator,
                                     absl::Status& creation_status);
 
+private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1218,7 +1216,7 @@ private:
                absl::Status& creation_status);
 
   using WildcardVirtualHosts =
-      std::map<int64_t, absl::node_hash_map<std::string, VirtualHostImplSharedPtr>, std::greater<>>;
+      std::map<int64_t, absl::flat_hash_map<std::string, VirtualHostImplSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
   const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
@@ -1226,7 +1224,7 @@ private:
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
   Stats::ScopeSharedPtr vhost_scope_;
-  absl::node_hash_map<std::string, VirtualHostImplSharedPtr> virtual_hosts_;
+  absl::flat_hash_map<std::string, VirtualHostImplSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
   // A note on using an unordered_map versus a vector of (string, VirtualHostImplSharedPtr) pairs:

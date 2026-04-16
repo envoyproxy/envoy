@@ -503,6 +503,10 @@ public:
     envoy_dynamic_module_callback_http_clear_route_cache(host_plugin_ptr_);
   }
 
+  void refreshRouteCluster() override {
+    envoy_dynamic_module_callback_http_clear_route_cluster_cache(host_plugin_ptr_);
+  }
+
   HeaderMap& requestHeaders() override { return request_headers_; }
 
   BodyBuffer& bufferedRequestBody() override { return buffered_request_body_; }

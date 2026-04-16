@@ -2429,6 +2429,15 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_timer_delete
 ) {
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _path: abi::envoy_dynamic_module_type_module_buffer,
+  _events: u32,
+) -> bool {
+  false
+}
+
 // Thread-local used by the test mock to capture the response body set via the callback.
 thread_local! {
   static TEST_ADMIN_RESPONSE: std::cell::RefCell<String> =
@@ -2929,6 +2938,94 @@ fn test_bootstrap_extension_timer_fired_identity() {
   }
 }
 
+#[test]
+fn test_bootstrap_extension_file_changed() {
+  // Verify that path and events are correctly passed through on_file_changed.
+  static FIRED_PATH: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+  static FIRED_EVENTS: AtomicU32 = AtomicU32::new(0);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_file_changed(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      path: &str,
+      events: u32,
+    ) {
+      *FIRED_PATH.lock().unwrap() = path.to_string();
+      FIRED_EVENTS.store(events, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  // Fire with MovedTo event.
+  let path = "test/path_a.txt";
+  let path_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path.as_ptr() as *mut _,
+    length: path.len(),
+  };
+  envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    std::ptr::null_mut(),
+    config_ptr,
+    path_buf,
+    FILE_WATCHER_EVENT_MOVED_TO,
+  );
+  assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_a.txt");
+  assert_eq!(
+    FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
+    FILE_WATCHER_EVENT_MOVED_TO
+  );
+
+  // Fire with Modified event on different path.
+  let path2 = "test/path_b.txt";
+  let path_buf2 = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: path2.as_ptr() as *mut _,
+    length: path2.len(),
+  };
+  envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    std::ptr::null_mut(),
+    config_ptr,
+    path_buf2,
+    FILE_WATCHER_EVENT_MODIFIED,
+  );
+  assert_eq!(FIRED_PATH.lock().unwrap().as_str(), "test/path_b.txt");
+  assert_eq!(
+    FIRED_EVENTS.load(std::sync::atomic::Ordering::SeqCst),
+    FILE_WATCHER_EVENT_MODIFIED
+  );
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
 // =============================================================================
 // Cert Validator callback stubs.
 // =============================================================================
@@ -2983,26 +3080,12 @@ fn test_cert_validator_config_new_and_destroy() {
     }
   }
 
-  NEW_CERT_VALIDATOR_CONFIG_FUNCTION.get_or_init(|| {
+  let new_config_fn: NewCertValidatorConfigFunction =
     |_name: &str, _config: &[u8]| -> Option<Box<dyn cert_validator::CertValidatorConfig>> {
       Some(Box::new(TestCertValidatorConfig))
-    }
-  });
+    };
 
-  let name = "test";
-  let config = b"config";
-  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
-    ptr: name.as_ptr() as *const _,
-    length: name.len(),
-  };
-  let config_buf = abi::envoy_dynamic_module_type_envoy_buffer {
-    ptr: config.as_ptr() as *const _,
-    length: config.len(),
-  };
-
-  let config_ptr = unsafe {
-    envoy_dynamic_module_on_cert_validator_config_new(std::ptr::null_mut(), name_buf, config_buf)
-  };
+  let config_ptr = cert_validator::init_cert_validator_config("test", b"config", &new_config_fn);
   assert!(!config_ptr.is_null());
 
   unsafe {
@@ -4987,7 +5070,7 @@ fn test_async_host_selection_with_stored_completion() {
 fn test_bootstrap_extension_cluster_add_or_update() {
   use std::sync::atomic::{AtomicBool, Ordering};
   static CLUSTER_ADDED: AtomicBool = AtomicBool::new(false);
-  static mut CLUSTER_NAME_RECEIVED: String = String::new();
+  static CLUSTER_NAME_RECEIVED: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -5004,9 +5087,7 @@ fn test_bootstrap_extension_cluster_add_or_update() {
       cluster_name: &str,
     ) {
       CLUSTER_ADDED.store(true, Ordering::SeqCst);
-      unsafe {
-        CLUSTER_NAME_RECEIVED = cluster_name.to_string();
-      }
+      *CLUSTER_NAME_RECEIVED.lock().unwrap() = cluster_name.to_string();
     }
   }
 
@@ -5046,9 +5127,7 @@ fn test_bootstrap_extension_cluster_add_or_update() {
   }
 
   assert!(CLUSTER_ADDED.load(Ordering::SeqCst));
-  unsafe {
-    assert_eq!(CLUSTER_NAME_RECEIVED, "test_cluster");
-  }
+  assert_eq!(*CLUSTER_NAME_RECEIVED.lock().unwrap(), "test_cluster");
 
   // Clean up.
   unsafe {
@@ -5060,7 +5139,7 @@ fn test_bootstrap_extension_cluster_add_or_update() {
 fn test_bootstrap_extension_cluster_removal() {
   use std::sync::atomic::{AtomicBool, Ordering};
   static CLUSTER_REMOVED: AtomicBool = AtomicBool::new(false);
-  static mut REMOVED_CLUSTER_NAME: String = String::new();
+  static REMOVED_CLUSTER_NAME: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -5077,9 +5156,7 @@ fn test_bootstrap_extension_cluster_removal() {
       cluster_name: &str,
     ) {
       CLUSTER_REMOVED.store(true, Ordering::SeqCst);
-      unsafe {
-        REMOVED_CLUSTER_NAME = cluster_name.to_string();
-      }
+      *REMOVED_CLUSTER_NAME.lock().unwrap() = cluster_name.to_string();
     }
   }
 
@@ -5119,9 +5196,7 @@ fn test_bootstrap_extension_cluster_removal() {
   }
 
   assert!(CLUSTER_REMOVED.load(Ordering::SeqCst));
-  unsafe {
-    assert_eq!(REMOVED_CLUSTER_NAME, "removed_cluster");
-  }
+  assert_eq!(*REMOVED_CLUSTER_NAME.lock().unwrap(), "removed_cluster");
 
   // Clean up.
   unsafe {
@@ -5191,7 +5266,7 @@ fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
 fn test_bootstrap_extension_listener_add_or_update() {
   use std::sync::atomic::{AtomicBool, Ordering};
   static LISTENER_ADDED: AtomicBool = AtomicBool::new(false);
-  static mut LISTENER_NAME_RECEIVED: String = String::new();
+  static LISTENER_NAME_RECEIVED: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -5208,9 +5283,7 @@ fn test_bootstrap_extension_listener_add_or_update() {
       listener_name: &str,
     ) {
       LISTENER_ADDED.store(true, Ordering::SeqCst);
-      unsafe {
-        LISTENER_NAME_RECEIVED = listener_name.to_string();
-      }
+      *LISTENER_NAME_RECEIVED.lock().unwrap() = listener_name.to_string();
     }
   }
 
@@ -5250,9 +5323,7 @@ fn test_bootstrap_extension_listener_add_or_update() {
   }
 
   assert!(LISTENER_ADDED.load(Ordering::SeqCst));
-  unsafe {
-    assert_eq!(LISTENER_NAME_RECEIVED, "test_listener");
-  }
+  assert_eq!(*LISTENER_NAME_RECEIVED.lock().unwrap(), "test_listener");
 
   // Clean up.
   unsafe {
@@ -5264,7 +5335,7 @@ fn test_bootstrap_extension_listener_add_or_update() {
 fn test_bootstrap_extension_listener_removal() {
   use std::sync::atomic::{AtomicBool, Ordering};
   static LISTENER_REMOVED: AtomicBool = AtomicBool::new(false);
-  static mut REMOVED_LISTENER_NAME: String = String::new();
+  static REMOVED_LISTENER_NAME: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
   struct TestBootstrapExtensionConfig;
   impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
@@ -5281,9 +5352,7 @@ fn test_bootstrap_extension_listener_removal() {
       listener_name: &str,
     ) {
       LISTENER_REMOVED.store(true, Ordering::SeqCst);
-      unsafe {
-        REMOVED_LISTENER_NAME = listener_name.to_string();
-      }
+      *REMOVED_LISTENER_NAME.lock().unwrap() = listener_name.to_string();
     }
   }
 
@@ -5323,9 +5392,7 @@ fn test_bootstrap_extension_listener_removal() {
   }
 
   assert!(LISTENER_REMOVED.load(Ordering::SeqCst));
-  unsafe {
-    assert_eq!(REMOVED_LISTENER_NAME, "removed_listener");
-  }
+  assert_eq!(*REMOVED_LISTENER_NAME.lock().unwrap(), "removed_listener");
 
   // Clean up.
   unsafe {

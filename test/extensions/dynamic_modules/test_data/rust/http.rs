@@ -49,7 +49,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "typed_filter_state_callbacks" => Some(Box::new(TypedFilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     "config_init_failure" => None,
-    _ => panic!("Unknown filter name: {}", name),
+    _ => panic!("Unknown filter name: {name}"),
   }
 }
 
@@ -181,6 +181,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.clear_route_cache();
+    envoy_filter.clear_route_cluster_cache();
 
     // Test single getter API.
     let single_value = envoy_filter
@@ -983,7 +984,7 @@ impl std::io::Read for BodyReader<'_> {
       let slice = self.data[self.vec_idx].as_slice();
       let remaining = slice.len() - self.buf_idx;
       let to_copy = std::cmp::min(remaining, buf.len() - n);
-      buf[n .. n + to_copy].copy_from_slice(&slice[self.buf_idx .. self.buf_idx + to_copy]);
+      buf[n..n + to_copy].copy_from_slice(&slice[self.buf_idx..self.buf_idx + to_copy]);
       n += to_copy;
       self.buf_idx += to_copy;
       if self.buf_idx >= slice.len() {
@@ -1064,29 +1065,17 @@ impl<EHF: EnvoyHttpFilter> std::io::Write for BodyWriter<'_, EHF> {
     if self.request {
       if self.received {
         if !self.envoy_filter.append_received_request_body(buf) {
-          return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Buffer is not available",
-          ));
+          return Err(std::io::Error::other("Buffer is not available"));
         }
       } else if !self.envoy_filter.append_buffered_request_body(buf) {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          "Buffer is not available",
-        ));
+        return Err(std::io::Error::other("Buffer is not available"));
       }
     } else if self.received {
       if !self.envoy_filter.append_received_response_body(buf) {
-        return Err(std::io::Error::new(
-          std::io::ErrorKind::Other,
-          "Buffer is not available",
-        ));
+        return Err(std::io::Error::other("Buffer is not available"));
       }
     } else if !self.envoy_filter.append_buffered_response_body(buf) {
-      return Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "Buffer is not available",
-      ));
+      return Err(std::io::Error::other("Buffer is not available"));
     }
 
     Ok(buf.len())
@@ -1110,7 +1099,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
         let mut reader = BodyReader::new(body.unwrap());
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-        self.request_body.extend_from_slice(&buf[.. n]);
+        self.request_body.extend_from_slice(&buf[..n]);
         // Drop the reader and try writing to the writer.
         drop(reader);
 
@@ -1129,7 +1118,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
         let mut reader = BodyReader::new(body.unwrap());
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-        self.request_body.extend_from_slice(&buf[.. n]);
+        self.request_body.extend_from_slice(&buf[..n]);
         // Drop the reader and try writing to the writer.
         drop(reader);
 

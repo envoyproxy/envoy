@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "envoy/common/conn_pool.h"
 #include "envoy/common/pure.h"
@@ -119,6 +120,9 @@ public:
    * @return absl::string_view a protocol description for logging.
    */
   virtual absl::string_view protocolDescription() const PURE;
+
+  virtual void setLifetimeCallbacks(OptRef<ConnectionLifetimeCallbacks> callbacks,
+                                    std::vector<uint8_t> hash_key) PURE;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
