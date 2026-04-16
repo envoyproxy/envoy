@@ -218,6 +218,7 @@ public:
   bool skipXffAppend() const override { return skip_xff_append_; }
   const std::string& via() const override { return via_; }
   Http::ForwardClientCertType forwardClientCert() const override { return forward_client_cert_; }
+  Http::ClientCertFormat clientCertFormat() const override { return forward_client_cert_format_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
@@ -318,6 +319,7 @@ private:
   const bool skip_xff_append_;
   const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
+  Http::ClientCertFormat forward_client_cert_format_{};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   Config::ConfigProviderManager* scoped_routes_config_provider_manager_;

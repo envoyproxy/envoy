@@ -1,0 +1,22 @@
+[package]
+name = "envoy-dynamic-modules-builtin-extensions"
+version = "0.1.0"
+edition = "2021"
+authors = ["Envoy Proxy Authors <envoy-dev@googlegroups.com>"]
+description = "Builtin Rust extensions for Envoy dynamic modules"
+license = "Apache-2.0"
+repository = "https://github.com/envoyproxy/envoy"
+
+[dependencies]
+envoy-proxy-dynamic-modules-rust-sdk = { path = "../sdk/rust" }
+hickory-resolver = { version = "0.25", features = ["system-config", "tokio", "tls-ring", "https-ring", "dnssec-ring", "webpki-roots"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+time = ">=0.3.47"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+url = "2"
+
+[lib]
+name = "envoy_dynamic_modules_builtin_extensions"
+path = "lib.rs"
+crate-type = ["staticlib"]

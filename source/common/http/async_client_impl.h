@@ -183,7 +183,8 @@ private:
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
                    absl::string_view transport_failure_reason = "") override;
-  Router::RouteConstSharedPtr route() override { return route_; }
+  OptRef<const Router::Route> route() override { return makeOptRefFromPtr(route_.get()); }
+  Router::RouteConstSharedPtr routeSharedPtr() override { return route_; }
   OptRef<const Upstream::ClusterInfo> clusterInfo() override {
     return makeOptRefFromPtr(parent_.cluster_.get());
   }
@@ -273,9 +274,13 @@ private:
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
   void resetIdleTimer() override {}
-  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
-  absl::optional<Upstream::LoadBalancerContext::OverrideHost>
-  upstreamOverrideHost() const override {
+  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host) override {
+    upstream_override_host_ = std::move(host);
+  }
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override {
+    if (upstream_override_host_.host.empty()) {
+      return {};
+    }
     return upstream_override_host_;
   }
   bool shouldLoadShed() const override { return false; }
@@ -319,7 +324,7 @@ private:
   bool router_destroyed_{false};
 
   // Upstream override host for bypassing load balancer selection
-  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
+  Upstream::LoadBalancerContext::OverrideHost upstream_override_host_;
 
   friend class AsyncClientImpl;
   friend class AsyncClientImplUnitTest;

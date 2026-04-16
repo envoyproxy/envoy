@@ -9,6 +9,7 @@
 
 #include "test/extensions/load_balancing_policies/common/load_balancer_impl_base_test.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 
@@ -81,7 +82,7 @@ public:
         MonotonicTime(std::chrono::seconds(non_empty_since_seconds)),
         /*last_update_time=*/
         MonotonicTime(std::chrono::seconds(last_update_time_seconds)));
-    host->setLbPolicyData(std::move(client_side_data));
+    host->addLbPolicyData(std::move(client_side_data));
   }
 
   Extensions::LoadBalancingPolicies::Common::OrcaLoadReportHandlerSharedPtr
@@ -294,7 +295,8 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
     xds::data::orca::v3::OrcaLoadReport orca_load_report;
     orca_load_report.set_rps_fractional(1000);
     orca_load_report.set_application_utilization(0.5);
-    EXPECT_EQ(host->lbPolicyData()->onOrcaLoadReport(orca_load_report, mock_stream_info),
+    EXPECT_EQ(host->typedLbPolicyData<OrcaHostLbPolicyData>()->onOrcaLoadReport(orca_load_report,
+                                                                                mock_stream_info),
               absl::OkStatus());
     EXPECT_EQ(host->weight(), 1);
   }
@@ -519,9 +521,9 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooRecent) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  host.lb_policy_data_ = std::make_unique<OrcaHostLbPolicyData>(
+  host.addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
       nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
+      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
   // Non empty since is too recent (5 > 2).
   EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host,
@@ -534,9 +536,9 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFro
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooStale) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  host.lb_policy_data_ = std::make_unique<OrcaHostLbPolicyData>(
+  host.addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
       nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(7)));
+      /*last_update_time=*/MonotonicTime(std::chrono::seconds(7))));
   // Last update time is too stale (7 < 8).
   EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host,
@@ -549,9 +551,9 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFro
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_Valid) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  host.lb_policy_data_ = std::make_unique<OrcaHostLbPolicyData>(
+  host.addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
       nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
+      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
   // Not empty since is not too recent (1 < 2) and last update time is not too
   // old (10 > 8).
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
@@ -569,7 +571,6 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
      GetUtilizationFromOrcaReport_ApplicationUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_application_utilization(0.5);
-  orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
                 orca_load_report, {"named_metrics.foo"}),
@@ -583,6 +584,26 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
                 orca_load_report, {"named_metrics.foo"}),
             0.3);
+}
+
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_Preference) {
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_application_utilization(0.5);
+  orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
+  orca_load_report.set_cpu_utilization(0.6);
+
+  // By default (flag enabled), named metrics win.
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
+                orca_load_report, {"named_metrics.foo"}),
+            0.3);
+
+  // With flag disabled, application utilization wins.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.orca_weight_manager_use_named_metrics_first", "false"}});
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
+                orca_load_report, {"named_metrics.foo"}),
+            0.5);
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_CpuUtilization) {

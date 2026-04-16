@@ -32,7 +32,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "upstream_reset" => Some(Box::new(UpstreamResetConfig {
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
-    _ => panic!("Unknown filter name: {}", name),
+    _ => panic!("Unknown filter name: {name}"),
   }
 }
 
@@ -262,8 +262,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MultipleStreamsFilter {
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // Create 3 concurrent streams.
-    for i in 1 ..= 3 {
-      let path = format!("/stream{}", i);
+    for i in 1..=3 {
+      let path = format!("/stream{i}");
       let (result, handle) = envoy_filter.start_http_stream(
         &self.cluster_name,
         &[

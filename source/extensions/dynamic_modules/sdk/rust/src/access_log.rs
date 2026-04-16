@@ -268,20 +268,20 @@ pub struct BytesInfo {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum AccessLogType {
-  NotSet               = 0,
+  NotSet = 0,
   TcpUpstreamConnected = 1,
-  TcpPeriodic          = 2,
-  TcpConnectionEnd     = 3,
-  DownstreamStart      = 4,
-  DownstreamPeriodic   = 5,
-  DownstreamEnd        = 6,
-  UpstreamPoolReady    = 7,
-  UpstreamPeriodic     = 8,
-  UpstreamEnd          = 9,
+  TcpPeriodic = 2,
+  TcpConnectionEnd = 3,
+  DownstreamStart = 4,
+  DownstreamPeriodic = 5,
+  DownstreamEnd = 6,
+  UpstreamPoolReady = 7,
+  UpstreamPeriodic = 8,
+  UpstreamEnd = 9,
   DownstreamTunnelSuccessfullyEstablished = 10,
   UdpTunnelUpstreamConnected = 11,
-  UdpPeriodic          = 12,
-  UdpSessionEnd        = 13,
+  UdpPeriodic = 12,
+  UdpSessionEnd = 13,
 }
 
 impl AccessLogType {
@@ -1239,51 +1239,57 @@ impl LogContext {
 ///
 /// # Example
 ///
-/// ```ignore
-/// use envoy_dynamic_modules_rust_sdk::{access_log::*, declare_access_logger};
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::access_log::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::declare_access_logger;
 ///
 /// struct MyLoggerConfig {
-///     format: String,
-///     logs_counter: CounterHandle,
-///     config_envoy_ptr: *mut std::ffi::c_void,
+///   format: String,
+///   logs_counter: CounterHandle,
+///   config_envoy_ptr: *mut std::ffi::c_void,
 /// }
 ///
 /// unsafe impl Send for MyLoggerConfig {}
 /// unsafe impl Sync for MyLoggerConfig {}
 ///
 /// impl AccessLoggerConfig for MyLoggerConfig {
-///     fn new(ctx: &ConfigContext, name: &str, config: &[u8]) -> Result<Self, String> {
-///         let logs_counter = ctx.define_counter("logs_total")
-///             .ok_or("Failed to define counter")?;
-///         Ok(Self {
-///             format: String::from_utf8_lossy(config).to_string(),
-///             logs_counter,
-///             config_envoy_ptr: ctx.envoy_ptr(),
-///         })
-///     }
+///   fn new(ctx: &ConfigContext, name: &str, config: &[u8]) -> Result<Self, String> {
+///     let logs_counter = ctx
+///       .define_counter("logs_total")
+///       .ok_or("Failed to define counter")?;
+///     Ok(Self {
+///       format: String::from_utf8_lossy(config).to_string(),
+///       logs_counter,
+///       config_envoy_ptr: ctx.envoy_ptr(),
+///     })
+///   }
 ///
-///     fn create_logger(&self, metrics: MetricsContext) -> Box<dyn AccessLogger> {
-///         Box::new(MyLogger {
-///             format: self.format.clone(),
-///             logs_counter: self.logs_counter,
-///             metrics,
-///         })
-///     }
+///   fn create_logger(
+///     &self,
+///     metrics: MetricsContext,
+///     _logger_envoy_ptr: *mut std::ffi::c_void,
+///   ) -> Box<dyn AccessLogger> {
+///     Box::new(MyLogger {
+///       format: self.format.clone(),
+///       logs_counter: self.logs_counter,
+///       metrics,
+///     })
+///   }
 /// }
 ///
 /// struct MyLogger {
-///     format: String,
-///     logs_counter: CounterHandle,
-///     metrics: MetricsContext,
+///   format: String,
+///   logs_counter: CounterHandle,
+///   metrics: MetricsContext,
 /// }
 ///
 /// impl AccessLogger for MyLogger {
-///     fn log(&mut self, ctx: &LogContext) {
-///         self.metrics.increment_counter(self.logs_counter, 1);
-///         if let Some(code) = ctx.response_code() {
-///             println!("Response: {}", code);
-///         }
+///   fn log(&mut self, ctx: &LogContext) {
+///     self.metrics.increment_counter(self.logs_counter, 1);
+///     if let Some(code) = ctx.response_code() {
+///       println!("Response: {}", code);
 ///     }
+///   }
 /// }
 ///
 /// declare_access_logger!(MyLoggerConfig);

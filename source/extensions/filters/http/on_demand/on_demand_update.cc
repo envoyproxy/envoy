@@ -145,7 +145,7 @@ OnDemandRouteUpdate::OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config)
 }
 
 OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
-  if (auto route = callbacks_->route(); route != nullptr) {
+  if (auto route = callbacks_->route(); route) {
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return *route;
   }
@@ -158,7 +158,7 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   callbacks_->downstreamCallbacks()->requestRouteConfigUpdate(route_config_updated_callback_);
   // decodeHeaders() is completed.
   decode_headers_active_ = false;
-  return makeOptRefFromPtr(callbacks_->route().get());
+  return callbacks_->route();
 }
 
 Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&,

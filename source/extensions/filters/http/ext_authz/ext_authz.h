@@ -484,7 +484,7 @@ private:
     const bool skip_check_;
     const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& check_settings_;
   };
-  PerRouteFlags getPerRouteFlags(const Router::RouteConstSharedPtr& route) const;
+  PerRouteFlags getPerRouteFlags(OptRef<const Router::Route> route) const;
 
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling

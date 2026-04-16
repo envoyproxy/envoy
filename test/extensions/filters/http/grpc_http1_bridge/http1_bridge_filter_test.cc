@@ -58,7 +58,7 @@ public:
 TEST_F(GrpcHttp1BridgeFilterTest, NoRoute) {
   initialize();
   protocol_ = Http::Protocol::Http2;
-  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(OptRef<const Router::Route>()));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},

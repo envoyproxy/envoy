@@ -22,6 +22,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "xds/type/matcher/v3/matcher.pb.validate.h"
 
@@ -149,7 +150,7 @@ public:
     Envoy::Config::Metadata::mutableMetadataValue(metadata_, namespace_str, metadata_key)
         .set_string_value(metadata_value);
     EXPECT_CALL(*route_, metadata()).WillRepeatedly(testing::ReturnPointee(&metadata_));
-    EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::ReturnPointee(&route_));
+    stream_info_.route_ = route_;
   }
 
   void setDynamicMetadata(const std::string& namespace_str, const std::string& metadata_key,

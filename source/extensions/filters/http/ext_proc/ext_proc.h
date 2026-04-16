@@ -151,8 +151,8 @@ public:
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
   void incrementRequestBodySentCount() { request_body_sent_++; }
   void incrementResponseBodySentCount() { response_body_sent_++; }
-  int32_t requestBodySentCount() const { return request_body_sent_; }
-  int32_t responseBodySentCount() const { return response_body_sent_; }
+  uint32_t requestBodySentCount() const { return request_body_sent_; }
+  uint32_t responseBodySentCount() const { return response_body_sent_; }
 
   ProtobufTypes::MessagePtr serializeAsProto() const override;
 
