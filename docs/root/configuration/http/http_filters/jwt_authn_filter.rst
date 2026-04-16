@@ -267,6 +267,9 @@ Extract-Only Mode Security Considerations
 
    .. literalinclude:: _include/jwt-authn-extract-only-rbac.yaml
        :language: yaml
+       :lines: 58-73
+       :lineno-start: 58
+       :linenos:
        :caption: :download:`jwt-authn-extract-only-rbac.yaml <_include/jwt-authn-extract-only-rbac.yaml>`
 
    **Configuration:**

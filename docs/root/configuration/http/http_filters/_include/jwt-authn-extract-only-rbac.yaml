@@ -1,19 +1,76 @@
-# Example RBAC policy that only allows verified admin claims.
-# Use with extract_only_without_validation to ensure unverified
-# JWT claims are not trusted for authorization.
-policies:
-  admin_verified_only:
-    permissions:
-    - any: true
-    principals:
-    - and_ids:
-        ids:
-        - header:
-            name: "x-jwt-claim-role"
-            string_match:
-              exact: "admin"
-        - not_id:
-            header:
-              name: "x-jwt-signature-verified"
-              string_match:
-                exact: "false"
+# Example Envoy bootstrap config showing how to use
+# extract_only_without_validation with an RBAC policy that checks
+# the verification status header before trusting JWT-derived headers.
+#
+# The RBAC policy only allows requests where:
+#   1. The JWT claim 'role' equals 'admin', AND
+#   2. The x-jwt-signature-verified header is NOT 'false'
+# This prevents forged JWTs from satisfying the admin role check.
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: default
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/admin"
+                direct_response:
+                  status: 200
+                  body:
+                    inline_string: "admin OK"
+          http_filters:
+          - name: envoy.filters.http.jwt_authn
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+              providers:
+                example_provider:
+                  issuer: https://example.com
+                  claim_to_headers:
+                  - header_name: x-jwt-claim-role
+                    claim_name: role
+                  local_jwks:
+                    inline_string: "{}"
+              rules:
+              - match:
+                  prefix: "/admin"
+                requires:
+                  extract_only_without_validation: {}
+          - name: envoy.filters.http.rbac
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+              rules:
+                action: ALLOW
+                policies:
+                  admin_verified_only:
+                    permissions:
+                    - any: true
+                    principals:
+                    - and_ids:
+                        ids:
+                        - header:
+                            name: x-jwt-claim-role
+                            string_match:
+                              exact: admin
+                        - not_id:
+                            header:
+                              name: x-jwt-signature-verified
+                              string_match:
+                                exact: "false"
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
