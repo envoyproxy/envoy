@@ -11,6 +11,7 @@
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -1872,6 +1873,294 @@ TEST_F(LuaRouteWrapperTest, GetMetadataNoRoute) {
   EXPECT_CALL(printer_, testPrint("No metadata found"));
 
   start("callMe");
+  wrapper.reset();
+}
+
+class LuaStatsScopeWrapperTest
+    : public Filters::Common::Lua::LuaWrappersTestBase<StatsScopeWrapper> {
+public:
+  void setup(const std::string& script) override {
+    Filters::Common::Lua::LuaWrappersTestBase<StatsScopeWrapper>::setup(script);
+    state_->registerType<CounterWrapper>();
+    state_->registerType<GaugeWrapper>();
+    state_->registerType<HistogramWrapper>();
+  }
+
+protected:
+  Stats::TestUtil::TestStore store_;
+};
+
+// Test counter creation and operations.
+TEST_F(LuaStatsScopeWrapperTest, CounterOperations) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local counter = object:counter("test_counter")
+      testPrint(tostring(counter:value()))
+      counter:inc()
+      testPrint(tostring(counter:value()))
+      counter:add(5)
+      testPrint(tostring(counter:value()))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  EXPECT_CALL(printer_, testPrint("0"));
+  EXPECT_CALL(printer_, testPrint("1"));
+  EXPECT_CALL(printer_, testPrint("6"));
+  start("callMe");
+
+  // Verify the counter was created with the correct prefix.
+  EXPECT_EQ(6, store_.counter("lua.test_counter").value());
+  wrapper.reset();
+}
+
+// Test counter with negative add fails.
+TEST_F(LuaStatsScopeWrapperTest, CounterNegativeAddFails) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local counter = object:counter("test_counter")
+      counter:add(-1)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
+                            "[string \"...\"]:4: counter add amount must be non-negative");
+  wrapper.reset();
+}
+
+// Test gauge creation and operations.
+TEST_F(LuaStatsScopeWrapperTest, GaugeOperations) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local gauge = object:gauge("test_gauge")
+      testPrint(tostring(gauge:value()))
+      gauge:set(100)
+      testPrint(tostring(gauge:value()))
+      gauge:inc()
+      testPrint(tostring(gauge:value()))
+      gauge:dec()
+      testPrint(tostring(gauge:value()))
+      gauge:add(10)
+      testPrint(tostring(gauge:value()))
+      gauge:sub(5)
+      testPrint(tostring(gauge:value()))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  EXPECT_CALL(printer_, testPrint("0"));
+  EXPECT_CALL(printer_, testPrint("100"));
+  EXPECT_CALL(printer_, testPrint("101"));
+  EXPECT_CALL(printer_, testPrint("100"));
+  EXPECT_CALL(printer_, testPrint("110"));
+  EXPECT_CALL(printer_, testPrint("105"));
+  start("callMe");
+
+  // Verify the gauge was created with the correct prefix.
+  EXPECT_EQ(105, store_.gauge("lua.test_gauge", Stats::Gauge::ImportMode::NeverImport).value());
+  wrapper.reset();
+}
+
+// Test gauge with negative value operations fail.
+TEST_F(LuaStatsScopeWrapperTest, GaugeNegativeValueFails) {
+  const std::string SCRIPT_SET{R"EOF(
+    function callMe(object)
+      local gauge = object:gauge("test_gauge")
+      gauge:set(-1)
+    end
+  )EOF"};
+
+  const std::string SCRIPT_ADD{R"EOF(
+    function callMe(object)
+      local gauge = object:gauge("test_gauge")
+      gauge:add(-1)
+    end
+  )EOF"};
+
+  const std::string SCRIPT_SUB{R"EOF(
+    function callMe(object)
+      local gauge = object:gauge("test_gauge")
+      gauge:sub(-1)
+    end
+  )EOF"};
+
+  // Test set with negative value.
+  setup(SCRIPT_SET);
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper1(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
+                            "[string \"...\"]:4: gauge set value must be non-negative");
+  wrapper1.reset();
+
+  // Test add with negative value.
+  setup(SCRIPT_ADD);
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper2(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
+                            "[string \"...\"]:4: gauge add amount must be non-negative");
+  wrapper2.reset();
+
+  // Test sub with negative value.
+  setup(SCRIPT_SUB);
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper3(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
+                            "[string \"...\"]:4: gauge sub amount must be non-negative");
+  wrapper3.reset();
+}
+
+// Test histogram creation and recording.
+TEST_F(LuaStatsScopeWrapperTest, HistogramOperations) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local histogram = object:histogram("test_histogram")
+      histogram:recordValue(10)
+      histogram:recordValue(20)
+      histogram:recordValue(30)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  start("callMe");
+
+  // Verify the histogram was created with the correct prefix and unit.
+  auto histogram = store_.findHistogramByString("lua.test_histogram");
+  ASSERT_TRUE(histogram.has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified, histogram->get().unit());
+  wrapper.reset();
+}
+
+// Test histogram with different units.
+TEST_F(LuaStatsScopeWrapperTest, HistogramUnits) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local ms_histogram = object:histogram("latency", "ms")
+      ms_histogram:recordValue(150)
+
+      local bytes_histogram = object:histogram("size", "bytes")
+      bytes_histogram:recordValue(1024)
+
+      local us_histogram = object:histogram("latency_us", "microseconds")
+      us_histogram:recordValue(500)
+
+      local unspecified_histogram = object:histogram("count", "unspecified")
+      unspecified_histogram:recordValue(42)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  start("callMe");
+
+  // Verify histograms were created with correct units.
+  auto latency = store_.findHistogramByString("lua.latency");
+  ASSERT_TRUE(latency.has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, latency->get().unit());
+
+  auto size = store_.findHistogramByString("lua.size");
+  ASSERT_TRUE(size.has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, size->get().unit());
+
+  auto latency_us = store_.findHistogramByString("lua.latency_us");
+  ASSERT_TRUE(latency_us.has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Microseconds, latency_us->get().unit());
+
+  auto count = store_.findHistogramByString("lua.count");
+  ASSERT_TRUE(count.has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified, count->get().unit());
+
+  wrapper.reset();
+}
+
+// Test histogram with invalid unit.
+TEST_F(LuaStatsScopeWrapperTest, HistogramInvalidUnit) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local histogram = object:histogram("test_histogram", "invalid_unit")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  EXPECT_THROW_WITH_MESSAGE(
+      start("callMe"), Filters::Common::Lua::LuaException,
+      "[string \"...\"]:3: invalid histogram unit 'invalid_unit', expected 'ms', 'milliseconds', "
+      "'microseconds', 'bytes', or 'unspecified'");
+  wrapper.reset();
+}
+
+// Test histogram with negative value fails.
+TEST_F(LuaStatsScopeWrapperTest, HistogramNegativeValueFails) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local histogram = object:histogram("test_histogram")
+      histogram:recordValue(-1)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
+                            "[string \"...\"]:4: histogram value must be non-negative");
+  wrapper.reset();
+}
+
+// Test that stats are correctly prefixed.
+TEST_F(LuaStatsScopeWrapperTest, StatsPrefix) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local counter = object:counter("my.counter")
+      counter:inc()
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(),
+                                *store_.rootScope()->createScope("http.lua.custom")),
+      true);
+  start("callMe");
+
+  // Verify the counter was created with the full prefix.
+  EXPECT_EQ(1, store_.counter("http.lua.custom.my.counter").value());
   wrapper.reset();
 }
 

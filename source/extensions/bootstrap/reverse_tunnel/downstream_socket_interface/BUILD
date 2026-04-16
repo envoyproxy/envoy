@@ -90,6 +90,7 @@ envoy_cc_library(
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:rping_interceptor_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

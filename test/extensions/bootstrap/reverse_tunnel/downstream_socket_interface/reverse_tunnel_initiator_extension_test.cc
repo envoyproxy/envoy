@@ -143,6 +143,34 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeRequestPathOverride) {
   EXPECT_EQ(custom_extension->handshakeRequestPath(), "/custom/handshake");
 }
 
+TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersDefaults) {
+  EXPECT_TRUE(extension_->handshakeAdditionalHeaders().empty());
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersOverride) {
+  auto custom_config = config_;
+  auto* hdr1 = custom_config.mutable_http_handshake()->add_additional_headers();
+  hdr1->mutable_header()->set_key("x-custom-auth");
+  hdr1->mutable_header()->set_value("token123");
+  hdr1->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  auto* hdr2 = custom_config.mutable_http_handshake()->add_additional_headers();
+  hdr2->mutable_header()->set_key("x-request-id");
+  hdr2->mutable_header()->set_value("abc-def");
+  // hdr2 defaults to APPEND_IF_EXISTS_OR_ADD (proto default = 0).
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  const auto& headers = custom_extension->handshakeAdditionalHeaders();
+  ASSERT_EQ(headers.size(), 2);
+  EXPECT_EQ(headers[0].header().key(), "x-custom-auth");
+  EXPECT_EQ(headers[0].header().value(), "token123");
+  EXPECT_EQ(headers[0].append_action(),
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  EXPECT_EQ(headers[1].header().key(), "x-request-id");
+  EXPECT_EQ(headers[1].header().value(), "abc-def");
+  EXPECT_EQ(headers[1].append_action(),
+            envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+}
+
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
   // This should be a no-op.
   extension_->onServerInitialized(server_);

@@ -36,9 +36,22 @@ case $ENVOY_BUILD_VARIANT in
         ;;
 esac
 
+# Validate extracted values contain only expected characters
+if [[ -n "$BUILD_REPO" && ! "$BUILD_REPO" =~ ^[a-zA-Z0-9._:/-]+$ ]]; then
+    echo "Error: build-image.repo contains invalid characters"
+    exit 1
+fi
+if [[ -n "$BUILD_SHA" && ! "$BUILD_SHA" =~ ^[a-fA-F0-9]+$ ]]; then
+    echo "Error: build-image.sha contains invalid characters"
+    exit 1
+fi
+if [[ -n "$BUILD_TAG" && ! "$BUILD_TAG" =~ ^[a-fA-F0-9]+$ ]]; then
+    echo "Error: build-image.tag contains invalid characters"
+    exit 1
+fi
+
 # shellcheck disable=SC2034
 BUILD_CONTAINER="${BUILD_REPO}@sha256:${BUILD_SHA}"
-
 
 if [[ -z "$BUILD_REPO" || -z "$BUILD_SHA" || -z "$BUILD_TAG" ]]; then
     echo "Error: Missing repo, sha, or tag values in .github/config.yml"

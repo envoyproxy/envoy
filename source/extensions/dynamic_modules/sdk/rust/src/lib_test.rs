@@ -3080,26 +3080,12 @@ fn test_cert_validator_config_new_and_destroy() {
     }
   }
 
-  NEW_CERT_VALIDATOR_CONFIG_FUNCTION.get_or_init(|| {
+  let new_config_fn: NewCertValidatorConfigFunction =
     |_name: &str, _config: &[u8]| -> Option<Box<dyn cert_validator::CertValidatorConfig>> {
       Some(Box::new(TestCertValidatorConfig))
-    }
-  });
+    };
 
-  let name = "test";
-  let config = b"config";
-  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
-    ptr: name.as_ptr() as *const _,
-    length: name.len(),
-  };
-  let config_buf = abi::envoy_dynamic_module_type_envoy_buffer {
-    ptr: config.as_ptr() as *const _,
-    length: config.len(),
-  };
-
-  let config_ptr = unsafe {
-    envoy_dynamic_module_on_cert_validator_config_new(std::ptr::null_mut(), name_buf, config_buf)
-  };
+  let config_ptr = cert_validator::init_cert_validator_config("test", b"config", &new_config_fn);
   assert!(!config_ptr.is_null());
 
   unsafe {

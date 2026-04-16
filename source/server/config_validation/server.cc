@@ -143,6 +143,20 @@ void ValidationInstance::initialize(const Options& options,
                                                                false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
+  // Create bootstrap extensions to validate their configs and register any providers
+  // or singletons needed by downstream config elements.
+  // Note: Any lifecycle callbacks are intentionally not invoked as they are serving-time callbacks
+  // with side effects not appropriate for validation.
+  for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
+    auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
+        bootstrap_extension);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    bootstrap_extensions_.push_back(
+        factory.createBootstrapExtension(*config, serverFactoryContext()));
+  }
+
   runtime_ = component_factory.createRuntime(*this, initial_config);
   ENVOY_BUG(runtime_ != nullptr,
             "Component factory should not return nullptr from createRuntime()");

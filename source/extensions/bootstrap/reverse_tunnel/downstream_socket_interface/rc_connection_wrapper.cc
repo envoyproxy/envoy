@@ -139,6 +139,30 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   headers->addCopy(cluster_hdr, std::string(cluster_id));
   headers->addCopy(tenant_hdr, std::string(tenant_id));
   headers->addCopy(upstream_cluster_hdr, cluster_name_);
+  using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
+  for (const auto& h : parent_.additionalHeaders()) {
+    const Http::LowerCaseString key(h.header().key());
+    const auto& value = h.header().value();
+    switch (h.append_action()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+      headers->addCopy(key, value);
+      break;
+    case HeaderValueOption::ADD_IF_ABSENT:
+      if (headers->get(key).empty()) {
+        headers->addCopy(key, value);
+      }
+      break;
+    case HeaderValueOption::OVERWRITE_IF_EXISTS:
+      if (!headers->get(key).empty()) {
+        headers->setCopy(key, value);
+      }
+      break;
+    case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+      headers->setCopy(key, value);
+      break;
+    }
+  }
   headers->setContentLength(0);
 
   // Encode via HTTP/1 codec.
