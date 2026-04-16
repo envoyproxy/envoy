@@ -170,10 +170,11 @@ You can also run the above command via `do_ci.sh`, eg:
 
 ```console
 
-$ export ENVOY_DEFLAKE_JOBS="60"
-$ export BAZEL_BUILD_EXTRA_OPTIONS="--config=clang --config=tsan"
-$ export ENVOY_DEFLAKE_TARGET=//test/integration:load_stats_integration_test
-$ export ENVOY_DEFLAKE_TEST=IpVersionsClientType/LoadStatsIntegrationTest.SuccessWithCustomMetrics/IPv4_GoogleGrpc
+$ export ENVOY_DEFLAKE_JOBS="60"  # optional
+$ export ENVOY_DEFLAKE_RUNS="10"  # optional, defaults to 1000
+$ export BAZEL_BUILD_EXTRA_OPTIONS="--config=clang --config=tsan"  # set the type of test/toolchain
+$ export ENVOY_DEFLAKE_TARGET=//test/integration:load_stats_integration_test  # required
+$ export ENVOY_DEFLAKE_TEST=IpVersionsClientType/LoadStatsIntegrationTest.SuccessWithCustomMetrics/IPv4_GoogleGrpc  # required
 $ ./ci/do_ci.sh deflake
 
 ```
