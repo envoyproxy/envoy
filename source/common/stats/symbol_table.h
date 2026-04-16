@@ -910,7 +910,7 @@ public:
   void clear(SymbolTable& symbol_table);
 
   /**
-   * @return the first StatName in the list. List must be populated.
+   * @return the first StatName in the list. List must be populated and non-empty.
    */
   StatName front() const {
     ASSERT(populated());
