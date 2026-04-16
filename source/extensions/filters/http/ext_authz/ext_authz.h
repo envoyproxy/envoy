@@ -61,6 +61,39 @@ struct ExtAuthzFilterStats {
   ALL_EXT_AUTHZ_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+/**
+ * Shadow-mode authorization decision carried in FilterState when
+ * ``shadow_mode`` is enabled. A downstream filter reads this object and
+ * decides whether to enforce the decision.
+ */
+class ShadowDecisionObject : public Envoy::StreamInfo::FilterState::Object {
+public:
+  using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
+
+  ShadowDecisionObject(ShadowDecisionProto::EngineResult engine_result, Http::Code status_code,
+                       std::string body,
+                       Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers)
+      : engine_result_(engine_result), status_code_(status_code), body_(std::move(body)),
+        response_headers_(std::move(response_headers)) {}
+
+  ShadowDecisionProto::EngineResult engineResult() const { return engine_result_; }
+  Http::Code statusCode() const { return status_code_; }
+  const std::string& body() const { return body_; }
+  const Filters::Common::ExtAuthz::UnsafeHeaderVector& responseHeaders() const {
+    return response_headers_;
+  }
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override;
+
+  absl::optional<std::string> serializeAsString() const override;
+
+private:
+  const ShadowDecisionProto::EngineResult engine_result_;
+  const Http::Code status_code_;
+  const std::string body_;
+  const Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers_;
+};
+
 class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
   explicit ExtAuthzLoggingInfo(const absl::optional<Envoy::Protobuf::Struct> filter_metadata)
@@ -150,6 +183,8 @@ public:
   bool failureModeAllow() const { return failure_mode_allow_; }
 
   bool shadowMode() const { return shadow_mode_; }
+
+  const std::string& shadowFilterStateKey() const { return shadow_filter_state_key_; }
 
   bool failureModeAllowHeaderAdd() const { return failure_mode_allow_header_add_; }
 
@@ -269,6 +304,7 @@ private:
   const bool failure_mode_allow_;
   const bool failure_mode_allow_header_add_;
   const bool shadow_mode_;
+  const std::string shadow_filter_state_key_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const uint32_t max_denied_response_body_bytes_;
@@ -481,8 +517,8 @@ private:
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
   // In shadow mode, writes the authorization decision and response attributes into
-  // dynamic metadata and increments the appropriate shadow stat counter.
-  void setShadowModeMetadata(const Filters::Common::ExtAuthz::ResponsePtr& response);
+  // FilterState and increments the appropriate shadow stat counter.
+  void setShadowFilterState(const Filters::Common::ExtAuthz::ResponsePtr& response);
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
   void updateEffect(const Filters::Common::ProcessingEffect::Effect effect);

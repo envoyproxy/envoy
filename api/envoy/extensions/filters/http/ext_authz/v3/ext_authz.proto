@@ -382,6 +382,36 @@ message ExtAuthz {
   bool shadow_mode = 32;
 }
 
+// Serialized form of the shadow-mode authorization decision written to FilterState
+// when :ref:`shadow_mode
+// <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.shadow_mode>` is
+// enabled. Consumed by a downstream filter that decides whether to enforce the
+// decision.
+message ShadowDecision {
+  // The decision the auth server returned.
+  enum EngineResult {
+    ENGINE_RESULT_UNSPECIFIED = 0;
+    OK = 1;
+    DENIED = 2;
+    ERROR = 3;
+  }
+
+  // The decision the auth server returned.
+  EngineResult engine_result = 1;
+
+  // Response status code the filter would have set on termination. Populated for
+  // ``DENIED`` and ``ERROR``; unset for ``OK``.
+  uint32 status_code = 2;
+
+  // Response body the filter would have sent on termination. Populated for
+  // ``DENIED`` and ``ERROR`` when non-empty; unset for ``OK``.
+  string body = 3;
+
+  // Response headers the auth server asked to set on a denied response
+  // (e.g. ``WWW-Authenticate``). Populated for ``DENIED`` only.
+  map<string, string> response_headers = 4;
+}
+
 // Configuration for buffering the request data.
 message BufferSettings {
   option (udpa.annotations.versioning).previous_message_type =
