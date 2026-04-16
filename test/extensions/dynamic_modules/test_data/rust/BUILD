@@ -12,6 +12,8 @@ package(default_visibility = [
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
 
+exports_files(["Cargo.toml"])
+
 test_program(name = "no_op")
 
 test_program(name = "network_no_op")
@@ -39,6 +41,8 @@ test_program(name = "bootstrap_shared_data_test")
 test_program(name = "bootstrap_init_target_test")
 
 test_program(name = "bootstrap_timer_test")
+
+test_program(name = "bootstrap_file_watcher_test")
 
 test_program(name = "bootstrap_admin_handler_test")
 

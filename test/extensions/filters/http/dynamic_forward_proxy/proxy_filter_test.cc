@@ -325,7 +325,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
 TEST_F(ProxyFilterTest, NoRoute) {
   InSequence s;
 
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(callbacks_, route()).WillOnce(Return(OptRef<const Router::Route>{}));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
@@ -778,7 +778,6 @@ public:
 
     filter_->setDecoderFilterCallbacks(callbacks_);
 
-    ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
         .WillByDefault(Return(
             &factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -802,7 +801,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, NoFilterStatePresent) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -830,7 +828,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostPresent) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -878,7 +875,6 @@ public:
 
     filter_->setDecoderFilterCallbacks(callbacks_);
 
-    ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
         .WillByDefault(Return(
             &factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -939,7 +935,6 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStateHostWhenFla
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -974,7 +969,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStatePortPresent) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -1010,7 +1004,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostAndPortPresent) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
@@ -1051,7 +1044,6 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStatePortWhenFla
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
   ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
       .WillByDefault(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));

@@ -185,10 +185,15 @@ HttpAccessLoggerCacheImpl::getOrCreateApplicator(
     }
   }
 
+  // If this object cannot be created, it is critical that the `shared_ptr` custom deleter
+  // below is not run, because it would deadlock as the mutex is already held.
+  std::unique_ptr<Http::HttpServiceHeadersApplicator> headers_applicator =
+      Http::HttpServiceHeadersApplicator::createOrThrow(http_service, server_context);
+
   // Capture shared_from_this() in the deleter so the mutex and map remain alive.
   std::shared_ptr<HttpAccessLoggerCacheImpl> self = shared_from_this();
   std::shared_ptr<const Http::HttpServiceHeadersApplicator> applicator(
-      Http::HttpServiceHeadersApplicator::createOrThrow(http_service, server_context).release(),
+      headers_applicator.release(),
       [self, config_hash](const Http::HttpServiceHeadersApplicator* ptr) {
         {
           absl::MutexLock lock(&self->applicator_mutex_);

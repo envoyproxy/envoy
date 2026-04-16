@@ -356,7 +356,8 @@ bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::Req
                               const StreamInfo::StreamInfo& info) const {
   if (metadata_source_ == envoy::config::rbac::v3::MetadataSource::ROUTE) {
     // Return false if there's no route since we can't match its metadata
-    return info.route() ? matcher_.match(info.route()->metadata()) : false;
+    const auto route = info.route();
+    return route ? matcher_.match(route->metadata()) : false;
   }
   return matcher_.match(info.dynamicMetadata());
 }

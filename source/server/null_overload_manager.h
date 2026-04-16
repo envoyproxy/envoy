@@ -5,6 +5,8 @@
 
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -61,6 +63,10 @@ public:
     return true;
   }
   void stop() override {}
+  absl::optional<envoy::config::overload::v3::ShrinkHeapConfig>
+  getShrinkHeapConfig() const override {
+    return absl::nullopt;
+  }
 
   ThreadLocal::SlotPtr tls_;
   // The admin code runs in non-permissive mode, rejecting connections and

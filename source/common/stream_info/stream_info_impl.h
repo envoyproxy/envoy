@@ -336,7 +336,10 @@ struct StreamInfoImpl : public StreamInfo {
   }
   Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return vhost_; }
 
-  Router::RouteConstSharedPtr route() const override { return route_; }
+  OptRef<const Router::Route> route() const override {
+    return makeOptRefFromPtr<const Router::Route>(route_.get());
+  }
+  Router::RouteConstSharedPtr routeSharedPtr() const override { return route_; }
 
   envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
   const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
@@ -385,7 +388,10 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_cluster_info_ = upstream_cluster_info;
   }
 
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const override {
+  OptRef<const Upstream::ClusterInfo> upstreamClusterInfo() const override {
+    return makeOptRefFromPtr<const Upstream::ClusterInfo>(upstream_cluster_info_.get());
+  }
+  Upstream::ClusterInfoConstSharedPtr upstreamClusterInfoSharedPtr() const override {
     return upstream_cluster_info_;
   }
 
@@ -456,12 +462,12 @@ struct StreamInfoImpl : public StreamInfo {
     response_flags_.insert(response_flags_.end(), other_response_flags.begin(),
                            other_response_flags.end());
     health_check_request_ = info.healthCheck();
-    route_ = info.route();
+    route_ = info.routeSharedPtr();
     vhost_ = info.virtualHostSharedPtr();
     metadata_ = info.dynamicMetadata();
     filter_state_ = info.filterState();
     request_headers_ = request_headers;
-    upstream_cluster_info_ = info.upstreamClusterInfo();
+    upstream_cluster_info_ = info.upstreamClusterInfoSharedPtr();
     auto stream_id_provider = info.getStreamIdProvider();
     if (stream_id_provider.has_value() && stream_id_provider->toStringView().has_value()) {
       std::string id{stream_id_provider->toStringView().value()};
@@ -563,7 +569,7 @@ private:
   const Http::RequestHeaderMap* request_headers_{};
   StreamIdProviderSharedPtr stream_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
+  Upstream::ClusterInfoConstSharedPtr upstream_cluster_info_;
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;

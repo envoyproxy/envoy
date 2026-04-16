@@ -38,7 +38,12 @@ def envoy_dependency_imports(
         jq_version = JQ_VERSION,
         yq_version = YQ_VERSION,
         buf_sha = BUF_SHA,
-        buf_version = BUF_VERSION):
+        buf_version = BUF_VERSION,
+        # This allows the downstream repo to point to a different locally re-generated lockfile,
+        # which can be used to workaround a rules_rust bug. See:
+        # - https://github.com/bazelbuild/rules_rust/issues/3521
+        # - https://github.com/envoyproxy/envoy/issues/38951
+        cargo_bazel_lockfile = "@envoy//:Cargo.Bazel.lock"):
     compatibility_proxy_repo()
     rules_foreign_cc_dependencies()
     go_rules_dependencies()
@@ -65,13 +70,18 @@ def envoy_dependency_imports(
     )
     rules_rust_dependencies()
     rust_register_toolchains(
+        versions = ["1.88.0"],
         extra_target_triples = [
             "wasm32-unknown-unknown",
             "wasm32-wasi",
+            # Unconditionally specify the target triples for x-compilations.
+            # Note that the toolchain won't be fetched/used unless the target triple is actually used in the build.
+            "x86_64-unknown-linux-gnu",
+            "aarch64-unknown-linux-gnu",
         ],
     )
     crate_universe_dependencies()
-    crates_repositories()
+    crates_repositories(cargo_bazel_lockfile = cargo_bazel_lockfile)
     grcov_repository()
     shellcheck_dependencies()
     proxy_wasm_rust_sdk_dependencies()
@@ -238,24 +248,10 @@ def envoy_download_go_sdks(go_version):
         version = go_version,
     )
 
-def crates_repositories():
+def crates_repositories(cargo_bazel_lockfile):
     crates_repository(
-        name = "dynamic_modules_rust_sdk_crate_index",
-        cargo_lockfile = "@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
-        # TODO: Ideally we should uncomment the below to make using the Rust SDK via rules_rust reproducible.
-        # However, rules_rust has a bug that when this Envoy repo is used as a dependency in another Bazel workspace,
-        # the lockfile is not properly propagated, which causes the build to fail without CARGO_BAZEL_REPIN=true, which
-        # ends up changing the content of this Envoy repository.
-        #
-        # In practice, the Rust SDK is only used in the tests in our repository (i.e. non main code) as well as
-        # people usually use the native cargo toolchain, which already uses the Cargo.lock file, so this comment-out
-        # is not an issue for now.
-        #
-        # Please refer to the following issues and PR for more details:
-        # * https://github.com/bazelbuild/rules_rust/issues/3521
-        # * https://github.com/envoyproxy/envoy/issues/38951
-        # * https://github.com/bazelbuild/rules_rust/pull/3866
-        #
-        # lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
-        manifests = ["@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
+        name = "envoy_rust_crate_index",
+        cargo_lockfile = "@envoy//:Cargo.lock",
+        lockfile = Label(cargo_bazel_lockfile),
+        manifests = ["@envoy//:Cargo.toml"],
     )

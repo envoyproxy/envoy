@@ -7,6 +7,7 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/http_service_headers.h"
 #include "source/extensions/filters/common/ext_proc/client_base.h"
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 
@@ -23,8 +24,9 @@ class ExtProcHttpClient : public Envoy::Extensions::Common::ExternalProcessing::
                           public Logger::Loggable<Logger::Id::init> {
 public:
   ExtProcHttpClient(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
-                    Server::Configuration::ServerFactoryContext& context)
-      : config_(config), context_(context) {}
+                    Server::Configuration::ServerFactoryContext& context,
+                    std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator)
+      : config_(config), context_(context), headers_applicator_(std::move(headers_applicator)) {}
 
   ~ExtProcHttpClient() override { cancel(); }
 
@@ -50,6 +52,7 @@ private:
   void onError();
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;
   Server::Configuration::ServerFactoryContext& context_;
+  std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator_;
   Http::AsyncClient::OngoingRequest* active_request_{};
   Envoy::Extensions::Common::ExternalProcessing::RequestCallbacks<
       envoy::service::ext_proc::v3::ProcessingResponse>* callbacks_{};

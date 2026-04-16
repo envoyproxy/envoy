@@ -33,7 +33,9 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//contrib/golang/common/dso/test:dso_mocks",
         "//contrib/golang/filters/http/source:golang_filter_lib",
+        "//source/common/network:address_lib",
         "//source/common/stream_info:stream_info_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",

@@ -121,10 +121,6 @@ jobs:
         include:
         - target: publish
           name: github
-          source: |
-            export ENVOY_COMMIT=${{ fromJSON(inputs.request).request.sha }}
-            export ENVOY_REPO=${{ github.repository }}
-            export ENVOY_PUBLISH_DRY_RUN=${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
 
   docs:
     # For normal commits to Envoy main this will trigger an update in the website repo,
@@ -139,12 +135,12 @@ jobs:
     needs:
     - release
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/appauth@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/dispatch@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/dispatch@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}

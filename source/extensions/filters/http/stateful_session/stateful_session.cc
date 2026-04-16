@@ -26,7 +26,11 @@ public:
 StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
                                              Server::Configuration::GenericFactoryContext& context,
                                              const std::string& stats_prefix, Stats::Scope& scope)
-    : strict_(config.strict()) {
+    : strict_(config.strict()),
+      status_on_strict_destination_not_found_(
+          config.strict() && config.status_on_strict_destination_not_found() != 0
+              ? static_cast<Http::Code>(config.status_on_strict_destination_not_found())
+              : Http::Code::ServiceUnavailable) {
   // Only construct stats if stat_prefix is explicitly set.
   if (!config.stat_prefix().empty()) {
     const std::string final_prefix =
@@ -82,8 +86,9 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
   }
 
   if (auto upstream_address = session_state_->upstreamAddress(); upstream_address.has_value()) {
-    decoder_callbacks_->setUpstreamOverrideHost(
-        std::make_pair(upstream_address.value(), effective_config_->isStrict()));
+    decoder_callbacks_->setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost{
+        std::string(upstream_address.value()), effective_config_->isStrict(),
+        effective_config_->statusOnMissingStrictDestination()});
   }
   return Http::FilterHeadersStatus::Continue;
 }

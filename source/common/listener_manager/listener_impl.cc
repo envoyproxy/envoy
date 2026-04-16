@@ -5,6 +5,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 #include "envoy/network/exception.h"
@@ -30,6 +32,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/stats_matcher_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -239,6 +242,8 @@ absl::Status ListenSocketFactoryImpl::doFinalPreWorkerInit() {
   return absl::OkStatus();
 }
 
+constexpr absl::string_view StatsMatcherMetadataKey = "envoy.stats_matcher";
+
 namespace {
 std::string listenerStatsScope(const envoy::config::listener::v3::Listener& config) {
   if (!config.stat_prefix().empty()) {
@@ -254,15 +259,50 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
   // Listener creation will fail shortly when the address is used.
   return absl::StrCat("invalid_address_listener");
 }
+
+absl::StatusOr<std::pair<Stats::ScopeSharedPtr, Stats::ScopeSharedPtr>>
+generateListenerStatsScope(const envoy::config::listener::v3::Listener& config,
+                           Envoy::Server::Instance& server) {
+  auto& stats = server.stats();
+  Stats::StatsMatcherSharedPtr scope_matcher;
+
+  // Check for a per-listener stats matcher in typed_filter_metadata. If present, unpack it as
+  // StatsMatcher and use it to restrict which stats are created for this listener's scope.
+  const auto& typed_meta = config.metadata().typed_filter_metadata();
+  if (auto it = typed_meta.find(StatsMatcherMetadataKey); it != typed_meta.end()) {
+    envoy::config::metrics::v3::StatsMatcher stats_matcher_proto;
+    if (auto status = MessageUtil::unpackTo(it->second, stats_matcher_proto); status.ok()) {
+      MessageUtil::validate(stats_matcher_proto,
+                            server.messageValidationContext().staticValidationVisitor());
+      scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(
+          stats_matcher_proto, stats.symbolTable(), server.serverFactoryContext());
+    } else {
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::config), warn,
+                          "Failed to unpack stats matcher for listener {}: {}", config.name(),
+                          status.message());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.strict_stats_matcher_unpacked")) {
+        return absl::InvalidArgumentError(fmt::format(
+            "Failed to unpack stats matcher for listener {}: {}", config.name(), status.message()));
+      }
+    }
+  }
+
+  Stats::ScopeSharedPtr scope = stats.createScope("", false, {}, scope_matcher);
+  Stats::ScopeSharedPtr listener_scope = stats.createScope(
+      fmt::format("listener.{}.", listenerStatsScope(config)), false, {}, std::move(scope_matcher));
+
+  return std::make_pair(std::move(scope), std::move(listener_scope));
+}
 } // namespace
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-    const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
-    : Server::FactoryContextImplBase(
-          server, validation_visitor, server.stats().createScope(""),
-          server.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config))),
-          std::make_shared<ListenerInfoImpl>(config)),
+    const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager,
+    Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope)
+    : Server::FactoryContextImplBase(server, validation_visitor, std::move(scope),
+                                     std::move(listener_scope),
+                                     std::make_shared<ListenerInfoImpl>(config)),
       drain_manager_(std::move(drain_manager)) {}
 
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
@@ -274,9 +314,14 @@ ListenerImpl::create(const envoy::config::listener::v3::Listener& config,
                      const std::string& version_info, ListenerManagerImpl& parent,
                      const std::string& name, bool added_via_api, bool workers_started,
                      uint64_t hash) {
+  auto stats_scope_pair_or_error = generateListenerStatsScope(config, parent.server_);
+  RETURN_IF_NOT_OK_REF(stats_scope_pair_or_error.status());
+
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<ListenerImpl>(new ListenerImpl(
-      config, version_info, parent, name, added_via_api, workers_started, hash, creation_status));
+  auto ret = std::unique_ptr<ListenerImpl>(
+      new ListenerImpl(config, version_info, parent, name, added_via_api, workers_started, hash,
+                       std::move(stats_scope_pair_or_error->first),
+                       std::move(stats_scope_pair_or_error->second), creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -284,7 +329,8 @@ ListenerImpl::create(const envoy::config::listener::v3::Listener& config,
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, absl::Status& creation_status)
+                           uint64_t hash, Stats::ScopeSharedPtr scope,
+                           Stats::ScopeSharedPtr listener_scope, absl::Status& creation_status)
     : parent_(parent),
       socket_type_(config.has_internal_listener()
                        ? Network::Socket::Type::Stream
@@ -318,7 +364,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, *this,
-          parent_.factory_->createDrainManager(config.drain_type()))),
+          parent_.factory_->createDrainManager(config.drain_type()), std::move(scope),
+          std::move(listener_scope))),
       reuse_port_(getReusePortOrDefault(parent_.server_, config, socket_type_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config.name() +
                             ".connection_limit"),
@@ -934,9 +981,11 @@ void ListenerImpl::buildProxyProtocolListenerFilter(
 PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config_message, ListenerImpl& listener_impl,
-    DrainManagerPtr drain_manager)
+    DrainManagerPtr drain_manager, Stats::ScopeSharedPtr scope,
+    Stats::ScopeSharedPtr listener_scope)
     : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-          server, validation_visitor, config_message, std::move(drain_manager))),
+          server, validation_visitor, config_message, std::move(drain_manager), std::move(scope),
+          std::move(listener_scope))),
       listener_impl_(listener_impl) {}
 
 Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() { PANIC("not implemented"); }

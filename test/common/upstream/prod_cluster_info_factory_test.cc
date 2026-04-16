@@ -36,6 +36,33 @@ protected:
   ProdClusterInfoFactory factory_;
 };
 
+// alt_stat_name is preferred over name for stats scope generation.
+TEST_F(ProdClusterInfoFactoryTest, AltStatNamePreferred) {
+  const std::string yaml = R"EOF(
+    name: my_cluster
+    alt_stat_name: my_alt_cluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+
+  auto info = createClusterInfo(parseClusterFromV3Yaml(yaml));
+  ASSERT_NE(nullptr, info);
+  info->trafficStats();
+
+  // Stats scope should be generated with alt_stat_name, not name.
+  EXPECT_EQ(info->statsScope().symbolTable().toString(info->statsScope().prefix()),
+            "cluster.my_alt_cluster");
+}
+
 // Verify that a cluster without a stats matcher in metadata creates all stats normally.
 TEST_F(ProdClusterInfoFactoryTest, NoMetadataStatsMatcher) {
   const std::string yaml = R"EOF(
@@ -56,6 +83,9 @@ TEST_F(ProdClusterInfoFactoryTest, NoMetadataStatsMatcher) {
   auto info = createClusterInfo(parseClusterFromV3Yaml(yaml));
   ASSERT_NE(nullptr, info);
   info->trafficStats();
+
+  EXPECT_EQ(info->statsScope().symbolTable().toString(info->statsScope().prefix()),
+            "cluster.my_cluster");
 
   // Without a scope matcher, stats of any name are accepted.
   EXPECT_NE("", info->statsScope().counterFromString("upstream_cx_total").name());

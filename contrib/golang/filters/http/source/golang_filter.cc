@@ -404,11 +404,18 @@ void Filter::continueStatusInternal(ProcessorState& state, GolangStatus status) 
 
     case FilterState::ProcessingTrailer:
       state.continueDoData();
+      if (hasDestroyed()) {
+        return;
+      }
       state.continueProcessing();
       break;
 
     default:
       ASSERT(0, "unexpected state");
+    }
+
+    if (hasDestroyed()) {
+      return;
     }
   }
 
@@ -426,6 +433,9 @@ void Filter::continueStatusInternal(ProcessorState& state, GolangStatus status) 
     auto done = doDataGo(state, state.getBufferData(), state.getEndStream());
     if (done) {
       state.continueDoData();
+      if (hasDestroyed()) {
+        return;
+      }
     } else {
       // do not process trailers when data is not finished
       return;
@@ -997,7 +1007,8 @@ CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_v
 
   if (state.isThreadSafe()) {
     // it's safe to write header in the safe thread.
-    s->setUpstreamOverrideHost(std::make_pair(std::string(host), strict));
+    s->setUpstreamOverrideHost(
+        Upstream::LoadBalancerContext::OverrideHost{std::string(host), strict});
   } else {
     // should deep copy the string_view before post to dispatcher callback.
     auto host_str = std::string(host);
@@ -1008,7 +1019,8 @@ CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_v
     // in the Go thread.
     state.getDispatcher().post([this, s, weak_ptr, host_str] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
-        s->setUpstreamOverrideHost(std::make_pair(std::string(host_str), false));
+        s->setUpstreamOverrideHost(
+            Upstream::LoadBalancerContext::OverrideHost{std::string(host_str), false});
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in setUpstreamOverrideHost");
       }
@@ -1190,9 +1202,8 @@ CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) 
     }
     break;
   case EnvoyValue::UpstreamClusterName:
-    if (streamInfo().upstreamClusterInfo().has_value() &&
-        streamInfo().upstreamClusterInfo().value()) {
-      req_->strValue = streamInfo().upstreamClusterInfo().value()->name();
+    if (const auto cluster_info = streamInfo().upstreamClusterInfo()) {
+      req_->strValue = cluster_info->name();
     } else {
       return CAPIStatus::CAPIValueNotFound;
     }
