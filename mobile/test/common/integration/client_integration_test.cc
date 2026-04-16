@@ -88,6 +88,8 @@ public:
   void initialize() override {
     builder_.enableWorkerThread(getUseWorkerThread());
     if (getUseWorkerThread()) {
+      // Platform cert validation is disabled when using worker thread. The engine will use the
+      // built-in root certs which doesn't have the CA cert for our fake upstream.
       builder_.enforceTrustChainVerification(false);
     }
     // Integration test starts upstreams before Envoy which can cause a data race.
@@ -511,6 +513,7 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkChangeEventsAnd
   builder_.enableQuicConnectionMigration(true);
   builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
   builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
+  builder_.setMigrateIdleQuicConnection(true);
   initialize();
 
   if (getCodecType() != Http::CodecType::HTTP3 || version_ != Network::Address::IpVersion::v4) {
@@ -1744,6 +1747,9 @@ TEST_P(ClientIntegrationTest, TestStats) {
 
 #if defined(__APPLE__)
 TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
+  if (getUseWorkerThread()) {
+    return;
+  }
   builder_.respectSystemProxySettings(true);
   initialize();
   ASSERT_TRUE(Envoy::Api::External::retrieveApi("envoy_proxy_resolver") != nullptr);

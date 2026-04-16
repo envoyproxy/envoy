@@ -159,6 +159,8 @@ public:
   EngineBuilder& enableHttp3(bool http3_on);
   // If true, all HTTP requests are handled on a dedicated worker thread instead of on the Envoy
   // main thread which also handles all xDS requests.
+  // Note: Engine in worker thread model doesn't support platform certificate validation and system
+  // proxy settings. And these settings will be ignored if worker thread model is enabled.
   EngineBuilder& enableWorkerThread(bool use_worker_thread);
   EngineBuilder& addQuicConnectionOption(std::string option);
   EngineBuilder& addQuicClientConnectionOption(std::string option);

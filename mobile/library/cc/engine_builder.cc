@@ -315,6 +315,10 @@ EngineBuilder& EngineBuilder::setMaxConcurrentStreams(int max_concurrent_streams
 
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
+  if (use_worker_thread_) {
+    // Platform certificate validation is not supported with worker thread.
+    return *this;
+  }
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
 }
@@ -371,6 +375,14 @@ std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
 
 EngineBuilder& EngineBuilder::enableWorkerThread(bool use_worker_thread) {
   use_worker_thread_ = use_worker_thread;
+  if (use_worker_thread_) {
+    // Platform certificate validation and system proxy settings are not supported with worker
+    // thread.
+    platform_certificates_validation_on_ = false;
+#ifdef __APPLE__
+    respect_system_proxy_settings_ = false;
+#endif
+  }
   return *this;
 }
 
@@ -439,6 +451,10 @@ EngineBuilder::setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_
 
 #if defined(__APPLE__)
 EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh_interval_secs) {
+  if (use_worker_thread_) {
+    // System proxy settings are not supported with worker thread.
+    return *this;
+  }
   respect_system_proxy_settings_ = value;
   if (refresh_interval_secs > 0) {
     proxy_settings_refresh_interval_secs_ = refresh_interval_secs;
@@ -760,7 +776,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
                                                  CertificateValidationContext::ACCEPT_UNTRUSTED);
   }
 
-  if (platform_certificates_validation_on_ && !use_worker_thread_) {
+  if (platform_certificates_validation_on_) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator
         validator;
     if (network_thread_priority_.has_value()) {
@@ -1163,7 +1179,7 @@ EngineSharedPtr EngineBuilder::build() {
   }
 
 #if defined(__APPLE__)
-  if (respect_system_proxy_settings_ && !use_worker_thread_) {
+  if (respect_system_proxy_settings_) {
     registerAppleProxyResolver(proxy_settings_refresh_interval_secs_);
   }
 #endif
