@@ -420,8 +420,7 @@ constexpr absl::string_view StatsMatcherMetadataKey = "envoy.stats_matcher";
 
 Stats::ScopeSharedPtr
 generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
-                   Server::Configuration::ServerFactoryContext& server_context,
-                   bool use_alt_stat_name) {
+                   Server::Configuration::ServerFactoryContext& server_context) {
   auto& stats = server_context.serverScope().store();
   Stats::StatsMatcherSharedPtr scope_matcher;
 
@@ -442,11 +441,10 @@ generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
     }
   }
 
-  return stats.createScope(
-      fmt::format("cluster.{}.", (!config.alt_stat_name().empty() && use_alt_stat_name)
-                                     ? config.alt_stat_name()
-                                     : config.name()),
-      false, {}, std::move(scope_matcher));
+  return stats.createScope(fmt::format("cluster.{}.", (!config.alt_stat_name().empty())
+                                                          ? config.alt_stat_name()
+                                                          : config.name()),
+                           false, {}, std::move(scope_matcher));
 }
 
 // TODO(pianiststickman): this implementation takes a lock on the hot path and puts a copy of the

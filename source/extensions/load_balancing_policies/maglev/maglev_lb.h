@@ -75,7 +75,8 @@ public:
 protected:
   struct TableBuildEntry {
     TableBuildEntry(const HostConstSharedPtr& host, uint64_t offset, uint64_t skip, double weight)
-        : host_(host), offset_(offset), skip_(skip), weight_(weight) {}
+        : host_(host), offset_(offset), skip_(skip), weight_(weight), current_permutation_(offset) {
+    }
 
     HostConstSharedPtr host_;
     const uint64_t offset_;
@@ -84,9 +85,8 @@ protected:
     double target_weight_{};
     uint64_t next_{};
     uint64_t count_{};
+    uint64_t current_permutation_{};
   };
-
-  uint64_t permutation(const TableBuildEntry& entry);
 
   /**
    * Template method for constructing the Maglev table.
