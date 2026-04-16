@@ -72,8 +72,7 @@ int main(int argc, char** argv) {
         break;
       }
       ++input_args;
-      // Outputs from envoy_directory_genrule might be directories or we might
-      // have artisanal files.
+      // Might be directories or we might have artisanal files.
       if (api->fileSystem().directoryExists(arg)) {
         const auto paths = Envoy::TestUtility::listFiles(arg, true);
         Envoy::test_corpus_.insert(Envoy::test_corpus_.begin(), paths.begin(), paths.end());

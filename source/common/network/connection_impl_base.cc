@@ -78,5 +78,28 @@ void ConnectionImplBase::onDelayedCloseTimeout() {
       StreamInfo::LocalCloseReasons::get().TriggeredDelayedCloseTimeout);
 }
 
+void ConnectionImplBase::onFilterAboveHighWatermark() {
+  ++above_high_watermark_count_;
+  if (above_high_watermark_count_ == 1) {
+    for (ConnectionCallbacks* callback : callbacks_) {
+      if (callback) {
+        callback->onAboveWriteBufferHighWatermark();
+      }
+    }
+  }
+}
+
+void ConnectionImplBase::onFilterBelowLowWatermark() {
+  ASSERT(above_high_watermark_count_ > 0);
+  --above_high_watermark_count_;
+  if (above_high_watermark_count_ == 0) {
+    for (ConnectionCallbacks* callback : callbacks_) {
+      if (callback) {
+        callback->onBelowWriteBufferLowWatermark();
+      }
+    }
+  }
+}
+
 } // namespace Network
 } // namespace Envoy

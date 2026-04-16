@@ -118,6 +118,13 @@ envoy.regex_engines.hyperscan:
   - envoy.regex_engines
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.stat_sinks.kafka:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig
 envoy.tap_sinks.udp_sink:
   categories:
   - envoy.filters.http
@@ -163,6 +170,13 @@ envoy.filters.http.peer_metadata:
   status: alpha
   type_urls:
   - io.istio.http.peer_metadata.Config
+envoy.filters.network.peer_metadata:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.peer_metadata.v3.Config
 envoy.filters.network.metadata_exchange:
   categories:
   - envoy.filters.network

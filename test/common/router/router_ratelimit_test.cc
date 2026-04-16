@@ -16,6 +16,7 @@
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -703,6 +704,124 @@ actions:
       - key: test
       - key: prop
     source: ROUTE_ENTRY
+)EOF";
+
+  setupTest(yaml);
+
+  std::string metadata_yaml = R"EOF(
+filter_metadata:
+  envoy.xxx:
+    test:
+      prop: foo
+)EOF";
+
+  TestUtility::loadFromYaml(metadata_yaml, route_->metadata_);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchClusterEntrySource) {
+  const std::string yaml = R"EOF(
+actions:
+- metadata:
+    descriptor_key: fake_key
+    default_value: fake_value
+    metadata_key:
+      key: 'envoy.xxx'
+      path:
+      - key: test
+      - key: prop
+    source: CLUSTER_ENTRY
+)EOF";
+
+  setupTest(yaml);
+
+  NiceMock<Upstream::MockClusterInfo> cluster_info;
+  std::string metadata_yaml = R"EOF(
+filter_metadata:
+  envoy.xxx:
+    test:
+      prop: foo
+)EOF";
+  TestUtility::loadFromYaml(metadata_yaml, cluster_info.metadata_);
+
+  EXPECT_CALL(stream_info_, upstreamClusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>(cluster_info)));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchClusterEntrySourceMissingCluster) {
+  const std::string yaml = R"EOF(
+actions:
+- metadata:
+    descriptor_key: fake_key
+    metadata_key:
+      key: 'envoy.xxx'
+      path:
+      - key: test
+      - key: prop
+    source: CLUSTER_ENTRY
+    skip_if_absent: true
+)EOF";
+
+  setupTest(yaml);
+
+  EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::Return(absl::nullopt));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+
+  // Descriptor should be added but it will be empty because skip_if_absent is true
+  EXPECT_FALSE(descriptors_.empty());
+  EXPECT_TRUE(descriptors_[0].entries_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchClusterEntrySourceMissingMetadata) {
+  const std::string yaml = R"EOF(
+actions:
+- metadata:
+    descriptor_key: fake_key
+    metadata_key:
+      key: 'envoy.xxx'
+      path:
+      - key: test
+      - key: prop
+    source: CLUSTER_ENTRY
+    skip_if_absent: true
+)EOF";
+
+  setupTest(yaml);
+
+  NiceMock<Upstream::MockClusterInfo> cluster_info;
+  // Empty metadata
+  EXPECT_CALL(stream_info_, upstreamClusterInfo())
+      .WillRepeatedly(testing::Return(OptRef<const Upstream::ClusterInfo>(cluster_info)));
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+
+  // Descriptor should be added but it will be empty because skip_if_absent is true
+  EXPECT_FALSE(descriptors_.empty());
+  EXPECT_TRUE(descriptors_[0].entries_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchClusterLocalitySource) {
+  const std::string yaml = R"EOF(
+actions:
+- metadata:
+    descriptor_key: fake_key
+    default_value: fake_value
+    metadata_key:
+      key: 'envoy.xxx'
+      path:
+      - key: test
+      - key: prop
+    source: CLUSTER_LOCALITY_ENTRY
   )EOF";
 
   setupTest(yaml);
@@ -714,12 +833,72 @@ filter_metadata:
       prop: foo
   )EOF";
 
-  TestUtility::loadFromYaml(metadata_yaml, route_->metadata_);
+  auto locality_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  TestUtility::loadFromYaml(metadata_yaml, *locality_metadata);
+
+  auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  EXPECT_CALL(*upstream_host, localityMetadata())
+      .WillRepeatedly(testing::Return(locality_metadata));
+  stream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
 
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
-              testing::ContainerEq(descriptors_));
+  ASSERT_EQ(1, descriptors_.size());
+  EXPECT_EQ("fake_key", descriptors_[0].entries_[0].key_);
+  EXPECT_EQ("foo", descriptors_[0].entries_[0].value_);
+}
+
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchClusterLocalitySourceNoHost) {
+  const std::string yaml = R"EOF(
+actions:
+- metadata:
+    descriptor_key: fake_key
+    default_value: fake_value
+    metadata_key:
+      key: 'envoy.xxx'
+      path:
+      - key: test
+      - key: prop
+    source: CLUSTER_LOCALITY_ENTRY
+  )EOF";
+
+  setupTest(yaml);
+
+  // Clear upstream host
+  stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+
+  ASSERT_EQ(1, descriptors_.size());
+  EXPECT_EQ("fake_key", descriptors_[0].entries_[0].key_);
+  EXPECT_EQ("fake_value", descriptors_[0].entries_[0].value_);
+}
+
+TEST_F(RateLimitPolicyEntryTest, MetaDataMatchClusterLocalitySourceNoUpstreamInfo) {
+  const std::string yaml = R"EOF(
+actions:
+- metadata:
+    descriptor_key: fake_key
+    default_value: fake_value
+    metadata_key:
+      key: 'envoy.xxx'
+      path:
+      - key: test
+      - key: prop
+    source: CLUSTER_LOCALITY_ENTRY
+  )EOF";
+
+  setupTest(yaml);
+
+  // Clear upstream info
+  stream_info_.setUpstreamInfo(nullptr);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+
+  ASSERT_EQ(1, descriptors_.size());
+  EXPECT_EQ("fake_key", descriptors_[0].entries_[0].key_);
+  EXPECT_EQ("fake_value", descriptors_[0].entries_[0].value_);
 }
 
 // Tests that the default_value is used in the descriptor when the metadata_key is empty.

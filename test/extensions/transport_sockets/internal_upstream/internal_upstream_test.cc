@@ -34,7 +34,7 @@ public:
   MOCK_METHOD(void, setNewDataAvailable, ());
   MOCK_METHOD(Buffer::Instance*, getReceiveBuffer, ());
   MOCK_METHOD(bool, canReceiveData, (), (const));
-  MOCK_METHOD(bool, isWritable, (), (const));
+  MOCK_METHOD(bool, isWriteUnblocked, (), (const));
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
   MOCK_METHOD(std::shared_ptr<PassthroughState>, passthroughState, ());

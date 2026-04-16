@@ -67,6 +67,7 @@
 #include "source/extensions/upstreams/tcp/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
 
@@ -84,8 +85,7 @@ using UpstreamNetworkFilterConfigProviderManager =
 
 Stats::ScopeSharedPtr
 generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
-                   Server::Configuration::ServerFactoryContext& server_context,
-                   bool use_alt_stat_name = true);
+                   Server::Configuration::ServerFactoryContext& server_context);
 
 class LegacyLbPolicyConfigHelper {
 public:
@@ -249,11 +249,17 @@ public:
     last_hc_pass_time_.emplace(std::move(last_hc_pass_time));
   }
 
-  void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
-    lb_policy_data_ = std::move(lb_policy_data);
+  void addLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
+    if (lb_policy_data != nullptr) {
+      lb_policy_datas_.push_back(std::move(lb_policy_data));
+    }
   }
-  OptRef<HostLbPolicyData> lbPolicyData() const override {
-    return makeOptRefFromPtr(lb_policy_data_.get());
+  size_t lbPolicyDataCount() const override { return lb_policy_datas_.size(); }
+  OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const override {
+    if (index >= lb_policy_datas_.size()) {
+      return {};
+    }
+    return makeOptRefFromPtr(lb_policy_datas_[index].get());
   }
 
 protected:
@@ -291,7 +297,8 @@ private:
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   absl::optional<MonotonicTime> last_hc_pass_time_;
-  HostLbPolicyDataPtr lb_policy_data_;
+  // Inline capacity of 2 covers the typical case of 1-2 LB policies per host.
+  absl::InlinedVector<HostLbPolicyDataPtr, 2> lb_policy_datas_;
 };
 
 /**

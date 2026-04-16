@@ -558,6 +558,25 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
+TEST_F(EnvoyQuicServerStreamTest, FinPassedUpWhenReadDisableUponHeaders) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_disable_data_read_immediately",
+                                true);
+
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
+      .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr&, bool) {
+        quic_stream_->readDisable(true);
+      }));
+  spdy_request_headers_[":method"] = "GET";
+  std::string header_data = spdyHeaderToHttp3StreamPayload(spdy_request_headers_);
+  quic::QuicStreamFrame frame(stream_id_, /*fin=*/true, 0, header_data);
+  quic_stream_->OnStreamFrame(frame);
+
+  EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+  EXPECT_EQ(quic_stream_->read_side_closed(), true);
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
 TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
   const bool disable_data_read_immediately = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.quic_disable_data_read_immediately");
@@ -963,6 +982,43 @@ TEST_F(EnvoyQuicServerStreamTest, DuplicatedPathHeader) {
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   quic_stream_->OnStreamHeaderList(true, 0, header_list);
+}
+
+TEST_F(EnvoyQuicServerStreamTest, DisallowObsTextBehavior) {
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _)).Times(testing::AnyNumber());
+  {
+    // Default behavior is to disallow obs text.
+    envoy::config::core::v3::Http3ProtocolOptions options;
+    auto stream = std::make_unique<EnvoyQuicServerStream>(
+        stream_id_ + 12, &quic_session_, quic::BIDIRECTIONAL, stats_, options,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+    // \x80 is obsolete text
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::REJECT,
+              stream->validateHeader("custom-header", "foo\x80"));
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::ACCEPT,
+              stream->validateHeader("custom-header", "foo"));
+  }
+  {
+    envoy::config::core::v3::Http3ProtocolOptions options;
+    options.mutable_disallow_obs_text()->set_value(true);
+    auto stream = std::make_unique<EnvoyQuicServerStream>(
+        stream_id_ + 16, &quic_session_, quic::BIDIRECTIONAL, stats_, options,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+    // \x80 is obsolete text
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::REJECT,
+              stream->validateHeader("custom-header", "foo\x80"));
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::ACCEPT,
+              stream->validateHeader("custom-header", "foo"));
+  }
+  {
+    envoy::config::core::v3::Http3ProtocolOptions options;
+    options.mutable_disallow_obs_text()->set_value(false);
+    auto stream = std::make_unique<EnvoyQuicServerStream>(
+        stream_id_ + 20, &quic_session_, quic::BIDIRECTIONAL, stats_, options,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::ACCEPT,
+              stream->validateHeader("custom-header", "foo\x80"));
+  }
 }
 
 } // namespace Quic

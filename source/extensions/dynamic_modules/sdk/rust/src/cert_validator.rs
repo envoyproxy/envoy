@@ -6,9 +6,9 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use envoy_proxy_dynamic_modules_rust_sdk::*;
+//! ```
 //! use envoy_proxy_dynamic_modules_rust_sdk::cert_validator::*;
+//! use envoy_proxy_dynamic_modules_rust_sdk::*;
 //!
 //! fn program_init() -> bool {
 //!   true
@@ -258,10 +258,21 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cert_validator_config_new(
     name.length,
   ));
   let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
-  let new_config_fn = NEW_CERT_VALIDATOR_CONFIG_FUNCTION
-    .get()
-    .expect("NEW_CERT_VALIDATOR_CONFIG_FUNCTION must be set");
-  match new_config_fn(name_str, config_slice) {
+  init_cert_validator_config(
+    name_str,
+    config_slice,
+    NEW_CERT_VALIDATOR_CONFIG_FUNCTION
+      .get()
+      .expect("NEW_CERT_VALIDATOR_CONFIG_FUNCTION must be set"),
+  )
+}
+
+pub(crate) fn init_cert_validator_config(
+  name: &str,
+  config: &[u8],
+  new_config_fn: &crate::NewCertValidatorConfigFunction,
+) -> abi::envoy_dynamic_module_type_cert_validator_config_module_ptr {
+  match new_config_fn(name, config) {
     Some(config) => wrap_into_c_void_ptr!(config),
     None => std::ptr::null(),
   }

@@ -137,39 +137,39 @@ HostUtility::HostStatusSet HostUtility::createOverrideHostStatus(
   return override_host_status;
 }
 
-std::pair<HostConstSharedPtr, bool> HostUtility::selectOverrideHost(const HostMap* host_map,
-                                                                    HostStatusSet status,
-                                                                    LoadBalancerContext* context) {
+HostUtility::OverrideHostSelectionResult
+HostUtility::selectOverrideHost(const HostMap* host_map, HostStatusSet status,
+                                LoadBalancerContext* context) {
   if (context == nullptr) {
-    return {nullptr, false};
+    return {};
   }
 
   OptRef<const Upstream::LoadBalancerContext::OverrideHost> override_host =
       context->overrideHostToSelect();
   if (!override_host.has_value()) {
-    return {nullptr, false};
+    return {};
   }
 
   const bool strict_mode = override_host->strict;
 
   if (host_map == nullptr) {
-    return {nullptr, strict_mode};
+    return {nullptr, strict_mode, OverrideHostSelectionStatus::NotFound};
   }
 
   auto host_iter = host_map->find(override_host->host);
 
   // The override host cannot be found in the host map.
   if (host_iter == host_map->end()) {
-    return {nullptr, strict_mode};
+    return {nullptr, strict_mode, OverrideHostSelectionStatus::NotFound};
   }
 
   HostConstSharedPtr host = host_iter->second;
   ASSERT(host != nullptr);
 
   if (status[static_cast<uint32_t>(host->healthStatus())]) {
-    return {host, strict_mode};
+    return {host, strict_mode, OverrideHostSelectionStatus::Success};
   }
-  return {nullptr, strict_mode};
+  return {nullptr, strict_mode, OverrideHostSelectionStatus::Unhealthy};
 }
 
 void HostUtility::forEachHostMetric(
