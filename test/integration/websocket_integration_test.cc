@@ -922,7 +922,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeoutWithRetries) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0)->mutable_route();
-        route->mutable_timeout()->set_nanos(200 * 1000 * 1000); // 200ms route timeout
+        route->mutable_timeout()->set_seconds(2); // 2s route timeout
       });
   initialize();
 
@@ -936,7 +936,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketUpgradeRouteTimeoutWithRetries) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(upgradeFailedResponseHeaders(), false);
+  upstream_request_->encodeHeaders(upgradeFailedResponseHeaders(), true);
 
   // Wait for the first request to be reset or disconnected
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
