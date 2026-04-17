@@ -1,3 +1,6 @@
+#include <string>
+#include <utility>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -96,10 +99,21 @@ public:
   }
 
   void waitForRatelimitRequest() {
+    envoy::service::ratelimit::v3::RateLimitRequest expected_request_msg;
+    expected_request_msg.set_domain("some_domain");
+    auto* entry = expected_request_msg.add_descriptors()->add_entries();
+    entry->set_key("destination_cluster");
+    entry->set_value("cluster_0");
+    waitForRatelimitRequest(expected_request_msg);
+  }
 
-    AssertionResult result =
-        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_);
-    RELEASE_ASSERT(result, result.message());
+  void waitForRatelimitRequest(
+      const envoy::service::ratelimit::v3::RateLimitRequest& expected_request_msg) {
+    if (fake_ratelimit_connection_ == nullptr) {
+      AssertionResult result =
+          fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_);
+      RELEASE_ASSERT(result, result.message());
+    }
     for (int i = 0; i < num_requests_; i++) {
       AssertionResult result =
           fake_ratelimit_connection_->waitForNewStream(*dispatcher_, ratelimit_requests_[i]);
@@ -114,11 +128,6 @@ public:
                 ratelimit_requests_[i]->headers().getPathValue());
       EXPECT_EQ("application/grpc", ratelimit_requests_[i]->headers().getContentTypeValue());
 
-      envoy::service::ratelimit::v3::RateLimitRequest expected_request_msg;
-      expected_request_msg.set_domain("some_domain");
-      auto* entry = expected_request_msg.add_descriptors()->add_entries();
-      entry->set_key("destination_cluster");
-      entry->set_value("cluster_0");
       EXPECT_EQ(expected_request_msg.DebugString(), request_msg.DebugString());
     }
   }
@@ -718,6 +727,75 @@ envoy.xxx:
   entry->set_value("cluster_0");
 
   EXPECT_TRUE(TestUtility::protoEqual(expected_request_msg, request_msg));
+
+  sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OK, {},
+                        Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{}, 0);
+  waitForSuccessfulUpstreamResponse(0);
+  cleanup();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
+}
+
+TEST_P(RatelimitIntegrationTest, ClusterLocalityEntry) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* locality = bootstrap.mutable_static_resources()
+                         ->mutable_clusters(0)
+                         ->mutable_load_assignment()
+                         ->mutable_endpoints(0);
+
+    const std::string metadata_yaml = R"EOF(
+      filter_metadata:
+        envoy.xxx:
+          test: foo
+    )EOF";
+    TestUtility::loadFromYaml(metadata_yaml, *locality->mutable_metadata());
+  });
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* rate_limit = hcm.mutable_route_config()
+                               ->mutable_virtual_hosts(0)
+                               ->mutable_routes(0)
+                               ->mutable_route()
+                               ->add_rate_limits();
+        // Apply rate limit when stream is complete and the host is available to
+        // get locality metadata.
+        rate_limit->set_apply_on_stream_done(true);
+        auto* action = rate_limit->add_actions()->mutable_metadata();
+        action->set_source(
+            envoy::config::route::v3::RateLimit::Action::MetaData::CLUSTER_LOCALITY_ENTRY);
+        action->set_descriptor_key("cluster_locality_metadata");
+        auto* metadata_key = action->mutable_metadata_key();
+        metadata_key->set_key("envoy.xxx");
+        metadata_key->add_path()->set_key("test");
+      });
+
+  initialize();
+  initiateClientConnection();
+
+  envoy::service::ratelimit::v3::RateLimitRequest expected_request_msg;
+  expected_request_msg.set_domain("some_domain");
+  auto* descriptor = expected_request_msg.add_descriptors();
+  auto* entry = descriptor->add_entries();
+  entry->set_key("destination_cluster");
+  entry->set_value("cluster_0");
+  waitForRatelimitRequest(expected_request_msg);
+  sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OK, {},
+                        Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{}, 0);
+
+  // Safe stream for the first rate limit request to prevent race condition between destroying it
+  // and receiving new rate limit request.
+  FakeStreamPtr first_stream = std::move(ratelimit_requests_[0]);
+
+  // The cluster locality entry should be added to the rate limit request sent
+  // on the response path.
+  expected_request_msg.mutable_descriptors()->Clear();
+  descriptor = expected_request_msg.add_descriptors();
+  entry = descriptor->add_entries();
+  entry->set_key("cluster_locality_metadata");
+  entry->set_value("foo");
+  waitForRatelimitRequest(expected_request_msg);
 
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OK, {},
                         Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{}, 0);

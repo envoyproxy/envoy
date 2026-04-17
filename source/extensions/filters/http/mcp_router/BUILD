@@ -33,6 +33,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/mcp:filter_state_lib",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:variant",
+        "@envoy_api//envoy/extensions/clusters/mcp_multicluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
     ],
 )
