@@ -17,7 +17,6 @@ namespace BasicAuth {
 
 namespace {
 constexpr uint32_t MaximumUriLength = 256;
-constexpr absl::string_view DynamicMetadataNamespace = "envoy.filters.http.basic_auth";
 constexpr absl::string_view DynamicMetadataUsernameKey = "username";
 
 // Function to compute SHA1 hash
@@ -122,8 +121,8 @@ void BasicAuthFilter::setDynamicMetadata(absl::string_view username) {
   ProtobufWkt::Struct metadata;
   (*metadata.mutable_fields())[std::string(DynamicMetadataUsernameKey)].set_string_value(
       std::string(username));
-  decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(DynamicMetadataNamespace),
-                                                      metadata);
+  decoder_callbacks_->streamInfo().setDynamicMetadata(
+      std::string(decoder_callbacks_->filterConfigName()), metadata);
 }
 
 Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,

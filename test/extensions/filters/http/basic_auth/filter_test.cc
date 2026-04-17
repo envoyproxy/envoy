@@ -24,6 +24,8 @@ public:
                                              *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+    ON_CALL(decoder_filter_callbacks_, filterConfigName)
+        .WillByDefault(Return("envoy.filters.http.basic_auth"));
   }
 
   NiceMock<Stats::IsolatedStoreImpl> stats_;
@@ -347,6 +349,8 @@ public:
                                              *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+    ON_CALL(decoder_filter_callbacks_, filterConfigName)
+        .WillByDefault(Return("envoy.filters.http.basic_auth"));
   }
 
   NiceMock<Stats::IsolatedStoreImpl> stats_;
