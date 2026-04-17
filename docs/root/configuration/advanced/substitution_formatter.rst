@@ -1304,6 +1304,12 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%DOWNSTREAM_TLS_GROUP%``
+  HTTP/TCP/THRIFT
+    The OpenSSL name of the TLS group used for the key agreement to establish the downstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%DOWNSTREAM_TLS_VERSION%``
   HTTP/TCP/THRIFT
     The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
@@ -1443,6 +1449,12 @@ Current supported substitution commands include:
 ``%UPSTREAM_TLS_CIPHER%``
   HTTP/TCP/THRIFT
     The OpenSSL name for the set of ciphers used to establish the upstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%UPSTREAM_TLS_GROUP%``
+  HTTP/TCP/THRIFT
+    The OpenSSL name of the TLS group used for the key agreement to establish the upstream TLS connection.
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
