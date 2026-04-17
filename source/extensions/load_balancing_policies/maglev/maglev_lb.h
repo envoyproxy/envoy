@@ -162,6 +162,26 @@ private:
   std::vector<HostConstSharedPtr> host_table_;
 };
 
+// A simplified implementation for the case where there is only a single host.
+class DegenerateMaglevTable : public MaglevTable {
+public:
+  DegenerateMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
+                        double max_normalized_weight, uint64_t table_size,
+                        bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats);
+  ~DegenerateMaglevTable() override = default;
+
+  // ThreadAwareLoadBalancerBase::HashingLoadBalancer
+  HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
+
+  void logMaglevTable(bool use_hostname_for_hashing) const override;
+
+private:
+  void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
+                                        double max_normalized_weight) override;
+
+  HostConstSharedPtr single_host_;
+};
+
 /**
  * Thread aware load balancer implementation for Maglev.
  */

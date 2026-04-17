@@ -159,6 +159,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: quic
+  change: |
+    Fixed HTTP/3 client connection pool to handle early data request correctly with asynchronous certificates
+    validation. This change is gated by the runtime guard ``envoy.reloadable_features.fix_http3_early_data_timing``.
 - area: router
   change: |
     Fixed a bug where the router's buffer overflow check double-counted the request body size when an

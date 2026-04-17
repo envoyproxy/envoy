@@ -1109,6 +1109,8 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
   builder_.enableDrainPostDnsRefresh(true);
+  // 0-RTT requests will not populate some of the final stream intel fields, so skip the validation.
+  expect_data_streams_ = false;
   add_fake_dns_ = true;
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
@@ -1814,5 +1816,79 @@ TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
   EXPECT_EQ(cc_.status_, "200");
 }
 
+TEST_P(ClientIntegrationTest, HttpsWithEarlyData) {
+  // Dummy comment to invalidate cache
+  if (getCodecType() != Http::CodecType::HTTP3 ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_http3_early_data_timing")) {
+    return;
+  }
+  EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
+  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _)).Times(AnyNumber());
+  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation())
+      .Times(AnyNumber());
+
+  autonomous_upstream_ = false;
+
+  initialize();
+  default_request_headers_.setScheme("https");
+  stream_ = createNewStream(createDefaultStreamCallbacks());
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*BaseIntegrationTest::dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(10, true);
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls_, 1);
+  ASSERT_EQ(cc_.status_, "200");
+  ASSERT_GE(cc_.on_data_calls_, 1);
+  ASSERT_EQ(cc_.on_complete_calls_, 1);
+  EXPECT_EQ(0, getCounterValue("cluster.base.upstream_cx_connect_with_0_rtt"));
+
+  // Wait for session ticket to be received (QUIC sends it after handshake)
+  timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(500));
+
+  // Close connection to force reconnect and use session ticket
+  ASSERT_TRUE(upstream_connection_->close());
+  ASSERT_TRUE(upstream_connection_->waitForDisconnect());
+  upstream_connection_.reset();
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_destroy", 1));
+
+  // Reset terminal callback for the second request.
+  ConditionalInitializer terminal_callback;
+  cc_.terminal_callback_ = &terminal_callback;
+  // Skip validating final stream intel for the second request.
+  expect_data_streams_ = false;
+
+  default_request_headers_.addCopy("second_request", "1");
+  stream_ = createNewStream(createDefaultStreamCallbacks());
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+
+  // Handle second request on upstream
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*BaseIntegrationTest::dispatcher_,
+                                                        upstream_connection_));
+  ASSERT_TRUE(
+      upstream_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*BaseIntegrationTest::dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(10, true);
+
+  terminal_callback.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls_, 2);
+  ASSERT_EQ(cc_.status_, "200");
+
+  EXPECT_EQ(1, getCounterValue("cluster.base.upstream_cx_connect_with_0_rtt"));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_http3_early_data_timing")) {
+    EXPECT_EQ(1, getCounterValue("cluster.base.upstream_rq_0rtt"));
+  }
+}
 } // namespace
 } // namespace Envoy
