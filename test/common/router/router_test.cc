@@ -1770,6 +1770,10 @@ TEST_F(RouterTest, UpstreamTimeout) {
 // Verify that a gRPC request hitting the global response timeout gets
 // DEADLINE_EXCEEDED (grpc-status 4) instead of UNAVAILABLE.
 TEST_F(RouterTest, GrpcUpstreamTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded", "true"}});
+
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
@@ -1809,6 +1813,10 @@ TEST_F(RouterTest, GrpcUpstreamTimeout) {
 // Verify that a gRPC request hitting the per-try timeout gets
 // DEADLINE_EXCEEDED (grpc-status 4) instead of UNAVAILABLE.
 TEST_F(RouterTest, GrpcUpstreamPerTryTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded", "true"}});
+
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
