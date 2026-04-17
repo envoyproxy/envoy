@@ -3472,7 +3472,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
 }
 
 // Verify that in shadow mode a denied response does not terminate the request — the request
-// reaches the upstream and the client gets a 200.
+// reaches the upstream and the client gets a 200 — and that the ShadowDecision is readable
+// via %FILTER_STATE(envoy.filters.http.ext_authz.shadow)% in access logs.
 TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedReachesUpstream) {
   GrpcInitializeConfigOpts opts;
   opts.shadow_mode = true;
@@ -3480,6 +3481,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedReachesUpstream) {
   initializeConfig(opts);
 
   setDownstreamProtocol(Http::CodecType::HTTP1);
+  useAccessLog("%FILTER_STATE(envoy.filters.http.ext_authz.shadow:PLAIN)%");
   HttpIntegrationTest::initialize();
 
   initiateClientConnection(0);
@@ -3497,6 +3499,11 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedReachesUpstream) {
 
   // In shadow mode the request should reach the upstream despite the deny.
   waitForSuccessfulUpstreamResponse("200");
+
+  // The shadow decision is exposed in the access log via FilterState.
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, testing::HasSubstr("DENIED"));
+  EXPECT_THAT(log, testing::HasSubstr("403"));
 
   cleanup();
 }

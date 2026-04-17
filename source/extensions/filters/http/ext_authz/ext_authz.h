@@ -85,7 +85,24 @@ public:
 
   absl::optional<std::string> serializeAsString() const override;
 
+  // Expose engine_result and status_code as individual fields so access-log formatters
+  // and CEL expressions can read them without paying the cost of serializing the full
+  // ShadowDecision to JSON.
+  bool hasFieldSupport() const override { return true; }
+  Envoy::StreamInfo::FilterState::Object::FieldType
+  getField(absl::string_view field_name) const override {
+    if (field_name == "engine_result") {
+      return absl::string_view(ShadowDecisionProto::EngineResult_Name(engine_result_));
+    }
+    if (field_name == "status_code" && status_code_ != static_cast<Http::Code>(0)) {
+      return int64_t(static_cast<uint32_t>(status_code_));
+    }
+    return {};
+  }
+
 private:
+  void populateProto(ShadowDecisionProto& msg) const;
+
   const ShadowDecisionProto::EngineResult engine_result_;
   const Http::Code status_code_;
   const Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers_;
@@ -514,8 +531,10 @@ private:
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
   // In shadow mode, writes the authorization decision and response attributes into
-  // FilterState and increments the appropriate shadow stat counter.
-  void setShadowFilterState(const Filters::Common::ExtAuthz::ResponsePtr& response);
+  // FilterState and increments the appropriate shadow stat counter. Takes the response
+  // by non-const reference so we can std::move ``headers_to_set`` into the object instead
+  // of copying.
+  void setShadowFilterState(Filters::Common::ExtAuthz::Response& response);
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
   void updateEffect(const Filters::Common::ProcessingEffect::Effect effect);

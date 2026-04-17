@@ -405,13 +405,18 @@ message ShadowDecision {
   // The decision the auth server returned.
   EngineResult engine_result = 1;
 
-  // Response status code the filter would have set on termination. Populated for
-  // ``DENIED`` and ``ERROR``; unset for ``OK``.
-  uint32 status_code = 2;
+  // Response status code associated with the decision. For ``DENIED`` and ``ERROR`` this is
+  // the code the filter would have set on termination (the auth server's code for ``DENIED``,
+  // or :ref:`status_on_error
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.status_on_error>` fallback
+  // for ``ERROR``). For ``OK`` this defaults to ``200`` so consumers always see a populated
+  // value — the upstream response code is not known at shadow-decision time.
+  uint32 status_code = 2 [(validate.rules).uint32 = {gte: 100, lte: 599, ignore_empty: true}];
 
   // Response headers the auth server asked to set on a denied response
-  // (e.g. ``WWW-Authenticate``). Populated for ``DENIED`` only.
-  map<string, string> response_headers = 3;
+  // (e.g. ``WWW-Authenticate``, ``Set-Cookie``). Populated for ``DENIED`` only.
+  // Preserves ordering and duplicate header names.
+  repeated config.core.v3.HeaderValue response_headers = 3;
 }
 
 // Configuration for buffering the request data.

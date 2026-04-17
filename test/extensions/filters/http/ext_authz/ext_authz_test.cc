@@ -6585,15 +6585,28 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
   EXPECT_EQ(proto.status_code(), 401);
   ASSERT_EQ(proto.response_headers().size(), 1);
-  EXPECT_EQ(proto.response_headers().at("x-auth-reason"), "unauthorized");
+  EXPECT_EQ(proto.response_headers()[0].key(), "x-auth-reason");
+  EXPECT_EQ(proto.response_headers()[0].value(), "unauthorized");
 
-  // serializeAsString returns JSON (with preserved snake_case field names).
+  // serializeAsString returns JSON — parse it back to a proto so the assertions are robust
+  // against MessageUtil JSON-option changes (whitespace, field ordering, etc.).
   auto serialized_str = shadow->serializeAsString();
   ASSERT_TRUE(serialized_str.has_value());
-  EXPECT_THAT(*serialized_str, testing::HasSubstr("\"engine_result\""));
-  EXPECT_THAT(*serialized_str, testing::HasSubstr("\"DENIED\""));
-  EXPECT_THAT(*serialized_str, testing::HasSubstr("\"status_code\""));
-  EXPECT_THAT(*serialized_str, testing::HasSubstr("401"));
+  envoy::extensions::filters::http::ext_authz::v3::ShadowDecision decoded_from_json;
+  TestUtility::loadFromJson(*serialized_str, decoded_from_json);
+  EXPECT_EQ(decoded_from_json.engine_result(),
+            envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
+  EXPECT_EQ(decoded_from_json.status_code(), 401);
+  ASSERT_EQ(decoded_from_json.response_headers().size(), 1);
+  EXPECT_EQ(decoded_from_json.response_headers()[0].key(), "x-auth-reason");
+  EXPECT_EQ(decoded_from_json.response_headers()[0].value(), "unauthorized");
+
+  // Field-level access for access-log formatters and CEL.
+  EXPECT_TRUE(shadow->hasFieldSupport());
+  EXPECT_EQ(absl::get<absl::string_view>(shadow->getField("engine_result")), "DENIED");
+  EXPECT_EQ(absl::get<int64_t>(shadow->getField("status_code")), 401);
+  // Unknown field returns monostate.
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(shadow->getField("unknown")));
 
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
   // In shadow mode, denied stats are still incremented (the decision was deny).
@@ -6645,6 +6658,10 @@ TEST_F(HttpFilterTest, ShadowModeErrorSetsFilterStateAndContinues) {
   // Default status_on_error is 403.
   EXPECT_EQ(shadow->statusCode(), Http::Code::Forbidden);
 
+  // getField exposes the ERROR enum name and the fallback status code.
+  EXPECT_EQ(absl::get<absl::string_view>(shadow->getField("engine_result")), "ERROR");
+  EXPECT_EQ(absl::get<int64_t>(shadow->getField("status_code")), 403);
+
   EXPECT_EQ(1U, config_->stats().shadow_error_.value());
   // In shadow mode, error stats are still incremented (the auth service returned an error).
   EXPECT_EQ(1U, config_->stats().error_.value());
@@ -6684,9 +6701,10 @@ TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
   ASSERT_NE(shadow, nullptr);
   EXPECT_EQ(shadow->engineResult(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::OK);
+  // OK defaults to 200 so consumers see a populated status_code for every engine_result.
+  EXPECT_EQ(shadow->statusCode(), Http::Code::OK);
 
-  // Exercise serializeAsProto on the OK branch — status_code is 0 and no headers, which
-  // exercises the skip branches in serializeAsProto.
+  // Exercise serializeAsProto on the OK branch.
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
   const auto& proto =
@@ -6694,8 +6712,11 @@ TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
           *serialized);
   EXPECT_EQ(proto.engine_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::OK);
-  EXPECT_EQ(proto.status_code(), 0);
+  EXPECT_EQ(proto.status_code(), 200);
   EXPECT_TRUE(proto.response_headers().empty());
+
+  EXPECT_EQ(absl::get<absl::string_view>(shadow->getField("engine_result")), "OK");
+  EXPECT_EQ(absl::get<int64_t>(shadow->getField("status_code")), 200);
 
   EXPECT_EQ(1U, config_->stats().ok_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
@@ -6733,10 +6754,10 @@ TEST_F(HttpFilterTest, ShadowModeDenyAtDisable) {
   // Check should NOT be called since the filter is disabled.
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
 
-  // Should NOT send local reply.
+  // Response flag SHOULD be set even in shadow mode, so the access log reflects what enforce
+  // mode would have logged.
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
-              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
-      .Times(0);
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
 
   // Filter should continue, not stop.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -6885,6 +6906,110 @@ TEST_F(HttpFilterTest, ShadowModeFilterStateKeyScopedByStatPrefix) {
   EXPECT_EQ(shadow->engineResult(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
 
+  EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+}
+
+// Verify that shadow_mode combined with failure_mode_allow on an Error response still
+// continues the request and writes the ShadowDecision. Shadow mode short-circuits before
+// the failure_mode_allow branch, so the failure_mode_allowed_ counter is NOT incremented.
+TEST_F(HttpFilterTest, ShadowModeWithFailureModeAllowOnError) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  shadow_mode: true
+  failure_mode_allow: true
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // Neither the failure_mode_allow response flag nor setResponseFlag should fire in the
+  // Error+shadow path.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService))
+      .Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  const auto* shadow =
+      decoder_filter_callbacks_.streamInfo().filterState()->getDataReadOnly<ShadowDecisionObject>(
+          kShadowFilterStateKey);
+  ASSERT_NE(shadow, nullptr);
+  EXPECT_EQ(shadow->engineResult(),
+            envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::ERROR);
+  EXPECT_EQ(shadow->statusCode(), Http::Code::Forbidden);
+
+  EXPECT_EQ(1U, config_->stats().shadow_error_.value());
+  EXPECT_EQ(1U, config_->stats().error_.value());
+  // Shadow mode short-circuits before the failure_mode_allow branch.
+  EXPECT_EQ(0U, config_->stats().failure_mode_allowed_.value());
+}
+
+// Verify that shadow_mode combined with with_request_body buffers the body, dispatches the
+// auth check with the body included, and writes the ShadowDecision on Deny.
+TEST_F(HttpFilterTest, ShadowModeWithRequestBody) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  shadow_mode: true
+  with_request_body:
+    max_request_bytes: 10
+    allow_partial_message: true
+  )EOF");
+
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // Feed enough body to trigger the auth call (max_request_bytes=10 with allow_partial_message).
+  Buffer::OwnedImpl body("0123456789");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(body, true));
+
+  // Auth server denies — shadow mode must continue without a local reply.
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Forbidden;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  const auto* shadow =
+      decoder_filter_callbacks_.streamInfo().filterState()->getDataReadOnly<ShadowDecisionObject>(
+          kShadowFilterStateKey);
+  ASSERT_NE(shadow, nullptr);
+  EXPECT_EQ(shadow->engineResult(),
+            envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
+  EXPECT_EQ(shadow->statusCode(), Http::Code::Forbidden);
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
 }
 

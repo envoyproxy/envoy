@@ -415,12 +415,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       if (config_->shadowMode()) {
         ENVOY_STREAM_LOG(trace,
                          "ext_authz filter is disabled (deny_at_disable). Shadow mode: setting "
-                         "metadata and continuing.",
+                         "filter state and continuing.",
                          *decoder_callbacks_);
         auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
         response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
         response->status_code = config_->statusOnError();
-        setShadowFilterState(response);
+        setShadowFilterState(*response);
+        // Set the response flag so access logs reflect what enforce mode would have logged,
+        // enabling operators to correlate shadow-denied-on-disable with real denials.
+        decoder_callbacks_->streamInfo().setResponseFlag(
+            StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
         return Http::FilterHeadersStatus::Continue;
       }
       ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.",
@@ -978,7 +982,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
     }
     if (config_->shadowMode()) {
-      setShadowFilterState(response);
+      setShadowFilterState(*response);
     }
     stats_.ok_.inc();
     continueDecoding();
@@ -1010,7 +1014,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     // In shadow mode, set the dynamic metadata and continue without sending a local reply.
     if (config_->shadowMode()) {
-      setShadowFilterState(response);
+      setShadowFilterState(*response);
       continueDecoding();
       break;
     }
@@ -1077,7 +1081,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     // In shadow mode, always continue on error (equivalent to forced fail-open).
     if (config_->shadowMode()) {
-      setShadowFilterState(response);
+      setShadowFilterState(*response);
       continueDecoding();
       break;
     }
@@ -1290,24 +1294,31 @@ void Filter::addErrorResponseHeaders(
   }
 }
 
+void ShadowDecisionObject::populateProto(ShadowDecisionProto& msg) const {
+  msg.set_engine_result(engine_result_);
+  if (status_code_ != static_cast<Http::Code>(0)) {
+    msg.set_status_code(static_cast<uint32_t>(status_code_));
+  }
+  for (const auto& [key, value] : response_headers_) {
+    auto* hv = msg.add_response_headers();
+    hv->set_key(key);
+    hv->set_value(value);
+  }
+}
+
 ProtobufTypes::MessagePtr ShadowDecisionObject::serializeAsProto() const {
   auto msg = std::make_unique<ShadowDecisionProto>();
-  msg->set_engine_result(engine_result_);
-  if (status_code_ != static_cast<Http::Code>(0)) {
-    msg->set_status_code(static_cast<uint32_t>(status_code_));
-  }
-  auto* headers = msg->mutable_response_headers();
-  for (const auto& [key, value] : response_headers_) {
-    (*headers)[key] = value;
-  }
+  populateProto(*msg);
   return msg;
 }
 
 absl::optional<std::string> ShadowDecisionObject::serializeAsString() const {
-  return MessageUtil::getJsonStringFromMessageOrError(*serializeAsProto());
+  ShadowDecisionProto msg;
+  populateProto(msg);
+  return MessageUtil::getJsonStringFromMessageOrError(msg);
 }
 
-void Filter::setShadowFilterState(const Filters::Common::ExtAuthz::ResponsePtr& response) {
+void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response) {
   using Filters::Common::ExtAuthz::CheckStatus;
   using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
 
@@ -1315,22 +1326,26 @@ void Filter::setShadowFilterState(const Filters::Common::ExtAuthz::ResponsePtr& 
   Http::Code status_code = static_cast<Http::Code>(0);
   Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers;
 
-  switch (response->status) {
+  switch (response.status) {
   case CheckStatus::OK:
     engine_result = ShadowDecisionProto::OK;
+    status_code = Http::Code::OK;
     break;
   case CheckStatus::Denied:
     engine_result = ShadowDecisionProto::DENIED;
-    status_code = response->status_code;
-    response_headers = response->headers_to_set;
+    status_code = response.status_code;
+    response_headers = std::move(response.headers_to_set);
     stats_.shadow_denied_.inc();
     break;
   case CheckStatus::Error:
     engine_result = ShadowDecisionProto::ERROR;
-    status_code = response->status_code != static_cast<Http::Code>(0) ? response->status_code
-                                                                      : config_->statusOnError();
+    status_code = response.status_code != static_cast<Http::Code>(0) ? response.status_code
+                                                                     : config_->statusOnError();
     stats_.shadow_error_.inc();
     break;
+  default:
+    IS_ENVOY_BUG("unexpected CheckStatus value in shadow mode");
+    return;
   }
 
   auto object = std::make_shared<ShadowDecisionObject>(engine_result, status_code,

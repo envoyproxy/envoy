@@ -387,6 +387,15 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: ext_authz
+  change: |
+    Added :ref:`shadow_mode
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.shadow_mode>` to the HTTP
+    ext_authz filter. When enabled, the filter calls the authorization service as normal but never
+    terminates the request. The authorization decision is written to FilterState as a
+    :ref:`ShadowDecision <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ShadowDecision>`
+    under key ``envoy.filters.http.ext_authz.shadow`` (scoped by ``stat_prefix`` when set) so that
+    a subsequent filter can read and optionally enforce it.
 - area: dynamic_modules
   change: |
     Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
