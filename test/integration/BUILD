@@ -1749,9 +1749,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "load_stats_integration_test",
-    size = "large",
     srcs = ["load_stats_integration_test.cc"],
-    rbe_pool = "4core",
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",

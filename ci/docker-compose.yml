@@ -41,6 +41,10 @@ x-envoy-build-base: &envoy-build-base
   - GITHUB_TOKEN
   - GITHUB_APP_ID
   - GITHUB_INSTALL_ID
+  - ENVOY_DEFLAKE_JOBS
+  - ENVOY_DEFLAKE_RUNS
+  - ENVOY_DEFLAKE_TARGET
+  - ENVOY_DEFLAKE_TEST
 
   # Build configuration
   - NUM_CPUS

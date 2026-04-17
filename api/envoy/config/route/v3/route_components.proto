@@ -2395,6 +2395,13 @@ message RateLimit {
 
         // Query :ref:`cluster metadata <envoy_v3_api_field_config.cluster.v3.Cluster.metadata>`
         CLUSTER_ENTRY = 2;
+
+        // Query :ref:`cluster locality metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>`
+        // Cluster locality metadata is available after upstream host selection only. To populate descriptors
+        // with cluster locality metadata it needs to be have the
+        // :ref:`apply_on_stream_done field <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>`
+        // set to ``true`` or host selection completed before the rate limit filter is executed.
+        CLUSTER_LOCALITY_ENTRY = 3;
       }
 
       // The key to use in the descriptor entry.
