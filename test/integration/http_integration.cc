@@ -1464,6 +1464,17 @@ void HttpIntegrationTest::testLargeResponseHeaders(uint32_t size, uint32_t count
   // exceed `size` due to the keys and other headers. The actual request header count will exceed
   // `count` by four due to default headers.
 
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) -> void {
+    // Disable the per-route timeout so slow CI / large response header
+    // processing can't trip a 504 before the test's own waitForEndStream
+    // deadline. See #44416.
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+    route->mutable_timeout()->set_seconds(0);
+    route->mutable_timeout()->set_nanos(0);
+  });
+
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
