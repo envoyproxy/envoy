@@ -352,10 +352,6 @@ case $CI_TARGET in
             exit 1
         fi
         ENVOY_CACHE_OUTPUT_BASE="${ENVOY_CACHE_OUTPUT_BASE:-base}"
-        # workaround rules_rust bug for docs and external workspaces
-        if [[ "${ENVOY_CACHE_OUTPUT_BASE}" == "docs" || "${ENVOY_CACHE_OUTPUT_BASE}" == "external" ]]; then
-            export CARGO_BAZEL_REPIN=true
-        fi
         setup_clang_toolchain
         echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
         if [[ -n "${ENVOY_CACHE_WORKING_DIR}" ]]; then
@@ -370,6 +366,28 @@ case $CI_TARGET in
               > /dev/null
         TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
         echo "Generated cache: ${TOTAL_SIZE}"
+        ;;
+
+    deflake)
+        ENVOY_DEFLAKE_RUNS=${ENVOY_DEFLAKE_RUNS:-1000}
+        if [[ -z "$ENVOY_DEFLAKE_TARGET" || -z "$ENVOY_DEFLAKE_TEST" ]]; then
+            echo "Both ENVOY_DEFLAKE_TARGET and ENVOY_DEFLAKE_TEST must be set to use deflake" >&2
+            exit 1
+        fi
+        _BAZEL_ARGS=(
+            "$ENVOY_DEFLAKE_TARGET"
+            "${BAZEL_BUILD_OPTIONS[@]}"
+            --test_arg=--gtest_filter="$ENVOY_DEFLAKE_TEST"
+            --runs_per_test="${ENVOY_DEFLAKE_RUNS}"
+            --test_arg="-l trace"
+            --cache_test_results=no)
+        if [[ -n "$ENVOY_DEFLAKE_JOBS" ]]; then
+            _BAZEL_ARGS+=(--jobs="$ENVOY_DEFLAKE_JOBS")
+        fi
+        echo "Deflake args: " >&2
+        echo "  ${_BAZEL_ARGS[*]}" >&2
+        echo "" >&2
+        bazel test "${_BAZEL_ARGS[@]}"
         ;;
 
     format-api|check_and_fix_proto_format)

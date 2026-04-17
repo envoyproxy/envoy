@@ -5,6 +5,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -21,6 +22,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
+#include "contrib/golang/common/dso/test/mocks.h"
 #include "contrib/golang/filters/http/source/golang_filter.h"
 #include "gmock/gmock.h"
 
@@ -28,17 +30,23 @@ using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Return;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Golang {
-namespace {
 
 class TestFilter : public Filter {
 public:
+  using Filter::continueStatusInternal;
   using Filter::Filter;
+  DecodingProcessorState& testDecodingState() { return decoding_state_; }
+  HttpRequestInternal* testReq() { return req_; }
 };
+
+namespace {
 
 class GolangHttpFilterTest : public testing::Test {
 public:
@@ -189,6 +197,72 @@ TEST_F(GolangHttpFilterTest, InvalidConfigForRouteConfigFilter) {
   InSequence s;
   EXPECT_THROW_WITH_REGEX(setup(ROUTECONFIG, genSoPath(), ROUTECONFIG), EnvoyException,
                           "golang filter failed to parse plugin config");
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/44320.
+TEST_F(GolangHttpFilterTest, BufferedDataAfterDestroyDuringContinue) {
+  auto dso_lib = std::make_shared<NiceMock<Dso::MockHttpFilterDsoImpl>>();
+  ON_CALL(*dso_lib, envoyGoFilterNewHttpPluginConfig(_)).WillByDefault(Return(1));
+  ON_CALL(*dso_lib, envoyGoFilterOnHttpHeader(_, _, _, _))
+      .WillByDefault(Return(static_cast<uint64_t>(GolangStatus::Running)));
+
+  bool destroyed = false;
+  bool data_called_after_destroy = false;
+  ON_CALL(*dso_lib, envoyGoFilterOnHttpData(_, _, _, _))
+      .WillByDefault(Invoke(
+          [&destroyed, &data_called_after_destroy](processState*, GoUint64, GoUint64, GoUint64) {
+            if (destroyed) {
+              data_called_after_destroy = true;
+            }
+            return static_cast<uint64_t>(GolangStatus::Continue);
+          }));
+  ON_CALL(*dso_lib, envoyGoFilterOnHttpDestroy(_, _))
+      .WillByDefault(Invoke([&destroyed](httpRequest*, int) { destroyed = true; }));
+
+  const auto yaml = R"EOF(
+    library_id: test
+    library_path: test
+    plugin_name: test
+    )EOF";
+  envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> mock_context;
+  auto config = std::make_shared<FilterConfig>(proto_config, dso_lib, "", mock_context);
+  config->newGoPluginConfig();
+
+  Network::Address::InstanceConstSharedPtr addr(
+      (*Network::Address::PipeInstance::create("/test/test.sock")).release());
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> mock_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> mock_enc_callbacks;
+  NiceMock<Envoy::Network::MockConnection> mock_connection;
+  ON_CALL(mock_callbacks, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{mock_connection}));
+  mock_connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
+  mock_connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr);
+  EXPECT_CALL(mock_callbacks.dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
+
+  auto filter = std::make_shared<TestFilter>(config, dso_lib, 0);
+  filter->setDecoderFilterCallbacks(mock_callbacks);
+  filter->setEncoderFilterCallbacks(mock_enc_callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter->decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl body("request body");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter->decodeData(body, false));
+
+  EXPECT_CALL(mock_callbacks, continueDecoding()).WillOnce(Invoke([&filter]() {
+    filter->onDestroy();
+  }));
+
+  filter->continueStatusInternal(filter->testDecodingState(), GolangStatus::Continue);
+
+  EXPECT_FALSE(data_called_after_destroy)
+      << "envoyGoFilterOnHttpData must not be called after onDestroy";
+
+  ASSERT_NE(nullptr, filter->testReq());
+  delete filter->testReq();
 }
 
 } // namespace

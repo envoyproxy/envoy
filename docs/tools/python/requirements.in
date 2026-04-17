@@ -16,5 +16,6 @@ envoy.code.check>=0.5.12
 frozendict>=2.3.7
 jinja2
 packaging
+pygments>=2.20.0
 pyyaml
 uvloop==0.20.0
