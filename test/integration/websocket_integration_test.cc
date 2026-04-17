@@ -262,8 +262,8 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0)->mutable_route();
-        route->mutable_idle_timeout()->set_seconds(0);
-        route->mutable_idle_timeout()->set_nanos(200 * 1000 * 1000);
+        route->mutable_idle_timeout()->set_seconds(1);
+        route->mutable_idle_timeout()->set_nanos(0);
       });
   initialize();
 
