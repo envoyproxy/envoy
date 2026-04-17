@@ -433,25 +433,28 @@ public:
    * Creates a new scheduler for the given cluster.
    */
   static DynamicModuleClusterScheduler* create(DynamicModuleCluster* cluster) {
-    return new DynamicModuleClusterScheduler(cluster->weak_from_this(), cluster->dispatcher_);
+    return new DynamicModuleClusterScheduler(cluster->weak_from_this());
   }
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([cluster = cluster_, event_id]() {
-      if (std::shared_ptr<DynamicModuleCluster> cluster_shared = cluster.lock()) {
-        cluster_shared->onScheduled(event_id);
+    // Lock the cluster so its dispatcher member stays valid across `post`.
+    auto cluster_shared = cluster_.lock();
+    if (!cluster_shared) {
+      return;
+    }
+    cluster_shared->dispatcher_.post([cluster = cluster_, event_id]() {
+      if (std::shared_ptr<DynamicModuleCluster> cs = cluster.lock()) {
+        cs->onScheduled(event_id);
       }
     });
   }
 
 private:
-  DynamicModuleClusterScheduler(std::weak_ptr<DynamicModuleCluster> cluster,
-                                Event::Dispatcher& dispatcher)
-      : cluster_(std::move(cluster)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleClusterScheduler(std::weak_ptr<DynamicModuleCluster> cluster)
+      : cluster_(std::move(cluster)) {}
 
   // Using a weak pointer to avoid unnecessarily extending the lifetime of the cluster.
   std::weak_ptr<DynamicModuleCluster> cluster_;
-  Event::Dispatcher& dispatcher_;
 };
 
 /**
