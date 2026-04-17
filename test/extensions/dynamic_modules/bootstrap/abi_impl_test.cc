@@ -15,6 +15,7 @@
 #include "test/mocks/upstream/cluster_update_callbacks_handle.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -1311,6 +1312,36 @@ TEST_F(BootstrapAbiImplTest, TimerFired) {
 
   // Clean up.
   envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+// Covers that `timer_delete` invoked from a background thread posts the deletion to the main
+// thread dispatcher rather than running it inline.
+TEST_F(BootstrapAbiImplTest, TimerDeleteFromBackgroundThreadPostsToMainDispatcher) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  auto* timer_ptr =
+      envoy_dynamic_module_callback_bootstrap_extension_timer_new(config.value()->thisAsVoidPtr());
+  EXPECT_NE(timer_ptr, nullptr);
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(dispatcher_, post(testing::_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  auto& thread_factory = Thread::threadFactoryForTest();
+  auto thread = thread_factory.createThread(
+      [&]() { envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr); });
+  thread->join();
+
+  ASSERT_TRUE(captured_cb);
+  captured_cb();
 }
 
 // Test that the timer callback safely handles a destroyed config via weak_ptr.

@@ -5,6 +5,7 @@
 #include "envoy/server/admin.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/thread.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
@@ -490,7 +491,20 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
 
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
-  delete static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
+  auto* timer = static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
+  // The underlying `Event::Timer` `deregisters` from the dispatcher's timer list in its
+  // destructor, which is only safe on the dispatcher thread. Post the deletion to the main thread
+  // when the caller is on a background thread.
+  if (Envoy::Thread::MainThread::isMainThread() || Envoy::Thread::TestThread::isTestThread()) {
+    delete timer;
+    return;
+  }
+  if (auto config_shared = timer->weakConfig().lock()) {
+    config_shared->main_thread_dispatcher_.post([timer]() { delete timer; });
+    return;
+  }
+  // The config is gone, so the dispatcher is unreachable; delete inline as a best effort.
+  delete timer;
 }
 
 // -------------------- File Watcher Callbacks --------------------

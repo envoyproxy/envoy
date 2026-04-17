@@ -521,6 +521,12 @@ public:
 
   Event::Timer& timer() { return *timer_; }
 
+  /**
+   * Returns the weak pointer to the owning config so `timer_delete` can reach the main thread
+   * dispatcher.
+   */
+  const std::weak_ptr<DynamicModuleBootstrapExtensionConfig>& weakConfig() const { return config_; }
+
 private:
   // The config that this timer is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the config.
