@@ -390,7 +390,7 @@ envoy.filters.http.geoip:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.filters.http.geoip.v3.Geoip
 envoy.filters.network.geoip:
@@ -797,7 +797,7 @@ envoy.filters.listener.local_ratelimit:
 envoy.filters.listener.original_dst:
   categories:
   - envoy.filters.listener
-  security_posture: robust_to_untrusted_downstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.original_dst.v3.OriginalDst

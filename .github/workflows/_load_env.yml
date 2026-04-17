@@ -55,7 +55,6 @@ env:
 
 jobs:
   request:
-    if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
     runs-on: ubuntu-24.04
     outputs:
       build-image: ${{ toJSON(fromJSON(steps.env.outputs.data).request.build-image) }}
