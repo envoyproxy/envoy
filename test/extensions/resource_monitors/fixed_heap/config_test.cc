@@ -71,8 +71,7 @@ TEST(FixedHeapMonitorFactoryTest, RejectNeitherSet) {
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   EXPECT_THROW_WITH_REGEX(factory->createResourceMonitor(config, context), EnvoyException,
-                          "exactly one of max_heap_size_bytes or max_heap_size_bytes_runtime must "
-                          "be set");
+                          "max heap size must be greater than 0");
 }
 
 TEST(FixedHeapMonitorFactoryTest, RejectBothSet) {
@@ -84,10 +83,14 @@ TEST(FixedHeapMonitorFactoryTest, RejectBothSet) {
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
   config.set_max_heap_size_bytes(1000);
   config.mutable_max_heap_size_bytes_runtime()->set_default_value(2000);
+  config.mutable_max_heap_size_bytes_runtime()->set_runtime_key("fixed_heap.max_bytes");
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
   testing::NiceMock<Runtime::MockLoader> runtime;
+  EXPECT_CALL(runtime, snapshot()).WillRepeatedly(testing::ReturnRef(runtime.snapshot_));
+  EXPECT_CALL(runtime.snapshot_, getInteger("fixed_heap.max_bytes", 2000))
+      .WillRepeatedly(testing::Return(2000));
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   EXPECT_THROW_WITH_REGEX(factory->createResourceMonitor(config, context), EnvoyException,
@@ -103,12 +106,14 @@ TEST(FixedHeapMonitorFactoryTest, RejectRuntimeDefaultZero) {
 
   envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig config;
   config.mutable_max_heap_size_bytes_runtime()->set_default_value(0);
+  config.mutable_max_heap_size_bytes_runtime()->set_runtime_key("fixed_heap.max_bytes");
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
   testing::NiceMock<Runtime::MockLoader> runtime;
   EXPECT_CALL(runtime, snapshot()).WillRepeatedly(testing::ReturnRef(runtime.snapshot_));
-  EXPECT_CALL(runtime.snapshot_, getInteger(_, 0)).WillRepeatedly(testing::Return(0));
+  EXPECT_CALL(runtime.snapshot_, getInteger("fixed_heap.max_bytes", 0))
+      .WillRepeatedly(testing::Return(0));
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   EXPECT_THROW_WITH_REGEX(factory->createResourceMonitor(config, context), EnvoyException,

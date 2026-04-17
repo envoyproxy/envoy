@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/resource_monitors/fixed_heap:fixed_heap_monitor",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:test_runtime_lib",
         "@abseil-cpp//absl/types:optional",
     ],
