@@ -1062,7 +1062,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtl) {
   dns_cache_ttl_ = 2;
 
   dns_hostname_ = "not_actually_localhost"; // Set to a name that won't resolve.
-  initializeWithArgs();
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, /*dns_query_timeout=*/1);
   std::string host =
       fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1074,6 +1074,8 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtl) {
   checkSimpleRequestSuccess(1024, 1024, response.get());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_http1_total")->value());
+
+  test_server_->waitForCounterGe("dns_cache.foo.dns_query_failure", 1);
 
   // Wait for the host to be removed due to short TTL
   test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
@@ -1104,6 +1106,8 @@ TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResFail) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
+
+  test_server_->waitForCounterGe("dns_cache.foo.dns_query_failure", 1);
 
   // When the TTL is hit, the host will be removed from the DNS cache. This
   // won't break the outstanding connection.
@@ -1178,7 +1182,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtlHostActive) {
   dns_cache_ttl_ = 2;
 
   dns_hostname_ = "not_actually_localhost"; // Set to a name that won't resolve.
-  initializeWithArgs();
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, /*dns_query_timeout=*/1);
   std::string host =
       fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
   codec_client_ = makeHttpConnection(lookupPort("http"));
