@@ -71,14 +71,12 @@ public:
   using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
 
   ShadowDecisionObject(ShadowDecisionProto::EngineResult engine_result, Http::Code status_code,
-                       std::string body,
                        Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers)
-      : engine_result_(engine_result), status_code_(status_code), body_(std::move(body)),
+      : engine_result_(engine_result), status_code_(status_code),
         response_headers_(std::move(response_headers)) {}
 
   ShadowDecisionProto::EngineResult engineResult() const { return engine_result_; }
   Http::Code statusCode() const { return status_code_; }
-  const std::string& body() const { return body_; }
   const Filters::Common::ExtAuthz::UnsafeHeaderVector& responseHeaders() const {
     return response_headers_;
   }
@@ -90,7 +88,6 @@ public:
 private:
   const ShadowDecisionProto::EngineResult engine_result_;
   const Http::Code status_code_;
-  const std::string body_;
   const Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers_;
 };
 

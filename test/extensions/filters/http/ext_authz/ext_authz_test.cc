@@ -6571,7 +6571,6 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
   EXPECT_EQ(shadow->engineResult(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
   EXPECT_EQ(shadow->statusCode(), Http::Code::Unauthorized);
-  EXPECT_EQ(shadow->body(), "Access denied");
   ASSERT_EQ(shadow->responseHeaders().size(), 1);
   EXPECT_EQ(shadow->responseHeaders()[0].first, "x-auth-reason");
   EXPECT_EQ(shadow->responseHeaders()[0].second, "unauthorized");
@@ -6585,7 +6584,6 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
   EXPECT_EQ(proto.engine_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
   EXPECT_EQ(proto.status_code(), 401);
-  EXPECT_EQ(proto.body(), "Access denied");
   ASSERT_EQ(proto.response_headers().size(), 1);
   EXPECT_EQ(proto.response_headers().at("x-auth-reason"), "unauthorized");
 
@@ -6596,8 +6594,6 @@ TEST_F(HttpFilterTest, ShadowModeDeniedSetsFilterStateAndContinues) {
   EXPECT_THAT(*serialized_str, testing::HasSubstr("\"DENIED\""));
   EXPECT_THAT(*serialized_str, testing::HasSubstr("\"status_code\""));
   EXPECT_THAT(*serialized_str, testing::HasSubstr("401"));
-  EXPECT_THAT(*serialized_str, testing::HasSubstr("\"body\""));
-  EXPECT_THAT(*serialized_str, testing::HasSubstr("Access denied"));
 
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
   // In shadow mode, denied stats are still incremented (the decision was deny).
@@ -6648,7 +6644,6 @@ TEST_F(HttpFilterTest, ShadowModeErrorSetsFilterStateAndContinues) {
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::ERROR);
   // Default status_on_error is 403.
   EXPECT_EQ(shadow->statusCode(), Http::Code::Forbidden);
-  EXPECT_EQ(shadow->body(), "auth service error");
 
   EXPECT_EQ(1U, config_->stats().shadow_error_.value());
   // In shadow mode, error stats are still incremented (the auth service returned an error).
@@ -6690,8 +6685,8 @@ TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
   EXPECT_EQ(shadow->engineResult(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::OK);
 
-  // Exercise serializeAsProto on the OK branch — status_code is 0, body is empty, no headers.
-  // This covers the skip branches in serializeAsProto.
+  // Exercise serializeAsProto on the OK branch — status_code is 0 and no headers, which
+  // exercises the skip branches in serializeAsProto.
   auto serialized = shadow->serializeAsProto();
   ASSERT_NE(serialized, nullptr);
   const auto& proto =
@@ -6700,7 +6695,6 @@ TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
   EXPECT_EQ(proto.engine_result(),
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::OK);
   EXPECT_EQ(proto.status_code(), 0);
-  EXPECT_TRUE(proto.body().empty());
   EXPECT_TRUE(proto.response_headers().empty());
 
   EXPECT_EQ(1U, config_->stats().ok_.value());
@@ -6849,48 +6843,6 @@ TEST_F(HttpFilterTest, ShadowModeDeniedWithAuthServerDynamicMetadata) {
             envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::DENIED);
 
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
-}
-
-// Verify shadow mode error with empty body (exercises the empty-body branch in
-// setShadowFilterState's Error case).
-TEST_F(HttpFilterTest, ShadowModeErrorEmptyBody) {
-  InSequence s;
-
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_authz_server"
-  shadow_mode: true
-  )EOF");
-
-  prepareCheck();
-
-  EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
-            filter_->decodeHeaders(request_headers_, false));
-
-  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
-
-  Filters::Common::ExtAuthz::Response response{};
-  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
-  // No body set — exercises the empty-body branch.
-  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-
-  const auto* shadow =
-      decoder_filter_callbacks_.streamInfo().filterState()->getDataReadOnly<ShadowDecisionObject>(
-          kShadowFilterStateKey);
-  ASSERT_NE(shadow, nullptr);
-  EXPECT_EQ(shadow->engineResult(),
-            envoy::extensions::filters::http::ext_authz::v3::ShadowDecision::ERROR);
-  EXPECT_TRUE(shadow->body().empty());
-
-  EXPECT_EQ(1U, config_->stats().shadow_error_.value());
-  EXPECT_EQ(1U, config_->stats().error_.value());
 }
 
 // Verify that when stat_prefix is set, the shadow decision is written to a prefix-scoped

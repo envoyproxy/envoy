@@ -1296,9 +1296,6 @@ ProtobufTypes::MessagePtr ShadowDecisionObject::serializeAsProto() const {
   if (status_code_ != static_cast<Http::Code>(0)) {
     msg->set_status_code(static_cast<uint32_t>(status_code_));
   }
-  if (!body_.empty()) {
-    msg->set_body(body_);
-  }
   auto* headers = msg->mutable_response_headers();
   for (const auto& [key, value] : response_headers_) {
     (*headers)[key] = value;
@@ -1314,9 +1311,8 @@ void Filter::setShadowFilterState(const Filters::Common::ExtAuthz::ResponsePtr& 
   using Filters::Common::ExtAuthz::CheckStatus;
   using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
 
-  ShadowDecisionProto::EngineResult engine_result = ShadowDecisionProto::ENGINE_RESULT_UNSPECIFIED;
+  ShadowDecisionProto::EngineResult engine_result = ShadowDecisionProto::UNSPECIFIED;
   Http::Code status_code = static_cast<Http::Code>(0);
-  std::string body;
   Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers;
 
   switch (response->status) {
@@ -1326,7 +1322,6 @@ void Filter::setShadowFilterState(const Filters::Common::ExtAuthz::ResponsePtr& 
   case CheckStatus::Denied:
     engine_result = ShadowDecisionProto::DENIED;
     status_code = response->status_code;
-    body = response->body;
     response_headers = response->headers_to_set;
     stats_.shadow_denied_.inc();
     break;
@@ -1334,12 +1329,11 @@ void Filter::setShadowFilterState(const Filters::Common::ExtAuthz::ResponsePtr& 
     engine_result = ShadowDecisionProto::ERROR;
     status_code = response->status_code != static_cast<Http::Code>(0) ? response->status_code
                                                                       : config_->statusOnError();
-    body = response->body;
     stats_.shadow_error_.inc();
     break;
   }
 
-  auto object = std::make_shared<ShadowDecisionObject>(engine_result, status_code, std::move(body),
+  auto object = std::make_shared<ShadowDecisionObject>(engine_result, status_code,
                                                        std::move(response_headers));
 
   decoder_callbacks_->streamInfo().filterState()->setData(

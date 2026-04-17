@@ -363,20 +363,26 @@ message ExtAuthz {
   // When set to ``true``, the filter operates in shadow mode. In shadow mode the
   // filter still calls the external authorization service and processes the response,
   // but never terminates the request. Instead of sending a local reply on a denied or
-  // error response, the filter writes the authorization decision and associated response
-  // attributes (status code, body, headers) into dynamic metadata under the
-  // ``envoy.filters.http.ext_authz`` namespace so that a subsequent filter can read and
-  // optionally enforce them.
+  // error response, the filter writes the authorization decision (engine result, status
+  // code, response headers) into the request's
+  // :ref:`FilterState <arch_overview_data_sharing_between_filters>` as a
+  // :ref:`ShadowDecision
+  // <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ShadowDecision>` object so
+  // that subsequent filters can read and optionally enforce it.
+  //
+  // The FilterState key is ``envoy.filters.http.ext_authz.shadow`` by default, and
+  // ``envoy.filters.http.ext_authz.shadow.<stat_prefix>`` when :ref:`stat_prefix
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.stat_prefix>` is
+  // set, so that multiple ext_authz filters in the same chain write to distinct keys.
+  //
+  // The auth server's denied-response body is intentionally **not** carried on the
+  // ShadowDecision: bodies can be arbitrarily large and no downstream consumer in the
+  // shadow-comparison flow needs them. A consumer that wants to reproduce the auth
+  // server's full denied response must read it from its own source of truth rather
+  // than replaying it from FilterState.
   //
   // Header and query-parameter mutations from an OK response are still applied to the
   // request as usual.
-  //
-  // The following metadata keys are set in shadow mode:
-  //
-  // - ``shadow_engine_result``: one of ``ok``, ``denied``, or ``error``.
-  // - ``shadow_status_code``: the HTTP status code from the auth server (denied/error only).
-  // - ``shadow_body``: the response body from the auth server (denied/error only, if non-empty).
-  // - ``shadow_response_headers``: headers the auth server wanted set on the response (denied only).
   //
   // Defaults to ``false``.
   bool shadow_mode = 32;
@@ -390,7 +396,7 @@ message ExtAuthz {
 message ShadowDecision {
   // The decision the auth server returned.
   enum EngineResult {
-    ENGINE_RESULT_UNSPECIFIED = 0;
+    UNSPECIFIED = 0;
     OK = 1;
     DENIED = 2;
     ERROR = 3;
@@ -403,13 +409,9 @@ message ShadowDecision {
   // ``DENIED`` and ``ERROR``; unset for ``OK``.
   uint32 status_code = 2;
 
-  // Response body the filter would have sent on termination. Populated for
-  // ``DENIED`` and ``ERROR`` when non-empty; unset for ``OK``.
-  string body = 3;
-
   // Response headers the auth server asked to set on a denied response
   // (e.g. ``WWW-Authenticate``). Populated for ``DENIED`` only.
-  map<string, string> response_headers = 4;
+  map<string, string> response_headers = 3;
 }
 
 // Configuration for buffering the request data.
