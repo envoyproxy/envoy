@@ -1,15 +1,19 @@
 #include "source/common/quic/active_quic_listener.h"
 
+#include <memory>
 #include <utility>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.pb.h"
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
+#include "source/common/http/session_idle_list.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/udp_listener_impl.h"
@@ -39,7 +43,7 @@ ActiveQuicListener::ActiveQuicListener(
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-    bool reject_new_connections)
+    bool reject_new_connections, bool enable_session_idle_list)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           std::make_unique<Network::UdpListenerImpl>(
@@ -91,12 +95,12 @@ ActiveQuicListener::ActiveQuicListener(
       listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
     }
   }
-  // TODO(panting): Pass in a non-null session_idle_list when configured.
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
-      *connection_id_generator_, debug_visitor_factory, /*session_idle_list=*/nullptr);
+      *connection_id_generator_, debug_visitor_factory,
+      enable_session_idle_list ? std::make_unique<Http::SessionIdleList>(dispatcher) : nullptr);
 
   absl::AnyInvocable<void() &&> on_can_write_cb = [&]() { quic_dispatcher_->OnCanWrite(); };
 
@@ -270,6 +274,10 @@ void ActiveQuicListener::onFilterChainDraining(
 
 void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain) {
   quic_dispatcher_->closeConnectionsWithFilterChain(filter_chain);
+}
+
+void ActiveQuicListener::onCloseIdleHttpConnections(bool is_saturated) {
+  quic_dispatcher_->closeIdleQuicConnections(is_saturated);
 }
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
@@ -447,12 +455,21 @@ ActiveQuicListenerFactory::createActiveQuicListener(
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator) {
+  bool enable_session_idle_list = false;
+  for (const auto& action :
+       context_.serverFactoryContext().bootstrap().overload_manager().actions()) {
+    if (action.name() == Server::OverloadActionNames::get().CloseIdleHttpConnections) {
+      enable_session_idle_list = true;
+      break;
+    }
+  }
   return std::make_unique<ActiveQuicListener>(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
       std::move(cid_generator), worker_selector_,
-      makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_);
+      makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_,
+      enable_session_idle_list);
 }
 
 } // namespace Quic

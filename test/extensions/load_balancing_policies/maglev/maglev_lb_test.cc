@@ -57,12 +57,17 @@ TEST(MaglevTableLogMaglevTableTest, MaglevTableLogMaglevTableTest) {
   NormalizedHostWeightVector normalized_host_weights = {{host1, 1}};
 
   {
-    CompactMaglevTable table(normalized_host_weights, 1, 2, true, stats);
+    OriginalMaglevTable table(normalized_host_weights, 1, 2, true, stats);
     table.logMaglevTable(true);
   }
 
   {
     CompactMaglevTable table(normalized_host_weights, 1, 2, true, stats);
+    table.logMaglevTable(true);
+  }
+
+  {
+    DegenerateMaglevTable table(normalized_host_weights, 1, 2, true, stats);
     table.logMaglevTable(true);
   }
 }
@@ -146,6 +151,25 @@ TEST_F(MaglevLoadBalancerTest, DefaultMaglevTableSize) {
   createLb();
   EXPECT_EQ(defaultValue, lb_->tableSize());
 };
+
+TEST_F(MaglevLoadBalancerTest, SingleHost) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(7);
+
+  EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
+  EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(1, lb_->stats().max_entries_per_host_.value());
+
+  // Always selects the single host: 127.0.0.1:90
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  for (uint32_t i = 0; i < 5; ++i) {
+    TestLoadBalancerContext context(i);
+    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context).host);
+  }
+}
 
 // Basic sanity tests.
 TEST_F(MaglevLoadBalancerTest, Basic) {
@@ -508,6 +532,21 @@ TEST_F(MaglevLoadBalancerTest, Weighted) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
               lb->chooseHost(&context).host);
+  }
+}
+
+TEST_F(MaglevLoadBalancerTest, WeightedSingleHost) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 7)};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(17);
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(1, lb_->stats().max_entries_per_host_.value());
+
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  for (uint32_t i = 0; i < 17; ++i) {
+    TestLoadBalancerContext context(i);
+    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context).host);
   }
 }
 

@@ -167,6 +167,10 @@ bug_fixes:
     causing clients to incorrectly retry requests that had already timed out. This behavior can be
     reverted by setting the runtime guard
     ``envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded`` to ``false``.
+- area: quic
+  change: |
+    Fixed HTTP/3 client connection pool to handle early data request correctly with asynchronous certificates
+    validation. This change is gated by the runtime guard ``envoy.reloadable_features.fix_http3_early_data_timing``.
 - area: router
   change: |
     Fixed a bug where the router's buffer overflow check double-counted the request body size when an
@@ -395,6 +399,11 @@ removed_config_or_runtime:
     and legacy code path.
 
 new_features:
+- area: lua
+  change: |
+    Added stats API support to the :ref:`Lua filter <config_http_filters_lua>`, allowing Lua
+    scripts to create and increment counters, gauges, and histograms via
+    ``handle:streamInfo():stats()``.
 - area: dynamic_modules
   change: |
     Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
@@ -1026,6 +1035,11 @@ new_features:
 - area: ratelimit
   change: |
     Support populating rate limit descriptors from cluster locality metadata.
+- area: http
+  change: |
+    Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
+    that closes idle downstream HTTP connections when the overload action is active. Currently only HTTP/3 idle connections
+    trimming is supported, and HTTP/1 and HTTP/2 support are to be implemented.
 
 - area: contrib
   change: |

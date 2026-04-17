@@ -31,8 +31,8 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
     LoadBalancerFactory(DynamicModuleClusterHandleSharedPtr handle) : handle_(std::move(handle)) {}
 
-    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
-      return std::make_unique<DynamicModuleLoadBalancer>(handle_);
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
+      return std::make_unique<DynamicModuleLoadBalancer>(handle_, params.priority_set);
     }
 
     DynamicModuleClusterHandleSharedPtr handle_;
@@ -591,14 +591,15 @@ void DynamicModuleCluster::HttpCalloutCallback::onFailure(const Http::AsyncClien
 // =================================================================================================
 
 DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(
-    const DynamicModuleClusterHandleSharedPtr& handle)
-    : handle_(handle), in_module_lb_(nullptr) {
+    const DynamicModuleClusterHandleSharedPtr& handle, const Upstream::PrioritySet& priority_set)
+    : handle_(handle), priority_set_(priority_set), in_module_lb_(nullptr) {
   in_module_lb_ =
       handle_->cluster_->config()->on_cluster_lb_new_(handle_->cluster_->inModuleCluster(), this);
 
-  // Register for host membership updates if the module implements the hook.
+  // Register for host membership updates if the module implements the hook. Subscribe on the
+  // worker local priority set so the callback list is only mutated on this worker thread.
   if (handle_->cluster_->config()->on_cluster_lb_on_host_membership_update_ != nullptr) {
-    member_update_cb_ = handle_->cluster_->prioritySet().addMemberUpdateCb(
+    member_update_cb_ = priority_set_.addMemberUpdateCb(
         [this](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
           hosts_added_ = &hosts_added;
           hosts_removed_ = &hosts_removed;

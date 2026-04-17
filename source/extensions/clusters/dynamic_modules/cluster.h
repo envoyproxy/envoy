@@ -485,7 +485,11 @@ private:
  */
 class DynamicModuleLoadBalancer : public Upstream::LoadBalancer {
 public:
-  DynamicModuleLoadBalancer(const DynamicModuleClusterHandleSharedPtr& handle);
+  // ``priority_set`` must be the worker local priority set supplied via
+  // ``LoadBalancerParams::priority_set``. The membership update subscription is registered on it so
+  // that the callback list is mutated only on the thread that owns this load balancer instance.
+  DynamicModuleLoadBalancer(const DynamicModuleClusterHandleSharedPtr& handle,
+                            const Upstream::PrioritySet& priority_set);
   ~DynamicModuleLoadBalancer() override;
 
   // Upstream::LoadBalancer.
@@ -532,8 +536,13 @@ public:
   const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
   const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
 
+  // Returns the priority set that this load balancer subscribes to for host membership updates.
+  const Upstream::PrioritySet& memberUpdatePrioritySet() const { return priority_set_; }
+
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;
+  // Worker local priority set that backs the membership update subscription.
+  const Upstream::PrioritySet& priority_set_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 
   // Shared cancellation flag for the active async host selection. Set in chooseHost when the
