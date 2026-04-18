@@ -1261,11 +1261,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   opts.stats_expect_response_bytes = false;
   opts.failure_mode_allow = false;
   opts.timeout_ms = 1;
-  // EnvoyGrpc routes through the router, which now correctly returns DEADLINE_EXCEEDED
-  // for gRPC timeouts instead of UNAVAILABLE.
-  ext_authz_grpc_status_ = clientType() == Grpc::ClientType::EnvoyGrpc
-                               ? LoggingTestFilterConfig::DEADLINE_EXCEEDED
-                               : LoggingTestFilterConfig::UNAVAILABLE;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::UNAVAILABLE;
   initializeConfig(opts);
 
   // Use h1, set up the test.
@@ -1292,11 +1288,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GrpcCallFailureUsesStatusOnError) {
   opts.failure_mode_allow = false;
   opts.timeout_ms = 1;
   opts.status_on_error_code = 503;
-  // EnvoyGrpc routes through the router, which now correctly returns DEADLINE_EXCEEDED
-  // for gRPC timeouts instead of UNAVAILABLE.
-  ext_authz_grpc_status_ = clientType() == Grpc::ClientType::EnvoyGrpc
-                               ? LoggingTestFilterConfig::DEADLINE_EXCEEDED
-                               : LoggingTestFilterConfig::UNAVAILABLE;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::UNAVAILABLE;
   initializeConfig(opts);
 
   setDownstreamProtocol(Http::CodecType::HTTP1);
@@ -1450,11 +1442,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
   init_opts.stats_expect_response_bytes = false;
   init_opts.failure_mode_allow = true;
   init_opts.timeout_ms = 1;
-  // EnvoyGrpc routes through the router, which now correctly returns DEADLINE_EXCEEDED
-  // for gRPC timeouts instead of UNAVAILABLE.
-  ext_authz_grpc_status_ = clientType() == Grpc::ClientType::EnvoyGrpc
-                               ? LoggingTestFilterConfig::DEADLINE_EXCEEDED
-                               : LoggingTestFilterConfig::UNAVAILABLE;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::UNAVAILABLE;
   initializeConfig(init_opts);
 
   // Use h1, set up the test.

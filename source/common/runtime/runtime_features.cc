@@ -58,7 +58,6 @@ RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
 RUNTIME_GUARD(envoy_reloadable_features_get_header_tag_from_header_map);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
-RUNTIME_GUARD(envoy_reloadable_features_grpc_timeout_returns_deadline_exceeded);
 RUNTIME_GUARD(envoy_reloadable_features_happy_eyeballs_sort_non_ip_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_header_mutation_url_encode_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_health_check_after_cluster_warming);
@@ -184,6 +183,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
+
+// TODO(jwendell): Flip to true to make gRPC timeout responses return DEADLINE_EXCEEDED
+// instead of UNAVAILABLE.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_grpc_timeout_returns_deadline_exceeded);
 
 // TODO(yanavlasov): Flip to true after prod testing.
 // Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
