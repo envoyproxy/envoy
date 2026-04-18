@@ -83,12 +83,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
     : allow_partial_message_(config.with_request_body().allow_partial_message()),
       failure_mode_allow_(config.failure_mode_allow()),
       failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
-      shadow_mode_(config.shadow_mode()),
-      shadow_filter_state_key_(
-          config.stat_prefix().empty()
-              ? "envoy.filters.http.ext_authz.shadow"
-              : absl::StrCat("envoy.filters.http.ext_authz.shadow.", config.stat_prefix())),
-      clear_route_cache_(config.clear_route_cache()),
+      shadow_mode_(config.shadow_mode()), clear_route_cache_(config.clear_route_cache()),
       max_request_bytes_(config.with_request_body().max_request_bytes()),
       max_denied_response_body_bytes_(config.max_denied_response_body_bytes()),
 
@@ -1295,7 +1290,7 @@ void Filter::addErrorResponseHeaders(
 }
 
 void ShadowDecisionObject::populateProto(ShadowDecisionProto& msg) const {
-  msg.set_engine_result(engine_result_);
+  msg.set_check_result(check_result_);
   if (status_code_ != static_cast<Http::Code>(0)) {
     msg.set_status_code(static_cast<uint32_t>(status_code_));
   }
@@ -1322,23 +1317,23 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
   using Filters::Common::ExtAuthz::CheckStatus;
   using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
 
-  ShadowDecisionProto::EngineResult engine_result = ShadowDecisionProto::UNSPECIFIED;
+  ShadowDecisionProto::CheckResult check_result = ShadowDecisionProto::UNSPECIFIED;
   Http::Code status_code = static_cast<Http::Code>(0);
   Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers;
 
   switch (response.status) {
   case CheckStatus::OK:
-    engine_result = ShadowDecisionProto::OK;
+    check_result = ShadowDecisionProto::OK;
     status_code = Http::Code::OK;
     break;
   case CheckStatus::Denied:
-    engine_result = ShadowDecisionProto::DENIED;
+    check_result = ShadowDecisionProto::DENIED;
     status_code = response.status_code;
     response_headers = std::move(response.headers_to_set);
     stats_.shadow_denied_.inc();
     break;
   case CheckStatus::Error:
-    engine_result = ShadowDecisionProto::ERROR;
+    check_result = ShadowDecisionProto::ERROR;
     status_code = response.status_code != static_cast<Http::Code>(0) ? response.status_code
                                                                      : config_->statusOnError();
     stats_.shadow_error_.inc();
@@ -1348,11 +1343,13 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
     return;
   }
 
-  auto object = std::make_shared<ShadowDecisionObject>(engine_result, status_code,
+  auto object = std::make_shared<ShadowDecisionObject>(check_result, status_code,
                                                        std::move(response_headers));
 
+  // Suffix the key with ".shadow" so it doesn't collide with ExtAuthzLoggingInfo, which
+  // already uses the filter's configured name as its FilterState key (with a different lifespan).
   decoder_callbacks_->streamInfo().filterState()->setData(
-      config_->shadowFilterStateKey(), std::move(object),
+      absl::StrCat(decoder_callbacks_->filterConfigName(), ".shadow"), std::move(object),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 

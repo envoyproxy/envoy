@@ -370,10 +370,10 @@ message ExtAuthz {
   // <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ShadowDecision>` object so
   // that subsequent filters can read and optionally enforce it.
   //
-  // The FilterState key is ``envoy.filters.http.ext_authz.shadow`` by default, and
-  // ``envoy.filters.http.ext_authz.shadow.<stat_prefix>`` when :ref:`stat_prefix
-  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.stat_prefix>` is
-  // set, so that multiple ext_authz filters in the same chain write to distinct keys.
+  // The FilterState key is the filter's configured ``name`` in the filter chain with a
+  // ``.shadow`` suffix (``envoy.filters.http.ext_authz.shadow`` by default). Multiple ext_authz
+  // filters in the same chain must already have distinct names and therefore write to distinct
+  // keys automatically.
   //
   // The auth server's denied-response body is intentionally **not** carried on the
   // ShadowDecision: bodies can be arbitrarily large and no downstream consumer in the
@@ -395,7 +395,7 @@ message ExtAuthz {
 // decision.
 message ShadowDecision {
   // The decision the auth server returned.
-  enum EngineResult {
+  enum CheckResult {
     UNSPECIFIED = 0;
     OK = 1;
     DENIED = 2;
@@ -403,7 +403,7 @@ message ShadowDecision {
   }
 
   // The decision the auth server returned.
-  EngineResult engine_result = 1;
+  CheckResult check_result = 1;
 
   // Response status code associated with the decision. For ``DENIED`` and ``ERROR`` this is
   // the code the filter would have set on termination (the auth server's code for ``DENIED``,

@@ -398,8 +398,9 @@ new_features:
     ext_authz filter. When enabled, the filter calls the authorization service as normal but never
     terminates the request. The authorization decision is written to FilterState as a
     :ref:`ShadowDecision <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ShadowDecision>`
-    under key ``envoy.filters.http.ext_authz.shadow`` (scoped by ``stat_prefix`` when set) so that
-    a subsequent filter can read and optionally enforce it.
+    under the filter's configured name with a ``.shadow`` suffix
+    (``envoy.filters.http.ext_authz.shadow`` by default) so that a subsequent filter can read
+    and optionally enforce it.
 - area: lua
   change: |
     Added stats API support to the :ref:`Lua filter <config_http_filters_lua>`, allowing Lua

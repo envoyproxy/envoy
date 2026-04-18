@@ -3473,7 +3473,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
 
 // Verify that in shadow mode a denied response does not terminate the request — the request
 // reaches the upstream and the client gets a 200 — and that the ShadowDecision is readable
-// via %FILTER_STATE(envoy.filters.http.ext_authz.shadow)% in access logs.
+// via %FILTER_STATE(<filter name>)% in access logs.
 TEST_P(ExtAuthzGrpcIntegrationTest, ShadowModeDeniedReachesUpstream) {
   GrpcInitializeConfigOpts opts;
   opts.shadow_mode = true;

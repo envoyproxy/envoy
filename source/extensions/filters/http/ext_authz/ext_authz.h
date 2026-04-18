@@ -70,12 +70,12 @@ class ShadowDecisionObject : public Envoy::StreamInfo::FilterState::Object {
 public:
   using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
 
-  ShadowDecisionObject(ShadowDecisionProto::EngineResult engine_result, Http::Code status_code,
+  ShadowDecisionObject(ShadowDecisionProto::CheckResult check_result, Http::Code status_code,
                        Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers)
-      : engine_result_(engine_result), status_code_(status_code),
+      : check_result_(check_result), status_code_(status_code),
         response_headers_(std::move(response_headers)) {}
 
-  ShadowDecisionProto::EngineResult engineResult() const { return engine_result_; }
+  ShadowDecisionProto::CheckResult checkResult() const { return check_result_; }
   Http::Code statusCode() const { return status_code_; }
   const Filters::Common::ExtAuthz::UnsafeHeaderVector& responseHeaders() const {
     return response_headers_;
@@ -85,14 +85,14 @@ public:
 
   absl::optional<std::string> serializeAsString() const override;
 
-  // Expose engine_result and status_code as individual fields so access-log formatters
+  // Expose check_result and status_code as individual fields so access-log formatters
   // and CEL expressions can read them without paying the cost of serializing the full
   // ShadowDecision to JSON.
   bool hasFieldSupport() const override { return true; }
   Envoy::StreamInfo::FilterState::Object::FieldType
   getField(absl::string_view field_name) const override {
-    if (field_name == "engine_result") {
-      return absl::string_view(ShadowDecisionProto::EngineResult_Name(engine_result_));
+    if (field_name == "check_result") {
+      return absl::string_view(ShadowDecisionProto::CheckResult_Name(check_result_));
     }
     if (field_name == "status_code" && status_code_ != static_cast<Http::Code>(0)) {
       return int64_t(static_cast<uint32_t>(status_code_));
@@ -103,7 +103,7 @@ public:
 private:
   void populateProto(ShadowDecisionProto& msg) const;
 
-  const ShadowDecisionProto::EngineResult engine_result_;
+  const ShadowDecisionProto::CheckResult check_result_;
   const Http::Code status_code_;
   const Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers_;
 };
@@ -197,8 +197,6 @@ public:
   bool failureModeAllow() const { return failure_mode_allow_; }
 
   bool shadowMode() const { return shadow_mode_; }
-
-  const std::string& shadowFilterStateKey() const { return shadow_filter_state_key_; }
 
   bool failureModeAllowHeaderAdd() const { return failure_mode_allow_header_add_; }
 
@@ -318,7 +316,6 @@ private:
   const bool failure_mode_allow_;
   const bool failure_mode_allow_header_add_;
   const bool shadow_mode_;
-  const std::string shadow_filter_state_key_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const uint32_t max_denied_response_body_bytes_;
