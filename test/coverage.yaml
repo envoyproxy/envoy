@@ -52,7 +52,7 @@ directories:
   source/extensions/filters/http/mcp_router: 82.3
   source/extensions/filters/http/oauth2: 97.6
   source/extensions/filters/listener: 96.5
-  source/extensions/filters/listener/dynamic_modules: 96.9
+  source/extensions/filters/listener/dynamic_modules: 96.7
   source/extensions/filters/listener/original_src: 92.1
   source/extensions/filters/listener/tls_inspector: 94.5
   source/extensions/filters/network/dubbo_proxy: 96.2

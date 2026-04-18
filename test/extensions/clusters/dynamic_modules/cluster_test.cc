@@ -1140,6 +1140,26 @@ TEST_F(DynamicModuleClusterTest, OnScheduledAfterClusterDestroyed) {
   captured_cb();
 }
 
+// `commit` must not touch the dispatcher once the owning cluster has been destroyed.
+TEST_F(DynamicModuleClusterTest, CommitAfterClusterDestroyedDoesNotTouchDispatcher) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto* scheduler_ptr = envoy_dynamic_module_callback_cluster_scheduler_new(cluster.get());
+  EXPECT_NE(scheduler_ptr, nullptr);
+
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+
+  envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 42);
+
+  envoy_dynamic_module_callback_cluster_scheduler_delete(scheduler_ptr);
+}
+
 // Test calling onScheduled directly.
 TEST_F(DynamicModuleClusterTest, OnScheduledDirect) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));

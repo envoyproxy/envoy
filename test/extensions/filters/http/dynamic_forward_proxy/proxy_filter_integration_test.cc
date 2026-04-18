@@ -710,6 +710,8 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
   test_server_->waitForCounterEq("dns_cache.foo.dns_query_attempt", 1);
   // Start the next request before unblocking the resolve.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // Wait for both requests to be received downstream before unblocking DNS.
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_total", 2);
   Network::TestResolver::unblockResolve();
 
   ASSERT_TRUE(response1->waitForEndStream());
