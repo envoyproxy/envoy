@@ -298,18 +298,17 @@ BENCHMARK(bmSetStrings);
 // boundaries: 1-byte (<=127), 2-byte (128-16383), 3-byte (16384-2097151).
 // ---------------------------------------------------------------------------
 
-static constexpr uint32_t SpilloverMask = 0x80;
-static constexpr uint32_t Low7Bits = 0x7f;
+using Encoding = Envoy::Stats::SymbolTable::Encoding;
 static constexpr size_t MaxVarintBytes = 10;
 
 // Encode a varint into buf[]. Returns the number of bytes written.
 static size_t encodeNumberToBuffer(uint64_t number, uint8_t* buf) {
   size_t len = 0;
   do {
-    if (number < SpilloverMask) {
+    if (number < Encoding::SpilloverMask) {
       buf[len++] = static_cast<uint8_t>(number);
     } else {
-      buf[len++] = static_cast<uint8_t>((number & Low7Bits) | SpilloverMask);
+      buf[len++] = static_cast<uint8_t>((number & Encoding::Low7Bits) | Encoding::SpilloverMask);
     }
     number >>= 7;
   } while (number != 0);
@@ -318,15 +317,15 @@ static size_t encodeNumberToBuffer(uint64_t number, uint8_t* buf) {
 
 // Implementation A: fast-path + loop (matches the current header).
 static std::pair<uint64_t, size_t> decodeNumberFastPath(const uint8_t* encoding) {
-  if (encoding[0] < SpilloverMask) {
+  if (encoding[0] < Encoding::SpilloverMask) {
     return {encoding[0], 1};
   }
   uint64_t number = 0;
-  uint64_t uc = SpilloverMask;
+  uint64_t uc = Encoding::SpilloverMask;
   const uint8_t* start = encoding;
-  for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
+  for (uint32_t shift = 0; (uc & Encoding::SpilloverMask) != 0; ++encoding, shift += 7) {
     uc = static_cast<uint32_t>(*encoding);
-    number |= (uc & Low7Bits) << shift;
+    number |= (uc & Encoding::Low7Bits) << shift;
   }
   return {number, static_cast<size_t>(encoding - start)};
 }
@@ -334,11 +333,11 @@ static std::pair<uint64_t, size_t> decodeNumberFastPath(const uint8_t* encoding)
 // Implementation B: loop-only (the original, no fast-path check).
 static std::pair<uint64_t, size_t> decodeNumberLoopOnly(const uint8_t* encoding) {
   uint64_t number = 0;
-  uint64_t uc = SpilloverMask;
+  uint64_t uc = Encoding::SpilloverMask;
   const uint8_t* start = encoding;
-  for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
+  for (uint32_t shift = 0; (uc & Encoding::SpilloverMask) != 0; ++encoding, shift += 7) {
     uc = static_cast<uint32_t>(*encoding);
-    number |= (uc & Low7Bits) << shift;
+    number |= (uc & Encoding::Low7Bits) << shift;
   }
   return {number, static_cast<size_t>(encoding - start)};
 }
@@ -350,32 +349,32 @@ static std::pair<uint64_t, size_t> decodeNumberDoWhile(const uint8_t* encoding) 
   size_t i = 0;
   do {
     byte = encoding[i];
-    res |= (byte & Low7Bits) << (7 * i);
+    res |= (byte & Encoding::Low7Bits) << (7 * i);
     i++;
-  } while ((byte & SpilloverMask) && i < MaxVarintBytes);
+  } while ((byte & Encoding::SpilloverMask) && i < MaxVarintBytes);
   return {res, i};
 }
 
 // Implementation D: unrolled with early returns per byte.
 static std::pair<uint64_t, size_t> decodeNumberUnrolled(const uint8_t* p) {
-  if (p[0] < SpilloverMask) {
+  if (p[0] < Encoding::SpilloverMask) {
     return {p[0], 1};
   }
-  uint64_t res = p[0] & Low7Bits;
-  if (p[1] < SpilloverMask) {
+  uint64_t res = p[0] & Encoding::Low7Bits;
+  if (p[1] < Encoding::SpilloverMask) {
     return {res | static_cast<uint64_t>(p[1]) << 7, 2};
   }
-  res |= static_cast<uint64_t>(p[1] & Low7Bits) << 7;
-  if (p[2] < SpilloverMask) {
+  res |= static_cast<uint64_t>(p[1] & Encoding::Low7Bits) << 7;
+  if (p[2] < Encoding::SpilloverMask) {
     return {res | static_cast<uint64_t>(p[2]) << 14, 3};
   }
   // Fall back to loop for 4+ byte varint (values >= 2^21).
-  res |= static_cast<uint64_t>(p[2] & Low7Bits) << 14;
+  res |= static_cast<uint64_t>(p[2] & Encoding::Low7Bits) << 14;
   for (size_t i = 3; i < MaxVarintBytes; ++i) {
-    if (p[i] < SpilloverMask) {
+    if (p[i] < Encoding::SpilloverMask) {
       return {res | static_cast<uint64_t>(p[i]) << (7 * i), i + 1};
     }
-    res |= static_cast<uint64_t>(p[i] & Low7Bits) << (7 * i);
+    res |= static_cast<uint64_t>(p[i] & Encoding::Low7Bits) << (7 * i);
   }
   return {res, MaxVarintBytes};
 }
@@ -552,14 +551,14 @@ static size_t encodingSizeBytesLoop(uint64_t number) {
 }
 
 static size_t encodingSizeBytesHybrid(uint64_t number) {
-  if (number < SpilloverMask) {
+  if (number < Encoding::SpilloverMask) {
     return 1;
   }
   return (64 - std::countl_zero(number) + 6) / 7;
 }
 
 static size_t encodingSizeBytesLoopEarly(uint64_t number) {
-  if (number < SpilloverMask) {
+  if (number < Encoding::SpilloverMask) {
     return 1;
   }
   size_t num_bytes = 0;

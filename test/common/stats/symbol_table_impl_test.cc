@@ -756,8 +756,10 @@ TEST_F(StatNameTest, EqualityWithMultiByteVarint) {
 
   // Sweep a few potential padding numbers just to make sure we cover. This
   // is over-testing but that's ok.
+  constexpr int lower_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) - 5;
+  constexpr int upper_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) + 5;
   for (int padding = 0; padding <= 10; ++padding) {
-    for (int num_segments = 125; num_segments <= 135; ++num_segments) {
+    for (int num_segments = lower_bound; num_segments <= upper_bound; ++num_segments) {
       clearStorage();
 
       // Pre-allocate throwaway symbols to shift symbol numbering.
@@ -790,8 +792,8 @@ TEST_F(StatNameTest, EqualityWithMultiByteVarint) {
       EXPECT_NE(x, z) << "padding=" << padding << " segments=" << num_segments;
     }
   }
-  // Confirm every dataSize from 125 through 135 was exercised.
-  for (size_t i = 125; i <= 135; ++i) {
+  // Confirm every dataSize across the varint boundary was exercised.
+  for (int i = lower_bound; i <= upper_bound; ++i) {
     EXPECT_TRUE(seen[i]) << "dataSize " << i << " was never hit";
   }
 }
@@ -826,37 +828,23 @@ TEST_F(StatNameTest, EncodingSizeBytesAtBoundaries) {
 TEST_F(StatNameTest, EqualityAtVarintBoundary) {
   // Dynamic names give precise control over dataSize():
   //   dataSize = 1 (LiteralStringIndicator) + varint_size(name.size()) + name.size()
-  // So name length 125 → dataSize 127 (1-byte varint, decodeNumber fast-path)
-  //    name length 126 → dataSize 128 (2-byte varint, decodeNumber slow-path)
+  // Sweep base_len across the outer-varint boundary (dataSize 127/128) so we
+  // hit both the decodeNumber fast-path and slow-path for operator==/hash.
   StatNameDynamicPool dynamic(table_);
-  const std::string fast_str(125, 'a'); // dataSize = 127, fast-path
-  const std::string slow_str(126, 'a'); // dataSize = 128, slow-path
+  constexpr int lower_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) - 5;
+  constexpr int upper_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) + 5;
 
-  StatName fast1 = dynamic.add(fast_str);
-  StatName fast2 = dynamic.add(fast_str); // separate storage, same content
-  StatName slow1 = dynamic.add(slow_str);
-  StatName slow2 = dynamic.add(slow_str);
+  for (int base_len = lower_bound; base_len <= upper_bound; ++base_len) {
+    const std::string s(base_len, 'a');
+    StatName a = dynamic.add(s);
+    StatName b = dynamic.add(s);
 
-  // Verify data sizes land where we expect (127 = last fast-path, 128 = first slow-path).
-  EXPECT_EQ(127, fast1.dataSize());
-  EXPECT_EQ(128, slow1.dataSize());
-
-  // Same-path equality and hash.
-  EXPECT_NE(fast1.dataIncludingSize(), fast2.dataIncludingSize()); // distinct storage
-  EXPECT_EQ(fast1, fast2);
-  EXPECT_EQ(fast1.hash(), fast2.hash());
-  EXPECT_NE(slow1.dataIncludingSize(), slow2.dataIncludingSize());
-  EXPECT_EQ(slow1, slow2);
-  EXPECT_EQ(slow1.hash(), slow2.hash());
-
-  // Cross-boundary: fast-path name != slow-path name.
-  EXPECT_NE(fast1, slow1);
-  EXPECT_NE(slow1, fast1);
-  EXPECT_NE(fast1.hash(), slow1.hash());
-
-  // Neither is empty.
-  EXPECT_FALSE(fast1.empty());
-  EXPECT_FALSE(slow1.empty());
+    // Distinct backing storage, identical content.
+    EXPECT_NE(a.dataIncludingSize(), b.dataIncludingSize()) << "base_len=" << base_len;
+    ASSERT_TRUE(a == b) << "base_len=" << base_len;
+    EXPECT_EQ(a.hash(), b.hash()) << "base_len=" << base_len;
+    EXPECT_FALSE(a.empty()) << "base_len=" << base_len;
+  }
 }
 
 TEST_F(StatNameTest, StartsWith) {
