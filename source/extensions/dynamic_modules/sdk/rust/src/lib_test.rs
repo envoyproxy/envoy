@@ -3080,26 +3080,12 @@ fn test_cert_validator_config_new_and_destroy() {
     }
   }
 
-  NEW_CERT_VALIDATOR_CONFIG_FUNCTION.get_or_init(|| {
+  let new_config_fn: NewCertValidatorConfigFunction =
     |_name: &str, _config: &[u8]| -> Option<Box<dyn cert_validator::CertValidatorConfig>> {
       Some(Box::new(TestCertValidatorConfig))
-    }
-  });
+    };
 
-  let name = "test";
-  let config = b"config";
-  let name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
-    ptr: name.as_ptr() as *const _,
-    length: name.len(),
-  };
-  let config_buf = abi::envoy_dynamic_module_type_envoy_buffer {
-    ptr: config.as_ptr() as *const _,
-    length: config.len(),
-  };
-
-  let config_ptr = unsafe {
-    envoy_dynamic_module_on_cert_validator_config_new(std::ptr::null_mut(), name_buf, config_buf)
-  };
+  let config_ptr = cert_validator::init_cert_validator_config("test", b"config", &new_config_fn);
   assert!(!config_ptr.is_null());
 
   unsafe {
@@ -5470,4 +5456,73 @@ fn test_bootstrap_extension_listener_lifecycle_default_noop() {
   unsafe {
     envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
   }
+}
+
+// =============================================================================
+// MockEnvoyNetworkFilter Tests
+// =============================================================================
+
+#[test]
+fn test_mock_envoy_network_filter_on_new_connection() {
+  struct TestNetworkFilter;
+  impl NetworkFilter<network::MockEnvoyNetworkFilter> for TestNetworkFilter {
+    fn on_new_connection(
+      &mut self,
+      envoy_filter: &mut network::MockEnvoyNetworkFilter,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      assert_eq!(envoy_filter.get_connection_id(), 42);
+      assert_eq!(
+        envoy_filter.get_remote_address(),
+        ("10.0.0.1".to_string(), 1234)
+      );
+      abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+    }
+  }
+
+  let mut mock = network::MockEnvoyNetworkFilter::new();
+  mock.expect_get_connection_id().returning(|| 42);
+  mock
+    .expect_get_remote_address()
+    .returning(|| ("10.0.0.1".to_string(), 1234));
+
+  let mut filter = TestNetworkFilter;
+  assert_eq!(
+    filter.on_new_connection(&mut mock),
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  );
+}
+
+#[test]
+fn test_mock_envoy_network_filter_on_read() {
+  struct TestNetworkFilter;
+  impl NetworkFilter<network::MockEnvoyNetworkFilter> for TestNetworkFilter {
+    fn on_read(
+      &mut self,
+      envoy_filter: &mut network::MockEnvoyNetworkFilter,
+      data_length: usize,
+      _end_stream: bool,
+    ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+      envoy_filter.drain_read_buffer(data_length);
+      envoy_filter.append_write_buffer(b"response");
+      abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+    }
+  }
+
+  let mut mock = network::MockEnvoyNetworkFilter::new();
+  mock
+    .expect_drain_read_buffer()
+    .with(mockall::predicate::eq(100))
+    .times(1)
+    .returning(|_| ());
+  mock
+    .expect_append_write_buffer()
+    .with(mockall::predicate::eq(b"response".as_slice()))
+    .times(1)
+    .returning(|_| ());
+
+  let mut filter = TestNetworkFilter;
+  assert_eq!(
+    filter.on_read(&mut mock, 100, false),
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  );
 }

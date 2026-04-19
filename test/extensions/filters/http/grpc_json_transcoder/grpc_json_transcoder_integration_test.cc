@@ -1299,7 +1299,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UTF8) {
       false);
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidationGrpcContentType) {
   HttpIntegrationTest::initialize();
 
   // Transcoding does not occur from a request with the gRPC content type.
@@ -1315,7 +1315,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
       Http::TestResponseHeaderMapImpl{
           {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "", true, false, R"({ "theme" : "Children")");
+}
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidationUnknownPath) {
+  HttpIntegrationTest::initialize();
   // Transcoding does not occur when unknown path is called.
   // HTTP Request to is passed directly to gRPC backend.
   // gRPC response is passed directly to HTTP client.
@@ -1328,7 +1331,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
       Http::TestResponseHeaderMapImpl{
           {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "", true, false, R"({ "theme" : "Children")");
+}
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidationUnknownQueryParam) {
+  HttpIntegrationTest::initialize();
   // Transcoding does not occur when unknown query param is included.
   // HTTP Request to is passed directly to gRPC backend.
   // gRPC response is passed directly to HTTP client.
