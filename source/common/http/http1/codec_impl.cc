@@ -1206,8 +1206,12 @@ Envoy::StatusOr<CallbackResult> ServerConnectionImpl::onHeadersCompleteBase() {
     auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
 
-    if (!handling_upgrade_ && headers->Connection()) {
-      // If we fail to sanitize the request, return a 400 to the client
+    if (headers->Connection()) {
+      // Sanitize Connection-nominated headers for all requests, including
+      // upgrades. Per RFC 7230 Section 6.1, a proxy MUST remove any header
+      // listed in the Connection header before forwarding. Previously, this
+      // was skipped for upgrade requests (handling_upgrade_), allowing
+      // attacker-controlled headers to be smuggled to the upstream.
       if (!Utility::sanitizeConnectionHeader(*headers)) {
         absl::string_view header_value = headers->getConnectionValue();
         ENVOY_CONN_LOG(debug, "Invalid nominated headers in Connection: {}", connection_,
