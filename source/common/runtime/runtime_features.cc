@@ -184,6 +184,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 
+// TODO(jwendell): Flip to true to make gRPC timeout responses return DEADLINE_EXCEEDED
+// instead of UNAVAILABLE.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_grpc_timeout_returns_deadline_exceeded);
+
 // TODO(yanavlasov): Flip to true after prod testing.
 // Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
 // before downstream.

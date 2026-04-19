@@ -159,6 +159,14 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: grpc
+  change: |
+    Fixed the router to return ``DEADLINE_EXCEEDED`` (gRPC status 4) instead of ``UNAVAILABLE`` (gRPC
+    status 14) when the router itself enforces a gRPC request timeout. Previously, the router sent an
+    HTTP 504 local reply which was mapped to ``UNAVAILABLE`` via the standard HTTP-to-gRPC status mapping,
+    causing clients to incorrectly retry requests that had already timed out. This behavior is disabled
+    by default and can be enabled by setting the runtime guard
+    ``envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded`` to ``true``.
 - area: quic
   change: |
     Fixed HTTP/3 client connection pool to handle early data request correctly with asynchronous certificates

@@ -26,6 +26,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/functional/function_ref.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -541,6 +542,15 @@ public:
 
   // Returns the priority set that this load balancer subscribes to for host membership updates.
   const Upstream::PrioritySet& memberUpdatePrioritySet() const { return priority_set_; }
+
+  /**
+   * Looks up `lb` in the process-wide registry of live instances. Returns true and invokes `f`
+   * with the instance under the registry lock when found, false otherwise. Used by the async
+   * host selection completion ABI callback, which receives a raw pointer from the module that
+   * may outlive the load balancer.
+   */
+  static bool withActiveInstance(const DynamicModuleLoadBalancer* lb,
+                                 absl::FunctionRef<void(const DynamicModuleLoadBalancer&)> f);
 
 private:
   const DynamicModuleClusterHandleSharedPtr handle_;

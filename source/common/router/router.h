@@ -597,7 +597,8 @@ private:
   // headers (e.g. due to a reset). Handles recording stats and responding
   // downstream if appropriate.
   void onUpstreamAbort(Http::Code code, StreamInfo::CoreResponseFlag response_flag,
-                       absl::string_view body, bool dropped, absl::string_view details);
+                       absl::string_view body, bool dropped, absl::string_view details,
+                       absl::optional<Grpc::Status::GrpcStatus> grpc_status = absl::nullopt);
   void onUpstreamComplete(UpstreamRequest& upstream_request);
   // Reset all in-flight upstream requests.
   void resetAll();
