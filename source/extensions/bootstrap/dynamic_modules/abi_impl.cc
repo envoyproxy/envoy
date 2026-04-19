@@ -492,9 +492,10 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
   using namespace Envoy;
-  // The underlying `Event::Timer` deregisters from the dispatcher's timer list in its destructor,
-  // which is only safe on the dispatcher thread. Callers that hold the timer handle from a context
-  // that may be dropped off the main thread must route deletion through the scheduler ABI.
+  // The underlying `Event::Timer` `deregisters` from the dispatcher's timer list in its
+  // destructor, which is only safe on the dispatcher thread. Callers that hold the timer handle
+  // from a context that may be dropped off the main thread must route deletion through the
+  // scheduler ABI.
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   delete static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
 }

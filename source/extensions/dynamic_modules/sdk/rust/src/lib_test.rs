@@ -5471,7 +5471,10 @@ fn test_mock_envoy_network_filter_on_new_connection() {
       envoy_filter: &mut network::MockEnvoyNetworkFilter,
     ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
       assert_eq!(envoy_filter.get_connection_id(), 42);
-      assert_eq!(envoy_filter.get_remote_address(), ("10.0.0.1".to_string(), 1234));
+      assert_eq!(
+        envoy_filter.get_remote_address(),
+        ("10.0.0.1".to_string(), 1234)
+      );
       abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
     }
   }
