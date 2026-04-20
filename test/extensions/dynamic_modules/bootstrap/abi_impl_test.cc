@@ -156,6 +156,32 @@ TEST_F(BootstrapAbiImplTest, OnScheduledAfterConfigDestroyed) {
   captured_cb();
 }
 
+// `commit` must not touch the dispatcher once the owning config has been destroyed. Exercises
+// the validate-mode teardown race where a background thread may call `commit` after the main
+// thread dispatcher has already been released.
+TEST_F(BootstrapAbiImplTest, CommitAfterConfigDestroyedDoesNotTouchDispatcher) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  auto* scheduler_ptr = envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
+      config.value()->thisAsVoidPtr());
+  EXPECT_NE(scheduler_ptr, nullptr);
+
+  config.value().reset();
+
+  EXPECT_CALL(dispatcher_, post(testing::_)).Times(0);
+
+  envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, 42);
+
+  envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(scheduler_ptr);
+}
+
 // Test calling onScheduled directly.
 TEST_F(BootstrapAbiImplTest, OnScheduledDirect) {
   auto dynamic_module =

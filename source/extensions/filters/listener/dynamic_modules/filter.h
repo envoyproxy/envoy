@@ -152,14 +152,23 @@ private:
  */
 class DynamicModuleListenerFilterScheduler {
 public:
-  DynamicModuleListenerFilterScheduler(DynamicModuleListenerFilterWeakPtr filter,
-                                       Event::Dispatcher& dispatcher)
-      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleListenerFilterScheduler(DynamicModuleListenerFilterWeakPtr filter)
+      : filter_(std::move(filter)) {}
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([filter = filter_, event_id]() {
-      if (DynamicModuleListenerFilterSharedPtr filter_shared = filter.lock()) {
-        filter_shared->onScheduled(event_id);
+    // Lock the filter so the dispatcher reference obtained via its callbacks stays valid across
+    // `post`.
+    auto filter_shared = filter_.lock();
+    if (!filter_shared) {
+      return;
+    }
+    Event::Dispatcher* dispatcher = filter_shared->dispatcher();
+    if (dispatcher == nullptr) {
+      return;
+    }
+    dispatcher->post([filter = filter_, event_id]() {
+      if (DynamicModuleListenerFilterSharedPtr fs = filter.lock()) {
+        fs->onScheduled(event_id);
       }
     });
   }
@@ -168,8 +177,6 @@ private:
   // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the filter.
   DynamicModuleListenerFilterWeakPtr filter_;
-  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
-  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace ListenerFilters
