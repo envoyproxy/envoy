@@ -115,11 +115,10 @@ BAZEL_BUILD_OPTIONS=(
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
-
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
   "--test_env=HEAPCHECK=")
 
-if [[ -z "${ENVOY_RBE}" ]]; then
+if [[ "${BAZEL_BUILD_EXTRA_OPTIONS[*]}" != *"--config=rbe"* ]]; then
     BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
     echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
 fi
