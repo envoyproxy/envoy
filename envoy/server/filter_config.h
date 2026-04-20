@@ -157,6 +157,33 @@ public:
   virtual ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() { return nullptr; }
 };
 
+/**
+ * Base class for all HttpProtocolOptionsConfig factories.
+ */
+class HostHttpProtocolOptionsConfigFactory : public ProtocolOptionsFactory {
+public:
+  ~HostHttpProtocolOptionsConfigFactory() override = default;
+
+
+  /**
+   * @return a specific implementation of the HostHttpProtocolOptionsConfig configured for the
+   *         cluster.
+   */
+  virtual Upstream::HostHttpProtocolOptionsConfigConstSharedPtr createHostHttpProtocolOptionsConfig(
+      const Protobuf::Message& config,
+      Server::Configuration::ProtocolOptionsFactoryContext& context) const PURE;
+
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createProtocolOptionsConfig(
+      const Protobuf::Message& config,
+      Server::Configuration::ProtocolOptionsFactoryContext& context) override {
+    return createHostHttpProtocolOptionsConfig(config, context);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return createEmptyProtocolOptionsProto();
+  }
+};
+
 using FilterDependenciesPtr =
     std::unique_ptr<envoy::extensions::filters::common::dependency::v3::FilterDependencies>;
 using MatchingRequirementsPtr =

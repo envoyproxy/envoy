@@ -549,21 +549,21 @@ TEST_F(Http2ConnPoolImplTest, CloseExcessMixedMultiplexing) {
   // 3  2  6
   // Connection capacity is min(max requests per connection, max concurrent streams).
   // Use maxRequestsPerConnection here since max requests is tested above.
-  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(3));
-  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(3));
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection(_)).WillOnce(Return(3));
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection(_)).WillOnce(Return(3));
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   ActiveTestRequest r2(*this, 0, false);
   ActiveTestRequest r3(*this, 0, false);
 
-  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(2));
-  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(2));
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection(_)).WillOnce(Return(2));
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection(_)).WillOnce(Return(2));
   expectClientCreate();
   ActiveTestRequest r4(*this, 0, false);
   ActiveTestRequest r5(*this, 0, false);
 
-  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(6));
-  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(6));
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection(_)).WillOnce(Return(6));
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection(_)).WillOnce(Return(6));
   expectClientCreate();
   ActiveTestRequest r6(*this, 0, false);
 
@@ -1944,10 +1944,10 @@ class InitialStreamsLimitTest : public Http2ConnPoolImplTest {
 protected:
   void SetUp() override {
     mock_host_->cluster_.http2_options_.mutable_max_concurrent_streams()->set_value(2000);
-    EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection)
+    EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection(_))
         .Times(AnyNumber())
         .WillRepeatedly(Return(4000));
-    EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection()).WillRepeatedly(Return(8000));
+    EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection(_)).WillRepeatedly(Return(8000));
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -1983,7 +1983,7 @@ TEST_F(InitialStreamsLimitTest, InitialStreamsLimitRespectCache) {
 TEST_F(InitialStreamsLimitTest, InitialStreamsLimitRespectMaxRequests) {
   // Max requests per connection is an upper bound.
   EXPECT_CALL(*cache_, getConcurrentStreams(_)).WillOnce(Return(500));
-  EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection)
+  EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection(_))
       .Times(AnyNumber())
       .WillRepeatedly(Return(100));
   EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));

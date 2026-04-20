@@ -885,6 +885,8 @@ public:
   const HttpProtocolOptionsConfig& httpProtocolOptions() const override {
     return *http_protocol_options_;
   }
+  const HttpProtocolOptionsConfig&
+  httpProtocolOptions(const HostDescription& host) const override;
   absl::Status configureLbPolicies(const envoy::config::cluster::v3::Cluster& config,
                                    Server::Configuration::ServerFactoryContext& context);
   ProtocolOptionsConfigConstSharedPtr
@@ -906,6 +908,7 @@ public:
   }
   bool maintenanceMode() const override;
   uint32_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint32_t maxRequestsPerConnection(const HostDescription& host) const override;
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   absl::optional<uint16_t> maxResponseHeadersKb() const override {
     return max_response_headers_kb_;
@@ -1035,6 +1038,8 @@ protected:
   getRetryBudgetParams(const envoy::config::cluster::v3::CircuitBreakers::Thresholds& thresholds);
 
 private:
+  absl::StatusOr<HostHttpProtocolOptionsConfigConstSharedPtr> hostHttpOptions() const;
+
   std::shared_ptr<UpstreamNetworkFilterConfigProviderManager>
   createSingletonUpstreamNetworkFilterConfigProviderManager(
       Server::Configuration::ServerFactoryContext& context);
@@ -1072,6 +1077,7 @@ private:
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
+  const HostHttpProtocolOptionsConfigConstSharedPtr host_http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint32_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;

@@ -1,6 +1,7 @@
 #include "source/common/http/conn_pool_base.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/config/metadata.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -221,7 +222,9 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(
     uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
     OptRef<Upstream::Host::CreateConnectionData> data)
     : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
+          parent,
+          maxStreamsPerConnection(
+              parent.host()->cluster().maxRequestsPerConnection(*parent.host())),
           effective_concurrent_streams, max_configured_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);

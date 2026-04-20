@@ -103,12 +103,17 @@ createProtocolOptionsConfig(const std::string& name, const Protobuf::Any& typed_
     factory =
         Registry::FactoryRegistry<Server::Configuration::ProtocolOptionsFactory>::getFactory(name);
   }
+  if (factory == nullptr) {
+    const std::string type{TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url())};
+    factory =
+        Registry::FactoryRegistry<Server::Configuration::HostHttpProtocolOptionsConfigFactory>::getFactoryByType(type);
+  }
 
   if (factory == nullptr) {
     return absl::InvalidArgumentError(
         fmt::format("Didn't find a registered network or http filter or protocol "
-                    "options implementation for name: '{}'",
-                    name));
+                    "options implementation for name '{}' or type '{}'",
+                    name, typed_config.type_url()));
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyProtocolOptionsProto();
@@ -1137,6 +1142,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context),
           std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>)),
+      host_http_protocol_options_(THROW_OR_RETURN_VALUE(hostHttpOptions(), HostHttpProtocolOptionsConfigConstSharedPtr)),
       tcp_protocol_options_(extensionProtocolOptionsTyped<TcpProtocolOptionsConfigImpl>(
           "envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions")),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -1736,6 +1742,27 @@ bool ClusterInfoImpl::maintenanceMode() const {
   return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
 }
 
+uint32_t ClusterInfoImpl::maxRequestsPerConnection(const HostDescription& host) const {
+  if (!host_http_protocol_options_ || !host.metadata()) {
+    return maxRequestsPerConnection();
+  }
+  const HttpProtocolOptionsConfig& options = httpProtocolOptions(host);
+  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(options.commonHttpProtocolOptions(),
+                                         max_requests_per_connection, maxRequestsPerConnection());
+}
+
+const HttpProtocolOptionsConfig&
+ClusterInfoImpl::httpProtocolOptions(const HostDescription& host) const {
+  if (!host_http_protocol_options_ || !host.metadata()) {
+    return httpProtocolOptions();
+  }
+  auto opts = host_http_protocol_options_->get(host);
+  if (opts) {
+    return *opts;
+  }
+  return httpProtocolOptions();
+}
+
 ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) const {
   ASSERT(enumToInt(priority) < resource_managers_.managers_.size());
   return *resource_managers_.managers_[enumToInt(priority)];
@@ -2164,6 +2191,24 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
       ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_stat_name,
                                                     track_remaining, circuit_breakers_stat_names_),
       budget_percent, min_retry_concurrency);
+}
+
+absl::StatusOr<HostHttpProtocolOptionsConfigConstSharedPtr>
+ClusterInfoImpl::hostHttpOptions() const {
+  HostHttpProtocolOptionsConfigConstSharedPtr host_http_options;
+  for (const auto& [name, options] : extension_protocol_options_) {
+    HostHttpProtocolOptionsConfigConstSharedPtr opt =
+        std::dynamic_pointer_cast<const HostHttpProtocolOptionsConfig>(options);
+    if (!opt) {
+      continue;
+    }
+    if (host_http_options) {
+      return absl::InvalidArgumentError(
+          fmt::format("Duplicate upstream host http options provided"));
+    }
+    host_http_options = opt;
+  }
+  return host_http_options;
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
