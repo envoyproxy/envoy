@@ -1,12 +1,24 @@
 # Envoy setec
 
+## High level workflow in setec
+
+Security fixes are sensitive and their development and deployment have a well defined process in Envoy and lead to quarterly security releases which are shipped to vendors and merged back into envoyproxy.
+
+The high level flow is as follows:
+
+1. Ask the current [release manager](https://github.com/envoyproxy/envoy/blob/main/RELEASES.md#release-management) to update `envoy/main` and `patches/main` to mirror latest `envoyproxy/main` when you're ready to start working on a fix
+2. Create a branch from `patches/main` where you'll develop the fix
+3. Create a PR for this fix against `patches/main` and merge it. This fix should be a single commit.
+4. < time elapses, more fixes get merged into patches/main over the quarter-long cycle >
+5. When it's time for patch release, we'll create a stack PR for each branch and cherry-pick all the fixes merged during the cycle.
+6. The tarball of patches produced by step 5, will be distributed to our vendors as prior warning and for testing. When the embargo expires, we reveal the cve/advisories and immediately make prs in the envoy repo with the patch stacks
+
 ## Setec branches
 
 ### The `main` branch (**This branch is CLOSED!**)
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/envoyproxy/envoy/badge)](https://api.securityscorecards.dev/projects/github.com/envoyproxy/envoy)
-[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=main)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=main)
 [![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
 [![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
 
@@ -18,22 +30,13 @@ Do not create Pull Requests -> `main` or update it other than to rebase to Envoy
 
 These contain the mirrors of the Envoy `main` and release branches.
 
-These are automatically updated daily (currently by @phlax) and should not be changed manually.
+These are manually updated on-demand by the [release manager](https://github.com/envoyproxy/envoy/blob/main/RELEASES.md#release-management). If they are out of date, ask the release manager to update them.
 
 Do not create Pull Requests against these branches - PR against the "patch" branches.
 
 The current mirror branches are:
 
 - [envoy/main](https://github.com/envoyproxy/envoy-setec/tree/envoy/main)
-  [![Azure Pipelines](https://dev.azure.com/cncf/envoy-security/_apis/build/status/9?branchName=envoy/main)](https://dev.azure.com/cncf/envoy-security/_build/latest?definitionId=9&branchName=envoy/main)
-- [envoy/1.25](https://github.com/envoyproxy/envoy-setec/tree/envoy/1.25)
-  [![Azure Pipelines](https://dev.azure.com/cncf/envoy-security/_apis/build/status/9?branchName=envoy/1.25)](https://dev.azure.com/cncf/envoy-security/_build/latest?definitionId=9&branchName=envoy/1.25)
-- [envoy/1.24](https://github.com/envoyproxy/envoy-setec/tree/envoy/1.24)
-  [![Azure Pipelines](https://dev.azure.com/cncf/envoy-security/_apis/build/status/9?branchName=envoy/1.24)](https://dev.azure.com/cncf/envoy-security/_build/latest?definitionId=9&branchName=envoy/1.24)
-- [envoy/1.23](https://github.com/envoyproxy/envoy-setec/tree/envoy/1.23)
-  [![Azure Pipelines](https://dev.azure.com/cncf/envoy-security/_apis/build/status/9?branchName=envoy/1.23)](https://dev.azure.com/cncf/envoy-security/_build/latest?definitionId=9&branchName=envoy/1.23)
-- [envoy/1.22](https://github.com/envoyproxy/envoy-setec/tree/envoy/1.22)
-  [![Azure Pipelines](https://dev.azure.com/cncf/envoy-security/_apis/build/status/9?branchName=envoy/1.22)](https://dev.azure.com/cncf/envoy-security/_build/latest?definitionId=9&branchName=envoy/1.22)
 
 Ideally, these branches should never fail as they are mirroring upstream Envoy branches, but in reality
 due to flakes and breakages, failure can happen.
@@ -44,11 +47,8 @@ Checking the CI for these branches can be helpful as baseline information about 
 
 These branches carry the current patches that will be published.
 
-The branches are rebased against Envoy release branches (ie `main`, `release/v1.25`, etc) each day.
+The branches are rebased against Envoy release branches (ie `main`, `release/v1.25`, etc) on demand.
 If merge/rebase fails manual intervention is required (see below).
-
-The branches are kept as Pull Requests so it can be seen what they will change when applied, and
-the patches can be published to the embargo list before publication
 
 You should open Pull Requests against these branches (in the first instance
 [branch: patches/main](https://github.com/envoyproxy/envoy-setec/tree/patches/main),
@@ -59,38 +59,7 @@ Currently the patch branch PRs are:
 #### main:
 Branch: [patches/main](https://github.com/envoyproxy/envoy-setec/tree/patches/main)
 
-Patch PR: https://github.com/envoyproxy/envoy-setec/pull/1298
-
-[![Azure Pipelines](https://dev.azure.com/cncf/envoy-security/_apis/build/status/9?branchName=patches/main)](https://dev.azure.com/cncf/envoy-security/_build/latest?definitionId=9&branchName=patches/main)
-
-#### 1.26
-Branch: [patches/1.26](https://github.com/envoyproxy/envoy-setec/tree/patches/1.26)
-
-Patch PR: https://github.com/envoyproxy/envoy-setec/pull/1302
-
-CI:[![Azure Pipelines](https://dev.azure.com/cncf/envoy-security/_apis/build/status/9?branchName=patches/1.26)](https://dev.azure.com/cncf/envoy-security/_build/latest?definitionId=9&branchName=patches/1.26)
-
-#### 1.25
-Branch: [patches/1.25](https://github.com/envoyproxy/envoy-setec/tree/patches/1.25)
-
-Patch PR: https://github.com/envoyproxy/envoy-setec/pull/1302
-
-CI:[![Azure Pipelines](https://dev.azure.com/cncf/envoy-security/_apis/build/status/9?branchName=patches/1.25)](https://dev.azure.com/cncf/envoy-security/_build/latest?definitionId=9&branchName=patches/1.25)
-
-#### 1.24
-Branch: [patches/1.24](https://github.com/envoyproxy/envoy-setec/tree/patches/1.24)
-
-Patch PR: https://github.com/envoyproxy/envoy-setec/pull/1301
-
-[![Azure Pipelines](https://dev.azure.com/cncf/envoy-security/_apis/build/status/9?branchName=patches/1.24)](https://dev.azure.com/cncf/envoy-security/_build/latest?definitionId=9&branchName=patches/1.24)
-
-
-#### 1.23
-Branch: [patches/1,23](https://github.com/envoyproxy/envoy-setec/tree/patches/1.23)
-
-Patch PR: https://github.com/envoyproxy/envoy-setec/pull/1300
-
-[![Azure Pipelines](https://dev.azure.com/cncf/envoy-security/_apis/build/status/9?branchName=patches/1.23)](https://dev.azure.com/cncf/envoy-security/_build/latest?definitionId=9&branchName=patches/1.23)
+Patch PR: [Find the open patch PRs here](https://github.com/envoyproxy/envoy-setec/pulls?q=is%3Apr+is%3Aopen+label%3Apatch%3Abranch)
 
 ### Resolving conflicts with upstream
 
