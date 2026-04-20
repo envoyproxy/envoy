@@ -1694,7 +1694,7 @@ envoy_cc_test(
     name = "websocket_integration_test",
     srcs = ["websocket_integration_test.cc"],
     rbe_pool = "linux_x64_small",
-    shard_count = 4,
+    shard_count = 8,
     deps = [
         ":http_protocol_integration_lib",
         ":websocket_integration_test_lib",
