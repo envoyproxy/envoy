@@ -1075,7 +1075,10 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtl) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_http1_total")->value());
 
-  test_server_->waitForCounterGe("dns_cache.foo.dns_query_failure", 1);
+  // Wait for a re-resolve to have been initiated. Use `dns_query_attempt` rather than
+  // `dns_query_failure` because with a short `dns_query_timeout` the query may be cancelled
+  // by the timeout timer and increment `dns_query_timeout` instead of `dns_query_failure`.
+  test_server_->waitForCounterGe("dns_cache.foo.dns_query_attempt", 1);
 
   // Wait for the host to be removed due to short TTL
   test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
@@ -1107,7 +1110,8 @@ TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResFail) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
-  test_server_->waitForCounterGe("dns_cache.foo.dns_query_failure", 1);
+  // See note in UseCacheFileShortTtl re: using dns_query_attempt as the sync barrier.
+  test_server_->waitForCounterGe("dns_cache.foo.dns_query_attempt", 1);
 
   // When the TTL is hit, the host will be removed from the DNS cache. This
   // won't break the outstanding connection.
