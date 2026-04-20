@@ -16,6 +16,7 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -1140,6 +1141,26 @@ TEST_F(DynamicModuleClusterTest, OnScheduledAfterClusterDestroyed) {
   captured_cb();
 }
 
+// `commit` must not touch the dispatcher once the owning cluster has been destroyed.
+TEST_F(DynamicModuleClusterTest, CommitAfterClusterDestroyedDoesNotTouchDispatcher) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto* scheduler_ptr = envoy_dynamic_module_callback_cluster_scheduler_new(cluster.get());
+  EXPECT_NE(scheduler_ptr, nullptr);
+
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+
+  envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 42);
+
+  envoy_dynamic_module_callback_cluster_scheduler_delete(scheduler_ptr);
+}
+
 // Test calling onScheduled directly.
 TEST_F(DynamicModuleClusterTest, OnScheduledDirect) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
@@ -1165,6 +1186,36 @@ TEST_F(DynamicModuleClusterTest, HandleDestructorDispatchesToMainThread) {
   // The handle destructor should post to the dispatcher. The mock dispatcher will execute
   // the posted callback inline.
   handle.reset();
+}
+
+// Covers that a worker-thread handle destruction posts the full teardown to the main dispatcher.
+TEST_F(DynamicModuleClusterTest, HandleDestructorFromWorkerThreadDefersAllTeardownToMainThread) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // The internal handle held by the thread-aware load balancer also posts on its main-thread
+  // destruction when `result` is torn down, so allow repeated posts and capture the first one
+  // from the worker-thread handle destruction.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .WillRepeatedly(testing::Invoke([&](Event::PostCb cb) {
+        if (!captured_cb) {
+          captured_cb = std::move(cb);
+        }
+      }));
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto& thread_factory = Thread::threadFactoryForTest();
+  auto thread = thread_factory.createThread([&]() { handle.reset(); });
+  thread->join();
+
+  ASSERT_TRUE(captured_cb);
+  EXPECT_NE(cluster.use_count(), 1);
+  captured_cb();
+  cluster.reset();
+  result = absl::InternalError("cleanup");
 }
 
 // Test that the server_initialized lifecycle callback is invoked.
@@ -2159,6 +2210,46 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteEmptyDetails) {
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(lb_envoy_ptr, context_ptr,
                                                                          nullptr, {nullptr, 0});
+}
+
+// Covers that `async_host_selection_complete` drops the event when the owning load balancer has
+// already been destroyed.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteAfterLbDestroyedDropsEvent) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  void* raw_lb_ptr = lb_instance.get();
+
+  lb_instance.reset();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _)).Times(0);
+
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      raw_lb_ptr, static_cast<void*>(&context), nullptr, {"dropped", 7});
+}
+
+// Covers pointer reuse: a new load balancer allocated at the same address as a freed one must
+// still be found by the registry.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteRegistersFreshInstancePerLb) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+
+  auto first = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  first.reset();
+  auto second = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  bool found = DynamicModuleLoadBalancer::withActiveInstance(
+      second.get(), [](const DynamicModuleLoadBalancer&) {});
+  EXPECT_TRUE(found);
 }
 
 // =============================================================================

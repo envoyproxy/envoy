@@ -162,14 +162,16 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
 
 /// The trait that represents the Envoy network filter.
 /// This is used in [`NetworkFilter`] to interact with the underlying Envoy network filter object.
+#[automock]
+#[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyNetworkFilter {
   /// Get the read buffer chunks. This is valid after the first on_read callback for the lifetime
   /// of the connection.
-  fn get_read_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer<'_>>, usize);
+  fn get_read_buffer_chunks<'a>(&'a mut self) -> (Vec<EnvoyBuffer<'a>>, usize);
 
   /// Get the write buffer chunks. This is valid after the first on_write callback for the lifetime
   /// of the connection.
-  fn get_write_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer<'_>>, usize);
+  fn get_write_buffer_chunks<'a>(&'a mut self) -> (Vec<EnvoyBuffer<'a>>, usize);
 
   /// Drain bytes from the beginning of the read buffer.
   fn drain_read_buffer(&mut self, length: usize);
@@ -228,23 +230,23 @@ pub trait EnvoyNetworkFilter {
 
   /// Get the requested server name (SNI).
   /// Returns None if SNI is not available.
-  fn get_requested_server_name(&self) -> Option<EnvoyBuffer<'_>>;
+  fn get_requested_server_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the direct remote (client) address and port without considering proxy protocol.
   /// Returns None if the address is not available or not an IP address.
-  fn get_direct_remote_address(&self) -> Option<(EnvoyBuffer<'_>, u32)>;
+  fn get_direct_remote_address<'a>(&'a self) -> Option<(EnvoyBuffer<'a>, u32)>;
 
   /// Get the SSL URI SANs from the peer certificate.
   /// Returns an empty vector if the connection is not SSL or no URI SANs are present.
-  fn get_ssl_uri_sans(&self) -> Vec<EnvoyBuffer<'_>>;
+  fn get_ssl_uri_sans<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
 
   /// Get the SSL DNS SANs from the peer certificate.
   /// Returns an empty vector if the connection is not SSL or no DNS SANs are present.
-  fn get_ssl_dns_sans(&self) -> Vec<EnvoyBuffer<'_>>;
+  fn get_ssl_dns_sans<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
 
   /// Get the SSL subject from the peer certificate.
   /// Returns None if the connection is not SSL or subject is not available.
-  fn get_ssl_subject(&self) -> Option<EnvoyBuffer<'_>>;
+  fn get_ssl_subject<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Set the filter state with the given key and byte value.
   /// Returns true if the operation is successful.

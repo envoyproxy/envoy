@@ -216,21 +216,25 @@ private:
  */
 class DynamicModuleListenerFilterConfigScheduler {
 public:
-  DynamicModuleListenerFilterConfigScheduler(
-      std::weak_ptr<DynamicModuleListenerFilterConfig> config, Event::Dispatcher& dispatcher)
-      : config_(std::move(config)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleListenerFilterConfigScheduler(
+      std::weak_ptr<DynamicModuleListenerFilterConfig> config)
+      : config_(std::move(config)) {}
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleListenerFilterConfig> config_shared = config.lock()) {
-        config_shared->onScheduled(event_id);
+    // Lock the config so its dispatcher member stays valid across `post`.
+    auto config_shared = config_.lock();
+    if (!config_shared) {
+      return;
+    }
+    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleListenerFilterConfig> cs = config.lock()) {
+        cs->onScheduled(event_id);
       }
     });
   }
 
 private:
   std::weak_ptr<DynamicModuleListenerFilterConfig> config_;
-  Event::Dispatcher& dispatcher_;
 };
 
 /**

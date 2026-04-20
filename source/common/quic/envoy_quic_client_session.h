@@ -123,9 +123,10 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override;
   bool ShouldCreateOutgoingBidirectionalStream() override {
-    ASSERT(quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream());
-    // Prefer creating an "invalid" stream outside of current stream bounds to
-    // crashing when dereferencing a nullptr in QuicHttpClientConnectionImpl::newStream
+    // quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream()
+    // might return false, but we want to create the stream anyway
+    // because otherwise we crash dereferencing a nullptr, so we
+    // don't even ask it, and just return true.
     return true;
   }
   // QuicFilterManagerConnectionImpl

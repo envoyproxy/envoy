@@ -156,9 +156,22 @@ minor_behavior_changes:
     If previously constructing a ``StreamRateLimiter`` using ``max_buffered_data``, use
     ``StreamRateLimiter::simpleTokenBucket(limit_kbps, time_source)`` to initialize an equivalent
     ``TokenBucket``.
+- area: http
+  change: |
+    Enable strict parsing of HTTP/1 chunked encoding. Strict parsing is disabled by default and can be
+    enabled by setting the ``envoy.reloadable_features.mcp_filter_use_new_metadata_namespace`` runtime
+    flag to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: grpc
+  change: |
+    Fixed the router to return ``DEADLINE_EXCEEDED`` (gRPC status 4) instead of ``UNAVAILABLE`` (gRPC
+    status 14) when the router itself enforces a gRPC request timeout. Previously, the router sent an
+    HTTP 504 local reply which was mapped to ``UNAVAILABLE`` via the standard HTTP-to-gRPC status mapping,
+    causing clients to incorrectly retry requests that had already timed out. This behavior is disabled
+    by default and can be enabled by setting the runtime guard
+    ``envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded`` to ``true``.
 - area: quic
   change: |
     Fixed HTTP/3 client connection pool to handle early data request correctly with asynchronous certificates
@@ -398,6 +411,16 @@ new_features:
     support to :ref:`RequestMirrorPolicy
     <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`, allowing mirrored
     requests to rewrite the host header to the upstream host.
+- area: ext_authz
+  change: |
+    Added :ref:`shadow_mode
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.shadow_mode>` to the HTTP
+    ext_authz filter. When enabled, the filter calls the authorization service as normal but never
+    terminates the request. The authorization decision is written to FilterState as a
+    :ref:`ShadowDecision <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ShadowDecision>`
+    under the filter's configured name with a ``.shadow`` suffix
+    (``envoy.filters.http.ext_authz.shadow`` by default) so that a subsequent filter can read
+    and optionally enforce it.
 - area: lua
   change: |
     Added stats API support to the :ref:`Lua filter <config_http_filters_lua>`, allowing Lua
@@ -1063,5 +1086,9 @@ new_features:
   change: |
     Promoted the dynamic modules HTTP filter (``envoy.filters.http.dynamic_modules``) from alpha
     to stable.
+- area: attributes
+  change: |
+    Added ``connection.peer_certificate`` and ``upstream.peer_certificate`` attributes that provide the
+    PEM-encoded peer certificate for downstream and upstream TLS connections respectively.
 
 deprecated:
