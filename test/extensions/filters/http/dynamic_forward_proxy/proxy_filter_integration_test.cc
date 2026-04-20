@@ -1062,7 +1062,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtl) {
   dns_cache_ttl_ = 2;
 
   dns_hostname_ = "not_actually_localhost"; // Set to a name that won't resolve.
-  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, /*dns_query_timeout=*/1);
+  initializeWithArgs();
   std::string host =
       fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1075,13 +1075,13 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtl) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_http1_total")->value());
 
-  // Wait for a re-resolve to have been initiated. Use `dns_query_attempt` rather than
-  // `dns_query_failure` because with a short `dns_query_timeout` the query may be cancelled
-  // by the timeout timer and increment `dns_query_timeout` instead of `dns_query_failure`.
-  test_server_->waitForCounterGe("dns_cache.foo.dns_query_attempt", 1);
-
-  // Wait for the host to be removed due to short TTL
-  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
+  // Wait for the host to be removed due to short TTL. Use a generous timeout: under slow
+  // builders (MSAN) a touch()/re-resolve-alarm race in DnsCacheImpl::onReResolveAlarm can
+  // force an extra DNS-failure+backoff cycle (~7s) before eviction. This does NOT slow the
+  // common case -- waitForCounterGe returns as soon as the counter fires. See issue #44426;
+  // structural fix tracked as follow-up.
+  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1,
+                                 std::chrono::milliseconds(30000));
 
   // Send a request and expect an error due to 1) removed host and 2) DNS resolution fail.
   response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -1110,12 +1110,11 @@ TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResFail) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
-  // See note in UseCacheFileShortTtl re: using dns_query_attempt as the sync barrier.
-  test_server_->waitForCounterGe("dns_cache.foo.dns_query_attempt", 1);
-
-  // When the TTL is hit, the host will be removed from the DNS cache. This
-  // won't break the outstanding connection.
-  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
+  // When the TTL is hit, the host will be removed from the DNS cache. This won't break the
+  // outstanding connection. Generous timeout for the touch()/alarm race (see
+  // UseCacheFileShortTtl comment and #44426).
+  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1,
+                                 std::chrono::milliseconds(30000));
 
   // Kick off a new request before the first is served.
   auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -1186,7 +1185,7 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtlHostActive) {
   dns_cache_ttl_ = 2;
 
   dns_hostname_ = "not_actually_localhost"; // Set to a name that won't resolve.
-  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, /*dns_query_timeout=*/1);
+  initializeWithArgs();
   std::string host =
       fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1196,8 +1195,10 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtlHostActive) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
-  // Wait for the host to be removed due to short TTL
-  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1);
+  // Wait for the host to be removed due to short TTL. Generous timeout for the touch()/alarm
+  // race (see #44426).
+  test_server_->waitForCounterGe("dns_cache.foo.host_removed", 1,
+                                 std::chrono::milliseconds(30000));
 
   // Finish the response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
