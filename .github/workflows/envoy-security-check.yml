@@ -101,7 +101,7 @@ jobs:
     # SLACK
     - name: Checkout repository (secure branch)
       if: matrix.action == 'slack'
-      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
       with:
         # Explicitly checkout main to avoid malicious code
         ref: main
