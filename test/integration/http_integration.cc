@@ -1466,13 +1466,10 @@ void HttpIntegrationTest::testLargeResponseHeaders(uint32_t size, uint32_t count
 
   config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
                                           v3::HttpConnectionManager& hcm) -> void {
-    // Disable the per-route timeout so slow CI / large response header
-    // processing can't trip a 504 before the test's own waitForEndStream
-    // deadline. See #44416.
+    // Disable route timeout to prevent 504 on slow CI (#44416).
     auto* route =
         hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
     route->mutable_timeout()->set_seconds(0);
-    route->mutable_timeout()->set_nanos(0);
   });
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
