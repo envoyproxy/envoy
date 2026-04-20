@@ -900,13 +900,24 @@ public:
   void clear(SymbolTable& symbol_table);
 
   /**
-   * @return the first StatName in the list. List must be populated and non-empty.
+   * @return the number of StatNames in the list, or 0 if not populated.
    */
-  StatName front() const {
-    // storage_[0] holds the element count, so if we are populated and non-empty
-    // the first byte will be greater than 0.
-    ASSERT(populated() && storage_[0] > 0);
-    return StatName(&storage_[1]);
+  uint32_t size() const { return populated() ? storage_[0] : 0; }
+
+  /**
+   * @return the StatName at the given index. This is O(index): each element
+   *         has a variable-length encoding, so callers that need to visit
+   *         many elements should prefer iterate().
+   *
+   * Requires: populated() && index < size().
+   */
+  StatName at(uint32_t index) const {
+    ASSERT(populated() && index < storage_[0]);
+    const uint8_t* p = &storage_[1];
+    for (uint32_t i = 0; i < index; ++i) {
+      p += StatName(p).size();
+    }
+    return StatName(p);
   }
 
 private:

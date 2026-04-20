@@ -390,8 +390,14 @@ TEST_F(StatNameTest, List) {
   StatName names[] = {makeStat("hello.world"), makeStat("goodbye.world")};
   StatNameList name_list;
   EXPECT_FALSE(name_list.populated());
+  EXPECT_EQ(0, name_list.size());
   table_.populateList(names, ARRAY_SIZE(names), name_list);
   EXPECT_TRUE(name_list.populated());
+  EXPECT_EQ(2, name_list.size());
+
+  // Random-access via at().
+  EXPECT_EQ("hello.world", table_.toString(name_list.at(0)));
+  EXPECT_EQ("goodbye.world", table_.toString(name_list.at(1)));
 
   // First, decode only the first name.
   name_list.iterate([this](StatName stat_name) -> bool {
@@ -410,6 +416,36 @@ TEST_F(StatNameTest, List) {
   EXPECT_EQ("goodbye.world", decoded_strings[1]);
   name_list.clear(table_);
   EXPECT_FALSE(name_list.populated());
+  EXPECT_EQ(0, name_list.size());
+}
+
+// Exercises StatNameList::at() walking across entries whose encoded sizes
+// straddle the single-byte varint boundary (dataSize 127/128). This catches
+// any mistake in advancing the pointer with StatName::size() across a
+// 1-byte-vs-2-byte length prefix.
+TEST_F(StatNameTest, ListAtVarintBoundary) {
+  // Build names with controlled dataSize via the dynamic-storage path:
+  //   dataSize = 1 (LiteralStringIndicator) + varint_size(len) + len.
+  StatNameDynamicPool dynamic(table_);
+  constexpr int lower_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) - 3;
+  constexpr int upper_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) + 3;
+
+  std::vector<StatName> names;
+  std::vector<std::string> expected;
+  for (int len = lower_bound; len <= upper_bound; ++len) {
+    std::string s(len, 'a' + ((len - lower_bound) % 26));
+    expected.push_back(s);
+    names.push_back(dynamic.add(s));
+  }
+
+  StatNameList name_list;
+  table_.populateList(names.data(), names.size(), name_list);
+  EXPECT_EQ(expected.size(), name_list.size());
+
+  for (uint32_t i = 0; i < expected.size(); ++i) {
+    EXPECT_EQ(expected[i], table_.toString(name_list.at(i))) << "index=" << i;
+  }
+  name_list.clear(table_);
 }
 
 TEST_F(StatNameTest, HashTable) {
