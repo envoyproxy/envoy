@@ -118,7 +118,9 @@ BAZEL_BUILD_OPTIONS=(
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
   "--test_env=HEAPCHECK=")
 
-if [[ "${BAZEL_BUILD_EXTRA_OPTIONS[*]}" != *"--config=rbe"* ]]; then
+if bazel "${BAZEL_STARTUP_OPTIONS[@]}" info --announce_rc "${BAZEL_BUILD_OPTIONS[@]}" 2>&1 | grep -q "remote_executor"; then
+    echo "Remote execution detected, not setting test_tmpdir."
+else
     BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
     echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
 fi
