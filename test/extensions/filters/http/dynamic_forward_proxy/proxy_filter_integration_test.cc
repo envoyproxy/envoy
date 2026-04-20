@@ -1059,7 +1059,9 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
 TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtl) {
   upstream_tls_ = false; // avoid cert errors for unknown hostname
   use_cache_file_ = true;
-  dns_cache_ttl_ = 2;
+  // Use a dns_cache_ttl large enough that the re-resolve alarm fires well after the request's
+  // touch() call, ensuring (now - last_used_time) > host_ttl (1s) even under slow builds (MSAN).
+  dns_cache_ttl_ = 5;
 
   dns_hostname_ = "not_actually_localhost"; // Set to a name that won't resolve.
   initializeWithArgs();
@@ -1092,7 +1094,7 @@ TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResFail) {
 
   upstream_tls_ = false; // avoid cert errors for unknown hostname
   use_cache_file_ = true;
-  dns_cache_ttl_ = 2;
+  dns_cache_ttl_ = 5;
 
   dns_hostname_ = "not_actually_localhost"; // Set to a name that won't resolve.
   initializeWithArgs();
@@ -1175,7 +1177,7 @@ TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResSuccess) {
 TEST_P(ProxyFilterIntegrationTest, UseCacheFileShortTtlHostActive) {
   upstream_tls_ = false; // avoid cert errors for unknown hostname
   use_cache_file_ = true;
-  dns_cache_ttl_ = 2;
+  dns_cache_ttl_ = 5;
 
   dns_hostname_ = "not_actually_localhost"; // Set to a name that won't resolve.
   initializeWithArgs();
