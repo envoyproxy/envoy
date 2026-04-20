@@ -335,6 +335,17 @@ TEST(TestConfig, DisableHttp3) {
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
 }
 
+TEST(TestConfig, EnableEarlyData) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), Not(HasSubstr("early_data_policy")));
+
+  engine_builder.enableEarlyData(false);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("envoy.route.early_data_policy.default"));
+}
+
 TEST(TestConfig, UdpSocketReceiveBufferSize) {
   EngineBuilder engine_builder;
   engine_builder.enableHttp3(true);

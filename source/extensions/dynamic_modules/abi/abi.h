@@ -495,6 +495,19 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
  */
 uint32_t envoy_dynamic_module_callback_get_concurrency();
 
+// ----------------------------- Server Mode -----------------------------------
+
+/**
+ * envoy_dynamic_module_callback_is_validation_mode may be called by the dynamic
+ * module to check if the server is running in config validation mode (--mode validate).
+ * This allows modules to optimize by only parsing and validating their config without
+ * performing expensive operations such as provider lookups or loading external resources.
+ * NOTE: This function must be called on the main thread.
+ *
+ * @return true if the server is in validation mode, false otherwise.
+ */
+bool envoy_dynamic_module_callback_is_validation_mode();
+
 // ----------------------------- Function Registry -----------------------------
 
 /**
@@ -8065,7 +8078,12 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
  * a timer created by envoy_dynamic_module_callback_bootstrap_extension_timer_new. The timer is
  * automatically disabled before deletion.
  *
- * This must be called on the main thread.
+ * This must be called on the main thread. The underlying Envoy timer `deregisters` from the
+ * main thread dispatcher's timer list in its destructor, so invoking this callback from any
+ * other thread is undefined behavior. If the module cannot guarantee main-thread deletion (for
+ * example, when the handle is owned by an async task that may complete on a worker thread), it
+ * must route deletion through the scheduler ABI so that the actual call lands on the main
+ * thread.
  *
  * @param timer_ptr is the pointer to the timer created by
  * envoy_dynamic_module_callback_bootstrap_extension_timer_new.

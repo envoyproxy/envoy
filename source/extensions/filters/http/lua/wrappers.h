@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/header_map.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/crypto/utility.h"
@@ -520,6 +521,156 @@ private:
   const StreamInfo::StreamInfo& stream_info_;
   const absl::string_view filter_config_name_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+};
+
+/**
+ * Lua wrapper for a stats Counter.
+ */
+class CounterWrapper : public Filters::Common::Lua::BaseLuaObject<CounterWrapper> {
+public:
+  explicit CounterWrapper(Stats::Counter& counter) : counter_(counter) {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"inc", static_luaInc}, {"add", static_luaAdd}, {"value", static_luaValue}};
+  }
+
+private:
+  /**
+   * Increment the counter by 1.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(CounterWrapper, luaInc);
+
+  /**
+   * Add an amount to the counter.
+   * @param 1 (int): amount to add.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(CounterWrapper, luaAdd);
+
+  /**
+   * Get the current value of the counter.
+   * @return int current value.
+   */
+  DECLARE_LUA_FUNCTION(CounterWrapper, luaValue);
+
+  Stats::Counter& counter_;
+};
+
+/**
+ * Lua wrapper for a stats Gauge.
+ */
+class GaugeWrapper : public Filters::Common::Lua::BaseLuaObject<GaugeWrapper> {
+public:
+  explicit GaugeWrapper(Stats::Gauge& gauge) : gauge_(gauge) {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"inc", static_luaInc}, {"dec", static_luaDec}, {"add", static_luaAdd},
+            {"sub", static_luaSub}, {"set", static_luaSet}, {"value", static_luaValue}};
+  }
+
+private:
+  /**
+   * Increment the gauge by 1.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaInc);
+
+  /**
+   * Decrement the gauge by 1.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaDec);
+
+  /**
+   * Add an amount to the gauge.
+   * @param 1 (int): amount to add.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaAdd);
+
+  /**
+   * Subtract an amount from the gauge.
+   * @param 1 (int): amount to subtract.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaSub);
+
+  /**
+   * Set the gauge to a specific value.
+   * @param 1 (int): value to set.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaSet);
+
+  /**
+   * Get the current value of the gauge.
+   * @return int current value.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaValue);
+
+  Stats::Gauge& gauge_;
+};
+
+/**
+ * Lua wrapper for a stats Histogram.
+ */
+class HistogramWrapper : public Filters::Common::Lua::BaseLuaObject<HistogramWrapper> {
+public:
+  explicit HistogramWrapper(Stats::Histogram& histogram) : histogram_(histogram) {}
+
+  static ExportedFunctions exportedFunctions() { return {{"recordValue", static_luaRecordValue}}; }
+
+private:
+  /**
+   * Record a value in the histogram.
+   * @param 1 (int): value to record.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(HistogramWrapper, luaRecordValue);
+
+  Stats::Histogram& histogram_;
+};
+
+/**
+ * Lua wrapper for a stats Scope. Allows Lua scripts to create and access
+ * counters, gauges, and histograms.
+ */
+class StatsScopeWrapper : public Filters::Common::Lua::BaseLuaObject<StatsScopeWrapper> {
+public:
+  explicit StatsScopeWrapper(Stats::Scope& scope) : scope_(scope) {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"counter", static_luaCounter},
+            {"gauge", static_luaGauge},
+            {"histogram", static_luaHistogram}};
+  }
+
+private:
+  /**
+   * Get or create a counter with the given name.
+   * @param 1 (string): counter name.
+   * @return CounterWrapper handle.
+   */
+  DECLARE_LUA_FUNCTION(StatsScopeWrapper, luaCounter);
+
+  /**
+   * Get or create a gauge with the given name.
+   * @param 1 (string): gauge name.
+   * @return GaugeWrapper handle.
+   */
+  DECLARE_LUA_FUNCTION(StatsScopeWrapper, luaGauge);
+
+  /**
+   * Get or create a histogram with the given name.
+   * @param 1 (string): histogram name.
+   * @param 2 (string, optional): unit - "ms"/"milliseconds", "microseconds", "bytes", or
+   *                              "unspecified" (default).
+   * @return HistogramWrapper handle.
+   */
+  DECLARE_LUA_FUNCTION(StatsScopeWrapper, luaHistogram);
+
+  Stats::Scope& scope_;
 };
 
 } // namespace Lua

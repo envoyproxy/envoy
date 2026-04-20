@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.32",
-        sha256 = "c97a787075422f9748ff3cf28eb160b8ef8b17e27c44083205ed6473d3945ae9",
+        version = "0.3.33",
+        sha256 = "0d35c07b06033cebf50c767b0acdd31f215035785da4ecb9fbc02c23f2d53805",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -61,14 +61,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     boringssl = dict(
         # To update BoringSSL, which tracks BCR tags, open https://registry.bazel.build/modules/boringssl
         # and select an appropriate tag for the new version.
-        version = "0.20260327.0",
-        sha256 = "6af7037a8891d0e3d097dd61de6d195f6c2b532ed69d138a16da47c06a6cd022",
+        version = "0.20260413.0",
+        sha256 = "3560f7dd3f08e16b9f84d877a5be21ec62071564783009571af5fcc6fad734d2",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
     ),
     aws_lc = dict(
-        version = "1.71.0",
-        sha256 = "31b1eed775294825f084c0d4e09df53e1cf036fb98a202a8c2c342543828a985",
+        version = "1.72.0",
+        sha256 = "f214c0e06e043c4f18b836059ccb5ecbed781173e8eed106839ee2dd4f4cc157",
         strip_prefix = "aws-lc-{version}",
         urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
     ),
@@ -553,8 +553,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "bbe3dde941efd8cc9297face96b6305bbfd880e1",
-        sha256 = "4e1c184c1f4c9e350c718127754c7d369f9fcc11dc7557cce48a9fe47970a0ed",
+        version = "ba02ee8fc1c0ab27d55f6bbb9e1ac7c9705c3e69",
+        sha256 = "670791b54c8f73eafbb25226b27132bad5d336b70f8543be9d39bbfd9dc7222c",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),

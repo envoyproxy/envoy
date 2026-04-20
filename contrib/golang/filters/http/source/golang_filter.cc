@@ -404,11 +404,18 @@ void Filter::continueStatusInternal(ProcessorState& state, GolangStatus status) 
 
     case FilterState::ProcessingTrailer:
       state.continueDoData();
+      if (hasDestroyed()) {
+        return;
+      }
       state.continueProcessing();
       break;
 
     default:
       ASSERT(0, "unexpected state");
+    }
+
+    if (hasDestroyed()) {
+      return;
     }
   }
 
@@ -426,6 +433,9 @@ void Filter::continueStatusInternal(ProcessorState& state, GolangStatus status) 
     auto done = doDataGo(state, state.getBufferData(), state.getEndStream());
     if (done) {
       state.continueDoData();
+      if (hasDestroyed()) {
+        return;
+      }
     } else {
       // do not process trailers when data is not finished
       return;

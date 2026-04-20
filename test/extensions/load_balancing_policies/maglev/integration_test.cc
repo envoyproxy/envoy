@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <numeric>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
@@ -10,6 +11,7 @@
 
 #include "test/integration/http_integration.h"
 
+#include "absl/strings/substitute.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -18,12 +20,16 @@ namespace LoadBalancingPolicies {
 namespace Maglev {
 namespace {
 
-class MaglevIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                              public HttpIntegrationTest {
+class MaglevIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, uint32_t>>,
+      public HttpIntegrationTest {
 public:
-  MaglevIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
-    // Create 3 different upstream server for stateful session test.
-    setUpstreamCount(3);
+  static Network::Address::IpVersion getIpVersion() { return std::get<0>(GetParam()); }
+  static uint32_t getNumUpstreams() { return std::get<1>(GetParam()); }
+
+  MaglevIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, getIpVersion()) {
+    // Create the desired number of upstream servers for the stateful session test.
+    setUpstreamCount(getNumUpstreams());
 
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -45,28 +51,20 @@ public:
           ASSERT(cluster_0->name() == "cluster_0");
           auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
 
-          constexpr absl::string_view endpoints_yaml = R"EOF(
-          lb_endpoints:
+          std::string endpoints_yaml = "lb_endpoints:";
+          constexpr absl::string_view single_endpoint = R"EOF(
           - endpoint:
               address:
                 socket_address:
-                  address: {}
-                  port_value: 0
-          - endpoint:
-              address:
-                socket_address:
-                  address: {}
-                  port_value: 0
-          - endpoint:
-              address:
-                socket_address:
-                  address: {}
+                  address: $0
                   port_value: 0
           )EOF";
+          for (uint32_t i = 0; i < getNumUpstreams(); ++i) {
+            absl::StrAppend(&endpoints_yaml, single_endpoint);
+          }
 
-          const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
-          TestUtility::loadFromYaml(
-              fmt::format(endpoints_yaml, local_address, local_address, local_address), *endpoint);
+          const std::string local_address = Network::Test::getLoopbackAddressString(getIpVersion());
+          TestUtility::loadFromYaml(absl::Substitute(endpoints_yaml, local_address), *endpoint);
 
           // If legacy API is used, set the LB policy by the old way.
           if (legacy_api) {
@@ -95,6 +93,12 @@ public:
     HttpIntegrationTest::initialize();
   }
 
+  std::vector<uint64_t> range(uint64_t bound) {
+    std::vector<uint64_t> v(bound);
+    std::iota(v.begin(), v.end(), 0);
+    return v;
+  }
+
   void runNormalLoadBalancing() {
     absl::optional<uint64_t> unique_upstream_index;
 
@@ -108,7 +112,7 @@ public:
 
       auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
-      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2});
+      auto upstream_index = waitForNextUpstreamRequest(range(getNumUpstreams()));
       ASSERT(upstream_index.has_value());
 
       if (unique_upstream_index.has_value()) {
@@ -129,9 +133,14 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, MaglevIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, MaglevIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(1, 3)),
+    [](const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, uint32_t>>& params) {
+      return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
+                          std::get<1>(params.param), "Upstreams");
+    });
 
 TEST_P(MaglevIntegrationTest, NormalLoadBalancing) {
   initializeConfig();

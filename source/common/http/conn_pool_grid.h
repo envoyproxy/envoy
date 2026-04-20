@@ -30,6 +30,7 @@ namespace Http {
 // the host's address list.
 class ConnectivityGrid : public ConnectionPool::Instance,
                          public Http3::PoolConnectResultCallback,
+                         public ConnectionPool::ConnectionLifetimeCallbacks,
                          protected Logger::Loggable<Logger::Id::pool> {
 public:
   struct ConnectivityOptions {
@@ -228,6 +229,15 @@ public:
   void onHandshakeComplete() override;
   void onZeroRttHandshakeFailed() override;
 
+  // ConnectionPool::ConnectionLifetimeCallbacks
+  void onConnectionOpen(ConnectionPool::Instance& pool, std::vector<uint8_t>& hash_key,
+                        const Network::Connection& connection) override;
+  void onConnectionDraining(ConnectionPool::Instance& pool, std::vector<uint8_t>& hash_key,
+                            const Network::Connection& connection) override;
+
+  void setLifetimeCallbacks(OptRef<ConnectionPool::ConnectionLifetimeCallbacks> callbacks,
+                            std::vector<uint8_t> hash_key) override;
+
 protected:
   // Set the required idle callback on the pool.
   void setupPool(ConnectionPool::Instance& pool);
@@ -308,6 +318,9 @@ private:
   bool deferred_deleting_{};
 
   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry_;
+
+  OptRef<ConnectionPool::ConnectionLifetimeCallbacks> callbacks_;
+  std::vector<uint8_t> hash_key_;
 };
 
 } // namespace Http

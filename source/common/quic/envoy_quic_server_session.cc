@@ -214,6 +214,14 @@ void EnvoyQuicServerSession::setHttp3Options(
       }
     }
   }
+  if (http3_options.has_quic_protocol_options()) {
+    const uint64_t memory_reduction_timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(
+        http3_options.quic_protocol_options(), memory_reduction_timeout, 0);
+    if (memory_reduction_timeout_ms > 0) {
+      connection()->SetMemoryReductionTimeout(
+          quic::QuicTime::Delta::FromMilliseconds(memory_reduction_timeout_ms));
+    }
+  }
   set_allow_extended_connect(http3_options_->allow_extended_connect());
   if (http3_options_->disable_qpack()) {
     DisableHuffmanEncoding();

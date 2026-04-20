@@ -48,6 +48,7 @@ envoy_cc_test(
     srcs = ["abi_impl_test.cc"],
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )

@@ -21,3 +21,4 @@ Contrib extensions
   tap_sinks/tap_sinks
   load_balancing_policies/peak_ewma/peak_ewma
   istio/istio
+  reverse_tunnel_reporter/reverse_tunnel_reporter
