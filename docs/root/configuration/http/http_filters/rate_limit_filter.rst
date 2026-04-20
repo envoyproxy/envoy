@@ -173,6 +173,10 @@ The ratelimit filter emits dynamic metadata as an opaque ``google.protobuf.Struc
 <envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse>` with a filled :ref:`dynamic_metadata
 <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.dynamic_metadata>` field.
 
+By default metadata is stored under the ``envoy.filters.http.ratelimit`` namespace. The namespace can be changed by setting the
+:ref:`metadata_namespace <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.metadata_namespace>` in the filter
+configuration.
+
 Runtime
 -------
 

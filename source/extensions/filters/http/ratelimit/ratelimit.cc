@@ -227,7 +227,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
-    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ratelimit", *dynamic_metadata);
+    callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), *dynamic_metadata);
   }
 
   switch (status) {
