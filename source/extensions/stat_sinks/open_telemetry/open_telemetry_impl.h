@@ -95,7 +95,7 @@ public:
     SortedAttributesVector releaseAttributes() { return std::move(sorted_attributes_); }
 
   private:
-    std::string name_;
+    const std::string name_;
     SortedAttributesVector sorted_attributes_;
   };
 

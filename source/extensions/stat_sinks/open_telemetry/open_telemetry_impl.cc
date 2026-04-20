@@ -69,7 +69,7 @@ void MetricAggregator::addHistogram(std::string&& metric_name,
   if (it != histogram_data_.end()) {
     std::vector<uint64_t> new_bucket_counts = stats.computeDisjointBuckets();
     auto& existing_point = it->second;
-    if (existing_point.explicit_bounds_.size() == stats.supportedBuckets().size() &&
+    if (existing_point.explicit_bounds_ == stats.supportedBuckets() &&
         existing_point.bucket_counts_.size() == new_bucket_counts.size() + 1) {
       existing_point.count_ += stats.sampleCount();
       existing_point.sum_ += stats.sampleSum();
@@ -113,6 +113,9 @@ void RequestStreamer::sendIfFull() {
 }
 
 void RequestStreamer::initNewRequest() {
+  if (current_request_ != nullptr) {
+    return;
+  }
   current_request_ = std::make_unique<MetricsExportRequest>();
   auto* rm = current_request_->add_resource_metrics();
   for (const auto& attr : resource_attributes_) {
@@ -240,7 +243,7 @@ void RequestStreamer::addAggregationResult(MetricAggregator::AggregationResult&&
 }
 
 void RequestStreamer::send() {
-  if (current_request_ != nullptr) {
+  if (current_request_ != nullptr && dp_num_ > 0) {
     send_callback_(std::move(current_request_));
   }
 }

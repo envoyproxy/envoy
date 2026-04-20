@@ -9,6 +9,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
@@ -712,6 +713,21 @@ TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestEmptyMetrics) {
   Tracers::OpenTelemetry::Resource resource;
   auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
   OtlpMetricsFlusherImpl flusher(options);
+
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+
+  EXPECT_EQ(requests.size(), 0);
+}
+
+TEST_F(OtlpMetricsFlusherTests, DeltaCountersAllZeroNoExport) {
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/true, /*report_histograms_as_deltas=*/false,
+      /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true));
+
+  addCounterToSnapshot("test_counter1", 0, 1);
+  addCounterToSnapshot("test_counter2", 0, 3);
 
   std::vector<MetricsExportRequestPtr> requests;
   flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
@@ -1750,6 +1766,37 @@ TEST_F(MetricAggregatorTests, HistogramAggregationDelta) {
     ASSERT_NE(dp3, nullptr);
     EXPECT_EQ(dp3->count_, 6);
   }
+}
+
+TEST_F(MetricAggregatorTests, HistogramAggregationBoundariesMismatch) {
+  setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                  /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+  std::vector<double> supported_buckets1 = {10, 20, 30};
+  std::vector<uint64_t> computed_buckets1 = {1, 2, 3};
+
+  mockHistogram(supported_buckets1, computed_buckets1, 6, 60);
+  metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                   MetricAggregator::SortedAttributesVector{{"key1", ""}});
+
+  // Add histogram with different boundaries
+  std::vector<double> supported_buckets2 = {10, 25, 30}; // Diff boundary
+  std::vector<uint64_t> computed_buckets2 = {4, 5, 6};
+  mockHistogram(supported_buckets2, computed_buckets2, 15, 150);
+  EXPECT_LOG_CONTAINS("error", "Histogram bounds mismatch", {
+    metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                     MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  });
+
+  auto metrics = metric_aggregator_->releaseResult();
+  EXPECT_EQ(metrics.histogram_data_.size(),
+            1); // Should not aggregate, so only 1 entry (the first one)
+
+  auto it = metrics.histogram_data_.begin();
+  EXPECT_EQ(it->first.name(), "metric1");
+  EXPECT_EQ(it->second.count_, 6); // Only first histogram data
+  EXPECT_EQ(it->second.sum_, 60);
 }
 
 class RequestStreamerTests : public testing::Test {
