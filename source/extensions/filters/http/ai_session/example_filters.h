@@ -1,12 +1,6 @@
 #pragma once
 
-// Example AiStreamFilter implementations that mirror concrete Envoy HTTP filters.
-//
-// Filter chain configured as:
-//   [McpAuthFilter] → [McpMethodRouterFilter] → [McpMetadataFilter]
-//
-// Analogous to:
-//   [ext_authz] → [router] → [header_mutation]
+// Example AiStreamFilter implementations: McpAuthFilter → McpInitFilter → McpContextFilter.
 
 #include "source/extensions/filters/http/ai_session/ai_filter.h"
 #include "source/extensions/filters/http/ai_session/ai_session.h"
@@ -21,18 +15,11 @@ namespace AiSession {
 // ---------------------------------------------------------------------------
 // McpAuthFilter
 //
-// Analogous to ext_authz HTTP filter.
-//
-// onMethod fires BEFORE params arrive.  This filter starts an async authz
-// check (e.g. OPA, custom service) keyed on (session.principal, method).
-// It returns StopIteration, which queues the subsequent onId / onParams /
-// onJsonRpcComplete events exactly as ext_authz holds the request body when
-// StopIteration is returned from decodeHeaders().
-//
-// When the authz response arrives asynchronously, the filter calls
-// callbacks_.continueProcessing(), which:
-//   1. Resumes onMethod on the next filter (McpMethodRouterFilter).
-//   2. Drains the queued onId, onParams, onComplete through the full chain.
+// onMethod fires BEFORE params arrive, so the filter can reject unauthorized
+// requests before the body is fully parsed.  Returning StopIteration queues
+// the subsequent onId / onParams / onJsonRpcComplete events exactly as
+// ext_authz holds the request body when StopIteration is returned from
+// decodeHeaders(); continueProcessing() drains them once authz resolves.
 // ---------------------------------------------------------------------------
 class McpAuthFilter : public AiStreamFilter {
 public:
@@ -79,16 +66,14 @@ private:
 // ---------------------------------------------------------------------------
 // McpInitFilter
 //
-// Analogous to a stateful "handshake" filter.
-//
 // Handles the MCP initialize → initialized exchange:
 //   - On "initialize": extracts client capabilities from params, marks the
 //     session as initialized, returns a synthetic response (no upstream call).
 //   - On "initialized": ACKs the notification, no-ops.
-//   - On anything else while session is not initialized: rejects.
+//   - On anything else while session is not initialized: rejects with -32002.
 //
-// Storing capabilities in AiSession (cross-request) mirrors how HCM stores
-// HPACK compression context across HTTP/2 streams.
+// Client capabilities are stored in AiSession so subsequent requests in the
+// same session can access them without repeating the handshake.
 // ---------------------------------------------------------------------------
 class McpInitFilter : public AiStreamFilter {
 public:
@@ -138,11 +123,10 @@ private:
 // ---------------------------------------------------------------------------
 // McpContextFilter
 //
-// Analogous to header_mutation or lua HTTP filter.
-//
-// Appends each completed tool-call exchange to the session's context window
-// so subsequent requests can reference prior results.  Demonstrates reading
-// and writing AiSession cross-request state.
+// Appends each completed tools/call or resources/read exchange to the
+// session's context window (AiSession::appendContext) so subsequent requests
+// can reference prior results.  Demonstrates reading and writing AiSession
+// cross-request state.
 // ---------------------------------------------------------------------------
 class McpContextFilter : public AiStreamFilter {
 public:
@@ -182,9 +166,7 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// Wire-up example: building an AiSessionManager with these filters
-//
-// Analogous to configuring http_filters in HCM bootstrap YAML.
+// Wire-up example
 // ---------------------------------------------------------------------------
 //
 // inline std::unique_ptr<AiSessionManager> buildMcpSessionManager() {

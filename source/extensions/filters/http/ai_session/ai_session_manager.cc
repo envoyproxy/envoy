@@ -58,15 +58,12 @@ AiSessionManager::newStream(const Http::RequestHeaderMap& request_headers,
   // Increment the request counter on the session before building the chain.
   session.nextRequestIndex();
 
-  // Build a fresh AiFilterChain for this request.
-  // This mirrors HCM calling each FilterFactory to populate an ActiveStream's
-  // filter chain.  The chain holds a reference to the session so filters can
-  // read/write cross-request state.
+  // Build a fresh AiFilterChain for this request.  The chain holds a
+  // reference to the session so filters can read/write cross-request state.
   auto chain = std::make_unique<AiFilterChain>(session, buildFilters());
 
   // Inject HTTP filter callbacks so the chain can call sendLocalReply() when
-  // a filter calls sendJsonRpcError().  Mirrors how FilterManagerImpl holds a
-  // pointer back to ActiveStream for local reply dispatch.
+  // a filter calls sendJsonRpcError().
   chain->setDecoderCallbacks(decoder_callbacks);
 
   // Store the chain on the session so it stays alive for the duration of
@@ -121,8 +118,8 @@ AiSession& AiSessionManager::getOrCreateSession(const std::string& session_id) {
 }
 
 std::vector<std::unique_ptr<AiStreamFilter>> AiSessionManager::buildFilters() {
-  // Analogous to HCM calling each FilterFactoryCb to build an ActiveStream's
-  // decoder filter list: each factory is called exactly once per request.
+  // Each factory is called exactly once per request — mirrors HCM calling
+  // each FilterFactoryCb to build an ActiveStream's decoder filter list.
   std::vector<std::unique_ptr<AiStreamFilter>> filters;
   filters.reserve(filter_factories_.size());
   for (const auto& factory : filter_factories_) {

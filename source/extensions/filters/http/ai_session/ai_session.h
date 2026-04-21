@@ -25,19 +25,15 @@ namespace AiSession {
 /**
  * Per-session state shared across multiple JSON-RPC exchanges.
  *
- * In HTTP, every request is independent and "session" state lives in cookies
- * or external stores. MCP (and AI workloads generally) define an explicit
- * session lifecycle: one initialize/initialized handshake followed by N
- * tool-call / resource-read exchanges, all sharing the same session ID.
+ * MCP defines an explicit session lifecycle: one initialize/initialized
+ * handshake followed by N tool-call / resource-read exchanges sharing the
+ * same session ID.  AiSession is the persistent object for that lifecycle;
+ * it survives across many HTTP requests.  AiSessionManager owns all live
+ * sessions in a map keyed by session ID.
  *
- * AiSession is the persistent object for that lifecycle. It is analogous to
- * Envoy's ActiveStream, but where ActiveStream dies at the end of one HTTP
- * request, AiSession survives across many requests as long as the session is
- * alive. The AiSessionManager holds all live sessions in a map keyed by ID.
- *
- * Each HTTP request creates an AiFilterChain that holds a reference to the
- * AiSession. Filters read session-level state (auth, capabilities, context
- * window) from this object without repeating the initialisation work.
+ * Each HTTP request creates a fresh AiFilterChain with a reference to the
+ * AiSession so filters can read and write cross-request state (auth,
+ * capabilities, context window) without repeating initialization work.
  */
 class AiSession {
 public:
@@ -96,19 +92,11 @@ public:
   // -------------------------------------------------------------------------
   // -------------------------------------------------------------------------
   // Active request management
-  //
-  // AiSessionManager calls beginRequest() on each new HTTP request to attach
-  // the per-request AiFilterChain to the session.  The session owns the chain
-  // so the chain's lifetime equals the request's lifetime.
-  //
-  // Mirrors how ActiveStream owns its FilterManager: the session (ActiveStream
-  // analog) owns the filter chain (FilterManager analog).
   // -------------------------------------------------------------------------
 
   /**
-   * Attach a new AiFilterChain for an incoming request.
-   * Replaces any previously active chain (one active request per session for
-   * HTTP/1.1; HTTP/2 would need a list).
+   * Attach a new AiFilterChain for an incoming request.  Replaces any
+   * previously active chain (one active request per session for HTTP/1.1).
    * @return Reference to the chain; valid until the next beginRequest() call.
    */
   AiFilterChain& beginRequest(std::unique_ptr<AiFilterChain> chain) {
