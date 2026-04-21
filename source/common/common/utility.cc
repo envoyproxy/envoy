@@ -361,6 +361,16 @@ const char* StringUtil::strtoull(const char* str, uint64_t& out, int base) {
     return nullptr;
   }
 
+  // Reject signed values for unsigned parsing to avoid normalizing malformed
+  // inputs (e.g. "-1") into large uint64_t values.
+  const char* first_non_whitespace = str;
+  while (*first_non_whitespace != '\0' && absl::ascii_isspace(*first_non_whitespace)) {
+    ++first_non_whitespace;
+  }
+  if (*first_non_whitespace == '+' || *first_non_whitespace == '-') {
+    return nullptr;
+  }
+
   char* end_ptr;
   errno = 0;
   out = std::strtoull(str, &end_ptr, base);
