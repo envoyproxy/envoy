@@ -353,7 +353,7 @@ std::string ConnectionInfoImplBase::ciphersuiteString() const {
 
 uint16_t ConnectionInfoImplBase::tlsGroupId() const { return SSL_get_curve_id(ssl()); }
 
-std::string ConnectionInfoImplBase::tlsGroupString() const {
+absl::string_view ConnectionInfoImplBase::tlsGroupString() const {
   const char* group = SSL_get_curve_name(tlsGroupId());
   if (group == nullptr) {
     return {};

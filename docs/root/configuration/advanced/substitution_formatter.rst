@@ -1306,7 +1306,7 @@ Current supported substitution commands include:
 
 ``%DOWNSTREAM_TLS_GROUP%``
   HTTP/TCP/THRIFT
-    The OpenSSL name of the TLS group used for the key agreement to establish the downstream TLS connection.
+    The name of the TLS group used for the key agreement to establish the downstream TLS connection.
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
@@ -1454,7 +1454,7 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_TLS_GROUP%``
   HTTP/TCP/THRIFT
-    The OpenSSL name of the TLS group used for the key agreement to establish the upstream TLS connection.
+    The name of the TLS group used for the key agreement to establish the upstream TLS connection.
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 

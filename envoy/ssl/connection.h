@@ -258,10 +258,10 @@ public:
   virtual uint16_t tlsGroupId() const PURE;
 
   /**
-   * @return std::string the OpenSSL name of the group that was used for the key agreement of the
-   *         established TLS connection. Returns "" if there is no group.
+   * @return absl::string_view the OpenSSL name of the group that was used for the key agreement of
+   *         the established TLS connection. Returns "" if there is no group.
    **/
-  virtual std::string tlsGroupString() const PURE;
+  virtual absl::string_view tlsGroupString() const PURE;
 
   /**
    * @return std::string the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS
