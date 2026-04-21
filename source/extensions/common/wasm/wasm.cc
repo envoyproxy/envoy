@@ -373,9 +373,14 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                  .value_or(code.empty() ? EMPTY_STRING : INLINE_STRING);
   }
 
+  // Include environment_variables in the vm_key so that a change to env vars triggers VM
+  // recreation, the same way a code change does. The env vars hash is appended to the code string
+  // since proxy_wasm::makeVmKey only accepts three parameters.
+  const std::size_t env_vars_hash = MessageUtil::hash(vm_config.environment_variables());
   auto vm_key = proxy_wasm::makeVmKey(
       vm_config.vm_id(),
-      THROW_OR_RETURN_VALUE(MessageUtil::anyToBytes(vm_config.configuration()), std::string), code);
+      THROW_OR_RETURN_VALUE(MessageUtil::anyToBytes(vm_config.configuration()), std::string),
+      absl::StrCat(code, env_vars_hash));
   auto complete_cb = [cb, vm_key, plugin, scope, &api, &cluster_manager, &dispatcher,
                       &lifecycle_notifier, create_root_context_for_testing,
                       &stats_handler](std::string code) -> bool {
