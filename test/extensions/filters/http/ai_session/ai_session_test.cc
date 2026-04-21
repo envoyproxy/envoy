@@ -192,7 +192,8 @@ TEST_F(AiFilterChainTest, StopOnMethodQueuesSubsequentEvents) {
 
   // Chain is stopped at stopper; rec has not seen onMethod yet.
   EXPECT_TRUE(chain->isStopped());
-  EXPECT_THAT(rec->events(), IsEmpty());
+  EXPECT_THAT(rec->events(), SizeIs(1));
+  EXPECT_EQ(RecordingFilter::Event::Type::Begin, rec->events()[0].type);
 
   // Events that arrive while stopped are queued.
   chain->onId(nlohmann::json(1));
@@ -200,7 +201,7 @@ TEST_F(AiFilterChainTest, StopOnMethodQueuesSubsequentEvents) {
   chain->onJsonRpcComplete();
 
   EXPECT_EQ(3u, chain->pendingEventCount()); // id, params, complete
-  EXPECT_THAT(rec->events(), IsEmpty());     // rec still not called
+  EXPECT_THAT(rec->events(), SizeIs(1));     // rec only saw Begin
 
   // Async resume: stopper finishes its work and calls continueProcessing().
   stopper->resume();
@@ -339,7 +340,7 @@ TEST_F(JsonRpcStackTest, MalformedJsonFiresOnError) {
   auto* rec = new RecordingFilter;
   auto chain = makeChain(session_, std::unique_ptr<AiStreamFilter>(rec));
 
-  feedJson(*chain, R"({"jsonrpc":"2.0","id":1,"method":)"); // truncated
+  EXPECT_FALSE(feedJson(*chain, R"({"jsonrpc":"2.0","id":1,"method":)").ok()); // truncated
 
   EXPECT_TRUE(chain->hasError());
   bool saw_error = false;

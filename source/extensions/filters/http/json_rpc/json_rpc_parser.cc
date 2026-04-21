@@ -20,7 +20,6 @@ JsonRpcParser::JsonRpcParser(JsonRpcDecoder& decoder) : decoder_(decoder) {}
 
 absl::Status JsonRpcParser::parse(const Buffer::Instance& data) {
   // Walk slices in place — no copy needed.
-  // This mirrors ConnectionImpl::dispatch() feeding raw TCP slices into llhttp.
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     const char* p = static_cast<const char*>(slice.mem_);
     for (size_t i = 0; i < slice.len_; ++i) {
@@ -43,7 +42,7 @@ absl::Status JsonRpcParser::finishParse() {
     return absl::InvalidArgumentError("JSON-RPC parse already failed");
   }
   if (state_ == State::Init) {
-    return absl::InvalidArgumentError("Empty body: no JSON-RPC object received");
+    return error("Empty body: no JSON-RPC object received");
   }
   // A numeric/bool/null id at the very end of the body has no trailing
   // delimiter, so flush it here if we're still accumulating one.
@@ -52,7 +51,7 @@ absl::Status JsonRpcParser::finishParse() {
       return s;
     }
   }
-  return absl::InvalidArgumentError("Incomplete JSON-RPC message: top-level '}' not seen");
+  return error("Incomplete JSON-RPC message: top-level '}' not seen");
 }
 
 // -----------------------------------------------------------------------------

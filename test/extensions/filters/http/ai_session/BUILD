@@ -17,6 +17,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/ai_session:ai_filter_lib",
         "//source/extensions/filters/http/ai_session:ai_session_lib",
         "//source/extensions/filters/http/ai_session:ai_session_manager_lib",
+        "//source/extensions/filters/http/ai_session:example_filters_lib",
         "//source/extensions/filters/http/json_rpc:json_rpc_parser_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
