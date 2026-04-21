@@ -604,7 +604,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "//source/extensions/transport_sockets/tls:config",
-	"//source/extensions/upstreams/host_http:config",
+        "//source/extensions/upstreams/host_http:config",
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
