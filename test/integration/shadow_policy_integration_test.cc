@@ -1176,6 +1176,10 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterAutoHostRewriteLogicalDns) {
   // The mirrored request's Host header should be rewritten to the shadow cluster's upstream
   // hostname, not the downstream request's host and not the "-shadow"-suffixed version.
   EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "shadow.example.com");
+
+  // Shut down the server before os_calls goes out of scope to avoid worker threads racing with
+  // singleton restoration during teardown.
+  test_server_.reset();
 }
 
 // When auto_host_rewrite is set on a mirror policy with a STATIC cluster (which has no hostname),
