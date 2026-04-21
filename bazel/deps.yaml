@@ -548,7 +548,7 @@ wasmtime:
   project_name: "wasmtime"
   project_desc: "A standalone runtime for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasmtime"
-  release_date: "2025-07-18"
+  release_date: "2026-04-09"
   use_category:
   - dataplane_ext
   extensions:
@@ -799,7 +799,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-04-06"
+  release_date: "2026-04-20"
   use_category:
   - build
   - controlplane
@@ -1346,7 +1346,7 @@ skywalking_data_collect_protocol:
   project_name: "skywalking-data-collect-protocol"
   project_desc: "Data Collect Protocols of Apache SkyWalking"
   project_url: "https://github.com/apache/skywalking-data-collect-protocol"
-  release_date: "2025-11-10"
+  release_date: "2026-04-21"
   use_category:
   - observability_ext
   extensions:
