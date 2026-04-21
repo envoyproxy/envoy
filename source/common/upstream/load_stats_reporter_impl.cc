@@ -151,7 +151,8 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
               upstream_endpoint_stats->set_total_issued_requests(host_rq_issued);
             }
 
-            // TODO(fcfort): Remove this latch() call when cleaning up `report_load_for_non_zero_stats`.
+            // TODO(fcfort): Remove this latch() call when cleaning up
+            // `report_load_for_non_zero_stats`.
             if (host_custom_metrics == nullptr) {
               host_custom_metrics = host->loadMetricStats().latch();
             }

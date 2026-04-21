@@ -36,7 +36,7 @@ namespace Upstream {
  *     - Current `rq_active_` is non-zero.
  *     - Latched `rq_total_` is non-zero.
  *     - Any custom load metrics are non-zero in `LoadMetricStats`.
- * 
+ *
  * Only one of these runtime features should be enabled at a time.
  */
 class LoadStatsReporterImpl
