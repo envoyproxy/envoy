@@ -1,7 +1,6 @@
-diff -u -r a/CMakeLists.txt b/CMakeLists.txt
---- a/CMakeLists.txt	2020-11-23 08:59:08.000000000 -0600
-+++ b/CMakeLists.txt	2021-01-15 17:15:43.665745800 -0600
-@@ -271,7 +271,11 @@
+--- a/CMakeLists.txt	2026-04-21 10:22:32.711440405 +0000
++++ b/CMakeLists.txt	2026-04-21 10:22:32.712440415 +0000
+@@ -353,7 +353,11 @@
  if(SIZEOF_SSIZE_T STREQUAL "")
    # ssize_t is a signed type in POSIX storing at least -1.
    # Set it to "int" to match the behavior of AC_TYPE_SSIZE_T (autotools).
