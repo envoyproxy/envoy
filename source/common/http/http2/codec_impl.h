@@ -441,6 +441,7 @@ protected:
     // to determine whether we should continue processing that data.
     absl::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
+    uint32_t cookie_count_;
     bool local_end_stream_sent_ : 1 = false;
     bool remote_end_stream_ : 1 = false;
     bool remote_rst_ : 1 = false;

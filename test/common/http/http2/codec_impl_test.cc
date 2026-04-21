@@ -3091,6 +3091,56 @@ TEST_P(Http2CodecImplTest, ManyRequestHeadersInvokeResetStream) {
   driveToCompletion();
 }
 
+// Tests stream reset when the size of request headers (including cookies)
+// exceeds the limit.
+TEST_P(Http2CodecImplTest, HeaderListSizeTooLargeWithCookies) {
+  max_request_headers_kb_ = 5;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  // Add many small cookies that exceed the limit in total
+  for (int i = 0; i < 60; i++) {
+    request_headers.addCopy("cookie", std::string(100, 'a'));
+  }
+
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  if (http2_implementation_ != Http2Impl::Oghttp2) {
+    // oghttp2 resets the stream from within the codec
+    EXPECT_EQ(1, server_stats_store_.counter("http2.header_list_size_too_large").value());
+  }
+}
+
+// Tests stream reset when the size of request headers (excluding cookies)
+// exceeds the limit.
+TEST_P(Http2CodecImplTest, HeaderListSizeTooLargeWithoutCookies) {
+  max_request_headers_kb_ = 5;
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  // Add many small headers that exceed the limit in total
+  for (int i = 0; i < 60; i++) {
+    request_headers.addCopy(std::to_string(i), std::string(100, 'a'));
+  }
+
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  if (http2_implementation_ != Http2Impl::Oghttp2) {
+    // oghttp2 resets the stream from within the codec
+    EXPECT_EQ(1, server_stats_store_.counter("http2.header_list_size_too_large").value());
+  }
+}
+
 // Tests that max number of request headers is configurable.
 TEST_P(Http2CodecImplTest, ManyRequestHeadersAccepted) {
   max_request_headers_count_ = 150;
