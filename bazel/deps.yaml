@@ -13,7 +13,7 @@ aws_lc:
   project_name: "AWS libcrypto (AWS-LC)"
   project_desc: "OpenSSL compatible general-purpose crypto library"
   project_url: "https://github.com/aws/aws-lc"
-  release_date: "2026-03-19"
+  release_date: "2026-04-13"
   use_category:
   - controlplane
   - dataplane_core
@@ -53,7 +53,7 @@ boringssl:
   project_name: "BoringSSL"
   project_desc: "Minimal OpenSSL fork"
   project_url: "https://github.com/google/boringssl"
-  release_date: "2026-03-30"
+  release_date: "2026-04-14"
   use_category:
   - controlplane
   - dataplane_core
@@ -296,7 +296,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-04-01"
+  release_date: "2026-04-16"
   use_category:
   - controlplane
   - dataplane_core
@@ -548,7 +548,7 @@ wasmtime:
   project_name: "wasmtime"
   project_desc: "A standalone runtime for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasmtime"
-  release_date: "2025-07-18"
+  release_date: "2026-04-09"
   use_category:
   - dataplane_ext
   extensions:
@@ -799,7 +799,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-04-06"
+  release_date: "2026-04-20"
   use_category:
   - build
   - controlplane

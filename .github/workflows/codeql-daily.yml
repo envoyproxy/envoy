@@ -27,7 +27,7 @@ jobs:
 
     steps:
 
-    - uses: envoyproxy/toolshed/actions/bind-mounts@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/bind-mounts@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
       if: |
         ! github.event.repository.private
       with:
@@ -42,7 +42,7 @@ jobs:
       if: |
         env.BUILD_TARGETS != ''
         && github.event.repository.private
-      uses: envoyproxy/toolshed/actions/diskspace@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+      uses: envoyproxy/toolshed/actions/diskspace@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
       with:
         to_remove: |
           /usr/local/.ghcup
@@ -52,7 +52,7 @@ jobs:
       uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@c10b8064de6f491fea524254123dbe5e09572f13  # codeql-bundle-v4.35.1
+      uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2
       with:
         languages: cpp
         trap-caching: false
@@ -91,4 +91,4 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@c10b8064de6f491fea524254123dbe5e09572f13  # codeql-bundle-v4.35.1
+      uses: github/codeql-action/analyze@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2

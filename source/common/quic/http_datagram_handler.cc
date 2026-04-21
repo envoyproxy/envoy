@@ -80,7 +80,7 @@ bool HttpDatagramHandler::encodeCapsuleFragment(absl::string_view capsule_fragme
   // If a CapsuleParser object fails to parse a capsule fragment, the corresponding stream should
   // be reset. Returning false in this method resets the stream.
   if (!capsule_parser_.IngestCapsuleFragment(capsule_fragment)) {
-    ENVOY_LOG(error, fmt::format("Capsule parsing error occured: capsule_fragment = {}",
+    ENVOY_LOG(error, fmt::format("Capsule parsing error occurred: capsule_fragment = {}",
                                  capsule_fragment));
     return false;
   }

@@ -56,6 +56,7 @@ struct Descriptor {
   DescriptorEntries entries_;
   absl::optional<RateLimitOverride> limit_ = absl::nullopt;
   absl::optional<uint64_t> hits_addend_ = absl::nullopt;
+  bool is_negative_hits_ = false;
   XRateLimitOption x_ratelimit_option_{};
 
   std::string toString() const {

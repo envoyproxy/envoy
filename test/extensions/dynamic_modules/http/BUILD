@@ -61,6 +61,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/server:factory_context_mocks",
+        "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 
@@ -117,6 +118,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",

@@ -1346,6 +1346,32 @@ TEST_F(EnvoyQuicServerSessionTest, SessionIdleCallbacksIdempotency) {
   EXPECT_CALL(session_idle_list_, RemoveSession(_));
 }
 
+TEST_F(EnvoyQuicServerSessionTest, MemoryReductionTimeoutTest) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  auto* quic_options = http3_options.mutable_quic_protocol_options();
+  quic_options->mutable_memory_reduction_timeout()->set_seconds(300);
+
+  // Mark handshake complete and set connection idle timeout to a large duration.
+  quic::test::QuicConnectionPeer::GetIdleNetworkDetector(quic_connection_)
+      .SetTimeouts(quic::QuicTime::Delta::Infinite(), quic::QuicTime::Delta::FromSeconds(600));
+
+  envoy_quic_session_.setHttp3Options(http3_options);
+
+  // Trigger SetAlarm.
+  quic::test::QuicConnectionPeer::GetIdleNetworkDetector(quic_connection_)
+      .OnPacketReceived(connection_helper_.GetClock()->Now());
+
+  // Check the alarm deadline.
+  quic::QuicAlarmProxy idle_detector_alarm =
+      quic::test::QuicConnectionPeer::GetIdleNetworkDetectorAlarm(quic_connection_);
+
+  EXPECT_TRUE(idle_detector_alarm.IsSet());
+  EXPECT_EQ(connection_helper_.GetClock()->Now() + quic::QuicTime::Delta::FromSeconds(300),
+            idle_detector_alarm.deadline());
+
+  installReadFilter();
+}
+
 class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessionTest {
   void SetUp() override {}
   void TearDown() override {

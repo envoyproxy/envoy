@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package envoy.extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client";
+option java_outer_classname = "StreamReverseTunnelsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/clients/grpc_client";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Reverse Tunnel Reporting Service]
+
+// ReverseTunnelReportingService allows Envoy instances to report reverse tunnel
+// connection state changes to a management server for monitoring and coordination.
+service ReverseTunnelReportingService {
+  // Bidirectional stream for reporting reverse tunnel connection state changes.
+  // The management server can control reporting intervals and acknowledge received reports.
+  rpc StreamReverseTunnels(stream StreamReverseTunnelsRequest)
+      returns (stream StreamReverseTunnelsResponse) {
+  }
+}
+
+// Request message sent by Envoy to report reverse tunnel state changes.
+// [#next-free-field: 6]
+message StreamReverseTunnelsRequest {
+  // Node identifier for the reporting Envoy instance.
+  // This identifies which Envoy instance is sending the report.
+  config.core.v3.Node node = 1 [(validate.rules).message = {required: true}];
+
+  // List of reverse tunnels that were established since the last report.
+  // Each tunnel represents a new connection from a downstream Envoy.
+  repeated ReverseTunnel added_tunnels = 2;
+
+  // List of tunnel names that were disconnected since the last report.
+  // Only the tunnel name is needed for removal notifications.
+  repeated string removed_tunnel_names = 3
+      [(validate.rules).repeated = {items {string {min_len: 1}}}];
+
+  // Indicates whether this report contains all active tunnels (true) or
+  // only changes since the last report (false). Usually invoked only on server disconnects.
+  bool full_push = 4;
+
+  // Unique nonce for this request to enable proper ACK/NACK handling.
+  // Must be non-negative and should increment for each request.
+  // This can also be modified to be used for checksum and tracking in the future.
+  int64 nonce = 5 [(validate.rules).int64 = {gte: 0}];
+}
+
+// Response message sent by the management server to control reporting behavior.
+message StreamReverseTunnelsResponse {
+  // Node identifier acknowledging which Envoy instance this response is for.
+  // Should match the node from the corresponding request.
+  string node_id = 1;
+
+  // Interval at which Envoy should send tunnel state reports.
+  // This is used to change the reporting_interval -> no need to repeat the same value.
+  google.protobuf.Duration report_interval = 2 [(validate.rules).duration = {
+    lte {seconds: 3600}
+    gte {nanos: 25000000}
+  }];
+
+  // Nonce from the request being acknowledged or rejected.
+  // Must match the nonce from the corresponding request.
+  int64 request_nonce = 3 [(validate.rules).int64 = {gte: 0}];
+
+  // Error details if the previous request failed processing.
+  // If populated, indicates the request was rejected (NACK).
+  // If empty, indicates successful processing (ACK).
+  // NACK will terminate the connection -> useful for logging rather than just some disconnect.
+  // So basically -> NACK then terminate.
+  google.rpc.Status error_detail = 4;
+}
+
+// Represents a single reverse tunnel connection with its metadata.
+message ReverseTunnel {
+  // Unique name to identify this tunnel connection.
+  // Must be unique within the reporting Envoy instance.
+  // This is also used for the reporting the disconnection with the associated tunnel initiator.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Identity information of the tunnel initiator (downstream Envoy).
+  // Contains ``node_id``, ``cluster_id``, and ``tenant_id`` for proper identification.
+  TunnelInitiatorIdentity identity = 2 [(validate.rules).message = {required: true}];
+
+  // Timestamp when this tunnel connection was created.
+  // Used for ordering events and debugging connection timing issues.
+  google.protobuf.Timestamp created_at = 3 [(validate.rules).timestamp = {required: true}];
+}
+
+message TunnelInitiatorIdentity {
+  // Required: Tenant identifier of the initiating Envoy instance.
+  string tenant_id = 1 [(validate.rules).string = {min_len: 1 max_len: 128}];
+
+  // Required: Cluster identifier of the initiating Envoy instance.
+  string cluster_id = 2 [(validate.rules).string = {min_len: 1 max_len: 128}];
+
+  // Required: Node identifier of the initiating Envoy instance.
+  string node_id = 3 [(validate.rules).string = {min_len: 1 max_len: 128}];
+}

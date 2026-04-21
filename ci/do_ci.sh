@@ -368,6 +368,28 @@ case $CI_TARGET in
         echo "Generated cache: ${TOTAL_SIZE}"
         ;;
 
+    deflake)
+        ENVOY_DEFLAKE_RUNS=${ENVOY_DEFLAKE_RUNS:-1000}
+        if [[ -z "$ENVOY_DEFLAKE_TARGET" || -z "$ENVOY_DEFLAKE_TEST" ]]; then
+            echo "Both ENVOY_DEFLAKE_TARGET and ENVOY_DEFLAKE_TEST must be set to use deflake" >&2
+            exit 1
+        fi
+        _BAZEL_ARGS=(
+            "$ENVOY_DEFLAKE_TARGET"
+            "${BAZEL_BUILD_OPTIONS[@]}"
+            --test_arg=--gtest_filter="$ENVOY_DEFLAKE_TEST"
+            --runs_per_test="${ENVOY_DEFLAKE_RUNS}"
+            --test_arg="-l trace"
+            --cache_test_results=no)
+        if [[ -n "$ENVOY_DEFLAKE_JOBS" ]]; then
+            _BAZEL_ARGS+=(--jobs="$ENVOY_DEFLAKE_JOBS")
+        fi
+        echo "Deflake args: " >&2
+        echo "  ${_BAZEL_ARGS[*]}" >&2
+        echo "" >&2
+        bazel test "${_BAZEL_ARGS[@]}"
+        ;;
+
     format-api|check_and_fix_proto_format)
         setup_clang_toolchain
         echo "Check and fix proto format ..."
@@ -978,6 +1000,8 @@ case $CI_TARGET in
         bazel run --config=ci \
                   --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
                   --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --action_env="CARGO_BAZEL_REPIN=true" \
+                  --host_action_env="CARGO_BAZEL_REPIN=true" \
                   --sandbox_writable_path="${HOME}/.docker/" \
                   --sandbox_writable_path="$HOME" \
                   @envoy-examples//:verify_examples
