@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.ai_session.v3;
+
+import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.ai_session.v3";
+option java_outer_classname = "McpContextProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ai_session/v3;ai_sessionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: MCP Context Filter]
+// [#extension: envoy.ai_filters.mcp_context]
+
+// Configuration for the MCP context-window AI filter.
+//
+// McpContextFilter appends each completed ``tools/call`` or
+// ``resources/read`` exchange to the session's context window so
+// subsequent requests in the same session can reference prior results.
+//
+// Analogous to a ``lua`` or ``header_mutation`` HTTP filter that records
+// per-session state.
+message McpContextConfig {
+  // Maximum number of turns to retain in the context window.
+  //
+  // When the window is full, the oldest turn is evicted (FIFO).
+  // Defaults to ``0`` (unlimited) when unset.
+  uint32 max_context_turns = 1;
+
+  // JSON-RPC methods whose completed exchanges are recorded in the
+  // context window.
+  //
+  // Defaults to ``["tools/call", "resources/read"]`` when empty.
+  repeated string tracked_methods = 2;
+}

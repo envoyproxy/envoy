@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.ai_session.v3;
+
+import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.ai_session.v3";
+option java_outer_classname = "McpAuthProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ai_session/v3;ai_sessionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: MCP Auth Filter]
+// [#extension: envoy.ai_filters.mcp_auth]
+
+// Configuration for the MCP authentication AI filter.
+//
+// McpAuthFilter is the authentication gate in the AI filter chain.
+// It runs before all other filters so that unauthenticated requests are
+// rejected as early as possible, before params are fully parsed.
+//
+// Analogous to ``envoy.filters.http.ext_authz`` in the HTTP filter chain.
+message McpAuthConfig {
+  // HTTP header whose value identifies the session principal (e.g. a JWT
+  // sub, an API key, or an OAuth2 client_id).
+  //
+  // When present in the request, its value is stored as the session's
+  // ``principal`` and ``isAuthenticated()`` returns true.
+  //
+  // Defaults to ``"x-mcp-identity"`` when empty.
+  string identity_header = 1;
+
+  // JSON-RPC methods that bypass authentication entirely.
+  //
+  // ``"initialize"`` is always in this list regardless of configuration —
+  // the MCP handshake must be reachable before a session is authenticated.
+  //
+  // Example: ``["initialize", "ping"]``
+  repeated string allowed_unauthenticated_methods = 2;
+
+  // Prefix that marks admin-only methods.
+  //
+  // Any method whose name starts with this prefix is only accessible to
+  // sessions whose ``principal`` equals ``"admin"``.
+  //
+  // Defaults to ``"admin/"`` when empty.
+  string admin_method_prefix = 3;
+}

@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.ai_session.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.ai_session.v3";
+option java_outer_classname = "AiSessionProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ai_session/v3;ai_sessionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: AI Session]
+// AI Session filter configuration.
+// [#extension: envoy.filters.http.ai_session]
+
+// Top-level configuration for the AI session HTTP filter.
+//
+// The filter sits in the Envoy HTTP filter chain and dispatches each
+// JSON-RPC request through an ordered list of AI filters, analogous to
+// how HCM dispatches HTTP requests through its ``http_filters`` list.
+//
+// Example:
+//
+// .. code-block:: yaml
+//
+//   name: envoy.filters.http.ai_session
+//   typed_config:
+//     "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.AiSession
+//     ai_filters:
+//       - name: envoy.ai_filters.mcp_auth
+//         typed_config:
+//           "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.McpAuthConfig
+//       - name: envoy.ai_filters.mcp_init
+//         typed_config:
+//           "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.McpInitConfig
+//       - name: envoy.ai_filters.mcp_context
+//         typed_config:
+//           "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.McpContextConfig
+message AiSession {
+  // Ordered list of AI filters to run for each JSON-RPC request.
+  //
+  // Mirrors the ``http_filters`` list in HCM: filters are instantiated and
+  // run in declaration order.  Each entry's ``typed_config`` is unpacked
+  // and passed to the corresponding ``NamedAiFilterConfigFactory``.
+  repeated config.core.v3.TypedExtensionConfig ai_filters = 1;
+}

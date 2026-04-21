@@ -1,6 +1,9 @@
 #pragma once
 
-#include "envoy/server/filter_config.h"
+#include "envoy/extensions/filters/http/ai_session/v3/ai_session.pb.h"
+#include "envoy/extensions/filters/http/ai_session/v3/ai_session.pb.validate.h"
+
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +19,17 @@ namespace AiSession {
  *   http_filters:
  *     - name: envoy.filters.http.ai_session
  *       typed_config:
- *         "@type": type.googleapis.com/google.protobuf.Empty
+ *         "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.AiSession
+ *         ai_filters:
+ *           - name: envoy.ai_filters.mcp_auth
+ *             typed_config:
+ *               "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.McpAuthConfig
+ *           - name: envoy.ai_filters.mcp_init
+ *             typed_config:
+ *               "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.McpInitConfig
+ *           - name: envoy.ai_filters.mcp_context
+ *             typed_config:
+ *               "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.McpContextConfig
  *
  * Object lifetimes (mirrors how HCM owns its filter chain):
  *
@@ -30,16 +43,16 @@ namespace AiSession {
  *          └─ borrows AiSessionManager& from TLS slot
  */
 class AiSessionFilterFactory
-    : public Server::Configuration::NamedHttpFilterConfigFactory {
+    : public Common::FactoryBase<
+          envoy::extensions::filters::http::ai_session::v3::AiSession> {
 public:
-  Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::FactoryContext& context) override;
+  AiSessionFilterFactory() : FactoryBase("envoy.filters.http.ai_session") {}
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-
-  std::string name() const override { return "envoy.filters.http.ai_session"; }
+private:
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::ai_session::v3::AiSession& proto_config,
+      const std::string& stats_prefix,
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace AiSession

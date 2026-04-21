@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.ai_session.v3;
+
+import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.ai_session.v3";
+option java_outer_classname = "McpInitProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ai_session/v3;ai_sessionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: MCP Init Filter]
+// [#extension: envoy.ai_filters.mcp_init]
+
+// Configuration for the MCP session-initialization AI filter.
+//
+// McpInitFilter enforces the MCP session handshake: every method other than
+// ``"initialize"`` and ``"notifications/initialized"`` is rejected on a
+// session that has not yet completed initialization.
+//
+// On an ``"initialize"`` request it extracts the client capabilities from
+// ``params.capabilities`` and records the negotiated protocol version in
+// the ``AiSession``, making them available to later filters.
+//
+// Analogous to a stateful "handshake" middleware in the HTTP filter chain.
+message McpInitConfig {
+  // Methods that are allowed on an uninitialized session in addition to
+  // ``"initialize"`` and ``"notifications/initialized"``.
+  //
+  // Useful for health-check or ping methods that must reach the upstream
+  // even before a session is established.
+  repeated string allowed_before_init = 1;
+
+  // Protocol version string to advertise in the initialize response.
+  //
+  // Stored in the session and forwarded to the upstream in the
+  // ``initialize`` response body.
+  //
+  // Defaults to ``"2024-11-05"`` when empty.
+  string protocol_version = 2;
+}

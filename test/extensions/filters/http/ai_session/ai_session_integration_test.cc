@@ -15,7 +15,17 @@ public:
     config_helper_.prependFilter(R"EOF(
       name: envoy.filters.http.ai_session
       typed_config:
-        "@type": type.googleapis.com/google.protobuf.Empty
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.AiSession
+        ai_filters:
+          - name: envoy.ai_filters.mcp_auth
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.McpAuthConfig
+          - name: envoy.ai_filters.mcp_init
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.McpInitConfig
+          - name: envoy.ai_filters.mcp_context
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.ai_session.v3.McpContextConfig
     )EOF");
     initialize();
   }
