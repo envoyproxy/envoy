@@ -12,7 +12,7 @@ envoy_cc_library(
     name = "json_rpc_decoder_lib",
     hdrs = ["json_rpc_decoder.h"],
     deps = [
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@nlohmann_json//:json",
     ],
 )
@@ -25,8 +25,8 @@ envoy_cc_library(
         ":json_rpc_decoder_lib",
         "//envoy/buffer:buffer_interface",
         "//source/common/common:logger_lib",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -41,7 +41,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )

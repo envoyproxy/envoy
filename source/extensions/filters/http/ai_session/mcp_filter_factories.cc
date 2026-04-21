@@ -1,8 +1,12 @@
 #include "envoy/extensions/filters/http/ai_session/v3/mcp_auth.pb.h"
+#include "envoy/extensions/filters/http/ai_session/v3/mcp_auth.pb.validate.h"
 #include "envoy/extensions/filters/http/ai_session/v3/mcp_context.pb.h"
+#include "envoy/extensions/filters/http/ai_session/v3/mcp_context.pb.validate.h"
 #include "envoy/extensions/filters/http/ai_session/v3/mcp_init.pb.h"
+#include "envoy/extensions/filters/http/ai_session/v3/mcp_init.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/ai_session/ai_filter_config_factory.h"
 #include "source/extensions/filters/http/ai_session/example_filters.h"
@@ -100,12 +104,10 @@ public:
 class McpContextFilterFactory : public NamedAiFilterConfigFactory {
 public:
   AiFilterFactory createAiFilterFactory(const Protobuf::Message& proto_config) override {
-    const auto& cfg = MessageUtil::downcastAndValidate<const McpContextProto&>(
+    MessageUtil::downcastAndValidate<const McpContextProto&>(
         proto_config, ProtobufMessage::getNullValidationVisitor());
 
-    const uint32_t max_turns = cfg.max_context_turns();
-
-    return [max_turns]() -> std::unique_ptr<AiStreamFilter> {
+    return []() -> std::unique_ptr<AiStreamFilter> {
       // TODO: pass max_turns and tracked_methods to McpContextFilter ctor.
       return std::make_unique<McpContextFilter>();
     };

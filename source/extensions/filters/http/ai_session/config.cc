@@ -84,7 +84,7 @@ class AiSessionFilterConfig {
 public:
   AiSessionFilterConfig(Server::Configuration::FactoryContext& context,
                         std::vector<AiFilterFactory> filter_factories) {
-    tls_slot_ = context.threadLocal().allocateSlot();
+    tls_slot_ = context.serverFactoryContext().threadLocal().allocateSlot();
     // Capture factories by value — each worker thread gets its own
     // AiSessionManager initialised with the same factory list.
     tls_slot_->set([factories = std::move(filter_factories)](
