@@ -168,6 +168,12 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: wasm
+  change: |
+    Fixed a bug where Envoy did not recreate the Wasm VM when only
+    :ref:`environment_variables <envoy_v3_api_field_extensions.wasm.v3.VmConfig.environment_variables>`
+    changed in ``vm_config``. The VM was previously reused from the cache because environment variables
+    were not included in the vm_key computation.
 - area: grpc
   change: |
     Fixed the router to return ``DEADLINE_EXCEEDED`` (gRPC status 4) instead of ``UNAVAILABLE`` (gRPC
