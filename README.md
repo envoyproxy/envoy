@@ -8,9 +8,9 @@ The high level flow is as follows:
 
 1. Ask the current [release manager](https://github.com/envoyproxy/envoy/blob/main/RELEASES.md#release-management) to update `envoy/main` and `patches/main` to mirror latest `envoyproxy/main` when you're ready to start working on a fix
 2. Create a branch from `patches/main` where you'll develop the fix
-3. Create a PR for this fix against `patches/main` and merge it. This fix should be a single commit.
-4. < time elapses, more fixes get merged into patches/main over the quarter-long cycle >
-5. When it's time for patch release, we'll create a stack PR for each branch and cherry-pick all the fixes merged during the cycle.
+3. Create a PR for this fix against `patches/main` with 1 commit, obtain approvals and ensure tests pass but _do not merge_. Merging will occur in a later step by the release manager.
+4. < time elapses, more fixes are made against patches/main over the quarter-long cycle >
+5. When it's time for patch release, we'll create a stack PR for each branch and cherry-pick all the fix PRs created and approved during the cycle.
 6. The tarball of patches produced by step 5, will be distributed to our vendors as prior warning and for testing. When the embargo expires, we reveal the cve/advisories and immediately make prs in the envoy repo with the patch stacks
 
 ## Setec branches
