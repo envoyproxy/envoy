@@ -30,12 +30,14 @@ namespace Upstream {
  * non-zero, even if no new requests were issued in the interval.
  * - envoy.reloadable_features.report_load_for_non_zero_stats: If true, load reports for a
  *   locality are sent if any of the following conditions are met for the sum of host stats in that
- * locality:
+ *   locality:
  *     - Latched `rq_success_` is non-zero.
  *     - Latched `rq_error_` is non-zero.
  *     - Current `rq_active_` is non-zero.
  *     - Latched `rq_total_` is non-zero.
  *     - Any custom load metrics are non-zero in `LoadMetricStats`.
+ * 
+ * Only one of these runtime features should be enabled at a time.
  */
 class LoadStatsReporterImpl
     : public LoadStatsReporter,

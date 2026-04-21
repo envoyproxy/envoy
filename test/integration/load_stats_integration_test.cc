@@ -1051,7 +1051,6 @@ TEST_P(LoadStatsIntegrationTest, ReportLoadForNonZeroStatsSuccessOnly) {
   ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 1, 0, 0, 1)}));
 
   // In the next interval, there are no new requests and no active requests, so no report is sent.
-
   cleanupLoadStatsConnection();
 }
 
@@ -1082,7 +1081,6 @@ TEST_P(LoadStatsIntegrationTest, ReportLoadForNonZeroStatsCustomMetricOnly) {
   ASSERT_TRUE(waitForLoadStatsRequest({expected_uls}));
 
   // In the next interval, there are no new requests and no custom metrics, so no report is sent.
-
   cleanupLoadStatsConnection();
 }
 
