@@ -50,6 +50,12 @@ public:
   const std::string& pathOverride() { return path_override_; }
 
   /**
+   * Returns the authorization request method override. When non-empty, replaces the HTTP method
+   * on the outgoing authorization request.
+   */
+  const std::string& methodOverride() const { return method_override_; }
+
+  /**
    * Returns authorization request timeout.
    */
   const std::chrono::milliseconds& timeout() const { return timeout_; }
@@ -131,6 +137,7 @@ private:
   const std::chrono::milliseconds timeout_;
   const std::string path_prefix_;
   const std::string path_override_;
+  const std::string method_override_;
   const std::string tracing_name_;
   Router::HeaderParserPtr request_headers_parser_;
   const bool encode_raw_headers_;

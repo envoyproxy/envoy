@@ -2658,6 +2658,72 @@ TEST_P(ExtAuthzHttpIntegrationTest, HttpRetryPolicyOldBehaviorWithFlagDisabled) 
   cleanup();
 }
 
+// Verifies that method_override replaces the HTTP method on the request sent to the
+// authorization server, regardless of the original client request method.
+TEST_P(ExtAuthzHttpIntegrationTest, MethodOverride) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    const std::string ext_authz_config = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 300s
+      method_override: "POST"
+    failure_mode_allow: false
+    )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config_);
+    proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+  });
+
+  HttpIntegrationTest::initialize();
+
+  // Send a GET request from the client; method_override should cause POST to reach ext_authz.
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  const auto headers = Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  response_ = codec_client_->makeHeaderOnlyRequest(headers);
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+  RELEASE_ASSERT(result, result.message());
+  result = ext_authz_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+
+  EXPECT_EQ(ext_authz_request_->headers().getMethodValue(), "POST");
+
+  Http::TestResponseHeaderMapImpl authz_response_headers{{":status", "200"}};
+  ext_authz_request_->encodeHeaders(authz_response_headers, true);
+
+  AssertionResult upstream_result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  RELEASE_ASSERT(upstream_result, upstream_result.message());
+  upstream_result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(upstream_result, upstream_result.message());
+  upstream_result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(upstream_result, upstream_result.message());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  cleanup();
+}
+
 class ExtAuthzLocalReplyIntegrationTest : public HttpIntegrationTest,
                                           public TestWithParam<Network::Address::IpVersion> {
 public:

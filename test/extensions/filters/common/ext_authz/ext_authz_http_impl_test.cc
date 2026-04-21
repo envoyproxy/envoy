@@ -376,6 +376,101 @@ TEST_F(ExtAuthzHttpClientTest, PathOverrideMustStartWithSlash) {
                             "path_override should start with \"/\".");
 }
 
+// Verify method_override replaces the original request method on the authorization request.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithMethodOverride) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    method_override: "POST"
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/hello"}, {":method", "GET"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
+}
+
+// Verify that without method_override, the original request method is forwarded unchanged.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithoutMethodOverride) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/hello"}, {":method", "DELETE"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getMethodValue(), "DELETE");
+}
+
+// Verify method_override with encode_raw_headers also overrides the method.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithMethodOverrideRawHeaders) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    method_override: "POST"
+  encode_raw_headers: true
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/hello"}, {":method", "GET"}}, {.encode_raw_headers = true});
+  EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
+}
+
+// Verify ClientConfig from HttpService directly also captures method_override.
+TEST_F(ExtAuthzHttpClientTest, ClientConfigFromHttpServiceWithMethodOverride) {
+  envoy::extensions::filters::http::ext_authz::v3::HttpService http_service;
+  TestUtility::loadFromYaml(R"EOF(
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    method_override: "POST"
+  )EOF",
+                            http_service);
+  auto cfg = std::make_shared<ClientConfig>(http_service, false, 250, factory_context_);
+  EXPECT_EQ(cfg->methodOverride(), "POST");
+}
+
+// Verify method_override containing whitespace is rejected at config load.
+TEST_F(ExtAuthzHttpClientTest, MethodOverrideWithWhitespaceRejected) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    method_override: "POST EVIL"
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(createConfig(yaml), EnvoyException,
+                            "method_override must not contain whitespace.");
+}
+
+// Verify method_override and path_override can be combined to target a fixed endpoint.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithMethodAndPathOverride) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    method_override: "POST"
+    path_override: "/auth"
+  )EOF";
+  initialize(yaml);
+  Http::RequestMessagePtr message_ptr =
+      sendRequest({{":path", "/original/path"}, {":method", "GET"}, {"foo", "bar"}});
+  EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
+  EXPECT_EQ(message_ptr->headers().getPathValue(), "/auth");
+}
+
 // Verify request body is set correctly when the normal body is empty and raw body is set.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRawBody) {
   Http::RequestMessagePtr message_ptr = sendRequest(

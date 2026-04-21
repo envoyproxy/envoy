@@ -124,6 +124,14 @@ absl::StatusOr<std::string> validatePathOverride(absl::string_view path_override
   return std::string(path_override);
 }
 
+absl::StatusOr<std::string> validateMethodOverride(absl::string_view method_override) {
+  if (!method_override.empty() &&
+      method_override.find_first_of(" \t\r\n") != absl::string_view::npos) {
+    return absl::InvalidArgumentError("method_override must not contain whitespace.");
+  }
+  return std::string(method_override);
+}
+
 absl::Status validateOnlyOneOfPathPrefixOrOverride(absl::string_view path_prefix,
                                                    absl::string_view path_override) {
   if (!path_prefix.empty() && !path_override.empty()) {
@@ -174,6 +182,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       path_prefix_(THROW_OR_RETURN_VALUE(validatePathPrefix(path_prefix), std::string)),
       path_override_(THROW_OR_RETURN_VALUE(
           validatePathOverride(config.http_service().path_override()), std::string)),
+      method_override_(THROW_OR_RETURN_VALUE(
+          validateMethodOverride(config.http_service().method_override()), std::string)),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(
@@ -208,6 +218,8 @@ ClientConfig::ClientConfig(
           THROW_OR_RETURN_VALUE(validatePathPrefix(http_service.path_prefix()), std::string)),
       path_override_(
           THROW_OR_RETURN_VALUE(validatePathOverride(http_service.path_override()), std::string)),
+      method_override_(THROW_OR_RETURN_VALUE(validateMethodOverride(http_service.method_override()),
+                                             std::string)),
       tracing_name_(fmt::format("async {} egress", http_service.server_uri().cluster())),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(
@@ -328,6 +340,8 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         } else {
           headers->addCopy(key, header.raw_value());
         }
+      } else if (key == Http::Headers::get().Method && !config_->methodOverride().empty()) {
+        headers->addCopy(key, config_->methodOverride());
       } else {
         headers->addCopy(key, header.raw_value());
       }
@@ -349,6 +363,8 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         } else {
           headers->addCopy(key, header.second);
         }
+      } else if (key == Http::Headers::get().Method && !config_->methodOverride().empty()) {
+        headers->addCopy(key, config_->methodOverride());
       } else {
         headers->addCopy(key, header.second);
       }
