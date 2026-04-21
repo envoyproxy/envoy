@@ -68,7 +68,7 @@ jobs:
     # PR
     - name: Comment on PR
       if: matrix.action == 'comment' && github.event.workflow_run.pull_requests[0]
-      uses: actions/github-script@v9
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9
       with:
         script: |
           try {
@@ -101,7 +101,7 @@ jobs:
     # SLACK
     - name: Checkout repository (secure branch)
       if: matrix.action == 'slack'
-      uses: actions/checkout@v6
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6
       with:
         # Explicitly checkout main to avoid malicious code
         ref: main

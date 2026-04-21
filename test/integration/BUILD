@@ -1692,12 +1692,9 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "websocket_integration_test",
-    size = "large",
     srcs = ["websocket_integration_test.cc"],
-    rbe_pool = "2core",
-    tags = [
-        "cpu:3",
-    ],
+    rbe_pool = "linux_x64_small",
+    shard_count = 8,
     deps = [
         ":http_protocol_integration_lib",
         ":websocket_integration_test_lib",

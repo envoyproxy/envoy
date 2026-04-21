@@ -72,6 +72,7 @@ void benchmarkMaglevLoadBalancerBuildTable(::benchmark::State& state) {
   }
 }
 BENCHMARK(benchmarkMaglevLoadBalancerBuildTable)
+    ->Arg(1)
     ->Arg(100)
     ->Arg(200)
     ->Arg(500)

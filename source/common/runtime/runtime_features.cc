@@ -53,6 +53,7 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_authz_http_client_retries_respect_us
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_stream_close_optimization);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
 RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
@@ -186,6 +187,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 
+// TODO(jwendell): Flip to true to make gRPC timeout responses return DEADLINE_EXCEEDED
+// instead of UNAVAILABLE.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_grpc_timeout_returns_deadline_exceeded);
+
 // TODO(yanavlasov): Flip to true after prod testing.
 // Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
 // before downstream.
@@ -227,6 +232,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_strip_custom_stat_prefix);
 // TODO(haoyuewang): Flip true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_data_read_immediately);
+// TODO(yavlasov): Flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_strict_chunk_parsing);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
