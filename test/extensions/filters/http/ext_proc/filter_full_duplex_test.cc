@@ -130,7 +130,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
     // 7 request chunks are sent to the ext_proc server.
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
 
   processResponseBodyHelper(" AAAAA ", want_response_body);
@@ -145,7 +145,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
   for (int i = 0; i < 3; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
     processResponseBodyHelper(std::to_string(i), want_response_body);
   }
 
@@ -157,7 +157,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
   for (int i = 0; i < 10; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 10);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
   // Send the last chunk.
   Buffer::OwnedImpl last_resp_chunk;
@@ -222,7 +222,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
     // 7 request chunks are sent to the ext_proc server.
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
 
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
@@ -374,7 +374,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithFilterConfigMissing) 
     // 4 request chunks are sent to the ext_proc server.
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
 
   processResponseBody(
@@ -489,7 +489,7 @@ TEST_F(HttpFilterTest, FullDuplexFailCloseWithDataInbound) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   processRequestHeaders(false, absl::nullopt);
   Buffer::OwnedImpl req_data("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
 
   // Fail close with gRPC error messages received.
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
