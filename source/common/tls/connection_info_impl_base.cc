@@ -351,10 +351,10 @@ std::string ConnectionInfoImplBase::ciphersuiteString() const {
   return SSL_CIPHER_get_name(cipher);
 }
 
-uint16_t ConnectionInfoImplBase::tlsGroupId() const { return SSL_get_curve_id(ssl()); }
+uint16_t ConnectionInfoImplBase::tlsGroupId() const { return SSL_get_group_id(ssl()); }
 
 absl::string_view ConnectionInfoImplBase::tlsGroupString() const {
-  const char* group = SSL_get_curve_name(tlsGroupId());
+  const char* group = SSL_get_group_name(tlsGroupId());
   if (group == nullptr) {
     return {};
   }
