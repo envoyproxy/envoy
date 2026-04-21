@@ -177,8 +177,7 @@ message Vhds {
   //
   // Envoy currently supports only glob collections.
   //
-  // If unspecified or empty, Envoy defaults to sending empty subscriptions
-  // (``resource_names_subscribe: []``).
+  // If unspecified or empty, Envoy defaults to sending a wildcard subscription.
   string default_virtual_host_resource_name = 2;
 
   // The virtual host resource name to use for on-demand VHDS requests.
