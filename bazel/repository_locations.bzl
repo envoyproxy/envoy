@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.32",
-        sha256 = "c97a787075422f9748ff3cf28eb160b8ef8b17e27c44083205ed6473d3945ae9",
+        version = "0.3.33",
+        sha256 = "0d35c07b06033cebf50c767b0acdd31f215035785da4ecb9fbc02c23f2d53805",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -278,10 +278,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/open-telemetry/opentelemetry-cpp/archive/refs/tags/v{version}.tar.gz"],
     ),
     skywalking_data_collect_protocol = dict(
-        sha256 = "5b7c49eff204c423b3d1ffc3b9ec84f2d77838b30464e4a3d6158cf0b6a8429a",
+        sha256 = "70e63dd30d9dfdcf0a0ef0976e19c7e21fa1411af13ec31452bd1da37e578e35",
         urls = ["https://github.com/apache/skywalking-data-collect-protocol/archive/v{version}.tar.gz"],
         strip_prefix = "skywalking-data-collect-protocol-{version}",
-        version = "10.3.0",
+        version = "10.4.0",
     ),
     cpp2sky = dict(
         sha256 = "d7e52f517de5a1dc7d927dd63a2e5aa5cf8c2dcfd8fcf6b64e179978daf1c3ed",
@@ -503,8 +503,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bytecodealliance/wasm-micro-runtime/archive/{version}.tar.gz"],
     ),
     wasmtime = dict(
-        version = "24.0.4",
-        sha256 = "d714d987a50cfc7d0b384ef4720e7c757cf4f5b7df617cbf38e432a3dc6c400d",
+        version = "24.0.7",
+        sha256 = "2cf72451e5031d8072623c4c3003699ee65ccc94edfab1d8b664744a8c611d4f",
         strip_prefix = "wasmtime-{version}",
         urls = ["https://github.com/bytecodealliance/wasmtime/archive/v{version}.tar.gz"],
     ),
@@ -720,14 +720,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-aarch64.tar.gz"],
     ),
     fips_go_linux_amd64 = dict(
-        version = "1.24.4",
-        sha256 = "77e5da33bb72aeaef1ba4418b6fe511bc4d041873cbf82e5aa6318740df98717",
+        version = "1.26.2",
+        sha256 = "990e6b4bbba816dc3ee129eaeaf4b42f17c2800b88a2166c265ac1a200262282",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-amd64.tar.gz"],
     ),
     fips_go_linux_arm64 = dict(
-        version = "1.24.4",
-        sha256 = "d5501ee5aca0f258d5fe9bfaed401958445014495dc115f202d43d5210b45241",
+        version = "1.26.2",
+        sha256 = "c958a1fe1b361391db163a485e21f5f228142d6f8b584f6bef89b26f66dc5b23",
         strip_prefix = "go",
         urls = ["https://dl.google.com/go/go{version}.linux-arm64.tar.gz"],
     ),

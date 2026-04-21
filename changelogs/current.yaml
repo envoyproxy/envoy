@@ -37,6 +37,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: geoip
+  change: |
+    :ref:`Envoy Http Geoip filter extension
+    <envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip>` has been promoted to stable status.
 - area: load_balancing
   change: |
     Changed the default behavior of ``OrcaWeightManager`` to prefer named metrics over application
@@ -287,6 +291,11 @@ bug_fixes:
     intentionally not parseable (for example ``goo.gle/debugonly`` prefixes). This change can
     be reverted by setting runtime guard
     ``envoy.reloadable_features.cel_message_serialize_text_format`` to ``false``.
+- area: ext_proc
+  change: |
+    Fixed a bug that unnecessary empty data chunks are processed by the filter chain. This
+    change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.ext_proc_return_stop_iteration`` to ``false``.
 - area: ratelimit
   change: |
     Fixed a bug in the gRPC rate limit client where the client could get into a bad state if the
