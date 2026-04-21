@@ -2,6 +2,10 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: geoip
+  change: |
+    :ref:`Envoy Http Geoip filter extension
+    <envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip>` has been promoted to stable status.
 - area: tcp_proxy
   change: |
     The TCP proxy filter now requires :ref:`max_early_data_bytes
