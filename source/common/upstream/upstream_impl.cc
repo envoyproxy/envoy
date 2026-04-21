@@ -104,16 +104,15 @@ createProtocolOptionsConfig(const std::string& name, const Protobuf::Any& typed_
         Registry::FactoryRegistry<Server::Configuration::ProtocolOptionsFactory>::getFactory(name);
   }
   if (factory == nullptr) {
-    const std::string type{TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url())};
-    factory =
-        Registry::FactoryRegistry<Server::Configuration::HostHttpProtocolOptionsConfigFactory>::getFactoryByType(type);
+    factory = Registry::FactoryRegistry<
+        Server::Configuration::HostHttpProtocolOptionsConfigFactory>::getFactory(name);
   }
 
   if (factory == nullptr) {
     return absl::InvalidArgumentError(
         fmt::format("Didn't find a registered network or http filter or protocol "
-                    "options implementation for name '{}' or type '{}'",
-                    name, typed_config.type_url()));
+                    "options implementation for name: '{}'",
+                    name));
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyProtocolOptionsProto();
@@ -1142,7 +1141,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context),
           std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>)),
-      host_http_protocol_options_(THROW_OR_RETURN_VALUE(hostHttpOptions(), HostHttpProtocolOptionsConfigConstSharedPtr)),
+      host_http_protocol_options_(
+          THROW_OR_RETURN_VALUE(hostHttpOptions(), HostHttpProtocolOptionsConfigConstSharedPtr)),
       tcp_protocol_options_(extensionProtocolOptionsTyped<TcpProtocolOptionsConfigImpl>(
           "envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions")),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(

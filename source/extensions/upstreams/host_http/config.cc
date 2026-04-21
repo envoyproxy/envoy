@@ -1,4 +1,4 @@
-#include "source/extensions/upstreams/host_specific_http/host_config.h"
+#include "source/extensions/upstreams/host_http/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +14,7 @@ HttpProtocolOptionsConfigImpl::HttpProtocolOptionsConfigImpl(
       matcher_(Matchers::MetadataMatcher(options.host_metadata_match(), context)) {}
 
 const Http::Http1Settings& HttpProtocolOptionsConfigImpl::http1Settings() const {
-  return http1_settings_,
+  return http1_settings_;
 }
 
 const envoy::config::core::v3::Http2ProtocolOptions&
@@ -34,12 +34,12 @@ HttpProtocolOptionsConfigImpl::commonHttpProtocolOptions() const {
 
 const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
 HttpProtocolOptionsConfigImpl::upstreamHttpProtocolOptions() const {
-  return absl::nullopt;
+  return upstream_http_protocol_options_;
 }
 
 const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
 HttpProtocolOptionsConfigImpl::alternateProtocolsCacheOptions() const {
-  return absl::nullopt;
+  return alternate_protocols_cache_options_;
 }
 
 const std::vector<Router::ShadowPolicyPtr>& HttpProtocolOptionsConfigImpl::shadowPolicies() const {
@@ -51,10 +51,10 @@ const Router::RetryPolicy* HttpProtocolOptionsConfigImpl::retryPolicy() const { 
 const Http::HashPolicy* HttpProtocolOptionsConfigImpl::hashPolicy() const { return nullptr; }
 
 bool HttpProtocolOptionsConfigImpl::matches(const Upstream::HostDescription& host) const {
-  if (!host->metadata()) {
+  if (!host.metadata()) {
     return false;
   }
-  return matcher_.match(*host->metadata());
+  return matcher_.match(*host.metadata());
 }
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
@@ -72,28 +72,29 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
 Upstream::HttpProtocolOptionsConfigOptConstRef
 ProtocolOptionsConfigImpl::get(const Upstream::HostDescription& host) const {
   for (const auto& option : options_) {
-    if (option.match(host)) {
+    if (option.matches(host)) {
       return option;
     }
   }
   return absl::nullopt;
 }
 
-HostHttpProtocolOptionsConfigConstSharedPtr
+Upstream::HostHttpProtocolOptionsConfigConstSharedPtr
 ProtocolOptionsConfigFactory::createHostHttpProtocolOptionsConfig(
     const Protobuf::Message& config,
-    Server::Configuration::ProtocolOptionsFactoryContext& context) {
+    Server::Configuration::ProtocolOptionsFactoryContext& context) const {
   const auto& conf = MessageUtil::downcastAndValidate<
       const envoy::extensions::upstreams::host_http::v3::HostHttpProtocolOptions&>(
       config, context.messageValidationVisitor());
-  return std::make_shared<const ProtocolOptionsConfigImpl>(config, context.serverFactoryContext());
+  return std::make_shared<const ProtocolOptionsConfigImpl>(conf, context.serverFactoryContext());
 }
 
 ProtobufTypes::MessagePtr ProtocolOptionsConfigFactory::createEmptyProtocolOptionsProto() {
   return std::make_unique<envoy::extensions::upstreams::host_http::v3::HostHttpProtocolOptions>();
 }
 
-REGISTER_FACTORY(ProtocolOptionsConfigFactory, Upstream::HostHttpProtocolOptionsConfigFactory);
+REGISTER_FACTORY(ProtocolOptionsConfigFactory,
+                 Server::Configuration::HostHttpProtocolOptionsConfigFactory);
 
 } // namespace HostHttp
 } // namespace Upstreams

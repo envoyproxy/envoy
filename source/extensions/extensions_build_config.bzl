@@ -403,6 +403,12 @@ EXTENSIONS = {
     "envoy.upstreams.http.udp":                         "//source/extensions/upstreams/http/udp:config",
 
     #
+    # HTTP Upstream Protocol Options extensions, with exception of envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+    # which is built in directly and therefore does not need to be registered here.
+    # 
+    "envoy.extensions.upstreams.host_http.v3.HostHttpProtocolOptions": "//source/extensions/upstreams/host_http:config",
+
+    #
     # Watchdog actions
     #
 

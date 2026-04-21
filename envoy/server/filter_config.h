@@ -164,7 +164,6 @@ class HostHttpProtocolOptionsConfigFactory : public ProtocolOptionsFactory {
 public:
   ~HostHttpProtocolOptionsConfigFactory() override = default;
 
-
   /**
    * @return a specific implementation of the HostHttpProtocolOptionsConfig configured for the
    *         cluster.

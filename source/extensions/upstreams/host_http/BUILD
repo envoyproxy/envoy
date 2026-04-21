@@ -9,9 +9,9 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "host_config",
-    srcs = ["host_config.cc"],
-    hdrs = ["host_config.h"],
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/registry",

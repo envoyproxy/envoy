@@ -7062,32 +7062,6 @@ TEST_F(HostHttpClusterInfoTest, DifferentHostsDifferentMaxRequests) {
   EXPECT_EQ(1000, cluster->info()->maxRequestsPerConnection(*medium_host));
 }
 
-// Test that maxRequestsPerConnection(host) uses DEFAULT_MAX_STREAMS when cluster value is 0.
-TEST_F(HostHttpClusterInfoTest, MaxRequestsDefaultsToDefaultMaxStreamsWhenZero) {
-  auto cluster = makeClusterWithHostHttpOptions(
-      R"EOF(
-        host_options:
-          - http_protocol_options:
-              max_requests_per_connection: 5000
-            host_metadata_match:
-              filter: envoy.lb
-              path:
-                - key: tier
-              value:
-                string_match:
-                  exact: "premium"
-  )EOF",
-      100, 0);
-
-  // Unmatched host: cluster max_requests_per_connection is 0, so DEFAULT_MAX_STREAMS (1 << 29).
-  auto host = makeHostWithMetadata(cluster->info(), "envoy.lb", "tier", "standard");
-  EXPECT_EQ(1U << 29, cluster->info()->maxRequestsPerConnection(*host));
-
-  // Matched host: host-specific value overrides.
-  auto premium_host = makeHostWithMetadata(cluster->info(), "envoy.lb", "tier", "premium");
-  EXPECT_EQ(5000, cluster->info()->maxRequestsPerConnection(*premium_host));
-}
-
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -43,6 +43,10 @@ private:
   Http::Http1Settings http1_settings_{};
   envoy::config::core::v3::Http3ProtocolOptions http3_options_{};
   std::vector<Router::ShadowPolicyPtr> shadow_policies_{};
+  absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
+      upstream_http_protocol_options_{};
+  absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
+      alternate_protocols_cache_options_{};
   envoy::config::core::v3::HttpProtocolOptions http_options_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   Matchers::MetadataMatcher matcher_;
@@ -69,11 +73,12 @@ private:
  * ProtocolOptionsFactory that loads and returns configuration for the host-specific HTTP protocol
  * options.
  */
-class ProtocolOptionsConfigFactory : public Upstream::HostHttpProtocolOptionsConfigFactory {
+class ProtocolOptionsConfigFactory
+    : public Server::Configuration::HostHttpProtocolOptionsConfigFactory {
 public:
   ~ProtocolOptionsConfigFactory() override = default;
 
-  HostHttpProtocolOptionsConfigConstSharedPtr createHostHttpProtocolOptionsConfig(
+  Upstream::HostHttpProtocolOptionsConfigConstSharedPtr createHostHttpProtocolOptionsConfig(
       const Protobuf::Message& config,
       Server::Configuration::ProtocolOptionsFactoryContext& context) const override;
 
