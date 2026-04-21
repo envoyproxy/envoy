@@ -2,10 +2,6 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: geoip
-  change: |
-    :ref:`Envoy Http Geoip filter extension
-    <envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip>` has been promoted to stable status.
 - area: tcp_proxy
   change: |
     The TCP proxy filter now requires :ref:`max_early_data_bytes
@@ -41,6 +37,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: geoip
+  change: |
+    :ref:`Envoy Http Geoip filter extension
+    <envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip>` has been promoted to stable status.
 - area: load_balancing
   change: |
     Changed the default behavior of ``OrcaWeightManager`` to prefer named metrics over application
