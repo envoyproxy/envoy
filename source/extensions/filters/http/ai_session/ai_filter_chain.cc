@@ -67,10 +67,8 @@ void AiFilterChain::onJsonRpcBegin() {
   dispatchBegin(0);
 }
 
-// After any dispatchX() call, a filter may have called sendJsonRpcError()
-// which sets chain_state_ = Error.  Guard: never overwrite Error with Stopped.
-// This matches how FilterManager handles sendLocalReply() called from within
-// a filter callback.
+// Guard: a filter may call sendJsonRpcError() inside a dispatch callback,
+// setting chain_state_ = Error.  Never overwrite Error with Stopped.
 #define HANDLE_STOP_OR_ERROR(stopped_at_var)         \
   do {                                               \
     if (chain_state_ == ChainState::Error) return;   \
@@ -307,11 +305,6 @@ void AiFilterChain::drainPending() {
     }
     current_event_valid_ = false;
   }
-}
-
-void AiFilterChain::replayEvent(const PendingEvent& event) {
-  // Helper kept for completeness; drainPending() handles the loop directly.
-  (void)event;
 }
 
 // =============================================================================

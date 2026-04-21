@@ -39,17 +39,9 @@ struct AiSessionManagerSlot : public ThreadLocal::ThreadLocalObject {
 // ---------------------------------------------------------------------------
 // buildFilterChain
 //
-// Resolves the ordered AI filter factory list from the AiSession proto config.
-//
-// For each TypedExtensionConfig entry in ai_session.ai_filters():
-//   1. Resolve factory by type URL (preferred) or name:
-//        Config::Utility::getAndCheckFactory<NamedAiFilterConfigFactory>(entry)
-//   2. Deserialise the typed_config Any into the factory's specific proto:
-//        Config::Utility::translateToFactoryConfig(entry, validator, *factory)
-//   3. Call factory->createAiFilterFactory(*config) to get the per-request lambda.
-//
-// This is the AI-layer analogue of how HCM processes its http_filters list:
-// for each entry it calls getAndCheckFactory + createFilterFactoryFromProto.
+// Resolves each TypedExtensionConfig entry in ai_session.ai_filters() into
+// an AiFilterFactory: looks up the factory by type URL, deserializes the
+// typed_config Any, and calls createAiFilterFactory().
 // ---------------------------------------------------------------------------
 std::vector<AiFilterFactory>
 buildFilterChain(const envoy::extensions::filters::http::ai_session::v3::AiSession& proto,
@@ -63,9 +55,6 @@ buildFilterChain(const envoy::extensions::filters::http::ai_session::v3::AiSessi
     RELEASE_ASSERT(factory != nullptr,
                    absl::StrCat("AI filter factory not found for entry: '", entry.name(), "'"));
 
-    // Deserialise the typed_config Any into the factory's specific proto.
-    // Config::Utility::translateToFactoryConfig calls createEmptyConfigProto()
-    // on the factory and then unpacks the Any into it.
     auto config = Config::Utility::translateToFactoryConfig(entry, validator, *factory);
 
     factories.push_back(factory->createAiFilterFactory(*config));
@@ -122,22 +111,8 @@ Http::FilterFactoryCb AiSessionFilterFactory::createFilterFactoryFromProtoTyped(
       std::make_shared<AiSessionFilterConfig>(context, std::move(filter_factories));
 
   // FilterFactoryCb — called once per HTTP request on the worker thread.
-  //
-  // Full call path once this filter is installed:
-  //
-  //   HCM::onData()
-  //     → HTTP codec
-  //       → ActiveStream::decodeHeaders()
-  //         → JsonRpcConnectionManager::decodeHeaders()
-  //             isJsonRpcContentType? → no  → Continue (pass through)
-  //                                  → yes → manager_.newStream(headers)
-  //                                           → AiSessionManager::newStream()
-  //                                               → getOrCreateSession()
-  //                                               → AiFilterChain(McpAuth→McpInit→McpContext)
-  //       → ActiveStream::decodeData()
-  //         → JsonRpcConnectionManager::decodeData()
-  //             → JsonRpcParser::parse()
-  //                 → AiFilterChain::onMethod / onParams / onJsonRpcComplete
+  // JsonRpcConnectionManager borrows the AiSessionManager& from the TLS slot
+  // and calls newStream() for each JSON-RPC request it identifies.
   return [config](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamDecoderFilter(
         std::make_shared<JsonRpc::JsonRpcConnectionManager>(config->manager()));

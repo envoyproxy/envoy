@@ -33,34 +33,31 @@ namespace AiSession {
 using AiFilterFactory = std::function<std::unique_ptr<AiStreamFilter>()>;
 
 /**
- * AiSessionManager — the ConnectionManagerImpl analog for the AI layer.
+ * AiSessionManager — per-worker session store and filter-chain factory.
  *
  * Responsibilities:
- *
- *   1. Implement JsonRpcConnectionManagerCallbacks::newStream() so that
- *      JsonRpcConnectionManager can hand off each JSON-RPC request here.
- *
- *   2. Manage the session map: look up an existing AiSession by the
- *      Mcp-Session-Id header (or equivalent), or create a new one if absent.
- *      This is the cross-request lifecycle that HCM does not need to handle
- *      (HTTP is stateless per-request; MCP / AI protocols are not).
- *
- *   3. For each request: instantiate a fresh AiFilterChain by calling each
- *      registered AiFilterFactory once.  This is analogous to HCM calling
- *      each FilterFactory in its http_filters list for every new ActiveStream.
- *
- *   4. Return the AiFilterChain (as a JsonRpcDecoder&) to the caller; from
- *      that point the chain drives itself via the JsonRpcDecoder callbacks.
+ *   1. Implement JsonRpcConnectionManagerCallbacks::newStream() to receive
+ *      each JSON-RPC request from JsonRpcConnectionManager.
+ *   2. Look up an existing AiSession by Mcp-Session-Id header, or create one.
+ *   3. Build a fresh AiFilterChain per request by calling each AiFilterFactory.
+ *   4. Return the chain as a JsonRpcDecoder& to drive parse-event dispatch.
  *
  * Session lifetime:
- *   Sessions are created on the first request that carries a session ID.
- *   They are removed via destroySession() (e.g. when a DELETE /mcp is seen
- *   or the session times out).
+ *   Sessions are created on the first request carrying a session ID and
+ *   removed via destroySession() (e.g. on DELETE /mcp or timeout).
  *
- * Concurrency:
- *   For HTTP/1.1 one session handles at most one in-flight request at a time.
- *   The active AiFilterChain is owned by the AiSession and replaced on every
- *   new request.  (HTTP/2 multiplexing would require a list of chains.)
+ * Per-worker scope:
+ *   One AiSessionManager lives per Envoy worker thread (via TLS).  Session
+ *   state is only coherent across requests that land on the same worker —
+ *   i.e., the same TCP connection.  If the MCP client reconnects and the new
+ *   connection is dispatched to a different worker, the session map on that
+ *   worker will not contain the old session.  No cross-worker session sharing
+ *   is implemented; connection-level affinity is assumed.
+ *
+ * Concurrency within one connection:
+ *   For HTTP/1.1, one session has at most one in-flight request at a time.
+ *   The active AiFilterChain is owned by the AiSession and replaced on each
+ *   new request.  HTTP/2 multiplexing would require a list of active chains.
  */
 class AiSessionManager : public JsonRpc::JsonRpcConnectionManagerCallbacks,
                          public Logger::Loggable<Logger::Id::filter> {
@@ -77,21 +74,8 @@ public:
 
   /**
    * Called once per JSON-RPC HTTP request by JsonRpcConnectionManager.
-   *
-   * Mirrors ServerConnectionCallbacks::newStream():
-   *   - The codec calls newStream() once per HTTP request to get a
-   *     RequestDecoder, then feeds it decodeHeaders / decodeData.
-   *   - Here, JsonRpcConnectionManager calls newStream() once per request
-   *     to get a JsonRpcDecoder, then feeds it onMethod / onId / onParams.
-   *
-   * What this method does:
-   *   1. Extract session ID from `request_headers`.
-   *   2. Look up or create the AiSession.
-   *   3. Build a fresh AiFilterChain from filter_factories_.
-   *   4. Inject `decoder_callbacks` into the chain so filters can call
-   *      sendLocalReply() via sendJsonRpcError().
-   *   5. Attach the chain to the session (AiSession::beginRequest).
-   *   6. Return the chain as a JsonRpcDecoder&.
+   * Extracts the session ID, looks up or creates the AiSession, builds a
+   * fresh AiFilterChain, and returns it as a JsonRpcDecoder&.
    */
   JsonRpc::JsonRpcDecoder&
   newStream(const Http::RequestHeaderMap& request_headers,
@@ -124,20 +108,18 @@ private:
   // Look up or create a session.
   AiSession& getOrCreateSession(const std::string& session_id);
 
-  // Build a fresh per-request filter list from filter_factories_.
-  // Mirrors HCM instantiating a FilterChain for each new ActiveStream.
   std::vector<std::unique_ptr<AiStreamFilter>> buildFilters();
 
   // -------------------------------------------------------------------------
   // State
   // -------------------------------------------------------------------------
 
-  // Registered filter factories — analogous to HCM's list of FilterFactoryCb.
-  // Called for every new JSON-RPC request to produce the per-request chain.
+  // Registered filter factories — called for every new JSON-RPC request to
+  // produce the per-request chain.
   std::vector<AiFilterFactory> filter_factories_;
 
   // Live sessions, keyed by session ID.
-  // Analogous to HCM's streams_ list, but sessions outlive individual requests.
+  // Sessions outlive individual requests but are scoped to this worker thread.
   absl::flat_hash_map<std::string, std::unique_ptr<AiSession>> sessions_;
 
   // The default session used when the client sends no session ID.

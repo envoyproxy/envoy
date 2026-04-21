@@ -16,7 +16,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiSession {
 
-// Short-hand aliases for the generated proto types.
 using McpAuthProto =
     envoy::extensions::filters::http::ai_session::v3::McpAuthConfig;
 using McpInitProto =
@@ -25,9 +24,7 @@ using McpContextProto =
     envoy::extensions::filters::http::ai_session::v3::McpContextConfig;
 
 // ---------------------------------------------------------------------------
-// McpAuthFilterFactory
-//
-// Registers "envoy.ai_filters.mcp_auth".
+// McpAuthFilterFactory — registers "envoy.ai_filters.mcp_auth"
 //
 // Reads identity_header and admin_method_prefix from McpAuthConfig.
 // The filter allows "initialize" unconditionally; all other methods require
@@ -36,12 +33,9 @@ using McpContextProto =
 class McpAuthFilterFactory : public NamedAiFilterConfigFactory {
 public:
   AiFilterFactory createAiFilterFactory(const Protobuf::Message& proto_config) override {
-    // Config is consumed here (at config-load time), not per-request.
-    // Fields with empty-string defaults fall back to the filter's built-ins.
     const auto& cfg = MessageUtil::downcastAndValidate<const McpAuthProto&>(
         proto_config, ProtobufMessage::getNullValidationVisitor());
 
-    // Capture config values by value so the lambda is self-contained.
     const std::string identity_header =
         cfg.identity_header().empty() ? "x-mcp-identity" : cfg.identity_header();
     const std::string admin_prefix =
@@ -63,11 +57,9 @@ public:
 };
 
 // ---------------------------------------------------------------------------
-// McpInitFilterFactory
+// McpInitFilterFactory — registers "envoy.ai_filters.mcp_init"
 //
-// Registers "envoy.ai_filters.mcp_init".
-//
-// Reads protocol_version and allowed_before_init from McpInitConfig.
+// Reads protocol_version from McpInitConfig.
 // The filter rejects any non-initialize request on an uninitialised session.
 // On "initialize" it stores client capabilities in the AiSession.
 // ---------------------------------------------------------------------------
@@ -94,11 +86,9 @@ public:
 };
 
 // ---------------------------------------------------------------------------
-// McpContextFilterFactory
+// McpContextFilterFactory — registers "envoy.ai_filters.mcp_context"
 //
-// Registers "envoy.ai_filters.mcp_context".
-//
-// Reads max_context_turns and tracked_methods from McpContextConfig.
+// Reads max_context_turns from McpContextConfig.
 // The filter appends each completed exchange to the session context window.
 // ---------------------------------------------------------------------------
 class McpContextFilterFactory : public NamedAiFilterConfigFactory {
@@ -120,13 +110,6 @@ public:
   std::string name() const override { return "envoy.ai_filters.mcp_context"; }
 };
 
-// ---------------------------------------------------------------------------
-// Static registrations.
-//
-// These three lines make the factories discoverable via:
-//   Config::Utility::getAndCheckFactory<NamedAiFilterConfigFactory>(entry)
-// where entry is a TypedExtensionConfig from the AiSession.ai_filters list.
-// ---------------------------------------------------------------------------
 REGISTER_FACTORY(McpAuthFilterFactory, NamedAiFilterConfigFactory);
 REGISTER_FACTORY(McpInitFilterFactory, NamedAiFilterConfigFactory);
 REGISTER_FACTORY(McpContextFilterFactory, NamedAiFilterConfigFactory);

@@ -36,12 +36,11 @@ class ActiveAiFilter : public AiStreamFilterCallbacks,
 public:
   ActiveAiFilter(AiFilterChain& chain, std::unique_ptr<AiStreamFilter> filter)
       : chain_(chain), handle_(std::move(filter)) {
-    // Inject callbacks — mirrors ActiveStreamDecoderFilter ctor calling
-    // handle_->setDecoderFilterCallbacks(*this).
+    // Mirrors ActiveStreamDecoderFilter ctor calling setDecoderFilterCallbacks(*this).
     handle_->setCallbacks(*this);
   }
 
-  // IterationState mirrors ActiveStreamFilterBase::IterationState.
+  // Mirrors ActiveStreamFilterBase::IterationState.
   enum class IterationState : uint8_t {
     Continue, // Filter has not stopped (or has resumed after stopping).
     Stopped,  // Filter returned StopIteration; chain is waiting for continueProcessing().
@@ -76,7 +75,7 @@ private:
 using ActiveAiFilterPtr = std::unique_ptr<ActiveAiFilter>;
 
 // ---------------------------------------------------------------------------
-// AiFilterChain — the FilterManagerImpl analog
+// AiFilterChain — the FilterManagerImpl analog for the AI layer.
 //
 // One instance per JSON-RPC request. Implements JsonRpcDecoder so it can be
 // returned directly from JsonRpcConnectionManagerCallbacks::newStream().
@@ -98,7 +97,7 @@ using ActiveAiFilterPtr = std::unique_ptr<ActiveAiFilter>;
 //     → resume current event from filter[i+1]
 //     → drain pending_events_ through the full chain
 //
-// This means each filter sees each event exactly once, in document order.
+// Each filter sees each event exactly once, in document order.
 // ---------------------------------------------------------------------------
 class AiFilterChain : public JsonRpc::JsonRpcDecoder,
                       public Logger::Loggable<Logger::Id::filter> {
@@ -182,11 +181,7 @@ private:
   size_t dispatchComplete(size_t start_idx);
   void   dispatchError(absl::string_view message);
 
-  // After resumeFrom(), replay any queued events through the full chain.
   void drainPending();
-
-  // Dispatch a single PendingEvent through the whole chain.
-  void replayEvent(const PendingEvent& event);
 
   AiSession& session_;
   std::vector<ActiveAiFilterPtr> filters_;
