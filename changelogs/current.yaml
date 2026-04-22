@@ -423,9 +423,9 @@ removed_config_or_runtime:
 new_features:
 - area: logging
   change: |
-    Added ``%E`` as a custom spdlog pattern flag that emits the Envoy version string. It can be
+    Added ``%N`` as a custom spdlog pattern flag that emits the Envoy version string. It can be
     used in the ``--log-format`` CLI flag or the bootstrap ``application_log_config.log_format``
-    to include the running version in every log line, e.g. ``--log-format "[%E][%l] %v"``.
+    to include the running version in every log line, e.g. ``--log-format "[%N][%l] %v"``.
 - area: ext_authz
   change: |
     Added :ref:`shadow_mode

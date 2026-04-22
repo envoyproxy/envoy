@@ -481,8 +481,8 @@ public:
 };
 
 /**
- * When added to a formatter, this adds 'E' as a user defined flag in the log pattern that emits
- * the Envoy version string set via setVersion(). Use %E in --log-format to include the running
+ * When added to a formatter, this adds 'N' as a user defined flag in the log pattern that emits
+ * the Envoy version string set via setVersion(). Use %N in --log-format to include the running
  * version in every log line. Call setVersion() once at server start-up (before any logs are
  * written) with the result of VersionInfo::version().
  */
@@ -495,7 +495,7 @@ public:
     return spdlog::details::make_unique<EnvoyVersion>();
   }
 
-  constexpr static char Placeholder = 'E';
+  constexpr static char Placeholder = 'N';
 };
 
 } // namespace CustomFlagFormatter

@@ -244,8 +244,14 @@ TEST_P(LoggerCustomFlagsTest, LogMessageWithTagsAndExtractTags) {
 }
 
 TEST_P(LoggerCustomFlagsTest, LogMessageWithEnvoyVersion) {
-  // %E emits the Envoy version string from envoyVersionString().
-  expectLogMessage("%E %v", "hello", absl::StrCat(envoyVersionString(), " hello"));
+  // Sanity-check the version string before using it as expected output: it must be non-empty
+  // and follow the slash-separated format produced by envoyVersionString().
+  const std::string& version = envoyVersionString();
+  EXPECT_FALSE(version.empty());
+  EXPECT_NE(version.find('/'), std::string::npos);
+
+  // %N emits the Envoy version string from envoyVersionString().
+  expectLogMessage("%N %v", "hello", absl::StrCat(version, " hello"));
   expectLogMessage("%v", "hello", "hello");
 }
 
