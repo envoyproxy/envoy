@@ -2105,6 +2105,20 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
   envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
 }
 
+// Covers the `dispatcher == nullptr` early return of the listener filter scheduler.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterSchedulerCommitWithoutCallbacksIsNoOp) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_->setCallbacksForTest(nullptr);
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
 // =============================================================================
 // Tests for socket option callbacks.
 // =============================================================================
@@ -2623,6 +2637,95 @@ TEST_F(DynamicModuleListenerFilterHttpCalloutTest, FilterDestructionCancelsPendi
   EXPECT_CALL(request, cancel());
   // Destroy the filter. This should cancel all pending callouts.
   filter_.reset();
+}
+
+// Covers the `on_listener_filter_http_callout_done_ == nullptr` branch of `onSuccess`.
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, HttpCalloutOnSuccessWithoutCalloutDoneHook) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+  const Http::AsyncClient::Callbacks* captured_callback = nullptr;
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillOnce(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::DoAll(testing::WithArg<1>([&](const Http::AsyncClient::Callbacks& cb) {
+                                 captured_callback = &cb;
+                               }),
+                               testing::Return(&request)));
+
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
+      5000);
+  ASSERT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success, result);
+  ASSERT_NE(nullptr, captured_callback);
+
+  filter_config_->on_listener_filter_http_callout_done_ = nullptr;
+
+  Http::ResponseMessagePtr response =
+      std::make_unique<Http::ResponseMessageImpl>(Http::ResponseHeaderMapImpl::create());
+  response->headers().setStatus(200);
+  const_cast<Http::AsyncClient::Callbacks*>(captured_callback)
+      ->onSuccess(request, std::move(response));
+}
+
+// Covers the `on_listener_filter_http_callout_done_ == nullptr` branch of `onFailure` along with
+// the `ExceedResponseBufferLimit` path of the reason switch.
+TEST_F(DynamicModuleListenerFilterHttpCalloutTest, HttpCalloutOnFailureWithoutCalloutDoneHook) {
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  NiceMock<Http::MockAsyncClient> async_client;
+  Http::MockAsyncClientRequest request(&async_client);
+  const Http::AsyncClient::Callbacks* captured_callback = nullptr;
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&cluster));
+  EXPECT_CALL(cluster, httpAsyncClient()).WillOnce(testing::ReturnRef(async_client));
+  EXPECT_CALL(async_client, send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::DoAll(testing::WithArg<1>([&](const Http::AsyncClient::Callbacks& cb) {
+                                 captured_callback = &cb;
+                               }),
+                               testing::Return(&request)));
+
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {.key_ptr = ":method", .key_length = 7, .value_ptr = "GET", .value_length = 3},
+      {.key_ptr = ":path", .key_length = 5, .value_ptr = "/test", .value_length = 5},
+      {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
+  };
+
+  auto result = envoy_dynamic_module_callback_listener_filter_http_callout(
+      filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
+      5000);
+  ASSERT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success, result);
+  ASSERT_NE(nullptr, captured_callback);
+
+  filter_config_->on_listener_filter_http_callout_done_ = nullptr;
+
+  const_cast<Http::AsyncClient::Callbacks*>(captured_callback)
+      ->onFailure(request, Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
+}
+
+// Covers `DynamicModuleListenerFilter::onScheduled` when `in_module_filter_` is null.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterOnScheduledWithoutInModuleFilterIsNoOp) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onScheduled(42);
+}
+
+// Covers the `on_listener_filter_config_scheduled_ == nullptr` branch of
+// `DynamicModuleListenerFilterConfig::onScheduled`.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterConfigOnScheduledWithoutHookIsNoOp) {
+  filter_config_->on_listener_filter_config_scheduled_ = nullptr;
+  filter_config_->onScheduled(42);
 }
 
 } // namespace ListenerFilters

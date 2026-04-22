@@ -348,6 +348,8 @@ public:
   void deferredDeleteRequest(HttpRequestInternal* req);
 
 private:
+  friend class TestFilter;
+
   bool hasDestroyed() {
     Thread::LockGuard lock(mutex_);
     return has_destroyed_;

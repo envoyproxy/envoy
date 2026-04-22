@@ -2066,13 +2066,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
 HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
     LoadBalancerContext* context) {
   auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
-  auto host_and_strict_mode = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
-                                                              override_host_statuses_, context);
-  if (host_and_strict_mode.first != nullptr) {
-    return {std::move(host_and_strict_mode.first)};
+  auto override_result = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                         override_host_statuses_, context);
+  if (override_result.host != nullptr) {
+    return {std::move(override_result.host)};
   }
 
-  if (!host_and_strict_mode.second) {
+  if (!override_result.strict) {
     Upstream::HostSelectionResponse host_selection = lb_->chooseHost(context);
     if (host_selection.host || host_selection.cancelable) {
       return host_selection;
@@ -2084,16 +2084,26 @@ HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cluster
 
   cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
   ENVOY_LOG(debug, "no healthy host");
-  return {nullptr};
+  HostSelectionResponse response{nullptr};
+  // Only apply the custom failure status when the destination is missing from
+  // available endpoints, not when it exists but is unhealthy.
+  if (override_result.status == HostUtility::OverrideHostSelectionStatus::NotFound) {
+    if (context != nullptr) {
+      if (auto override_host = context->overrideHostToSelect(); override_host.has_value()) {
+        response.failure_status = override_host->status_on_strict_destination_not_found;
+      }
+    }
+  }
+  return response;
 }
 
 HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
     LoadBalancerContext* context) {
   auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
-  auto host_and_strict_mode = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
-                                                              override_host_statuses_, context);
-  if (host_and_strict_mode.first != nullptr) {
-    return std::move(host_and_strict_mode.first);
+  auto override_result = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                         override_host_statuses_, context);
+  if (override_result.host != nullptr) {
+    return std::move(override_result.host);
   }
   // TODO(wbpcode): should we do strict mode check of override host here?
   return lb_->peekAnotherHost(context);

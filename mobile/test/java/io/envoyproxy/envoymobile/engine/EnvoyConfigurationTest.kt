@@ -82,6 +82,7 @@ class EnvoyConfigurationTest {
     dnsNumRetries: Int? = 3,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
+    enableEarlyData: Boolean = true,
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
     quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
@@ -136,6 +137,7 @@ class EnvoyConfigurationTest {
       dnsNumRetries ?: -1,
       enableDrainPostDnsRefresh,
       enableHttp3,
+      enableEarlyData,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
       quicHints,
@@ -326,5 +328,16 @@ class EnvoyConfigurationTest {
     val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate).contains("QuicPlatformPacketWriterConfig")
     assertThat(resolvedTemplate).contains("connection_migration { migrate_idle_connections { } }")
+  }
+
+  @Test
+  fun `configuration resolves early data policy when early data disabled`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      enableEarlyData = false
+    )
+
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
+    assertThat(resolvedTemplate).contains("envoy.route.early_data_policy.default")
   }
 }
