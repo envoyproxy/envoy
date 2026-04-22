@@ -399,6 +399,9 @@ bug_fixes:
     bootstrap extensions were completely skipped in validation mode, which meant their configs were
     not validated and any providers or singletons they register were unavailable to downstream config
     elements that depend on them.
+- area: http2
+  change: |
+    Apply nghttp2 CVE-2026-27135 patch.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
