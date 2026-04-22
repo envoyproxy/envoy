@@ -10,13 +10,16 @@
 namespace Envoy {
 namespace Quic {
 
-// Minimal TlsServerHandshaker subclass that pins a ServerContextImpl at
-// connection creation time. Ensures session ticket keys remain valid for
-// the connection's lifetime, matching TCP TLS behavior.
+// TlsServerHandshaker subclass for QUIC session ticket handling.
 //
-// Also owns the per-connection session ticket callback plumbing:
-// self-registers in SSL ex_data so ticketKeyCallback() can retrieve
-// the pinned context from an SSL* in a C callback.
+// The session ticket key callback is installed on QUICHE's shared ssl context,
+// so every connection reaches the same callback regardless of which filter
+// chain served it. To find the right session ticket keys at callback time,
+// each connection pins a shared pointer to its ServerContextImpl in ssl ex
+// data at creation time. The pinned pointer keeps the context alive for the
+// connection even after an SDS update rotates the factory's active context,
+// and it matches TCP TLS behavior where each connection is bound to the
+// ServerContextImpl that was current at connection creation.
 class EnvoyTlsServerHandshaker : public quic::TlsServerHandshaker {
 public:
   EnvoyTlsServerHandshaker(quic::QuicSession* session,

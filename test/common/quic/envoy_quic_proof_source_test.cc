@@ -170,6 +170,34 @@ public:
     EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
   }
 
+  void expectCertChainAndPrivateKey(const std::string& cert, bool expect_private_key,
+                                    bool expect_fail_to_load = false) {
+    int times = -1;
+    if (expect_fail_to_load) {
+      times = 0;
+    } else if (expect_private_key) {
+      times = 2;
+    } else {
+      times = 1;
+    }
+    EXPECT_CALL(listen_socket_, ioHandle()).Times(times);
+    EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+        .WillRepeatedly(Invoke(
+            [&](const Network::ConnectionSocket& connection_socket, const StreamInfo::StreamInfo&) {
+              EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
+                        *connection_socket.connectionInfoProvider().localAddress());
+              EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
+                        *connection_socket.connectionInfoProvider().remoteAddress());
+              EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
+              EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
+              return &filter_chain_;
+            }));
+    EXPECT_CALL(filter_chain_, transportSocketFactory())
+        .WillRepeatedly(ReturnRef(*transport_socket_factory_));
+
+    loadCertsIntoFactory(cert, expect_private_key);
+  }
+
   // Sets up mock config expectations and triggers cert loading into the transport
   // socket factory. Does NOT set proof-source-level expectations (ioHandle,
   // findFilterChain, transportSocketFactory) — callers add those as needed.
@@ -210,34 +238,6 @@ public:
     absl::Status callback_status = secret_update_callback_();
     THROW_IF_NOT_OK(callback_status);
     ASSERT_TRUE(callback_status.ok());
-  }
-
-  void expectCertChainAndPrivateKey(const std::string& cert, bool expect_private_key,
-                                    bool expect_fail_to_load = false) {
-    int times = -1;
-    if (expect_fail_to_load) {
-      times = 0;
-    } else if (expect_private_key) {
-      times = 2;
-    } else {
-      times = 1;
-    }
-    EXPECT_CALL(listen_socket_, ioHandle()).Times(times);
-    EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
-        .WillRepeatedly(Invoke(
-            [&](const Network::ConnectionSocket& connection_socket, const StreamInfo::StreamInfo&) {
-              EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                        *connection_socket.connectionInfoProvider().localAddress());
-              EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                        *connection_socket.connectionInfoProvider().remoteAddress());
-              EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
-              EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
-              return &filter_chain_;
-            }));
-    EXPECT_CALL(filter_chain_, transportSocketFactory())
-        .WillRepeatedly(ReturnRef(*transport_socket_factory_));
-
-    loadCertsIntoFactory(cert, expect_private_key);
   }
 
 protected:

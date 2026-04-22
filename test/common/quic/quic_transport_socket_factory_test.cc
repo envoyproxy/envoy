@@ -113,6 +113,11 @@ downstream_tls_context:
                             "TLS Client Authentication is not supported over QUIC");
 }
 
+// QuicServerTransportSocketFactory implements DownstreamTransportSocketFactory
+// only so it can be stored on a FilterChain, not to actually create transport
+// sockets — QUIC connections use the QUICHE stack directly via
+// EnvoyQuicServerSession. Verify createDownstreamTransportSocket() panics if
+// accidentally called.
 TEST_F(QuicServerTransportSocketFactoryConfigTest, CreateDownstreamTransportSocketPanics) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 downstream_tls_context:

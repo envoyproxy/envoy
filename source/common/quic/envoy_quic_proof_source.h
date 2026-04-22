@@ -40,11 +40,6 @@ private:
     const Network::FilterChain& filter_chain_;
   };
 
-  absl::optional<TransportSocketFactoryWithFilterChain>
-  getTransportSocketAndFilterChain(const quic::QuicSocketAddress& server_address,
-                                   const quic::QuicSocketAddress& client_address,
-                                   const std::string& hostname);
-
   struct CertWithFilterChain {
     quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_;
     std::shared_ptr<quic::CertificatePrivateKey> private_key_;
@@ -53,6 +48,11 @@ private:
 
   CertWithFilterChain getTlsCertAndFilterChain(const TransportSocketFactoryWithFilterChain& data,
                                                const std::string& hostname, bool* cert_matched_sni);
+
+  absl::optional<TransportSocketFactoryWithFilterChain>
+  getTransportSocketAndFilterChain(const quic::QuicSocketAddress& server_address,
+                                   const quic::QuicSocketAddress& client_address,
+                                   const std::string& hostname);
 
   Network::Socket& listen_socket_;
   Network::FilterChainManager* filter_chain_manager_{nullptr};
