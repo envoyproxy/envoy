@@ -296,7 +296,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-04-16"
+  release_date: "2026-04-20"
   use_category:
   - controlplane
   - dataplane_core
@@ -1346,7 +1346,7 @@ skywalking_data_collect_protocol:
   project_name: "skywalking-data-collect-protocol"
   project_desc: "Data Collect Protocols of Apache SkyWalking"
   project_url: "https://github.com/apache/skywalking-data-collect-protocol"
-  release_date: "2025-11-10"
+  release_date: "2026-04-21"
   use_category:
   - observability_ext
   extensions:
