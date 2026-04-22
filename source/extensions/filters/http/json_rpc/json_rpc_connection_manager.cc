@@ -35,12 +35,15 @@ JsonRpcConnectionManager::decodeHeaders(Http::RequestHeaderMap& headers, bool en
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Obtain the per-request decoder from the application layer.
+  // Obtain the per-request JSON-RPC decoder from the application layer.
   // Mirrors ServerConnectionImpl::onMessageBeginBase() calling callbacks_.newStream().
   decoder_ = &callbacks_.newStream(headers, *decoder_callbacks_);
 
-  // Create the per-request streaming parser bound to this decoder.
-  parser_ = std::make_unique<JsonRpcParser>(*decoder_);
+  // Wire up the two-stage translation pipeline:
+  //   JsonParser (stage 1) → JsonRpcTranslator (stage 2) → JsonRpcDecoder
+  // translator_ must be created before parser_ since parser_ holds a reference to it.
+  translator_ = std::make_unique<JsonRpcTranslator>(*decoder_);
+  parser_ = std::make_unique<JsonParser>(*translator_);
 
   if (end_stream) {
     // No body will follow — finish immediately (e.g. GET with Content-Type set).

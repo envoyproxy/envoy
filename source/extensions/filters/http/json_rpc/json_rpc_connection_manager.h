@@ -8,8 +8,10 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/json_rpc/json_decoder.h"
+#include "source/extensions/filters/http/json_rpc/json_parser.h"
 #include "source/extensions/filters/http/json_rpc/json_rpc_decoder.h"
-#include "source/extensions/filters/http/json_rpc/json_rpc_parser.h"
+#include "source/extensions/filters/http/json_rpc/json_rpc_translator.h"
 
 #include "absl/status/status.h"
 
@@ -89,13 +91,17 @@ private:
 
   JsonRpcConnectionManagerCallbacks& callbacks_;
 
-  // Per-request decoder supplied by callbacks_.newStream().
+  // Per-request JSON-RPC decoder supplied by callbacks_.newStream().
   // Null until decodeHeaders() is called on a JSON-RPC request.
   JsonRpcDecoder* decoder_{nullptr};
 
-  // Per-request streaming parser.
-  // Created alongside decoder_ in decodeHeaders().
-  std::unique_ptr<JsonRpcParser> parser_;
+  // Stage 2: maps JsonDecoder events onto JsonRpcDecoder callbacks.
+  // Owns a reference to decoder_; created alongside it in decodeHeaders().
+  std::unique_ptr<JsonRpcTranslator> translator_;
+
+  // Stage 1: translates raw body bytes into JsonDecoder events.
+  // Owns a reference to translator_; created after translator_ in decodeHeaders().
+  std::unique_ptr<JsonParser> parser_;
 };
 
 } // namespace JsonRpc

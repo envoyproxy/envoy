@@ -8,6 +8,7 @@ def envoy_toolchains():
         name = "clang_platform",
         aliases = {
             "amd64": "@envoy//bazel/platforms/rbe:linux_x64",
+            "x86_64": "@envoy//bazel/platforms:macos_x86_64",
             "aarch64": "@envoy//bazel/platforms/rbe:linux_arm64",
         },
     )
