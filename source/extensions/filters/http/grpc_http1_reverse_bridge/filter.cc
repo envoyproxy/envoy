@@ -104,7 +104,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
     if (withhold_grpc_frames_) {
       // Adjust the content-length header to account for us removing the gRPC frame header.
-      adjustContentLength(headers, [](auto size) { return size - Grpc::GRPC_FRAME_HEADER_SIZE; });
+      adjustContentLength(headers, [](auto size) {
+        if (size < Grpc::GRPC_FRAME_HEADER_SIZE) {
+          return size; // Avoid underflow; decodeData will fail if body too small
+        }
+        return size - Grpc::GRPC_FRAME_HEADER_SIZE;
+      });
     }
 
     // Clear the route cache to recompute the cache. This provides additional
