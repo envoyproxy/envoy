@@ -142,7 +142,8 @@ uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
   case HeaderType::ResponseTrailers:
     return response_trailers.has_value() ? response_trailers->byteSize() : 0;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected HeaderType enum in extractHeadersByteSize");
+  return 0;
 }
 
 absl::optional<std::string> HeadersByteSizeFormatter::format(const Context& context,
@@ -264,7 +265,8 @@ absl::optional<std::string> GrpcStatusFormatter::format(const Context& context,
     return std::to_string(grpc_status.value());
   }
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected GrpcStatusFormatter::Format enum in format");
+  return absl::nullopt;
 }
 
 Protobuf::Value GrpcStatusFormatter::formatValue(const Context& context,
@@ -301,7 +303,8 @@ Protobuf::Value GrpcStatusFormatter::formatValue(const Context& context,
     return ValueUtil::numberValue(grpc_status.value());
   }
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected GrpcStatusFormatter::Format enum in formatValue");
+  return SubstitutionFormatUtils::unspecifiedValue();
 }
 
 QueryParameterFormatter::QueryParameterFormatter(absl::string_view parameter_key,
