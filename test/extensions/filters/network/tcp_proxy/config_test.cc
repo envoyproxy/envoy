@@ -73,6 +73,19 @@ TEST(ConfigTest, ConfigTest) {
   cb(connection);
 }
 
+TEST(ConfigTest, ConfigWithDrainCloseCheck) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ConfigFactory factory;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
+      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_stat_prefix("prefix");
+  config.set_cluster("cluster");
+  config.set_check_drain_close(true);
+
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(config, context).ok());
+}
+
 } // namespace TcpProxy
 } // namespace NetworkFilters
 } // namespace Extensions
