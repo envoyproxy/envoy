@@ -725,6 +725,50 @@ typed_config:
   cleanup();
 }
 
+// requestHeaders() in envoy_on_response returns the original downstream request headers.
+TEST_P(LuaIntegrationTest, RequestHeadersAccessibleInResponse) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        local req_headers = response_handle:requestHeaders()
+        response_handle:headers():add("x-echoed-path", req_headers:get(":path"))
+        response_handle:headers():add("x-echoed-authority", req_headers:get(":authority"))
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/request/headers"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("/test/request/headers", response->headers()
+                                         .get(Http::LowerCaseString("x-echoed-path"))[0]
+                                         ->value()
+                                         .getStringView());
+  EXPECT_EQ("foo.lyft.com", response->headers()
+                                .get(Http::LowerCaseString("x-echoed-authority"))[0]
+                                ->value()
+                                .getStringView());
+
+  cleanup();
+}
+
 // Upstream call followed by continuation.
 TEST_P(LuaIntegrationTest, UpstreamHttpCall) {
   const std::string FILTER_AND_CODE =
