@@ -609,6 +609,10 @@ def _nghttp2():
             "@envoy//bazel/foreign_cc:nghttp2.patch",
             "@envoy//bazel/foreign_cc:nghttp2_huffman.patch",
             "@envoy//bazel/foreign_cc:nghttp2_max_hd_nv.patch",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part1.diff",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part2.diff",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part3.diff",
+            "@envoy//bazel/foreign_cc:nghttp2-CVE-2026-27135_part4.diff",
         ],
     )
 

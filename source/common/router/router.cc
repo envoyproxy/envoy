@@ -1453,11 +1453,17 @@ void Filter::onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag response_flags,
 
   const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
-  onUpstreamAbort(timeout_response_code_, response_flags, body, false, details);
+  const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
+      (grpc_request_ && Runtime::runtimeFeatureEnabled(
+                            "envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded"))
+          ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded)
+          : absl::nullopt;
+  onUpstreamAbort(timeout_response_code_, response_flags, body, false, details, grpc_status);
 }
 
 void Filter::onUpstreamAbort(Http::Code code, StreamInfo::CoreResponseFlag response_flags,
-                             absl::string_view body, bool dropped, absl::string_view details) {
+                             absl::string_view body, bool dropped, absl::string_view details,
+                             absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   callbacks_->streamInfo().setResponseFlag(response_flags);
@@ -1474,7 +1480,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::CoreResponseFlag respo
         }
         modify_headers_(headers);
       },
-      absl::nullopt, details);
+      grpc_status, details);
 }
 
 bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,

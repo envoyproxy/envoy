@@ -296,7 +296,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-04-14"
+  release_date: "2026-04-20"
   use_category:
   - controlplane
   - dataplane_core
@@ -548,7 +548,7 @@ wasmtime:
   project_name: "wasmtime"
   project_desc: "A standalone runtime for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasmtime"
-  release_date: "2025-07-18"
+  release_date: "2026-04-09"
   use_category:
   - dataplane_ext
   extensions:
@@ -799,7 +799,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-04-06"
+  release_date: "2026-04-20"
   use_category:
   - build
   - controlplane
@@ -828,7 +828,7 @@ fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-03-27"
+  release_date: "2026-04-21"
   use_category:
   - build
   - dataplane_core
@@ -841,7 +841,7 @@ fips_cmake_linux_x86_64:
   project_name: "CMake (Linux x86_64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-03-27"
+  release_date: "2026-04-21"
   use_category:
   - build
   - dataplane_core
@@ -1346,7 +1346,7 @@ skywalking_data_collect_protocol:
   project_name: "skywalking-data-collect-protocol"
   project_desc: "Data Collect Protocols of Apache SkyWalking"
   project_url: "https://github.com/apache/skywalking-data-collect-protocol"
-  release_date: "2025-11-10"
+  release_date: "2026-04-21"
   use_category:
   - observability_ext
   extensions:
