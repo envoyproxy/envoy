@@ -423,6 +423,11 @@ new_features:
     and optionally enforce it.
 - area: lua
   change: |
+    Added ``handle:requestHeaders()`` to the :ref:`Lua filter <config_http_filters_lua>`, allowing
+    Lua scripts to access the downstream request headers from within ``envoy_on_response``. The
+    returned handle is read-only.
+- area: lua
+  change: |
     Added stats API support to the :ref:`Lua filter <config_http_filters_lua>`, allowing Lua
     scripts to create and increment counters, gauges, and histograms via
     ``handle:streamInfo():stats()``.

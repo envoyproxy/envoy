@@ -930,6 +930,104 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   EXPECT_EQ(2, stats_store_.counter("test.lua.executions").value());
 }
 
+// Access request headers from envoy_on_response.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponse) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local req_headers = response_handle:requestHeaders()
+      response_handle:logTrace(req_headers:get(":path"))
+      response_handle:logTrace(req_headers:get("x-custom"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/test"}, {"x-custom", "hello"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"trace", "/test"}, {"trace", "hello"}}), {
+        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                  filter_->encodeHeaders(response_headers, true));
+      });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// requestHeaders() returns nil when no request headers are available.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseNil) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local req_headers = response_handle:requestHeaders()
+      if req_headers == nil then
+        response_handle:logTrace("no request headers")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders()).WillOnce(Return(Http::RequestHeaderMapOptRef{}));
+  EXPECT_LOG_CONTAINS("trace", "no request headers", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// requestHeaders() is read-only: mutations should raise a Lua error.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseReadOnly) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local req_headers = response_handle:requestHeaders()
+      req_headers:add("x-should-fail", "value")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
+  EXPECT_LOG_CONTAINS("error", "header map can no longer be modified", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+// requestHeaders() from envoy_on_request returns the current request headers (non-nil).
+TEST_F(LuaHttpFilterTest, RequestHeadersInRequest) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local req_headers = request_handle:requestHeaders()
+      request_handle:logTrace(req_headers:get(":path"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/test"}};
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
+  EXPECT_LOG_CONTAINS("trace", "/test", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+              filter_->decodeHeaders(request_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
 // Response synchronous body.
 TEST_F(LuaHttpFilterTest, ResponseSynchronousBody) {
   const std::string SCRIPT{R"EOF(

@@ -540,6 +540,27 @@ int StreamHandleWrapper::luaHeaders(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaRequestHeaders(lua_State* state) {
+  ASSERT(state_ == State::Running);
+
+  Http::RequestHeaderMapOptRef request_headers = callbacks_.requestHeaders();
+  if (!request_headers.has_value()) {
+    return 0;
+  }
+
+  if (request_headers_wrapper_.get() != nullptr) {
+    request_headers_wrapper_.pushStack();
+  } else {
+    // The "can modify" callback returns false to make this wrapper read-only at the Lua level.
+    // This is intentional: callers should not mutate headers through this accessor regardless
+    // of which filter phase they are in (e.g. mutating request headers from envoy_on_response
+    // would have no effect after headers have been forwarded upstream).
+    request_headers_wrapper_.reset(
+        HeaderMapWrapper::create(state, request_headers.value().get(), [] { return false; }), true);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaBody(lua_State* state) {
   ASSERT(state_ == State::Running);
 
