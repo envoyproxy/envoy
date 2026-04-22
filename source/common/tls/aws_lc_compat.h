@@ -24,6 +24,12 @@ inline int SSL_CTX_set_compliance_policy(SSL_CTX* /*ctx*/,
                                          enum ssl_compliance_policy_t /*policy*/) {
   return 0;
 }
+
+// AWS-LC's X509_NAME_dup takes non-const X509_NAME*, unlike BoringSSL which accepts const.
+// Wrap it so call sites stay const-correct for other targets.
+inline X509_NAME* X509_NAME_dup(const X509_NAME* name) {
+  return ::X509_NAME_dup(const_cast<X509_NAME*>(name));
+}
 #endif
 
 } // namespace Envoy

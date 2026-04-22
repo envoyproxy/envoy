@@ -260,8 +260,7 @@ absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
       continue;
     }
 
-    // const_cast needed because AWS-LC's X509_NAME_dup takes non-const input.
-    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(const_cast<X509_NAME*>(name)));
+    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
       return absl::InvalidArgumentError("Failed to load trusted client CA certificate");
     }
