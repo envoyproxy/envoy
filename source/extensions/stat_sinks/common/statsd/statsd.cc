@@ -161,7 +161,8 @@ const std::string UdpStatsdSink::buildMessage(const StatType& metric, ValueType 
     return message;
   }
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected TagPosition enum in buildMessage");
+  return "";
 }
 
 template <class StatType> const std::string UdpStatsdSink::getName(const StatType& metric) const {
