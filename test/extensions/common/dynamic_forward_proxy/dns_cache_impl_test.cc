@@ -910,17 +910,18 @@ TEST_F(DnsCacheImplTest, ResolveFailureBackoffCappedByHostTtl) {
   resolve_timer->invokeCallback();
 
   // DNS fails. The raw failure backoff is 60s (dns_refresh_rate). Without the cap the next alarm
-  // would fire at T+61s. With the cap, it fires at host_ttl-elapsed+1ms = 1000-100+1 = 901ms.
+  // would fire at T+61s. The cap reduces it to host_ttl-elapsed = 1000-100 = 900ms, which is
+  // then floored at dns_min_refresh_rate = 1000ms because the cap kicked in.
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(update_callbacks_,
               onDnsResolutionComplete("foo.com:80",
                                       DnsHostInfoEquals("10.0.0.1:80", "foo.com", false),
                                       Network::DnsResolver::ResolutionStatus::Failure));
-  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(901), _));
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(1000), _));
   resolve_cb(Network::DnsResolver::ResolutionStatus::Failure, "", TestUtility::makeDnsResponse({}));
 
-  // After the capped backoff now-last_used = 1001ms > host_ttl: the host is evicted.
-  simTime().advanceTimeWait(std::chrono::milliseconds(901));
+  // After the floored backoff now-last_used = 1100ms > host_ttl (1000ms): the host is evicted.
+  simTime().advanceTimeWait(std::chrono::milliseconds(1000));
   EXPECT_CALL(update_callbacks_, onDnsHostRemove("foo.com:80"));
   resolve_timer->invokeCallback();
   checkStats(2 /* attempt */, 1 /* success */, 1 /* failure */, 1 /* address changed */,

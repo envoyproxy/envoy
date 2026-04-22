@@ -402,6 +402,13 @@ bug_fixes:
 - area: http2
   change: |
     Apply nghttp2 CVE-2026-27135 patch.
+- area: shared_pool
+  change: |
+    Fixed a leak in ``ObjectSharedPool`` when the last reference to a pooled object is released
+    on a non-main thread after the main dispatcher has started teardown. The queued cross-thread
+    deletion now carries ownership, so the object is freed whether or not the dispatcher runs
+    the queued callback. Most visibly this fixes a LeakSanitizer leak in
+    ``StrictDnsClusterImpl`` involving the ``Locality`` shared pool during server shutdown.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
