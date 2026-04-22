@@ -672,9 +672,9 @@ TEST_F(ExtractionUtilTest, ExtractStringFieldValue_OK_DefaultValue) {
 }
 
 TEST_F(ExtractionUtilTest, ExtractStringFieldValue_OK_RepeatedStringLeafNode) {
-  EXPECT_THAT(
-      ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings", test_request_raw_proto_),
-      IsOkAndHolds("repeated-string-0"));
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
+                                      test_request_raw_proto_),
+              IsOkAndHolds("repeated-string-0"));
 }
 
 TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_EmptyPath) {
