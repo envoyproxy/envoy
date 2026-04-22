@@ -282,6 +282,26 @@ TEST_F(LuaHeaderMapWrapperTest, IteratorAcrossYield) {
                             "[string \"...\"]:5: object used outside of proper scope");
 }
 
+// Verify that iterator garbage collection without completing iteration doesn't cause
+// use-after-free.
+TEST_F(LuaHeaderMapWrapperTest, IteratorGarbageCollection) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      for key, value in pairs(object) do
+        break
+      end
+      collectgarbage("collect")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl headers{{"foo", "bar"}, {"hello", "world"}};
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  start("callMe");
+}
+
 // Verify setting the HTTP1 reason phrase
 TEST_F(LuaHeaderMapWrapperTest, SetHttp1ReasonPhrase) {
   const std::string SCRIPT{R"EOF(
