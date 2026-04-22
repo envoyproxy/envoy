@@ -1,0 +1,7 @@
+date: October 16, 2025
+
+bug_fixes:
+- area: connection pool
+  change: |
+    Fix a crash in the TCP connection pool that occurs during downstream connection teardown when large requests
+    or responses trigger flow control.

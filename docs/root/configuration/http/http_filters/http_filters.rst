@@ -6,6 +6,7 @@ HTTP filters
 .. toctree::
   :maxdepth: 2
 
+  a2a_filter
   adaptive_concurrency_filter
   admission_control_filter
   aws_lambda_filter
@@ -15,6 +16,7 @@ HTTP filters
   basic_auth_filter
   buffer_filter
   cache_filter
+  cache_v2_filter
   cdn_loop_filter
   checksum_filter
   compressor_filter
@@ -30,6 +32,7 @@ HTTP filters
   ext_authz_filter
   ext_proc_filter
   fault_filter
+  file_server_filter
   file_system_buffer_filter
   gcp_authn_filter
   geoip_filter
@@ -51,9 +54,12 @@ HTTP filters
   language_filter
   local_rate_limit_filter
   lua_filter
+  mcp_filter
+  mcp_router_filter
   oauth2_filter
   on_demand_updates_filter
   original_src_filter
+  proto_api_scrubber_filter
   proto_message_extraction_filter
   rate_limit_filter
   rate_limit_quota_filter
@@ -61,10 +67,11 @@ HTTP filters
   router_filter
   set_filter_state
   set_metadata_filter
-  squash_filter
+  sse_to_metadata_filter
   stateful_session_filter
   sxg_filter
   tap_filter
   thrift_to_metadata_filter
   upstream_codec_filter
   wasm_filter
+  transform_filter

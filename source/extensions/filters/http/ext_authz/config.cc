@@ -30,6 +30,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
   Http::FilterFactoryCb callback;
   if (proto_config.has_http_service()) {
     // Raw HTTP client.
+    // A timeout of 0 means infinite (no timeout).
     const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.http_service().server_uri(),
                                                            timeout, DefaultTimeout);
     const auto client_config =
@@ -39,16 +40,22 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
                 &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
           server_context.clusterManager(), client_config);
-      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
+      callbacks.addStreamFilter(
+          std::make_shared<Filter>(filter_config, std::move(client), server_context));
     };
   } else {
     // gRPC client.
+    // A timeout of 0 means infinite (no timeout). Convert to nullopt in that case.
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
+    const absl::optional<std::chrono::milliseconds> timeout =
+        timeout_ms == 0
+            ? absl::nullopt
+            : absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
     THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config));
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
-    callback = [&server_context, filter_config = std::move(filter_config), timeout_ms,
+    callback = [&server_context, filter_config = std::move(filter_config), timeout,
                 config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client_or_error = server_context.clusterManager()
                                  .grpcAsyncClientManager()
@@ -56,8 +63,9 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
                                      config_with_hash_key, server_context.scope(), true);
       THROW_IF_NOT_OK_REF(client_or_error.status());
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          client_or_error.value(), std::chrono::milliseconds(timeout_ms));
-      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
+          client_or_error.value(), timeout);
+      callbacks.addStreamFilter(
+          std::make_shared<Filter>(filter_config, std::move(client), server_context));
     };
   }
   return callback;

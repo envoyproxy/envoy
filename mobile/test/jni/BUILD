@@ -64,9 +64,6 @@ cc_library(
 cc_binary(
     name = "libenvoy_jni_http_test_server_factory.so",
     testonly = True,
-    linkopts = [
-        "-latomic",
-    ],
     linkshared = True,
     deps = [
         ":jni_http_test_server_factory_lib",
@@ -101,9 +98,6 @@ cc_library(
 cc_binary(
     name = "libenvoy_jni_http_proxy_test_server_factory.so",
     testonly = True,
-    linkopts = [
-        "-latomic",
-    ],
     linkshared = True,
     deps = [
         ":jni_http_proxy_test_server_factory_lib",
@@ -115,9 +109,6 @@ cc_binary(
 cc_binary(
     name = "libenvoy_jni_with_test_extensions.so",
     testonly = True,
-    linkopts = [
-        "-latomic",
-    ],
     linkshared = True,
     deps = [
         ":envoy_jni_with_test_extensions_lib",
@@ -149,9 +140,6 @@ cc_library(
 cc_binary(
     name = "libenvoy_jni_with_test_and_listener_extensions.so",
     testonly = True,
-    linkopts = [
-        "-latomic",
-    ],
     linkshared = True,
     deps = [
         ":envoy_jni_with_test_and_listener_extensions_lib",

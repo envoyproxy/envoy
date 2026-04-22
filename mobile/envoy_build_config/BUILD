@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_mobile_package",
     "envoy_select_envoy_mobile_listener",
+    "envoy_select_envoy_mobile_xds",
 )
 
 licenses(["notice"])  # Apache 2
@@ -24,6 +25,7 @@ envoy_cc_library(
         "@envoy//source/common/router:upstream_codec_filter_lib",
         "@envoy//source/common/tls/cert_validator:cert_validator_lib",
         "@envoy//source/common/upstream:default_local_address_selector_factory",
+        "@envoy//source/extensions/api_listeners/default_api_listener:api_listener_lib",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
         "@envoy//source/extensions/compression/gzip/decompressor:config",
@@ -38,6 +40,7 @@ envoy_cc_library(
         "@envoy//source/extensions/network/dns_resolver/getaddrinfo:config",
         "@envoy//source/extensions/path/match/uri_template:config",
         "@envoy//source/extensions/path/rewrite/uri_template:config",
+        "@envoy//source/extensions/quic/client_packet_writer:default_quic_client_packet_writer_factory_config",
         "@envoy//source/extensions/request_id/uuid:config",
         "@envoy//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "@envoy//source/extensions/transport_sockets/raw_buffer:config",
@@ -50,12 +53,20 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:config",
         "@envoy_mobile//library/common/extensions/key_value/platform:config",
         "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
+        "@envoy_mobile//library/common/extensions/quic_packet_writer/platform:config",
         "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
     ] + envoy_select_envoy_mobile_listener(
         [
             "@envoy//source/extensions/udp_packet_writer/default:config",
             "@envoy//source/common/listener_manager:listener_manager_lib",
             "@envoy//source/common/listener_manager:connection_handler_lib",
+        ],
+        "@envoy",
+    ) + envoy_select_envoy_mobile_xds(
+        [
+            "@envoy//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+            "@envoy//source/extensions/config_subscription/grpc:grpc_mux_lib",
+            "@envoy//source/extensions/config_subscription/grpc:grpc_subscription_lib",
         ],
         "@envoy",
     ),
@@ -119,6 +130,8 @@ envoy_cc_library(
         "@envoy_mobile//test/common/http/filters/test_read:filter_cc_proto_descriptor",
         "@envoy_mobile//test/common/http/filters/test_remote_response:config",
         "@envoy_mobile//test/common/http/filters/test_remote_response:filter_cc_proto_descriptor",
+        "@envoy_mobile//test/common/mocks/dns:mock_dns_resolver_lib",
+        "@envoy_mobile//test/common/mocks/dns:mock_dns_resolver_proto_cc_proto_descriptor",
     ],
     alwayslink = 1,
 )

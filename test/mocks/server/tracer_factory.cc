@@ -13,7 +13,7 @@ using ::testing::Invoke;
 
 MockTracerFactory::MockTracerFactory(const std::string& name) : name_(name) {
   ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([] {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
 }
 

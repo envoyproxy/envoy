@@ -12,6 +12,12 @@ namespace Envoy {
 namespace Fuzz {
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
+  // Cap the input string by 32KiB. The fuzzer should be able to detect issues
+  // for smaller inputs.
+  if (len > 32 * 1024) {
+    ENVOY_LOG_MISC(warn, "The input buffer is longer than 32KiB, skipping");
+    return;
+  }
   FuzzedDataProvider provider(buf, len);
   std::string buffer1, buffer2, errmsg;
   while (provider.remaining_bytes() != 0) {

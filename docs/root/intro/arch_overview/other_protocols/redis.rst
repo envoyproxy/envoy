@@ -6,7 +6,7 @@ Redis
 Envoy can act as a Redis proxy, partitioning commands among instances in a cluster.
 In this mode, the goals of Envoy are to maintain availability and partition tolerance
 over consistency. This is the key point when comparing Envoy to `Redis Cluster
-<https://redis.io/topics/cluster-spec>`_. Envoy is designed as a best-effort cache,
+<https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/>`_. Envoy is designed as a best-effort cache,
 meaning that it will not try to reconcile inconsistent data or keep a globally consistent
 view of cluster membership. It also supports routing commands from different workloads to
 different upstream clusters based on their access patterns, eviction, or isolation
@@ -14,11 +14,11 @@ requirements.
 
 The Redis project offers a thorough reference on partitioning as it relates to Redis. See
 "`Partitioning: how to split data among multiple Redis instances
-<https://redis.io/topics/partitioning>`_".
+<https://redis.io/docs/latest/operate/oss_and_stack/management/scaling/>`_".
 
 **Features of Envoy Redis**:
 
-* `Redis protocol <https://redis.io/topics/protocol>`_ codec.
+* `Redis protocol <https://redis.io/docs/latest/develop/reference/protocol-spec/>`_ codec.
 * Hash-based partitioning.
 * Redis transaction support.
 * Ketama distribution.
@@ -66,12 +66,12 @@ close map to 5xx. All other responses from Redis are counted as a success.
 Redis Cluster Support
 ---------------------
 
-Envoy offers support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
+Envoy offers support for `Redis Cluster <https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/>`_.
 
 When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a non-cluster Redis client
 implemented in any language to connect to the proxy as if it's a single node Redis instance.
 The Envoy proxy will keep track of the cluster topology and send commands to the correct Redis node in the
-cluster according to the `spec <https://redis.io/topics/cluster-spec>`_. Advance features such as reading
+cluster according to the `spec <https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/>`_. Advance features such as reading
 from replicas can also be added to the Envoy proxy instead of updating redis clients in each language.
 
 Envoy proxy tracks the topology of the cluster by sending periodic
@@ -129,7 +129,7 @@ Supported commands
 At the protocol level, pipelines are supported.
 Use pipelining wherever possible for the best performance.
 
-At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING and ECHO
+At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING, ECHO and INFO
 are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
 and no other commands will be processed until authentication is successful when a password has been
 configured. If an external authentication provider is set, Envoy will instead send the authentication arguments
@@ -140,6 +140,21 @@ if upstream authentication passwords are configured for the cluster. Envoy respo
 Arguments to PING are not allowed. Envoy responds to ECHO immediately with the command argument.
 All other supported commands must contain a key. Supported commands are functionally identical to the
 original Redis command except possibly in failure scenarios.
+
+RESP Protocol
+^^^^^^^^^^^^^
+Envoy redis proxy supports only RESP2 protocol for now. Clients should connect to Envoy using RESP2 protocol.
+hello command with only hello 2 argument is supported, hello 3 will result in error response from Envoy.
+
+INFO command
+^^^^^^^^^^^^
+INFO command is handled by envoy differently it aggregates metrics across all shards and returns consolidated cluster-wide statistics.
+An optional section parameter can be provided to filter the output (e.g., INFO memory).
+INFO.SHARD is an Envoy-specific command introduced for debugging purposes that queries a specific shard by index
+and returns that shard's complete INFO response (e.g., INFO.SHARD 0 memory).
+Shard numbering starts from 0 and shards are ordered from lowest to highest slot assignment.
+when using INFO.SHARD command, if the provided shard index is invalid, Envoy will return an error.
+when using INFO.SHARD command, via redis-cli, make sure to use --raw flag to get the proper output format.
 
 For details on each command's usage see the official
 `Redis command reference <https://redis.io/commands>`_.
@@ -170,12 +185,32 @@ For details on each command's usage see the official
   TTL, Generic
   TYPE, Generic
   UNLINK, Generic
+  COPY, Generic
+  RENAME, Generic
+  RENAMENX, Generic
+  SORT, Generic
+  SORT_RO, Generic
+  SCRIPT, Generic
+  FLUSHALL, Generic
+  FLUSHDB, Generic
+  SLOWLOG, Generic
+  CONFIG, Generic
+  CLUSTER INFO, Generic
+  CLUSTER SLOTS, Generic
+  CLUSTER KEYSLOT, Generic
+  CLUSTER NODES, Generic
+  RANDOMKEY, Generic
+  OBJECT, Generic
   GEOADD, Geo
   GEODIST, Geo
   GEOHASH, Geo
   GEOPOS, Geo
   GEORADIUS_RO, Geo
   GEORADIUSBYMEMBER_RO, Geo
+  GEOSEARCH, Geo
+  GEOSEARCHSTORE, Geospatial
+  GEORADIUS, Geospatial
+  GEORADIUSBYMEMBER, Geospatial
   HDEL, Hash
   HEXISTS, Hash
   HGET, Hash
@@ -191,8 +226,10 @@ For details on each command's usage see the official
   HSETNX, Hash
   HSTRLEN, Hash
   HVALS, Hash
+  HRANDFIELD, Hash
   PFADD, HyperLogLog
   PFCOUNT, HyperLogLog
+  PFMERGE, HyperLogLog
   LINDEX, List
   LINSERT, List
   LLEN, List
@@ -203,6 +240,8 @@ For details on each command's usage see the official
   LREM, List
   LSET, List
   LTRIM, List
+  LPOS, List
+  RPOPLPUSH, List
   MULTI, Transaction
   RPOP, List
   RPUSH, List
@@ -217,7 +256,16 @@ For details on each command's usage see the official
   SPOP, Set
   SRANDMEMBER, Set
   SREM, Set
+  SCAN, Generic
   SSCAN, Set
+  SDIFF, Set
+  SDIFFSTORE, Set
+  SINTER, Set
+  SINTERSTORE, Set
+  SMISMEMBER, Set
+  SMOVE, Set
+  SUNION, Set
+  SUNIONSTORE, Set
   WATCH, String
   UNWATCH, String
   ZADD, Sorted Set
@@ -241,20 +289,34 @@ For details on each command's usage see the official
   ZPOPMAX, Sorted Set
   ZSCAN, Sorted Set
   ZSCORE, Sorted Set
+  ZDIFF, Sorted Set
+  ZDIFFSTORE, Sorted Set
+  ZINTER, Sorted Set
+  ZINTERSTORE, Sorted Set
+  ZMSCORE, Sorted Set
+  ZRANDMEMBER, Sorted Set
+  ZRANGESTORE, Sorted Set
+  ZUNION, Sorted Set
+  ZUNIONSTORE, Sorted Set
   APPEND, String
   BITCOUNT, String
   BITFIELD, String
+  BITFIELD_RO, String
   BITPOS, String
   DECR, String
   DECRBY, String
   GET, String
   GETBIT, String
   GETDEL, String
+  GETEX, String
   GETRANGE, String
   GETSET, String
   INCR, String
   INCRBY, String
   INCRBYFLOAT, String
+  INFO, Server
+  INFO.SHARD, Server
+  ROLE, Server
   MGET, String
   MSET, String
   PSETEX, String
@@ -264,6 +326,8 @@ For details on each command's usage see the official
   SETNX, String
   SETRANGE, String
   STRLEN, String
+  MSETNX, String
+  SUBSTR, String
   XACK, Stream
   XADD, Stream
   XAUTOCLAIM, Stream
@@ -284,6 +348,7 @@ For details on each command's usage see the official
   BF.MEXISTS, Bloom
   BF.RESERVE, Bloom
   BF.SCANDUMP, Bloom
+  BITOP, Bitmap
 
 Failure modes
 -------------
@@ -318,6 +383,7 @@ Envoy can also generate its own errors in response to the client.
   ERR <external-message>, "The authentication command failed on the external auth provider."
   "ERR Client sent AUTH, but no password is set", "An authentication command was received, but no
   downstream authentication password or external authentication provider have been configured."
+  ERR invalid cursor, "The iteration command failed due to an invalid or unrecognized cursor."
 
 
 In the case of MGET, each individual key that cannot be fetched will generate an error response.
@@ -336,5 +402,5 @@ response for each in place of the value.
 Protocol
 --------
 
-Although `RESP <https://redis.io/docs/reference/protocol-spec/>`_ is recommended for production use,
-`inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_ are also supported.
+Although `RESP <https://redis.io/docs/latest/develop/reference/protocol-spec/>`_ is recommended for production use,
+`inline commands <https://redis.io/docs/latest/develop/reference/protocol-spec/#inline-commands>`_ are also supported.

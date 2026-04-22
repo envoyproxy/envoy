@@ -18,7 +18,7 @@ envoy_cc_library(
     deps = [
         "//envoy/buffer:buffer_interface",
         "//source/common/http:utility_lib",
-        "@com_github_nlohmann_json//:json",
+        "@nlohmann_json//:json",
     ],
 )
 
@@ -62,8 +62,8 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/singleton:const_singleton",
-        "@com_github_nlohmann_json//:json",
         "@com_google_googleapis//google/api:http_cc_proto",
+        "@nlohmann_json//:json",
     ],
 )
 

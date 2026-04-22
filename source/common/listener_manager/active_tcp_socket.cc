@@ -3,6 +3,7 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/listener_manager/active_stream_listener_base.h"
+#include "source/common/network/downstream_network_namespace.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
@@ -10,7 +11,8 @@ namespace Server {
 
 ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
                                  Network::ConnectionSocketPtr&& socket,
-                                 bool hand_off_restored_destination_connections)
+                                 bool hand_off_restored_destination_connections,
+                                 const absl::optional<std::string>& network_namespace)
     : listener_(listener), socket_(std::move(socket)),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       iter_(accept_filters_.end()),
@@ -18,6 +20,17 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
           listener_.dispatcher().timeSource(), socket_->connectionInfoProviderSharedPtr(),
           StreamInfo::FilterState::LifeSpan::Connection)) {
   listener_.stats_.downstream_pre_cx_active_.inc();
+
+  // Automatically populate network namespace from listener address if present.
+  if (network_namespace && !network_namespace->empty()) {
+    stream_info_->filterState()->setData(
+        Network::DownstreamNetworkNamespace::key(),
+        std::make_unique<Network::DownstreamNetworkNamespace>(*network_namespace),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+  socket_->connectionInfoProvider().setListenerInfo(listener_.config_->listenerInfo());
 }
 
 ActiveTcpSocket::~ActiveTcpSocket() {
@@ -74,6 +87,7 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
   listener_filter_buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
       socket_->ioHandle(), listener_.dispatcher(),
       [this](bool error) {
+        (*iter_)->onClose();
         socket_->ioHandle().close();
         if (error) {
           listener_.stats_.downstream_listener_filter_error_.inc();
@@ -172,13 +186,11 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
   }
 }
 
-void ActiveTcpSocket::setDynamicMetadata(const std::string& name,
-                                         const ProtobufWkt::Struct& value) {
+void ActiveTcpSocket::setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) {
   stream_info_->setDynamicMetadata(name, value);
 }
 
-void ActiveTcpSocket::setDynamicTypedMetadata(const std::string& name,
-                                              const ProtobufWkt::Any& value) {
+void ActiveTcpSocket::setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) {
   stream_info_->setDynamicTypedMetadata(name, value);
 }
 
@@ -209,7 +221,13 @@ void ActiveTcpSocket::newConnection() {
     // Note also that we must account for the number of connections properly across both listeners.
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
     listener_.decNumConnections();
-    new_listener.value().get().onAcceptWorker(std::move(socket_), false, false);
+    absl::optional<std::string> network_namespace;
+    if (const auto* obj = stream_info_->filterState()->getDataReadOnlyGeneric(
+            Network::DownstreamNetworkNamespace::key());
+        obj) {
+      network_namespace = obj->serializeAsString();
+    }
+    new_listener.value().get().onAcceptWorker(std::move(socket_), false, false, network_namespace);
   } else {
     // Set default transport protocol if none of the listener filters did it.
     if (socket_->detectedTransportProtocol().empty()) {

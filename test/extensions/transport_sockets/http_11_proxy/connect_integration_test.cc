@@ -3,6 +3,8 @@
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 
+#include "source/common/network/utility.h"
+
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 
@@ -30,6 +32,10 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:
     name: foo
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
 )EOF";
     config_helper_.prependFilter(filter);
 
@@ -42,6 +48,10 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
   dns_cache_config:
     name: foo
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
 )EOF";
       TestUtility::loadFromYaml(cluster_type_config, *cluster->mutable_cluster_type());
       cluster->clear_load_assignment();
@@ -69,6 +79,21 @@ typed_config:
     } else if (upstream_tls_) {
       config_helper_.configureUpstreamTls(use_alpn_, try_http3_);
     }
+
+    if (pre_create_upstreams_) {
+      setUpstreamCount(0);
+      config_helper_.skipPortUsageValidation();
+      if (upstream_tls_) {
+        addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), upstreamProtocol(), false);
+        addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), upstreamProtocol(), false);
+      } else {
+        addFakeUpstream(upstreamProtocol());
+        addFakeUpstream(upstreamProtocol());
+      }
+      fake_upstreams_[1]->setDisableAllAndDoNotEnable(true);
+      default_proxy_address_ = fake_upstreams_[1]->localAddress();
+    }
+
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket =
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
@@ -80,6 +105,10 @@ typed_config:
       transport_socket->set_name("envoy.transport_sockets.http_11_proxy");
       envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
           transport;
+      if (default_proxy_address_ != nullptr) {
+        Network::Utility::addressToProtobufAddress(*default_proxy_address_,
+                                                   *transport.mutable_default_proxy_address());
+      }
       transport.mutable_transport_socket()->MergeFrom(inner_socket);
       transport_socket->mutable_typed_config()->PackFrom(transport);
 
@@ -121,12 +150,16 @@ typed_config:
   }
 
   void stripConnectUpgradeAndRespond(bool include_content_length = false) {
-    // Strip the CONNECT upgrade.
+    // Strip the CONNECT upgrade - expect RFC 9110 compliant request with Host header.
     std::string prefix_data;
     const std::string hostname(default_request_headers_.getHostValue());
     const std::string port = Http::HeaderUtility::hostHasPort(hostname) ? "" : ":443";
     ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", prefix_data));
-    EXPECT_EQ(absl::StrCat("CONNECT ", hostname, port, " HTTP/1.1\r\n\r\n"), prefix_data);
+
+    // Verify the CONNECT request format is RFC 9110 compliant with Host header.
+    std::string expected_connect = absl::StrCat("CONNECT ", hostname, port, " HTTP/1.1\r\n",
+                                                "Host: ", hostname, port, "\r\n\r\n");
+    EXPECT_EQ(expected_connect, prefix_data);
 
     absl::string_view content_length = include_content_length ? "Content-Length: 0\r\n" : "";
     // Ship the CONNECT response.
@@ -139,6 +172,9 @@ typed_config:
   // If true, we'll explicitly set the inner "transport_socket" field to raw buffer if it is not
   // configured.
   bool set_inner_transport_socket_ = true;
+
+  bool pre_create_upstreams_ = false;
+  Network::Address::InstanceConstSharedPtr default_proxy_address_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http11ConnectHttpIntegrationTest,
@@ -214,6 +250,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, CleartextRequestResponse) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("bar")).empty());
 }
+
 // Test sending 2 requests to one proxy
 TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSignleEndpoint) {
   initialize();
@@ -527,6 +564,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddressLegacy) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
+// Test sending a request to host with port.
 TEST_P(Http11ConnectHttpIntegrationTest, HostWithPort) {
   initialize();
 
@@ -553,6 +591,42 @@ TEST_P(Http11ConnectHttpIntegrationTest, HostWithPort) {
   // Wait for the encapsulated response to be received.
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(Http11ConnectHttpIntegrationTest, ConfiguredProxy) {
+  pre_create_upstreams_ = true;
+  initialize();
+
+  // With a default proxy configured, the request gets proxied to fake upstream 1.
+  default_request_headers_.setCopy(Envoy::Http::LowerCaseString("foo"), "bar");
+  default_response_headers_.setCopy(Envoy::Http::LowerCaseString("foo"), "bar");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // The request should be sent to fake upstream 1, due to the default proxy address.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  // Verify the CONNECT request format. Since we are using a static cluster and
+  // default_proxy_address, the CONNECT target is the physical address of the upstream.
+  std::string prefix_data;
+  ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", prefix_data));
+  const std::string target = fake_upstreams_[0]->localAddress()->asString();
+  std::string expected_connect =
+      absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n", "Host: ", target, "\r\n\r\n");
+  EXPECT_EQ(expected_connect, prefix_data);
+
+  // Ship the CONNECT response.
+  fake_upstream_connection_->writeRawData("HTTP/1.1 200 OK\r\n\r\n");
+
+  ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("foo")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("foo")).empty());
 }
 
 } // namespace

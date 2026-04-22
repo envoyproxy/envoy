@@ -70,8 +70,6 @@ public:
   const std::string Lua = "envoy.filters.http.lua";
   // On-demand RDS updates filter
   const std::string OnDemand = "envoy.filters.http.on_demand";
-  // Squash filter
-  const std::string Squash = "envoy.filters.http.squash";
   // External Authorization filter
   const std::string ExtAuthorization = "envoy.filters.http.ext_authz";
   // RBAC HTTP Authorization filter

@@ -33,15 +33,6 @@ constexpr absl::string_view kValidCharacters =
 constexpr absl::string_view::iterator kValidCharactersBegin = kValidCharacters.begin();
 constexpr absl::string_view::iterator kValidCharactersEnd = kValidCharacters.end();
 
-bool isFirstCharacterOfValidMethod(char c) {
-  static constexpr char kValidFirstCharacters[] = {'A', 'B', 'C', 'D', 'G', 'H', 'L', 'M',
-                                                   'N', 'O', 'P', 'R', 'S', 'T', 'U'};
-
-  const auto* begin = &kValidFirstCharacters[0];
-  const auto* end = &kValidFirstCharacters[ABSL_ARRAYSIZE(kValidFirstCharacters) - 1] + 1;
-  return std::binary_search(begin, end, c);
-}
-
 // TODO(#21245): Skip method validation altogether when UHV method validation is
 // enabled.
 bool isMethodValid(absl::string_view method, bool allow_custom_methods) {
@@ -161,8 +152,11 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   http_validation_policy.validate_transfer_encoding = false;
   http_validation_policy.require_content_length_if_body_required = false;
   http_validation_policy.disallow_invalid_header_characters_in_response = true;
-  http_validation_policy.disallow_lone_cr_in_chunk_extension = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension");
+  http_validation_policy.disallow_lone_cr_in_chunk_extension = true;
+
+  http_validation_policy.disallow_stray_data_after_chunk =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_chunk_parsing");
+
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
@@ -185,21 +179,10 @@ size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {
-    if (delay_reset_) {
-      if (first_message_) {
-        first_message_ = false;
-      } else {
-        framer_.Reset();
-      }
-    }
-
-    if (!allow_newlines_between_requests_) {
-      if (message_type_ == MessageType::Request && !allow_custom_methods_ &&
-          !isFirstCharacterOfValidMethod(*slice)) {
-        status_ = ParserStatus::Error;
-        error_message_ = "HPE_INVALID_METHOD";
-        return 0;
-      }
+    if (first_message_) {
+      first_message_ = false;
+    } else {
+      framer_.Reset();
     }
 
     if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
@@ -366,13 +349,10 @@ void BalsaParser::MessageDone() {
   if (status_ == ParserStatus::Error ||
       // In the case of early 1xx, MessageDone() can be called twice in a row.
       // The !first_byte_processed_ check is to make this function idempotent.
-      (wait_for_first_byte_before_msg_done_ && !first_byte_processed_)) {
+      !first_byte_processed_) {
     return;
   }
   status_ = convertResult(connection_->onMessageComplete());
-  if (!delay_reset_) {
-    framer_.Reset();
-  }
   first_byte_processed_ = false;
   headers_done_ = false;
 }

@@ -1,0 +1,48 @@
+date: December 4, 2025
+
+behavior_changes:
+- area: dynamic modules
+  change: |
+    The dynamic module ABI has been updated to support streaming body manipulation. This change also
+    fixed potential incorrect behavior when access or modify the request or response body. See
+    https://github.com/envoyproxy/envoy/issues/40918 for more details.
+- area: http
+  change: |
+    Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests
+    that receive data before Envoy sent a ``200`` response to the client. While this is not a strictly compliant behavior
+    it is very common as a latency reducing measure. As such the option is disabled by default.
+
+bug_fixes:
+- area: bootstrap
+  change: |
+    Fixed an issue where the custom
+    :ref:`header_prefix <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.header_prefix>`
+    will result in crash at startup.
+- area: tcp_proxy
+  change: |
+    Fixed a connection leak in the TCP proxy when the ``receive_before_connect`` feature is enabled and the
+    downstream connection closes before the upstream connection is established.
+- area: tls
+  change: |
+    Fixed an issue where SANs of type ``OTHERNAME`` in a TLS cert were truncated if there was
+    an embedded null octet, leading to incorrect SAN validation.
+- area: http
+  change: |
+    Fixed a remote ``jwt_auth`` token fetch crash with two or more auth headers when ``allow_missing_or_failed`` is set.
+
+new_features:
+- area: overload management
+  change: |
+    The fixed heap resource monitor can now calculate memory pressure as currently allocated memory divided by maximum heap size,
+    giving more accurate and lower memory pressure values.
+    This can avoid unnecessary load shedding or overload actions.
+    To enable, set ``envoy.reloadable_features.fixed_heap_use_allocated`` to true.
+    The default algorithm (heap_size - pageheap_unmapped - pageheap_free) does not discount for free memory in TCMalloc caches.
+- area: tls_inspector
+  change: |
+    Propagate the transport error from the tls_inspector to the DownstreamTransportFailureReason in StreamInfo
+    for access logging prior to the TLS handshake.
+- area: dynamic modules
+  change: |
+    Added support for loading dynamic modules globally by setting :ref:`load_globally
+    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.load_globally>` to true.

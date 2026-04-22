@@ -104,7 +104,7 @@ private:
                      static_cast<int>(parent_.read_callbacks_->connection().detectedCloseType()));
 
       if (parent_.read_callbacks_->connection().detectedCloseType() ==
-          Network::DetectedCloseType::RemoteReset) {
+          StreamInfo::DetectedCloseType::RemoteReset) {
         parent_.client_->close(Network::ConnectionCloseType::AbortReset);
       } else {
         parent_.client_->close(Network::ConnectionCloseType::NoFlush);
@@ -147,7 +147,7 @@ private:
       ENVOY_LOG_MISC(debug, "tcp client test filter upstream detected close type: {}.",
                      static_cast<int>(parent_.client_->detectedCloseType()));
 
-      if (parent_.client_->detectedCloseType() == Network::DetectedCloseType::RemoteReset) {
+      if (parent_.client_->detectedCloseType() == StreamInfo::DetectedCloseType::RemoteReset) {
         parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::AbortReset);
       } else {
         parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);

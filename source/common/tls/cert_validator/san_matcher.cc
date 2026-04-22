@@ -27,7 +27,7 @@ bool StringSanMatcher::typeCompatible(const GENERAL_NAME* general_name) const {
   return true;
 }
 
-bool StringSanMatcher::match(const GENERAL_NAME* general_name) const {
+bool StringSanMatcher::match(GENERAL_NAME const* general_name) const {
   if (!typeCompatible(general_name)) {
     return false;
   }
@@ -35,7 +35,7 @@ bool StringSanMatcher::match(const GENERAL_NAME* general_name) const {
   return matcher_.match(Utility::generalNameAsString(general_name));
 }
 
-bool StringSanMatcher::match(const GENERAL_NAME* general_name,
+bool StringSanMatcher::match(GENERAL_NAME const* general_name,
                              const StreamInfo::StreamInfo& stream_info) const {
   if (!typeCompatible(general_name)) {
     return false;
@@ -45,7 +45,7 @@ bool StringSanMatcher::match(const GENERAL_NAME* general_name,
   return matcher_.match(Utility::generalNameAsString(general_name), context);
 }
 
-bool DnsExactStringSanMatcher::match(const GENERAL_NAME* general_name) const {
+bool DnsExactStringSanMatcher::match(GENERAL_NAME const* general_name) const {
   if (general_name->type != GEN_DNS) {
     return false;
   }

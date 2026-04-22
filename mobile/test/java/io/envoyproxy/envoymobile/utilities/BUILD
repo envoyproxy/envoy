@@ -24,6 +24,32 @@ envoy_mobile_android_test(
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/utilities",
+        "//library/java/io/envoyproxy/envoymobile/utilities:network_utilities",
         "//library/java/org/chromium/net",
+    ],
+)
+
+envoy_mobile_android_test(
+    name = "android_network_test",
+    srcs = [
+        "AndroidNetworkTest.java",
+    ],
+    native_deps = [
+        "//test/jni:libenvoy_jni_with_test_extensions.so",
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "io.envoyproxy.envoymobile.utilities.AndroidNetworkTest",
+    deps = [
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
+        "//library/java/io/envoyproxy/envoymobile/utilities",
+        "//library/java/io/envoyproxy/envoymobile/utilities:network_utilities",
+        "@maven//:org_robolectric_annotations",
     ],
 )

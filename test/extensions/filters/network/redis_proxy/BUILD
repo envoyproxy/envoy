@@ -105,6 +105,25 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "aws_iam_auth_test",
+    srcs = ["aws_iam_auth_test.cc"],
+    extension_names = ["envoy.filters.network.redis_proxy"],
+    rbe_pool = "6gig",
+    deps = [
+        ":redis_mocks",
+        "//source/extensions/filters/network/common/redis:aws_iam_authenticator_lib",
+        "//source/extensions/filters/network/common/redis:client_interface",
+        "//source/extensions/filters/network/common/redis:client_lib",
+        "//source/extensions/filters/network/common/redis:redis_command_stats_lib",
+        "//test/extensions/common/aws:aws_mocks",
+        "//test/extensions/filters/network/common/redis:redis_mocks",
+        "//test/extensions/filters/network/common/redis:test_utils_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_mock(
     name = "redis_mocks",
     srcs = ["mocks.cc"],
@@ -151,7 +170,7 @@ envoy_extension_cc_benchmark_binary(
         "//test/mocks/network:network_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -190,6 +209,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:integration_lib",
         "@envoy_api//envoy/service/redis_auth/v3:pkg_cc_proto",
     ],
@@ -208,7 +229,7 @@ envoy_extension_cc_benchmark_binary(
         "//source/extensions/filters/network/redis_proxy:router_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

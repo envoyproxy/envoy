@@ -56,11 +56,11 @@ using Rules = std::vector<Rule>;
 /**
  * Configuration for the Json to Metadata filter.
  */
-class FilterConfig {
+class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
-  FilterConfig(
-      const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
-      Stats::Scope& scope, Regex::Engine& regex_engine);
+  static absl::StatusOr<std::shared_ptr<FilterConfig>>
+  create(const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
+         Stats::Scope& scope, Regex::Engine& regex_engine, bool per_route = false);
 
   JsonToMetadataStats& rqstats() { return rqstats_; }
   JsonToMetadataStats& respstats() { return respstats_; }
@@ -73,6 +73,11 @@ public:
   bool responseContentTypeAllowed(absl::string_view) const;
 
 private:
+  FilterConfig(
+      const envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata& proto_config,
+      Stats::Scope& scope, Regex::Engine& regex_engine, bool per_route,
+      absl::Status& creation_status);
+
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
   Rules generateRules(const ProtobufRepeatedRule& proto_rule) const;
   JsonToMetadataStats rqstats_;
@@ -106,7 +111,7 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
 private:
-  using StructMap = absl::flat_hash_map<std::string, ProtobufWkt::Struct>;
+  using StructMap = absl::flat_hash_map<std::string, Protobuf::Struct>;
   // Handle on_missing case of the `rule` and store in `struct_map`.
   void handleOnMissing(const Rule& rule, StructMap& struct_map,
                        Http::StreamFilterCallbacks& filter_callback);
@@ -132,20 +137,23 @@ private:
   void processResponseBody();
 
   const std::string& decideNamespace(const std::string& nspace) const;
-  bool addMetadata(const std::string& meta_namespace, const std::string& key,
-                   ProtobufWkt::Value val, const bool preserve_existing_metadata_value,
-                   StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback);
+  bool addMetadata(const std::string& meta_namespace, const std::string& key, Protobuf::Value val,
+                   const bool preserve_existing_metadata_value, StructMap& struct_map,
+                   Http::StreamFilterCallbacks& filter_callback);
   void applyKeyValue(const std::string& value, const KeyValuePair& keyval, StructMap& struct_map,
                      Http::StreamFilterCallbacks& filter_callback);
   void applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map,
                      Http::StreamFilterCallbacks& filter_callback);
-  void applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval, StructMap& struct_map,
+  void applyKeyValue(Protobuf::Value value, const KeyValuePair& keyval, StructMap& struct_map,
                      Http::StreamFilterCallbacks& filter_callback);
   void finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
                                bool should_clear_route_cache, const StructMap& struct_map,
                                bool& processing_finished_flag);
 
+  FilterConfig* getConfig() const;
+
   std::shared_ptr<FilterConfig> config_;
+  mutable FilterConfig* effective_config_{nullptr};
   bool request_processing_finished_{false};
   bool response_processing_finished_{false};
 };

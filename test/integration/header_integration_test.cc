@@ -307,25 +307,24 @@ public:
 
           if (use_eds_) {
             addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-dynamic",
-                      R"(%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
+                      R"(%UPSTREAM_METADATA(test.namespace:key)%)", append);
 
             // Iterate over VirtualHosts, nested Routes and WeightedClusters, adding a dynamic
             // response header.
             for (auto& vhost : *route_config->mutable_virtual_hosts()) {
               addHeader(vhost.mutable_response_headers_to_add(), "x-vhost-dynamic",
-                        R"(vhost:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
+                        R"(vhost:%UPSTREAM_METADATA(test.namespace:key)%)", append);
 
               for (auto& route : *vhost.mutable_routes()) {
                 addHeader(route.mutable_response_headers_to_add(), "x-route-dynamic",
-                          R"(route:%UPSTREAM_METADATA(["test.namespace", "key"])%)", append);
+                          R"(route:%UPSTREAM_METADATA(test.namespace:key)%)", append);
 
                 if (route.has_route()) {
                   auto* route_action = route.mutable_route();
                   if (route_action->has_weighted_clusters()) {
                     for (auto& c : *route_action->mutable_weighted_clusters()->mutable_clusters()) {
                       addHeader(c.mutable_response_headers_to_add(), "x-weighted-cluster-dynamic",
-                                R"(weighted:%UPSTREAM_METADATA(["test.namespace", "key"])%)",
-                                append);
+                                R"(weighted:%UPSTREAM_METADATA(test.namespace:key)%)", append);
                     }
                   }
                 }
@@ -391,7 +390,7 @@ public:
 
         envoy::service::discovery::v3::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
-        discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+        discovery_response.set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
 
         auto cluster_load_assignment =
             TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(fmt::format(
@@ -1053,6 +1052,45 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
       });
 }
 
+TEST_P(HeaderIntegrationTest, TestResponseHeadersOnlyBeHandledOnce) {
+  initializeFilter(HeaderMode::Append, false);
+  registerTestServerPorts({"http"});
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},
+      {":path", "/vhost-and-route"},
+      {":scheme", "http"},
+      {":authority", "vhost-headers.com"},
+  });
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  ASSERT_TRUE(response->waitForEndStream());
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    codec_client_->close();
+  }
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+
+  Http::TestResponseHeaderMapImpl response_headers{response->headers()};
+  EXPECT_EQ(1, response_headers.get(Http::LowerCaseString("x-route-response")).size());
+  EXPECT_EQ("route", response_headers.get_("x-route-response"));
+  EXPECT_EQ(1, response_headers.get(Http::LowerCaseString("x-vhost-response")).size());
+  EXPECT_EQ("vhost", response_headers.get_("x-vhost-response"));
+}
+
 // Validates that XFF gets properly parsed.
 TEST_P(HeaderIntegrationTest, TestXFFParsing) {
   initializeFilter(HeaderMode::Replace, false);
@@ -1351,24 +1389,24 @@ TEST_P(EmptyHeaderIntegrationTest, AllProtocolsPassEmptyHeaders) {
   *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-ds-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
     keep_empty_value: true
   )EOF");
   *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-ds-no-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
   )EOF");
   *vhost.add_response_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-us-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
     keep_empty_value: true
   )EOF");
   *vhost.add_response_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-us-no-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
   )EOF");
 
   config_helper_.addVirtualHost(vhost);

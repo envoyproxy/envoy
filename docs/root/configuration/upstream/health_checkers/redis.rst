@@ -24,6 +24,9 @@ Redis health checker is shown below:
 
 * :ref:`v3 API reference <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`
 
+The redis health checker can also be configured with AWS IAM Authentication, in the same way as the `redis_proxy` filter. see
+:ref:`AWS IAM Authentication <config_network_filters_redis_proxy_aws_iam>` for more information.
+
 Statistics
 ----------
 

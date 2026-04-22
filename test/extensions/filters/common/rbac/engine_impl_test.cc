@@ -94,7 +94,7 @@ void checkMatcherEngine(
 
 void onMetadata(NiceMock<StreamInfo::MockStreamInfo>& info) {
   ON_CALL(info, setDynamicMetadata("envoy.common", _))
-      .WillByDefault(Invoke([&info](const std::string&, const ProtobufWkt::Struct& obj) {
+      .WillByDefault(Invoke([&info](const std::string&, const Protobuf::Struct& obj) {
         (*info.metadata_.mutable_filter_metadata())["envoy.common"] = obj;
       }));
 }
@@ -443,7 +443,7 @@ TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
   auto label = MessageUtil::keyValueStruct("label", "prod");
   envoy::config::core::v3::Metadata metadata;
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("other", label));
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   checkEngine(engine, true, LogResult::Undecided, info, Envoy::Network::MockConnection(), headers);

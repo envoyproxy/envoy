@@ -20,6 +20,52 @@
 namespace Envoy {
 namespace Matchers {
 
+template <class RegexMatcherType>
+RegexStringMatcher::RegexStringMatcher(const RegexMatcherType& safe_regex,
+                                       Server::Configuration::CommonFactoryContext& context)
+    : regex_(THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(safe_regex, context.regexEngine()),
+                                   Regex::CompiledMatcherPtr)) {}
+
+// Explicit instantiation of the two possible types.
+template RegexStringMatcher::RegexStringMatcher(const ::envoy::type::matcher::v3::RegexMatcher&,
+                                                Server::Configuration::CommonFactoryContext&);
+template RegexStringMatcher::RegexStringMatcher(const ::xds::type::matcher::v3::RegexMatcher&,
+                                                Server::Configuration::CommonFactoryContext&);
+
+template <class StringMatcherType>
+/* static */ StringMatcherImpl::StringMatcherVariant
+StringMatcherImpl::createVariant(const StringMatcherType& matcher,
+                                 Server::Configuration::CommonFactoryContext& context) {
+  switch (matcher.match_pattern_case()) {
+  case StringMatcherType::MatchPatternCase::kExact:
+    return ExactStringMatcher(matcher.exact(), matcher.ignore_case());
+  case StringMatcherType::MatchPatternCase::kPrefix:
+    return PrefixStringMatcher(matcher.prefix(), matcher.ignore_case());
+  case StringMatcherType::MatchPatternCase::kSuffix:
+    return SuffixStringMatcher(matcher.suffix(), matcher.ignore_case());
+  case StringMatcherType::MatchPatternCase::kSafeRegex:
+    if (matcher.ignore_case()) {
+      ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
+    }
+    return RegexStringMatcher(matcher.safe_regex(), context);
+  case StringMatcherType::MatchPatternCase::kContains:
+    return ContainsStringMatcher(matcher.contains(), matcher.ignore_case());
+  case StringMatcherType::MatchPatternCase::kCustom:
+    return CustomStringMatcher(matcher.custom(), context);
+  default:
+    ExceptionUtil::throwEnvoyException(
+        fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
+  }
+}
+
+// Explicit instantiation of the two possible types.
+template StringMatcherImpl::StringMatcherVariant
+StringMatcherImpl::createVariant(const ::envoy::type::matcher::v3::StringMatcher&,
+                                 Server::Configuration::CommonFactoryContext&);
+template StringMatcherImpl::StringMatcherVariant
+StringMatcherImpl::createVariant(const ::xds::type::matcher::v3::StringMatcher&,
+                                 Server::Configuration::CommonFactoryContext&);
+
 ValueMatcherConstSharedPtr
 ValueMatcher::create(const envoy::type::matcher::v3::ValueMatcher& v,
                      Server::Configuration::CommonFactoryContext& context) {
@@ -44,20 +90,20 @@ ValueMatcher::create(const envoy::type::matcher::v3::ValueMatcher& v,
   PANIC("unexpected");
 }
 
-bool NullMatcher::match(const ProtobufWkt::Value& value) const {
-  return value.kind_case() == ProtobufWkt::Value::kNullValue;
+bool NullMatcher::match(const Protobuf::Value& value) const {
+  return value.kind_case() == Protobuf::Value::kNullValue;
 }
 
-bool BoolMatcher::match(const ProtobufWkt::Value& value) const {
-  return value.kind_case() == ProtobufWkt::Value::kBoolValue && matcher_ == value.bool_value();
+bool BoolMatcher::match(const Protobuf::Value& value) const {
+  return value.kind_case() == Protobuf::Value::kBoolValue && matcher_ == value.bool_value();
 }
 
-bool PresentMatcher::match(const ProtobufWkt::Value& value) const {
-  return matcher_ && value.kind_case() != ProtobufWkt::Value::KIND_NOT_SET;
+bool PresentMatcher::match(const Protobuf::Value& value) const {
+  return matcher_ && value.kind_case() != Protobuf::Value::KIND_NOT_SET;
 }
 
-bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
-  if (value.kind_case() != ProtobufWkt::Value::kNumberValue) {
+bool DoubleMatcher::match(const Protobuf::Value& value) const {
+  if (value.kind_case() != Protobuf::Value::kNumberValue) {
     return false;
   }
 
@@ -81,8 +127,8 @@ ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher,
   oneof_value_matcher_ = ValueMatcher::create(matcher.one_of(), context);
 }
 
-bool ListMatcher::match(const ProtobufWkt::Value& value) const {
-  if (value.kind_case() != ProtobufWkt::Value::kListValue) {
+bool ListMatcher::match(const Protobuf::Value& value) const {
+  if (value.kind_case() != Protobuf::Value::kListValue) {
     return false;
   }
 
@@ -104,7 +150,7 @@ OrMatcher::OrMatcher(const envoy::type::matcher::v3::OrMatcher& matcher,
   }
 }
 
-bool OrMatcher::match(const ProtobufWkt::Value& value) const {
+bool OrMatcher::match(const Protobuf::Value& value) const {
   for (const auto& or_matcher : or_matchers_) {
     if (or_matcher->match(value)) {
       return true;
@@ -136,7 +182,8 @@ filterStateObjectMatcherFromProto(const envoy::type::matcher::v3::FilterStateMat
   case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kAddressMatch: {
     auto ip_list = Network::Address::IpList::create(matcher.address_match().ranges());
     RETURN_IF_NOT_OK_REF(ip_list.status());
-    return std::make_unique<FilterStateIpRangeMatcher>(std::move(*ip_list));
+    return std::make_unique<FilterStateIpRangeMatcher>(std::move(*ip_list),
+                                                       matcher.address_match().invert_match());
     break;
   }
   default:

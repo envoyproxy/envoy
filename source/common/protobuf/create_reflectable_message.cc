@@ -10,11 +10,6 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 
 #else
 
-#include "bazel/cc_proto_descriptor_library/create_dynamic_message.h"
-#include "bazel/cc_proto_descriptor_library/text_format_transcoder.h"
-#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
-
-#include "envoy/config/core/v3/base_descriptor.pb.h"
 #include "envoy/admin/v3/certs_descriptor.pb.h"
 #include "envoy/admin/v3/clusters_descriptor.pb.h"
 #include "envoy/admin/v3/config_dump_descriptor.pb.h"
@@ -52,19 +47,19 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/config/core/v3/socket_option_descriptor.pb.h"
 #include "envoy/config/core/v3/substitution_format_string_descriptor.pb.h"
 #include "envoy/config/core/v3/udp_socket_config_descriptor.pb.h"
-#include "envoy/config/endpoint/v3/endpoint_descriptor.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components_descriptor.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_descriptor.pb.h"
 #include "envoy/config/endpoint/v3/load_report_descriptor.pb.h"
 #include "envoy/config/listener/v3/api_listener_descriptor.pb.h"
-#include "envoy/config/listener/v3/listener_descriptor.pb.h"
 #include "envoy/config/listener/v3/listener_components_descriptor.pb.h"
+#include "envoy/config/listener/v3/listener_descriptor.pb.h"
 #include "envoy/config/listener/v3/quic_config_descriptor.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config_descriptor.pb.h"
 #include "envoy/config/metrics/v3/metrics_service_descriptor.pb.h"
 #include "envoy/config/metrics/v3/stats_descriptor.pb.h"
 #include "envoy/config/overload/v3/overload_descriptor.pb.h"
-#include "envoy/config/route/v3/route_descriptor.pb.h"
 #include "envoy/config/route/v3/route_components_descriptor.pb.h"
+#include "envoy/config/route/v3/route_descriptor.pb.h"
 #include "envoy/config/route/v3/scoped_route_descriptor.pb.h"
 #include "envoy/config/trace/v3/datadog_descriptor.pb.h"
 #include "envoy/config/trace/v3/dynamic_ot_descriptor.pb.h"
@@ -108,8 +103,8 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case_descriptor.pb.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator_descriptor.pb.h"
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff_descriptor.pb.h"
-#include "envoy/extensions/load_balancing_policies/common/v3/common_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/cluster_provided/v3/cluster_provided_descriptor.pb.h"
+#include "envoy/extensions/load_balancing_policies/common/v3/common_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/least_request/v3/least_request_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/random/v3/random_descriptor.pb.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin_descriptor.pb.h"
@@ -117,9 +112,11 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver_descriptor.pb.h"
 #include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver_descriptor.pb.h"
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver_descriptor.pb.h"
+#include "envoy/extensions/network/dns_resolver/hickory/v3/hickory_dns_resolver_descriptor.pb.h"
 #include "envoy/extensions/network/socket_interface/v3/default_socket_interface_descriptor.pb.h"
 #include "envoy/extensions/path/match/uri_template/v3/uri_template_match_descriptor.pb.h"
 #include "envoy/extensions/path/rewrite/uri_template/v3/uri_template_rewrite_descriptor.pb.h"
+#include "envoy/extensions/quic/client_writer_factory/v3/default_client_writer_descriptor.pb.h"
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator_descriptor.pb.h"
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream_descriptor.pb.h"
 #include "envoy/extensions/quic/proof_source/v3/proof_source_descriptor.pb.h"
@@ -160,7 +157,6 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/type/matcher/regex_descriptor.pb.h"
 #include "envoy/type/matcher/string_descriptor.pb.h"
 #include "envoy/type/matcher/struct_descriptor.pb.h"
-#include "envoy/type/matcher/value_descriptor.pb.h"
 #include "envoy/type/matcher/v3/filter_state_descriptor.pb.h"
 #include "envoy/type/matcher/v3/http_inputs_descriptor.pb.h"
 #include "envoy/type/matcher/v3/metadata_descriptor.pb.h"
@@ -172,6 +168,7 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/type/matcher/v3/string_descriptor.pb.h"
 #include "envoy/type/matcher/v3/struct_descriptor.pb.h"
 #include "envoy/type/matcher/v3/value_descriptor.pb.h"
+#include "envoy/type/matcher/value_descriptor.pb.h"
 #include "envoy/type/metadata/v3/metadata_descriptor.pb.h"
 #include "envoy/type/tracing/v3/custom_tag_descriptor.pb.h"
 #include "envoy/type/v3/hash_policy_descriptor.pb.h"
@@ -184,6 +181,10 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/type/v3/semantic_version_descriptor.pb.h"
 #include "envoy/type/v3/token_bucket_descriptor.pb.h"
 #include "envoy/watchdog/v3/abort_action_descriptor.pb.h"
+
+#include "bazel/cc_proto_descriptor_library/create_dynamic_message.h"
+#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
+#include "bazel/cc_proto_descriptor_library/text_format_transcoder.h"
 
 using cc_proto_descriptor_library::TextFormatTranscoder;
 using cc_proto_descriptor_library::internal::FileDescriptorInfo;
@@ -338,6 +339,8 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
       protobuf::reflection::
           envoy_extensions_network_dns_resolver_getaddrinfo_v3_getaddrinfo_dns_resolver::
               kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_network_dns_resolver_hickory_v3_hickory_dns_resolver::
+          kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_network_socket_interface_v3_default_socket_interface::
           kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_path_match_uri_template_v3_uri_template_match::
@@ -350,6 +353,8 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
       protobuf::reflection::envoy_extensions_quic_crypto_stream_v3_crypto_stream::
           kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_quic_proof_source_v3_proof_source::kFileDescriptorInfo,
+      protobuf::reflection::envoy_extensions_quic_client_writer_factory_v3_default_client_writer::
+          kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_regex_engines_v3_google_re2::kFileDescriptorInfo,
       protobuf::reflection::envoy_extensions_request_id_uuid_v3_uuid::kFileDescriptorInfo,
       protobuf::reflection::
@@ -448,7 +453,7 @@ void loadFileDescriptors(const FileDescriptorInfo& file_descriptor_info) {
 Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
   Protobuf::ReflectableMessage reflectable_message = createDynamicMessage(getTranscoder(), message);
   ASSERT(reflectable_message,
-         absl::StrCat("Unable to create dyanmic message for: ", message.GetTypeName()));
+         absl::StrCat("Unable to create dynamic message for: ", message.GetTypeName()));
   return reflectable_message;
 }
 

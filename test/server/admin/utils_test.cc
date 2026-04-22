@@ -39,11 +39,17 @@ TEST_F(UtilsTest, HistogramMode) {
   query_.overwrite("histogram_buckets", "detailed");
   EXPECT_TRUE(Utility::histogramBucketsParam(query_, histogram_buckets_mode).ok());
   EXPECT_EQ(Utility::HistogramBucketsMode::Detailed, histogram_buckets_mode);
+  query_.overwrite("histogram_buckets", "prometheusnative");
+  EXPECT_TRUE(Utility::histogramBucketsParam(query_, histogram_buckets_mode).ok());
+  EXPECT_EQ(Utility::HistogramBucketsMode::PrometheusNative, histogram_buckets_mode);
   query_.overwrite("histogram_buckets", "garbage");
   absl::Status status = Utility::histogramBucketsParam(query_, histogram_buckets_mode);
   EXPECT_FALSE(status.ok());
-  EXPECT_THAT(status.ToString(),
-              HasSubstr("usage: /stats?histogram_buckets=(cumulative|disjoint|detailed|summary)"));
+  EXPECT_THAT(
+      status.ToString(),
+      HasSubstr(
+          "usage: "
+          "/stats?histogram_buckets=(cumulative|disjoint|detailed|summary|prometheusnative)"));
 }
 
 TEST_F(UtilsTest, QueryParam) {

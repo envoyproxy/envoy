@@ -17,6 +17,7 @@ EXTENSIONS = {
     "envoy.filters.http.route_cache_reset":                "@envoy_mobile//library/common/extensions/filters/http/route_cache_reset:config",
     "envoy.filters.http.router":                           "//source/extensions/filters/http/router:config",
     "envoy.filters.network.http_connection_manager":       "//source/extensions/filters/network/http_connection_manager:config",
+    "envoy.http_api_listener":                             "//source/extensions/api_listeners/default_api_listener:api_listener_lib",
     "envoy.http.original_ip_detection.xff":                "//source/extensions/http/original_ip_detection/xff:config",
     "envoy.key_value.platform":                            "@envoy_mobile//library/common/extensions/key_value/platform:config",
     "envoy.network.dns_resolver.apple":                    "//source/extensions/network/dns_resolver/apple:config",
@@ -31,6 +32,8 @@ EXTENSIONS = {
     "envoy.connection_handler.default":                    "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
     "envoy.load_balancing_policies.round_robin":           "//source/extensions/load_balancing_policies/round_robin:config",
     "envoy.load_balancing_policies.cluster_provided":      "//source/extensions/load_balancing_policies/cluster_provided:config",
+    "envoy.quic.packet_writer.platform":                   "@envoy_mobile//library/common/extensions/quic_packet_writer/platform:config",
+    "envoy.quic.packet_writer.default":                    "//source/extensions/quic/client_packet_writer:default_quic_client_packet_writer_factory_config",
 }
 WINDOWS_EXTENSIONS = {}
 LEGACY_ALWAYSLINK = 1

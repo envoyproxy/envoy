@@ -130,7 +130,7 @@ inline Http::FilterHeadersStatus HttpFilterFuzzer::sendHeaders(Http::StreamDecod
                                                                const test::fuzz::HttpData& data,
                                                                bool end_stream) {
   request_headers_ = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(data.headers());
-  if (request_headers_.Path() == nullptr) {
+  if (request_headers_.Path() == nullptr || request_headers_.getPathValue().empty()) {
     request_headers_.setPath("/foo");
   }
   if (request_headers_.Method() == nullptr) {

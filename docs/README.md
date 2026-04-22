@@ -24,7 +24,7 @@ SPHINX_SKIP_CONFIG_VALIDATION=true ./ci/do_ci.sh docs
 If not using the Docker build container, you can run:
 
 ```bash
-bazel run --//tools/tarball:target=//docs:html //tools/tarball:unpack "$PWD"/generated/docs/
+bazel run --@envoy//tools/tarball:target=//:html @envoy//tools/tarball:unpack "$PWD"/generated/docs/
 ```
 
 ## Using the Docker build container to build the documentation

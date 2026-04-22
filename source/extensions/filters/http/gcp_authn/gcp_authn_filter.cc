@@ -6,6 +6,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -27,13 +28,13 @@ void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str
 } // namespace
 
 using ::Envoy::Router::RouteConstSharedPtr;
-using ::google::jwt_verify::Status;
 using Http::FilterHeadersStatus;
+using JwtVerify::Status;
 
 // TODO(tyxia) Handle the duplicated outstanding requests.
 Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& hdrs, bool) {
-  Envoy::Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-  if (route == nullptr || route->routeEntry() == nullptr) {
+  const auto route = decoder_callbacks_->route();
+  if (!route || !route->routeEntry()) {
     // Nothing to do if no route, continue the filter chain iteration.
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
@@ -75,11 +76,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     // So, we add the audience from the config to the final url by substituting the `[AUDIENCE]`
     // with real audience string from the config.
 
-    std::string final_url = absl::StrReplaceAll(
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.gcp_authn_use_fixed_url")
-            ? UrlString
-            : filter_config_->http_uri().uri(),
-        {{"[AUDIENCE]", audience_str_}});
+    std::string final_url = absl::StrReplaceAll(UrlString, {{"[AUDIENCE]", audience_str_}});
     client_->fetchToken(*this, buildRequest(final_url));
     initiating_call_ = false;
   } else {
@@ -112,8 +109,7 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
         ENVOY_LOG(debug, "No request header to be modified.");
       }
       // Decode the tokens.
-      std::unique_ptr<::google::jwt_verify::Jwt> jwt =
-          std::make_unique<::google::jwt_verify::Jwt>();
+      std::unique_ptr<JwtVerify::Jwt> jwt = std::make_unique<JwtVerify::Jwt>();
       Status status = jwt->parseFromString(token_str);
       if (status == Status::Ok) {
         if (jwt_token_cache_ != nullptr) {

@@ -27,3 +27,22 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "integration_test",
+    size = "large",
+    srcs = [
+        "integration_test.cc",
+    ],
+    extension_names = ["envoy.formatter.metadata"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        "//source/extensions/formatter/metadata:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+    ],
+)

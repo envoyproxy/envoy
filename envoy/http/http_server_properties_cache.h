@@ -137,8 +137,10 @@ public:
   /**
    * Returns the srtt estimate for an origin, or zero, if no srtt is cached.
    * @param origin The origin to get network characteristics for.
+   * @param use_canonical_suffix Whether to use canonical suffix for SRTT lookup.
    */
-  virtual std::chrono::microseconds getSrtt(const Origin& origin) const PURE;
+  virtual std::chrono::microseconds getSrtt(const Origin& origin,
+                                            bool use_canonical_suffix) const PURE;
 
   /**
    * Sets the number of concurrent streams allowed by the last connection to this origin.

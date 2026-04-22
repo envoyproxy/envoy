@@ -15,6 +15,7 @@
 
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
+extern const char build_version_suffix[];
 
 namespace Envoy {
 const std::string& VersionInfo::revision() {
@@ -26,14 +27,14 @@ const std::string& VersionInfo::revisionStatus() {
 }
 
 const std::string& VersionInfo::version() {
-  CONSTRUCT_ON_FIRST_USE(std::string,
-                         fmt::format("{}/{}/{}/{}/{}", revision(), BUILD_VERSION_NUMBER,
-                                     revisionStatus(), buildType(), sslVersion()));
+  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format("{}/{}{}/{}/{}/{}", revision(),
+                                                  BUILD_VERSION_NUMBER, build_version_suffix,
+                                                  revisionStatus(), buildType(), sslVersion()));
 }
 
 const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
-  static const auto* result =
-      new envoy::config::core::v3::BuildVersion(makeBuildVersion(BUILD_VERSION_NUMBER));
+  static const auto* result = new envoy::config::core::v3::BuildVersion(
+      makeBuildVersion(fmt::format("{}{}", BUILD_VERSION_NUMBER, build_version_suffix).c_str()));
   return *result;
 }
 

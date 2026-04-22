@@ -13,7 +13,7 @@ public:
   // Http::PassThroughFilter
   Http::FilterDataStatus decodeData(Buffer::Instance& buffer, bool end_stream) override {
     ENVOY_LOG_MISC(trace, "StreamTee decodeData {}", buffer.length());
-    absl::MutexLock l{&mutex_};
+    absl::MutexLock l{mutex_};
     request_body_.add(buffer);
     decode_end_stream_ = end_stream;
     if (on_decode_data_) {
@@ -23,7 +23,7 @@ public:
   }
 
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& request_trailers) override {
-    absl::MutexLock l{&mutex_};
+    absl::MutexLock l{mutex_};
     request_trailers_ = Http::createHeaderMap<Http::RequestTrailerMapImpl>(request_trailers);
     decode_end_stream_ = true;
     return Http::FilterTrailersStatus::Continue;
@@ -31,7 +31,7 @@ public:
 
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override {
     ENVOY_LOG_MISC(trace, "StreamTee encodeData {}", buffer.length());
-    absl::MutexLock l{&mutex_};
+    absl::MutexLock l{mutex_};
     response_body_.add(buffer);
     encode_end_stream_ = end_stream;
     if (on_encode_data_) {
@@ -41,7 +41,7 @@ public:
   }
 
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& response_trailers) override {
-    absl::MutexLock l{&mutex_};
+    absl::MutexLock l{mutex_};
     response_trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(response_trailers);
     encode_end_stream_ = true;
     return Http::FilterTrailersStatus::Continue;
@@ -83,7 +83,7 @@ bool StreamTeeFilterConfig::setEncodeDataCallback(
   }
 
   StreamTeeSharedPtr& stream_tee = stream_id_to_stream_tee_.find(stream_id)->second;
-  absl::MutexLock l{&stream_tee->mutex_};
+  absl::MutexLock l{stream_tee->mutex_};
   stream_tee->on_encode_data_ = cb;
 
   return true;
@@ -100,7 +100,7 @@ bool StreamTeeFilterConfig::setDecodeDataCallback(
   }
 
   StreamTeeSharedPtr& stream_tee = stream_id_to_stream_tee_.find(stream_id)->second;
-  absl::MutexLock l{&stream_tee->mutex_};
+  absl::MutexLock l{stream_tee->mutex_};
   stream_tee->on_decode_data_ = cb;
   return true;
 }

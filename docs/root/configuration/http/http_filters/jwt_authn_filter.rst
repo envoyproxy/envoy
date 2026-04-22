@@ -216,3 +216,22 @@ In this example the `tenants` claim is an object, therefore the JWT claim ("sub"
     x-jwt-claim-sub: <JWT Claim>
     x-jwt-claim-nested-key: <JWT Claim>
     x-jwt-tenants: <Base64 encoded JSON JWT Claim>
+
+Statistics
+----------
+
+The JWT authentication filter outputs statistics in the ``http.<stat_prefix>.jwt_authn.`` namespace.
+The :ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
+comes from the owning HTTP connection manager.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  allowed, Counter, Total requests that passed JWT authentication
+  denied, Counter, Total requests that failed JWT authentication
+  cors_preflight_bypassed, Counter, Total CORS preflight requests that bypassed JWT authentication
+  jwks_fetch_success, Counter, Total successful JWKS (JSON Web Key Set) remote fetches
+  jwks_fetch_failed, Counter, Total failed JWKS remote fetch attempts
+  jwt_cache_hit, Counter, Total JWT cache hits where a previously validated token was reused
+  jwt_cache_miss, Counter, Total JWT cache misses requiring full token validation

@@ -34,27 +34,30 @@ public:
 
   static constexpr uint64_t kiloBytesToBytes(const uint64_t val) { return val * 1024; }
 
+  static std::shared_ptr<TokenBucket> simpleTokenBucket(uint64_t limit_kbps,
+                                                        TimeSource& time_source);
+
   /**
-   * @param max_kbps maximum rate in KiB/s.
    * @param max_buffered_data maximum data to buffer before invoking the pause callback.
    * @param pause_data_cb callback invoked when the limiter has buffered too much data.
    * @param resume_data_cb callback invoked when the limiter has gone under the buffer limit.
    * @param write_data_cb callback invoked to write data to the stream.
    * @param continue_cb callback invoked to continue the stream. This is only used to continue
    *                    trailers that have been paused during body flush.
-   * @param time_source the time source to run the token bucket with.
    * @param dispatcher the stream's dispatcher to use for creating timers.
    * @param scope the stream's scope
+   * @param token_bucket the token bucket to use
+   * @param fill_interval time to wait between attempts to draw tokens from the bucket
    */
-  StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
-                    std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
-                    std::function<void(Buffer::Instance&, bool)> write_data_cb,
-                    std::function<void()> continue_cb,
-                    std::function<void(uint64_t, bool, std::chrono::milliseconds)> write_stats_cb,
-                    TimeSource& time_source, Event::Dispatcher& dispatcher,
-                    const ScopeTrackedObject& scope,
-                    std::shared_ptr<TokenBucket> token_bucket = nullptr,
-                    std::chrono::milliseconds fill_interval = DefaultFillInterval);
+  StreamRateLimiter(
+      uint64_t max_buffered_data, std::function<void()> pause_data_cb,
+      std::function<void()> resume_data_cb,
+      std::function<void(Buffer::Instance&, bool)> write_data_cb, std::function<void()> continue_cb,
+      std::function<void(uint64_t bytes_sent, uint64_t bytes_buffered, std::chrono::milliseconds)>
+          write_stats_cb,
+      Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
+      std::shared_ptr<TokenBucket> token_bucket,
+      std::chrono::milliseconds fill_interval = DefaultFillInterval);
 
   /**
    * Called by the stream to write data. All data writes happen asynchronously, the stream should

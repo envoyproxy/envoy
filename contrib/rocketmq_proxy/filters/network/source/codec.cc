@@ -59,7 +59,7 @@ RemotingCommandPtr Decoder::decode(Buffer::Instance& buffer, bool& underflow, bo
   int32_t code, version, opaque;
   uint32_t flag;
   if (isJsonHeader(mark)) {
-    ProtobufWkt::Struct header_struct;
+    Protobuf::Struct header_struct;
 
     // Parse header JSON text
     try {
@@ -247,8 +247,7 @@ std::string Decoder::decodeMsgId(Buffer::Instance& buffer, int32_t cursor) {
   return msg_id;
 }
 
-CommandCustomHeaderPtr Decoder::decodeExtHeader(RequestCode code,
-                                                ProtobufWkt::Struct& header_struct) {
+CommandCustomHeaderPtr Decoder::decodeExtHeader(RequestCode code, Protobuf::Struct& header_struct) {
   const auto& filed_value_pair = header_struct.fields();
   switch (code) {
   case RequestCode::SendMessage: {
@@ -320,7 +319,7 @@ CommandCustomHeaderPtr Decoder::decodeExtHeader(RequestCode code,
 }
 
 CommandCustomHeaderPtr Decoder::decodeResponseExtHeader(ResponseCode response_code,
-                                                        ProtobufWkt::Struct& header_struct,
+                                                        Protobuf::Struct& header_struct,
                                                         RequestCode request_code) {
   // No need to decode a failed response.
   if (response_code != ResponseCode::Success &&
@@ -352,41 +351,41 @@ CommandCustomHeaderPtr Decoder::decodeResponseExtHeader(ResponseCode response_co
 
 void Encoder::encode(const RemotingCommandPtr& command, Buffer::Instance& data) {
 
-  ProtobufWkt::Struct command_struct;
+  Protobuf::Struct command_struct;
   auto* fields = command_struct.mutable_fields();
 
-  ProtobufWkt::Value code_v;
+  Protobuf::Value code_v;
   code_v.set_number_value(command->code_);
   (*fields)["code"] = code_v;
 
-  ProtobufWkt::Value language_v;
+  Protobuf::Value language_v;
   language_v.set_string_value(command->language());
   (*fields)["language"] = language_v;
 
-  ProtobufWkt::Value version_v;
+  Protobuf::Value version_v;
   version_v.set_number_value(command->version_);
   (*fields)["version"] = version_v;
 
-  ProtobufWkt::Value opaque_v;
+  Protobuf::Value opaque_v;
   opaque_v.set_number_value(command->opaque_);
   (*fields)["opaque"] = opaque_v;
 
-  ProtobufWkt::Value flag_v;
+  Protobuf::Value flag_v;
   flag_v.set_number_value(command->flag_);
   (*fields)["flag"] = flag_v;
 
   if (!command->remark_.empty()) {
-    ProtobufWkt::Value remark_v;
+    Protobuf::Value remark_v;
     remark_v.set_string_value(command->remark_);
     (*fields)["remark"] = remark_v;
   }
 
-  ProtobufWkt::Value serialization_type_v;
+  Protobuf::Value serialization_type_v;
   serialization_type_v.set_string_value(command->serializeTypeCurrentRPC());
   (*fields)["serializeTypeCurrentRPC"] = serialization_type_v;
 
   if (command->custom_header_) {
-    ProtobufWkt::Value ext_fields_v;
+    Protobuf::Value ext_fields_v;
     command->custom_header_->encode(ext_fields_v);
     (*fields)["extFields"] = ext_fields_v;
   }

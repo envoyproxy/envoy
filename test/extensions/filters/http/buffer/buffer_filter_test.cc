@@ -128,7 +128,7 @@ TEST_F(BufferFilterTest, PerFilterConfigOverride) {
   BufferFilterSettings route_settings(per_route_cfg);
 
   EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig(_)).WillOnce(Return(&route_settings));
-  EXPECT_CALL(callbacks_, setDecoderBufferLimit(123ULL));
+  EXPECT_CALL(callbacks_, setBufferLimit(123ULL));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));

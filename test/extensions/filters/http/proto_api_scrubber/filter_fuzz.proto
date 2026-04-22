@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.proto_api_scrubber;
+
+message ProtoApiScrubberFuzzInput {
+  // Simulates a sequence of data frames for the request path.
+  repeated bytes request_data = 1;
+  // Simulates a sequence of data frames for the response path.
+  repeated bytes response_data = 2;
+}

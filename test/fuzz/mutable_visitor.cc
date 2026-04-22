@@ -28,7 +28,7 @@ void traverseMessageWorkerExt(ProtoVisitor& visitor, Protobuf::Message& message,
     absl::string_view target_type_url;
 
     if (message.GetDescriptor()->full_name() == "google.protobuf.Any") {
-      auto* any_message = Protobuf::DynamicCastMessage<ProtobufWkt::Any>(&message);
+      auto* any_message = Protobuf::DynamicCastMessage<Protobuf::Any>(&message);
       inner_message = Helper::typeUrlToMessage(any_message->type_url());
       target_type_url = any_message->type_url();
       if (inner_message) {

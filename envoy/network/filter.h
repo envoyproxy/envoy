@@ -2,8 +2,10 @@
 
 #include <memory>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/extension_config_provider.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener_filter_buffer.h"
 #include "envoy/network/transport_socket.h"
@@ -114,6 +116,18 @@ public:
    *              marking the filter as close ready.
    */
   virtual void disableClose(bool disabled) PURE;
+
+  /**
+   * Called by a write filter to signal that its internal buffer is above its high watermark.
+   * This propagates backpressure to the connection, which may notify ConnectionCallbacks.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called by a write filter to signal that its internal buffer has drained below its low
+   * watermark. Must be paired with a prior onAboveWriteBufferHighWatermark() call.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
 };
 
 /**
@@ -324,6 +338,13 @@ public:
    * @return true if read filters were initialized successfully, otherwise false.
    */
   virtual bool initializeReadFilters() PURE;
+
+  /**
+   * Add a network access log handler to the connection. The added log handlers will be called on
+   * during connections' destruction.
+   * @param handler supplies the access log handler to add.
+   */
+  virtual void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
 };
 
 /**
@@ -355,7 +376,7 @@ public:
    * @param value the struct to set on the namespace. A merge will be performed with new values for
    * the same key overriding existing.
    */
-  virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+  virtual void setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) PURE;
 
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
@@ -363,7 +384,7 @@ public:
    * @param value of type protobuf any to set on the namespace. A merge will be performed with new
    * values for the same key overriding existing.
    */
-  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
+  virtual void setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
@@ -398,6 +419,11 @@ public:
    * @param use_original_dst whether to use original destination address or not.
    */
   virtual void useOriginalDst(bool use_original_dst) PURE;
+
+  /**
+   * Return the connection level stream info interface.
+   */
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 };
 
 /**
@@ -439,6 +465,12 @@ public:
    * @return status used by the filter manager to manage further filter iteration.
    */
   virtual FilterStatus onData(Network::ListenerFilterBuffer& buffer) PURE;
+
+  /**
+   * Called when the connection is closed. Only the current filter that has stopped filter
+   * chain iteration will get the callback.
+   */
+  virtual void onClose() {};
 
   /**
    * Return the size of data the filter want to inspect from the connection.
@@ -577,6 +609,31 @@ using FilterConfigProviderPtr = std::unique_ptr<FilterConfigProvider<FactoryCb>>
 using NetworkFilterFactoriesList = std::vector<FilterConfigProviderPtr<FilterFactoryCb>>;
 
 /**
+ * Interface representing a single filter chain info.
+ */
+class FilterChainInfo {
+public:
+  virtual ~FilterChainInfo() = default;
+
+  /**
+   * @return the name of this filter chain.
+   */
+  virtual absl::string_view name() const PURE;
+
+  /**
+   * @return the metadata of this filter chain.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * @return the typed metadata provided in the config for this filter chain.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+};
+
+using FilterChainInfoSharedPtr = std::shared_ptr<const FilterChainInfo>;
+
+/**
  * Interface representing a single filter chain.
  */
 class FilterChain {
@@ -606,6 +663,16 @@ public:
    * @return the name of this filter chain.
    */
   virtual absl::string_view name() const PURE;
+
+  /**
+   * @return true if this filter chain configuration was discovered by FCDS.
+   */
+  virtual bool addedViaApi() const PURE;
+
+  /**
+   * @return the filter chain info for this filter chain.
+   */
+  virtual const FilterChainInfoSharedPtr& filterChainInfo() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;

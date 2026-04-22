@@ -21,6 +21,10 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig& proto_config,
       const std::string&, Server::Configuration::FactoryContext&) override;
+
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig& proto_config,
+      const std::string&, Server::Configuration::ServerFactoryContext&) override;
 };
 
 } // namespace ConnectGrpcBridge

@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3;static_namev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Static secret certificate mapper]
+// [#extension: envoy.tls.certificate_mappers.static_name]
+
+// A mapping to a fixed secret name for all certificates.
+message StaticName {
+  // The name for the secret to use for all connections.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+}

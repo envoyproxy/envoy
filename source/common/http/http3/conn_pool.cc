@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
@@ -39,8 +40,9 @@ getHostAddress(std::shared_ptr<const Upstream::HostDescription> host,
 }
 
 uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
-  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster.http3Options().quic_protocol_options(),
-                                         max_concurrent_streams, 100);
+  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      cluster.httpProtocolOptions().http3Options().quic_protocol_options(), max_concurrent_streams,
+      100);
 }
 
 const Envoy::Ssl::ClientContextConfig&
@@ -68,7 +70,9 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
           return;
         }
         codec_client_->connect();
-        if (readyForStream()) {
+        if (!Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.fix_http3_early_data_timing") &&
+            readyForStream()) {
           // This client can send early data, so check if there are any pending streams can be sent
           // as early data.
           parent_.onUpstreamReadyForEarlyData(*this);
@@ -88,9 +92,14 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
     parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
     // If there's waiting streams, make sure the pool will now serve them.
     parent_.onUpstreamReady();
-  } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::ReadyForEarlyData) {
-    // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
-    parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
+  } else if (state() == ActiveClient::State::ReadyForEarlyData) {
+    if (currentUnusedCapacity() == 0) {
+      // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
+      parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
+    } else if (Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.fix_http3_early_data_timing")) {
+      parent_.onUpstreamReadyForEarlyData(*this);
+    }
   }
 }
 
@@ -110,9 +119,10 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
     OptRef<PoolConnectResultCallback> connect_callback, Http::PersistentQuicInfo& quic_info,
     OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
-    bool attempt_happy_eyeballs)
+    Server::OverloadManager& overload_manager, bool attempt_happy_eyeballs)
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
-                            random_generator, state, client_fn, codec_fn, protocol, {}, nullptr),
+                            random_generator, state, client_fn, codec_fn, protocol,
+                            overload_manager, {}, nullptr),
       quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
       server_id_(sni(transport_socket_options, host),
                  static_cast<uint16_t>(host_->address()->ip()->port())),
@@ -147,14 +157,15 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
 
   Network::Address::InstanceConstSharedPtr address =
       getHostAddress(host(), attempt_happy_eyeballs_);
+  const auto& transport_options = transportSocketOptions();
   auto upstream_local_address_selector = host()->cluster().getUpstreamLocalAddressSelector();
-  auto upstream_local_address =
-      upstream_local_address_selector->getUpstreamLocalAddress(address, socketOptions());
+  auto upstream_local_address = upstream_local_address_selector->getUpstreamLocalAddress(
+      address, socketOptions(), makeOptRefFromPtr(transport_options.get()));
 
   return Quic::createQuicNetworkConnection(
       quic_info_, std::move(crypto_config), server_id_, dispatcher(), address,
       upstream_local_address.address_, quic_stat_names, rtt_cache, scope,
-      upstream_local_address.socket_options_, transportSocketOptions(), connection_id_generator_,
+      upstream_local_address.socket_options_, transport_options, connection_id_generator_,
       host_->transportSocketFactory(), network_observer_registry_.ptr());
 }
 
@@ -168,7 +179,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  OptRef<PoolConnectResultCallback> connect_callback,
                  Http::PersistentQuicInfo& quic_info,
                  OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
-                 bool attempt_happy_eyeballs) {
+                 Server::OverloadManager& overload_manager, bool attempt_happy_eyeballs) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [&quic_stat_names, rtt_cache,
@@ -209,7 +220,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info,
-      network_observer_registry, attempt_happy_eyeballs);
+      network_observer_registry, overload_manager, attempt_happy_eyeballs);
 }
 
 } // namespace Http3

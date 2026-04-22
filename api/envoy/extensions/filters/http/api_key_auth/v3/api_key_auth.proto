@@ -23,7 +23,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // For example, the following configuration configures the filter to authenticate the clients using
 // the API key from the header ``X-API-KEY``. And only the clients with the key ``real-key`` are
-// considered as authenticated.
+// considered as authenticated. The client information is configured to be forwarded
+// in the header ``x-client-id``.
 //
 // .. code-block:: yaml
 //
@@ -32,6 +33,9 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //      client: user
 //    key_sources:
 //     - header: "X-API-KEY"
+//    forwarding:
+//      header: "x-client-id"
+//      hide_credentials: false
 //
 message ApiKeyAuth {
   // The credentials that are used to authenticate the clients.
@@ -39,6 +43,9 @@ message ApiKeyAuth {
 
   // The key sources to fetch the key from the coming request.
   repeated KeySource key_sources = 2;
+
+  // Optional configuration to control what information should be propagated to upstream services.
+  Forwarding forwarding = 3;
 }
 
 // API key auth configuration of per route or per virtual host or per route configuration.
@@ -67,6 +74,11 @@ message ApiKeyAuthPerRoute {
   //   route.
   //
   repeated string allowed_clients = 3;
+
+  // Optional configuration to control what information should be propagated to upstream services.
+  // If this field is non-empty, then the forwarding information in the filter level configuration
+  // will be ignored and the forwarding in this configuration will be used.
+  Forwarding forwarding = 4;
 }
 
 // Single credential entry that contains the API key and the related client id.
@@ -100,4 +112,17 @@ message KeySource {
   string cookie = 3
       [(validate.rules).string =
            {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
+}
+
+message Forwarding {
+  // The header name in which to store the client information. If this field is non-empty,
+  // the client string associated with the matched credential will be injected into
+  // the request before forwarding upstream.
+  string header = 1
+      [(validate.rules).string = {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // If true, remove the API key from the request before forwarding upstream.
+  //
+  // This applies to all configured key sources: ``header``, ``query``, and ``cookie``.
+  bool hide_credentials = 2;
 }

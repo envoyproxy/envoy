@@ -94,6 +94,11 @@ public:
   virtual bool used() const PURE;
 
   /**
+   * Clear any indicator on whether this metric has been updated.
+   */
+  virtual void markUnused() PURE;
+
+  /**
    * Indicates whether this metric is hidden.
    */
   virtual bool hidden() const PURE;
@@ -280,5 +285,36 @@ public:
 private:
   std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;
 };
+
+class StatMatchingData {
+public:
+  static absl::string_view name() { return "stat_matching_data"; }
+
+  virtual std::string fullName() const PURE;
+
+  virtual ~StatMatchingData() = default;
+};
+
+class StatTagMatchingData {
+public:
+  static absl::string_view name() { return "stat_tag_matching_data"; }
+
+  virtual absl::string_view value() const PURE;
+
+  virtual ~StatTagMatchingData() = default;
+};
+
+template <class StatType> class StatMatchingDataImpl : public StatMatchingData {
+public:
+  explicit StatMatchingDataImpl(const StatType& metric) : metric_(metric) {}
+
+  static std::string name() { return "stat_matching_data_impl"; }
+
+  std::string fullName() const override { return metric_.name(); }
+
+private:
+  const StatType& metric_;
+};
+
 } // namespace Stats
 } // namespace Envoy

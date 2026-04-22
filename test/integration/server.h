@@ -16,7 +16,7 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
@@ -77,15 +77,21 @@ public:
   TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope, Store& store)
       : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
-  ScopeSharedPtr createScope(const std::string& name) override {
+  ScopeSharedPtr createScope(const std::string& name, bool evictable,
+                             const ScopeStatsLimitSettings& limits,
+                             StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
-    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->createScope(name), store_);
+    return std::make_shared<TestScopeWrapper>(
+        lock_, wrapped_scope_->createScope(name, evictable, limits, std::move(matcher)), store_);
   }
 
-  ScopeSharedPtr scopeFromStatName(StatName name) override {
+  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable,
+                                   const ScopeStatsLimitSettings& limits,
+                                   StatsMatcherSharedPtr matcher = nullptr) override {
     Thread::LockGuard lock(lock_);
-    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->scopeFromStatName(name),
-                                              store_);
+    return std::make_shared<TestScopeWrapper>(
+        lock_, wrapped_scope_->scopeFromStatName(name, evictable, limits, std::move(matcher)),
+        store_);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,
@@ -184,7 +190,7 @@ public:
   }
   void add(uint64_t amount) override {
     counter_->add(amount);
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     condvar_.Signal();
   }
   void inc() override { add(1); }
@@ -196,6 +202,7 @@ public:
   uint32_t use_count() const override { return counter_->use_count(); }
   StatName tagExtractedStatName() const override { return counter_->tagExtractedStatName(); }
   bool used() const override { return counter_->used(); }
+  void markUnused() override { counter_->markUnused(); }
   bool hidden() const override { return counter_->hidden(); }
   SymbolTable& symbolTable() override { return counter_->symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
@@ -207,12 +214,11 @@ private:
 };
 
 // A stats allocator which creates NotifyingCounters rather than regular CounterImpls.
-class NotifyingAllocatorImpl : public Stats::AllocatorImpl {
+class NotifyingAllocator : public Stats::Allocator {
 public:
-  using Stats::AllocatorImpl::AllocatorImpl;
-
+  NotifyingAllocator(Stats::SymbolTable& symbol_table) : Stats::Allocator(symbol_table) {}
   void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() != value) {
       condvar_.Wait(&mutex_);
@@ -221,7 +227,7 @@ public:
   }
 
   void waitForCounterFromStringGe(const std::string& name, uint64_t value) {
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() < value) {
       condvar_.Wait(&mutex_);
@@ -230,7 +236,7 @@ public:
   }
 
   void waitForCounterExists(const std::string& name) {
-    absl::MutexLock l(&mutex_);
+    absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to exist", name);
     while (getCounterLockHeld(name) == nullptr) {
       condvar_.Wait(&mutex_);
@@ -242,10 +248,10 @@ protected:
   Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
                                       const StatNameTagVector& stat_name_tags) override {
     Stats::Counter* counter = new NotifyingCounter(
-        Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
+        Stats::Allocator::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
         condvar_);
     {
-      absl::MutexLock l(&mutex_);
+      absl::MutexLock l(mutex_);
       // Allow getting the counter directly from the allocator, since it's harder to
       // signal when the counter has been added to a given stats store.
       counters_.emplace(counter->name(), counter);
@@ -365,6 +371,16 @@ public:
   void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {};
   const Stats::TagVector& fixedTags() override { CONSTRUCT_ON_FIRST_USE(Stats::TagVector); }
 
+  void evictUnused() override {
+    Thread::LockGuard lock(lock_);
+    eviction_count_++;
+  }
+
+  uint32_t evictionCount() const {
+    Thread::LockGuard lock(lock_);
+    return eviction_count_;
+  }
+
   // Stats::StoreRoot
   void addSink(Sink&) override {}
   void setTagProducer(TagProducerPtr&&) override {}
@@ -381,6 +397,7 @@ private:
   IsolatedStoreImpl store_;
   PostMergeCb merge_cb_;
   ScopeSharedPtr lazy_default_scope_;
+  uint32_t eviction_count_{0};
 };
 
 } // namespace Stats
@@ -551,7 +568,7 @@ public:
   virtual Stats::Store& statStore() PURE;
   virtual Server::ThreadLocalOverloadState& overloadState() PURE;
   virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
-  virtual Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() PURE;
+  virtual Stats::NotifyingAllocator& notifyingStatsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
   bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
@@ -634,8 +651,8 @@ public:
 
   Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
 
-  Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() override {
-    auto* ret = dynamic_cast<Stats::NotifyingAllocatorImpl*>(stats_allocator_.get());
+  Stats::NotifyingAllocator& notifyingStatsAllocator() override {
+    auto* ret = dynamic_cast<Stats::NotifyingAllocator*>(stats_allocator_.get());
     RELEASE_ASSERT(ret != nullptr,
                    "notifyingStatsAllocator() is not created when real_stats is true");
     return *ret;
@@ -658,7 +675,7 @@ private:
   Network::Address::InstanceConstSharedPtr admin_address_;
   absl::Notification server_gone_;
   Stats::SymbolTableImpl symbol_table_;
-  std::unique_ptr<Stats::AllocatorImpl> stats_allocator_;
+  std::unique_ptr<Stats::Allocator> stats_allocator_;
 };
 
 } // namespace Envoy

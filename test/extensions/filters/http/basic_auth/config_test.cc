@@ -150,6 +150,27 @@ TEST(Factory, InvalidConfigNotSHA) {
       EnvoyException, "basic auth: unsupported htpasswd format: please use {SHA}");
 }
 
+TEST(Factory, ValidConfigWithServerContext) {
+  const std::string yaml = R"(
+  users:
+    inline_string: |-
+        user1:{SHA}tESsBmE/yNY3lb6a0L6vVQEZNqw=
+        user2:{SHA}EJ9LPFDXsN9ynSmbxvjp75Bmlx8=
+  )";
+
+  BasicAuthFilterFactory factory;
+  BasicAuth proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto callback =
+      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  callback(filter_callback);
+}
+
 } // namespace BasicAuth
 } // namespace HttpFilters
 } // namespace Extensions

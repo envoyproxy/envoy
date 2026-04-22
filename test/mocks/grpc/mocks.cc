@@ -44,6 +44,9 @@ MockAsyncClientManager::MockAsyncClientManager() {
       .WillByDefault(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<testing::NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
+  ON_CALL(*this, getOrCreateRawAsyncClientWithHashKey(_, _, _)).WillByDefault(Invoke([] {
+    return std::make_shared<testing::NiceMock<Grpc::MockAsyncClient>>();
+  }));
 }
 
 MockAsyncClientManager::~MockAsyncClientManager() = default;

@@ -172,7 +172,7 @@ TEST_F(ActiveMessageTest, RecordPopRouteInfo) {
   auto host_description = new NiceMock<Upstream::MockHostDescription>();
 
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  ProtobufWkt::Struct topic_route_data;
+  Protobuf::Struct topic_route_data;
   auto* fields = topic_route_data.mutable_fields();
 
   std::string broker_name = "broker-a";
@@ -184,7 +184,7 @@ TEST_F(ActiveMessageTest, RecordPopRouteInfo) {
   (*fields)[RocketmqConstants::get().BrokerName] = ValueUtil::stringValue(broker_name);
   (*fields)[RocketmqConstants::get().BrokerId] = ValueUtil::numberValue(broker_id);
   (*fields)[RocketmqConstants::get().Perm] = ValueUtil::numberValue(6);
-  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, Protobuf::Struct>(
       NetworkFilterNames::get().RocketmqProxy, topic_route_data));
 
   EXPECT_CALL(*host_description, metadata()).WillRepeatedly(Return(metadata));

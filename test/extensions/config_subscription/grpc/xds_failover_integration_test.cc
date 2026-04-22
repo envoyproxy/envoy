@@ -147,13 +147,12 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
       auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-          tls_context, factory_context_, false);
+          tls_context, factory_context_, {}, false);
       // upstream_stats_store_ should have been initialized be prior call to
       // BaseIntegrationTest::createXdsUpstream().
       ASSERT(upstream_stats_store_ != nullptr);
       auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-          std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
-          std::vector<std::string>{});
+          std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
       addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
     }
     failover_xds_upstream_ = fake_upstreams_.back().get();
@@ -179,6 +178,15 @@ public:
   void primaryConnectionFailure() {
     AssertionResult result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
+    // When GoogleGrpc is used, there may be cases where the connection will be
+    // disconnected before the gRPC library observes the TLS handshake, which will
+    // end up in a fast retry without notifying Envoy that the connection was
+    // disconnected. We wait for a stream to ensure that the gRPC library
+    // observed a successful connection.
+    if (clientType() == Grpc::ClientType::GoogleGrpc) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+    }
     result = xds_connection_->close();
     RELEASE_ASSERT(result, result.message());
   }
@@ -263,17 +271,17 @@ public:
 
     EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "1", {}, {}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
 
     sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
         LdsTypeUrl, {buildSimpleListener("listener_0", "cluster_0")},
         {buildSimpleListener("listener_0", "cluster_0")}, {}, "1", {}, xds_stream);
 
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                         {"cluster_0"}, {}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}, false,
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}, false,
                                         Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream));
 
     test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
@@ -629,7 +637,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
 
@@ -748,7 +756,7 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
 
@@ -872,7 +880,7 @@ TEST_P(XdsFailoverAdsIntegrationTest,
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "failover1", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false,
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       failover_xds_stream_.get()));
 
@@ -1048,5 +1056,83 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
   EXPECT_TRUE(compareDiscoveryRequest(
       LdsTypeUrl, "", {}, {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
       failover_xds_stream_.get(), makeOptRef(empty_initial_resource_versions_map)));
+}
+
+// Validates that initial resource versions are sent after ADS replacement where
+// the first attempt to the primary source fails.
+TEST_P(XdsFailoverAdsIntegrationTest, InitialResourceVersionsSentAfterAdsReplacementAndFailure) {
+  // Initial resource versions is only supported by delta-xDS, so skip the SotW
+  // tests.
+  if (sotwOrDelta() != Grpc::SotwOrDelta::Delta &&
+      sotwOrDelta() != Grpc::SotwOrDelta::UnifiedDelta) {
+    GTEST_SKIP()
+        << "Initial resource versions is only supported by delta-xDS, skipping non-delta-xDS tests";
+    return;
+  }
+  initialize();
+
+  // Establish the primary connection, receive a CDS update, and send a CDS
+  // response (simple static cluster).
+  createXdsConnection();
+  ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+  xds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true));
+  auto cluster = ConfigHelper::buildCluster("cluster_0");
+  cluster.set_type(envoy::config::cluster::v3::Cluster::STATIC);
+  cluster.clear_eds_cluster_config();
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(CdsTypeUrl, {cluster}, {cluster}, {},
+                                                             "1", {}, xds_stream_.get());
+
+  // Receive LDS request
+  EXPECT_TRUE(compareDiscoveryRequest(LdsTypeUrl, "", {}, {}, {}, false));
+  // Receive CDS ACK.
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "1", {}, {}, {}, false));
+
+  // Replace the ADS server config (with a different timeout, just triggering the
+  // mechanism).
+  envoy::config::core::v3::ApiConfigSource new_ads_config;
+  new_ads_config.CopyFrom(test_server_->server().bootstrap().dynamic_resources().ads_config());
+  new_ads_config.mutable_grpc_services(0)->mutable_timeout()->set_seconds(200);
+
+  // Replace the ADS config.
+  test_server_->setAdsConfigSource(new_ads_config);
+
+  // Expect a reset from the ADS source.
+  EXPECT_TRUE(xds_stream_->waitForReset());
+  // GoogleGrpc will disconnect in this case, and a new connection will be
+  // created. EnvoyGrpc will not kill the connection, and a new stream should be
+  // created.
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    ASSERT_TRUE(xds_connection_->waitForDisconnect());
+    xds_connection_.reset();
+    // Reject the initial primary server attempt.
+    primaryConnectionFailure();
+  } else {
+    ASSERT(clientType() == Grpc::ClientType::EnvoyGrpc);
+    xds_stream_.reset();
+    // The connection will be re-used in then EnvoyGrpc case.
+    ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+    // Disconnect the primary immediately.
+    ASSERT_TRUE(xds_connection_->close());
+  }
+
+  // Wait for the second attempt to the primary source.
+  ASSERT_TRUE(xds_connection_->waitForDisconnect());
+  // The CDS request fails when the primary disconnects. After that fetch the config
+  // dump to ensure that the retry timer kicks in.
+  waitForPrimaryXdsRetryTimer();
+
+  // Allow the second attempt to the primary to succeed.
+  createXdsConnection();
+  ASSERT_TRUE(xds_connection_->waitForNewStream(*dispatcher_, xds_stream_));
+  xds_stream_->startGrpcStream();
+
+  // The first CDS request should include the initial-resource-versions.
+  const absl::flat_hash_map<std::string, std::string> cds_initial_resource_versions_map{
+      {"cluster_0", "1"}};
+  EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
+                                      makeOptRef(cds_initial_resource_versions_map)));
 }
 } // namespace Envoy

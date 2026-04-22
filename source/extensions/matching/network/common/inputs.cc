@@ -10,12 +10,11 @@ namespace Network {
 namespace Matching {
 
 Matcher::DataInputGetResult TransportProtocolInput::get(const MatchingData& data) const {
-  const auto transport_protocol = data.socket().detectedTransportProtocol();
+  absl::string_view transport_protocol = data.socket().detectedTransportProtocol();
   if (!transport_protocol.empty()) {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::string(transport_protocol)};
+    return Matcher::DataInputGetResult::CreateStringView(transport_protocol);
   }
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+  return Matcher::DataInputGetResult::NoData();
 }
 
 class DestinationIPInputFactory : public DestinationIPInputBaseFactory<MatchingData> {};
@@ -71,6 +70,15 @@ class FilterStateInputFactory : public FilterStateInputBaseFactory<MatchingData>
 class HttpFilterStateInputFactory : public FilterStateInputBaseFactory<Http::HttpMatchingData> {};
 REGISTER_FACTORY(FilterStateInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(HttpFilterStateInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
+
+class NetworkNamespaceInputFactory : public NetworkNamespaceInputBaseFactory<MatchingData> {};
+class UdpNetworkNamespaceInputFactory : public NetworkNamespaceInputBaseFactory<UdpMatchingData> {};
+class HttpNetworkNamespaceInputFactory
+    : public NetworkNamespaceInputBaseFactory<Http::HttpMatchingData> {};
+REGISTER_FACTORY(NetworkNamespaceInputFactory, Matcher::DataInputFactory<MatchingData>);
+REGISTER_FACTORY(UdpNetworkNamespaceInputFactory, Matcher::DataInputFactory<UdpMatchingData>);
+REGISTER_FACTORY(HttpNetworkNamespaceInputFactory,
+                 Matcher::DataInputFactory<Http::HttpMatchingData>);
 
 } // namespace Matching
 } // namespace Network

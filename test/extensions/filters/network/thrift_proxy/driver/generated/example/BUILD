@@ -1,4 +1,3 @@
-load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 
@@ -14,7 +13,5 @@ py_library(
         "constants.py",
         "ttypes.py",
     ],
-    deps = [
-        requirement("thrift"),
-    ],
+    deps = ["@thrift"],
 )

@@ -31,8 +31,14 @@ ZlibCompressorImpl::ZlibCompressorImpl(uint64_t chunk_size)
 void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy comp_strategy,
                               int64_t window_bits, uint64_t memory_level = 8) {
   ASSERT(initialized_ == false);
-  const int result = deflateInit2(zstream_ptr_.get(), static_cast<int64_t>(comp_level), Z_DEFLATED,
-                                  window_bits, memory_level, static_cast<uint64_t>(comp_strategy));
+  // The deflateInit2 macro from zlib.h contains an old-style cast, so we need to suppress the
+  // warning for this call.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+  const int result = deflateInit2(zstream_ptr_.get(), static_cast<int>(comp_level), Z_DEFLATED,
+                                  static_cast<int>(window_bits), static_cast<int>(memory_level),
+                                  static_cast<int>(comp_strategy));
+#pragma GCC diagnostic pop
   RELEASE_ASSERT(result >= 0, "");
   initialized_ = true;
 }

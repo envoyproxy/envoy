@@ -3,6 +3,7 @@
 #include <list>
 #include <memory>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -100,6 +101,18 @@ public:
    * @param action for how the connection will be closed.
    */
   virtual void closeConnection(ConnectionCloseAction action) PURE;
+
+  /**
+   * Called when a filter's internal write buffer has gone above its high watermark.
+   * This propagates backpressure to the connection, which may notify ConnectionCallbacks.
+   */
+  virtual void onFilterAboveHighWatermark() PURE;
+
+  /**
+   * Called when a filter's internal write buffer has drained below its low watermark.
+   * Must be paired with a prior onFilterAboveHighWatermark() call.
+   */
+  virtual void onFilterBelowLowWatermark() PURE;
 };
 
 /**
@@ -121,6 +134,9 @@ public:
   void maybeClose();
   void onConnectionClose(ConnectionCloseAction close_action);
   bool pendingClose() { return state_.local_close_pending_ || state_.remote_close_pending_; }
+
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler);
+  void log(AccessLog::AccessLogType type);
 
 protected:
   struct State {
@@ -178,6 +194,13 @@ private:
 
     void disableClose(bool disable) override;
 
+    void onAboveWriteBufferHighWatermark() override {
+      parent_.connection_.onFilterAboveHighWatermark();
+    }
+    void onBelowWriteBufferLowWatermark() override {
+      parent_.connection_.onFilterBelowLowWatermark();
+    }
+
     FilterManagerImpl& parent_;
     WriteFilterSharedPtr filter_;
     bool pending_close_{false};
@@ -197,6 +220,7 @@ private:
   std::list<ActiveWriteFilterPtr> downstream_filters_;
   State state_;
   absl::optional<ConnectionCloseAction> latched_close_action_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
 };
 
 } // namespace Network

@@ -56,10 +56,8 @@ public:
   }
 
   void setup(Http::RequestHeaderMap& request_headers) {
-
-    state_ = RetryStateImpl::create(policy_, request_headers, cluster_, &virtual_cluster_,
-                                    route_stats_context_, factory_context_, dispatcher_,
-                                    Upstream::ResourcePriority::Default);
+    state_ = RetryStateImpl::create(*policy_, request_headers, cluster_, factory_context_,
+                                    dispatcher_, Upstream::ResourcePriority::Default);
   }
 
   void expectTimerCreateAndEnable() {
@@ -156,24 +154,13 @@ public:
 
     EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
               state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
-
-    EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-    EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-    EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-    EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
   }
 
   void TearDown() override { cleanupOutstandingResources(); }
 
   Event::SimulatedTimeSystem test_time_;
-  NiceMock<TestRetryPolicy> policy_;
+  std::shared_ptr<NiceMock<TestRetryPolicy>> policy_ = TestRetryPolicy::createMock();
   NiceMock<Upstream::MockClusterInfo> cluster_;
-  TestVirtualCluster virtual_cluster_;
-  Stats::IsolatedStoreImpl stats_store_;
-  Stats::StatNameManagedStorage stat_name_{"fake_route", stats_store_.symbolTable()};
-  RouteStatNames stat_names_{stats_store_.symbolTable()};
-  RouteStatsContextImpl route_stats_context_{*stats_store_.rootScope(), stat_names_,
-                                             stat_name_.statName(), "fake_route"};
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Runtime::MockLoader>& runtime_{factory_context_.runtime_loader_};
@@ -219,13 +206,6 @@ TEST_F(RouterRetryStateImplTest, PolicyRefusedStream) {
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(remote_refused_stream_reset_, RetryState::Http3Used::No,
                                      reset_callback_, false));
-
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
@@ -251,13 +231,6 @@ TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailure) {
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(remote_refused_stream_reset_, RetryState::Http3Used::No,
                                      reset_callback_, false));
-
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyAltProtocolPostHandshakeFailureWithoutTcpFallback) {
@@ -297,13 +270,6 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemoteReset) {
   EXPECT_EQ(
       RetryStatus::NoRetryLimitExceeded,
       state_->shouldRetryReset(remote_reset_, RetryState::Http3Used::No, reset_callback_, false));
-
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, Policy5xxRemote503) {
@@ -389,13 +355,6 @@ TEST_F(RouterRetryStateImplTest, PolicyGatewayErrorRemoteReset) {
   EXPECT_EQ(
       RetryStatus::NoRetryLimitExceeded,
       state_->shouldRetryReset(remote_reset_, RetryState::Http3Used::No, reset_callback_, false));
-
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyGrpcCancelled) {
@@ -437,13 +396,6 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemote200RemoteReset) {
   EXPECT_EQ(
       RetryStatus::NoRetryLimitExceeded,
       state_->shouldRetryReset(remote_reset_, RetryState::Http3Used::No, reset_callback_, false));
-
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, RuntimeGuard) {
@@ -453,8 +405,9 @@ TEST_F(RouterRetryStateImplTest, RuntimeGuard) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
-  EXPECT_EQ(RetryStatus::No, state_->shouldRetryReset(remote_reset_, RetryState::Http3Used::No,
-                                                      reset_callback_, false));
+  EXPECT_EQ(
+      RetryStatus::NoRuntime,
+      state_->shouldRetryReset(remote_reset_, RetryState::Http3Used::No, reset_callback_, false));
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyConnectFailureOtherReset) {
@@ -502,7 +455,7 @@ TEST_F(RouterRetryStateImplTest, PolicyRetriable4xxReset) {
 }
 
 TEST_F(RouterRetryStateImplTest, RetriableStatusCodes) {
-  policy_.retriable_status_codes_.push_back(409);
+  policy_->retriable_status_codes_.push_back(409);
   verifyPolicyWithRemoteResponse("retriable-status-codes", "409", false /* is_grpc */);
 }
 
@@ -526,14 +479,10 @@ TEST_F(RouterRetryStateImplTest, NoRetryUponTooEarlyStatusCodeWithDownstreamEarl
 
   EXPECT_EQ(RetryStatus::No,
             state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
-
-  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(0UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(0UL, route_stats_context_.stats().upstream_rq_retry_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, RetriableStatusCodesUpstreamReset) {
-  policy_.retriable_status_codes_.push_back(409);
+  policy_->retriable_status_codes_.push_back(409);
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "retriable-status-codes"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
@@ -606,13 +555,13 @@ TEST_F(RouterRetryStateImplTest, RetriableStatusCodesHeader) {
 // Test that when 'retriable-headers' policy is set via request header, certain configured headers
 // trigger retries.
 TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicySetViaRequestHeader) {
-  policy_.retry_on_ = RetryPolicy::RETRY_ON_5XX;
+  policy_->retry_on_ = RetryPolicy::RETRY_ON_5XX;
 
   Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> matchers;
   auto* matcher = matchers.Add();
   matcher->set_name("X-Upstream-Pushback");
 
-  policy_.retriable_headers_ =
+  policy_->retriable_headers_ =
       Http::HeaderUtility::buildHeaderMatcherVector(matchers, factory_context_);
 
   // No retries based on response headers: retry mode isn't enabled.
@@ -644,7 +593,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicySetViaRequestHeader) {
 // Test that when 'retriable-headers' policy is set via retry policy configuration,
 // configured header matcher conditions trigger retries.
 TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicyViaRetryPolicyConfiguration) {
-  policy_.retry_on_ = RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
+  policy_->retry_on_ = RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
 
   Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> matchers;
 
@@ -664,7 +613,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicyViaRetryPolicyConfigurati
   matcher4->mutable_range_match()->set_start(500);
   matcher4->mutable_range_match()->set_end(505);
 
-  policy_.retriable_headers_ =
+  policy_->retriable_headers_ =
       Http::HeaderUtility::buildHeaderMatcherVector(matchers, factory_context_);
 
   auto should_retry_with_response = [this](const Http::TestResponseHeaderMapImpl& response_headers,
@@ -784,7 +733,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersSetViaRequestHeader) {
 
 // Test merging retriable headers set via request headers and via config file.
 TEST_F(RouterRetryStateImplTest, RetriableHeadersMergedConfigAndRequestHeaders) {
-  policy_.retry_on_ = RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
+  policy_->retry_on_ = RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
 
   Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> matchers;
 
@@ -794,7 +743,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersMergedConfigAndRequestHeaders) 
   matcher->mutable_string_match()->set_exact("200");
   matcher->set_invert_match(true);
 
-  policy_.retriable_headers_ =
+  policy_->retriable_headers_ =
       Http::HeaderUtility::buildHeaderMatcherVector(matchers, factory_context_);
 
   // No retries according to config.
@@ -837,13 +786,6 @@ TEST_F(RouterRetryStateImplTest, PolicyResetRemoteReset) {
   EXPECT_EQ(
       RetryStatus::NoRetryLimitExceeded,
       state_->shouldRetryReset(remote_reset_, RetryState::Http3Used::No, reset_callback_, false));
-
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
@@ -856,7 +798,7 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
   matcher2->set_name(":method");
   matcher2->mutable_string_match()->set_exact("HEAD");
 
-  policy_.retriable_request_headers_ =
+  policy_->retriable_request_headers_ =
       Http::HeaderUtility::buildHeaderMatcherVector(matchers, factory_context_);
 
   {
@@ -917,26 +859,19 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
 }
 
 TEST_F(RouterRetryStateImplTest, RouteConfigNoRetriesAllowed) {
-  policy_.num_retries_ = 0;
-  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  policy_->num_retries_ = 0;
+  policy_->retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
   setup();
 
   EXPECT_TRUE(state_->enabled());
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Unknown,
                                      reset_callback_, false));
-
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(0UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
-  policy_.num_retries_ = 1;
-  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  policy_->num_retries_ = 1;
+  policy_->retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
   Http::TestRequestHeaderMapImpl request_headers;
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
@@ -959,14 +894,11 @@ TEST_F(RouterRetryStateImplTest, NoAvailableRetries) {
   EXPECT_EQ(RetryStatus::NoOverflow,
             state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Unknown,
                                      reset_callback_, false));
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_overflow_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_overflow_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_overflow_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
   // The max retries header will take precedence over the policy
-  policy_.num_retries_ = 4;
+  policy_->num_retries_ = 4;
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"},
                                                  {"x-envoy-retry-grpc-on", "cancelled"},
                                                  {"x-envoy-max-retries", "3"}};
@@ -998,21 +930,11 @@ TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Unknown,
                                      reset_callback_, false));
-
-  EXPECT_EQ(3UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_success_.value());
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(3UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(0UL, virtual_cluster_.stats().upstream_rq_retry_success_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(3UL, route_stats_context_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(0UL, route_stats_context_.stats().upstream_rq_retry_success_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, Backoff) {
-  policy_.num_retries_ = 5;
-  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  policy_->num_retries_ = 5;
+  policy_->retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
   Http::TestRequestHeaderMapImpl request_headers;
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
@@ -1070,22 +992,14 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(RetryStatus::No,
             state_->shouldRetryHeaders(response_headers, request_headers, header_callback_));
-
-  EXPECT_EQ(5UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_success_.value());
-  EXPECT_EQ(5UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_success_.value());
-  EXPECT_EQ(5UL, route_stats_context_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_success_.value());
-  EXPECT_EQ(0UL, cluster_.circuit_breakers_stats_.rq_retry_open_.value());
 }
 
 // Test customized retry back-off intervals.
 TEST_F(RouterRetryStateImplTest, CustomBackOffInterval) {
-  policy_.num_retries_ = 10;
-  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
-  policy_.base_interval_ = std::chrono::milliseconds(100);
-  policy_.max_interval_ = std::chrono::milliseconds(1200);
+  policy_->num_retries_ = 10;
+  policy_->retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  policy_->base_interval_ = std::chrono::milliseconds(100);
+  policy_->max_interval_ = std::chrono::milliseconds(1200);
   Http::TestRequestHeaderMapImpl request_headers;
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
@@ -1134,9 +1048,9 @@ TEST_F(RouterRetryStateImplTest, CustomBackOffInterval) {
 
 // Test the default maximum retry back-off interval.
 TEST_F(RouterRetryStateImplTest, CustomBackOffIntervalDefaultMax) {
-  policy_.num_retries_ = 10;
-  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
-  policy_.base_interval_ = std::chrono::milliseconds(100);
+  policy_->num_retries_ = 10;
+  policy_->retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  policy_->base_interval_ = std::chrono::milliseconds(100);
   Http::TestRequestHeaderMapImpl request_headers;
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
@@ -1197,7 +1111,7 @@ TEST_F(RouterRetryStateImplTest, ParseRateLimitedResetInterval) {
   reset_header_2->set_name("X-RateLimit-Reset");
   reset_header_2->set_format(envoy::config::route::v3::RetryPolicy::UNIX_TIMESTAMP);
 
-  policy_.reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(reset_headers);
+  policy_->reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(reset_headers);
 
   // Failure case: Matches reset header (seconds) but exceeds max_interval (>5min)
   {
@@ -1263,8 +1177,8 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
   reset_header->set_name("Retry-After");
   reset_header->set_format(envoy::config::route::v3::RetryPolicy::SECONDS);
 
-  policy_.num_retries_ = 4;
-  policy_.reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(reset_headers);
+  policy_->num_retries_ = 4;
+  policy_->reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(reset_headers);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
   setup(request_headers);
@@ -1314,14 +1228,11 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
   EXPECT_EQ(
       RetryStatus::NoRetryLimitExceeded,
       state_->shouldRetryHeaders(response_headers_reset_2, request_headers, header_callback_));
-
-  EXPECT_EQ(2UL, cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_.value());
-  EXPECT_EQ(2UL, cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {
-  policy_.host_selection_max_attempts_ = 2;
-  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  policy_->host_selection_max_attempts_ = 2;
+  policy_->retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
 
   setup();
 
@@ -1351,13 +1262,6 @@ TEST_F(RouterRetryStateImplTest, ZeroMaxRetriesHeader) {
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(connect_failure_, RetryState::Http3Used::Unknown,
                                      reset_callback_, false));
-
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(0UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(0UL, route_stats_context_.stats().upstream_rq_retry_.value());
 }
 
 // Check that if there are 0 remaining retries available but we get
@@ -1375,13 +1279,6 @@ TEST_F(RouterRetryStateImplTest, NoPreferredOverLimitExceeded) {
   Http::TestResponseHeaderMapImpl good_response_headers{{":status", "200"}};
   EXPECT_EQ(RetryStatus::No,
             state_->shouldRetryHeaders(good_response_headers, request_headers, header_callback_));
-
-  EXPECT_EQ(0UL, cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(0UL, virtual_cluster_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(0UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
-  EXPECT_EQ(1UL, cluster_.trafficStats()->upstream_rq_retry_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_.value());
-  EXPECT_EQ(0UL, route_stats_context_.stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, BudgetAvailableRetries) {

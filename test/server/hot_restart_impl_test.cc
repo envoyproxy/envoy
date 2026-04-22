@@ -13,6 +13,7 @@
 #include "test/server/hot_restart_udp_forwarding_test_helper.h"
 #include "test/server/utility.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_random_generator.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/match.h"
@@ -248,5 +249,52 @@ TEST_F(HotRestartUdpForwardingContextTest,
   EXPECT_FALSE(result.has_value());
 }
 
+TEST_F(HotRestartImplTest, IsInitializingReflectsLifecyclePhases) {
+  const mode_t mode = S_IRUSR | S_IWUSR;
+  const std::string socket_path = testDomainSocketName();
+
+  std::vector<uint8_t> buffer;
+  EXPECT_CALL(hot_restart_os_sys_calls_, shmOpen(_, _, _)).Times(2).WillRepeatedly([]() {
+    return Api::SysCallIntResult{1, 0};
+  });
+  EXPECT_CALL(os_sys_calls_, ftruncate(_, _)).WillOnce(WithArg<1>(Invoke([&buffer](off_t size) {
+    buffer.resize(size);
+    return Api::SysCallIntResult{0, 0};
+  })));
+  EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _))
+      .Times(2)
+      .WillRepeatedly(
+          InvokeWithoutArgs([&buffer]() { return Api::SysCallPtrResult{buffer.data(), 0}; }));
+  EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(8);
+  EXPECT_CALL(os_sys_calls_, close(_)).Times(8);
+  EXPECT_CALL(hot_restart_os_sys_calls_, shmUnlink(_));
+
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+
+  // Create the parent process first (restart_epoch == 0), and it should start in initializing
+  // state.
+  std::unique_ptr<HotRestartImpl> hri_epoch0;
+  ASSERT_NO_THROW(
+      { hri_epoch0 = std::make_unique<HotRestartImpl>(1, 0, socket_path, mode, false, false); });
+  EXPECT_TRUE(hri_epoch0->isInitializing());
+
+  // Simulate the parent finishing its initialization by clearing the flag.
+  ASSERT_FALSE(buffer.empty());
+  auto* shmem = reinterpret_cast<SharedMemory*>(buffer.data());
+  shmem->flags_.store(shmem->flags_.load() & ~SHMEM_FLAGS_INITIALIZING);
+  EXPECT_FALSE(hri_epoch0->isInitializing());
+
+  // Create the child process (restart_epoch > 0).
+  std::unique_ptr<HotRestartImpl> hri_epoch1;
+  ASSERT_NO_THROW(
+      { hri_epoch1 = std::make_unique<HotRestartImpl>(0, 1, socket_path, mode, false, false); });
+  EXPECT_TRUE(hri_epoch1->isInitializing());
+
+  // Ensure that the child's flag is cleared after call to drain parent listeners.
+  ASSERT_NO_THROW({ hri_epoch1->drainParentListeners(); });
+  EXPECT_FALSE(hri_epoch1->isInitializing());
+}
 } // namespace Server
 } // namespace Envoy

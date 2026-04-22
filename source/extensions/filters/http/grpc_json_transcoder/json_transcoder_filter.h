@@ -27,8 +27,8 @@ namespace GrpcJsonTranscoder {
 
 struct MethodInfo {
   const Protobuf::MethodDescriptor* descriptor_ = nullptr;
-  std::vector<const ProtobufWkt::Field*> request_body_field_path;
-  std::vector<const ProtobufWkt::Field*> response_body_field_path;
+  std::vector<const Protobuf::Field*> request_body_field_path;
+  std::vector<const Protobuf::Field*> response_body_field_path;
   bool request_type_is_http_body_ = false;
   bool response_type_is_http_body_ = false;
 };
@@ -49,6 +49,11 @@ public:
       const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
           proto_config,
       Api::Api& api);
+
+  // grpc by default doesn't like a frame larger than 4MB. Splitting streamed data
+  // into 1MB pieces should keep that threshold from being exceeded when data comes
+  // in as a large buffer.
+  static constexpr size_t MaxStreamedPieceSize = 1024 * 1024;
 
   /**
    * Create an instance of Transcoder interface based on incoming request.
@@ -113,7 +118,7 @@ private:
   void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
   absl::Status resolveField(const Protobuf::Descriptor* descriptor,
                             const std::string& field_path_str,
-                            std::vector<const ProtobufWkt::Field*>* field_path, bool* is_http_body);
+                            std::vector<const Protobuf::Field*>* field_path, bool* is_http_body);
   absl::Status createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
                                 const google::api::HttpRule& http_rule,
                                 MethodInfoSharedPtr& method_info);

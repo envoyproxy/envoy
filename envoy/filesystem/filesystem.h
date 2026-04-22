@@ -119,7 +119,7 @@ public:
   /**
    * @return string the file path
    */
-  virtual std::string path() const PURE;
+  virtual absl::string_view path() const PURE;
 
   /**
    * @return the type of the destination

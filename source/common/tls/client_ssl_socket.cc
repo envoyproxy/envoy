@@ -43,7 +43,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats(stats_scope)),
       config_(std::move(config)) {
   {
-    absl::WriterMutexLock l(&ssl_ctx_mu_);
+    absl::WriterMutexLock l(ssl_ctx_mu_);
     auto ctx_or_error = manager_.createSslClientContext(stats_scope_, *config_);
     SET_AND_RETURN_IF_NOT_OK(ctx_or_error.status(), creation_status);
     ssl_ctx_ = *ctx_or_error;
@@ -61,7 +61,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
   // use the same ssl_ctx to create SslSocket.
   Envoy::Ssl::ClientContextSharedPtr ssl_ctx;
   {
-    absl::ReaderMutexLock l(&ssl_ctx_mu_);
+    absl::ReaderMutexLock l(ssl_ctx_mu_);
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
@@ -86,7 +86,7 @@ absl::Status ClientSslSocketFactory::onAddOrUpdateSecret() {
   auto ctx_or_error = manager_.createSslClientContext(stats_scope_, *config_);
   RETURN_IF_NOT_OK(ctx_or_error.status());
   {
-    absl::WriterMutexLock l(&ssl_ctx_mu_);
+    absl::WriterMutexLock l(ssl_ctx_mu_);
     std::swap(*ctx_or_error, ssl_ctx_);
   }
   manager_.removeContext(*ctx_or_error);
@@ -95,7 +95,7 @@ absl::Status ClientSslSocketFactory::onAddOrUpdateSecret() {
 }
 
 Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
-  absl::ReaderMutexLock l(&ssl_ctx_mu_);
+  absl::ReaderMutexLock l(ssl_ctx_mu_);
   return ssl_ctx_;
 }
 

@@ -1,0 +1,13 @@
+diff --git a/Makefile.am b/Makefile.am
+index 217f6d5..da14d1e 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -259,7 +259,7 @@ lib@LIBQATNAME@_la_CFLAGS = -I$(srcdir)/quickassist/utilities/libusdm_drv \
+ 			    -D USER_SPACE \
+ 			    -D LAC_BYTE_ORDER=__LITTLE_ENDIAN \
+ 			    $(COMMON_FLAGS)
+-lib@LIBQATNAME@_la_LIBADD = libosal.la libadf.la lib@LIBUSDMNAME@.la -lcrypto -lnuma
++lib@LIBQATNAME@_la_LIBADD = libosal.la libadf.la lib@LIBUSDMNAME@.la -lcrypto_internal -lnuma
+ if !USE_CCODE_CRC
+ lib@LIBQATNAME@_la_LIBADD += crc32_gzip_refl_by8.lo crc64_ecma_norm_by8.lo
+ endif

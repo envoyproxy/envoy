@@ -1,4 +1,3 @@
-load("@rules_proto//proto:defs.bzl", "ProtoInfo")
 load("//tools/api_proto_plugin:plugin.bzl", "api_proto_plugin_aspect", "api_proto_plugin_impl")
 
 def _protojsonschema_impl(target, ctx):

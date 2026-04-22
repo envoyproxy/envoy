@@ -99,7 +99,7 @@ public:
    * Creates an XdsConfigTracker using the given config.
    */
   virtual XdsConfigTrackerPtr
-  createXdsConfigTracker(const ProtobufWkt::Any& config,
+  createXdsConfigTracker(const Protobuf::Any& config,
                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                          Event::Dispatcher& dispatcher) PURE;
 

@@ -11,11 +11,11 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http2/codec_impl.h"
-#include "source/common/http/conn_manager_utility.h"
 
 #include "test/common/http/codec_impl_fuzz.pb.validate.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
@@ -27,7 +27,6 @@
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
-
 #include "quiche/common/platform/api/quiche_test.h"
 
 using testing::_;
@@ -832,6 +831,10 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     // need to further evaluate. However, in fuzzing we allow oghttp2 reaching FATAL states that may
     // happen in production environments.
     quiche::test::QuicheScopedDisableExitOnDFatal scoped_object;
+#ifdef ENVOY_ENABLE_UHV
+    // This allows sending NUL, CR and LF in headers without triggering ASSERTs in Envoy.
+    HeaderStringValidator::disable_validation_for_tests_ = true;
+#endif
     codecFuzzHttp2Oghttp2(input);
 #endif
   } catch (const EnvoyException& e) {

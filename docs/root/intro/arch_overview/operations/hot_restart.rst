@@ -6,8 +6,9 @@ Hot restart
 Ease of operation is one of the primary goals of Envoy. In addition to robust statistics and a local
 administration interface, Envoy has the ability to “hot” or “live” restart itself. This means that
 Envoy can fully reload itself (both code and configuration) without dropping existing connections
-during the :ref:`drain process <arch_overview_draining>`. The hot restart functionality has the
-following general architecture:
+during the :ref:`drain process <arch_overview_draining>`. However, existing connections are not
+transferred to the new envoy process: they must complete during the drain process or be terminated.
+The hot restart functionality has the following general architecture:
 
 * The two active processes communicate with each other over unix domain sockets using a basic RPC
   protocol. All counters are sent from the old process to the new process over the unix domain, and
@@ -21,8 +22,12 @@ following general architecture:
 * During the draining phase, the old process attempts to gracefully close existing connections. How
   this is done depends on the configured filters. The drain time is configurable via the
   :option:`--drain-time-s` option and as more time passes draining becomes more aggressive.
-* After drain sequence, the new Envoy process tells the old Envoy process to shut itself down.
-  This time is configurable via the :option:`--parent-shutdown-time-s` option.
+* Later, usually after the drain sequence, the new Envoy process tells the old Envoy process to shut
+  itself down. This time is configurable via the :option:`--parent-shutdown-time-s` option. Note
+  that the `--parent-shutdown-time-s` option is independent of the `--drain-time-s` value, and so
+  the parent shutdown time should be set to a larger value.
+* Any remaining connections to the old envoy process are closed. The hot restart functionality
+  does not transfer existing connections to the new process.
 * Envoy’s hot restart support was designed so that it will work correctly even if the new Envoy
   process and the old Envoy process are running inside different containers. Communication between
   the processes takes place only using unix domain sockets.

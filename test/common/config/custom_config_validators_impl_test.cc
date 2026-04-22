@@ -36,15 +36,15 @@ class FakeConfigValidatorFactory : public ConfigValidatorFactory {
 public:
   FakeConfigValidatorFactory(bool should_reject) : should_reject_(should_reject) {}
 
-  ConfigValidatorPtr createConfigValidator(const ProtobufWkt::Any&,
+  ConfigValidatorPtr createConfigValidator(const Protobuf::Any&,
                                            ProtobufMessage::ValidationVisitor&) override {
     return std::make_unique<FakeConfigValidator>(should_reject_);
   }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom empty config proto. This is only allowed in tests.
-    return should_reject_ ? ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()}
-                          : ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Value()};
+    return should_reject_ ? ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()}
+                          : ProtobufTypes::MessagePtr{new Envoy::Protobuf::Value()};
   }
 
   std::string name() const override {

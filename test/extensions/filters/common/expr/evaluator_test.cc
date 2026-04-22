@@ -27,13 +27,17 @@ TEST(Evaluator, Print) {
   EXPECT_EQ(print(CelValue::CreateString(&test)), "test");
   EXPECT_EQ(print(CelValue::CreateBytes(&test)), "test");
 
-  ProtobufWkt::Arena arena;
+  Protobuf::Arena arena;
   envoy::config::core::v3::Node node;
   std::string node_yaml = "id: test";
   TestUtility::loadFromYaml(node_yaml, node);
   EXPECT_EQ(print(CelValue::CreateNull()), "NULL");
-  EXPECT_THAT(print(google::api::expr::runtime::CelProtoWrapper::CreateMessage(&node, &arena)),
-              MatchesRegex(".*id:\\s+\"test\""));
+  const std::string node_textproto =
+      print(google::api::expr::runtime::CelProtoWrapper::CreateMessage(&node, &arena));
+  EXPECT_THAT(node_textproto, ::testing::HasSubstr("id: \"test\""));
+  envoy::config::core::v3::Node parsed;
+  EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(node_textproto, &parsed));
+  EXPECT_EQ(parsed.id(), "test");
 
   EXPECT_EQ(print(CelValue::CreateDuration(absl::Minutes(1))), "1m");
   absl::Time time = TestUtility::parseTime("Dec 22 01:50:34 2020 GMT", "%b %e %H:%M:%S %Y GMT");
@@ -48,7 +52,7 @@ TEST(Evaluator, Activation) {
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
   info.upstreamInfo()->setUpstreamFilterState(filter_state);
-  ProtobufWkt::Arena arena;
+  Protobuf::Arena arena;
   const auto activation = createActivation(nullptr, info, nullptr, nullptr, nullptr);
   EXPECT_TRUE(activation->FindValue("filter_state", &arena).has_value());
   EXPECT_TRUE(activation->FindValue("upstream_filter_state", &arena).has_value());

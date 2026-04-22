@@ -82,6 +82,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool or requests (mainly for HTTP/2 and above) circuit breaking and were failed
   upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure or remote connection termination
   upstream_rq_pending_active, Gauge, Total active requests pending a connection pool connection
+  upstream_rq_per_cx, Histogram, Number of requests handled per upstream connection for all HTTP protocols
   upstream_rq_cancelled, Counter, Total requests cancelled before obtaining a connection pool connection
   upstream_rq_maintenance_mode, Counter, Total requests that resulted in an immediate 503 due to :ref:`maintenance mode<config_http_filters_router_runtime_maintenance_mode>`
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
@@ -111,7 +112,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   update_attempt, Counter, Total attempted cluster membership updates by service discovery
   update_success, Counter, Total successful cluster membership updates by service discovery
   update_failure, Counter, Total failed cluster membership updates by service discovery
-  update_duration, Histogram, Amount of time spent updating configs
+  update_duration, Histogram, Amount of time in milliseconds spent updating configs
   update_empty, Counter, Total cluster membership updates ending with empty cluster load assignment and continuing with previous config
   update_no_rebuild, Counter, Total successful cluster membership updates that didn't result in any cluster load balancing structure rebuilds
   version, Gauge, Hash of the contents from the last successful API fetch
@@ -257,6 +258,39 @@ are rooted at *cluster.<name>.* and contain the following statistics:
   external.upstream_rq_<\*>, Counter, External origin specific HTTP response codes
   external.upstream_rq_time, Histogram, External origin request time milliseconds
 
+.. note::
+   The ``upstream_rq_<*xx>`` and ``upstream_rq_<*>`` counters only count **final** responses
+   sent to the downstream client. Responses that trigger a retry are counted in
+   ``retry.upstream_rq_<*xx>`` and ``retry.upstream_rq_<*>`` instead (see
+   :ref:`retry statistics <config_cluster_manager_cluster_stats_retry>` below).
+
+   For example, if a request receives ``503`` → ``503`` → ``200`` (two retries before success):
+
+   * ``retry.upstream_rq_503`` = 2 (the two ``503`` responses that were retried)
+   * ``upstream_rq_503`` = 0 (no 503 was sent downstream)
+   * ``upstream_rq_200`` = 1 (the final successful response)
+
+.. _config_cluster_manager_cluster_stats_retry:
+
+Retry statistics
+----------------
+
+When retries are enabled and a response triggers a retry, the following dynamic HTTP statistics
+are emitted. These are rooted at ``cluster.<name>.retry.`` and track responses that were **not**
+sent to the downstream client because they triggered a retry:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  ``upstream_rq_<\*xx>``, Counter, "Aggregate HTTP response codes that triggered retry (e.g., 5xx)"
+  ``upstream_rq_<\*>``, Counter, "Specific HTTP response codes that triggered retry (e.g., ``503``)"
+
+.. note::
+   These counters are incremented when a response triggers a retry and is **not** forwarded
+   downstream. The corresponding ``upstream_rq_<*>`` counters (without the ``retry.`` prefix)
+   only count final responses that were actually sent to the client.
+
 .. _config_cluster_manager_cluster_stats_tls:
 
 TLS statistics
@@ -265,6 +299,15 @@ TLS statistics
 If TLS is used by the cluster the following statistics are rooted at *cluster.<name>.ssl.*:
 
 .. include:: ../../../_include/ssl_stats.rst
+
+.. _config_cluster_manager_cluster_stats_certs:
+
+TLS and CA certificates
+-----------------------
+
+TLS and CA certificate statistics are rooted in the ``cluster.<name>.ssl.certificate.<cert_name>.``:
+
+.. include:: ../../../_include/cert_stats.rst
 
 .. _config_cluster_manager_cluster_stats_tcp:
 
@@ -320,7 +363,6 @@ the following statistics:
   lb_zone_routing_sampled, Counter, Sending some requests to the same zone
   lb_zone_routing_cross_zone, Counter, Zone aware routing mode but have to send cross zone
   lb_local_cluster_not_ok, Counter, Local host set is not set or it is panic mode for local cluster
-  lb_zone_number_differs, Counter, No zone aware routing because the feature flag is disabled and the number of zones in local and upstream cluster is different
   lb_zone_no_capacity_left, Counter, Total number of times ended with random zone selection due to rounding error
   original_dst_host_invalid, Counter, Total number of invalid hosts passed to original destination load balancer
 

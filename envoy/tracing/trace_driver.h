@@ -114,6 +114,23 @@ public:
   virtual void setSampled(bool sampled) PURE;
 
   /**
+   * When the startSpan() of tracer is called, the Envoy tracing decision is passed to the
+   * tracer to help determine whether the span should be sampled.
+   *
+   * But note that the tracer may have its own sampling decision logic (e.g. custom sampler,
+   * external tracing context, etc.), and it may not use the Envoy tracing decision at all,
+   * then the desicion may be ignored by the tracer.
+   *
+   * The method is used to return whether the Envoy tracing decision is used by the tracer
+   * or not.
+   *
+   * When the Envoy tracing decision is refreshed becase route refresh or other reasons, if
+   * the Envoy tracing decision is used by the tracer, the sampled value will be updated
+   * by the HTTP connection manager based on the new Envoy tracing decision.
+   */
+  virtual bool useLocalDecision() const PURE;
+
+  /**
    * Retrieve a key's value from the span's baggage.
    * This baggage data could've been set by this span or any parent spans.
    * @param key baggage key

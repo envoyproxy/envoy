@@ -99,7 +99,7 @@ public:
   void removeWatch(Watch* watch);
 
   // UntypedConfigUpdateCallbacks.
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<Protobuf::Any>& resources,
                       const std::string& version_info) override;
 
   void onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,

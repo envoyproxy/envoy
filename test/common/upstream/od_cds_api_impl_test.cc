@@ -4,7 +4,9 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/missing_cluster_notifier.h"
 
@@ -24,14 +26,17 @@ public:
   void SetUp() override {
     envoy::config::core::v3::ConfigSource odcds_config;
     OptRef<xds::core::v3::ResourceLocator> null_locator;
-    odcds_ = *OdCdsApiImpl::create(odcds_config, null_locator, cm_, notifier_, *store_.rootScope(),
-                                   validation_visitor_);
+    odcds_ =
+        *OdCdsApiImpl::create(odcds_config, null_locator, xds_manager_, cm_, notifier_,
+                              *store_.rootScope(), validation_visitor_, server_factory_context_);
     odcds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
 
+  NiceMock<Config::MockXdsManager> xds_manager_;
   NiceMock<MockClusterManager> cm_;
   Stats::IsolatedStoreImpl store_;
   MockMissingClusterNotifier notifier_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   OdCdsApiSharedPtr odcds_;
   Config::SubscriptionCallbacks* odcds_callbacks_ = nullptr;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;

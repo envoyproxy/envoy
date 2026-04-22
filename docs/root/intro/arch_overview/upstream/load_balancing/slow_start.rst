@@ -8,7 +8,7 @@ With no slow start enabled Envoy would send a proportional amount of traffic to 
 This could be undesirable for services that require warm up time to serve full production load and could result in request timeouts, loss of data and deteriorated user experience.
 
 Slow start mode is a mechanism that affects load balancing weight of upstream endpoints and can be configured per upstream cluster.
-Currently, slow start is supported in :ref:`Round Robin <envoy_v3_api_field_config.cluster.v3.Cluster.RoundRobinLbConfig.slow_start_config>` and :ref:`Least Request <envoy_v3_api_field_config.cluster.v3.Cluster.LeastRequestLbConfig.slow_start_config>` load balancer types.
+Currently, slow start is supported in :ref:`Round Robin <envoy_v3_api_field_config.cluster.v3.Cluster.RoundRobinLbConfig.slow_start_config>`, :ref:`Least Request <envoy_v3_api_field_config.cluster.v3.Cluster.LeastRequestLbConfig.slow_start_config>` and :ref:`client-side weighted round robin <arch_overview_load_balancing_types_client_side_weighted_round_robin>` via :ref:`SlowStartConfig <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.SlowStartConfig>`.
 
 Slow start mode is most effective for cases where few new endpoints come up e.g. scale event in Kubernetes. When all the endpoints are relatively new e.g. new deployment in Kubernetes, slow start is not very effective as all endpoints end up getting same amount of requests.
 

@@ -18,7 +18,7 @@ public:
   /**
    * @return a vector of bytes representing the Fluentd MessagePack record
    */
-  virtual std::vector<uint8_t> format(const Formatter::HttpFormatterContext& context,
+  virtual std::vector<uint8_t> format(const Formatter::Context& context,
                                       const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
@@ -34,7 +34,7 @@ class FluentdFormatterImpl : public FluentdFormatter {
 public:
   FluentdFormatterImpl(Formatter::FormatterPtr json_formatter);
 
-  std::vector<uint8_t> format(const Formatter::HttpFormatterContext& context,
+  std::vector<uint8_t> format(const Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
 
 private:

@@ -16,4 +16,18 @@ DefaultSystemHelper::validateCertificateChain(const std::vector<std::string>& /*
 
 void DefaultSystemHelper::cleanupAfterCertificateValidation() {}
 
+int64_t DefaultSystemHelper::getDefaultNetworkHandle() { return -1; }
+
+std::vector<std::pair<int64_t, ConnectionType>> DefaultSystemHelper::getAllConnectedNetworks() {
+  return {};
+}
+
+std::unique_ptr<Platform::NetworkChangeMonitor>
+DefaultSystemHelper::initializeNetworkChangeMonitor(Platform::NetworkChangeListener&) {
+  return nullptr;
+}
+
+void DefaultSystemHelper::bindSocketToNetwork(Network::ConnectionSocket& /*socket*/,
+                                              int64_t /*network_handle*/) {}
+
 } // namespace Envoy

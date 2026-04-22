@@ -31,7 +31,6 @@ constexpr absl::string_view expected_types[] = {
 
 using HttpFilterProto =
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
-using Http::HeaderValueOf;
 using testing::Not;
 
 class UpstreamHttpFilterIntegrationTestBase : public HttpIntegrationTest {
@@ -74,12 +73,13 @@ public:
   }
 
   const HttpFilterProto getAddHeaderFilterConfig(const std::string& name, const std::string& key,
-                                                 const std::string& value) {
+                                                 const std::string& value, bool disabled = false) {
     HttpFilterProto filter_config;
     filter_config.set_name(name);
     auto configuration = test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(value);
+    filter_config.set_disabled(disabled);
     filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
@@ -173,8 +173,28 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
   initialize();
 
   auto headers = sendRequestAndGetHeaders();
-  EXPECT_THAT(*headers, Not(HeaderValueOf("x-test-router", "aa")));
-  EXPECT_THAT(*headers, HeaderValueOf("x-test-cluster", "bb"));
+  EXPECT_THAT(*headers, Not(ContainsHeader("x-test-router", "aa")));
+  EXPECT_THAT(*headers, ContainsHeader("x-test-cluster", "bb"));
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, ClusterUpstreamFiltersDisabled) {
+  addStaticRouterFilter(
+      getAddHeaderFilterConfig("envoy.test.add_header_upstream", "x-test-router", "aa", true));
+  addCodecRouterFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  EXPECT_THAT(*headers, Not(ContainsHeader("x-test-router", "aa")));
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, RouterUpstreamFiltersDisabled) {
+  addStaticClusterFilter(
+      getAddHeaderFilterConfig("envoy.test.add_header_upstream", "x-test-cluster", "bb", true));
+  addCodecClusterFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  EXPECT_THAT(*headers, Not(ContainsHeader("x-test-cluster", "bb")));
 }
 
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
@@ -192,9 +212,9 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
 
   auto headers = sendRequestAndGetHeaders();
   if (useRouterFilters()) {
-    EXPECT_THAT(*headers, Not(HeaderValueOf(default_header_key_, default_header_value_)));
+    EXPECT_THAT(*headers, Not(ContainsHeader(default_header_key_, default_header_value_)));
   } else {
-    EXPECT_THAT(*headers, HeaderValueOf(default_header_key_, default_header_value_));
+    EXPECT_THAT(*headers, ContainsHeader(default_header_key_, default_header_value_));
   }
 }
 
@@ -218,6 +238,51 @@ class StaticRouterAndClusterFiltersIntegrationTest
 public:
   StaticRouterAndClusterFiltersIntegrationTest()
       : UpstreamHttpFilterIntegrationTestBase(GetParam(), false) {}
+
+  void routeRetryAndFilterReturnStopIteration(bool send_body) {
+    autonomous_upstream_ = false;
+    config_helper_.prependFilter(R"EOF(
+name: encode-headers-return-stop-iteration-filter
+)EOF",
+                                 false);
+
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* route = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route();
+          route->mutable_timeout()->set_seconds(60);
+          auto* retry_policy = route->mutable_retry_policy();
+          retry_policy->set_retry_on("5xx,connect-failure,refused-stream");
+          retry_policy->mutable_num_retries()->set_value(5);
+          retry_policy->mutable_per_try_timeout()->set_seconds(30);
+          retry_policy->mutable_retry_back_off()->mutable_base_interval()->set_seconds(1);
+        });
+    initialize();
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+    if (send_body) {
+      upstream_request_->encodeData(100, true);
+    } else {
+      upstream_request_->encodeTrailers(
+          Http::TestResponseTrailerMapImpl{{"x-test-trailers", "Yes"}});
+    }
+    EXPECT_TRUE(upstream_request_->complete());
+
+    // Router filter send retries.
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(100, true);
+    EXPECT_TRUE(upstream_request_->complete());
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+  }
 };
 
 // Only cluster-specified filters should be applied.
@@ -231,6 +296,15 @@ TEST_P(StaticRouterAndClusterFiltersIntegrationTest, StaticRouterAndClusterFilte
 
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, "value-from-cluster");
+}
+
+// Test route retries on 5xx and an upstream filter returns StopIteration.
+TEST_P(StaticRouterAndClusterFiltersIntegrationTest, RouterRetrySendBody) {
+  routeRetryAndFilterReturnStopIteration(/*send_body*/ true);
+}
+
+TEST_P(StaticRouterAndClusterFiltersIntegrationTest, RouterRetrySendTrailers) {
+  routeRetryAndFilterReturnStopIteration(/*send_body*/ false);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, StaticRouterAndClusterFiltersIntegrationTest,
@@ -454,7 +528,7 @@ public:
   void sendLdsResponse(const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().Listener);
+    response.set_type_url(Config::TestTypeUrl::get().Listener);
     response.add_resources()->PackFrom(listener_config_);
     lds_stream_->sendGrpcMessage(response);
   }

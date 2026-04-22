@@ -231,6 +231,23 @@ TEST_F(AWSCredentialsFileRegionProviderTest, CustomCredentialsFileViaCredentialP
   EXPECT_EQ("credentialsdefaultregion", provider.getRegion().value());
 }
 
+TEST_F(AWSCredentialsFileRegionProviderTest,
+       CustomCredentialsFileAndProfileViaCredentialProviderConfig) {
+  auto temp = TestEnvironment::temporaryDirectory();
+  TestEnvironment::setEnvVar("HOME", temp, 1);
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credentials_file(temp + "/.aws/customfile");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      credentials_file, CREDENTIALS_FILE_CONTENTS, true, false);
+
+  envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config;
+  credential_file_config.mutable_credentials_data_source()->set_filename(credentials_file);
+  credential_file_config.set_profile("profile1");
+  auto provider = AWSCredentialsFileRegionProvider(credential_file_config);
+  EXPECT_EQ("profile1region", provider.getRegion().value());
+}
+
 TEST_F(AWSCredentialsFileRegionProviderTest, CustomCredentialsFileRegionSet) {
   auto temp = TestEnvironment::temporaryDirectory();
   TestEnvironment::setEnvVar("HOME", temp, 1);
@@ -329,6 +346,19 @@ TEST_F(RegionProviderChainTest, EnvironmentBeforeCredentialsFile) {
 
   TestEnvironment::setEnvVar("AWS_REGION", "environmentregion", 1);
   EXPECT_EQ(chain.getRegion().value(), "environmentregion");
+}
+
+TEST_F(RegionProviderChainTest, EnvironmentBeforeCredentialsFileRegionSet) {
+  auto temp = TestEnvironment::temporaryDirectory();
+  TestEnvironment::setEnvVar("HOME", temp, 1);
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credentials_file(temp + "/.aws/credentials");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      credentials_file, CREDENTIALS_FILE_CONTENTS, true, false);
+
+  TestEnvironment::setEnvVar("AWS_SIGV4A_SIGNING_REGION_SET", "environmentsigv4aregion", 1);
+  EXPECT_EQ(chain.getRegionSet().value(), "environmentsigv4aregion");
 }
 
 TEST_F(RegionProviderChainTest, EnvironmentBeforeConfigFile) {

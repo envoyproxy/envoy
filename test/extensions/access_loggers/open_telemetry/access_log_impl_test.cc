@@ -53,7 +53,7 @@ class MockGrpcAccessLogger : public GrpcAccessLogger {
 public:
   // GrpcAccessLogger
   MOCK_METHOD(void, log, (LogRecord && entry));
-  MOCK_METHOD(void, log, (ProtobufWkt::Empty && entry));
+  MOCK_METHOD(void, log, (Protobuf::Empty && entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcAccessLoggerCache {

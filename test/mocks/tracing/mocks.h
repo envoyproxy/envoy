@@ -18,15 +18,16 @@ public:
   ~MockConfig() override;
 
   MOCK_METHOD(OperationName, operationName, (), (const));
-  MOCK_METHOD(const CustomTagMap*, customTags, (), (const));
+  MOCK_METHOD(void, modifySpan, (Span&, bool), (const));
   MOCK_METHOD(bool, verbose, (), (const));
   MOCK_METHOD(uint32_t, maxPathTagLength, (), (const));
   MOCK_METHOD(bool, spawnUpstreamSpan, (), (const));
+  MOCK_METHOD(bool, noContextPropagation, (), (const));
 
   OperationName operation_name_{OperationName::Ingress};
-  CustomTagMap custom_tags_;
   bool verbose_{false};
   bool spawn_upstream_span_{false};
+  bool no_context_propagation_{false};
 };
 
 class MockSpan : public Span {
@@ -40,7 +41,8 @@ public:
   MOCK_METHOD(void, finishSpan, ());
   MOCK_METHOD(void, injectContext,
               (Tracing::TraceContext & request_headers, const Tracing::UpstreamContext& upstream));
-  MOCK_METHOD(void, setSampled, (const bool sampled));
+  MOCK_METHOD(void, setSampled, (bool sampled));
+  MOCK_METHOD(bool, useLocalDecision, (), (const));
   MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value));
   MOCK_METHOD(std::string, getBaggage, (absl::string_view key));
   MOCK_METHOD(std::string, getTraceId, (), (const));

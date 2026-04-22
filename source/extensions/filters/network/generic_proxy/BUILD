@@ -180,9 +180,9 @@ envoy_cc_library(
         "//envoy/common:pure_lib",
         "//envoy/tracing:trace_context_interface",
         "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -226,6 +226,7 @@ envoy_cc_library(
         "//envoy/access_log:access_log_config_interface",
         "//envoy/tracing:trace_config_interface",
         "//envoy/tracing:tracer_interface",
+        "//source/common/tracing:tracer_config_lib",
         "//source/extensions/filters/network/generic_proxy:access_log_lib",
         "//source/extensions/filters/network/generic_proxy:match_input_lib",
         "//source/extensions/filters/network/generic_proxy/interface:codec_interface",

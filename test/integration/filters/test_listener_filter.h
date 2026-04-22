@@ -7,7 +7,9 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 
+#ifdef ENVOY_ENABLE_QUIC
 #include "quiche/quic/core/quic_packets.h"
+#endif
 
 namespace Envoy {
 /**
@@ -19,7 +21,7 @@ public:
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
-    absl::MutexLock m(&alpn_lock_);
+    absl::MutexLock m(alpn_lock_);
     ASSERT(!alpn_.empty());
     cb.socket().setRequestedApplicationProtocols({alpn_});
     alpn_.clear();
@@ -31,7 +33,7 @@ public:
   size_t maxReadBytes() const override { return 0; }
 
   static void setAlpn(std::string alpn) {
-    absl::MutexLock m(&alpn_lock_);
+    absl::MutexLock m(alpn_lock_);
     alpn_ = alpn;
   }
 

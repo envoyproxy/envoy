@@ -20,6 +20,7 @@
 #include "xds/type/matcher/v3/matcher.pb.h"
 
 using testing::_;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -278,6 +279,16 @@ on_no_match:
         .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
   }
 
+  void setLocalAddressWithNetworkNamespace(const std::string& network_namespace_path,
+                                           uint16_t port = 123) {
+    address_ = std::make_shared<Network::Address::Ipv4Instance>(
+        "127.0.0.1", port, nullptr, absl::make_optional(std::string(network_namespace_path)));
+
+    req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
+    ON_CALL(connection_.stream_info_, downstreamAddressProvider())
+        .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
+  }
+
   void checkAccessLogMetadata(LogResult expected) {
     if (expected != LogResult::Undecided) {
       auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(
@@ -295,17 +306,17 @@ on_no_match:
 
   void setMetadata() {
     ON_CALL(req_info_, setDynamicMetadata("envoy.filters.http.rbac", _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>("envoy.filters.http.rbac", obj));
+              Protobuf::MapPair<std::string, Protobuf::Struct>("envoy.filters.http.rbac", obj));
         }));
 
     ON_CALL(req_info_,
             setDynamicMetadata(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+              Protobuf::MapPair<std::string, Protobuf::Struct>(
                   Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, obj));
         }));
   }
@@ -967,6 +978,100 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherDenied) {
   checkAccessLogMetadata(LogResult::Undecided);
 }
 
+TEST_F(RoleBasedAccessControlFilterTest, MatcherNetworkNamespaceAllowed) {
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+
+  const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      single_predicate:
+        input:
+          name: envoy.matching.inputs.network_namespace
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
+        value_match:
+          exact: "/var/run/netns/http_ns1"
+    on_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow_ns
+          action: ALLOW
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: deny_all
+      action: DENY
+)EOF";
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml, matcher);
+  *config.mutable_matcher() = matcher;
+  config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
+
+  setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor()));
+
+  setLocalAddressWithNetworkNamespace("/var/run/netns/http_ns1", 123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, MatcherNetworkNamespaceDenied) {
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+
+  const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      single_predicate:
+        input:
+          name: envoy.matching.inputs.network_namespace
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
+        value_match:
+          exact: "/var/run/netns/http_ns1"
+    on_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow_ns
+          action: ALLOW
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: deny_all
+      action: DENY
+)EOF";
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml, matcher);
+  *config.mutable_matcher() = matcher;
+  config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
+
+  setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor()));
+
+  setLocalAddressWithNetworkNamespace("/var/run/netns/other", 123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
 TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {
   setupMatcher("ALLOW", "DENY");
 
@@ -1464,6 +1569,51 @@ TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
       upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY), EnvoyException,
       "Invalid UpstreamIpPortMatcher configuration - missing `upstream_ip` "
       "and/or `upstream_port_range`");
+}
+
+// This test specifically verifies the fix for issue #39479 by testing the case where:
+// 1. Only an enforced engine exists (explicitly no shadow rules)
+// 2. The enforced engine allows access (returns Continue)
+// 3. Metadata should still be set in this case
+TEST_F(RoleBasedAccessControlFilterTest, EnforcedEngineOnlyAllowsAccessMetadataTest) {
+  // Create RBAC config with ONLY enforced rules (explicitly no shadow rules)
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+  envoy::config::rbac::v3::Policy policy;
+  auto policy_rules = policy.add_permissions()->mutable_or_rules();
+  policy_rules->add_rules()->set_destination_port(123);
+  policy.add_principals()->set_any(true);
+  config.mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+  (*config.mutable_rules()->mutable_policies())["enforced_only_policy"] = policy;
+  config.set_rules_stat_prefix("rules_stat_prefix_");
+
+  // Create config with only the enforced engine
+  auto config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor());
+  setupConfig(std::move(config_ptr));
+
+  setDestinationPort(123);
+  setMetadata();
+
+  // Call the filter's decodeHeaders (should continue since policy allows access)
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+
+  // Verify that allowed counter is incremented
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+
+  // Verify that dynamic metadata is set correctly even though there's no shadow
+  // engine and the enforced engine returned Continue
+  EXPECT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+
+  // Verify the metadata contents
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
+  EXPECT_EQ("allowed",
+            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
+  EXPECT_EQ(
+      "enforced_only_policy",
+      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
 }
 
 } // namespace

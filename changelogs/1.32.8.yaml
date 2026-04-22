@@ -1,0 +1,10 @@
+date: July 18, 2025
+
+bug_fixes:
+- area: release
+  change: |
+    Container (Ubuntu/distroless) updates, and fixed permissions for distroless config directory.
+- area: dynatrace
+  change: |
+    Fixed a division by zero bug in the Dynatrace sampling controller that occurred when ``total_wanted`` was less than
+    ``top_k_size``. The calculation was refactored to avoid the intermediate division that could result in zero.

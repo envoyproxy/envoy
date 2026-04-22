@@ -3,6 +3,7 @@
 #include <memory>
 #include <ostream>
 
+#include "source/common/http/session_idle_list_interface.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
@@ -50,7 +51,8 @@ struct ConnectionMapPosition {
 // simplified by changing the inheritance to a member variable instantiated
 // before quic_connection_.
 class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
-                               public QuicFilterManagerConnectionImpl {
+                               public QuicFilterManagerConnectionImpl,
+                               public Envoy::Http::IdleSessionInterface {
 public:
   EnvoyQuicServerSession(
       const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
@@ -61,7 +63,8 @@ public:
       uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats,
-      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory);
+      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+      Http::SessionIdleListInterface* session_idle_list);
 
   ~EnvoyQuicServerSession() override;
 
@@ -74,6 +77,19 @@ public:
   // Called by QuicHttpServerConnectionImpl before creating data streams.
   void setHttpConnectionCallbacks(Http::ServerConnectionCallbacks& callbacks) {
     http_connection_callbacks_ = &callbacks;
+  }
+
+  void setH3GoAwayLoadShedPoints(Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch,
+                                 Server::LoadShedPoint* should_send_go_away_on_dispatch) {
+    ENVOY_LOG_ONCE_IF(trace, should_send_go_away_and_close_on_dispatch == nullptr,
+                      "LoadShedPoint "
+                      "envoy.load_shed_points.http3_server_go_away_and_close_on_dispatch "
+                      "is not found. Is it configured?");
+    ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch == nullptr,
+                      "LoadShedPoint envoy.load_shed_points.http3_server_go_away_on_dispatch "
+                      "is not found. Is it configured?");
+    should_send_go_away_and_close_on_dispatch_ = should_send_go_away_and_close_on_dispatch;
+    should_send_go_away_on_dispatch_ = should_send_go_away_on_dispatch;
   }
 
   // quic::QuicSession
@@ -99,7 +115,19 @@ public:
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
 
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override {
+    return false;
+  }
+
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
+
+  // Overridden to remove the session from the idle list when the last stream is
+  // closed.
+  void OnStreamClosed(quic::QuicStreamId id) override;
+
+  // IdleSessionInterface
+  void TerminateIdleSession() override;
+
   using quic::QuicSession::PerformActionOnActiveStreams;
 
 protected:
@@ -114,7 +142,6 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
-  quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
 
@@ -123,9 +150,13 @@ protected:
   // Used by base class to access quic connection after initialization.
   const quic::QuicConnection* quicConnection() const override;
   quic::QuicConnection* quicConnection() override;
+  void MaybeAddSessionToIdleList();
+  void MaybeRemoveSessionFromIdleList();
 
 private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
+  void ActivateStream(std::unique_ptr<quic::QuicStream> stream) override;
+  void OnLastActiveStreamClosed();
 
   std::unique_ptr<EnvoyQuicServerConnection> quic_connection_;
   // These callbacks are owned by network filters and quic session should out live
@@ -140,6 +171,13 @@ private:
   QuicConnectionStats& connection_stats_;
   quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
   std::unique_ptr<quic::QuicConnectionDebugVisitor> debug_visitor_;
+  // Load shed points for H3 GoAway
+  Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_ = nullptr;
+  Server::LoadShedPoint* should_send_go_away_on_dispatch_ = nullptr;
+  Http::SessionIdleListInterface* session_idle_list_;
+  bool h3_go_away_sent_ = false;
+  bool on_connection_closed_called_ = false;
+  bool is_in_idle_list_ = false;
 };
 
 } // namespace Quic

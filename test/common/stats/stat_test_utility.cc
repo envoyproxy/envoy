@@ -33,7 +33,6 @@ void forEachSampleStat(int num_clusters, bool include_other_stats,
                                         "lb_subsets_selected",
                                         "lb_zone_cluster_too_small",
                                         "lb_zone_no_capacity_left",
-                                        "lb_zone_number_differs",
                                         "lb_zone_routing_all_directly",
                                         "lb_zone_routing_cross_zone",
                                         "lb_zone_routing_sampled",
@@ -118,6 +117,10 @@ TestScope::TestScope(const std::string& prefix, TestStore& store)
     : IsolatedScopeImpl(prefix, store), store_(store), prefix_str_(addDot(prefix)) {}
 TestScope::TestScope(StatName prefix, TestStore& store)
     : IsolatedScopeImpl(prefix, store), store_(store),
+      prefix_str_(addDot(store.symbolTable().toString(prefix))) {}
+
+TestScope::TestScope(StatName prefix, TestStore& store, StatsMatcherSharedPtr matcher)
+    : IsolatedScopeImpl(prefix, store, std::move(matcher)), store_(store),
       prefix_str_(addDot(store.symbolTable().toString(prefix))) {}
 
 // Override the Stats::Store methods for name-based lookup of stats, to use
@@ -209,8 +212,8 @@ Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
   return *histogram_ref;
 }
 
-ScopeSharedPtr TestStore::makeScope(StatName name) {
-  return std::make_shared<TestScope>(name, *this);
+ScopeSharedPtr TestStore::makeScope(StatName name, StatsMatcherSharedPtr matcher) {
+  return std::make_shared<TestScope>(name, *this, std::move(matcher));
 }
 
 TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}

@@ -100,6 +100,19 @@ Alternatively the trace context can be manually propagated by the service:
   request. In addition, the single :ref:`config_http_conn_man_headers_b3` header propagation format is
   supported, which is a more compressed format.
 
+  The Zipkin tracer can optionally be configured to support both B3 and W3C trace context formats
+  for improved interoperability. This is controlled by the
+  :ref:`trace_context_option <envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option>` configuration option.
+  When set to ``USE_B3_WITH_W3C_PROPAGATION``, the tracer will:
+
+  - For downstream requests: Extract trace context from B3 headers first, fallback to W3C trace headers
+    (:ref:`traceparent <config_http_conn_man_headers_traceparent>` and
+    :ref:`tracestate <config_http_conn_man_headers_tracestate>`) when B3 headers are not present.
+  - For upstream requests: Inject both B3 and W3C trace headers to maximize compatibility.
+
+  This option is disabled by default (``USE_B3``) to maintain backward compatibility, where only
+  B3 headers are used for both extraction and injection.
+
 * When using the Datadog tracer, Envoy relies on the service to propagate the
   Datadog-specific HTTP headers (
   :ref:`config_http_conn_man_headers_x-datadog-trace-id`,

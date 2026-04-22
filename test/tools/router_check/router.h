@@ -121,7 +121,16 @@ private:
   /*
    * Performs direct-response reply actions for a response entry.
    */
-  void sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry);
+  void sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry,
+                      Envoy::StreamInfo::StreamInfoImpl& stream_info);
+
+  /**
+   * Apply dynamic metadata to stream_info, similar to how the set_metadata filter works.
+   */
+  void applyDynamicMetadata(
+      Envoy::StreamInfo::StreamInfoImpl& stream_info,
+      const Envoy::Protobuf::RepeatedPtrField<
+          envoy::extensions::filters::http::set_metadata::v3::Metadata>& dynamic_metadata);
 
   bool compareCluster(ToolConfig& tool_config,
                       const envoy::RouterCheckToolSchema::ValidationAssert& expected,

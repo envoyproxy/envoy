@@ -1,3 +1,4 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:defs.bzl", "cc_toolchain", "cc_toolchain_suite")
 load(":armeabi_cc_toolchain_config.bzl", "armeabi_cc_toolchain_config")
 load(":cc_toolchain_config.bzl", "cc_toolchain_config")
@@ -89,13 +90,13 @@ cc_toolchain_config(
     coverage_link_flags = ["--coverage"],
     cpu = "k8",
     cxx_builtin_include_directories = [
-        "/usr/lib/gcc/x86_64-linux-gnu/11/include",
+        "/usr/lib/gcc/x86_64-linux-gnu/13/include",
         "/usr/local/include",
         "/usr/include/x86_64-linux-gnu",
         "/usr/include",
-        "/usr/include/c++/11",
-        "/usr/include/x86_64-linux-gnu/c++/11",
-        "/usr/include/c++/11/backward",
+        "/usr/include/c++/13",
+        "/usr/include/x86_64-linux-gnu/c++/13",
+        "/usr/include/c++/13/backward",
     ],
     cxx_flags = ["-std=c++0x"],
     dbg_compile_flags = ["-g"],

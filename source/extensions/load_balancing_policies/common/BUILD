@@ -27,8 +27,37 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
-        "@com_google_absl//absl/synchronization",
+        "//source/common/http:hash_policy_lib",
+        "//source/common/http:headers_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "locality_wrr_lib",
+    srcs = ["locality_wrr.cc"],
+    hdrs = ["locality_wrr.h"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "//source/common/upstream:scheduler_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "orca_weight_manager_lib",
+    srcs = ["orca_weight_manager.cc"],
+    hdrs = ["orca_weight_manager.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/orca:orca_load_metrics_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
 
@@ -39,6 +68,7 @@ envoy_cc_library(
     # previously considered core code and used by mobile.
     visibility = ["//visibility:public"],
     deps = [
+        ":locality_wrr_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stats:stats_interface",

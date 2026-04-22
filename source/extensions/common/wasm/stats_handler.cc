@@ -10,7 +10,7 @@ namespace Common {
 namespace Wasm {
 
 Stats::ScopeSharedPtr CreateStatsHandler::lockAndCreateStats(const Stats::ScopeSharedPtr& scope) {
-  absl::MutexLock l(&mutex_);
+  absl::MutexLock l(mutex_);
   Stats::ScopeSharedPtr lock;
   if (!(lock = scope_.lock())) {
     resetStats();
@@ -23,7 +23,7 @@ Stats::ScopeSharedPtr CreateStatsHandler::lockAndCreateStats(const Stats::ScopeS
 }
 
 void CreateStatsHandler::resetStatsForTesting() {
-  absl::MutexLock l(&mutex_);
+  absl::MutexLock l(mutex_);
   resetStats();
 }
 

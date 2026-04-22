@@ -18,11 +18,13 @@ envoy_cc_library(
     name = "filter",
     srcs = [
         "postgres_decoder.cc",
+        "postgres_encoder.cc",
         "postgres_filter.cc",
         "postgres_message.cc",
     ],
     hdrs = [
         "postgres_decoder.h",
+        "postgres_encoder.h",
         "postgres_filter.h",
         "postgres_message.h",
         "postgres_session.h",
@@ -30,6 +32,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         "//contrib/common/sqlutils/source:sqlutils_lib",
+        "//contrib/postgres/protocol:postgres_protocol_lib",
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",

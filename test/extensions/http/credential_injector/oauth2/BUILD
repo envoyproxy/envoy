@@ -44,6 +44,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.credential_injector"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/http:headers_lib",
         "//source/extensions/filters/http/credential_injector:config",
         "//source/extensions/http/injected_credentials/oauth2:config",
         "//source/extensions/http/injected_credentials/oauth2:oauth_response_cc_proto",

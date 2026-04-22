@@ -56,11 +56,16 @@ public:
         failure_mode_allow_(config.failure_mode_allow()),
         include_peer_certificate_(config.include_peer_certificate()),
         include_tls_session_(config.include_tls_session()),
+        send_tls_alert_on_denial_(config.send_tls_alert_on_denial()),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
                 ? absl::optional<Matchers::MetadataMatcher>(
                       Matchers::MetadataMatcher(config.filter_enabled_metadata(), context))
-                : absl::nullopt) {
+                : absl::nullopt),
+        metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
+                                     config.metadata_context_namespaces().end()),
+        typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
+                                           config.typed_metadata_context_namespaces().end()) {
     auto labels_key_it =
         context.bootstrap().node().metadata().fields().find(config.bootstrap_metadata_labels_key());
     if (labels_key_it != context.bootstrap().node().metadata().fields().end()) {
@@ -75,9 +80,16 @@ public:
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
   bool includePeerCertificate() const { return include_peer_certificate_; }
   bool includeTLSSession() const { return include_tls_session_; }
+  bool sendTlsAlertOnDenial() const { return send_tls_alert_on_denial_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
   bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
     return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
+  }
+  const std::vector<std::string>& metadataContextNamespaces() const {
+    return metadata_context_namespaces_;
+  }
+  const std::vector<std::string>& typedMetadataContextNamespaces() const {
+    return typed_metadata_context_namespaces_;
   }
 
 private:
@@ -87,7 +99,10 @@ private:
   LabelsMap destination_labels_;
   const bool include_peer_certificate_;
   const bool include_tls_session_;
+  const bool send_tls_alert_on_denial_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
+  const std::vector<std::string> metadata_context_namespaces_;
+  const std::vector<std::string> typed_metadata_context_namespaces_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

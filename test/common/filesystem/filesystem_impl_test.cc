@@ -235,6 +235,26 @@ TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_TRUE(file_system_.illegalPath("/sys"));
   EXPECT_TRUE(file_system_.illegalPath("/sys/"));
   EXPECT_TRUE(file_system_.illegalPath("/_some_non_existent_file"));
+
+  // Cgroup-related paths should be allowed for container-aware CPU detection
+  // Test /proc paths for cgroup discovery
+  EXPECT_FALSE(file_system_.illegalPath("/proc/self/mountinfo"));
+  EXPECT_FALSE(file_system_.illegalPath("/proc/self/cgroup"));
+
+  // Test cgroup v2 paths (unified hierarchy)
+  EXPECT_FALSE(file_system_.illegalPath("/sys/fs/cgroup/cpu.max"));
+  EXPECT_FALSE(file_system_.illegalPath("/sys/fs/cgroup/user.slice/cpu.max"));
+  EXPECT_FALSE(file_system_.illegalPath("/sys/fs/cgroup/system.slice/docker-abc123.scope/cpu.max"));
+
+  // Test cgroup v1 paths (legacy hierarchy with separate controllers)
+  EXPECT_FALSE(file_system_.illegalPath("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"));
+  EXPECT_FALSE(file_system_.illegalPath("/sys/fs/cgroup/cpu/cpu.cfs_period_us"));
+  EXPECT_FALSE(file_system_.illegalPath("/sys/fs/cgroup/cpu/docker/abc123/cpu.cfs_quota_us"));
+  EXPECT_FALSE(file_system_.illegalPath("/sys/fs/cgroup/cpu/user.slice/cpu.cfs_period_us"));
+
+  // Other /sys and /proc paths should still be blocked
+  EXPECT_TRUE(file_system_.illegalPath("/proc/kallsyms"));
+  EXPECT_TRUE(file_system_.illegalPath("/sys/kernel/debug"));
 #endif
 }
 

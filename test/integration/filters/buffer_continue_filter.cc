@@ -31,7 +31,7 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     data_total_ += data.length();
 
-    const auto limit = encoder_callbacks_->encoderBufferLimit();
+    const auto limit = encoder_callbacks_->bufferLimit();
     const auto header_size = response_headers_->byteSize();
 
     if (limit && header_size + data_total_ > limit) {

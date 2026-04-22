@@ -24,7 +24,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "api_listener_interface",
     hdrs = ["api_listener.h"],
-    deps = ["//envoy/http:api_listener_interface"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/http:api_listener_interface",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -34,7 +38,7 @@ envoy_cc_library(
         "//envoy/http:context_interface",
         "//envoy/stats:sink_interface",
         "//envoy/upstream:cluster_manager_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -338,6 +342,7 @@ envoy_cc_library(
     deps = [
         ":factory_context_interface",
         "//envoy/config:typed_config_interface",
+        "//envoy/server:instance_interface",
     ],
 )
 

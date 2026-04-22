@@ -42,6 +42,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/common:random_generator_lib",
+        "//source/common/http:response_decoder_impl_base",
         "//source/common/network:socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
@@ -58,7 +59,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    visibility = ["//visibility:public"],
+    extra_visibility = [
+        "//test:__subpackages__",
+    ],
     deps = [
         ":udp_proxy_filter_lib",
         "//envoy/registry",

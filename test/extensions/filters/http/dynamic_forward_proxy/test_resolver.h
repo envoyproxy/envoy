@@ -15,7 +15,7 @@ namespace Network {
 class TestResolver : public GetAddrInfoDnsResolver {
 public:
   ~TestResolver() {
-    absl::MutexLock guard(&mutex_);
+    absl::MutexLock guard(mutex_);
     blocked_resolutions_.clear();
   }
 
@@ -23,7 +23,7 @@ public:
 
   static void unblockResolve(absl::optional<std::string> dns_override = {}) {
     while (1) {
-      absl::MutexLock guard(&resolution_mutex_);
+      absl::MutexLock guard(resolution_mutex_);
       if (blocked_resolutions_.empty()) {
         continue;
       }
@@ -39,10 +39,10 @@ public:
     std::unique_ptr<PendingQuery> new_query =
         std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback);
     PendingQuery* raw_new_query = new_query.get();
-    absl::MutexLock guard(&resolution_mutex_);
+    absl::MutexLock guard(resolution_mutex_);
     blocked_resolutions_.push_back(
         [&, query = std::move(new_query)](absl::optional<std::string> dns_override) mutable {
-          absl::MutexLock guard(&mutex_);
+          absl::MutexLock guard(mutex_);
           if (dns_override.has_value()) {
             *const_cast<std::string*>(&query->dns_name_) = dns_override.value();
           }

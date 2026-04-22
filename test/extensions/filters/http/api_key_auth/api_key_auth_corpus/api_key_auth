@@ -20,6 +20,10 @@ filter_config {
       query: "api_key"
     }
   }
+  forwarding {
+    header: "x-client-id"
+    hide_credentials: true
+  }
 }
 request_data {
   headers {

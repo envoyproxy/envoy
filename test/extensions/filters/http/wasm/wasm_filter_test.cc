@@ -8,6 +8,8 @@
 #include "test/mocks/router/mocks.h"
 #include "test/test_common/wasm_base.h"
 
+#include "gmock/gmock.h"
+
 using testing::_;
 using testing::Eq;
 using testing::InSequence;
@@ -16,7 +18,7 @@ using testing::Return;
 using testing::ReturnRef;
 
 MATCHER_P(MapEq, rhs, "") {
-  const Envoy::ProtobufWkt::Struct& obj = arg;
+  const Envoy::Protobuf::Struct& obj = arg;
   EXPECT_TRUE(rhs.size() > 0);
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
@@ -283,6 +285,29 @@ TEST_P(WasmHttpFilterTest, HeadersStopAndContinue) {
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"server", "envoy-wasm-pause"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().decodeHeaders(request_headers, true));
+  root_context_->onTick(0);
+  filter().clearRouteCache();
+  EXPECT_THAT(request_headers.get_("newheader"), Eq("newheadervalue"));
+  EXPECT_THAT(request_headers.get_("server"), Eq("envoy-wasm-continue"));
+  filter().onDestroy();
+}
+
+TEST_P(WasmHttpFilterTest, HeadersStopAndContinueAllowStopIteration) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(PiotrSikora): This hand off is not currently possible in the Rust SDK.
+    return;
+  }
+  setAllowOnHeadersStopIteration(true);
+  setupTest("", "headers");
+  setupFilter();
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"server", "envoy-wasm-pause"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter().decodeHeaders(request_headers, true));
   root_context_->onTick(0);
   filter().clearRouteCache();
@@ -1052,7 +1077,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1079,7 +1104,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1175,7 +1200,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1217,7 +1242,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
     EXPECT_EQ(filter().grpcCancel(0xFF02), proxy_wasm::WasmResult::NotFound);
     EXPECT_EQ(filter().grpcClose(0xFF02), proxy_wasm::WasmResult::NotFound);
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1266,7 +1291,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallCancel) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1326,7 +1351,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallClose) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1386,7 +1411,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1425,7 +1450,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
       wasm_.reset();
     }
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1515,7 +1540,7 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1576,7 +1601,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("close");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1636,7 +1661,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1686,7 +1711,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1743,7 +1768,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1777,7 +1802,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   setupTest("", "metadata");
   setupFilter();
   envoy::config::core::v3::Node node_data;
-  ProtobufWkt::Value node_val;
+  Protobuf::Value node_val;
   node_val.set_string_value("wasm_node_get_value");
   (*node_data.mutable_metadata()->mutable_fields())["wasm_node_get_key"] = node_val;
   (*node_data.mutable_metadata()->mutable_fields())["wasm_node_list_key"] =
@@ -1798,7 +1823,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   }
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+      Protobuf::MapPair<std::string, Protobuf::Struct>(
           "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
 
@@ -1834,14 +1859,14 @@ TEST_P(WasmHttpFilterTest, Property) {
     return;
   }
   envoy::config::core::v3::Node node_data;
-  ProtobufWkt::Value node_val;
+  Protobuf::Value node_val;
   node_val.set_string_value("sample_data");
   (*node_data.mutable_metadata()->mutable_fields())["istio.io/metadata"] = node_val;
   EXPECT_CALL(local_info_, node()).WillRepeatedly(ReturnRef(node_data));
   setupTest("", "property");
   setupFilter();
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+      Protobuf::MapPair<std::string, Protobuf::Struct>(
           "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
   EXPECT_CALL(request_stream_info_, responseCode()).WillRepeatedly(Return(403));
@@ -1869,7 +1894,7 @@ TEST_P(WasmHttpFilterTest, Property) {
   EXPECT_CALL(encoder_callbacks_, connection())
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection}));
   std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(request_stream_info_, route()).WillRepeatedly(Return(route));
+  request_stream_info_.route_ = route;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host_description(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
@@ -1910,7 +1935,8 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
   EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(*cluster_metadata));
   EXPECT_CALL(request_stream_info_, requestComplete)
       .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-  EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
+  request_stream_info_.upstream_cluster_info_ = cluster;
+  EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).Times(testing::AnyNumber());
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
   filter().log({&request_headers}, request_stream_info_);
@@ -2182,6 +2208,46 @@ TEST_P(WasmHttpFilterTest, VerifySignature) {
   EXPECT_CALL(rootContext(), log_(spdlog::level::err,
                                   Eq(absl::string_view("Failed to initialize digest verify."))))
       .Times(2);
+  rootContext().onTick(0);
+}
+
+TEST_P(WasmHttpFilterTest, Sign) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(patricio78): test not yet implemented using Rust SDK.
+    return;
+  }
+  setupTest("", "sign");
+  setupFilter();
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::info, Eq(absl::string_view("signature created successfully"))));
+
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::err, Eq(absl::string_view("unknown is not supported."))));
+  EXPECT_CALL(
+      rootContext(),
+      log_(spdlog::level::err,
+           Eq(absl::string_view("Invalid key type: private key required for signing operation."))));
+  rootContext().onTick(0);
+}
+
+TEST_P(WasmHttpFilterTest, SignAndVerifySignature) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(patricio78): test not yet implemented using Rust SDK.
+    return;
+  }
+  setupTest("", "sign_and_verify_signature");
+  setupFilter();
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::info,
+                   Eq(absl::string_view("signature created successfully, length: 256"))));
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::info,
+                   Eq(absl::string_view(
+                       "end-to-end test passed: signature created and verified successfully"))));
+  EXPECT_CALL(
+      rootContext(),
+      log_(spdlog::level::info,
+           Eq(absl::string_view("mutual exclusion test passed: both PEM and DER keys rejected"))));
   rootContext().onTick(0);
 }
 

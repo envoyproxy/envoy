@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.mcp_router.v3;
+
+import "envoy/type/metadata/v3/metadata.proto";
+
+import "google/protobuf/duration.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp_router.v3";
+option java_outer_classname = "McpRouterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/mcp_router/v3;mcp_routerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: MCP Multiplexer/Demultiplexer]
+// [#extension: envoy.filters.http.mcp_router]
+
+// Configuration for the MCP Multiplexer/Demultiplexer.
+//
+// This extension aggregates capabilities, tools and resources of remote MCP servers and presents Envoy
+// as a singe MCP server to the client. This allows a unified policy to be applied to multiple remote
+// servers and abstracts multiple MCP servers as a single one.
+//
+// This filter must be a terminal filter in the filter chain and replaces the HTTP router filter.
+//
+// Not all route level policies are applicable to this filter.
+// Specifically the following policies are ignored:
+// * :ref:`route <envoy_v3_api_field_config.route.v3.Route.route>`
+// * :ref:`redirect <envoy_v3_api_field_config.route.v3.Route.redirect>`
+// * :ref:`direct_response <envoy_v3_api_field_config.route.v3.Route.direct_response>`
+//
+
+// Extract identity from a request header.
+message HeaderSource {
+  // Header name to extract (e.g., "x-user-identity").
+  string name = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+}
+
+// Extract identity from dynamic metadata (e.g., populated by JWT or ext_authz filter).
+message DynamicMetadataSource {
+  // The metadata key to retrieve the value from.
+  type.metadata.v3.MetadataKey key = 1 [(validate.rules).message = {required: true}];
+}
+
+// Defines how the identity (user/principal) is extracted from the request.
+// Exactly one of ``header`` or ``dynamic_metadata`` must be set.
+message IdentityExtractor {
+  // Extract identity from a request header.
+  HeaderSource header = 1;
+
+  // Extract identity from dynamic metadata.
+  DynamicMetadataSource dynamic_metadata = 2;
+}
+
+// Specifies how to handle requests where the identity is missing or mismatched.
+message ValidationPolicy {
+  enum Mode {
+    // Not specified. Defaults to DISABLED behavior.
+    MODE_UNSPECIFIED = 0;
+
+    // Bind identity on Initialize if present, but do not validate subsequent requests.
+    // If extraction fails, the session proceeds anonymously.
+    DISABLED = 1;
+
+    // Reject the request (403) if the identity cannot be extracted
+    // or if the session identity does not match the request identity.
+    ENFORCE = 2;
+  }
+
+  Mode mode = 1 [(validate.rules).enum = {defined_only: true}];
+}
+
+// Session identity configuration.
+message SessionIdentity {
+  // Defines how the identity (user/principal) is extracted from the request.
+  IdentityExtractor identity = 1 [(validate.rules).message = {required: true}];
+
+  // Specifies how to handle requests where the subject is missing or invalid.
+  // Defaults to DISABLED.
+  ValidationPolicy validation = 2;
+}
+
+message McpRouter {
+  // Specification of the MCP server.
+  message McpBackend {
+    // Unique name for this backend. Used for:
+    // - Tool name prefixing (e.g., "time__get_current_time")
+    // - Session ID composition
+    // - Logging and error messages.
+    // Default will be the cluster name if not specified.
+    string name = 1;
+
+    // Backend target specification.
+    McpCluster mcp_cluster = 2;
+  }
+
+  // Cluster-based backend configuration.
+  message McpCluster {
+    // Cluster name to route requests to.
+    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Path to use for MCP requests. Defaults to "/mcp".
+    string path = 2;
+
+    // Request timeout.
+    // If not set, uses cluster's timeout configuration.
+    google.protobuf.Duration timeout = 3;
+
+    // Indicates that during forwarding, the host header will be swapped with
+    // this value.
+    string host_rewrite_literal = 4;
+  }
+
+  // A list of remote MCP servers. MCP router aggregates capabilities, tools and resources from remote MCP servers
+  // and presents itself as single MCP server to the client. All remote MCP servers are sent the same capabilities
+  // that the client presented to Envoy.
+  repeated McpBackend servers = 1;
+
+  // If set, extracts a request "subject" and binds it into the MCP session.
+  // If not set, sessions are created without identity binding.
+  SessionIdentity session_identity = 2;
+}

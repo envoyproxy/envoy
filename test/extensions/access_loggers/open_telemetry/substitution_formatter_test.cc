@@ -41,7 +41,7 @@ public:
     (*struct_.mutable_fields())["inner_key"] = ValueUtil::stringValue("inner_value");
   }
 
-  explicit TestSerializedStructFilterState(const ProtobufWkt::Struct& s) : use_struct_(true) {
+  explicit TestSerializedStructFilterState(const Protobuf::Struct& s) : use_struct_(true) {
     struct_.CopyFrom(s);
   }
 
@@ -51,20 +51,20 @@ public:
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     if (use_struct_) {
-      auto s = std::make_unique<ProtobufWkt::Struct>();
+      auto s = std::make_unique<Protobuf::Struct>();
       s->CopyFrom(struct_);
       return s;
     }
 
-    auto d = std::make_unique<ProtobufWkt::Duration>();
+    auto d = std::make_unique<Protobuf::Duration>();
     d->CopyFrom(duration_);
     return d;
   }
 
 private:
   const bool use_struct_{false};
-  ProtobufWkt::Struct struct_;
-  ProtobufWkt::Duration duration_;
+  Protobuf::Struct struct_;
+  Protobuf::Duration duration_;
 };
 
 // Class used to test serializeAsString and serializeAsProto of FilterState
@@ -75,7 +75,7 @@ public:
     return raw_string_ + " By PLAIN";
   }
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    auto message = std::make_unique<Protobuf::StringValue>();
     message->set_value(raw_string_ + " By TYPED");
     return message;
   }
@@ -89,12 +89,12 @@ private:
  * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
  */
 void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
-  ProtobufWkt::Struct struct_obj;
+  Protobuf::Struct struct_obj;
   auto& fields_map = *struct_obj.mutable_fields();
   fields_map["test_key"] = ValueUtil::stringValue("test_value");
-  ProtobufWkt::Struct struct_inner;
+  Protobuf::Struct struct_inner;
   (*struct_inner.mutable_fields())["inner_key"] = ValueUtil::stringValue("inner_value");
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
   *val.mutable_struct_value() = struct_inner;
   fields_map["test_obj"] = val;
   (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
@@ -112,6 +112,29 @@ void verifyOpenTelemetryOutput(KeyValueList output, OpenTelemetryFormatMap expec
        ++output_it, ++expected_it) {
     EXPECT_EQ(*output_it, *expected_it);
   }
+}
+
+// Verifies that unsupported top-level value types (e.g., bool_value) throw an exception.
+TEST(SubstitutionFormatterTest, UnsupportedValueTypeThrows) {
+  KeyValueList key_mapping;
+  auto* kv = key_mapping.add_values();
+  kv->set_key("test");
+  kv->mutable_value()->set_bool_value(true);
+
+  std::vector<Formatter::CommandParserPtr> commands;
+  EXPECT_THROW(OpenTelemetryFormatter(key_mapping, commands), EnvoyException);
+}
+
+// Verifies that unsupported array element types (e.g., int_value) throw an exception.
+TEST(SubstitutionFormatterTest, UnsupportedArrayValueTypeThrows) {
+  KeyValueList key_mapping;
+  auto* kv = key_mapping.add_values();
+  kv->set_key("test");
+  auto* array = kv->mutable_value()->mutable_array_value();
+  array->add_values()->set_int_value(42);
+
+  std::vector<Formatter::CommandParserPtr> commands;
+  EXPECT_THROW(OpenTelemetryFormatter(key_mapping, commands), EnvoyException);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
@@ -557,18 +580,16 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterDynamicMetadataTest) {
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataTest) {
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
-  absl::optional<std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>> cluster =
-      std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(**cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
-  EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
-  EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(metadata));
+  stream_info.upstream_cluster_info_ = cluster;
 
   OpenTelemetryFormatMap expected = {
       {"test_key", "test_value"},
@@ -619,16 +640,10 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
                             key_mapping);
   OpenTelemetryFormatter formatter(key_mapping, {});
 
-  // Empty optional (absl::nullopt)
+  // No cluster info
   {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
-    verifyOpenTelemetryOutput(
-        formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
-        expected);
-  }
-  // Empty cluster info (nullptr)
-  {
-    EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(nullptr));
+    EXPECT_CALL(Const(stream_info), upstreamClusterInfo())
+        .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
     verifyOpenTelemetryOutput(
         formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
         expected);

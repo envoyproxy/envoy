@@ -15,9 +15,8 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/protobuf",
-        "//source/common/protobuf:cc_wkt_protos",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_protofieldextraction//:all_libs",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@proto-field-extraction//:all_libs",
     ],
 )
 
@@ -34,10 +33,9 @@ envoy_cc_library(
         ":proto_extractor_interface",
         "//source/common/common:regex_lib",
         "//source/common/protobuf",
-        "//source/common/protobuf:cc_wkt_protos",
-        "@com_google_protoconverter//:all",
-        "@com_google_protofieldextraction//:all_libs",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
+        "@proto-converter//:all",
+        "@proto-field-extraction//:all_libs",
+        "@proto-processing//proto_processing_lib/proto_scrubber",
     ],
 )
 
@@ -54,10 +52,9 @@ envoy_cc_library(
         ":proto_extractor_interface",
         "//source/common/common:regex_lib",
         "//source/common/protobuf",
-        "//source/common/protobuf:cc_wkt_protos",
-        "@com_google_protoconverter//:all",
-        "@com_google_protofieldextraction//:all_libs",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:field_mask_path_checker",
+        "@proto-converter//:all",
+        "@proto-field-extraction//:all_libs",
+        "@proto-processing//proto_processing_lib/proto_scrubber",
+        "@proto-processing//proto_processing_lib/proto_scrubber:field_mask_path_checker",
     ],
 )

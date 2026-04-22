@@ -19,6 +19,9 @@ public:
   // ThreadLocal::ThreadLocalObject
   ~LuaStringMatcher() override = default;
 
+  // To avoid hiding other implementations of match.
+  using Matchers::StringMatcher::match;
+
   // Matchers::StringMatcher
   bool match(absl::string_view value) const override;
 

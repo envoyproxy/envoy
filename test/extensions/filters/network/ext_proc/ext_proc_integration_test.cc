@@ -23,7 +23,7 @@ using envoy::service::network_ext_proc::v3::ProcessingResponse;
 // Test-only filter that sets both typed and untyped connection metadata based on filter config
 class MetadataSetterFilter : public Network::ReadFilter {
 public:
-  MetadataSetterFilter(const ProtobufWkt::Struct& filter_config) : filter_config_(filter_config) {}
+  MetadataSetterFilter(const Protobuf::Struct& filter_config) : filter_config_(filter_config) {}
 
   Network::FilterStatus onNewConnection() override {
     // Set untyped metadata from config
@@ -50,11 +50,11 @@ public:
         for (const auto& [namespace_name, string_value] : typed_namespaces.fields()) {
           if (string_value.has_string_value()) {
             // Create a StringValue
-            ProtobufWkt::StringValue string_proto;
+            Protobuf::StringValue string_proto;
             string_proto.set_value(string_value.string_value());
 
             // Serialize to an Any
-            ProtobufWkt::Any typed_value;
+            Protobuf::Any typed_value;
             typed_value.PackFrom(string_proto);
 
             // Use the appropriate way to add typed metadata
@@ -78,7 +78,7 @@ public:
 
 private:
   Network::ReadFilterCallbacks* callbacks_{nullptr};
-  const ProtobufWkt::Struct& filter_config_;
+  const Protobuf::Struct& filter_config_;
 };
 
 class MetadataSetterFilterFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
@@ -86,14 +86,14 @@ public:
   absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext&) override {
-    const auto& struct_config = dynamic_cast<const ProtobufWkt::Struct&>(proto_config);
+    const auto& struct_config = dynamic_cast<const Protobuf::Struct&>(proto_config);
     return [struct_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<MetadataSetterFilter>(struct_config));
     };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   std::string name() const override { return "test.metadata_setter"; }
@@ -222,25 +222,25 @@ public:
 
       for (int i = 0; i < filters->size(); i++) {
         if ((*filters)[i].name() == "test.metadata_setter") {
-          ProtobufWkt::Struct existing_config;
+          Protobuf::Struct existing_config;
           if ((*filters)[i].has_typed_config()) {
             (*filters)[i].typed_config().UnpackTo(&existing_config);
           }
 
           // Set untyped metadata
           if (!untyped_values.empty()) {
-            ProtobufWkt::Struct metadata_struct;
+            Protobuf::Struct metadata_struct;
             auto* fields = metadata_struct.mutable_fields();
 
             for (const auto& [key, value] : untyped_values) {
               (*fields)[key].set_string_value(value);
             }
 
-            ProtobufWkt::Value namespace_value;
+            Protobuf::Value namespace_value;
             *namespace_value.mutable_struct_value() = metadata_struct;
 
             if (!existing_config.fields().contains("untyped_metadata")) {
-              ProtobufWkt::Value untyped_value;
+              Protobuf::Value untyped_value;
               existing_config.mutable_fields()->insert({"untyped_metadata", untyped_value});
             }
 
@@ -252,13 +252,13 @@ public:
           // Set typed metadata
           if (typed_value.has_value()) {
             if (!existing_config.fields().contains("typed_metadata")) {
-              ProtobufWkt::Value typed_value;
+              Protobuf::Value typed_value;
               existing_config.mutable_fields()->insert({"typed_metadata", typed_value});
             }
 
             auto* typed_metadata =
                 existing_config.mutable_fields()->at("typed_metadata").mutable_struct_value();
-            typed_metadata->mutable_fields()->insert({namespace_name, ProtobufWkt::Value()});
+            typed_metadata->mutable_fields()->insert({namespace_name, Protobuf::Value()});
             typed_metadata->mutable_fields()
                 ->at(namespace_name)
                 .set_string_value(typed_value.value());
@@ -391,6 +391,38 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamClose) {
   tcp_client->close();
 }
 
+// Test default message timeout (200ms) handling for TCP proxy
+TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDefaultMessageTimeout) {
+  initialize();
+
+  Envoy::IntegrationTcpClientPtr tcp_client =
+      makeTcpConnection(lookupPort("network_ext_proc_filter"));
+
+  Envoy::FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send data from client
+  ASSERT_TRUE(tcp_client->write("client_data_timeout_test", false));
+
+  // Wait for the processing request from ext_proc filter
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+  EXPECT_EQ(request.has_read_data(), true);
+  EXPECT_EQ(request.read_data().data(), "client_data_timeout_test");
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(250));
+
+  verifyCounters({{"streams_started", 1},
+                  {"stream_msgs_sent", 1},
+                  {"stream_msgs_received", 0}, // No response received due to timeout
+                  {"read_data_sent", 1},
+                  {"message_timeouts", 1}}); // Message timeout counter
+
+  ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+
+  tcp_client->close();
+}
+
 TEST_P(NetworkExtProcFilterIntegrationTest, MultipleClientConnections) {
   initialize();
 
@@ -486,13 +518,41 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyUpstreamHalfCloseBothWays) {
 
   ProcessingRequest write_request;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
-  EXPECT_EQ(write_request.has_write_data(), true);
-  EXPECT_EQ(write_request.write_data().data(), "server_response");
-  EXPECT_EQ(write_request.write_data().end_of_stream(), true);
 
-  sendWriteGrpcMessage("server_data_inspected", true);
+  if (!write_request.write_data().end_of_stream()) {
+    size_t total_upstream_data = 0;
+    // We got partial data without end_of_stream
+    std::string partial_data = write_request.write_data().data();
+    std::string partial_response = partial_data + "_inspected";
+    sendWriteGrpcMessage(partial_response, false);
 
-  tcp_client->waitForData("server_data_inspected");
+    // Wait for client to receive the partial data
+    total_upstream_data += partial_response.length();
+    ASSERT_TRUE(tcp_client->waitForData(total_upstream_data));
+
+    // Wait for the final message with end_of_stream
+    ProcessingRequest final_request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, final_request));
+    EXPECT_EQ(final_request.has_write_data(), true);
+    EXPECT_EQ(final_request.write_data().end_of_stream(), true);
+
+    // Respond to the final message
+    std::string final_data = final_request.write_data().data();
+    std::string final_response = final_data.empty() ? "" : final_data + "_inspected";
+    sendReadGrpcMessage(final_response, true);
+
+    // Wait for the final data if non-empty
+    if (!final_response.empty()) {
+      total_upstream_data += final_response.length();
+      ASSERT_TRUE(tcp_client->waitForData(total_upstream_data));
+    }
+  } else {
+    // We got the complete data with end_of_stream in one message
+    EXPECT_EQ(write_request.write_data().data(), "server_response");
+    EXPECT_EQ(write_request.write_data().end_of_stream(), true);
+    sendWriteGrpcMessage("server_data_inspected", true);
+    tcp_client->waitForData("server_data_inspected");
+  }
 
   // Close everything
   ASSERT_TRUE(fake_upstream_connection->close());
@@ -534,23 +594,61 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamHalfCloseBothWays)
   // Use true here, and listener connection will get remote close.
   // and the disableClose(true) will take effect to delay the deletion of the filter chain.
   ASSERT_TRUE(tcp_client->write("client_data", true));
+
+  // Track total data received by upstream
+  size_t total_upstream_data = 0;
+
+  // Process read data - handle potential TCP fragmentation
   ProcessingRequest write_request;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
   EXPECT_EQ(write_request.has_read_data(), true);
-  EXPECT_EQ(write_request.read_data().data(), "client_data");
-  EXPECT_EQ(write_request.read_data().end_of_stream(), true);
 
-  sendReadGrpcMessage("client_data_inspected", true);
+  // Handle potential TCP fragmentation for client data
+  if (!write_request.read_data().end_of_stream()) {
+    // We got partial data without end_of_stream
+    std::string partial_data = write_request.read_data().data();
+    std::string partial_response = partial_data + "_inspected";
+    sendReadGrpcMessage(partial_response, false);
 
-  ASSERT_TRUE(fake_upstream_connection->waitForData(21));
+    // Wait for upstream to receive the partial data
+    total_upstream_data += partial_response.length();
+    ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+
+    // Wait for the final message with end_of_stream
+    ProcessingRequest final_request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, final_request));
+    EXPECT_EQ(final_request.has_read_data(), true);
+    EXPECT_EQ(final_request.read_data().end_of_stream(), true);
+
+    // Respond to the final message
+    std::string final_data = final_request.read_data().data();
+    std::string final_response = final_data.empty() ? "" : final_data + "_inspected";
+    sendReadGrpcMessage(final_response, true);
+
+    // Wait for the final data if non-empty
+    if (!final_response.empty()) {
+      total_upstream_data += final_response.length();
+      ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+    }
+  } else {
+    // We got the complete data with end_of_stream in one message
+    EXPECT_EQ(write_request.read_data().data(), "client_data");
+    EXPECT_EQ(write_request.read_data().end_of_stream(), true);
+
+    sendReadGrpcMessage("client_data_inspected", true);
+    ASSERT_TRUE(fake_upstream_connection->waitForData(21)); // "client_data_inspected"
+  }
+
+  // Wait for the upstream to see the half-close
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Verify bidirectional data counters
   verifyCounters({{"streams_started", 1},
-                  {"stream_msgs_sent", 2},     // One for read, one for write
-                  {"stream_msgs_received", 2}, // One for read, one for write
-                  {"read_data_sent", 1},
-                  {"read_data_injected", 1},
+                  {"stream_msgs_sent", 2},     // At least 2 (could be more with fragmentation)
+                  {"stream_msgs_received", 2}, // At least 2 (could be more with fragmentation)
+                  {"read_data_sent", 1},       // At least 1
+                  {"read_data_injected", 1},   // At least 1
                   {"write_data_sent", 1},
                   {"write_data_injected", 1}});
 
@@ -662,20 +760,53 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleDataChunks) {
   EXPECT_EQ(request1.read_data().end_of_stream(), false);
 
   sendReadGrpcMessage("chunk1_processed", false, true);
-  ASSERT_TRUE(fake_upstream_connection->waitForData(16));
+  size_t total_upstream_data = 16; // Already received "chunk1_processed"
+  ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data)); // "chunk1_processed"
 
   ASSERT_TRUE(tcp_client->write("chunk2", true));
 
-  // Second chunk should also be sent to ext_proc
   ProcessingRequest request2;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request2));
   EXPECT_EQ(request2.has_read_data(), true);
-  EXPECT_EQ(request2.read_data().data(), "chunk2");
-  EXPECT_EQ(request2.read_data().end_of_stream(), true);
 
-  // Respond to second chunk
-  sendReadGrpcMessage("chunk2_processed", true);
-  ASSERT_TRUE(fake_upstream_connection->waitForData(16));
+  // Handle potential TCP fragmentation
+  if (!request2.read_data().end_of_stream()) {
+    // We got partial data without end_of_stream
+    std::string partial_response = request2.read_data().data() + "_processed";
+    sendReadGrpcMessage(partial_response, false);
+
+    // Wait for upstream to receive the partial data
+    total_upstream_data += partial_response.length();
+    ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+
+    // Wait for the final message with end_of_stream
+    ProcessingRequest request3;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request3));
+    EXPECT_EQ(request3.has_read_data(), true);
+    EXPECT_EQ(request3.read_data().end_of_stream(), true);
+
+    // Respond to the final message
+    std::string final_response = request3.read_data().data() + "_processed";
+    sendReadGrpcMessage(final_response, true);
+
+    // Wait for the final data if non-empty
+    if (!request3.read_data().data().empty()) {
+      total_upstream_data += final_response.length();
+      ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+    }
+  } else {
+    // We got the complete chunk2 with end_of_stream in one message
+    EXPECT_EQ(request2.read_data().data(), "chunk2");
+    EXPECT_EQ(request2.read_data().end_of_stream(), true);
+
+    sendReadGrpcMessage("chunk2_processed", true);
+
+    total_upstream_data += 16; // "chunk2_processed"
+    ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+  }
+
+  // Wait for half-close to ensure end_of_stream was properly propagated
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
 
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
@@ -862,7 +993,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TypedMetadataForwarding) {
   EXPECT_EQ(typed_metadata.type_url(), "type.googleapis.com/google.protobuf.StringValue");
 
   // Deserialize the StringValue to verify the content
-  ProtobufWkt::StringValue string_value;
+  Protobuf::StringValue string_value;
   EXPECT_TRUE(string_value.ParseFromString(typed_metadata.value()));
   EXPECT_EQ(string_value.value(), "hello-world");
 
@@ -908,7 +1039,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, BothTypedAndUntypedMetadataForwardin
   EXPECT_EQ(typed_metadata.type_url(), "type.googleapis.com/google.protobuf.StringValue");
 
   // Deserialize the StringValue
-  ProtobufWkt::StringValue string_value;
+  Protobuf::StringValue string_value;
   EXPECT_TRUE(string_value.ParseFromString(typed_metadata.value()));
   EXPECT_EQ(string_value.value(), "typed-test-value");
 

@@ -190,9 +190,10 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
   std::map<std::string, std::string> geo_headers = {
-      {"x-geo-region", "dummy-region"},   {"x-geo-city", "dummy-city"},
-      {"x-geo-country", "dummy-country"}, {"x-geo-asn", "dummy-asn"},
-      {"x-geo-isp", "dummy-isp"},         {"x-geo-apple-private-relay", "true"}};
+      {"x-geo-region", "dummy-region"},     {"x-geo-city", "dummy-city"},
+      {"x-geo-country", "dummy-country"},   {"x-geo-asn", "dummy-asn"},
+      {"x-geo-asn-org", "dummy-asn-org"},   {"x-geo-isp", "dummy-isp"},
+      {"x-geo-apple-private-relay", "true"}};
   std::map<std::string, std::string> geo_anon_headers = {{"x-geo-anon", "true"},
                                                          {"x-geo-anon-vpn", "false"},
                                                          {"x-geo-anon-hosting", "true"},
@@ -210,6 +211,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
                                                             {"x-geo-region", "dummy-region"},
                                                             {"x-geo-country", "dummy-country"},
                                                             {"x-geo-asn", "dummy-asn"},
+                                                            {"x-geo-asn-org", "dummy-asn-org"},
                                                             {"x-geo-isp", "dummy-isp"},
                                                             {"x-geo-apple-private-relay", "true"},
                                                             {"x-geo-anon", "true"},
@@ -223,7 +225,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ("1.2.3.4:0", captured_rq_.remoteAddress()->asString());
-  EXPECT_EQ(11, request_headers.size());
+  EXPECT_EQ(12, request_headers.size());
   for (auto& geo_header : geo_headers) {
     auto& header = geo_header.first;
     auto& value = geo_header.second;
@@ -293,6 +295,142 @@ TEST_F(GeoipFilterTest, NoCrashIfFilterDestroyedBeforeCallbackCalled) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(0, request_headers.size());
   ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
+}
+
+TEST_F(GeoipFilterTest, UseIpAddressHeaderSuccessfulLookup) {
+  initializeProviderFactory();
+  const std::string external_request_yaml = R"EOF(
+    custom_header_config:
+      header_name: "x-real-ip"
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+)EOF";
+  initializeFilter(external_request_yaml);
+  Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.addCopy("x-real-ip", "5.6.7.8");
+  expectStats();
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(*dummy_driver_, lookup(_, _))
+      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
+                              captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
+                            })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(2, request_headers.size());
+  EXPECT_THAT(request_headers, HasExpectedHeader("x-geo-city", "dummy-city"));
+  // IP address should be extracted from the x-real-ip header, not the downstream address.
+  EXPECT_EQ("5.6.7.8:0", captured_rq_.remoteAddress()->asString());
+  ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
+  filter_->onDestroy();
+}
+
+TEST_F(GeoipFilterTest, UseIpAddressHeaderWithIpv6) {
+  initializeProviderFactory();
+  const std::string external_request_yaml = R"EOF(
+    custom_header_config:
+      header_name: "x-real-ip"
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+)EOF";
+  initializeFilter(external_request_yaml);
+  Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.addCopy("x-real-ip", "2001:db8::1");
+  expectStats();
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(*dummy_driver_, lookup(_, _))
+      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
+                              captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
+                            })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(2, request_headers.size());
+  EXPECT_THAT(request_headers, HasExpectedHeader("x-geo-city", "dummy-city"));
+  // IPv6 address should be extracted from the x-real-ip header.
+  EXPECT_EQ("[2001:db8::1]:0", captured_rq_.remoteAddress()->asString());
+  ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
+  filter_->onDestroy();
+}
+
+TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnMissingHeader) {
+  initializeProviderFactory();
+  const std::string external_request_yaml = R"EOF(
+    custom_header_config:
+      header_name: "x-real-ip"
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+)EOF";
+  initializeFilter(external_request_yaml);
+  Http::TestRequestHeaderMapImpl request_headers;
+  // No x-real-ip header in the request.
+  expectStats();
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(*dummy_driver_, lookup(_, _))
+      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
+                              captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
+                            })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(1, request_headers.size());
+  EXPECT_THAT(request_headers, HasExpectedHeader("x-geo-city", "dummy-city"));
+  // Should fall back to downstream address when header is missing.
+  EXPECT_EQ("1.2.3.4:0", captured_rq_.remoteAddress()->asString());
+  ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
+  filter_->onDestroy();
+}
+
+TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnInvalidIp) {
+  initializeProviderFactory();
+  const std::string external_request_yaml = R"EOF(
+    custom_header_config:
+      header_name: "x-real-ip"
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+)EOF";
+  initializeFilter(external_request_yaml);
+  Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.addCopy("x-real-ip", "not-a-valid-ip");
+  expectStats();
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(*dummy_driver_, lookup(_, _))
+      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
+                              captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
+                            })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(2, request_headers.size());
+  EXPECT_THAT(request_headers, HasExpectedHeader("x-geo-city", "dummy-city"));
+  // Should fall back to downstream address when IP is invalid.
+  EXPECT_EQ("1.2.3.4:0", captured_rq_.remoteAddress()->asString());
+  ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
+  filter_->onDestroy();
 }
 
 } // namespace

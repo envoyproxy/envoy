@@ -199,7 +199,7 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
   }
 }
 
-void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<Protobuf::Any>& resources,
                               const std::string& version_info) {
   if (watches_.empty()) {
     return;

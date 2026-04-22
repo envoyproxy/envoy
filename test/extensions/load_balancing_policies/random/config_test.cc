@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace Random {
 namespace {
 
@@ -45,6 +45,6 @@ TEST(RandomConfigTest, ValidateFail) {
 
 } // namespace
 } // namespace Random
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

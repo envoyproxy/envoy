@@ -6,11 +6,30 @@
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/zipkin/util.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_json_field_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+
+uint64_t Tracer::generateTraceId() {
+  if (timestamp_trace_ids_) {
+    // Generate timestamp-prefixed 64-bit value:
+    // [32-bit epoch seconds][32-bit random]
+    const uint32_t epoch_seconds =
+        static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(
+                                  time_source_.monotonicTime().time_since_epoch())
+                                  .count());
+    const uint32_t random_part = static_cast<uint32_t>(random_generator_.random());
+
+    // Combine: timestamp in upper 32 bits, random in lower 32 bits
+    return (static_cast<uint64_t>(epoch_seconds) << 32) | random_part;
+  } else {
+    // Use fully random trace ID (existing behavior)
+    return random_generator_.random();
+  }
+}
 
 /**
  * @param spawn_child_span whether the Envoy will spawn a child span for the request. This
@@ -53,13 +72,23 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   cs.setEndpoint(std::move(ep));
 
   // Create an all-new span, with no parent id
-  SpanPtr span_ptr = std::make_unique<Span>(time_source_);
+  SpanPtr span_ptr = std::make_unique<Span>(time_source_, *this);
   span_ptr->setName(span_name);
   uint64_t random_number = random_generator_.random();
   span_ptr->setId(random_number);
-  span_ptr->setTraceId(random_number);
+
+  // Set trace id(s)
   if (trace_id_128bit_) {
-    span_ptr->setTraceIdHigh(random_generator_.random());
+    span_ptr->setTraceId(random_number);
+    span_ptr->setTraceIdHigh(generateTraceId());
+  } else {
+    if (timestamp_trace_ids_) {
+      // 64-bit: timestamp-prefixed
+      span_ptr->setTraceId(generateTraceId());
+    } else {
+      // Legacy behavior: trace id equals span id
+      span_ptr->setTraceId(random_number);
+    }
   }
   int64_t start_time_micro = std::chrono::duration_cast<std::chrono::microseconds>(
                                  time_source_.monotonicTime().time_since_epoch())
@@ -75,14 +104,12 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   // Add CS annotation to the span
   span_ptr->addAnnotation(std::move(cs));
 
-  span_ptr->setTracer(this);
-
   return span_ptr;
 }
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
                           SystemTime timestamp, const SpanContext& previous_context) {
-  SpanPtr span_ptr = std::make_unique<Span>(time_source_);
+  SpanPtr span_ptr = std::make_unique<Span>(time_source_, *this);
   // If the previous context is inner context then this span is span for upstream request.
   Annotation annotation = getAnnotation(split_spans_for_request_ || config.spawnUpstreamSpan(),
                                         previous_context.innerContext(), config.operationName());
@@ -139,8 +166,6 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
                                  time_source_.monotonicTime().time_since_epoch())
                                  .count();
   span_ptr->setStartTime(start_time_micro);
-
-  span_ptr->setTracer(this);
 
   return span_ptr;
 }

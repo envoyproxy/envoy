@@ -22,6 +22,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
@@ -45,7 +46,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 59]
+// [#next-free-field: 61]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -652,9 +653,10 @@ message Cluster {
     // If this is not set, we default to a merge window of 1000ms. To disable it, set the merge
     // window to 0.
     //
-    // Note: merging does not apply to cluster membership changes (e.g.: adds/removes); this is
-    // because merging those updates isn't currently safe. See
-    // https://github.com/envoyproxy/envoy/pull/3941.
+    // .. note::
+    //   Merging does not apply to cluster membership changes (e.g.: adds/removes); this is
+    //   because merging those updates isn't currently safe. See
+    //   https://github.com/envoyproxy/envoy/pull/3941.
     google.protobuf.Duration update_merge_window = 4;
 
     // If set to true, Envoy will :ref:`exclude <arch_overview_load_balancing_excluded>` new hosts
@@ -746,6 +748,9 @@ message Cluster {
     // If both this and preconnect_ratio are set, Envoy will make sure both predicted needs are met,
     // basically preconnecting max(predictive-preconnect, per-upstream-preconnect), for each
     // upstream.
+    //
+    // This is limited somewhat arbitrarily to 3 because preconnecting too aggressively can
+    // harm latency more than the preconnecting helps.
     google.protobuf.DoubleValue predictive_preconnect_ratio = 2
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
@@ -808,6 +813,41 @@ message Cluster {
   // [#comment:TODO(incfly): add a detailed architecture doc on intended usage.]
   repeated TransportSocketMatch transport_socket_matches = 43;
 
+  // Optional matcher that selects a transport socket from
+  // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+  //
+  // This matcher uses the generic xDS matcher framework to select a named transport socket
+  // based on various inputs available at transport socket selection time.
+  //
+  // Supported matching inputs:
+  //
+  // * ``endpoint_metadata``: Extract values from the selected endpoint's metadata.
+  // * ``locality_metadata``: Extract values from the endpoint's locality metadata.
+  // * ``transport_socket_filter_state``: Extract values from filter state that was explicitly shared from
+  //   downstream to upstream via ``TransportSocketOptions``. This enables flexible
+  //   downstream-connection-based matching, such as:
+  //
+  //   - Network namespace matching.
+  //   - Custom connection attributes.
+  //   - Any data explicitly passed via filter state.
+  //
+  // .. note::
+  //   Filter state sharing follows the same pattern as tunneling in Envoy. Filters must explicitly
+  //   share data by setting filter state with the appropriate sharing mode. The filter state is
+  //   then accessible via the ``transport_socket_filter_state`` input during transport socket selection.
+  //
+  // If this field is set, it takes precedence over legacy metadata-based selection
+  // performed by :ref:`transport_socket_matches
+  // <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` alone.
+  // If the matcher does not yield a match, Envoy uses the default transport socket
+  // configured for the cluster.
+  //
+  // When using this field, each entry in
+  // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`
+  // must have a unique ``name``. The matcher outcome is expected to reference one of
+  // these names.
+  xds.type.matcher.v3.Matcher transport_socket_matcher = 59;
+
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
   // :ref:`statistics <config_cluster_manager_cluster_stats>` if :ref:`alt_stat_name
@@ -816,12 +856,14 @@ message Cluster {
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // An optional alternative to the cluster name to be used for observability. This name is used
-  // emitting stats for the cluster and access logging the cluster name. This will appear as
+  // for emitting stats for the cluster and access logging the cluster name. This will appear as
   // additional information in configuration dumps of a cluster's current status as
   // :ref:`observability_name <envoy_v3_api_field_admin.v3.ClusterStatus.observability_name>`
-  // and as an additional tag "upstream_cluster.name" while tracing. Note: Any ``:`` in the name
-  // will be converted to ``_`` when emitting statistics. This should not be confused with
-  // :ref:`Router Filter Header <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
+  // and as an additional tag "upstream_cluster.name" while tracing.
+  //
+  // .. note::
+  //   Any ``:`` in the name will be converted to ``_`` when emitting statistics. This should not be confused with
+  //   :ref:`Router Filter Header <config_http_filters_router_x-envoy-upstream-alt-stat-name>`.
   string alt_stat_name = 28 [(udpa.annotations.field_migrate).rename = "observability_name"];
 
   oneof cluster_discovery_type {
@@ -844,6 +886,12 @@ message Cluster {
   // unspecified, an implementation defined default is applied (1MiB).
   google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5
       [(udpa.annotations.security).configure_for_untrusted_upstream = true];
+
+  // Optional timeout that controls how long an upstream connection is allowed to stay above the
+  // configured buffer high watermark before it is closed. If this timeout is not specified, or
+  // explicitly set to 0, connections will not be closed due to buffer high watermark usage.
+  google.protobuf.Duration per_connection_buffer_high_watermark_timeout = 60
+      [(validate.rules).duration = {gte {}}];
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
@@ -1301,14 +1349,18 @@ message UpstreamConnectionOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.UpstreamConnectionOptions";
 
+  // [#comment: Keep this list of address types in sync with api/config/core/v3/address.proto.]
   enum FirstAddressFamilyVersion {
-    // respect the native ranking of destination ip addresses returned from dns
-    // resolution
+    // Use the first address family encountered in the address list.
     DEFAULT = 0;
 
     V4 = 1;
 
     V6 = 2;
+
+    PIPE = 3;
+
+    INTERNAL = 4;
   }
 
   message HappyEyeballsConfig {

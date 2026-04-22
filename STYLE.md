@@ -1,5 +1,6 @@
 # C++ coding style
 
+* Envoy currently supports C++20.
 * The Envoy source code is formatted using clang-format. Thus all white spaces, etc.
   issues are taken care of automatically. The Azure Pipelines will automatically check
   the code format and fail. There are make targets that can both check the format
@@ -51,6 +52,15 @@
   raw memory in a test and return it to the production code with the expectation that the
   production code will hold it in a `unique_ptr` and free it. Envoy uses the factory pattern
   quite a bit for these cases. (Search the code for "factory").
+* For accessor functions, prefer `OptRef<const T>` or `const Type&` as return types for functions
+  that return *const* references to existing objects *when there is no intention of mutation*.
+  If the caller needs to take ownership of the returned object via a `shared_ptr`, add a separate
+  function with a `SharedPtr` suffix that returns a shared pointer to
+  extend ownership. For example:
+  * `const ConnectionInfoProvider& connectionInfoProvider() const;`
+  * `ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const;`
+  * `OptRef<const Route> route() const;`
+  * `RouteConstSharedPtr routeSharedPtr() const;`
 * Prefer explicitly sized integer types, such as uint64_t rather than size_t. In particular, use
   explicitly sized integers for data that is written to disk or involved in math that might overflow.
 * The Google C++ style guide points out that [non-PoD static and global variables are forbidden](https://google.github.io/styleguide/cppguide.html#Static_and_Global_Variables).
@@ -159,6 +169,9 @@ A few general notes on our error handling philosophy:
     should be used where it may be useful to detect if an efficient condition is violated in
     production (and fatal check in debug-only builds). This will also log a stack trace
     of the previous calls leading up to `ENVOY_BUG`.
+  - `ENVOY_NOTIFICATION`: logs and increments the ``envoy_notifications`` counter. These should be
+    used where it may be useful to detect if an efficient condition is met in production, for
+    example before rolling out a potentially disruptive configuration change.
 
 * Sub-macros alias the macros above and can be used to annotate specific situations:
   - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need

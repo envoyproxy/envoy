@@ -114,7 +114,7 @@ private:
     DnsHostInfoImpl(DnsCacheImpl& parent, absl::string_view resolved_host, bool is_ip_address);
     // DnsHostInfo
     Network::Address::InstanceConstSharedPtr address() const override;
-    std::vector<Network::Address::InstanceConstSharedPtr> addressList(bool filtered) const override;
+    std::vector<Network::Address::InstanceConstSharedPtr> addressList() const override;
     const std::string& resolvedHost() const override;
     bool isIpAddress() const override;
     void touch() final;

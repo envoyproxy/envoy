@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Proto representation of the value returned by /server_info, containing
 // server version/server status information.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ServerInfo {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ServerInfo";
 
@@ -57,9 +57,12 @@ message ServerInfo {
 
   // Populated node identity of this server.
   config.core.v3.Node node = 7;
+
+  // Whether the server is currently initializing during a hot restart.
+  bool hot_restart_initializing = 8;
 }
 
-// [#next-free-field: 42]
+// [#next-free-field: 43]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";
@@ -160,6 +163,9 @@ message CommandLineOptions {
 
   // See :option:`--file-flush-interval-msec` for details.
   google.protobuf.Duration file_flush_interval = 16;
+
+  // See :option:`--file-flush-min-size-kb` for details.
+  uint32 file_flush_min_size = 42;
 
   // See :option:`--drain-time-s` for details.
   google.protobuf.Duration drain_time = 17;

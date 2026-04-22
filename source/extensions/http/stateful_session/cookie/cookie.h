@@ -30,7 +30,7 @@ public:
         : upstream_address_(std::move(address)), factory_(factory), time_source_(time_source) {}
 
     absl::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
-    void onUpdate(absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) override;
+    bool onUpdate(absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) override;
 
   private:
     absl::optional<std::string> upstream_address_;
@@ -98,7 +98,7 @@ private:
   const std::string name_;
   const std::chrono::seconds ttl_;
   const std::string path_;
-  const Envoy::Http::CookieAttributeRefVector attributes_;
+  std::vector<Envoy::Http::CookieAttribute> attributes_;
   TimeSource& time_source_;
 
   std::function<bool(absl::string_view)> path_matcher_;

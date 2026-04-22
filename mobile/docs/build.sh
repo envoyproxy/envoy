@@ -30,7 +30,7 @@ rm -rf "${DOCS_OUTPUT_DIR}"
 mkdir -p "${DOCS_OUTPUT_DIR}"
 DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
 
-./bazelw run \
+bazel run \
          "--@envoy//tools/tarball:target=$DOCS_TARGET" \
          @envoy//tools/tarball:unpack \
          "$DOCS_OUTPUT_DIR"

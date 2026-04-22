@@ -3,6 +3,8 @@ Propagate the generated Swift header from a swift_library target
 This exists to work around https://github.com/bazelbuild/rules_swift/issues/291
 """
 
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+
 def _swift_header_collector(ctx):
     headers = [
         DefaultInfo(

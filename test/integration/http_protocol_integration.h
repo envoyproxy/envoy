@@ -11,7 +11,6 @@ struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
   Http::CodecType downstream_protocol;
   Http::CodecType upstream_protocol;
-  Http1ParserImpl http1_implementation;
   Http2Impl http2_implementation;
   bool use_universal_header_validator;
 };
@@ -75,10 +74,10 @@ public:
   HttpProtocolIntegrationTest(const std::string config)
       : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, config),
         use_universal_header_validator_(GetParam().use_universal_header_validator) {
-    setupHttp1ImplOverrides(GetParam().http1_implementation);
     setupHttp2ImplOverrides(GetParam().http2_implementation);
     config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
                                       GetParam().use_universal_header_validator ? "true" : "false");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "true");
   }
 
   void SetUp() override {
@@ -110,11 +109,11 @@ public:
             std::get<0>(GetParam()).downstream_protocol, std::get<0>(GetParam()).version,
             ConfigHelper::httpProxyConfig(std::get<0>(GetParam()).downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
-    setupHttp1ImplOverrides(std::get<0>(GetParam()).http1_implementation);
     setupHttp2ImplOverrides(std::get<0>(GetParam()).http2_implementation);
     config_helper_.addRuntimeOverride(
         "envoy.reloadable_features.enable_universal_header_validator",
         std::get<0>(GetParam()).use_universal_header_validator ? "true" : "false");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "true");
   }
   static std::string testParamsToString(
       const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {

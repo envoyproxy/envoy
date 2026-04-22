@@ -25,7 +25,7 @@ envoy_cc_library(
         "//envoy/router:cluster_specifier_plugin_interface",
         "//source/common/common:utility_lib",
         "//source/common/http:utility_lib",
-        "//source/common/router:config_lib",
+        "//source/common/router:delegating_route_lib",
         "@envoy_api//contrib/envoy/extensions/router/cluster_specifier/golang/v3alpha:pkg_cc_proto",
     ],
 )

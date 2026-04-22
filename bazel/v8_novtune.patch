@@ -1,0 +1,18 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 3f5a87d054e..740b1f1773b 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -4477,12 +4477,7 @@ v8_library(
+     copts = ["-Wno-implicit-fallthrough"],
+     strip_include_prefix = "third_party",
+     visibility = ["//visibility:public"],
+-    deps = [":noicu/v8"] + select({
+-        ":is_v8_enable_vtunejit": [
+-            ":v8_vtune",
+-        ],
+-        "//conditions:default": [],
+-    }),
++    deps = [":noicu/v8"],
+ )
+ 
+ alias(

@@ -2,7 +2,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_extension_package",
-    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2
@@ -80,7 +79,7 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -94,9 +93,12 @@ envoy_cc_library(
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:utility_lib",
+        "//source/extensions/common/aws/credential_providers:assume_role_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:container_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:environment_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:instance_profile_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:webidentity_credentials_provider_lib",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
@@ -132,6 +134,7 @@ envoy_cc_library(
         ":metadata_fetcher_lib",
         ":utility_lib",
         "//envoy/common:time_interface",
+        "//source/common/common:cancel_wrapper_lib",
     ],
 )
 
@@ -144,11 +147,6 @@ envoy_cc_library(
         "signer_base_impl.h",
         "utility.h",
     ],
-    copts = envoy_select_boringssl(
-        [
-            "-DENVOY_SSL_FIPS",
-        ],
-    ),
     deps = [
         "//envoy/common:pure_lib",
         "//envoy/http:message_interface",
@@ -164,7 +162,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/singleton:const_singleton",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],
@@ -175,7 +173,7 @@ envoy_cc_library(
     hdrs = ["region_provider.h"],
     deps = [
         "//envoy/common:pure_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 

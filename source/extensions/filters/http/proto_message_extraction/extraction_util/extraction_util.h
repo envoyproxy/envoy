@@ -44,7 +44,7 @@ constexpr int kProtoTranslationMaxRecursionDepth = 64;
 
 ABSL_CONST_INIT const char* const kStructTypeUrl = "type.googleapis.com/google.protobuf.Struct";
 
-bool IsEmptyStruct(const ProtobufWkt::Struct& message_struct);
+bool IsEmptyStruct(const Protobuf::Struct& message_struct);
 
 bool IsLabelName(absl::string_view value);
 
@@ -86,10 +86,9 @@ absl::string_view ExtractLocationIdFromResourceName(absl::string_view resource_n
 
 // Recursively redacts the path_pieces in the enclosing proto_struct.
 void RedactPath(std::vector<std::string>::const_iterator path_begin,
-                std::vector<std::string>::const_iterator path_end,
-                ProtobufWkt::Struct* proto_struct);
+                std::vector<std::string>::const_iterator path_end, Protobuf::Struct* proto_struct);
 
-void RedactPaths(absl::Span<const std::string> paths_to_redact, ProtobufWkt::Struct* proto_struct);
+void RedactPaths(absl::Span<const std::string> paths_to_redact, Protobuf::Struct* proto_struct);
 
 // Finds the last value of the non-repeated string field after the first
 // value. Returns an empty string if there is only one string field. Returns
@@ -116,15 +115,15 @@ ExtractStringFieldValue(const Protobuf::Type& type,
 
 absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator path_pieces_begin,
                                      std::vector<std::string>::const_iterator path_pieces_end,
-                                     ProtobufWkt::Struct* message_struct);
+                                     Protobuf::Struct* message_struct);
 
 // Converts given proto message to Struct. It also adds
 // a "@type" property with proto type url to the generated Struct. Expects the
 // TypeResolver to handle types prefixed with "type.googleapis.com/".
 absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
-                             const Envoy::ProtobufWkt::Type& type,
+                             const Envoy::Protobuf::Type& type,
                              ::Envoy::Protobuf::util::TypeResolver* type_resolver,
-                             ::Envoy::ProtobufWkt::Struct* message_struct);
+                             ::Envoy::Protobuf::Struct* message_struct);
 
 // Extracts given proto message and convert the extracted proto to Struct.
 //
@@ -133,10 +132,10 @@ absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& mess
 //  (2) error during scrubbing/converting;
 //  (3) the message is empty after scrubbing;
 bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
-                   const Envoy::ProtobufWkt::Type& type,
+                   const Envoy::Protobuf::Type& type,
                    const ::google::grpc::transcoding::TypeHelper& type_helper,
                    Protobuf::field_extraction::MessageData* message,
-                   Envoy::ProtobufWkt::Struct* message_struct);
+                   Envoy::Protobuf::Struct* message_struct);
 
 } // namespace ProtoMessageExtraction
 } // namespace HttpFilters

@@ -2,7 +2,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace ClusterProvided {
 
 Upstream::ThreadAwareLoadBalancerPtr Factory::create(OptRef<const Upstream::LoadBalancerConfig>,
@@ -20,6 +20,6 @@ Upstream::ThreadAwareLoadBalancerPtr Factory::create(OptRef<const Upstream::Load
 REGISTER_FACTORY(Factory, Upstream::TypedLoadBalancerFactory);
 
 } // namespace ClusterProvided
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

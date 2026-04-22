@@ -740,20 +740,17 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     // If longer keys are ever supported, remember to change the signature buffer to be larger.
     ASSERT(key_size / 8 <= CryptoMbContext::MAX_SIGNATURE_SIZE);
 
-    BIGNUM e_check;
+    bssl::UniquePtr<BIGNUM> e_check{BN_new()};
     // const BIGNUMs, memory managed by BoringSSL in RSA key structure.
     const BIGNUM* e = nullptr;
     const BIGNUM* n = nullptr;
     const BIGNUM* d = nullptr;
     RSA_get0_key(rsa, &n, &e, &d);
-    BN_init(&e_check);
-    BN_add_word(&e_check, 65537);
-    if (e == nullptr || BN_ucmp(e, &e_check) != 0) {
-      BN_free(&e_check);
+    BN_add_word(e_check.get(), 65537);
+    if (e == nullptr || BN_ucmp(e, e_check.get()) != 0) {
       throw EnvoyException("Only RSA keys with \"e\" parameter value 65537 are allowed, because "
                            "we can validate the signatures using multi-buffer instructions.");
     }
-    BN_free(&e_check);
   } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
     ENVOY_LOG(debug, "CryptoMb key type: ECDSA");
     key_type_ = KeyType::Ec;

@@ -88,7 +88,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.load_balancing_policies.least_request"],
     rbe_pool = "6gig",
     deps = [
-        "//source/extensions/load_balancing_policies/least_request:least_request_lb_lib",
+        "//source/extensions/load_balancing_policies/least_request:config",
         "//test/extensions/load_balancing_policies/common:load_balancer_base_test_lib",
     ],
 )

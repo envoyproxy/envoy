@@ -57,11 +57,11 @@ PolicySharedPtr FilterConfig::getPolicy(const ::Envoy::Http::ResponseHeaderMap& 
 
   ::Envoy::Http::Matching::HttpMatchingDataImpl data(stream_info);
   data.onResponseHeaders(headers);
-  auto match = Matcher::evaluateMatch<::Envoy::Http::HttpMatchingData>(*matcher_, data);
-  if (!match.result_) {
+  auto match_result = Matcher::evaluateMatch<::Envoy::Http::HttpMatchingData>(*matcher_, data);
+  if (!match_result.isMatch()) {
     return PolicySharedPtr{};
   }
-  return match.result_()->getTyped<CustomResponseMatchAction>().policy_;
+  return std::dynamic_pointer_cast<const Policy>(match_result.actionByMove());
 }
 
 } // namespace CustomResponse

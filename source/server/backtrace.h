@@ -58,7 +58,7 @@ public:
    * e.g.
    *   `7d34c0e28000-7d34c1e0d000 /build/foo/bar/source/exe/envoy-static`
    */
-  static const std::string& addrMapping(bool setup = false);
+  static absl::string_view addrMapping(bool setup = false);
 
   /**
    * Directs the output of logTrace() to directly stderr rather than the

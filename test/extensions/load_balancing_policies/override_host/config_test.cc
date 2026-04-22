@@ -21,7 +21,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace OverrideHost {
 namespace {
 
@@ -32,7 +32,7 @@ using ::Envoy::Upstream::MockHostSet;
 using ::test::load_balancing_policies::override_host::Config;
 using ::testing::HasSubstr;
 
-TEST(OverrideHostLbonfigTest, NoFallbackLb) {
+TEST(OverrideHostLbConfigTest, NoFallbackLb) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
@@ -48,7 +48,7 @@ TEST(OverrideHostLbonfigTest, NoFallbackLb) {
                           "value is required");
 }
 
-TEST(OverrideHostLbonfigTest, NoFallbackPolicies) {
+TEST(OverrideHostLbConfigTest, NoFallbackPolicies) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
@@ -66,14 +66,14 @@ TEST(OverrideHostLbonfigTest, NoFallbackPolicies) {
                                                "fallback load balancer factory with names from "));
 }
 
-TEST(OverrideHostLbonfigTest, NoPrimaryOverideSources) {
+TEST(OverrideHostLbConfigTest, NoPrimaryOverideSources) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
 
-  ProtobufWkt::Struct invalid_policy;
+  Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
@@ -92,7 +92,7 @@ TEST(OverrideHostLbonfigTest, NoPrimaryOverideSources) {
                           "value must contain at least 1 item");
 }
 
-TEST(OverrideHostLbonfigTest, FirstValidFallbackPolicyIsUsed) {
+TEST(OverrideHostLbConfigTest, FirstValidFallbackPolicyIsUsed) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
@@ -100,7 +100,7 @@ TEST(OverrideHostLbonfigTest, FirstValidFallbackPolicyIsUsed) {
   OverrideHost config_msg;
   config_msg.add_override_host_sources()->set_header("x-foo");
 
-  ProtobufWkt::Struct invalid_policy;
+  Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
@@ -119,7 +119,7 @@ TEST(OverrideHostLbonfigTest, FirstValidFallbackPolicyIsUsed) {
   EXPECT_TRUE(result.ok());
 }
 
-TEST(OverrideHostLbonfigTest, EmptyPrimaryOverrideSource) {
+TEST(OverrideHostLbConfigTest, EmptyPrimaryOverrideSource) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
@@ -128,7 +128,7 @@ TEST(OverrideHostLbonfigTest, EmptyPrimaryOverrideSource) {
   // Do not set either host or metadata keys
   config_msg.add_override_host_sources();
 
-  ProtobufWkt::Struct invalid_policy;
+  Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
@@ -148,7 +148,7 @@ TEST(OverrideHostLbonfigTest, EmptyPrimaryOverrideSource) {
                                                "Empty override source"));
 }
 
-TEST(OverrideHostLbonfigTest, HeaderAndMetadataInTheSameOverrideSource) {
+TEST(OverrideHostLbConfigTest, HeaderAndMetadataInTheSameOverrideSource) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
@@ -161,7 +161,7 @@ TEST(OverrideHostLbonfigTest, HeaderAndMetadataInTheSameOverrideSource) {
   metadata_key->set_key("x-bar");
   metadata_key->add_path()->set_key("a/b/c");
 
-  ProtobufWkt::Struct invalid_policy;
+  Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
@@ -181,7 +181,7 @@ TEST(OverrideHostLbonfigTest, HeaderAndMetadataInTheSameOverrideSource) {
                                                "Only one override source must be set"));
 }
 
-TEST(OverrideHostLbonfigTest, FallbackLbCalledToChooseHost) {
+TEST(OverrideHostLbConfigTest, FallbackLbCalledToChooseHost) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
   auto cluster_info = std::make_shared<NiceMock<Envoy::Upstream::MockClusterInfo>>();
   NiceMock<Envoy::Upstream::MockPrioritySet> main_thread_priority_set;
@@ -214,8 +214,7 @@ TEST(OverrideHostLbonfigTest, FallbackLbCalledToChooseHost) {
   EXPECT_NE(thread_local_lb_factory, nullptr);
 
   MockHostSet* host_set = thread_local_priority_set.getMockHostSet(0);
-  host_set->hosts_ = {
-      Envoy::Upstream::makeTestHost(cluster_info, "tcp://127.0.0.1:80", context.time_system_)};
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(cluster_info, "tcp://127.0.0.1:80")};
   host_set->runCallbacks(host_set->hosts_, {});
   auto thread_local_lb = thread_local_lb_factory->create({thread_local_priority_set, nullptr});
   EXPECT_NE(thread_local_lb, nullptr);
@@ -225,8 +224,31 @@ TEST(OverrideHostLbonfigTest, FallbackLbCalledToChooseHost) {
   EXPECT_EQ(host->address()->asString(), "127.0.0.1:80");
 }
 
+TEST(OverrideHostLbConfigTest, ValidSelectedHostKey) {
+  NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
+  ::envoy::config::core::v3::TypedExtensionConfig config;
+  config.set_name("envoy.load_balancers.override_host");
+  OverrideHost config_msg;
+  config_msg.add_override_host_sources()->set_header("x-foo");
+
+  auto* metadata_key = config_msg.mutable_selected_host_key();
+  metadata_key->set_key("envoy.lb");
+  metadata_key->add_path()->set_key("x-gateway-destination-endpoint-served");
+
+  Config fallback_picker_config;
+  auto* typed_extension_config =
+      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
+  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
+  typed_extension_config->set_name("envoy.load_balancers.override_host.test");
+
+  config.mutable_typed_config()->PackFrom(config_msg);
+  auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
+  auto result = factory.loadConfig(context, config_msg);
+  EXPECT_TRUE(result.ok());
+}
+
 } // namespace
 } // namespace OverrideHost
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

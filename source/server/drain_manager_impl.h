@@ -62,7 +62,7 @@ private:
   std::map<Network::DrainDirection, MonotonicTime> drain_deadlines_ = {
       {Network::DrainDirection::InboundOnly, MonotonicTime()},
       {Network::DrainDirection::All, MonotonicTime()}};
-  mutable Common::CallbackManager<std::chrono::milliseconds> cbs_{};
+  mutable Common::CallbackManager<absl::Status, std::chrono::milliseconds> cbs_{};
   std::vector<std::function<void()>> drain_complete_cbs_;
 
   // Callbacks called by startDrainSequence to cascade/proxy to children

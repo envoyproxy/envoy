@@ -13,9 +13,9 @@ public:
       : BaseTester(num_hosts, weighted_subset_percent, weight) {}
 
   void initialize() {
+    envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin config;
     lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, &local_priority_set_, stats_,
-                                                   runtime_, random_, common_config_,
-                                                   round_robin_lb_config_, simTime());
+                                                   runtime_, random_, 50, config, simTime());
   }
 
   std::unique_ptr<RoundRobinLoadBalancer> lb_;

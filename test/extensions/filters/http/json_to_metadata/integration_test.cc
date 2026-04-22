@@ -1,4 +1,9 @@
+#include "envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
@@ -255,6 +260,60 @@ TEST_P(JsonToMetadataIntegrationTest, InvalidJson) {
   EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.mismatched_content_type")->value());
   EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.resp.no_body")->value());
   EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp.invalid_json_body")->value());
+}
+
+TEST_P(JsonToMetadataIntegrationTest, RouteConfigOverride) {
+  config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.json_to_metadata
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata
+)EOF");
+
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+    route->mutable_match()->set_path("/route/override");
+
+    // Per-route configuration that overrides the global config
+    const std::string per_route_config = R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: route_field
+    on_present:
+      metadata_namespace: envoy.lb
+      key: route_field
+response_rules:
+  rules:
+  - selectors:
+    - key: route_field
+    on_present:
+      metadata_namespace: envoy.lb
+      key: route_field
+)EOF";
+    envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata route_json_to_metadata;
+    TestUtility::loadFromYaml(per_route_config, route_json_to_metadata);
+
+    Protobuf::Any per_route_any;
+    per_route_any.PackFrom(route_json_to_metadata);
+    route->mutable_typed_per_filter_config()->insert(
+        {"envoy.filters.http.json_to_metadata", per_route_any});
+  });
+
+  initialize();
+
+  Http::TestRequestHeaderMapImpl headers{{":scheme", "http"},
+                                         {":path", "/route/override"},
+                                         {":method", "POST"},
+                                         {":authority", "host"},
+                                         {"Content-Type", "application/json"}};
+  const std::string request_body = R"({"route_field":"route_value"})";
+  const std::string response_body = R"({"route_field":"route_value"})";
+
+  runTest(headers, request_body, response_headers_, response_body);
+
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.rq.success")->value());
+  EXPECT_EQ(1UL, test_server_->counter("json_to_metadata.resp.success")->value());
 }
 
 } // namespace

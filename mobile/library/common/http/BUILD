@@ -22,7 +22,7 @@ envoy_cc_library(
         "//library/common/stream_info:extra_stream_info_lib",
         "//library/common/system:system_helper_lib",
         "//library/common/types:c_types_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy//envoy/buffer:buffer_interface",
         "@envoy//envoy/common:scope_tracker_interface",
         "@envoy//envoy/event:deferred_deletable",

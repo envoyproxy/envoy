@@ -3,7 +3,7 @@
 Well Known Filter State Objects
 ===============================
 
-The following lists the filter state object keys used by the Envoy extensions:
+The following lists the filter state object keys used by the Envoy extensions to programmatically modify their behavior:
 
 ``envoy.network.upstream_server_name``
   Sets the transport socket option to override the `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ in
@@ -63,9 +63,12 @@ The following lists the filter state object keys used by the Envoy extensions:
 ``envoy.filters.network.http_connection_manager.local_reply_owner``
   Shared filter status for logging which filter config name in the HTTP filter chain sent the local reply.
 
-``envoy.string``
-  A special generic string object factory, to be used as a :ref:`factory lookup key
-  <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`.
+``envoy.network.transport_socket.http_11_proxy.info``
+  Sets per-request HTTP/1.1 proxy information for upstream connections. This is used to inform the http_11_proxy
+  transport socket of the proxy information for the upstream connection.
+  Accepts a constructor string of the form ``"<target_host:port>,<proxy_ip:port>"``. If ``proxy_ip`` is an IPv6
+  address, it must use bracket notation (for example, ``[::1]:15002``). For example:
+  ``"example.com:443,127.0.0.1:15002"`` or ``"example.com:443,[::1]:15002"``.
 
 ``envoy.tcp_proxy.per_connection_idle_timeout_ms``
   :ref:`TCP proxy idle timeout duration
@@ -76,6 +79,82 @@ The following lists the filter state object keys used by the Envoy extensions:
   :ref:`Rate Limit Hits Addend
   <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>` override on a per-route basis.
   Accepts a number string as a constructor.
+
+``envoy.geoip``
+  :ref:`Network GeoIP filter <config_network_filters_geoip>` stores geolocation lookup results
+  in this filter state object. The object contains fields for geographic data such as country,
+  city, region, and ASN. Supports serialization for access logging and field-level access. Fields:
+
+  * ``country``: ISO country code;
+  * ``city``: city name;
+  * ``region``: ISO region code;
+  * ``asn``: autonomous system number;
+  * ``anon``: anonymization network check result (``true`` or ``false``);
+  * ``anon_vpn``: VPN check result (``true`` or ``false``);
+  * ``anon_hosting``: hosting provider check result (``true`` or ``false``);
+  * ``anon_tor``: TOR exit node check result (``true`` or ``false``);
+  * ``anon_proxy``: public proxy check result (``true`` or ``false``);
+  * ``isp``: ISP name;
+  * ``apple_private_relay``: iCloud Private Relay check result (``true`` or ``false``).
+
+``envoy.filters.http.mcp.request``
+  :ref:`MCP filter <config_http_filters_mcp>` stores parsed MCP (Model Context Protocol) JSON-RPC
+  request attributes when ``request_storage_mode`` is set to ``FILTER_STATE`` or
+  ``DYNAMIC_METADATA_AND_FILTER_STATE``. The object stores extracted fields from the parsed request.
+
+``envoy.network.network_namespace``
+  Contains the value of the downstream connection's Linux network namespace if it differs from the default.
+
+``envoy.network.upstream_bind_override.network_namespace``
+  Allows overriding the network namespace on the upstream connections using the :ref:`Linux network
+  namespace local address selector
+  <envoy_v3_api_msg_extensions.local_address_selectors.filter_state_override.v3.Config>`
+  extension. The object should serialize to the network namespace filepath, and the empty string
+  value clears the network namespace. This object is expected to be shared from the downstream
+  filters with the upstream connections.
+
+``envoy.tls.certificate_mappers.on_demand_secret``
+  Allows overriding the certificate to use per-connection using the :ref:`filter state certificate mapper
+  <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config>`.
+
+``envoy.tls.cert_validator.spiffe.workload_trust_domain``
+  Specifies per-connection workload trust domain to be used in the :ref:`SPIFFE certificate validator
+  <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>`.
+
+Filter state object factories
+-----------------------------
+
+The following generic filter state factories can be used to create filter state objects via
+configuration with a :ref:`factory lookup key
+<envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`.
+
+``envoy.string``
+  A generic string object factory for creating filter state entries with custom key names.
+  Use this as the :ref:`factory_key
+  <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`
+  when your ``object_key`` is a custom name not listed in this document.
+
+  Example configuration:
+
+  .. code-block:: yaml
+
+    object_key: my.custom.key
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "my-value"
+
+  This creates a filter state entry named ``my.custom.key`` containing the string ``my-value``.
+  The value can be accessed in access logs using ``%FILTER_STATE(my.custom.key)%``.
+
+``envoy.hashable_string``
+  Same as ``envoy.string`` but supports connection pool hashing when :ref:`shared with the upstream
+  <arch_overview_advanced_filter_state_sharing>`. Please use with care as it can lead to significant
+  increase in the number of upstream connections when used with HTTP upstreams.
+
+``envoy.network.ip``
+  A factory to create IP addresses from ``IPv4`` and ``IPv6`` address strings.
+
 
 Filter state object fields
 --------------------------

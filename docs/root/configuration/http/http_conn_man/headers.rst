@@ -36,8 +36,8 @@ The ``:scheme`` header will be used by Envoy over ``x-forwarded-proto`` where th
 -----
 
 The ``:path`` header is a pseudo-header populated by Envoy using the value of the path of the HTTP
-request. E.g. an HTTP request of the form ``GET /docs/thing HTTP/1.1`` would have a ``:path`` value
-of ``/docs/thing``.
+request, including query parameters. E.g. an HTTP request of the form ``GET /docs/thing HTTP/1.1``
+would have a ``:path`` value of ``/docs/thing``.
 
 :method
 -------
@@ -164,6 +164,17 @@ x-forwarded-client-cert
 or all of the clients or proxies that a request has flowed through, on its way from the client to the
 server. A proxy may choose to sanitize/append/forward the XFCC header before proxying the request.
 
+The XFCC header value can be formatted in either text or JSON format, controlled by the
+:ref:`format<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.SetCurrentClientCertDetails.format>`
+option.
+
+.. _config_http_conn_man_headers_x-forwarded-client-cert_text:
+
+Text format
+^^^^^^^^^^^
+
+The text format is the default.
+
 The XFCC header value is a comma (``,``) separated string. Each substring is an XFCC element, which
 holds information added by a single proxy. A proxy can append the current client certificate
 information as an XFCC element, to the end of the request's XFCC header after a comma.
@@ -178,7 +189,7 @@ The following keys are supported:
 1. ``By`` The Subject Alternative Name (URI type) of the current proxy's certificate. The current proxy's certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 2. ``Hash`` The SHA 256 digest of the current client certificate.
 3. ``Cert`` The entire client certificate in URL encoded PEM format.
-4. ``Chain`` The entire client certificate chain (including the leaf certificate) in URL encoded PEM format.
+4. ``Chain`` The entire client certificate chain (including the leaf certificate) in URL encoded PEM format. Note that this is not the validated chain; it is the original chain provided by the client which may include certificates not in the validated chain.
 5. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
 6. ``URI`` The URI type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 7. ``DNS`` The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.
@@ -187,16 +198,60 @@ A client certificate may contain multiple Subject Alternative Name types. For de
 
 .. _RFC 5280: https://tools.ietf.org/html/rfc5280#section-4.2.1.6
 
-Some examples of the XFCC header are:
+Some examples of the XFCC header in text format are:
 
 1. For one client certificate with only URI type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client";URI=http://testclient.lyft.com``
 2. For two client certificates with only URI type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;URI=http://testclient.lyft.com,By=http://backend.lyft.com;Hash=9ba61d6425303443c0748a02dd8de688468ed33be74eee6556d90c0149c1309e;URI=http://frontend.lyft.com``
 3. For one client certificate with both URI type and DNS type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client";URI=http://testclient.lyft.com;DNS=lyft.com;DNS=www.lyft.com``
 
+.. _config_http_conn_man_headers_x-forwarded-client-cert_json:
+
+JSON format
+^^^^^^^^^^^
+
+When the JSON format is selected, the XFCC header value is a JSON array of objects. Each object in
+the array represents the certificate information added by a single proxy. The same keys used in the
+text format are available as JSON object fields, but with the following structural differences:
+
+* ``by``, ``uri``, ``dns``, and ``chain`` are JSON arrays of strings (since they can have multiple values).
+  For ``chain``, each string is the PEM-encoded representation of a single certificate
+  in the peer certificate chain. This is the peer provided chain, not the validated chain.
+* ``hash``, ``cert``, and ``subject`` are JSON strings.
+* Unlike the text format, ``cert`` and ``chain`` PEM values are not URL-encoded; instead,
+  special characters (such as newlines in PEM data) are escaped using standard JSON escaping rules.
+* Only fields with non-empty values are included in the JSON object.
+* Values are escaped according to JSON rules (e.g. ``"`` becomes ``\"``, ``\`` becomes ``\\``).
+
+An example of the XFCC header in JSON format:
+
+.. code-block:: json
+
+  [{"by":["http://frontend.lyft.com"],"hash":"468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688","subject":"/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client","uri":["http://testclient.lyft.com"],"dns":["lyft.com","www.lyft.com"]}]
+
+An example with two proxy hops:
+
+.. code-block:: json
+
+  [{"by":["http://frontend.lyft.com"],"hash":"468ed33be74eee6556d90c0149c1309e","uri":["http://testclient.lyft.com"]},{"by":["http://backend.lyft.com"],"hash":"9ba61d6425303443c0748a02dd8de688","uri":["http://frontend.lyft.com"]}]
+
+Format auto-detection when appending
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When ``forward_client_cert_details`` is ``APPEND_FORWARD`` and the request already has an XFCC
+header, the format of the existing header value is auto-detected rather than using the configured
+format. This prevents mixing text and JSON formats in the same header value. The detection is
+heuristic: if the existing value starts with ``[`` and ends with ``]``, it is treated as a JSON
+array and the new entry is appended as a new object within that array. Otherwise, the existing value
+is treated as text and the new entry is appended using the text format with a ``,`` delimiter.
+
+The configured format is only used when there is no existing XFCC header value (either because the
+mode is ``SANITIZE_SET``, which always replaces the value, or because the mode is ``APPEND_FORWARD``
+and no prior XFCC header was present).
+
 How Envoy processes XFCC is specified by the
-:ref:`forward_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
-and the
-:ref:`set_current_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`
+:ref:`forward_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`,
+the
+:ref:`set_current_client_cert_details<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`,
 HTTP connection manager options. If ``forward_client_cert_details`` is unset, the XFCC header will be sanitized by
 default.
 
@@ -481,6 +536,46 @@ The ``x-forwarded-proto`` header will be used by Envoy over ``:scheme`` where th
 encryption is wanted, for example clearing default ports based on ``x-forwarded-proto``. See
 :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
 
+Inferring x-forwarded-proto from PROXY protocol destination port
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When Envoy is deployed behind a Layer 4 load balancer (such as AWS NLB) that terminates TLS and
+forwards traffic using PROXY protocol, Envoy receives unencrypted traffic but needs to know the
+original protocol for correct redirect behavior and routing decisions.
+
+The :ref:`forward_proto_config
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_proto_config>`
+configuration option allows specifying which destination ports should be treated as HTTPS or HTTP.
+When configured:
+
+1. If the connection's local address was restored from PROXY protocol (indicated by the
+   :ref:`proxy_protocol <config_listener_filters_proxy_protocol>` listener filter)
+2. And the destination port is in ``https_destination_ports``, ``x-forwarded-proto`` is set to ``https``
+3. Or if the destination port is in ``http_destination_ports``, ``x-forwarded-proto`` is set to ``http``
+
+If the port is not in either list or the address was not restored from PROXY protocol, the behavior
+falls back to using the current connection's TLS status.
+
+Example configuration:
+
+.. code-block:: yaml
+
+  http_connection_manager:
+    forward_proto_config:
+      https_destination_ports: [443, 8443]
+      http_destination_ports: [80, 8080]
+
+This is particularly useful for the following deployment pattern:
+
+.. code-block:: text
+
+  Client (HTTPS:443) → L4 Load Balancer (TLS termination) → PROXY protocol → Envoy (HTTP)
+
+In this scenario, without this configuration, Envoy would set ``x-forwarded-proto: http`` because
+it sees an unencrypted connection. With ``https_destination_ports`` configured to include 443,
+Envoy correctly sets ``x-forwarded-proto: https`` based on the original destination port from the
+PROXY protocol header.
+
 .. _config_http_conn_man_headers_x-envoy-local-overloaded:
 
 x-envoy-local-overloaded
@@ -515,6 +610,39 @@ following features are available:
 
 See the architecture overview on
 :ref:`context propagation <arch_overview_tracing_context_propagation>` for more information.
+
+.. note::
+
+ Three configuration settings control ``x-request-id`` generation and preservation:
+
+ :ref:`generate_request_id <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.generate_request_id>`
+  When ``true`` (the default), Envoy generates a new ``x-request-id`` for requests that
+  do not already have one. When ``false``, the entire request ID generation and mutation
+  logic is skipped. Disabling this can reduce overhead in high-throughput scenarios where
+  request ID tracking is not needed.
+
+ :ref:`use_remote_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
+  When ``true``, Envoy uses the downstream connection's remote address to determine whether
+  a request is an *edge request* (i.e., from an external client). For edge requests, Envoy
+  replaces any existing ``x-request-id`` with a newly generated value by default. When
+  ``false`` (the default), requests are never treated as edge requests, so any existing
+  ``x-request-id`` is preserved.
+
+ :ref:`preserve_external_request_id <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.preserve_external_request_id>`
+  When ``true``, Envoy keeps an existing ``x-request-id`` on edge requests rather than
+  replacing it. This setting only has an effect when ``use_remote_address`` is ``true``,
+  since edge requests cannot occur otherwise.
+
+ The resulting behavior is:
+
+ * **No ``x-request-id`` in the request** -- Envoy generates a new UUID (if
+   ``generate_request_id`` is enabled).
+ * **``x-request-id`` present, non-edge request** (``use_remote_address`` is ``false``, or
+   the downstream address is internal) -- Envoy preserves the existing value.
+ * **``x-request-id`` present, edge request, ``preserve_external_request_id`` is ``false``**
+   -- Envoy replaces the value with a new UUID.
+ * **``x-request-id`` present, edge request, ``preserve_external_request_id`` is ``true``**
+   -- Envoy preserves the existing value.
 
 .. _config_http_conn_man_headers_x-ot-span-context:
 
@@ -637,6 +765,28 @@ The ``x-amzn-trace-id`` HTTP header is used by the AWS X-Ray tracer in Envoy. Th
 parent ID and sampling decision are added to HTTP requests in the tracing header. See more on AWS X-Ray tracing
 `here <https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html#xray-concepts-tracingheader>`__.
 
+.. _config_http_conn_man_headers_traceparent:
+
+traceparent
+-----------
+
+The ``traceparent`` HTTP header is used for W3C trace context propagation. It contains version, trace ID,
+parent ID, and trace flags in a standardized format. This header is supported by the Zipkin tracer when
+``trace_context_option`` is set to ``USE_B3_WITH_W3C_PROPAGATION``. In this mode, the tracer will extract
+from W3C headers as fallback when B3 headers are not present, and inject both B3 and W3C headers for
+upstream requests. See more on W3C Trace Context `here <https://www.w3.org/TR/trace-context/#traceparent-header>`__.
+
+.. _config_http_conn_man_headers_tracestate:
+
+tracestate
+----------
+
+The ``tracestate`` HTTP header is used for W3C trace context propagation. It carries vendor-specific trace
+identification data as a set of name/value pairs. This header is supported by the Zipkin tracer when
+``trace_context_option`` is set to ``USE_B3_WITH_W3C_PROPAGATION``. In this mode, the tracer will extract
+from W3C headers as fallback when B3 headers are not present, and inject both B3 and W3C headers for
+upstream requests. See more on W3C Trace Context `here <https://www.w3.org/TR/trace-context/#tracestate-header>`__.
+
 .. _config_http_conn_man_headers_custom_request_headers:
 
 Custom request/response headers
@@ -680,7 +830,7 @@ headers are modified before the request is sent upstream and the response is not
 
 .. attention::
 
-  The following legacy header formatters are still supported, but will be deprecated in the future.
+  The following legacy header formatters are deprecated and will be removed soon.
   The equivalent information can be accessed using indicated substitutes.
 
   ``%DYNAMIC_METADATA(["namespace", "key", ...])%``

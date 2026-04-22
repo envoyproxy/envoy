@@ -3,12 +3,15 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/server/overload/load_shed_point.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "source/common/singleton/const_singleton.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -39,16 +42,20 @@ public:
   // Overload action to reset streams using excessive memory.
   const std::string ResetStreams = "envoy.overload_actions.reset_high_memory_stream";
 
+  // Overload action to terminate idle downstream HTTP connections.
+  const std::string CloseIdleHttpConnections = "envoy.overload_actions.close_idle_http_connections";
+
   // This should be kept current with the Overload actions available.
   // This is the last member of this class to duplicating the strings with
   // proper lifetime guarantees.
-  const std::array<absl::string_view, 7> WellKnownActions = {StopAcceptingRequests,
+  const std::array<absl::string_view, 8> WellKnownActions = {StopAcceptingRequests,
                                                              DisableHttpKeepAlive,
                                                              StopAcceptingConnections,
                                                              RejectIncomingConnections,
                                                              ShrinkHeap,
                                                              ReduceTimeouts,
-                                                             ResetStreams};
+                                                             ResetStreams,
+                                                             CloseIdleHttpConnections};
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
@@ -106,6 +113,13 @@ public:
    * about overload state changes.
    */
   virtual void stop() PURE;
+
+  /**
+   * Get the configuration for the ShrinkHeap overload action.
+   * @return optional config, empty if no ShrinkHeap action is configured or has no typed_config.
+   */
+  virtual absl::optional<envoy::config::overload::v3::ShrinkHeapConfig>
+  getShrinkHeapConfig() const PURE;
 };
 
 } // namespace Server

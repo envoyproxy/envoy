@@ -24,8 +24,7 @@ class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBas
                                            public Envoy::Singleton::Instance,
                                            public MetadataFetcher::MetadataReceiver {
 public:
-  InstanceProfileCredentialsProvider(Api::Api& api,
-                                     Server::Configuration::ServerFactoryContext& context,
+  InstanceProfileCredentialsProvider(Server::Configuration::ServerFactoryContext& context,
                                      AwsClusterManagerPtr aws_cluster_manager,
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,

@@ -133,7 +133,7 @@ An assessment of a robust security posture for an extension is subject to the fo
 * Does the extension have active [CODEOWNERS](CODEOWNERS) who are willing to
   vouch for the robustness of the extension?
 * Is the extension absent a [low coverage
-  exception](https://github.com/envoyproxy/envoy/blob/main/test/per_file_coverage.sh#L5)?
+  exception](https://github.com/envoyproxy/envoy/blob/main/test/coverage.yaml)?
 
 The current stability and security posture of all extensions can be seen
 [here](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions).

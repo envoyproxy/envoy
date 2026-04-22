@@ -27,12 +27,12 @@ struct FilterStats {
 struct UntypedMetadataEntry {
   bool allow_overwrite{};
   std::string metadata_namespace;
-  ProtobufWkt::Struct value;
+  Protobuf::Struct value;
 };
 struct TypedMetadataEntry {
   bool allow_overwrite{};
   std::string metadata_namespace;
-  ProtobufWkt::Any value;
+  Protobuf::Any value;
 };
 class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
                public Logger::Loggable<Logger::Id::config> {

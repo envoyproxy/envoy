@@ -14,7 +14,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace RoundRobin {
 namespace {
 
@@ -127,6 +127,6 @@ TEST_P(RoundRobinIntegrationTest, NormalLoadBalancingWithLegacyAPI) {
 
 } // namespace
 } // namespace RoundRobin
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

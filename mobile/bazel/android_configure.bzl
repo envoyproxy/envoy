@@ -20,7 +20,7 @@ def _android_autoconf_impl(repository_ctx):
     sdk_rule = ""
     if sdk_home:
         sdk_rule = """
-    native.android_sdk_repository(
+    android_sdk_repository(
         name="androidsdk",
         path="{}",
         api_level={},
@@ -43,14 +43,20 @@ def _android_autoconf_impl(repository_ctx):
     if ndk_rule == "" and sdk_rule == "":
         sdk_rule = "pass"
 
+    loads = ""
+    if sdk_rule != "" and sdk_rule != "pass":
+        loads += 'load("@rules_android//android:rules.bzl", "android_sdk_repository")\n'
+    if ndk_rule != "":
+        loads += 'load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")'
+
     repository_ctx.file("BUILD.bazel", "")
     repository_ctx.file("android_configure.bzl", """
-load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
+{}
 
 def android_workspace():
     {}
     {}
-    """.format(sdk_rule, ndk_rule))
+    """.format(loads, sdk_rule, ndk_rule))
 
 android_configure = repository_rule(
     implementation = _android_autoconf_impl,

@@ -23,9 +23,7 @@ public:
   int count() { return count_; };
 
 private:
-  void emitLog(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&) override {
-    count_++;
-  }
+  void emitLog(const Formatter::Context&, const StreamInfo::StreamInfo&) override { count_++; }
 
   int count_ = 0;
 };

@@ -38,7 +38,7 @@ TEST(FactoryTest, FactoryTest) {
   ProtoHeaderMutation proto_mutation;
   TestUtility::loadFromYaml(config, proto_mutation);
 
-  ProtobufWkt::Any any_config;
+  Protobuf::Any any_config;
   any_config.PackFrom(proto_mutation);
 
   EXPECT_NE(nullptr, factory->createExtension(any_config, context));

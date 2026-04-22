@@ -116,8 +116,9 @@ void HotRestartImpl::drainParentListeners() {
   shmem_->flags_ &= ~SHMEM_FLAGS_INITIALIZING;
 }
 
-int HotRestartImpl::duplicateParentListenSocket(const std::string& address, uint32_t worker_index) {
-  return as_child_.duplicateParentListenSocket(address, worker_index);
+int HotRestartImpl::duplicateParentListenSocket(const std::string& address, uint32_t worker_index,
+                                                absl::string_view network_namespace) {
+  return as_child_.duplicateParentListenSocket(address, worker_index, network_namespace);
 }
 
 void HotRestartImpl::registerUdpForwardingListener(
@@ -161,6 +162,10 @@ void HotRestartImpl::shutdown() {
 
 uint32_t HotRestartImpl::baseId() { return base_id_; }
 std::string HotRestartImpl::version() { return hotRestartVersion(); }
+
+bool HotRestartImpl::isInitializing() const {
+  return (shmem_->flags_.load() & SHMEM_FLAGS_INITIALIZING) != 0;
+}
 
 std::string HotRestartImpl::hotRestartVersion() {
   return fmt::format("{}.{}", HOT_RESTART_VERSION, sizeof(SharedMemory));

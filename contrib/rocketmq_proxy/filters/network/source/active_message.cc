@@ -206,7 +206,7 @@ void ActiveMessage::onQueryTopicRoute() {
     }
     ENVOY_LOG(trace, "Prepare TopicRouteData for {} OK", topic_name);
     TopicRouteData topic_route_data(std::move(queue_data_list), std::move(broker_data_list));
-    ProtobufWkt::Struct data_struct;
+    Protobuf::Struct data_struct;
     topic_route_data.encode(data_struct);
     std::string json = MessageUtil::getJsonStringFromMessageOrError(data_struct);
     ENVOY_LOG(trace, "Serialize TopicRouteData for {} OK:\n{}", cluster_name, json);

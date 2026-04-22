@@ -1,9 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
-
-envoy_py_namespace()
 
 exports_files([
     "gen_git_sha.sh",

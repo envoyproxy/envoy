@@ -10,6 +10,8 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/codes.h"
+#include "source/common/http/utility.h"
+#include "source/common/router/retry_policy_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
@@ -32,6 +34,8 @@ const Http::HeaderMap& lengthZeroHeader() {
 }
 
 // Static response used for creating authorization ERROR responses.
+// Note: status_code is left unset so the filter can use the configured status_on_error
+// configuration.
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
                                             UnsafeHeaderVector{},
@@ -41,12 +45,20 @@ const Response& errorResponse() {
                                             UnsafeHeaderVector{},
                                             UnsafeHeaderVector{},
                                             UnsafeHeaderVector{},
+                                            false,
                                             {{}},
                                             Http::Utility::QueryParamsVector{},
                                             {},
                                             EMPTY_STRING,
-                                            Http::Code::Forbidden,
-                                            ProtobufWkt::Struct{}});
+                                            static_cast<Http::Code>(0),
+                                            Protobuf::Struct{}});
+}
+
+// Static matcher that never matches anything. Used for matchers that are not applicable
+// in certain response contexts (e.g., upstream headers for denied responses).
+const MatcherSharedPtr& neverMatchingMatcher() {
+  CONSTRUCT_ON_FIRST_USE(MatcherSharedPtr, std::make_shared<HeaderKeyMatcher>(
+                                               std::vector<Matchers::StringMatcherPtr>{}));
 }
 
 // SuccessResponse used for creating either DENIED or OK authorization responses.
@@ -105,6 +117,41 @@ absl::StatusOr<std::string> validatePathPrefix(absl::string_view path_prefix) {
   return std::string(path_prefix);
 }
 
+absl::StatusOr<std::string> validatePathOverride(absl::string_view path_override) {
+  if (!path_override.empty() && path_override[0] != '/') {
+    return absl::InvalidArgumentError("path_override should start with \"/\".");
+  }
+  return std::string(path_override);
+}
+
+absl::Status validateOnlyOneOfPathPrefixOrOverride(absl::string_view path_prefix,
+                                                   absl::string_view path_override) {
+  if (!path_prefix.empty() && !path_override.empty()) {
+    return absl::InvalidArgumentError(
+        "Only one of path_prefix or path_override may be set, not both.");
+  }
+  return absl::OkStatus();
+}
+
+absl::StatusOr<Router::RetryPolicyConstSharedPtr>
+createRetryPolicy(const envoy::config::core::v3::RetryPolicy& core_retry_policy,
+                  Server::Configuration::CommonFactoryContext& context) {
+  // Convert core retry policy to route retry policy and create the implementation.
+  // By default when runtime flag is true, pass empty string to respect user's configured
+  // retry_on, not override it. When flag is false, use hardcoded defaults for backwards
+  // compatibility.
+  const std::string default_retry_on =
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_authz_http_client_retries_respect_user_retry_on")
+          ? ""
+          : "5xx,gateway-error,connect-failure,reset";
+  envoy::config::route::v3::RetryPolicy route_retry_policy =
+      Http::Utility::convertCoreToRouteRetryPolicy(core_retry_policy, default_retry_on);
+
+  return Router::RetryPolicyImpl::create(route_retry_policy, context.messageValidationVisitor(),
+                                         context);
+}
+
 } // namespace
 
 // Config
@@ -125,13 +172,57 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           context)),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(THROW_OR_RETURN_VALUE(validatePathPrefix(path_prefix), std::string)),
+      path_override_(THROW_OR_RETURN_VALUE(
+          validatePathOverride(config.http_service().path_override()), std::string)),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(
               config.http_service().authorization_request().headers_to_add(),
               envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
           Router::HeaderParserPtr)),
-      encode_raw_headers_(config.encode_raw_headers()) {}
+      encode_raw_headers_(config.encode_raw_headers()),
+      retry_policy_(config.http_service().has_retry_policy()
+                        ? THROW_OR_RETURN_VALUE(
+                              createRetryPolicy(config.http_service().retry_policy(), context),
+                              Router::RetryPolicyConstSharedPtr)
+                        : nullptr) {
+  THROW_IF_NOT_OK(
+      validateOnlyOneOfPathPrefixOrOverride(path_prefix, config.http_service().path_override()));
+}
+
+ClientConfig::ClientConfig(
+    const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
+    bool encode_raw_headers, uint32_t timeout, Server::Configuration::CommonFactoryContext& context)
+    : client_header_matchers_(toClientMatchers(
+          http_service.authorization_response().allowed_client_headers(), context)),
+      client_header_on_success_matchers_(toClientMatchersOnSuccess(
+          http_service.authorization_response().allowed_client_headers_on_success(), context)),
+      to_dynamic_metadata_matchers_(toDynamicMetadataMatchers(
+          http_service.authorization_response().dynamic_metadata_from_headers(), context)),
+      upstream_header_matchers_(toUpstreamMatchers(
+          http_service.authorization_response().allowed_upstream_headers(), context)),
+      upstream_header_to_append_matchers_(toUpstreamMatchers(
+          http_service.authorization_response().allowed_upstream_headers_to_append(), context)),
+      cluster_name_(http_service.server_uri().cluster()), timeout_(timeout),
+      path_prefix_(
+          THROW_OR_RETURN_VALUE(validatePathPrefix(http_service.path_prefix()), std::string)),
+      path_override_(
+          THROW_OR_RETURN_VALUE(validatePathOverride(http_service.path_override()), std::string)),
+      tracing_name_(fmt::format("async {} egress", http_service.server_uri().cluster())),
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(
+              http_service.authorization_request().headers_to_add(),
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
+          Router::HeaderParserPtr)),
+      encode_raw_headers_(encode_raw_headers),
+      retry_policy_(
+          http_service.has_retry_policy()
+              ? THROW_OR_RETURN_VALUE(createRetryPolicy(http_service.retry_policy(), context),
+                                      Router::RetryPolicyConstSharedPtr)
+              : nullptr) {
+  THROW_IF_NOT_OK(validateOnlyOneOfPathPrefixOrOverride(http_service.path_prefix(),
+                                                        http_service.path_override()));
+}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -229,8 +320,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         continue;
       }
 
-      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+      if (key == Http::Headers::get().Path) {
+        if (!config_->pathOverride().empty()) {
+          headers->addCopy(key, config_->pathOverride());
+        } else if (!config_->pathPrefix().empty()) {
+          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.raw_value()));
+        } else {
+          headers->addCopy(key, header.raw_value());
+        }
       } else {
         headers->addCopy(key, header.raw_value());
       }
@@ -244,8 +341,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
         continue;
       }
 
-      if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+      if (key == Http::Headers::get().Path) {
+        if (!config_->pathOverride().empty()) {
+          headers->addCopy(key, config_->pathOverride());
+        } else if (!config_->pathPrefix().empty()) {
+          headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+        } else {
+          headers->addCopy(key, header.second);
+        }
       } else {
         headers->addCopy(key, header.second);
       }
@@ -279,6 +382,12 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setSampled(absl::nullopt);
 
     options.setSendXff(false);
+
+    // Apply retry policy if configured.
+    if (config_->retryPolicy() != nullptr) {
+      options.setRetryPolicy(config_->retryPolicy());
+      options.setBufferBodyForRetry(true);
+    }
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
@@ -361,20 +470,24 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                 UnsafeHeaderVector{},
                                 UnsafeHeaderVector{},
                                 UnsafeHeaderVector{},
+                                false,
                                 std::move(headers_to_remove),
                                 Http::Utility::QueryParamsVector{},
                                 {},
                                 EMPTY_STRING,
                                 Http::Code::OK,
-                                ProtobufWkt::Struct{}}};
+                                Protobuf::Struct{}}};
     return std::move(ok.response_);
   }
 
   // Create a Denied authorization response.
+  // For denied responses, only headers_to_set which is populated by the first matcher is
+  // used by the ext_authz filter when sending the local reply. The headers_to_add and
+  // response_headers_to_add fields are not used, so we pass a never-matching matcher.
   SuccessResponse denied{message->headers(),
                          config_->clientHeaderMatchers(),
-                         config_->upstreamHeaderToAppendMatchers(),
-                         config_->clientHeaderOnSuccessMatchers(),
+                         neverMatchingMatcher(),
+                         neverMatchingMatcher(),
                          config_->dynamicMetadataMatchers(),
                          Response{CheckStatus::Denied,
                                   UnsafeHeaderVector{},
@@ -384,12 +497,13 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                   UnsafeHeaderVector{},
                                   UnsafeHeaderVector{},
                                   UnsafeHeaderVector{},
+                                  false,
                                   {{}},
                                   Http::Utility::QueryParamsVector{},
                                   {},
                                   message->bodyAsString(),
                                   static_cast<Http::Code>(status_code),
-                                  ProtobufWkt::Struct{}}};
+                                  Protobuf::Struct{}}};
   return std::move(denied.response_);
 }
 

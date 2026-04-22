@@ -52,8 +52,10 @@ public:
     const std::string& root_ca_cert =
         cert_chain.substr(cert_chain.rfind("-----BEGIN CERTIFICATE-----"));
     const std::string path_string("some_path");
+    const std::string cert_name("some_cert_name");
     ON_CALL(cert_validation_ctx_config_, caCert()).WillByDefault(ReturnRef(root_ca_cert));
     ON_CALL(cert_validation_ctx_config_, caCertPath()).WillByDefault(ReturnRef(path_string));
+    ON_CALL(cert_validation_ctx_config_, caCertName()).WillByDefault(ReturnRef(cert_name));
     ON_CALL(cert_validation_ctx_config_, trustChainVerification)
         .WillByDefault(Return(envoy::extensions::transport_sockets::tls::v3::
                                   CertificateValidationContext::VERIFY_TRUST_CHAIN));
@@ -161,8 +163,7 @@ public:
     EXPECT_CALL(*mock_context_config_, alpnProtocols()).WillRepeatedly(ReturnRef(alpn_));
     transport_socket_factory_ = *QuicServerTransportSocketFactory::create(
         true, listener_config_.listenerScope(),
-        std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_), ssl_context_manager_,
-        std::vector<std::string>{});
+        std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_), ssl_context_manager_);
     transport_socket_factory_->initialize();
     EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
   }
@@ -196,12 +197,14 @@ public:
         getDefaultTlsCertificateSelectorConfigFactory();
     ASSERT_TRUE(factory);
     ASSERT_EQ("envoy.tls.certificate_selectors.default", factory->name());
-    const ProtobufWkt::Any any;
-    absl::Status creation_status = absl::OkStatus();
-    auto tls_certificate_selector_factory_cb = factory->createTlsCertificateSelectorFactory(
-        any, factory_context_, ProtobufMessage::getNullValidationVisitor(), creation_status, true);
+    const Protobuf::Any any;
+
+    Server::Configuration::MockGenericFactoryContext ctx;
+    ON_CALL(ctx, serverFactoryContext()).WillByDefault(ReturnRef(factory_context_));
+    auto tls_certificate_selector_factory_cb =
+        factory->createTlsCertificateSelectorFactory(any, ctx, *mock_context_config_, true);
     EXPECT_CALL(*mock_context_config_, tlsCertificateSelectorFactory())
-        .WillRepeatedly(Return(tls_certificate_selector_factory_cb));
+        .WillRepeatedly(ReturnRef(*tls_certificate_selector_factory_cb.value()));
 
     EXPECT_CALL(*mock_context_config_, isReady()).WillRepeatedly(Return(true));
     std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
@@ -209,6 +212,7 @@ public:
     EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
     EXPECT_CALL(tls_cert_config_, pkcs12()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, certificateChainPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+    EXPECT_CALL(tls_cert_config_, certificateName()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, privateKeyMethod()).WillRepeatedly(Return(nullptr));
     EXPECT_CALL(tls_cert_config_, privateKeyPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, password()).WillRepeatedly(ReturnRef(EMPTY_STRING));

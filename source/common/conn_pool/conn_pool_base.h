@@ -3,6 +3,7 @@
 #include "envoy/common/conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -71,7 +72,9 @@ public:
   virtual void initializeReadFilters() PURE;
 
   // Closes the underlying connection.
-  virtual void close() PURE;
+  virtual void
+  close(Envoy::Network::ConnectionCloseType type = Envoy::Network::ConnectionCloseType::NoFlush,
+        absl::string_view details = "") PURE;
   // Returns the ID of the underlying connection.
   virtual uint64_t id() const PURE;
   // Returns true if this closed with an incomplete stream, for stats tracking/ purposes.
@@ -183,7 +186,8 @@ public:
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   Upstream::ClusterConnectivityState& state);
+                   Upstream::ClusterConnectivityState& state,
+                   Server::OverloadManager& overload_manager);
   virtual ~ConnPoolImplBase();
 
   void deleteIsPendingImpl();
@@ -323,6 +327,7 @@ protected:
     ShouldNotConnect,
     NoConnectionRateLimited,
     CreatedButRateLimited,
+    LoadShed,
   };
   // Creates up to 3 connections, based on the preconnect ratio.
   // Returns the ConnectionResult of the last attempt.
@@ -415,6 +420,7 @@ private:
 
   Event::SchedulableCallbackPtr upstream_ready_cb_;
   Common::DebugRecursionChecker recursion_checker_;
+  Server::LoadShedPoint* create_new_connection_load_shed_{nullptr};
 };
 
 } // namespace ConnectionPool

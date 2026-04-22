@@ -40,7 +40,7 @@ public:
   std::string name() const override { return "envoy.tracers.sample"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 };
 
@@ -66,7 +66,7 @@ TEST_F(TracerManagerImplTest, ShouldReturnWhenNoTracingProviderHasBeenConfigured
 TEST_F(TracerManagerImplTest, ShouldUseProperTracerFactory) {
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("envoy.tracers.sample");
-  tracing_config.mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
+  tracing_config.mutable_typed_config()->PackFrom(Protobuf::Struct());
 
   auto tracer = tracer_manager_.getOrCreateTracer(&tracing_config);
 
@@ -120,7 +120,7 @@ TEST_F(TracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
 TEST_F(TracerManagerImplTest, ShouldFailIfTracerProviderIsUnknown) {
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("invalid");
-  tracing_config.mutable_typed_config()->PackFrom(ProtobufWkt::Value());
+  tracing_config.mutable_typed_config()->PackFrom(Protobuf::Value());
 
   EXPECT_THROW_WITH_MESSAGE(tracer_manager_.getOrCreateTracer(&tracing_config), EnvoyException,
                             "Didn't find a registered implementation for 'invalid' "
@@ -132,7 +132,7 @@ TEST_F(TracerManagerImplTest, ShouldFailIfProviderSpecificConfigIsNotValid) {
   tracing_config.set_name("envoy.tracers.sample");
   tracing_config.mutable_typed_config()->PackFrom(ValueUtil::stringValue("value"));
 
-  ProtobufWkt::Any expected_any_proto;
+  Protobuf::Any expected_any_proto;
   expected_any_proto.PackFrom(ValueUtil::stringValue("value"));
   EXPECT_THROW_WITH_MESSAGE(tracer_manager_.getOrCreateTracer(&tracing_config), EnvoyException,
                             "Didn't find a registered implementation for 'envoy.tracers.sample' "

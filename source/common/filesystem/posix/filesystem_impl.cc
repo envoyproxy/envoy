@@ -1,3 +1,5 @@
+#include "source/common/filesystem/filesystem_impl.h"
+
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -16,7 +18,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-#include "source/common/filesystem/filesystem_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
@@ -55,7 +56,7 @@ Api::IoCallBoolResult FileImplPosix::open(FlagSet in) {
     return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
   }
   const auto flags_and_mode = translateFlag(in);
-  fd_ = ::open(path().c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
+  fd_ = ::open(filepath_and_type_.path_.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
   return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
 }
 
@@ -67,8 +68,8 @@ Api::IoCallBoolResult TmpFileImplPosix::open(FlagSet in) {
   const auto flags_and_mode = translateFlag(in);
 #ifdef O_TMPFILE
   // Try to create a temp file with no name. Only some file systems support this.
-  fd_ =
-      ::open(path().c_str(), (flags_and_mode.flags_ & ~O_CREAT) | O_TMPFILE, flags_and_mode.mode_);
+  fd_ = ::open(filepath_and_type_.path_.c_str(), (flags_and_mode.flags_ & ~O_CREAT) | O_TMPFILE,
+               flags_and_mode.mode_);
   if (fd_ != -1) {
     return resultSuccess(true);
   }
@@ -331,6 +332,19 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   // symlinks at all. To avoid lots of platform, specifics, we allowlist
   // /dev/fd/* _before_ resolving the canonical path.
   if (absl::StartsWith(path, "/dev/fd/")) {
+    return false;
+  }
+
+  // Allow access to cgroup-related /proc and /sys files for container-aware CPU detection.
+  // These are read-only system files that provide resource limit information.
+  // Whitelisted paths:
+  //   - /proc/self/'mountinfo': Discovers cgroup filesystem mount points
+  //   - /proc/self/cgroup: Determines process cgroup assignments
+  //   - /sys/fs/cgroup/*: Reads cgroup v1 and v2 CPU limit files
+  //     - v2: /sys/fs/cgroup/*/cpu.max
+  //     - v1: /sys/fs/cgroup/cpu/*/cpu.'cfs'_quota_us and cpu.'cfs'_period_us
+  if (path == "/proc/self/mountinfo" || path == "/proc/self/cgroup" ||
+      absl::StartsWith(path, "/sys/fs/cgroup/")) {
     return false;
   }
 

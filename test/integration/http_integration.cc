@@ -32,9 +32,9 @@
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 #endif
 
+#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
-#include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
@@ -297,8 +297,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   }
 
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
-      timeSystem())};
+      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
   // in-connection version negotiation.
   auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
@@ -324,7 +323,7 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         const envoy::config::bootstrap::v3::Bootstrap& config)
     : HttpIntegrationTest::HttpIntegrationTest(
           downstream_protocol,
           [version](int) {
@@ -336,7 +335,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         const envoy::config::bootstrap::v3::Bootstrap& config)
     : BaseIntegrationTest(upstream_address_fn, version, config),
       downstream_protocol_(downstream_protocol), quic_stat_names_(stats_store_.symbolTable()) {
   // Legacy integration tests expect the default listener to be named "http" for
@@ -404,7 +403,7 @@ void HttpIntegrationTest::initialize() {
   // Needs to outlive all QUIC connections.
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   auto quic_connection_persistent_info =
-      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster);
+      Quic::createPersistentQuicInfoForCluster(*dispatcher_, *cluster, server_factory_context_);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
@@ -423,17 +422,6 @@ void HttpIntegrationTest::initialize() {
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
-}
-
-void HttpIntegrationTest::setupHttp1ImplOverrides(Http1ParserImpl http1_implementation) {
-  switch (http1_implementation) {
-  case Http1ParserImpl::HttpParser:
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_use_balsa_parser", "false");
-    break;
-  case Http1ParserImpl::BalsaParser:
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_use_balsa_parser", "true");
-    break;
-  }
 }
 
 void HttpIntegrationTest::setupHttp2ImplOverrides(Http2Impl http2_implementation) {
@@ -1476,6 +1464,14 @@ void HttpIntegrationTest::testLargeResponseHeaders(uint32_t size, uint32_t count
   // exceed `size` due to the keys and other headers. The actual request header count will exceed
   // `count` by four due to default headers.
 
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) -> void {
+    // Disable route timeout to prevent 504 on slow CI (#44416).
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+    route->mutable_timeout()->set_seconds(0);
+  });
+
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
@@ -1819,13 +1815,6 @@ std::string HttpIntegrationTest::upstreamProtocolStatsRoot() const {
   return "invalid";
 }
 
-std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
-  if (version_ == Network::Address::IpVersion::v4) {
-    return "listener.127.0.0.1_0." + stat_name;
-  }
-  return "listener.[__1]_0." + stat_name;
-}
-
 void HttpIntegrationTest::expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
                                                              BytesCountExpectation h2_expectation,
                                                              BytesCountExpectation h3_expectation,
@@ -1900,18 +1889,21 @@ void HttpIntegrationTest::expectDownstreamBytesSentAndReceived(BytesCountExpecta
 }
 
 void Http2RawFrameIntegrationTest::startHttp2Session() {
+  startHttp2Session(Http2Frame::makeEmptySettingsFrame());
+}
+
+void Http2RawFrameIntegrationTest::startHttp2Session(const Http2Frame& settings) {
   ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
 
-  // Send empty initial SETTINGS frame.
-  auto settings = Http2Frame::makeEmptySettingsFrame();
+  // Send initial SETTINGS frame.
   ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
 
   // Read initial SETTINGS frame from the server.
   readFrame();
 
-  // Send an SETTINGS ACK.
-  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
-  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
+  // Send a SETTINGS ACK.
+  auto settings_ack = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings_ack), false, false));
 
   // read pending SETTINGS and WINDOW_UPDATE frames
   readFrame();
@@ -1919,6 +1911,10 @@ void Http2RawFrameIntegrationTest::startHttp2Session() {
 }
 
 void Http2RawFrameIntegrationTest::beginSession() {
+  beginSession(Http2Frame::makeEmptySettingsFrame());
+}
+
+void Http2RawFrameIntegrationTest::beginSession(const Http2Frame& settings) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower outbound frame limits to make tests run faster
@@ -1930,7 +1926,7 @@ void Http2RawFrameIntegrationTest::beginSession() {
       envoy::config::core::v3::SocketOption::STATE_PREBIND,
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
   tcp_client_ = makeTcpConnection(lookupPort("http"), options);
-  startHttp2Session();
+  startHttp2Session(settings);
 }
 
 Http2Frame Http2RawFrameIntegrationTest::readFrame() {

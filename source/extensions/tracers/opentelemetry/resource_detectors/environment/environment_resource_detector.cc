@@ -30,8 +30,8 @@ Resource EnvironmentResourceDetector::detect() {
   std::string attributes_str = "";
 
   TRY_NEEDS_AUDIT {
-    attributes_str = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(ds, true, context_.serverFactoryContext().api()), std::string);
+    attributes_str =
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(ds, true, context_.api()), std::string);
   }
   END_TRY catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Failed to detect resource attributes from the environment: {}.", e.what());

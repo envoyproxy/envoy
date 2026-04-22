@@ -205,6 +205,8 @@ envoy_cc_test(
         "//source/common/stats:tag_producer_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:prometheus_stats_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:stats_utility_lib",
         "//test/test_common:utility_lib",
@@ -258,7 +260,11 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "config_dump_handler_test",
-    srcs = envoy_select_admin_functionality(["config_dump_handler_test.cc"]),
+    srcs = select({
+        "//bazel:disable_admin_functionality": [],
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["config_dump_handler_test.cc"],
+    }),
     rbe_pool = "6gig",
     deps = [
         ":admin_instance_lib",

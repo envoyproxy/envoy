@@ -38,7 +38,8 @@ GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
   if (header.empty()) {
     header = "Authorization";
   }
-  return std::make_shared<GenericCredentialInjector>(header, secret_reader);
+  return std::make_shared<GenericCredentialInjector>(header, config.header_value_prefix(),
+                                                     secret_reader);
 }
 
 /**

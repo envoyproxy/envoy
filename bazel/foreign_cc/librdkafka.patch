@@ -1,8 +1,35 @@
+diff --git a/mklove/Makefile.base b/mklove/Makefile.base
+index 91be4391..ee0952af 100755
+--- a/mklove/Makefile.base
++++ b/mklove/Makefile.base
+@@ -7,6 +7,22 @@ MKL_YELLOW?=	\033[033m
+ MKL_BLUE?=	\033[034m
+ MKL_CLR_RESET?=	\033[0m
+ 
++AR ?= ar
++RANLIB ?= ranlib
++
++ifdef EXT_BUILD_ROOT
++    ifneq ($(findstring /,$(AR)),)
++        ifeq ($(filter /%,$(AR)),)
++            AR := $(EXT_BUILD_ROOT)/$(AR)
++        endif
++    endif
++    ifneq ($(findstring /,$(RANLIB)),)
++        ifeq ($(filter /%,$(RANLIB)),)
++            RANLIB := $(EXT_BUILD_ROOT)/$(RANLIB)
++        endif
++    endif
++endif
++
+ DEPS=		$(OBJS:%.o=%.d)
+ 
+ # TOPDIR is "TOPDIR/mklove/../" i.e., TOPDIR.
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 33481ba1..681d0c5c 100644
+index bbe63cff..875189d6 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -66,7 +66,6 @@ set(
+@@ -76,7 +76,6 @@ set(
      tinycthread.c
      tinycthread_extra.c
      rdxxhash.c
@@ -11,10 +38,10 @@ index 33481ba1..681d0c5c 100644
  
  if(WITH_SSL)
 diff --git a/src/Makefile b/src/Makefile
-index 26df5723..69bdb427 100644
+index 0d0635ce..01ab9528 100644
 --- a/src/Makefile
 +++ b/src/Makefile
-@@ -43,7 +43,7 @@ SRCS=		rdkafka.c rdkafka_broker.c rdkafka_msg.c rdkafka_topic.c \
+@@ -46,7 +46,7 @@ SRCS=		rdkafka.c rdkafka_broker.c rdkafka_msg.c rdkafka_topic.c \
  		rdkafka_assignor.c rdkafka_range_assignor.c \
  		rdkafka_roundrobin_assignor.c rdkafka_sticky_assignor.c \
  		rdkafka_feature.c \
@@ -24,10 +51,10 @@ index 26df5723..69bdb427 100644
  		tinycthread.c tinycthread_extra.c \
  		rdlog.c rdstring.c rdkafka_event.c rdkafka_metadata.c \
 diff --git a/src/rdkafka.c b/src/rdkafka.c
-index 33147ccd..5ed33b29 100644
+index 656076df..b723ef92 100644
 --- a/src/rdkafka.c
 +++ b/src/rdkafka.c
-@@ -71,9 +71,6 @@
+@@ -74,9 +74,6 @@
  #include <sys/timeb.h>
  #endif
  
@@ -37,7 +64,7 @@ index 33147ccd..5ed33b29 100644
  #if WITH_CURL
  #include "rdhttp.h"
  #endif
-@@ -139,8 +136,6 @@ void rd_kafka_set_thread_sysname(const char *fmt, ...) {
+@@ -142,8 +139,6 @@ void rd_kafka_set_thread_sysname(const char *fmt, ...) {
  }
  
  static void rd_kafka_global_init0(void) {
@@ -46,7 +73,7 @@ index 33147ccd..5ed33b29 100644
          mtx_init(&rd_kafka_global_lock, mtx_plain);
  #if ENABLE_DEVEL
          rd_atomic32_init(&rd_kafka_op_cnt, 0);
-@@ -153,8 +148,6 @@ static void rd_kafka_global_init0(void) {
+@@ -156,8 +151,6 @@ static void rd_kafka_global_init0(void) {
          rd_kafka_ssl_init();
  #endif
  

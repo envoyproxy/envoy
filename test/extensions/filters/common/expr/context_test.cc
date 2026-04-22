@@ -183,6 +183,14 @@ TEST(Context, RequestAttributes) {
   }
 
   {
+    auto value = request[CelValue::CreateStringView(HeadersBytes)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    // this equals to total_size-size
+    EXPECT_EQ(160, value.value().Int64OrDie());
+  }
+
+  {
     auto value = request[CelValue::CreateStringView(Headers)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMap());
@@ -386,6 +394,14 @@ TEST(Context, ResponseAttributes) {
   }
 
   {
+    auto value = response[CelValue::CreateStringView(HeadersBytes)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    // this equals to total_size-size
+    EXPECT_EQ(12, value.value().Int64OrDie());
+  }
+
+  {
     auto value = response[CelValue::CreateStringView(Headers)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMap());
@@ -522,6 +538,9 @@ TEST(Context, ConnectionFallbackAttributes) {
 
 TEST(Context, ConnectionAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info(
+      new NiceMock<Upstream::MockClusterInfo>());
+  info.upstream_cluster_info_ = cluster_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -565,6 +584,7 @@ TEST(Context, ConnectionAttributes) {
   info.setAttemptCount(upstream_request_attempt_count);
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*upstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
   EXPECT_CALL(*upstream_host, locality()).WillRepeatedly(ReturnRef(upstream_locality));
 
@@ -599,6 +619,38 @@ TEST(Context, ConnectionAttributes) {
       .WillRepeatedly(ReturnRef(peer_certificate_digest));
   EXPECT_CALL(*upstream_ssl_info, sha256PeerCertificateDigest())
       .WillRepeatedly(ReturnRef(peer_certificate_digest));
+  const std::string peer_cert_pem =
+      "-----BEGIN CERTIFICATE-----\n"
+      "MIIEoTCCA4mgAwIBAgIUQRkh3sY/JN5+tu5NX3Tbyx0Y8mIwDQYJKoZIhvcNAQEL\n"
+      "BQAwdjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcM\n"
+      "DVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsMEEx5ZnQgRW5n\n"
+      "aW5lZXJpbmcxEDAOBgNVBAMMB1Rlc3QgQ0EwHhcNMjQwNDA4MTA0MjUzWhcNMjYw\n"
+      "NDA4MTA0MjUzWjCBqDELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWEx\n"
+      "FjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsM\n"
+      "EEx5ZnQgRW5naW5lZXJpbmcxGzAZBgNVBAMMElRlc3QgRnJvbnRlbmQgVGVhbTEl\n"
+      "MCMGCSqGSIb3DQEJARYWZnJvbnRlbmQtdGVhbUBseWZ0LmNvbTCCASIwDQYJKoZI\n"
+      "hvcNAQEBBQADggEPADCCAQoCggEBAKfEnhbPuNbkPue6HWQS6TJK48my/JEh+3vb\n"
+      "HVjiaMKe9ERxXW19xfFXHBCaB4dRrVTxrKlS3XivQkTck1P99s2YkCvDYUns9B4o\n"
+      "mUnjj/mdVL0OPgdu5mfAmgKB5BqD2psSt117FzIT9AnXQ80pSpQHmDrC5ZSEYkqb\n"
+      "FAOU5QTp7AA5NJMB7ZKbgjeohehLwG92G8tk4ARgB1M/615sVdz3vlbOsa4VLDKS\n"
+      "UbgnGRNiQoVFzSUHQhb6cl+/hDtW2q5nBGiHW3zeYIdCM718XUPlOnOj45Y+2E0d\n"
+      "XVM3txLXJ0huWylitiCtK0jBpy7kSI7Ubcaw1LhWuYrwO6S8bdECAwEAAaOB8zCB\n"
+      "8DAMBgNVHRMBAf8EAjAAMAsGA1UdDwQEAwIF4DAdBgNVHSUEFjAUBggrBgEFBQcD\n"
+      "AgYIKwYBBQUHAwEwdAYDVR0RBG0wa4Yfc3BpZmZlOi8vbHlmdC5jb20vZnJvbnRl\n"
+      "bmQtdGVhbYYYaHR0cDovL2Zyb250ZW5kLmx5ZnQuY29tgghseWZ0LmNvbYIMd3d3\n"
+      "Lmx5ZnQuY29thwQBAgMEhxAAAAABAAIAAwAAAAAAAAAEMB0GA1UdDgQWBBSS/zHJ\n"
+      "9Mtc3XtVgk7+VxF6kS1YDDAfBgNVHSMEGDAWgBQZ/nNEIOqmw8nxkUzZNY87irkj\n"
+      "AgDANBgkqhkiG9w0BAQsFAAOCAQEAnYBoTWYkhMMsr10lagEJOPMHK9EIz/h/W8Rc\n"
+      "r9DhREZA1+uEQrsFpzsqHhDqDEhjjmakU14VeNmTpZ+HUvDFY3YaAoZnXFYmg/6+\n"
+      "jtxLkzRjjtCIaEHRiiIS7xMw8wyhMcmoQY9mQNbyWonIVpykvYFf0h5fVo11BAv7\n"
+      "ELUKZeCqFJBifLdfME0cIub/PhoJfk/hM6X2lRUUe2wvtOP8Vd9wHfrzktJysSLI\n"
+      "TwHES7ftFo9+vYn5qM27PGW9TWPvCF2EFiUziqAoaZkP5YwiFEIY2N9uRFliXm1/\n"
+      "Jg3xZwtsjs+9jsVHQqKSUHivUR3s7NenUF8s3bOMtqkccaVcww==\n"
+      "-----END CERTIFICATE-----";
+  EXPECT_CALL(*downstream_ssl_info, pemEncodedPeerCertificate())
+      .WillRepeatedly(ReturnRef(peer_cert_pem));
+  EXPECT_CALL(*upstream_ssl_info, pemEncodedPeerCertificate())
+      .WillRepeatedly(ReturnRef(peer_cert_pem));
 
   {
     auto value = connection[CelValue::CreateStringView(Undefined)];
@@ -733,6 +785,13 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
+    auto value = connection[CelValue::CreateStringView(PeerCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(peer_cert_pem, value.value().StringOrDie().value());
+  }
+
+  {
     auto value = connection[CelValue::CreateStringView(ID)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsUint64());
@@ -817,6 +876,13 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
+    auto value = upstream[CelValue::CreateStringView(PeerCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(peer_cert_pem, value.value().StringOrDie().value());
+  }
+
+  {
     auto value = upstream[CelValue::CreateStringView(UpstreamLocalAddress)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
@@ -837,11 +903,33 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(*value.value().MessageOrDie(),
                                                            upstream_locality));
   }
+
+  {
+    cluster_info->endpoint_stats_.membership_total_.set(1);
+    auto value = upstream[CelValue::CreateStringView(UpstreamNumEndpoints)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(1, value.value().Uint64OrDie());
+  }
+
+  {
+    cluster_info->endpoint_stats_.membership_total_.set(0);
+    auto value = upstream[CelValue::CreateStringView(UpstreamNumEndpoints)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(0, value.value().Uint64OrDie());
+  }
+
+  {
+    info.upstream_cluster_info_ = nullptr;
+    auto value = upstream[CelValue::CreateStringView(UpstreamNumEndpoints)];
+    EXPECT_FALSE(value.has_value());
+  }
 }
 
 TEST(Context, FilterStateAttributes) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
-  ProtobufWkt::Arena arena;
+  Protobuf::Arena arena;
   FilterStateWrapper wrapper(arena, filter_state);
   auto status_or = wrapper.ListKeys(&arena);
   EXPECT_EQ(status_or.status().message(), "ListKeys() is not implemented");
@@ -874,7 +962,7 @@ TEST(Context, FilterStateAttributes) {
                               "type.googleapis.com/google.protobuf.DoubleValue",
                               StreamInfo::FilterState::LifeSpan::FilterChain);
   auto cel_state = std::make_shared<CelState>(prototype);
-  ProtobufWkt::DoubleValue v;
+  Protobuf::DoubleValue v;
   v.set_value(1.0);
   cel_state->setValue(v.SerializeAsString());
   EXPECT_TRUE(cel_state->serializeAsString().has_value());
@@ -922,14 +1010,18 @@ TEST(Context, XDSAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info(
       new NiceMock<Upstream::MockClusterInfo>());
-  EXPECT_CALL(info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+  info.upstream_cluster_info_ = cluster_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto host_metadata = std::make_shared<const envoy::config::core::v3::Metadata>();
+  auto locality_metadata = std::make_shared<const envoy::config::core::v3::Metadata>();
   EXPECT_CALL(*upstream_host, metadata()).WillRepeatedly(Return(host_metadata));
+  EXPECT_CALL(*upstream_host, localityMetadata()).WillRepeatedly(Return(locality_metadata));
   info.upstreamInfo()->setUpstreamHost(upstream_host);
   std::shared_ptr<NiceMock<Router::MockRoute>> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
+  info.route_ = route;
+  info.virtual_host_ = route->virtual_host_;
+
   const std::string chain_name = "fake_filter_chain_name";
 
   auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
@@ -980,13 +1072,19 @@ TEST(Context, XDSAttributes) {
     const auto value = wrapper[CelValue::CreateStringView(VirtualHostMetadata)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
-    EXPECT_EQ(&route->virtual_host_.metadata_, value.value().MessageOrDie());
+    EXPECT_EQ(&route->virtual_host_->metadata_, value.value().MessageOrDie());
   }
   {
     const auto value = wrapper[CelValue::CreateStringView(UpstreamHostMetadata)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
     EXPECT_EQ(host_metadata.get(), value.value().MessageOrDie());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(UpstreamHostLocalityMetadata)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
+    EXPECT_EQ(locality_metadata.get(), value.value().MessageOrDie());
   }
   {
     const auto value = wrapper[CelValue::CreateStringView(FilterChainName)];
@@ -1026,9 +1124,9 @@ TEST(Context, XDSAttributesEdgeCases) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info(
       new NiceMock<Upstream::MockClusterInfo>());
-  EXPECT_CALL(info, upstreamClusterInfo()).WillRepeatedly(Return(nullptr));
+  // cluster_info is declared but not set - upstreamClusterInfo() returns empty OptRef by default
   std::shared_ptr<NiceMock<Router::MockRoute>> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
+  info.route_ = route;
   info.downstream_connection_info_provider_->setListenerInfo(nullptr);
 
   Protobuf::Arena arena;
@@ -1204,18 +1302,36 @@ TEST(Context, ExtractSslInfoEmptyValues) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  auto upstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   const std::string sni_name = "kittens.com";
   info.downstream_connection_info_provider_->setRequestedServerName(sni_name);
   info.downstream_connection_info_provider_->setSslConnection(downstream_ssl_info);
+  info.upstreamInfo()->setUpstreamSslConnection(upstream_ssl_info);
 
   Protobuf::Arena arena;
   ConnectionWrapper connection(arena, info);
+  UpstreamWrapper upstream(arena, info);
   const std::string empty_str;
   EXPECT_CALL(*downstream_ssl_info, sha256PeerCertificateDigest())
       .WillRepeatedly(ReturnRef(empty_str));
 
   {
     auto value = connection[CelValue::CreateStringView(SHA256PeerCertificateDigest)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  // Test connection.peer_certificate when certificate is not presented
+  EXPECT_CALL(*downstream_ssl_info, pemEncodedPeerCertificate())
+      .WillRepeatedly(ReturnRef(empty_str));
+  {
+    auto value = connection[CelValue::CreateStringView(PeerCertificate)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  // Test upstream.peer_certificate when certificate is not presented
+  EXPECT_CALL(*upstream_ssl_info, pemEncodedPeerCertificate()).WillRepeatedly(ReturnRef(empty_str));
+  {
+    auto value = upstream[CelValue::CreateStringView(PeerCertificate)];
     EXPECT_FALSE(value.has_value());
   }
 }

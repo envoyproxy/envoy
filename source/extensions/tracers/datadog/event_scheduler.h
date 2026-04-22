@@ -5,6 +5,7 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "datadog/event_scheduler.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,7 +36,11 @@ public:
   Cancel schedule_recurring_event(std::chrono::steady_clock::duration interval,
                                   std::function<void()> callback) override;
 
-  nlohmann::json config_json() const override;
+  // Implementation of the required config() method from datadog::tracing::EventScheduler
+  std::string config() const override;
+
+  // Provides JSON configuration for debug logging.
+  const nlohmann::json& config_json() const;
 
 private:
   Event::Dispatcher& dispatcher_;

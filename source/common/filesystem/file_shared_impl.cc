@@ -23,7 +23,7 @@ std::string IoFileError::getErrorDetails() const { return errorDetails(errno_); 
 
 bool FileSharedImpl::isOpen() const { return fd_ != INVALID_HANDLE; };
 
-std::string FileSharedImpl::path() const { return filepath_and_type_.path_; };
+absl::string_view FileSharedImpl::path() const { return filepath_and_type_.path_; };
 
 DestinationType FileSharedImpl::destinationType() const { return filepath_and_type_.file_type_; };
 

@@ -33,7 +33,8 @@ private:
 
 } // namespace
 
-Span::Span(datadog::tracing::Span&& span) : span_(std::move(span)) {}
+Span::Span(datadog::tracing::Span&& span, bool use_local_decision)
+    : span_(std::move(span)), use_local_decision_(use_local_decision) {}
 
 const datadog::tracing::Optional<datadog::tracing::Span>& Span::impl() const { return span_; }
 

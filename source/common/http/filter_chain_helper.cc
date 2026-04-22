@@ -16,19 +16,21 @@ namespace Envoy {
 namespace Http {
 
 void FilterChainUtility::createFilterChainForFactories(
-    Http::FilterChainManager& manager, const FilterChainOptions& options,
-    const FilterFactoriesList& filter_factories) {
+    Http::FilterChainFactoryCallbacks& callbacks, const FilterFactoriesList& filter_factories) {
   bool added_missing_config_filter = false;
+
   for (const auto& filter_config_provider : filter_factories) {
+    absl::string_view filter_config_name = filter_config_provider.provider->name();
     // If this filter is disabled explicitly, skip trying to create it.
-    if (options.filterDisabled(filter_config_provider.provider->name())
-            .value_or(filter_config_provider.disabled)) {
+    if (callbacks.filterDisabled(filter_config_name).value_or(filter_config_provider.disabled)) {
       continue;
     }
 
     auto config = filter_config_provider.provider->config();
+
     if (config.has_value()) {
-      manager.applyFilterFactoryCb({filter_config_provider.provider->name()}, config.ref());
+      callbacks.setFilterConfigName(filter_config_name);
+      config.value()(callbacks);
       continue;
     }
 
@@ -36,7 +38,8 @@ void FilterChainUtility::createFilterChainForFactories(
     if (!added_missing_config_filter) {
       ENVOY_LOG(trace, "Missing filter config for a provider {}",
                 filter_config_provider.provider->name());
-      manager.applyFilterFactoryCb({}, MissingConfigFilterFactory);
+      callbacks.setFilterConfigName("");
+      MissingConfigFilterFactory(callbacks);
       added_missing_config_filter = true;
     } else {
       ENVOY_LOG(trace, "Provider {} missing a filter config",

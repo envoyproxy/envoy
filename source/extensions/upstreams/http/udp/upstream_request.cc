@@ -29,7 +29,7 @@ void UdpConnPool::newStream(Router::GenericConnectionPoolCallbacks* callbacks) {
   Envoy::Network::SocketPtr socket = createSocket(host_);
   auto source_address_selector = host_->cluster().getUpstreamLocalAddressSelector();
   auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(
-      host_->address(), /*socket_options=*/nullptr);
+      host_->address(), /*socket_options=*/nullptr, /*transport_socket_options=*/{});
   if (!Envoy::Network::Socket::applyOptions(upstream_local_address.socket_options_, *socket,
                                             envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
     callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
@@ -76,7 +76,7 @@ void UdpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     absl::string_view mem_slice(static_cast<const char*>(slice.mem_), slice.len_);
     if (!capsule_parser_.IngestCapsuleFragment(mem_slice)) {
-      ENVOY_LOG_MISC(error, "Capsule ingestion error occured: slice = {}", mem_slice);
+      ENVOY_LOG_MISC(error, "Capsule ingestion error occurred: slice = {}", mem_slice);
       break;
     }
   }

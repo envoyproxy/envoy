@@ -219,6 +219,10 @@ public:
     decoder_callbacks_->addDecodedData(data, is_streaming);
   }
 
+  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host_and_strict) {
+    decoder_callbacks_->setUpstreamOverrideHost(std::move(host_and_strict));
+  }
+
 private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
 };

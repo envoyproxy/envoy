@@ -45,11 +45,9 @@ message NetworkExternalProcessor {
   // prematurely with an error, the filter will fail, leading to the close of connection.
   // With this parameter set to true, however, then if the gRPC stream is prematurely closed
   // or could not be opened, processing continues without error.
-  // [#not-implemented-hide:]
   bool failure_mode_allow = 2;
 
   // Options for controlling processing behavior.
-  // [#not-implemented-hide:]
   ProcessingMode processing_mode = 3;
 
   // Specifies the timeout for each individual message sent on the stream and
@@ -57,7 +55,6 @@ message NetworkExternalProcessor {
   // the proxy sends a message on the stream that requires a response, it will
   // reset this timer, and will stop processing and return an error (subject
   // to the processing mode) if the timer expires. Default is 200 ms.
-  // [#not-implemented-hide:]
   google.protobuf.Duration message_timeout = 4 [(validate.rules).duration = {
     lte {seconds: 3600}
     gte {}

@@ -5,37 +5,50 @@ load(
     "envoy_cc_library",
     "envoy_contrib_package",
 )
+load(
+    "//contrib:all_contrib_extensions.bzl",
+    "envoy_contrib_linux_x86_64_constraints",
+)
 
 licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
+COMMON_ENV = {
+    "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd/lib",
+    "QAT_INCLUDE_PATH": "$$EXT_BUILD_DEPS/qatlib/include/qat",
+    "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
+}
+
+COMMON_CFLAGS = "-I$$EXT_BUILD_ROOT/external/numactl"
+
 make(
     name = "qat-zstd",
-    build_data = ["@com_github_qat_zstd//:all"],
+    build_data = ["@qat-zstd//:all"],
+    # Include the numa_archive genrule output so that libnuma.a is available
+    # for the linker to find with -lnuma.
+    data = ["//bazel/external:numa_archive"],
     env = select({
-        "//bazel:clang_build": {
-            "CFLAGS": "-Wno-error=unused-parameter -Wno-error=unused-command-line-argument -I$$EXT_BUILD_DEPS/qatlib/include -I$$EXT_BUILD_DEPS/zstd/include",
+        "//bazel:clang_build": COMMON_ENV | {
+            "CFLAGS": COMMON_CFLAGS + " -Wno-error=unused-parameter -Wno-error=unused-command-line-argument",
         },
-        "//conditions:default": {
-            "CFLAGS": "-I$$EXT_BUILD_DEPS/qatlib/include -I$$EXT_BUILD_DEPS/zstd/include",
+        "//conditions:default": COMMON_ENV | {
+            "CFLAGS": COMMON_CFLAGS,
         },
     }),
     includes = [],
-    lib_source = "@com_github_qat_zstd//:all",
+    lib_source = "@qat-zstd//:all",
     out_static_libs = ["libqatseqprod.a"],
     tags = ["skip_on_windows"],
-    target_compatible_with = [
-        "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
-    ],
+    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     targets = [
-        "ENABLE_USDM_DRV=1",
         "install",
     ],
     deps = [
-        "//bazel/foreign_cc:zstd",
         "//contrib/qat:qatlib",
+        "@zstd",
+        # numactl headers are needed for compilation
+        "@numactl//:numa",
     ],
 )
 

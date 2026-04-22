@@ -22,8 +22,10 @@ project-lifecycle:
   - github:adisuissa
   - github:agrawroh
   - github:botengyao
+  - github:jwendell
   - github:KBaichoo
   - github:keith
+  - github:krinkinmu
   - github:kyessenov
   - github:mathetake
   - github:nezdolik
@@ -31,6 +33,7 @@ project-lifecycle:
   - github:ravenblackx
   - github:tonya11en
   - github:tyxia
+  - github:yanjunxiang-google
 contribution-policy:
   accepts-pull-requests: true
   accepts-automated-pull-requests: true

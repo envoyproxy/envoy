@@ -24,10 +24,10 @@ class SkipActionFactory
     : public Matcher::ActionFactory<Envoy::Http::Matching::HttpFilterActionContext> {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
-                                                 Envoy::Http::Matching::HttpFilterActionContext&,
-                                                 ProtobufMessage::ValidationVisitor&) override {
-    return []() { return std::make_unique<SkipAction>(); };
+  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message&,
+                                             Envoy::Http::Matching::HttpFilterActionContext&,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    return std::make_shared<SkipAction>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
@@ -67,35 +67,6 @@ private:
   absl::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
 };
 
-struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallbacks {
-  DelegatingFactoryCallbacks(Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks,
-                             Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
-      : delegated_callbacks_(delegated_callbacks), match_tree_(match_tree) {}
-
-  Event::Dispatcher& dispatcher() override { return delegated_callbacks_.dispatcher(); }
-  void addStreamDecoderFilter(Envoy::Http::StreamDecoderFilterSharedPtr filter) override {
-    auto delegating_filter =
-        std::make_shared<DelegatingStreamFilter>(match_tree_, std::move(filter), nullptr);
-    delegated_callbacks_.addStreamDecoderFilter(std::move(delegating_filter));
-  }
-  void addStreamEncoderFilter(Envoy::Http::StreamEncoderFilterSharedPtr filter) override {
-    auto delegating_filter =
-        std::make_shared<DelegatingStreamFilter>(match_tree_, nullptr, std::move(filter));
-    delegated_callbacks_.addStreamEncoderFilter(std::move(delegating_filter));
-  }
-  void addStreamFilter(Envoy::Http::StreamFilterSharedPtr filter) override {
-    auto delegating_filter = std::make_shared<DelegatingStreamFilter>(match_tree_, filter, filter);
-    delegated_callbacks_.addStreamFilter(std::move(delegating_filter));
-  }
-
-  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
-    delegated_callbacks_.addAccessLogHandler(std::move(handler));
-  }
-
-  Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks_;
-  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
-};
-
 } // namespace Factory
 
 void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
@@ -105,7 +76,7 @@ void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
   }
 
   // If no match tree is set, interpret as a skip.
-  if (!has_match_tree_) {
+  if (match_tree_ == nullptr) {
     skip_filter_ = true;
     match_tree_evaluated_ = true;
     return;
@@ -114,14 +85,14 @@ void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
   ASSERT(matching_data_ != nullptr);
   data_update_func(*matching_data_);
 
-  const auto match_result =
+  const Matcher::ActionMatchResult match_result =
       Matcher::evaluateMatch<Envoy::Http::HttpMatchingData>(*match_tree_, *matching_data_);
 
-  match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
+  match_tree_evaluated_ = match_result.isComplete();
 
-  if (match_tree_evaluated_ && match_result.result_) {
-    const auto result = match_result.result_();
-    if ((result == nullptr) || (SkipAction().typeUrl() == result->typeUrl())) {
+  if (match_tree_evaluated_ && match_result.isMatch()) {
+    const auto& result = match_result.action();
+    if (result == nullptr || SkipAction().typeUrl() == result->typeUrl()) {
       skip_filter_ = true;
     } else {
       ASSERT(base_filter_ != nullptr);
@@ -275,6 +246,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           proto_config.extension_config());
+
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
       .stat_prefix_ = prefix,
@@ -292,6 +264,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::UpstreamHttpFilterConfigFactory>(
           proto_config.extension_config());
+
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = false,
       .stat_prefix_ = prefix,
@@ -341,7 +314,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   }
 
   return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    Factory::DelegatingFactoryCallbacks delegating_callbacks(callbacks, match_tree);
+    DelegatingFactoryCallbacks delegating_callbacks(callbacks, match_tree);
     return filter_factory(delegating_callbacks);
   };
 }
@@ -362,6 +335,10 @@ FilterConfigPerRoute::createFilterMatchTree(
       std::make_unique<envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
   requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
       envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance().GetTypeName()));
+  requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
+      envoy::type::matcher::v3::HttpResponseHeaderMatchInput::default_instance().GetTypeName()));
+  requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
+      envoy::type::matcher::v3::HttpResponseTrailerMatchInput::default_instance().GetTypeName()));
   requirements->mutable_data_input_allow_list()->add_type_url(TypeUtil::descriptorFullNameToTypeUrl(
       xds::type::matcher::v3::HttpAttributesCelMatchInput::default_instance().GetTypeName()));
   Envoy::Http::Matching::HttpFilterActionContext action_context{

@@ -1,3 +1,4 @@
+#include "envoy/extensions/filters/http/file_server/v3/file_server.pb.h"
 #include "envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.pb.h"
 #include "envoy/extensions/filters/http/grpc_json_reverse_transcoder/v3/transcoder.pb.h"
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
@@ -93,7 +94,7 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
       "type.googleapis.com/google.protobuf.Empty",
       "type.googleapis.com/google.api.HttpBody",
   };
-  ProtobufWkt::Any* mutable_any = mutable_data->mutable_proto_body()->mutable_message();
+  Protobuf::Any* mutable_any = mutable_data->mutable_proto_body()->mutable_message();
   const std::string& type_url = expected_types[choice % expected_types.size()];
   mutable_any->set_type_url(type_url);
 }
@@ -139,6 +140,18 @@ void cleanFileSystemBufferConfig(Protobuf::Message* message) {
   }
 }
 
+void cleanFileServerConfig(Protobuf::Message* message) {
+  envoy::extensions::filters::http::file_server::v3::FileServerConfig& config =
+      *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::file_server::v3::FileServerConfig>(message);
+  if (config.manager_config().thread_pool().thread_count() > kMaxAsyncFileManagerThreadCount) {
+    throw EnvoyException(fmt::format(
+        "received input exceeding the allowed number of threads ({} > {}) for "
+        "FileServerConfig.AsyncFileManager",
+        config.manager_config().thread_pool().thread_count(), kMaxAsyncFileManagerThreadCount));
+  }
+}
+
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
                                          Protobuf::Message* message) {
   // Map filter name to clean-up function.
@@ -154,6 +167,9 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   } else if (filter_name == "envoy.filters.http.file_system_buffer") {
     // Limit the number of threads to create to kMaxAsyncFileManagerThreadCount
     cleanFileSystemBufferConfig(message);
+  } else if (filter_name == "envoy.filters.http.file_server") {
+    // Limit the number of threads to create to kMaxAsyncFileManagerThreadCount
+    cleanFileServerConfig(message);
   }
 }
 
@@ -202,9 +218,17 @@ void UberFilterFuzzer::perFilterSetup() {
 
   // Prepare expectations for AWSRequestSigning filter
   ON_CALL(decoder_callbacks_, addDecodedData(_, _))
-      .WillByDefault([this](Buffer::Instance& data, bool) { decoding_buffer_ = &data; });
+      .WillByDefault([this](Buffer::Instance& data, bool) {
+        if (decoding_buffer_ == nullptr) {
+          decoding_buffer_ = std::make_unique<Buffer::OwnedImpl>();
+        }
+        decoding_buffer_->move(data);
+      });
   ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault([this]() -> const Buffer::Instance* {
-    return decoding_buffer_;
+    if (decoding_buffer_ == nullptr) {
+      decoding_buffer_ = std::make_unique<Buffer::OwnedImpl>();
+    }
+    return decoding_buffer_.get();
   });
   ON_CALL(encoder_callbacks_, dispatcher()).WillByDefault([this]() -> Event::Dispatcher& {
     return *worker_thread_dispatcher_;

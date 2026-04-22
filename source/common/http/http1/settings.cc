@@ -44,13 +44,6 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
     ret.stateful_header_key_formatter_ = factory.createFromProto(*header_formatter_config);
   }
 
-  if (config.has_use_balsa_parser()) {
-    ret.use_balsa_parser_ = config.use_balsa_parser().value();
-  } else {
-    ret.use_balsa_parser_ =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser");
-  }
-
   ret.allow_custom_methods_ = config.allow_custom_methods();
 
   return ret;
@@ -59,7 +52,7 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
                                  Server::Configuration::CommonFactoryContext& context,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 const ProtobufWkt::BoolValue& hcm_stream_error,
+                                 const Protobuf::BoolValue& hcm_stream_error,
                                  bool validate_scheme) {
   Http1Settings ret = parseHttp1Settings(config, context, validation_visitor);
   ret.validate_scheme_ = validate_scheme;

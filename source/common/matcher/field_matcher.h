@@ -8,24 +8,6 @@ namespace Envoy {
 namespace Matcher {
 
 /**
- * The result of a field match.
- */
-struct FieldMatchResult {
-  // Encodes whether we were able to perform the match.
-  MatchState match_state_;
-
-  // The result, if matching was completed.
-  absl::optional<bool> result_;
-
-  // The unwrapped result. Should only be called if match_state_ == MatchComplete.
-  bool result() const {
-    ASSERT(match_state_ == MatchState::MatchComplete);
-    ASSERT(result_.has_value());
-    return *result_;
-  }
-};
-
-/**
  * Base class for matching against a single input.
  */
 template <class DataType> class FieldMatcher {
@@ -34,10 +16,8 @@ public:
 
   /**
    * Attempts to match against the provided data.
-   * @returns absl::optional<bool> if matching was possible, the result of the match. Otherwise
-   * absl::nullopt if the data is not available.
    */
-  virtual FieldMatchResult match(const DataType& data) PURE;
+  virtual MatchResult match(const DataType& data) PURE;
 };
 template <class DataType> using FieldMatcherPtr = std::unique_ptr<FieldMatcher<DataType>>;
 
@@ -52,22 +32,22 @@ public:
   explicit AllFieldMatcher(std::vector<FieldMatcherPtr<DataType>>&& matchers)
       : matchers_(std::move(matchers)) {}
 
-  FieldMatchResult match(const DataType& data) override {
+  MatchResult match(const DataType& data) override {
     for (const auto& matcher : matchers_) {
-      const auto result = matcher->match(data);
+      const MatchResult result = matcher->match(data);
 
       // If we are unable to decide on a match at this point, propagate this up to defer
       // the match result until we have the requisite data.
-      if (result.match_state_ == MatchState::UnableToMatch) {
+      if (result == MatchResult::InsufficientData) {
         return result;
       }
 
-      if (!result.result()) {
+      if (result == MatchResult::NoMatch) {
         return result;
       }
     }
 
-    return {MatchState::MatchComplete, true};
+    return MatchResult::Matched;
   }
 
 private:
@@ -86,28 +66,28 @@ public:
   explicit AnyFieldMatcher(std::vector<FieldMatcherPtr<DataType>>&& matchers)
       : matchers_(std::move(matchers)) {}
 
-  FieldMatchResult match(const DataType& data) override {
+  MatchResult match(const DataType& data) override {
     bool unable_to_match_some_matchers = false;
     for (const auto& matcher : matchers_) {
-      const auto result = matcher->match(data);
+      const MatchResult result = matcher->match(data);
 
-      if (result.match_state_ == MatchState::UnableToMatch) {
+      if (result == MatchResult::InsufficientData) {
         unable_to_match_some_matchers = true;
         continue;
       }
 
-      if (result.result()) {
-        return {MatchState::MatchComplete, true};
+      if (result == MatchResult::Matched) {
+        return result;
       }
     }
 
     // If we didn't find a successful match but not all matchers could be evaluated,
-    // return UnableToMatch to defer the match result.
+    // return InsufficientData to defer the match result.
     if (unable_to_match_some_matchers) {
-      return {MatchState::UnableToMatch, absl::nullopt};
+      return MatchResult::InsufficientData;
     }
 
-    return {MatchState::MatchComplete, false};
+    return MatchResult::NoMatch;
   }
 
 private:
@@ -121,13 +101,12 @@ template <class DataType> class NotFieldMatcher : public FieldMatcher<DataType> 
 public:
   explicit NotFieldMatcher(FieldMatcherPtr<DataType> matcher) : matcher_(std::move(matcher)) {}
 
-  FieldMatchResult match(const DataType& data) override {
-    const auto result = matcher_->match(data);
-    if (result.match_state_ == MatchState::UnableToMatch) {
+  MatchResult match(const DataType& data) override {
+    const MatchResult result = matcher_->match(data);
+    if (result == MatchResult::InsufficientData) {
       return result;
     }
-
-    return {MatchState::MatchComplete, !result.result()};
+    return (result == MatchResult::Matched) ? MatchResult::NoMatch : MatchResult::Matched;
   }
 
 private:
@@ -136,47 +115,40 @@ private:
 
 /**
  * Implementation of a FieldMatcher that extracts an input value from the provided data and attempts
- * to match using an InputMatcher. absl::nullopt is returned whenever the data is not available or
- * if we failed to match and there is more data available.
- * A consequence of this is that if a match result is desired, care should be taken so that matching
- * is done with all the data available at some point.
+ * to match using an InputMatcher. InsufficientData is returned whenever the data is not available
+ * or if we failed to match and there may be more data available later. A consequence of this is
+ * that if a match result is desired, care should be taken so that matching is done with all the
+ * data available at some point.
  */
 template <class DataType>
 class SingleFieldMatcher : public FieldMatcher<DataType>, Logger::Loggable<Logger::Id::matcher> {
 public:
   static absl::StatusOr<std::unique_ptr<SingleFieldMatcher<DataType>>>
   create(DataInputPtr<DataType>&& data_input, InputMatcherPtr&& input_matcher) {
-    auto supported_input_types = input_matcher->supportedDataInputTypes();
-    if (supported_input_types.find(data_input->dataInputType()) == supported_input_types.end()) {
-      std::string supported_types =
-          absl::StrJoin(supported_input_types.begin(), supported_input_types.end(), ", ");
+    const bool supported = input_matcher->supportsDataInputType(data_input->dataInputType());
+    if (!supported) {
       return absl::InvalidArgumentError(
-          absl::StrCat("Unsupported data input type: ", data_input->dataInputType(),
-                       ". The matcher supports input type: ", supported_types));
+          absl::StrCat("Unsupported data input type: ", data_input->dataInputType()));
     }
 
     return std::unique_ptr<SingleFieldMatcher<DataType>>{
         new SingleFieldMatcher<DataType>(std::move(data_input), std::move(input_matcher))};
   }
 
-  FieldMatchResult match(const DataType& data) override {
+  MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
 
-    ENVOY_LOG(trace, "Attempting to match {}", input);
-    if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
-      return {MatchState::UnableToMatch, absl::nullopt};
+    if (input.availability() == DataAvailability::NotAvailable) {
+      return MatchResult::InsufficientData;
     }
 
-    bool current_match = input_matcher_->match(input.data_);
-    if (!current_match && input.data_availability_ ==
-                              DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
-      ENVOY_LOG(trace, "No match yet; delaying result as more data might be available.");
-      return {MatchState::UnableToMatch, absl::nullopt};
+    MatchResult current_match = input_matcher_->match(input);
+    if (current_match != MatchResult::Matched &&
+        input.availability() == DataAvailability::MoreDataMightBeAvailable) {
+      return MatchResult::InsufficientData;
     }
 
-    ENVOY_LOG(trace, "Match result: {}", current_match);
-
-    return {MatchState::MatchComplete, current_match};
+    return current_match;
   }
 
 private:

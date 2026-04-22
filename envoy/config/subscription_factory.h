@@ -10,6 +10,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/load_stats_reporter.h"
 
 #include "xds/core/v3/resource_locator.pb.h"
 
@@ -63,6 +64,26 @@ public:
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
 
   /**
+   * Subscription factory for a given ADS grpc-mux.
+   *
+   * @param ads_grpc_mux the ADS GrpcMux this subscription should use.
+   * @param config envoy::config::core::v3::ConfigSource to construct from.
+   * @param type_url type URL for the resource being subscribed to.
+   * @param scope stats scope for any stats tracked by the subscription.
+   * @param callbacks the callbacks needed by all Subscription objects, to deliver config updates.
+   *                  The callbacks must not result in the deletion of the Subscription object.
+   * @param resource_decoder how incoming opaque resource objects are to be decoded.
+   * @param options subscription options.
+   *
+   * @return SubscriptionPtr subscription object corresponding for config and type_url or error
+   * status.
+   */
+  virtual absl::StatusOr<SubscriptionPtr> subscriptionOverAdsGrpcMux(
+      GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
+      absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
+
+  /**
    * Collection subscription factory interface for xDS-TP URLs.
    *
    * @param collection_locator collection resource locator.
@@ -106,6 +127,9 @@ public:
     const SubscriptionOptions& options_;
     OptRef<const xds::core::v3::ResourceLocator> collection_locator_;
     SubscriptionStats stats_;
+    // An optional ADS gRPC mux to be used. Must be provided if ADS
+    // is used.
+    GrpcMuxSharedPtr ads_grpc_mux_;
   };
 
   std::string category() const override { return "envoy.config_subscription"; }
@@ -117,14 +141,16 @@ public:
   std::string category() const override { return "envoy.config_mux"; }
   virtual void shutdownAll() PURE;
   virtual std::shared_ptr<GrpcMux>
-  create(std::unique_ptr<Grpc::RawAsyncClient>&& async_client,
-         std::unique_ptr<Grpc::RawAsyncClient>&& async_failover_client,
+  create(std::shared_ptr<Grpc::RawAsyncClient>&& async_client,
+         std::shared_ptr<Grpc::RawAsyncClient>&& async_failover_client,
          Event::Dispatcher& dispatcher, Random::RandomGenerator& random, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info,
          std::unique_ptr<CustomConfigValidators>&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, OptRef<XdsConfigTracker> xds_config_tracker,
-         OptRef<XdsResourcesDelegate> xds_resources_delegate, bool use_eds_resources_cache) PURE;
+         OptRef<XdsResourcesDelegate> xds_resources_delegate,
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
+      PURE;
 };
 
 } // namespace Config

@@ -9,24 +9,24 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/jwt/jwt.h"
+#include "source/common/jwt/struct_utils.h"
+#include "source/common/jwt/verify.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_split.h"
 #include "absl/time/time.h"
-#include "jwt_verify_lib/jwt.h"
-#include "jwt_verify_lib/struct_utils.h"
-#include "jwt_verify_lib/verify.h"
-
-using ::google::jwt_verify::CheckAudience;
-using ::google::jwt_verify::Status;
-using ::google::jwt_verify::StructUtils;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
+
+using JwtVerify::CheckAudience;
+using JwtVerify::Status;
+using JwtVerify::StructUtils;
 
 // If the number is unsigned 64 bit integer, convert to string as integer,
 // otherwise, convert to string as double.
@@ -57,7 +57,7 @@ public:
         provider_(provider), is_allow_failed_(allow_failed), is_allow_missing_(allow_missing),
         time_source_(time_source) {}
   // Following functions are for JwksFetcher::JwksReceiver interface
-  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
+  void onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface.
   void verify(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
@@ -79,7 +79,7 @@ private:
   void handleGoodJwt(bool cache_hit);
 
   // Normalize and set the payload metadata.
-  void setPayloadMetadata(const ProtobufWkt::Struct& jwt_payload);
+  void setPayloadMetadata(const Protobuf::Struct& jwt_payload);
 
   // Calls the callback with status.
   void doneWithStatus(const Status& status);
@@ -107,7 +107,7 @@ private:
   std::vector<JwtLocationConstPtr> tokens_;
   JwtLocationConstPtr curr_token_;
   // The JWT object.
-  std::unique_ptr<::google::jwt_verify::Jwt> owned_jwt_;
+  std::unique_ptr<JwtVerify::Jwt> owned_jwt_;
   // The JWKS data object
   JwksCache::JwksData* jwks_data_{};
   // The HTTP request headers
@@ -129,7 +129,7 @@ private:
   const bool is_allow_failed_;
   const bool is_allow_missing_;
   TimeSource& time_source_;
-  ::google::jwt_verify::Jwt* jwt_{};
+  JwtVerify::Jwt* jwt_{};
 };
 
 std::string AuthenticatorImpl::name() const {
@@ -190,7 +190,7 @@ void AuthenticatorImpl::startVerify() {
 
   if (!use_jwt_cache) {
     ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
-    owned_jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
+    owned_jwt_ = std::make_unique<JwtVerify::Jwt>();
     status = owned_jwt_->parseFromString(curr_token_->token());
     jwt_ = owned_jwt_.get();
 
@@ -223,7 +223,7 @@ void AuthenticatorImpl::startVerify() {
   }
 
   // Default is 60 seconds
-  uint64_t clock_skew_seconds = ::google::jwt_verify::kClockSkewInSecond;
+  uint64_t clock_skew_seconds = JwtVerify::kClockSkewInSecond;
   if (jwks_data_->getJwtProvider().clock_skew_seconds() > 0) {
     clock_skew_seconds = jwks_data_->getJwtProvider().clock_skew_seconds();
   }
@@ -287,7 +287,14 @@ void AuthenticatorImpl::startVerify() {
   // jwks fetching can be shared by two requests.
   if (jwks_data_->getJwtProvider().has_remote_jwks()) {
     if (!fetcher_) {
-      fetcher_ = create_jwks_fetcher_cb_(cm_, jwks_data_->getJwtProvider().remote_jwks());
+      fetcher_ = create_jwks_fetcher_cb_(cm_, jwks_data_->retryPolicy(),
+                                         jwks_data_->getJwtProvider().remote_jwks());
+    } else {
+      // Cancel the previous fetch to reset if it is pending or not completed.
+      // At most one outstanding request may be in-flight, and it is possible that
+      // a new call is from the callback itself, which in-turn will reset the
+      // fetcher afterwards.
+      fetcher_->cancel();
     }
     fetcher_->fetch(*parent_span_, *this);
     return;
@@ -297,7 +304,7 @@ void AuthenticatorImpl::startVerify() {
   doneWithStatus(Status::JwksNoValidKeys);
 }
 
-void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
+void AuthenticatorImpl::onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) {
   jwks_cache_.stats().jwks_fetch_success_.inc();
   const Status status = jwks_data_->setRemoteJwks(std::move(jwks))->getStatus();
   if (status != Status::Ok) {
@@ -320,8 +327,7 @@ void AuthenticatorImpl::onDestroy() {
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
-  const Status status =
-      ::google::jwt_verify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
+  const Status status = JwtVerify::verifyJwtWithoutTimeChecking(*jwt_, *jwks_data_->getJwksObj());
 
   if (status != Status::Ok) {
     doneWithStatus(status);
@@ -333,23 +339,23 @@ void AuthenticatorImpl::verifyKey() {
 bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
                                             const std::string& header_name) {
   StructUtils payload_getter(jwt_->payload_pb_);
-  const ProtobufWkt::Value* claim_value;
+  const Protobuf::Value* claim_value;
   const auto status = payload_getter.GetValue(claim_name, claim_value);
   std::string str_claim_value;
   if (status == StructUtils::OK) {
     switch (claim_value->kind_case()) {
-    case Envoy::ProtobufWkt::Value::kStringValue:
+    case Envoy::Protobuf::Value::kStringValue:
       str_claim_value = claim_value->string_value();
       break;
-    case Envoy::ProtobufWkt::Value::kNumberValue:
+    case Envoy::Protobuf::Value::kNumberValue:
       str_claim_value = convertClaimDoubleToString(claim_value->number_value());
       break;
-    case Envoy::ProtobufWkt::Value::kBoolValue:
+    case Envoy::Protobuf::Value::kBoolValue:
       str_claim_value = claim_value->bool_value() ? "true" : "false";
       break;
-    case Envoy::ProtobufWkt::Value::kStructValue:
+    case Envoy::Protobuf::Value::kStructValue:
       ABSL_FALLTHROUGH_INTENDED;
-    case Envoy::ProtobufWkt::Value::kListValue: {
+    case Envoy::Protobuf::Value::kListValue: {
       std::string output;
       auto status = claim_value->has_struct_value()
                         ? ProtobufUtil::MessageToJsonString(claim_value->struct_value(), &output)
@@ -422,14 +428,14 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   doneWithStatus(Status::Ok);
 }
 
-void AuthenticatorImpl::setPayloadMetadata(const ProtobufWkt::Struct& jwt_payload) {
+void AuthenticatorImpl::setPayloadMetadata(const Protobuf::Struct& jwt_payload) {
   const auto& provider = jwks_data_->getJwtProvider();
   const auto& normalize = provider.normalize_payload_in_metadata();
   if (normalize.space_delimited_claims().empty()) {
     set_extracted_jwt_data_cb_(provider.payload_in_metadata(), jwt_payload);
   }
   // Make a temporary copy to normalize the JWT struct.
-  ProtobufWkt::Struct out_payload = jwt_payload;
+  Protobuf::Struct out_payload = jwt_payload;
   for (const auto& claim : normalize.space_delimited_claims()) {
     const auto& it = jwt_payload.fields().find(claim);
     if (it != jwt_payload.fields().end() && it->second.has_string_value()) {
@@ -445,11 +451,11 @@ void AuthenticatorImpl::setPayloadMetadata(const ProtobufWkt::Struct& jwt_payloa
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "{}: JWT verification completed with: {}", name(),
-            ::google::jwt_verify::getStatusString(status));
+            JwtVerify::getStatusString(status));
 
   if (Status::Ok != status) {
     // Forward the failed status to dynamic metadata
-    ENVOY_LOG(debug, "status is: {}", ::google::jwt_verify::getStatusString(status));
+    ENVOY_LOG(debug, "status is: {}", JwtVerify::getStatusString(status));
 
     std::string failed_status_in_metadata;
 
@@ -462,12 +468,12 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
     if (!failed_status_in_metadata.empty()) {
 
-      ProtobufWkt::Struct failed_status;
+      Protobuf::Struct failed_status;
       auto& failed_status_fields = *failed_status.mutable_fields();
       failed_status_fields["code"].set_number_value(enumToInt(status));
-      failed_status_fields["message"].set_string_value(google::jwt_verify::getStatusString(status));
+      failed_status_fields["message"].set_string_value(Envoy::JwtVerify::getStatusString(status));
       ENVOY_LOG(debug, "Code: {} Message: {}", enumToInt(status),
-                google::jwt_verify::getStatusString(status));
+                Envoy::JwtVerify::getStatusString(status));
       set_extracted_jwt_data_cb_(failed_status_in_metadata, failed_status);
     }
   }

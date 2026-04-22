@@ -10,7 +10,7 @@ using MetadataMatchCriteriaImplConstPtr = std::unique_ptr<const MetadataMatchCri
 
 class MetadataMatchCriteriaImpl : public MetadataMatchCriteria {
 public:
-  MetadataMatchCriteriaImpl(const ProtobufWkt::Struct& metadata_matches)
+  MetadataMatchCriteriaImpl(const Protobuf::Struct& metadata_matches)
       : metadata_match_criteria_(extractMetadataMatchCriteria(nullptr, metadata_matches)) {};
 
   // MetadataMatchCriteria
@@ -19,7 +19,7 @@ public:
   }
 
   MetadataMatchCriteriaConstPtr
-  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const override {
+  mergeMatchCriteria(const Protobuf::Struct& metadata_matches) const override {
     return MetadataMatchCriteriaImplConstPtr(
         new MetadataMatchCriteriaImpl(extractMetadataMatchCriteria(this, metadata_matches)));
   }
@@ -33,7 +33,7 @@ private:
 
   static std::vector<MetadataMatchCriterionConstSharedPtr>
   extractMetadataMatchCriteria(const MetadataMatchCriteriaImpl* parent,
-                               const ProtobufWkt::Struct& metadata_matches);
+                               const Protobuf::Struct& metadata_matches);
 
   const std::vector<MetadataMatchCriterionConstSharedPtr> metadata_match_criteria_;
 };

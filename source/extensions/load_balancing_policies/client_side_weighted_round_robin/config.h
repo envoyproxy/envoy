@@ -11,7 +11,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace ClientSideWeightedRoundRobin {
 
 using ClientSideWeightedRoundRobinLbProto = envoy::extensions::load_balancing_policies::
@@ -45,6 +45,6 @@ public:
 DECLARE_FACTORY(Factory);
 
 } // namespace ClientSideWeightedRoundRobin
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

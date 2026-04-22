@@ -4,6 +4,8 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "quiche_platform_impl/quiche_test_output_impl.h"
+
 #include <cstdlib>
 
 #include "test/test_common/file_system_for_test.h"
@@ -13,7 +15,6 @@
 #include "fmt/printf.h"
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_logging.h"
-#include "quiche_platform_impl/quiche_test_output_impl.h"
 
 namespace quiche {
 namespace {

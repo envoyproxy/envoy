@@ -28,8 +28,9 @@ class LdsApiImpl : public LdsApi,
 public:
   LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
              const xds::core::v3::ResourceLocator* lds_resources_locator,
-             Upstream::ClusterManager& cm, Init::Manager& init_manager, Stats::Scope& scope,
-             ListenerManager& lm, ProtobufMessage::ValidationVisitor& validation_visitor);
+             Config::XdsManager& xds_manager, Upstream::ClusterManager& cm,
+             Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,
+             ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Server::LdsApi
   std::string versionInfo() const override { return system_version_info_; }
@@ -48,7 +49,7 @@ private:
   std::string system_version_info_;
   ListenerManager& listener_manager_;
   Stats::ScopeSharedPtr scope_;
-  Upstream::ClusterManager& cm_;
+  Config::XdsManager& xds_manager_;
   Init::TargetImpl init_target_;
 };
 

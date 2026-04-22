@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package envoy.test.mock_dns_resolver.v3;
+
+// Configuration for MockDnsResolver used in tests.
+message MockDnsResolverConfig {
+  // Domains that should resolve as non-existent (NXDOMAIN/NODATA equivalent).
+  repeated string non_existent_domains = 1;
+}

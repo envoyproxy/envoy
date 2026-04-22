@@ -82,6 +82,7 @@ class EnvoyConfigurationTest {
     dnsNumRetries: Int? = 3,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
+    enableEarlyData: Boolean = true,
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
     quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
@@ -115,6 +116,11 @@ class EnvoyConfigurationTest {
     h3ConnectionKeepaliveInitialIntervalMilliseconds: Int = 0,
     disableDnsRefreshOnFailure: Boolean = false,
     disableDnsRefreshOnNetworkChange: Boolean = false,
+    useQuicPlatformPacketWriter: Boolean = true,
+    enableQuicConnectionMigration: Boolean = false,
+    migrateIdleQuicConnection: Boolean = false,
+    maxIdleTimeBeforeQuicMigrationSeconds: Long = 0,
+    maxTimeOnNonDefaultNetworkSeconds: Long = 0,
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       connectTimeoutSeconds,
@@ -131,6 +137,7 @@ class EnvoyConfigurationTest {
       dnsNumRetries ?: -1,
       enableDrainPostDnsRefresh,
       enableHttp3,
+      enableEarlyData,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
       quicHints,
@@ -156,6 +163,11 @@ class EnvoyConfigurationTest {
       enablePlatformCertificatesValidation,
       upstreamTlsSni,
       h3ConnectionKeepaliveInitialIntervalMilliseconds,
+      useQuicPlatformPacketWriter,
+      enableQuicConnectionMigration,
+      migrateIdleQuicConnection,
+      maxIdleTimeBeforeQuicMigrationSeconds,
+      maxTimeOnNonDefaultNetworkSeconds,
     )
   }
 
@@ -193,8 +205,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("canonical_suffixes");
     assertThat(resolvedTemplate).contains(".opq.com");
     assertThat(resolvedTemplate).contains(".xyz.com");
-    assertThat(resolvedTemplate).contains("connection_options: \"5RTO\"");
-    assertThat(resolvedTemplate).contains("client_connection_options: \"MPQC\"");
+    assertThat(resolvedTemplate).contains("connection_options: \"AKDU,BWRS,5RTO,EVMB\"");
     assertThat(resolvedTemplate).doesNotContain("connection_keepalive { initial_interval {")
 
     // Per Host Limits
@@ -213,16 +224,19 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("buffer_filter_1")
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
 
-    // Cert Validation
-    assertThat(resolvedTemplate).contains("trusted_ca")
-
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createProtoString doesn't change filter order.
     val resolvedTemplate2 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
+
+    // Validate the correct quic packet writer extension
+    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy_mobile.extensions.quic_packet_writer.platform.QuicPlatformPacketWriterConfig")
+    // Validate that connection migration is off
+    assertThat(resolvedTemplate).doesNotContain("connection_migration {")
+
     // Validate that createBootstrap also doesn't change filter order.
-    // This may leak memory as the boostrap isn't used.
+    // This may leak memory as the bootstrap isn't used.
     envoyConfiguration.createBootstrap()
     val resolvedTemplate3 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
@@ -256,9 +270,6 @@ class EnvoyConfigurationTest {
 
     // enableDrainPostDnsRefresh = true
     assertThat(resolvedTemplate).contains("enable_drain_post_dns_refresh: true")
-
-    // UDP GRO enabled by default
-    assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")
 
     // enableDNSCache = true
     assertThat(resolvedTemplate).contains("key: \"dns_persistent_cache\"")
@@ -304,5 +315,29 @@ class EnvoyConfigurationTest {
 
     assertThat(resolvedTemplate).contains("test_feature_false")
     assertThat(resolvedTemplate).contains("test_feature_true")
+  }
+
+  @Test
+  fun `configuration resolves with quic migration enabled`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      enableQuicConnectionMigration = true,
+      migrateIdleQuicConnection = true
+    )
+
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
+    assertThat(resolvedTemplate).contains("QuicPlatformPacketWriterConfig")
+    assertThat(resolvedTemplate).contains("connection_migration { migrate_idle_connections { } }")
+  }
+
+  @Test
+  fun `configuration resolves early data policy when early data disabled`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      enableEarlyData = false
+    )
+
+    val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
+    assertThat(resolvedTemplate).contains("envoy.route.early_data_policy.default")
   }
 }

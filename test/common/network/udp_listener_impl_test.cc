@@ -3,11 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/os_sys_calls.h"
-#include "envoy/config/core/v3/base.pb.h"
-
 #include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/network/address_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/udp_listener_impl.h"
@@ -17,13 +13,11 @@
 #include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mock_parent_drained_callback_registrar.h"
-#include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
-#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -237,33 +231,6 @@ TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
       }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
-
-#ifdef UDP_GRO
-TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsg) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
-    return;
-  }
-  setup(true);
-
-  ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(true));
-  client_.write(std::string(32768, 'a'), *send_to_addr_);
-  const std::string second("second");
-  client_.write(second, *send_to_addr_);
-
-  EXPECT_CALL(listener_callbacks_, onReadReady());
-  EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(AtLeast(1));
-  EXPECT_CALL(listener_callbacks_, onData(_)).WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-    validateRecvCallbackParams(data, 1);
-    EXPECT_EQ(data.buffer_->toString(), second);
-
-    dispatcher_->exit();
-  }));
-
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(1, listener_->packetsDropped());
-}
-#endif
 
 /**
  * Tests UDP listener for read and write callbacks with actual data.
@@ -667,10 +634,8 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
         // Set msg_iovec
         EXPECT_EQ(msg->msg_iovlen, 1);
         memcpy(msg->msg_iov[0].iov_base, stacked_message.data(), stacked_message.length());
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
-          EXPECT_EQ(msg->msg_iov[0].iov_len, 64 * 1024);
-        }
+        // The aggregated read limit is now always applied.
+        EXPECT_EQ(msg->msg_iov[0].iov_len, 64 * 1024);
         msg->msg_iov[0].iov_len = stacked_message.length();
 
         // Set control headers
@@ -738,10 +703,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
 }
 
 TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsgNoDrop) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
-    return;
-  }
+  // The aggregated read limit is now always applied.
   setup(true);
 
   ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(true));
@@ -771,10 +733,7 @@ TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsgNoDrop) {
 // of same size, regardless of MAX_NUM_PACKETS_PER_EVENT_LOOP or listener_callbacks_ provided limit.
 // But once MAX_NUM_PACKETS_PER_EVENT_LOOP of packets are processed, read will stop.
 TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
-    return;
-  }
+  // The aggregated read limit is now always applied.
   setup(true);
 
   EXPECT_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop()).WillRepeatedly(Return(32));

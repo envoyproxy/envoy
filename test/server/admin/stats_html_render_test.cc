@@ -40,9 +40,11 @@ TEST_F(StatsHtmlRenderTest, String) {
 
 TEST_F(StatsHtmlRenderTest, HistogramUnset) {
   constexpr absl::string_view expected =
-      "h1: P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) "
-      "P90(308.5,308.5) P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) "
-      "P99.9(309.985,309.985) P100(310,310)\n";
+      "h1: P0(205,205) P25(205,205) P50(303.3333333333333,303.3333333333333) "
+      "P75(306.6666666666667,306.6666666666667) "
+      "P90(306.6666666666667,306.6666666666667) P95(306.6666666666667,306.6666666666667) "
+      "P99(306.6666666666667,306.6666666666667) P99.5(306.6666666666667,306.6666666666667) "
+      "P99.9(306.6666666666667,306.6666666666667) P100(306.6666666666667,306.6666666666667)\n";
   StatsHtmlRender renderer{response_headers_, response_, params_};
   EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
               HasSubstr(expected));
@@ -50,9 +52,11 @@ TEST_F(StatsHtmlRenderTest, HistogramUnset) {
 
 TEST_F(StatsHtmlRenderTest, HistogramSummary) {
   constexpr absl::string_view expected =
-      "h1: P0(200,200) P25(207.5,207.5) P50(302.5,302.5) P75(306.25,306.25) "
-      "P90(308.5,308.5) P95(309.25,309.25) P99(309.85,309.85) P99.5(309.925,309.925) "
-      "P99.9(309.985,309.985) P100(310,310)\n";
+      "h1: P0(205,205) P25(205,205) P50(303.3333333333333,303.3333333333333) "
+      "P75(306.6666666666667,306.6666666666667) "
+      "P90(306.6666666666667,306.6666666666667) P95(306.6666666666667,306.6666666666667) "
+      "P99(306.6666666666667,306.6666666666667) P99.5(306.6666666666667,306.6666666666667) "
+      "P99.9(306.6666666666667,306.6666666666667) P100(306.6666666666667,306.6666666666667)\n";
   params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
   StatsHtmlRender renderer{response_headers_, response_, params_};
   EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),

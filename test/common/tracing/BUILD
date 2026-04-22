@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -16,6 +17,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:base64_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -44,6 +46,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/tracing:custom_tag_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -56,6 +59,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -85,7 +89,9 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/tracing:tracer_config_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
 
@@ -99,4 +105,21 @@ envoy_cc_test(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:trace_context_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "tracing_validation_test",
+    srcs = ["tracing_validation_test.cc"],
+    deps = [
+        "//source/common/tracing:tracing_validation_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "tracing_validation_fuzz_test",
+    srcs = ["tracing_validation_fuzz_test.cc"],
+    corpus = "tracing_validation_corpus",
+    deps = ["//source/common/tracing:tracing_validation_lib"],
 )

@@ -19,6 +19,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/proto/helloworld.pb.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -104,16 +105,16 @@ public:
     (*fields)["ext_authz_duration"] = ValueUtil::numberValue(10);
 
     EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
-        .WillOnce(Invoke([&response](const std::string& ns,
-                                     const ProtobufWkt::Struct& returned_dynamic_metadata) {
-          EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
-          EXPECT_TRUE(
-              returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
-          EXPECT_TRUE(
-              TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
-          EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
-                    returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
-        }));
+        .WillOnce(Invoke(
+            [&response](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
+              EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
+              EXPECT_TRUE(
+                  returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
+              EXPECT_TRUE(
+                  TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
+              EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
+                        returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
+            }));
 
     EXPECT_CALL(filter_callbacks_, continueReading());
     request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
@@ -385,7 +386,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
       addr_);
   filter_callbacks_.connection_.dispatcher_.globalTimeSystem().advanceTimeWait(
       std::chrono::milliseconds(5));
-  ProtobufWkt::Struct dynamic_metadata;
+  Protobuf::Struct dynamic_metadata;
   (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-ok");
   (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(12);
   // Since this is a stack response, duration should be 0;
@@ -404,7 +405,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
 
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
-                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+                                           const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_TRUE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_TRUE(dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
@@ -440,7 +441,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
       addr_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
-  ProtobufWkt::Struct dynamic_metadata;
+  Protobuf::Struct dynamic_metadata;
   (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-nok");
   (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(15);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
@@ -454,7 +455,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
           })));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
-                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+                                           const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
         EXPECT_FALSE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_FALSE(dynamic_metadata.fields().contains("ext_authz_duration"));
@@ -560,6 +561,206 @@ TEST_F(ExtAuthzFilterTest, EnabledWithMetadata) {
       .WillByDefault(ReturnRef(metadata));
 
   expectOKWithOnData();
+}
+
+// Verifies that specified metadata is passed along in the check request for network filter
+TEST_F(ExtAuthzFilterTest, MetadataContext) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_authz
+  metadata_context_namespaces:
+  - jazz.sax
+  - rock.guitar
+  typed_metadata_context_namespaces:
+  - blues.piano
+  )EOF";
+
+  initialize(yaml);
+
+  const std::string metadata_yaml = R"EOF(
+  filter_metadata:
+    jazz.sax:
+      coltrane: john
+      parker: charlie
+    rock.guitar:
+      hendrix: jimi
+      richards: keith
+    jazz.piano:
+      monk: thelonious
+  typed_filter_metadata:
+    blues.piano:
+      '@type': type.googleapis.com/helloworld.HelloRequest
+      name: jelly roll morton
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
+  ON_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(metadata));
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest& check_param,
+                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+        check_request = check_param;
+        request_callbacks_ = &callbacks;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Verify that the metadata specified in metadata_context_namespaces is passed
+  EXPECT_EQ("john", check_request.attributes()
+                        .metadata_context()
+                        .filter_metadata()
+                        .at("jazz.sax")
+                        .fields()
+                        .at("coltrane")
+                        .string_value());
+
+  EXPECT_EQ("jimi", check_request.attributes()
+                        .metadata_context()
+                        .filter_metadata()
+                        .at("rock.guitar")
+                        .fields()
+                        .at("hendrix")
+                        .string_value());
+
+  // Verify that metadata not in the namespace list is not passed
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().count("jazz.piano"));
+
+  // Verify that typed metadata specified in typed_metadata_context_namespaces is passed
+  helloworld::HelloRequest hello;
+  check_request.attributes()
+      .metadata_context()
+      .typed_filter_metadata()
+      .at("blues.piano")
+      .UnpackTo(&hello);
+  EXPECT_EQ("jelly roll morton", hello.name());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
+}
+
+// Verifies that when metadata_context_namespaces is configured but no matching metadata exists,
+// the check request is sent with empty metadata context
+TEST_F(ExtAuthzFilterTest, MetadataContextNoMatch) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_authz
+  metadata_context_namespaces:
+  - jazz.sax
+  - rock.guitar
+  typed_metadata_context_namespaces:
+  - blues.piano
+  )EOF";
+
+  initialize(yaml);
+
+  // Set up metadata that doesn't match the configured namespaces
+  const std::string metadata_yaml = R"EOF(
+  filter_metadata:
+    classical.violin:
+      vivaldi: antonio
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
+  ON_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(metadata));
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest& check_param,
+                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+        check_request = check_param;
+        request_callbacks_ = &callbacks;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Verify that no metadata is passed since no namespaces matched
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().size());
+  EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().size());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
+}
+
+// Verifies that when no metadata_context_namespaces are configured, no metadata is passed
+TEST_F(ExtAuthzFilterTest, NoMetadataContextNamespaces) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_authz
+  )EOF";
+
+  initialize(yaml);
+
+  const std::string metadata_yaml = R"EOF(
+  filter_metadata:
+    jazz.sax:
+      coltrane: john
+  )EOF";
+
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(metadata_yaml, metadata);
+  ON_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(metadata));
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest& check_param,
+                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+        check_request = check_param;
+        request_callbacks_ = &callbacks;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Verify that no metadata is passed when metadata_context_namespaces is not configured
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().size());
+  EXPECT_EQ(0, check_request.attributes().metadata_context().typed_filter_metadata().size());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
 }
 
 } // namespace ExtAuthz

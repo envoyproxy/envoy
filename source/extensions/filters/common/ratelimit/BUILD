@@ -38,7 +38,7 @@ envoy_cc_library(
         "//envoy/singleton:manager_interface",
         "//envoy/tracing:tracer_interface",
         "//source/common/stats:symbol_table_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
     ],
 )

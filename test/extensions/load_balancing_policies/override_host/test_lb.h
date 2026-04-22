@@ -19,7 +19,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace DynamicForwarding {
 
 constexpr absl::string_view kTestLoadBalancerName = "envoy.load_balancers.override_host.test";
@@ -50,6 +50,6 @@ private:
 };
 
 } // namespace DynamicForwarding
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

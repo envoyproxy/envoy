@@ -25,7 +25,7 @@ struct RequestField {
   absl::string_view path;
 
   // The request field value.
-  ProtobufWkt::Value value;
+  Protobuf::Value value;
 };
 
 using ExtractionResult = std::vector<RequestField>;

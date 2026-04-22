@@ -30,6 +30,7 @@ struct CdsStats {
 
 /**
  * CDS API implementation that fetches via Subscription.
+ * This supports the wildcard subscription to a single source.
  */
 class CdsApiImpl : public CdsApi,
                    Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster> {
@@ -38,7 +39,8 @@ public:
   create(const envoy::config::core::v3::ConfigSource& cds_config,
          const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
          Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
-         Server::Configuration::ServerFactoryContext& factory_context);
+         Server::Configuration::ServerFactoryContext& factory_context,
+         bool support_multi_ads_sources);
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}); }
@@ -60,7 +62,7 @@ private:
              const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
              Server::Configuration::ServerFactoryContext& factory_context,
-             absl::Status& creation_status);
+             bool support_multi_ads_sources, absl::Status& creation_status);
   void runInitializeCallbackIfAny();
 
   CdsApiHelper helper_;
@@ -68,6 +70,13 @@ private:
   Stats::ScopeSharedPtr scope_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   CdsStats stats_;
+  // This enables tracking the resources via SotW for wildcard-CDS, so concurrent OD-CDS
+  // resources won't get overridden when a CDS-wildcard update arrives.
+  // TODO(adisuissa): once proper support for an xDS-Caching layer is added,
+  // this will not be relevant, as the callbacks will be similar to delta-xDS
+  // from each collection source.
+  const bool support_multi_ads_sources_;
+  absl::flat_hash_set<std::string> sotw_resource_names_;
   Config::SubscriptionPtr subscription_;
   std::function<void()> initialize_callback_;
 };

@@ -1,8 +1,45 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
+load("//bazel:apple.bzl", "envoy_objc_library")
 
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
+
+envoy_objc_library(
+    name = "apple_network_change_monitor_lib",
+    srcs = [
+        "apple_network_change_monitor.mm",
+        "apple_network_change_monitor_impl.mm",
+    ],
+    hdrs = [
+        "apple_network_change_monitor.h",
+        "apple_network_change_monitor_impl.h",
+    ],
+    module_name = "AppleNetworkChangeMonitor",
+    sdk_frameworks = [
+        "CoreTelephony",
+        "Network",
+        "SystemConfiguration",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//library/cc:network_change_monitor_interface",
+        "//library/common:engine_types_lib",
+        "//library/common/network:network_types_lib",
+        "//library/common/types:c_types_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_mobile_quic_network_observer_registry_factory_lib",
+    srcs = ["envoy_mobile_quic_network_observer_registry_factory.cc"],
+    hdrs = ["envoy_mobile_quic_network_observer_registry_factory.h"],
+    repository = "@envoy",
+    deps = [
+        ":network_types_lib",
+        "@envoy//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
+    ],
+)
 
 envoy_cc_library(
     name = "connectivity_manager_lib",
@@ -14,10 +51,13 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        ":envoy_mobile_quic_network_observer_registry_factory_lib",
         ":network_type_socket_option_lib",
+        ":network_types_lib",
         ":proxy_settings_lib",
         "//library/common:engine_types_lib",
         "//library/common/network:src_addr_socket_option_lib",
+        "//library/common/system:system_helper_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/network:socket_interface",
         "@envoy//envoy/singleton:manager_interface",
@@ -95,7 +135,7 @@ envoy_cc_library(
     deps = select({
         "@envoy//bazel:apple": [
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
-            "@envoy//bazel:boringssl",
+            "@envoy//bazel:ssl",
         ],
         "//conditions:default": [],
     }),
@@ -113,6 +153,14 @@ envoy_cc_library(
     deps = [
         "@envoy//source/common/network:utility_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "network_types_lib",
+    hdrs = [
+        "network_types.h",
+    ],
+    repository = "@envoy",
 )
 
 envoy_cc_library(
@@ -151,6 +199,12 @@ envoy_cc_library(
             "apple_proxy_resolution.h",
             "apple_proxy_resolver.h",
             "apple_system_proxy_settings_monitor.h",
+        ],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        "@envoy//bazel:apple": [
+            "-framework CFNetwork",
         ],
         "//conditions:default": [],
     }),

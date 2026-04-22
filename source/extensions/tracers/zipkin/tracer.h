@@ -1,42 +1,16 @@
 #pragma once
 
-#include "envoy/common/pure.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "source/extensions/tracers/zipkin/span_context.h"
-#include "source/extensions/tracers/zipkin/tracer_interface.h"
-#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_types.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
-
-/**
- * Abstract class that delegates to users of the Tracer class the responsibility
- * of "reporting" a Zipkin span that has ended its life cycle. "Reporting" can mean that the
- * span will be sent to out to Zipkin, or buffered so that it can be sent out later.
- */
-class Reporter {
-public:
-  /**
-   * Destructor.
-   */
-  virtual ~Reporter() = default;
-
-  /**
-   * Method that a concrete Reporter class must implement to handle finished spans.
-   * For example, a span-buffer management policy could be implemented.
-   *
-   * @param span The span that needs action.
-   */
-  virtual void reportSpan(Span&& span) PURE;
-};
-
-using ReporterPtr = std::unique_ptr<Reporter>;
 
 /**
  * This class implements the Zipkin tracer. It has methods to create the appropriate Zipkin span
@@ -58,43 +32,37 @@ public:
    * @param random_generator Reference to the random-number generator to be used by the Tracer.
    * @param trace_id_128bit Whether 128bit ids should be used.
    * @param shared_span_context Whether shared span id should be used.
+   * @param timestamp_trace_ids Whether to include timestamp in first 4 bytes of trace IDs.
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
          Random::RandomGenerator& random_generator, const bool trace_id_128bit,
          const bool shared_span_context, TimeSource& time_source,
-         bool split_spans_for_request = false)
+         bool split_spans_for_request = false, bool timestamp_trace_ids = false)
       : service_name_(service_name), address_(address), reporter_(nullptr),
         random_generator_(random_generator), trace_id_128bit_(trace_id_128bit),
         shared_span_context_(shared_span_context), time_source_(time_source),
-        split_spans_for_request_(split_spans_for_request) {}
+        split_spans_for_request_(split_spans_for_request),
+        timestamp_trace_ids_(timestamp_trace_ids) {}
 
   /**
-   * Creates a "root" Zipkin span.
-   *
-   * @param config The tracing configuration
-   * @param span_name Name of the new span.
-   * @param start_time The time indicating the beginning of the span.
-   * @return SpanPtr The root span.
+   * Sets the trace context option for header injection behavior.
+   * @param trace_context_option The trace context option from ZipkinConfig.
    */
-  SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp);
+  void setTraceContextOption(TraceContextOption trace_context_option) {
+    trace_context_option_ = trace_context_option;
+  }
 
   /**
-   * Depending on the given context, creates either a "child" or a "shared-context" Zipkin span.
-   *
-   * @param config The tracing configuration
-   * @param span_name Name of the new span.
-   * @param start_time The time indicating the beginning of the span.
-   * @param previous_context The context of the span preceding the one to be created.
-   * @return SpanPtr The child span.
+   * Gets the current trace context option.
+   * @return The current trace context option.
    */
+  TraceContextOption traceContextOption() const override { return trace_context_option_; }
+
+  // TracerInterface
+  SpanPtr startSpan(const Tracing::Config&, const std::string& span_name,
+                    SystemTime timestamp) override;
   SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp,
-                    const SpanContext& previous_context);
-
-  /**
-   * TracerInterface::reportSpan.
-   *
-   * @param span The span to be reported.
-   */
+                    const SpanContext& previous_context) override;
   void reportSpan(Span&& span) override;
 
   /**
@@ -105,6 +73,15 @@ public:
   void setReporter(ReporterPtr reporter);
 
 private:
+  /**
+   * Generates a 64-bit value with a timestamp in the first 4 bytes if enabled.
+   * Format when enabled: [32-bit epoch seconds][32-bit random]
+   * Otherwise: fully random 64-bit.
+   *
+   * @return uint64_t value with optional timestamp prefix
+   */
+  uint64_t generateTraceId();
+
   const std::string service_name_;
   Network::Address::InstanceConstSharedPtr address_;
   ReporterPtr reporter_;
@@ -113,6 +90,8 @@ private:
   const bool shared_span_context_;
   TimeSource& time_source_;
   const bool split_spans_for_request_{};
+  TraceContextOption trace_context_option_{envoy::config::trace::v3::ZipkinConfig::USE_B3};
+  const bool timestamp_trace_ids_{};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

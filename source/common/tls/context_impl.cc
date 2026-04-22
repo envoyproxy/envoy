@@ -26,6 +26,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -66,10 +67,11 @@ int ContextImpl::sslExtendedSocketInfoIndex() {
   }());
 }
 
-ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
-                         Server::Configuration::CommonFactoryContext& factory_context,
-                         Ssl::ContextAdditionalInitFunc additional_init,
-                         absl::Status& creation_status)
+ContextImpl::ContextImpl(
+    Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+    const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
+    Server::Configuration::CommonFactoryContext& factory_context,
+    Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status)
     : scope_(scope), stats_(generateSslStats(scope)), factory_context_(factory_context),
       tls_max_version_(config.maxProtocolVersion()),
       stat_name_set_(scope.symbolTable().makeSet("TransportSockets::Tls")),
@@ -94,11 +96,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   auto validator_or_error = cert_validator_factory->createCertValidator(
-      config.certificateValidationContext(), stats_, factory_context_);
+      config.certificateValidationContext(), stats_, factory_context_, scope);
   SET_AND_RETURN_IF_NOT_OK(validator_or_error.status(), creation_status);
   cert_validator_ = std::move(*validator_or_error);
 
-  const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
   std::vector<SSL_CTX*> ssl_contexts(tls_contexts_.size());
@@ -162,10 +163,18 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         return;
       }
     }
+
+    // Register certificate compression algorithms to reduce TLS handshake size (RFC 8879).
+    // Priority: brotli > zlib (brotli generally provides best compression for certs).
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tls_certificate_compression_brotli")) {
+      CertCompression::registerBrotli(ctx.ssl_ctx_.get());
+      CertCompression::registerZlib(ctx.ssl_ctx_.get());
+    }
   }
 
   auto verify_mode_or_error = cert_validator_->initializeSslContexts(
-      ssl_contexts, config.capabilities().provides_certificates);
+      ssl_contexts, config.capabilities().provides_certificates, scope);
   SET_AND_RETURN_IF_NOT_OK(verify_mode_or_error.status(), creation_status);
   auto verify_mode = verify_mode_or_error.value();
 
@@ -212,6 +221,13 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       if (!creation_status.ok()) {
         return;
       }
+
+      // Create and set the certificate expiration gauge.
+      Stats::Gauge& expiration_gauge =
+          Extensions::TransportSockets::Tls::createCertificateExpirationGauge(
+              scope, tls_certificate.certificateName());
+      expiration_gauge.set(Utility::getExpirationUnixTime(ctx.cert_chain_.get()).count());
+
       // The must staple extension means the certificate promises to carry
       // with it an OCSP staple. https://tools.ietf.org/html/rfc7633#section-6
       constexpr absl::string_view tls_feature_ext = "1.3.6.1.5.5.7.1.24";
@@ -480,6 +496,10 @@ enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* ou
     if (result.tls_alert.has_value() && out_alert) {
       *out_alert = result.tls_alert.value();
     }
+    // Store detailed error information for access log reporting.
+    if (result.error_details.has_value()) {
+      extended_socket_info->setCertificateValidationError(result.error_details.value());
+    }
     return ssl_verify_invalid;
   }
   }
@@ -511,6 +531,7 @@ ValidationResults ContextImpl::customVerifyCertChain(
       absl::NullSafeStringView(host_name));
   if (result.status != ValidationResults::ValidationStatus::Pending) {
     extended_socket_info->setCertificateValidationStatus(result.detailed_status);
+    extended_socket_info->setValidatedCertChain(std::move(result.validated_chain));
     extended_socket_info->onCertificateValidationCompleted(
         result.status == ValidationResults::ValidationStatus::Successful, false);
   }
@@ -617,9 +638,9 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
     auto ocsp_resp = ctx.ocsp_response_.get();
     if (ocsp_resp) {
       auto* ocsp_details = detail->mutable_ocsp_details();
-      ProtobufWkt::Timestamp* valid_from = ocsp_details->mutable_valid_from();
+      Protobuf::Timestamp* valid_from = ocsp_details->mutable_valid_from();
       TimestampUtil::systemClockToTimestamp(ocsp_resp->getThisUpdate(), *valid_from);
-      ProtobufWkt::Timestamp* expiration = ocsp_details->mutable_expiration();
+      Protobuf::Timestamp* expiration = ocsp_details->mutable_expiration();
       TimestampUtil::systemClockToTimestamp(ocsp_resp->getNextUpdate(), *expiration);
     }
     cert_details.push_back(std::move(detail));

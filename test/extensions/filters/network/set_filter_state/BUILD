@@ -16,6 +16,9 @@ envoy_extension_cc_test(
     srcs = [
         "integration_test.cc",
     ],
+    data = [
+        "//test/config/integration/certs",
+    ],
     extension_names = ["envoy.filters.network.set_filter_state"],
     rbe_pool = "6gig",
     deps = [
@@ -25,5 +28,7 @@ envoy_extension_cc_test(
         "//test/integration:integration_lib",
         "//test/integration:utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

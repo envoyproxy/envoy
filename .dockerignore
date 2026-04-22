@@ -2,6 +2,7 @@
 !/VERSION.txt
 !/build_envoy
 !/ci
+!/distribution/docker
 !/configs/google-vrp
 !/configs/*yaml
 !/linux/amd64/release.tar.zst

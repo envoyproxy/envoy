@@ -1,5 +1,29 @@
 # `@envoy_repo` repository rule for managing the repo and querying its metadata.
 
+CONTAINERS = """
+
+REPO = "{repo}"
+REPO_GCR = "{repo_gcr}"
+SHA = "{sha}"
+SHA_GCC = "{sha_gcc}"
+SHA_MOBILE = "{sha_mobile}"
+SHA_WORKER = "{sha_worker}"
+TAG = "{tag}"
+
+def image_gcc():
+    return "%s@sha256:%s" % (
+        REPO_GCR, SHA_GCC)
+
+def image_mobile():
+    return "%s@sha256:%s" % (
+        REPO, SHA_MOBILE)
+
+def image_worker():
+    return "%s@sha256:%s" % (
+        REPO_GCR, SHA_WORKER)
+
+"""
+
 def _envoy_repo_impl(repository_ctx):
     """This provides information about the Envoy repository
 
@@ -40,22 +64,110 @@ def _envoy_repo_impl(repository_ctx):
     ```
 
     """
+
+    # parse container information for use in RBE
+    json_result = repository_ctx.execute([
+        repository_ctx.path(repository_ctx.attr.yq),
+        repository_ctx.path(repository_ctx.attr.envoy_ci_config),
+        "-ojson",
+    ])
+    if json_result.return_code != 0:
+        fail("yq failed: {}".format(json_result.stderr))
+    repository_ctx.file("ci-config.json", json_result.stdout)
+    config_data = json.decode(repository_ctx.read("ci-config.json"))
+    repository_ctx.file("containers.bzl", CONTAINERS.format(
+        repo = config_data["build-image"]["repo"],
+        repo_gcr = config_data["build-image"]["repo-gcr"],
+        sha = config_data["build-image"]["sha"],
+        sha_gcc = config_data["build-image"]["sha-gcc"],
+        sha_mobile = config_data["build-image"]["sha-mobile"],
+        sha_worker = config_data["build-image"]["sha-worker"],
+        tag = config_data["build-image"]["tag"],
+    ))
     repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)
     api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
     version = repository_ctx.read(repo_version_path).strip()
     api_version = repository_ctx.read(api_version_path).strip()
+
+    # Read BAZEL_LLVM_PATH environment variable for local LLVM installations
+    llvm_path = repository_ctx.os.environ.get("BAZEL_LLVM_PATH", "")
+    local_llvm = "True" if llvm_path else "False"
+
+    # By default, even when local toolchain is used, we still use the hermetic
+    # sysroot, when it's undesirable, you can set this environment variable to True
+    # to fallback to the host libc.
+    #
+    # NOTE: The cleanest way to provide this environment variable would be via Bazel's
+    # repo_env flag. It's particularly important when using remote build execution (aka
+    # RBE), as host environment variables are not directly passed to remote workers.
+    local_sysroot = repository_ctx.os.environ.get("BAZEL_USE_HOST_SYSROOT", "False")
+
+    # Make sure to not pass the content of environment variable directly to the Bazel
+    # Starlark file - we should only accept a proper boolean value and nothing else.
+    local_sysroot = {"True": True, "False": False}.get(local_sysroot, False)
+
+    repository_ctx.file("compiler.bzl", """
+LLVM_PATH = '%s'
+USE_LOCAL_SYSROOT = %s
+""" % (llvm_path, local_sysroot))
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
-    repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
+    repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", '''
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_python//python:defs.bzl", "py_library")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("//:path.bzl", "PATH")
 
+bool_flag(
+    name = "use_local_llvm_flag",
+    build_setting_default = %s,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "use_local_llvm",
+    flag_values = {
+        ":use_local_llvm_flag": "True",
+    },
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+bool_flag(
+    name = "use_local_sysroot_flag",
+    build_setting_default = %s,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "use_local_sysroot",
+    flag_values = {
+        ":use_local_sysroot_flag": "True",
+    },
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "use_hermetic_sysroot",
+    flag_values = {
+        ":use_local_sysroot_flag": "False",
+    },
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "envoy_repo",
-    srcs = ["__init__.py"],
+    srcs = ["envoy_repo.py"],
     visibility = ["//visibility:public"],
 )
 
@@ -63,7 +175,7 @@ py_console_script_binary(
     name = "get_project_json",
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project_data",
-    data = [":__init__.py"],
+    data = [":envoy_repo.py"],
 )
 
 genrule(
@@ -134,7 +246,7 @@ py_console_script_binary(
         "--release-message-path=$(location @envoy//changelogs:summary)",
     ],
     data = [
-        ":__init__.py",
+        ":envoy_repo.py",
         "@envoy//changelogs:summary",
     ],
     pkg = "@base_pip3//envoy_base_utils",
@@ -149,7 +261,7 @@ py_console_script_binary(
     ],
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    data = [":__init__.py"],
+    data = [":envoy_repo.py"],
 )
 
 py_console_script_binary(
@@ -160,7 +272,7 @@ py_console_script_binary(
     ],
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    data = [":__init__.py"],
+    data = [":envoy_repo.py"],
 )
 
 py_console_script_binary(
@@ -171,7 +283,7 @@ py_console_script_binary(
     ],
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    data = [":__init__.py"],
+    data = [":envoy_repo.py"],
 )
 
 py_console_script_binary(
@@ -182,17 +294,20 @@ py_console_script_binary(
     ],
     pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    data = [":__init__.py"],
+    data = [":envoy_repo.py"],
 )
 
-''')
+''' % (local_llvm, local_sysroot))
 
 _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
     attrs = {
         "envoy_version": attr.label(default = "@envoy//:VERSION.txt"),
         "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
+        "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
+        "yq": attr.label(default = "@yq"),
     },
+    environ = ["BAZEL_LLVM_PATH", "BAZEL_USE_HOST_SYSROOT"],
 )
 
 def envoy_repo():

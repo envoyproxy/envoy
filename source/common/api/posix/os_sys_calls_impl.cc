@@ -1,3 +1,5 @@
+#include "source/common/api/os_sys_calls_impl.h"
+
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -7,7 +9,6 @@
 
 #include "envoy/network/socket.h"
 
-#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/address_impl.h"
 
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
@@ -418,6 +419,16 @@ SysCallIntResult OsSysCallsImpl::getaddrinfo(const char* node, const char* servi
 }
 
 void OsSysCallsImpl::freeaddrinfo(addrinfo* res) { ::freeaddrinfo(res); }
+
+SysCallIntResult OsSysCallsImpl::getrlimit(int resource, struct rlimit* rlim) {
+  const int rc = ::getrlimit(resource, rlim);
+  return {rc, errno};
+}
+
+SysCallIntResult OsSysCallsImpl::setrlimit(int resource, const struct rlimit* rlim) {
+  const int rc = ::setrlimit(resource, rlim);
+  return {rc, errno};
+}
 
 } // namespace Api
 } // namespace Envoy

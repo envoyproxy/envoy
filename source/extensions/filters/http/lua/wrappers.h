@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/header_map.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/crypto/utility.h"
@@ -147,7 +148,7 @@ public:
 
 private:
   DynamicMetadataMapWrapper& parent_;
-  Protobuf::Map<std::string, ProtobufWkt::Struct>::const_iterator current_;
+  Protobuf::Map<std::string, Protobuf::Struct>::const_iterator current_;
 };
 
 /**
@@ -165,7 +166,7 @@ public:
 
 private:
   ConnectionDynamicMetadataMapWrapper& parent_;
-  Protobuf::Map<std::string, ProtobufWkt::Struct>::const_iterator current_;
+  Protobuf::Map<std::string, Protobuf::Struct>::const_iterator current_;
 };
 
 /**
@@ -261,6 +262,39 @@ private:
 };
 
 /**
+ * Lua wrapper for accessing filter state objects.
+ */
+class FilterStateWrapper : public Filters::Common::Lua::BaseLuaObject<FilterStateWrapper> {
+public:
+  FilterStateWrapper(StreamInfoWrapper& parent) : parent_(parent) {}
+  static ExportedFunctions exportedFunctions() {
+    return {{"get", static_luaGet}, {"set", static_luaSet}};
+  }
+
+private:
+  /**
+   * Get a filter state object by name, with an optional field name.
+   * @param 1 (string): object name.
+   * @param 2 (string, optional): field name for objects that support field access.
+   * @return filter state value as string, or nil if not found.
+   */
+  DECLARE_LUA_FUNCTION(FilterStateWrapper, luaGet);
+
+  /**
+   * Set a filter state object by name using a registered factory.
+   * @param 1 (string): object key (the name under which the object is stored).
+   * @param 2 (string): factory key (the registered ObjectFactory name).
+   * @param 3 (string): bytes payload to pass to the factory's createFromBytes.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(FilterStateWrapper, luaSet);
+
+  StreamInfo::StreamInfo& streamInfo();
+
+  StreamInfoWrapper& parent_;
+};
+
+/**
  * Lua wrapper for a stream info.
  */
 class StreamInfoWrapper : public Filters::Common::Lua::BaseLuaObject<StreamInfoWrapper> {
@@ -269,6 +303,8 @@ public:
   static ExportedFunctions exportedFunctions() {
     return {{"protocol", static_luaProtocol},
             {"dynamicMetadata", static_luaDynamicMetadata},
+            {"dynamicTypedMetadata", static_luaDynamicTypedMetadata},
+            {"filterState", static_luaFilterState},
             {"downstreamDirectLocalAddress", static_luaDownstreamDirectLocalAddress},
             {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
             {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
@@ -276,7 +312,8 @@ public:
             {"downstreamSslConnection", static_luaDownstreamSslConnection},
             {"requestedServerName", static_luaRequestedServerName},
             {"routeName", static_luaRouteName},
-            {"virtualClusterName", static_luaVirtualClusterName}};
+            {"virtualClusterName", static_luaVirtualClusterName},
+            {"drainConnectionUponCompletion", static_luaDrainConnectionUponCompletion}};
   }
 
 private:
@@ -291,6 +328,18 @@ private:
    * @return DynamicMetadataMapWrapper representation of StreamInfo dynamic metadata.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicMetadata);
+
+  /**
+   * Get reference to stream info typed metadata object.
+   * @return typed metadata wrapped as a Lua table.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicTypedMetadata);
+
+  /**
+   * Get reference to stream info filter state objects.
+   * @return filter state objects wrapped as a Lua table with string keys and serialized values.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaFilterState);
 
   /**
    * Get reference to stream info downstreamSslConnection.
@@ -342,18 +391,29 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaVirtualClusterName);
 
+  /**
+   * Drains the connection upon completion of this stream.
+   * For HTTP/1.1 this will add "Connection: close" header.
+   * For HTTP/2 and HTTP/3 this will trigger sending a GOAWAY frame.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDrainConnectionUponCompletion);
+
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {
     dynamic_metadata_wrapper_.reset();
+    filter_state_wrapper_.reset();
     downstream_ssl_connection_.reset();
   }
 
   StreamInfo::StreamInfo& stream_info_;
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<FilterStateWrapper> filter_state_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::SslConnectionWrapper>
       downstream_ssl_connection_;
 
   friend class DynamicMetadataMapWrapper;
+  friend class FilterStateWrapper;
 };
 
 /**
@@ -365,7 +425,8 @@ public:
   ConnectionStreamInfoWrapper(const StreamInfo::StreamInfo& connection_stream_info)
       : connection_stream_info_{connection_stream_info} {}
   static ExportedFunctions exportedFunctions() {
-    return {{"dynamicMetadata", static_luaConnectionDynamicMetadata}};
+    return {{"dynamicMetadata", static_luaConnectionDynamicMetadata},
+            {"dynamicTypedMetadata", static_luaConnectionDynamicTypedMetadata}};
   }
 
 private:
@@ -374,6 +435,12 @@ private:
    * @return ConnectionDynamicMetadataMapWrapper representation of StreamInfo dynamic metadata.
    */
   DECLARE_LUA_FUNCTION(ConnectionStreamInfoWrapper, luaConnectionDynamicMetadata);
+
+  /**
+   * Get reference to stream info typed metadata object.
+   * @return typed metadata wrapped as a Lua table.
+   */
+  DECLARE_LUA_FUNCTION(ConnectionStreamInfoWrapper, luaConnectionDynamicTypedMetadata);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override { connection_dynamic_metadata_wrapper_.reset(); }
@@ -406,6 +473,204 @@ private:
 class Timestamp {
 public:
   enum Resolution { Millisecond, Microsecond, Undefined };
+};
+
+class VirtualHostWrapper : public Filters::Common::Lua::BaseLuaObject<VirtualHostWrapper> {
+public:
+  VirtualHostWrapper(const StreamInfo::StreamInfo& stream_info,
+                     const absl::string_view filter_config_name)
+      : stream_info_{stream_info}, filter_config_name_{filter_config_name} {}
+
+  static ExportedFunctions exportedFunctions() { return {{"metadata", static_luaMetadata}}; }
+
+private:
+  /**
+   * @return a handle to the metadata.
+   */
+  DECLARE_LUA_FUNCTION(VirtualHostWrapper, luaMetadata);
+
+  const Protobuf::Struct& getMetadata() const;
+
+  // Filters::Common::Lua::BaseLuaObject
+  void onMarkDead() override { metadata_wrapper_.reset(); }
+
+  const StreamInfo::StreamInfo& stream_info_;
+  const absl::string_view filter_config_name_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+};
+
+class RouteWrapper : public Filters::Common::Lua::BaseLuaObject<RouteWrapper> {
+public:
+  RouteWrapper(const StreamInfo::StreamInfo& stream_info,
+               const absl::string_view filter_config_name)
+      : stream_info_{stream_info}, filter_config_name_{filter_config_name} {}
+
+  static ExportedFunctions exportedFunctions() { return {{"metadata", static_luaMetadata}}; }
+
+private:
+  /**
+   * @return a handle to the metadata.
+   */
+  DECLARE_LUA_FUNCTION(RouteWrapper, luaMetadata);
+
+  const Protobuf::Struct& getMetadata() const;
+
+  // Filters::Common::Lua::BaseLuaObject
+  void onMarkDead() override { metadata_wrapper_.reset(); }
+
+  const StreamInfo::StreamInfo& stream_info_;
+  const absl::string_view filter_config_name_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+};
+
+/**
+ * Lua wrapper for a stats Counter.
+ */
+class CounterWrapper : public Filters::Common::Lua::BaseLuaObject<CounterWrapper> {
+public:
+  explicit CounterWrapper(Stats::Counter& counter) : counter_(counter) {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"inc", static_luaInc}, {"add", static_luaAdd}, {"value", static_luaValue}};
+  }
+
+private:
+  /**
+   * Increment the counter by 1.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(CounterWrapper, luaInc);
+
+  /**
+   * Add an amount to the counter.
+   * @param 1 (int): amount to add.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(CounterWrapper, luaAdd);
+
+  /**
+   * Get the current value of the counter.
+   * @return int current value.
+   */
+  DECLARE_LUA_FUNCTION(CounterWrapper, luaValue);
+
+  Stats::Counter& counter_;
+};
+
+/**
+ * Lua wrapper for a stats Gauge.
+ */
+class GaugeWrapper : public Filters::Common::Lua::BaseLuaObject<GaugeWrapper> {
+public:
+  explicit GaugeWrapper(Stats::Gauge& gauge) : gauge_(gauge) {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"inc", static_luaInc}, {"dec", static_luaDec}, {"add", static_luaAdd},
+            {"sub", static_luaSub}, {"set", static_luaSet}, {"value", static_luaValue}};
+  }
+
+private:
+  /**
+   * Increment the gauge by 1.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaInc);
+
+  /**
+   * Decrement the gauge by 1.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaDec);
+
+  /**
+   * Add an amount to the gauge.
+   * @param 1 (int): amount to add.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaAdd);
+
+  /**
+   * Subtract an amount from the gauge.
+   * @param 1 (int): amount to subtract.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaSub);
+
+  /**
+   * Set the gauge to a specific value.
+   * @param 1 (int): value to set.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaSet);
+
+  /**
+   * Get the current value of the gauge.
+   * @return int current value.
+   */
+  DECLARE_LUA_FUNCTION(GaugeWrapper, luaValue);
+
+  Stats::Gauge& gauge_;
+};
+
+/**
+ * Lua wrapper for a stats Histogram.
+ */
+class HistogramWrapper : public Filters::Common::Lua::BaseLuaObject<HistogramWrapper> {
+public:
+  explicit HistogramWrapper(Stats::Histogram& histogram) : histogram_(histogram) {}
+
+  static ExportedFunctions exportedFunctions() { return {{"recordValue", static_luaRecordValue}}; }
+
+private:
+  /**
+   * Record a value in the histogram.
+   * @param 1 (int): value to record.
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(HistogramWrapper, luaRecordValue);
+
+  Stats::Histogram& histogram_;
+};
+
+/**
+ * Lua wrapper for a stats Scope. Allows Lua scripts to create and access
+ * counters, gauges, and histograms.
+ */
+class StatsScopeWrapper : public Filters::Common::Lua::BaseLuaObject<StatsScopeWrapper> {
+public:
+  explicit StatsScopeWrapper(Stats::Scope& scope) : scope_(scope) {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"counter", static_luaCounter},
+            {"gauge", static_luaGauge},
+            {"histogram", static_luaHistogram}};
+  }
+
+private:
+  /**
+   * Get or create a counter with the given name.
+   * @param 1 (string): counter name.
+   * @return CounterWrapper handle.
+   */
+  DECLARE_LUA_FUNCTION(StatsScopeWrapper, luaCounter);
+
+  /**
+   * Get or create a gauge with the given name.
+   * @param 1 (string): gauge name.
+   * @return GaugeWrapper handle.
+   */
+  DECLARE_LUA_FUNCTION(StatsScopeWrapper, luaGauge);
+
+  /**
+   * Get or create a histogram with the given name.
+   * @param 1 (string): histogram name.
+   * @param 2 (string, optional): unit - "ms"/"milliseconds", "microseconds", "bytes", or
+   *                              "unspecified" (default).
+   * @return HistogramWrapper handle.
+   */
+  DECLARE_LUA_FUNCTION(StatsScopeWrapper, luaHistogram);
+
+  Stats::Scope& scope_;
 };
 
 } // namespace Lua

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/http_server_properties_cache.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/http/conn_pool_base.h"
 
@@ -17,10 +18,11 @@ public:
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
       Upstream::ClusterConnectivityState& state,
       absl::optional<HttpServerPropertiesCache::Origin> origin,
-      Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache)
+      Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache,
+      Server::OverloadManager& overload_manager)
       : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
                              transport_socket_options, random_generator, state,
-                             {Protocol::Http2, Protocol::Http11}),
+                             {Protocol::Http2, Protocol::Http11}, overload_manager),
         http_server_properties_cache_(http_server_properties_cache), origin_(origin) {}
 
   Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;

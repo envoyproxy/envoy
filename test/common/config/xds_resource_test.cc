@@ -217,7 +217,27 @@ TEST(XdsResourceLocatorTest, Schemes) {
   }
 }
 
-// extra tests for fragment handling
+// Validate parsing for resources with alt directives.
+TEST(XdsResourceLocatorTest, AltFragements) {
+  {
+    constexpr absl::string_view alternative_uri = "xdstp://foo2/bar/baz/blah";
+    const auto alternative_locator = XdsResourceIdentifier::decodeUrl(alternative_uri).value();
+    const auto resource_locator =
+        XdsResourceIdentifier::decodeUrl(
+            absl::StrCat("xdstp://foo/bar/baz/blah?a=b#alt=", alternative_uri))
+            .value();
+    EXPECT_EQ(xds::core::v3::ResourceLocator::XDSTP, resource_locator.scheme());
+    EXPECT_EQ("foo", resource_locator.authority());
+    EXPECT_EQ("bar", resource_locator.resource_type());
+    EXPECT_EQ(resource_locator.id(), "baz/blah");
+    EXPECT_CONTEXT_PARAMS(resource_locator.exact_context(), Pair("a", "b"));
+    EXPECT_EQ(1, resource_locator.directives().size());
+    EXPECT_TRUE(
+        TestUtility::protoEqual(alternative_locator, resource_locator.directives()[0].alt()));
+    EXPECT_EQ(absl::StrCat("xdstp://foo/bar/baz/blah?a=b#alt=", alternative_uri),
+              XdsResourceIdentifier::encodeUrl(resource_locator));
+  }
+}
 
 } // namespace
 } // namespace Config

@@ -55,6 +55,7 @@ processing, which makes them suitable for RBAC policies.
    request.scheme, string, The scheme portion of the URL e.g. "http"
    request.method, string, Request method e.g. "GET"
    request.headers, "map<string, string>", All request headers indexed by the lower-cased header name
+   request.headers_bytes, int, Total size of request headers in bytes
    request.referer, string, Referer request header
    request.useragent, string, User agent request header
    request.time, timestamp, Time of the first byte received
@@ -90,6 +91,7 @@ Response attributes are only available after the request completes.
    response.flags, int, Additional details about the response beyond the standard response code encoded as a bit-vector
    response.grpc_status, int, Response gRPC status code
    response.headers, "map<string, string>", All response headers indexed by the lower-cased header name
+   response.headers_bytes, int, Total size of response headers in bytes
    response.trailers, "map<string, string>", All response trailers indexed by the lower-cased trailer name
    response.size, int, Size of the response body
    response.total_size, int, Total size of the response including the approximate uncompressed size of the headers and the trailers
@@ -121,6 +123,7 @@ RBAC):
    connection.uri_san_local_certificate, string, The first URI entry in the SAN field of the local certificate in the downstream TLS connection
    connection.uri_san_peer_certificate, string, The first URI entry in the SAN field of the peer certificate in the downstream TLS connection
    connection.sha256_peer_certificate_digest, string, SHA256 digest of the peer certificate in the downstream TLS connection if present
+   connection.peer_certificate, string, PEM-encoded peer certificate in the downstream TLS connection if present
    connection.transport_failure_reason, string, The transport failure reason e.g. certificate validation failed
 
 The following additional attributes are available upon the downstream connection termination:
@@ -141,6 +144,7 @@ The following attributes are available once the upstream connection is establish
    :widths: 1, 1, 4
 
    upstream.address, string, Upstream connection remote address
+   upstream.num_endpoints, uint64, the number of endpoints of the upstream cluster.
    upstream.port, int, Upstream connection remote port
    upstream.tls_version, string, TLS version of the upstream TLS connection
    upstream.subject_local_certificate, string, The subject field of the local certificate in the upstream TLS connection
@@ -150,6 +154,7 @@ The following attributes are available once the upstream connection is establish
    upstream.uri_san_local_certificate, string, The first URI entry in the SAN field of the local certificate in the upstream TLS connection
    upstream.uri_san_peer_certificate, string, The first URI entry in the SAN field of the peer certificate in the upstream TLS connection
    upstream.sha256_peer_certificate_digest, string, SHA256 digest of the peer certificate in the upstream TLS connection if present
+   upstream.peer_certificate, string, PEM-encoded peer certificate in the upstream TLS connection if present
    upstream.local_address, string, The local address of the upstream connection
    upstream.transport_failure_reason, string, The upstream transport failure reason e.g. certificate validation failed
    upstream.request_attempt_count, uint, The count of upstream request attempts. A value of ‘0’ indicates that the request was never attempted upstream
@@ -201,6 +206,7 @@ following attributes:
    xds.virtual_host_name, string, Virtual host name.
    xds.virtual_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Virtual host metadata
    xds.upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata
+   xds.upstream_host_locality_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host locality metadata
    xds.filter_chain_name, string, Listener filter chain name
 
 

@@ -23,13 +23,19 @@ public:
   const absl::optional<std::string>& ispDbPath() const { return isp_db_path_; }
   const absl::optional<std::string>& anonDbPath() const { return anon_db_path_; }
   const absl::optional<std::string>& asnDbPath() const { return asn_db_path_; }
+  const absl::optional<std::string>& countryDbPath() const { return country_db_path_; }
 
   bool isLookupEnabledForHeader(const absl::optional<std::string>& header);
+  bool isAsnDbPathSet() const { return asn_db_path_.has_value(); }
+  bool isIspDbPathSet() const { return isp_db_path_.has_value(); }
+  bool isCountryDbPathSet() const { return country_db_path_.has_value(); }
+  bool isCityDbPathSet() const { return city_db_path_.has_value(); }
 
   const absl::optional<std::string>& countryHeader() const { return country_header_; }
   const absl::optional<std::string>& cityHeader() const { return city_header_; }
   const absl::optional<std::string>& regionHeader() const { return region_header_; }
   const absl::optional<std::string>& asnHeader() const { return asn_header_; }
+  const absl::optional<std::string>& asnOrgHeader() const { return asn_org_header_; }
 
   const absl::optional<std::string>& anonHeader() const { return anon_header_; }
   const absl::optional<std::string>& anonVpnHeader() const { return anon_vpn_header_; }
@@ -65,6 +71,12 @@ public:
                                           unknown_hit_));
   }
 
+  void setDbBuildEpoch(absl::string_view maxmind_db_type, const uint64_t value) {
+    setGuage(
+        stat_name_set_->getBuiltin(absl::StrCat(maxmind_db_type, ".db_build_epoch"), unknown_hit_),
+        value);
+  }
+
   void registerGeoDbStats(const absl::string_view& db_type);
 
   Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }
@@ -74,11 +86,13 @@ private:
   absl::optional<std::string> isp_db_path_;
   absl::optional<std::string> anon_db_path_;
   absl::optional<std::string> asn_db_path_;
+  absl::optional<std::string> country_db_path_;
 
   absl::optional<std::string> country_header_;
   absl::optional<std::string> city_header_;
   absl::optional<std::string> region_header_;
   absl::optional<std::string> asn_header_;
+  absl::optional<std::string> asn_org_header_;
 
   absl::optional<std::string> anon_header_;
   absl::optional<std::string> anon_vpn_header_;
@@ -93,6 +107,7 @@ private:
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName unknown_hit_;
   void incCounter(Stats::StatName name);
+  void setGuage(Stats::StatName name, const uint64_t value);
 };
 
 using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;
@@ -131,6 +146,7 @@ private:
   MaxmindDbSharedPtr isp_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   MaxmindDbSharedPtr anon_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   MaxmindDbSharedPtr asn_db_ ABSL_GUARDED_BY(mmdb_mutex_);
+  MaxmindDbSharedPtr country_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   Thread::ThreadPtr mmdb_reload_thread_;
   Event::DispatcherPtr mmdb_reload_dispatcher_;
   Filesystem::WatcherPtr mmdb_watcher_;
@@ -144,6 +160,8 @@ private:
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInIspDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
+  void lookupInCountryDb(const Network::Address::InstanceConstSharedPtr& remote_address,
+                         absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   absl::Status onMaxmindDbUpdate(const std::string& db_path, const absl::string_view& db_type);
   absl::Status mmdbReload(const MaxmindDbSharedPtr reloaded_db, const absl::string_view& db_type)
       ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
@@ -155,10 +173,12 @@ private:
   MaxmindDbSharedPtr getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getAsnDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
+  MaxmindDbSharedPtr getCountryDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   void updateCityDb(MaxmindDbSharedPtr city_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   void updateIspDb(MaxmindDbSharedPtr isp_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   void updateAnonDb(MaxmindDbSharedPtr anon_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   void updateAsnDb(MaxmindDbSharedPtr asn_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
+  void updateCountryDb(MaxmindDbSharedPtr country_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
   const Singleton::InstanceSharedPtr owner_;
   // Used for testing only.

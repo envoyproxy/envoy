@@ -10,33 +10,6 @@
 namespace Envoy {
 namespace Secret {
 
-TlsCertificateConfigProviderImpl::TlsCertificateConfigProviderImpl(
-    const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& tls_certificate)
-    : tls_certificate_(
-          std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>(
-              tls_certificate)) {}
-
-CertificateValidationContextConfigProviderImpl::CertificateValidationContextConfigProviderImpl(
-    const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
-        certificate_validation_context)
-    : certificate_validation_context_(
-          std::make_unique<
-              envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>(
-              certificate_validation_context)) {}
-
-TlsSessionTicketKeysConfigProviderImpl::TlsSessionTicketKeysConfigProviderImpl(
-    const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&
-        tls_session_ticket_keys)
-    : tls_session_ticket_keys_(
-          std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys>(
-              tls_session_ticket_keys)) {}
-
-GenericSecretConfigProviderImpl::GenericSecretConfigProviderImpl(
-    const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret)
-    : generic_secret_(
-          std::make_unique<envoy::extensions::transport_sockets::tls::v3::GenericSecret>(
-              generic_secret)) {}
-
 absl::StatusOr<std::unique_ptr<ThreadLocalGenericSecretProvider>>
 ThreadLocalGenericSecretProvider::create(GenericSecretConfigProviderSharedPtr&& provider,
                                          ThreadLocal::SlotAllocator& tls, Api::Api& api) {
@@ -74,8 +47,9 @@ absl::Status ThreadLocalGenericSecretProvider::update() {
     RETURN_IF_NOT_OK_REF(value_or_error.status());
     value = std::move(value_or_error.value());
   }
-  tls_->runOnAllThreads(
-      [value = std::move(value)](OptRef<ThreadLocalSecret> tls) { tls->value_ = value; });
+  tls_->set([value = std::move(value)](Event::Dispatcher&) {
+    return std::make_shared<ThreadLocalSecret>(value);
+  });
   return absl::OkStatus();
 }
 

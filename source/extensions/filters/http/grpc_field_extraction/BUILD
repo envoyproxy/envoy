@@ -14,9 +14,9 @@ envoy_cc_library(
     hdrs = ["extractor.h"],
     external_deps = ["grpc_transcoding"],
     deps = [
-        "@com_google_absl//absl/status",
-        "@com_google_protofieldextraction//:all_libs",
+        "@abseil-cpp//absl/status",
         "@envoy_api//envoy/extensions/filters/http/grpc_field_extraction/v3:pkg_cc_proto",
+        "@proto-field-extraction//:all_libs",
     ],
 )
 
@@ -27,10 +27,11 @@ envoy_cc_library(
     external_deps = ["grpc_transcoding"],
     deps = [
         "extractor",
+        "//envoy/common:exception_lib",
         "//source/common/common:minimal_logger_lib",
-        "@com_google_absl//absl/status",
-        "@com_google_protofieldextraction//:all_libs",
+        "@abseil-cpp//absl/status",
         "@envoy_api//envoy/extensions/filters/http/grpc_field_extraction/v3:pkg_cc_proto",
+        "@proto-field-extraction//:all_libs",
     ],
 )
 

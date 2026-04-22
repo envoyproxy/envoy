@@ -15,6 +15,7 @@ class LinuxOsSysCallsImpl : public LinuxOsSysCalls {
 public:
   // Api::LinuxOsSysCalls
   SysCallIntResult sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t* mask) override;
+  SysCallIntResult setns(int fd, int nstype) const override;
 };
 
 using LinuxOsSysCallsSingleton = ThreadSafeSingleton<LinuxOsSysCallsImpl>;

@@ -99,6 +99,14 @@ StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& 
   if (bootstrap.stats_flush_case() == envoy::config::bootstrap::v3::Bootstrap::kStatsFlushOnAdmin) {
     flush_on_admin_ = bootstrap.stats_flush_on_admin();
   }
+
+  const auto evict_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_eviction_interval, 0);
+  if (evict_interval_ms % flush_interval_.count() != 0) {
+    status = absl::InvalidArgumentError(
+        "stats_eviction_interval must be a multiple of stats_flush_interval");
+    return;
+  }
+  evict_on_flush_ = evict_interval_ms / flush_interval_.count();
 }
 
 absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,

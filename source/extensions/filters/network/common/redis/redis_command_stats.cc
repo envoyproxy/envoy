@@ -26,6 +26,10 @@ RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std
       Extensions::NetworkFilters::Common::Redis::SupportedCommands::evalCommands());
   stat_name_set_->rememberBuiltins(Extensions::NetworkFilters::Common::Redis::SupportedCommands::
                                        hashMultipleSumResultCommands());
+  stat_name_set_->rememberBuiltins(
+      Extensions::NetworkFilters::Common::Redis::SupportedCommands::ClusterScopeCommands());
+  stat_name_set_->rememberBuiltins(
+      Extensions::NetworkFilters::Common::Redis::SupportedCommands::randomShardCommands());
   stat_name_set_->rememberBuiltin(
       Extensions::NetworkFilters::Common::Redis::SupportedCommands::mget());
   stat_name_set_->rememberBuiltin(

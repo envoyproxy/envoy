@@ -301,6 +301,14 @@ public:
 
   void setCodecCallbacks(ServerCodecCallbacks& callbacks) override { callbacks_ = &callbacks; }
   void decode(Envoy::Buffer::Instance& buffer, bool) override {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.generic_proxy_codec_buffer_limit")) {
+      if (decoding_buffer_.length() + buffer.length() > callbacks_->connection()->bufferLimit()) {
+        callbacks_->onDecodingFailure();
+        return;
+      }
+    }
+
     if (!decodeBuffer(buffer)) {
       onDecodingFailure();
     }
@@ -362,6 +370,13 @@ public:
 
   void setCodecCallbacks(ClientCodecCallbacks& callbacks) override { callbacks_ = &callbacks; }
   void decode(Envoy::Buffer::Instance& buffer, bool) override {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.generic_proxy_codec_buffer_limit")) {
+      if (decoding_buffer_.length() + buffer.length() > callbacks_->connection()->bufferLimit()) {
+        callbacks_->onDecodingFailure();
+        return;
+      }
+    }
     if (!decodeBuffer(buffer)) {
       onDecodingFailure();
     }

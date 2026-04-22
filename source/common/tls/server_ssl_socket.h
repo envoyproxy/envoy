@@ -36,7 +36,7 @@ class ServerSslSocketFactory : public Network::DownstreamTransportSocketFactory,
 public:
   static absl::StatusOr<std::unique_ptr<ServerSslSocketFactory>>
   create(Envoy::Ssl::ServerContextConfigPtr config, Envoy::Ssl::ContextManager& manager,
-         Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
+         Stats::Scope& stats_scope);
 
   ~ServerSslSocketFactory() override;
 
@@ -49,7 +49,6 @@ public:
 protected:
   ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPtr config,
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
-                         const std::vector<std::string>& server_names,
                          absl::Status& creation_status);
 
 private:
@@ -57,7 +56,6 @@ private:
   Stats::Scope& stats_scope_;
   SslSocketFactoryStats stats_;
   Envoy::Ssl::ServerContextConfigPtr config_;
-  const std::vector<std::string> server_names_;
   mutable absl::Mutex ssl_ctx_mu_;
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
 };

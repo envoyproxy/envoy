@@ -47,7 +47,7 @@ public:
 
 protected:
   InternalEngine* internalEngine() {
-    absl::MutexLock l(&engine_lock_);
+    absl::MutexLock l(engine_lock_);
     return engine_->engine_;
   }
   void initialize() override;

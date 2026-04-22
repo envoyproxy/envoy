@@ -504,11 +504,11 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
-  ProtobufWkt::Value v1;
+  Protobuf::Value v1;
   v1.set_string_value("v1");
   auto b1 = Grpc::Common::serializeToGrpcFrame(v1);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(*b1, false));
-  ProtobufWkt::Value v2;
+  Protobuf::Value v2;
   v2.set_string_value("v2");
   auto b2 = Grpc::Common::serializeToGrpcFrame(v2);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(*b2, true));

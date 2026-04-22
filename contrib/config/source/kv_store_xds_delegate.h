@@ -79,7 +79,7 @@ public:
   std::string name() const override;
 
   Envoy::Config::XdsResourcesDelegatePtr
-  createXdsResourcesDelegate(const ProtobufWkt::Any& config,
+  createXdsResourcesDelegate(const Protobuf::Any& config,
                              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                              Event::Dispatcher& dispatcher) override;
 };

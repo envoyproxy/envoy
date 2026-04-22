@@ -26,7 +26,7 @@ public:
   // TapFilter::HttpTapConfig
   HttpPerRequestTapperPtr
   createPerRequestTapper(const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
-                         uint64_t stream_id, OptRef<const Network::Connection> connection) override;
+                         Http::StreamDecoderFilterCallbacks& decoder_callbacks) override;
 
   TimeSource& timeSource() const override { return time_source_; }
 
@@ -38,12 +38,14 @@ class HttpPerRequestTapperImpl : public HttpPerRequestTapper, Logger::Loggable<L
 public:
   HttpPerRequestTapperImpl(HttpTapConfigSharedPtr config,
                            const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
-                           uint64_t stream_id, OptRef<const Network::Connection> connection)
-      : config_(std::move(config)),
+                           Http::StreamDecoderFilterCallbacks& callbacks)
+      : config_(std::move(config)), decoder_callbacks_(callbacks),
         should_record_headers_received_time_(tap_config.record_headers_received_time()),
         should_record_downstream_connection_(tap_config.record_downstream_connection()),
-        stream_id_(stream_id), sink_handle_(config_->createPerTapSinkHandleManager(stream_id)),
-        statuses_(config_->createMatchStatusVector()), connection_(connection) {
+        should_record_upstream_connection_(tap_config.record_upstream_connection()),
+        stream_id_(callbacks.streamId()),
+        sink_handle_(config_->createPerTapSinkHandleManager(callbacks.streamId())),
+        statuses_(config_->createMatchStatusVector()), connection_(callbacks.connection()) {
     config_->rootMatcher().onNewStream(statuses_);
   }
 
@@ -91,10 +93,13 @@ private:
                     config_->timeSource().systemTime().time_since_epoch())
                     .count();
   }
+  void setUpstreamConnection(envoy::data::tap::v3::Connection& up_stream_conn);
 
   HttpTapConfigSharedPtr config_;
+  Http::StreamDecoderFilterCallbacks& decoder_callbacks_;
   const bool should_record_headers_received_time_;
   const bool should_record_downstream_connection_;
+  const bool should_record_upstream_connection_;
   const uint64_t stream_id_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   Extensions::Common::Tap::Matcher::MatchStatusVector statuses_;

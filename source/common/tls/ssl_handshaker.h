@@ -87,11 +87,22 @@ public:
   void setCertificateValidationAlert(uint8_t alert) { cert_validation_alert_ = alert; }
 
   Ssl::CertificateSelectionCallbackPtr createCertificateSelectionCallback() override;
+  void setCertSelectionHandle(Ssl::SelectionHandleConstSharedPtr cert_selection_handle) override {
+    ASSERT(cert_selection_handle_ == nullptr);
+    cert_selection_handle_ = std::move(cert_selection_handle);
+  }
   void onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool staple,
                                        bool async) override;
   Ssl::CertificateSelectionStatus certificateSelectionResult() const override {
     return cert_selection_result_;
   }
+
+  void setCertificateValidationError(absl::string_view error_details) override {
+    cert_validation_error_ = std::string(error_details);
+  }
+  absl::string_view certificateValidationError() const override { return cert_validation_error_; }
+
+  void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) override;
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
@@ -112,6 +123,10 @@ private:
   // NotStarted if no cert selection has ever been kicked off.
   Ssl::CertificateSelectionStatus cert_selection_result_{
       Ssl::CertificateSelectionStatus::NotStarted};
+  // Stores the detailed certificate validation error message.
+  std::string cert_validation_error_;
+  // Stores additional per-connection data needed by the certificate selector.
+  Ssl::SelectionHandleConstSharedPtr cert_selection_handle_;
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,
@@ -134,6 +149,14 @@ public:
   void setState(Ssl::SocketState state) { state_ = state; }
   Ssl::HandshakeCallbacks* handshakeCallbacks() { return handshake_callbacks_; }
 
+  void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) {
+    validated_chain_ = std::move(chain);
+  }
+  // Returns the direct issuer from the validated chain, or nullptr if unavailable.
+  X509* validatedPeerIssuer() const override {
+    return validated_chain_.size() >= 2 ? validated_chain_[1].get() : nullptr;
+  }
+
   bssl::UniquePtr<SSL> ssl_;
 
 private:
@@ -141,6 +164,7 @@ private:
 
   Ssl::SocketState state_{Ssl::SocketState::PreHandshake};
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
+  std::vector<bssl::UniquePtr<X509>> validated_chain_;
 };
 
 using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;
@@ -174,7 +198,7 @@ public:
   std::string name() const override { return "envoy.default_tls_handshaker"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   Ssl::HandshakerFactoryCb createHandshakerCb(const Protobuf::Message&,

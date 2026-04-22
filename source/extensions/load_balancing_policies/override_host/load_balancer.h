@@ -19,7 +19,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
-#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/load_balancing_policies/override_host/override_host_filter_state.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -28,7 +28,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace OverrideHost {
 
 using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
@@ -70,9 +70,11 @@ public:
                                     RandomGenerator& random, TimeSource& time_source) const;
 
   const std::vector<OverrideSource>& overrideHostSources() const { return override_host_sources_; }
+  const absl::optional<Config::MetadataKey>& selectedHostKey() const { return selected_host_key_; }
 
 private:
   OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
+                       absl::optional<Config::MetadataKey>&& selected_host_key,
                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                        LoadBalancerConfigPtr&& fallback_load_balancer_config);
 
@@ -88,6 +90,7 @@ private:
   const FallbackLbConfig fallback_picker_lb_config_;
 
   const std::vector<OverrideSource> override_host_sources_;
+  const absl::optional<Config::MetadataKey> selected_host_key_;
 };
 
 // Load balancer for the dynamic forwarding, supporting external endpoint
@@ -145,14 +148,16 @@ private:
     }
 
   private:
-    HostConstSharedPtr getEndpoint(const std::vector<std::string>& selected_hosts,
-                                   StreamInfo::FilterState& filter_state);
+    HostConstSharedPtr getEndpoint(OverrideHostFilterState& override_host_state);
     HostConstSharedPtr findHost(absl::string_view endpoint);
 
+    HostSelectionResponse chooseHostInternal(LoadBalancerContext* context);
+
+    void addSelectedHostKey(LoadBalancerContext* context, HostSelectionResponse& response);
+
     // Lookup the list of endpoints selected by the LbTrafficExtension in the
-    // header (if configured) or in the request metadata.
-    // nullptr if neither host nor metadata is present.
-    // Error if the metadata is present but cannot be parsed.
+    // header or in the request metadata.
+    // TODO(wbpcode): will absl::InlinedVector be used here be better?
     std::vector<std::string> getSelectedHosts(LoadBalancerContext* context);
 
     // Return a list of endpoints selected by the LbTrafficExtension.
@@ -197,6 +202,6 @@ private:
 };
 
 } // namespace OverrideHost
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

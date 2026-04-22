@@ -6,6 +6,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "quiche/common/platform/api/quiche_logging.h"

@@ -298,7 +298,7 @@ public:
    * Get type URL from a typed config.
    * @param typed_config for the extension config.
    */
-  static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
+  static std::string getFactoryType(const Protobuf::Any& typed_config) {
     static const std::string typed_struct_type(
         xds::type::v3::TypedStruct::default_instance().GetTypeName());
     static const std::string legacy_typed_struct_type(
@@ -324,7 +324,7 @@ public:
    * Get a Factory from the registry by type URL.
    * @param typed_config for the extension config.
    */
-  template <class Factory> static Factory* getFactoryByType(const ProtobufWkt::Any& typed_config) {
+  template <class Factory> static Factory* getFactoryByType(const Protobuf::Any& typed_config) {
     if (typed_config.type_url().empty()) {
       return nullptr;
     }
@@ -367,7 +367,7 @@ public:
    */
   template <class Factory>
   static ProtobufTypes::MessagePtr
-  translateAnyToFactoryConfig(const ProtobufWkt::Any& typed_config,
+  translateAnyToFactoryConfig(const Protobuf::Any& typed_config,
                               ProtobufMessage::ValidationVisitor& validation_visitor,
                               Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
@@ -388,19 +388,39 @@ public:
   static std::string truncateGrpcStatusMessage(absl::string_view error_message);
 
   /**
+   * Obtain Grpc service config from the api config source.
+   * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
+   * @param grpc_service_idx index of the grpc service in the api_config_source. If there's no entry
+   *                         in the given index, a nullptr factory will be returned.
+   * @param xdstp_config_source whether the config source will be used for xdstp config source.
+   *                            These sources must be of type AGGREGATED_GRPC or
+   *                            AGGREGATED_DELTA_GRPC.
+   * @return OptRef to either const envoy::config::core::v3::GrpcService or nullptr if there's no
+   *         grpc_service in the given index.
+   */
+  static absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>>
+  getGrpcConfigFromApiConfigSource(
+      const envoy::config::core::v3::ApiConfigSource& api_config_source, int grpc_service_idx,
+      bool xdstp_config_source);
+
+  /**
    * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
    * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
    * @param skip_cluster_check whether to skip cluster validation.
    * @param grpc_service_idx index of the grpc service in the api_config_source. If there's no entry
    *                         in the given index, a nullptr factory will be returned.
+   * @param xdstp_config_source whether the config source will be used for xdstp config source.
+   *                            These sources must be of type AGGREGATED_GRPC or
+   *                            AGGREGATED_DELTA_GRPC.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory, or nullptr if there's no
-   * grpc_service in the given index.
+   *         grpc_service in the given index.
    */
   static absl::StatusOr<Grpc::AsyncClientFactoryPtr>
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope, bool skip_cluster_check, int grpc_service_idx);
+                                Stats::Scope& scope, bool skip_cluster_check, int grpc_service_idx,
+                                bool xdstp_config_source);
 
   /**
    * Translate opaque config from google.protobuf.Any to defined proto message.
@@ -409,7 +429,7 @@ public:
    * @param out_proto the proto message instantiated by extensions
    * @return a status indicating if translation was a success
    */
-  static absl::Status translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+  static absl::Status translateOpaqueConfig(const Protobuf::Any& typed_config,
                                             ProtobufMessage::ValidationVisitor& validation_visitor,
                                             Protobuf::Message& out_proto);
 

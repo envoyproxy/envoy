@@ -154,6 +154,7 @@ message HttpGenericBodyMatch {
 }
 
 // Tap output configuration.
+// [#next-free-field: 6]
 message OutputConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.OutputConfig";
@@ -181,6 +182,12 @@ message OutputConfig {
   // match can be determined. See the HTTP tap filter :ref:`streaming
   // <config_http_filters_tap_streaming>` documentation for more information.
   bool streaming = 4;
+
+  // Tapped messages will be sent on each read/write event for streamed tapping by default.
+  // But this behavior could be controlled by setting this field.
+  // If set then the tapped messages will be send once the threshold is reached.
+  // This could be used to avoid high frequent sending.
+  google.protobuf.UInt32Value min_streamed_sent_bytes = 5;
 }
 
 // Tap output sink configuration.

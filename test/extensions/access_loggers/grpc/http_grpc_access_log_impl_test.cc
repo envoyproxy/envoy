@@ -103,6 +103,27 @@ public:
                                                       logger_cache_);
   }
 
+  void initWithCommandParsers(const std::vector<Formatter::CommandParserPtr>& command_parsers) {
+    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
+    config_.mutable_common_config()->set_log_name("hello_log");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("uint32_accessor");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
+    config_.mutable_common_config()->set_transport_api_version(
+        envoy::config::core::v3::ApiVersion::V3);
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
+        .WillOnce(
+            [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
+                       config,
+                   Common::GrpcAccessLoggerType logger_type) {
+              EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
+              EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
+              return logger_;
+            });
+    access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
+                                                      logger_cache_, command_parsers);
+  }
+
   void expectLog(const std::string& expected_log_entry_yaml) {
     if (access_log_ == nullptr) {
       init();
@@ -167,11 +188,35 @@ response: {{}}
   HttpGrpcAccessLogPtr access_log_;
 };
 
+class TestCommandParser : public Formatter::CommandParser {
+public:
+  Formatter::FormatterProviderPtr parse(absl::string_view command, absl::string_view,
+                                        absl::optional<size_t>) const override {
+    if (command == "TEST_CUSTOM_CMD") {
+      class TestProvider : public Formatter::FormatterProvider {
+      public:
+        absl::optional<std::string> format(const Formatter::Context&,
+                                           const StreamInfo::StreamInfo&) const override {
+          return "custom_resolved_value";
+        }
+        Protobuf::Value formatValue(const Formatter::Context&,
+                                    const StreamInfo::StreamInfo&) const override {
+          Protobuf::Value val;
+          val.set_string_value("custom_resolved_value");
+          return val;
+        }
+      };
+      return std::make_unique<TestProvider>();
+    }
+    return nullptr;
+  }
+};
+
 class TestSerializedFilterState : public StreamInfo::FilterState::Object {
 public:
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto any = std::make_unique<ProtobufWkt::Any>();
-    ProtobufWkt::Duration value;
+    auto any = std::make_unique<Protobuf::Any>();
+    Protobuf::Duration value;
     value.set_seconds(10);
     any->PackFrom(value);
     return any;
@@ -195,7 +240,7 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     ASSERT(timing.lastDownstreamTxByteSent().has_value());
     stream_info.downstream_connection_info_provider_->setLocalAddress(
         *Network::Address::PipeInstance::create("/foo"));
-    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
+    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = Protobuf::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
                                        StreamInfo::FilterState::StateType::ReadOnly,
@@ -765,7 +810,7 @@ response: {}
     ASSERT(timing.lastDownstreamTxByteSent().has_value());
     stream_info.downstream_connection_info_provider_->setLocalAddress(
         *Network::Address::PipeInstance::create("/foo"));
-    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
+    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = Protobuf::Struct();
     stream_info.filter_state_->setData("string_accessor",
                                        std::make_unique<Router::StringAccessorImpl>("test_value"),
                                        StreamInfo::FilterState::StateType::ReadOnly,
@@ -1080,7 +1125,7 @@ metadata:
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, Protobuf::Struct>(
       "foo", MessageUtil::keyValueStruct("bar", "baz")));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
   stream_info.upstreamInfo()->setUpstreamHost(host);
@@ -1114,6 +1159,57 @@ common_properties:
     seconds: 3600
   custom_tags:
     mtag: baz
+request: {}
+response: {}
+)EOF");
+  access_log_->log({}, stream_info);
+}
+
+TEST_F(HttpGrpcAccessLogTest, CustomTagTestFormatterWithCommandParser) {
+  envoy::type::tracing::v3::CustomTag tag;
+  const auto tag_yaml = R"EOF(
+tag: custom_cmd_tag
+value: "%TEST_CUSTOM_CMD%"
+  )EOF";
+  TestUtility::loadFromYaml(tag_yaml, tag);
+  *config_.mutable_common_config()->add_custom_tags() = tag;
+
+  std::vector<Formatter::CommandParserPtr> command_parsers;
+  command_parsers.push_back(std::make_unique<TestCommandParser>());
+  initWithCommandParsers(command_parsers);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_ = SystemTime(1h);
+  stream_info.onRequestComplete();
+
+  expectLog(R"EOF(
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  access_log_type: NotSet
+  upstream_remote_address:
+    socket_address:
+      address: "10.0.0.1"
+      port_value: 443
+  upstream_local_address:
+    socket_address:
+      address: "127.1.2.3"
+      port_value: 58443
+  upstream_cluster: "fake_cluster"
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.3"
+      port_value: 63443
+  start_time:
+    seconds: 3600
+  custom_tags:
+    custom_cmd_tag: custom_resolved_value
 request: {}
 response: {}
 )EOF");

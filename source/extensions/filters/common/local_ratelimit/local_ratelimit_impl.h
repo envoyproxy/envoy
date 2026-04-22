@@ -13,6 +13,7 @@
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/local_ratelimit/local_ratelimit.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +29,8 @@ using ProtoLocalClusterRateLimit = envoy::extensions::common::ratelimit::v3::Loc
 class DynamicDescriptor : public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   DynamicDescriptor(uint64_t max_tokens, uint64_t tokens_per_fill,
-                    std::chrono::milliseconds fill_interval, uint32_t lru_size, TimeSource&);
+                    std::chrono::milliseconds fill_interval, uint32_t lru_size,
+                    TimeSource& time_source, bool shadow_mode);
   // add a new user configured descriptor to the set.
   RateLimitTokenBucketSharedPtr addOrGetDescriptor(const RateLimit::Descriptor& request_descriptor);
 
@@ -45,6 +47,7 @@ private:
   LruList lru_list_;
   uint32_t lru_size_;
   TimeSource& time_source_;
+  const bool shadow_mode_{false};
 };
 
 using DynamicDescriptorSharedPtr = std::shared_ptr<DynamicDescriptor>;
@@ -99,43 +102,39 @@ private:
 };
 using ShareProviderManagerSharedPtr = std::shared_ptr<ShareProviderManager>;
 
-class TokenBucketContext {
-public:
-  virtual ~TokenBucketContext() = default;
-
-  virtual uint64_t maxTokens() const PURE;
-  virtual uint64_t remainingTokens() const PURE;
-};
-
 class RateLimitTokenBucket : public TokenBucketContext,
                              public Logger::Loggable<Logger::Id::local_rate_limit> {
 public:
   RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
-                       std::chrono::milliseconds fill_interval, TimeSource& time_source);
+                       std::chrono::milliseconds fill_interval, TimeSource& time_source,
+                       bool shadow_mode);
 
   // RateLimitTokenBucket
   bool consume(double factor = 1.0, uint64_t tokens = 1);
+  // Refill tokens back to the bucket, capped at max_tokens.
+  void refill(uint64_t tokens);
   double fillRate() const { return token_bucket_.fillRate(); }
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 
+  bool shadowMode() const override { return shadow_mode_; }
   uint64_t maxTokens() const override { return static_cast<uint64_t>(token_bucket_.maxTokens()); }
   uint64_t remainingTokens() const override {
     return static_cast<uint64_t>(token_bucket_.remainingTokens());
+  }
+  uint64_t resetSeconds() const override {
+    return static_cast<uint64_t>(std::ceil(token_bucket_.nextTokenAvailable().count() / 1000));
   }
 
 private:
   AtomicTokenBucketImpl token_bucket_;
   const std::chrono::milliseconds fill_interval_;
+  const bool shadow_mode_{false};
 };
 using RateLimitTokenBucketSharedPtr = std::shared_ptr<RateLimitTokenBucket>;
 
-class LocalRateLimiterImpl : public Logger::Loggable<Logger::Id::local_rate_limit> {
+class LocalRateLimiterImpl : public Logger::Loggable<Logger::Id::local_rate_limit>,
+                             public LocalRateLimiter {
 public:
-  struct Result {
-    bool allowed{};
-    std::shared_ptr<const TokenBucketContext> token_bucket_context{};
-  };
-
   LocalRateLimiterImpl(
       const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
       const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
@@ -143,9 +142,10 @@ public:
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
       bool always_consume_default_token_bucket = true,
       ShareProviderSharedPtr shared_provider = nullptr, const uint32_t lru_size = 20);
-  ~LocalRateLimiterImpl();
+  ~LocalRateLimiterImpl() override;
 
-  Result requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);
+  LocalRateLimiter::Result
+  requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) override;
 
 private:
   RateLimitTokenBucketSharedPtr default_token_bucket_;
@@ -158,6 +158,13 @@ private:
 
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
   const bool always_consume_default_token_bucket_{};
+};
+
+class AlwaysDenyLocalRateLimiter : public LocalRateLimiter {
+public:
+  LocalRateLimiter::Result requestAllowed(absl::Span<const RateLimit::Descriptor>) override {
+    return {false, nullptr};
+  }
 };
 
 } // namespace LocalRateLimit

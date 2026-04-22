@@ -161,6 +161,25 @@ public:
    * @param filter supplies the filter to add.
    */
   virtual void addFilter(std::shared_ptr<StreamFilter> filter) PURE;
+
+  /**
+   * @return absl::string_view the filter config name that used to create the filter. This
+   * will return the latest set name by the setFilterConfigName() method.
+   */
+  virtual absl::string_view filterConfigName() const PURE;
+
+  /**
+   * Set the filter config name that used to create the filter. The latest set name will be
+   * used when creating filters.
+   *
+   * This should be called once before adding any filter.
+   * NOTE: By default, the FilterChainFactory will call this method to set the config name
+   * from configuration and the per filter factory does not need to care this method except
+   * it wants to override the config name.
+   *
+   * @param name supplies the filter config name.
+   */
+  virtual void setFilterConfigName(absl::string_view name) PURE;
 };
 
 /**
@@ -168,6 +187,9 @@ public:
  * from configuration.
  */
 struct FilterContext {
+  FilterContext() = default;
+  explicit FilterContext(absl::string_view config_name) : config_name(config_name) {}
+
   // The name of the filter configuration that used to create related filter factory function.
   // This could be any legitimate non-empty string.
   // This config name will have longer lifetime than any related filter instance. So string
@@ -176,24 +198,6 @@ struct FilterContext {
 };
 
 using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
-
-/**
- * The filter chain manager is provided by the connection manager to the filter chain factory.
- * The filter chain factory will post the filter factory context and filter factory to the
- * filter chain manager to create filter and construct HTTP stream filter chain.
- */
-class FilterChainManager {
-public:
-  virtual ~FilterChainManager() = default;
-
-  /**
-   * Post filter factory context and filter factory to the filter chain manager. The filter
-   * chain manager will create filter instance based on the context and factory internally.
-   * @param context supplies additional contextual information of filter factory.
-   * @param factory factory function used to create filter instances.
-   */
-  virtual void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) PURE;
-};
 
 /**
  * A FilterChainFactory is used by a connection manager to create a stream level filter chain
@@ -207,10 +211,9 @@ public:
 
   /**
    * Called when a new HTTP stream is created on the connection.
-   * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
-   *                FilterChainManager.
+   * @param callbacks supplies the callbacks that is used to create the filter chain.
    */
-  virtual void createFilterChain(FilterChainManager& manager) PURE;
+  virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) PURE;
 };
 
 } // namespace GenericProxy

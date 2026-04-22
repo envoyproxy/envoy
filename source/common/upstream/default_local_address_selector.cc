@@ -14,7 +14,8 @@ DefaultUpstreamLocalAddressSelector::DefaultUpstreamLocalAddressSelector(
 }
 
 UpstreamLocalAddress DefaultUpstreamLocalAddressSelector::getUpstreamLocalAddressImpl(
-    const Network::Address::InstanceConstSharedPtr& endpoint_address) const {
+    const Network::Address::InstanceConstSharedPtr& endpoint_address,
+    OptRef<const Network::TransportSocketOptions>) const {
   for (auto& local_address : upstream_local_addresses_) {
     if (local_address.address_ == nullptr) {
       continue;

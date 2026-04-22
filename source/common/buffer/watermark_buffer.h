@@ -45,8 +45,8 @@ public:
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
 
-  void setWatermarks(uint32_t high_watermark, uint32_t overflow_watermark = 0) override;
-  uint32_t highWatermark() const override { return high_watermark_; }
+  void setWatermarks(uint64_t high_watermark, uint32_t overflow_watermark = 0) override;
+  uint64_t highWatermark() const override { return high_watermark_; }
   // Returns true if the high watermark callbacks have been called more recently
   // than the low watermark callbacks.
   bool highWatermarkTriggered() const override { return above_high_watermark_called_; }
@@ -54,6 +54,8 @@ public:
 protected:
   virtual void checkHighAndOverflowWatermarks();
   virtual void checkLowWatermark();
+
+  uint64_t overflowWatermarkForTestOnly() const { return overflow_watermark_; }
 
 private:
   void commit(uint64_t length, absl::Span<RawSlice> slices,
@@ -65,9 +67,9 @@ private:
 
   // Used for enforcing buffer limits (off by default). If these are set to non-zero by a call to
   // setWatermarks() the watermark callbacks will be called as described above.
-  uint32_t high_watermark_{0};
-  uint32_t low_watermark_{0};
-  uint32_t overflow_watermark_{0};
+  uint64_t high_watermark_{0};
+  uint64_t low_watermark_{0};
+  uint64_t overflow_watermark_{0};
   // Tracks the latest state of watermark callbacks.
   // True between the time above_high_watermark_ has been called until below_low_watermark_ has
   // been called.

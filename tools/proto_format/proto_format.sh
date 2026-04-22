@@ -32,6 +32,7 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
 # Dont run this in git hooks by default
 if [[ -n "$CI_BRANCH" ]] || [[ "${FORCE_PROTO_FORMAT}" == "yes" ]]; then
     echo "Run buf tests"
-    cd api/ || exit 1
-    bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @rules_buf_toolchains//:buf lint
+    # Run buf lint from root directory with api/ as the target path
+    # This avoids changing directory and Bazel server restart issues
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @rules_buf_toolchains//:buf -- lint api/
 fi

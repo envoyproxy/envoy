@@ -1,18 +1,60 @@
+#![deny(warnings)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(dead_code)]
+#![allow(clippy::unnecessary_cast)]
 
+pub mod access_log;
+pub mod bootstrap;
 pub mod buffer;
-pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
-use mockall::predicate::*;
-use mockall::*;
+pub mod catch_unwind;
+pub mod cert_validator;
+pub mod cluster;
+pub mod dns_resolver;
+pub mod http;
+pub mod listener;
+pub mod load_balancer;
+pub mod matcher;
+pub mod network;
+pub mod tracer;
+pub mod transport_socket;
+pub mod udp_listener;
+pub mod upstream_http_tcp_bridge;
+pub mod utility;
+pub use bootstrap::*;
+pub use buffer::*;
+pub use catch_unwind::*;
+pub use cert_validator::*;
+pub use cluster::*;
+pub use dns_resolver::*;
+pub use http::*;
+pub use listener::*;
+pub use load_balancer::*;
+pub use network::*;
+pub use tracer::*;
+pub use transport_socket::*;
+pub use udp_listener::*;
+pub use upstream_http_tcp_bridge::*;
+pub use utility::*;
 
 #[cfg(test)]
 #[path = "./lib_test.rs"]
 mod mod_test;
 
+use crate::abi::envoy_dynamic_module_type_metrics_result;
+use std::any::Any;
 use std::sync::OnceLock;
+
+pub(crate) fn panic_payload_to_string(payload: Box<dyn Any + Send>) -> String {
+  match payload.downcast::<String>() {
+    Ok(s) => *s,
+    Err(payload) => match payload.downcast::<&str>() {
+      Ok(s) => s.to_string(),
+      Err(_) => "<non-string panic payload>".to_string(),
+    },
+  }
+}
 
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
@@ -44,29 +86,311 @@ pub mod abi {
 ///   _envoy_filter_config: &mut EC,
 ///   _name: &str,
 ///   _config: &[u8],
-/// ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
+/// ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
 ///   Some(Box::new(MyHttpFilterConfig {}))
 /// }
 ///
 /// struct MyHttpFilterConfig {}
 ///
-/// impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-///   for MyHttpFilterConfig
-/// {
-/// }
+/// impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MyHttpFilterConfig {}
 /// ```
 #[macro_export]
 macro_rules! declare_init_functions {
-  ($f:ident, $new_http_filter_config_fn:expr) => {
+  ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr) => {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_http_filter_config_fn);
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION,
+        $new_http_filter_config_fn,
+        "NEW_HTTP_FILTER_CONFIG_FUNCTION"
+      );
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
+        $new_http_filter_per_route_config_fn,
+        "NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION"
+      );
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
+      }
+    }
+  };
+  ($f:ident, $new_http_filter_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION,
+        $new_http_filter_config_fn,
+        "NEW_HTTP_FILTER_CONFIG_FUNCTION"
+      );
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+/// Get the concurrency from the server context options.
+/// # Safety
+///
+/// This function must be called on the main thread.
+pub unsafe fn get_server_concurrency() -> u32 {
+  unsafe { abi::envoy_dynamic_module_callback_get_concurrency() }
+}
+
+/// Check if the server is running in config validation mode (`--mode validate`).
+///
+/// This allows modules to optimize by only parsing and validating their config without
+/// performing expensive operations such as provider lookups or loading external resources.
+///
+/// # Safety
+///
+/// This function must be called on the main thread.
+pub unsafe fn is_validation_mode() -> bool {
+  unsafe { abi::envoy_dynamic_module_callback_is_validation_mode() }
+}
+
+/// Register a function pointer under a name in the process-wide function registry.
+///
+/// This allows modules loaded in the same process to expose functions that other modules can
+/// resolve by name and call directly, enabling zero-copy cross-module interactions. For example,
+/// a bootstrap extension can register a function that returns a pointer to a tenant snapshot,
+/// and HTTP filters can resolve and call it on every request.
+///
+/// Registration is typically done once during bootstrap (e.g., in `on_server_initialized`).
+/// Duplicate registration under the same key returns `false`.
+///
+/// Callers are responsible for agreeing on the function signature out-of-band, since the
+/// registry stores opaque pointers — analogous to `dlsym` semantics.
+///
+/// This is thread-safe and can be called from any thread.
+///
+/// # Safety
+///
+/// The `function_ptr` must point to a valid function that remains valid for the lifetime of the
+/// process.
+pub unsafe fn register_function(key: &str, function_ptr: *const std::ffi::c_void) -> bool {
+  unsafe {
+    abi::envoy_dynamic_module_callback_register_function(
+      str_to_module_buffer(key),
+      function_ptr as *mut std::ffi::c_void,
+    )
+  }
+}
+
+/// Retrieve a previously registered function pointer by name from the process-wide function
+/// registry. The returned pointer can be cast to the expected function signature and called
+/// directly.
+///
+/// Resolution is typically done once during configuration creation (e.g., in
+/// `on_http_filter_config_new`) and the result cached for per-request use.
+///
+/// This is thread-safe and can be called from any thread.
+pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
+  let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+  let found =
+    unsafe { abi::envoy_dynamic_module_callback_get_function(str_to_module_buffer(key), &mut ptr) };
+  if found {
+    Some(ptr as *const std::ffi::c_void)
+  } else {
+    None
+  }
+}
+
+/// Register an opaque data pointer under a name in the process-wide shared data registry.
+///
+/// This allows modules loaded in the same process to share arbitrary state, such as runtime
+/// handles, configuration snapshots, or shared caches without requiring direct access to
+/// each other's globals. For example, a bootstrap extension can register a `Tokio` runtime handle
+/// and HTTP filters or cluster extensions can retrieve and use it for async operations.
+///
+/// Unlike [`register_function`], the shared data registry allows overwriting an existing entry.
+/// If the key already exists, the data pointer is updated and the function returns `true`. This
+/// supports patterns where shared state is refreshed (e.g., after a configuration reload).
+/// Callers are responsible for managing the lifetime of overwritten data pointers.
+///
+/// Registration is typically done once during bootstrap (e.g., in `on_server_initialized` or
+/// `on_scheduled`).
+///
+/// This is thread-safe and can be called from any thread.
+///
+/// # Safety
+///
+/// The `data_ptr` must point to valid data that remains valid for the lifetime of the process.
+/// Callers are responsible for agreeing on the data type out-of-band, since the registry stores
+/// opaque pointers.
+pub unsafe fn register_shared_data(key: &str, data_ptr: *const std::ffi::c_void) -> bool {
+  unsafe {
+    abi::envoy_dynamic_module_callback_register_shared_data(
+      str_to_module_buffer(key),
+      data_ptr as *mut std::ffi::c_void,
+    )
+  }
+}
+
+/// Retrieve a previously registered data pointer by name from the process-wide shared data
+/// registry. The returned pointer can be cast to the expected data type and used directly.
+///
+/// Resolution is typically done once during configuration creation (e.g., in
+/// `on_http_filter_config_new`) and the result cached for per-request use.
+///
+/// This is thread-safe and can be called from any thread.
+pub fn get_shared_data(key: &str) -> Option<*const std::ffi::c_void> {
+  let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+  let found = unsafe {
+    abi::envoy_dynamic_module_callback_get_shared_data(str_to_module_buffer(key), &mut ptr)
+  };
+  if found {
+    Some(ptr as *const std::ffi::c_void)
+  } else {
+    None
+  }
+}
+
+/// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_trace {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Trace, $($arg)*)
+    };
+}
+
+/// Log a debug message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_debug {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Debug, $($arg)*)
+    };
+}
+
+/// Log an info message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_info {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Info, $($arg)*)
+    };
+}
+
+/// Log a warning message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_warn {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Warn, $($arg)*)
+    };
+}
+
+/// Log an error message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_error {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Error, $($arg)*)
+    };
+}
+
+/// Log a critical message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_critical {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Critical, $($arg)*)
+    };
+}
+
+/// Internal logging macro that handles the actual call to the Envoy logging callback
+/// used by envoy_log_* macros.
+#[macro_export]
+macro_rules! envoy_log {
+  ($level:expr, $($arg:tt)*) => {
+    {
+      #[cfg(not(test))]
+      {
+        let level = $level;
+        // SAFETY: envoy_dynamic_module_callback_log_enabled and envoy_dynamic_module_callback_log
+        // are FFI calls provided by the Envoy host.
+        let enabled = unsafe { $crate::abi::envoy_dynamic_module_callback_log_enabled(level) };
+        if enabled {
+          let message = format!($($arg)*);
+          let message_bytes = message.as_bytes();
+          unsafe {
+            $crate::abi::envoy_dynamic_module_callback_log(
+              level,
+              $crate::abi::envoy_dynamic_module_type_module_buffer {
+                ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
+                length: message_bytes.len(),
+              },
+            );
+          }
+        }
+      }
+      // In unit tests, just print to stderr since the Envoy symbols are not available.
+      #[cfg(test)]
+      {
+        let message = format!($($arg)*);
+        eprintln!("[{}] {}", stringify!($level), message);
+      }
+    }
+  };
+}
+
+/// Guard macro that ensures each factory `OnceLock` is registered by exactly one module.
+///
+/// When the same module is re-initialized (e.g. static modules loaded multiple times via
+/// `newDynamicModuleByName`, or per-route config triggering a second init), the function
+/// pointer will be identical and the re-registration is silently accepted (idempotent).
+///
+/// If a *different* module (standalone `.so` or consolidated `.so`) tries to register a
+/// different factory function for the same slot, this macro logs a critical message via
+/// `envoy_log_critical!` and panics. The panic is caught at the FFI boundary by Envoy,
+/// which converts it into a null return from `envoy_dynamic_module_on_program_init`,
+/// causing Envoy to refuse to start — the correct behaviour for a data-correctness issue.
+///
+/// In contrast, the previous `get_or_init` approach silently ignored the second writer,
+/// making the second module's factories unreachable at runtime with no diagnostic.
+#[macro_export]
+macro_rules! set_factory_once {
+  ($static:expr, $fn:expr, $name:literal) => {
+    if let Err(new_val) = $static.set($fn) {
+      if *$static.get().unwrap() != new_val {
+        $crate::envoy_log_critical!(
+          "Duplicate factory registration for {}. A different module already registered this \
+           factory. Check dynamic_module_config for conflicting standalone and consolidated \
+           .so loads.",
+          $name,
+        );
+        panic!(
+          "Duplicate factory registration for {}. A different module already registered this \
+           factory. Check dynamic_module_config for conflicting standalone and consolidated \
+           .so loads.",
+          $name,
+        );
       }
     }
   };
@@ -93,1164 +417,103 @@ pub type NewHttpFilterConfigFunction<EC, EHF> = fn(
   envoy_filter_config: &mut EC,
   name: &str,
   config: &[u8],
-) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>>;
+) -> Option<Box<dyn HttpFilterConfig<EHF>>>;
 
 /// The global init function for HTTP filter configurations. This is set via the
 /// `declare_init_functions` macro, and is not intended to be set directly.
 pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<
-  NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
+  NewHttpFilterConfigFunction<http::EnvoyHttpFilterConfigImpl, http::EnvoyHttpFilterImpl>,
 > = OnceLock::new();
 
-/// The trait that represents the configuration for an Envoy Http filter configuration.
-/// This has one to one mapping with the [`EnvoyHttpFilterConfig`] object.
+/// The function signature for the new HTTP filter per-route configuration function.
 ///
-/// The object is created when the corresponding Envoy Http filter config is created, and it is
-/// dropped when the corresponding Envoy Http filter config is destroyed. Therefore, the
-/// imlementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
-pub trait HttpFilterConfig<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> {
-  /// This is called when a HTTP filter chain is created for a new stream.
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
-    panic!("not implemented");
+/// This is called when a new HTTP filter per-route configuration is created. It must return an
+/// object representing the filter's per-route configuration. Returning `None` will cause the HTTP
+/// filter configuration to be rejected.
+/// This config can be later retried by the filter via
+/// [`EnvoyHttpFilter::get_most_specific_route_config`] method.
+pub type NewHttpFilterPerRouteConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn Any>>;
+
+/// The global init function for HTTP filter per-route configurations. This is set via the
+/// `declare_init_functions` macro, and is not intended to be set directly.
+pub static NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION: OnceLock<
+  NewHttpFilterPerRouteConfigFunction,
+> = OnceLock::new();
+
+// HTTP filter types are in the http module and re-exported above.
+
+pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_module_buffer {
+  abi::envoy_dynamic_module_type_module_buffer {
+    ptr: s.as_ptr() as *const _ as *mut _,
+    length: s.len(),
   }
 }
 
-/// The trait that corresponds to an Envoy Http filter for each stream
-/// created via the [`HttpFilterConfig::new_http_filter`] method.
-///
-/// All the event hooks are called on the same thread as the one that the [`HttpFilter`] is created
-/// via the [`HttpFilterConfig::new_http_filter`] method. In other words, the [`HttpFilter`] object
-/// is thread-local.
-pub trait HttpFilter<EHF: EnvoyHttpFilter> {
-  /// This is called when the request headers are received.
-  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
-  /// The `end_of_stream` indicates whether the request is the last message in the stream.
-  ///
-  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_request_headers_status`] to
-  /// indicate the status of the request headers processing.
-  fn on_request_headers(
-    &mut self,
-    _envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
-  }
+pub(crate) fn strs_to_module_buffers(
+  strs: &[&str],
+) -> Vec<abi::envoy_dynamic_module_type_module_buffer> {
+  strs.iter().map(|s| str_to_module_buffer(s)).collect()
+}
 
-  /// This is called when the request body is received.
-  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
-  /// The `end_of_stream` indicates whether the request is the last message in the stream.
-  ///
-  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_request_body_status`] to
-  /// indicate the status of the request body processing.
-  fn on_request_body(
-    &mut self,
-    _envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
-    abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
-  }
-
-  /// This is called when the request trailers are received.
-  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
-  ///
-  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status`] to
-  /// indicate the status of the request trailers processing.
-  fn on_request_trailers(
-    &mut self,
-    _envoy_filter: &mut EHF,
-  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
-    abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
-  }
-
-  /// This is called when the response headers are received.
-  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
-  /// The `end_of_stream` indicates whether the request is the last message in the stream.
-  ///
-  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_response_headers_status`] to
-  /// indicate the status of the response headers processing.
-  fn on_response_headers(
-    &mut self,
-    _envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
-  }
-
-  /// This is called when the response body is received.
-  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
-  /// The `end_of_stream` indicates whether the request is the last message in the stream.
-  ///
-  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_response_body_status`] to
-  /// indicate the status of the response body processing.
-  fn on_response_body(
-    &mut self,
-    _envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
-    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
-  }
-
-  /// This is called when the response trailers are received.
-  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
-  /// The `end_of_stream` indicates whether the request is the last message in the stream.
-  ///
-  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status`] to
-  /// indicate the status of the response trailers processing.
-  fn on_response_trailers(
-    &mut self,
-    _envoy_filter: &mut EHF,
-  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
-    abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
-  }
-
-  /// This is called when the stream is complete.
-  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
-  ///
-  /// This is called before this [`HttpFilter`] object is dropped and access logs are flushed.
-  fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {}
-
-  /// This is called when the HTTP callout is done.
-  ///
-  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
-  /// * `callout_id` is the ID of the callout that was done.
-  /// * `result` indicates the result of the callout.
-  /// * `response_headers` is a list of key-value pairs of the response headers. This is optional.
-  /// * `response_body` is the response body. This is optional.
-  fn on_http_callout_done(
-    &mut self,
-    _envoy_filter: &mut EHF,
-    _callout_id: u32,
-    _result: abi::envoy_dynamic_module_type_http_callout_result,
-    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
-    _response_body: Option<&[EnvoyBuffer]>,
-  ) {
+pub(crate) fn bytes_to_module_buffer(b: &[u8]) -> abi::envoy_dynamic_module_type_module_buffer {
+  abi::envoy_dynamic_module_type_module_buffer {
+    ptr: b.as_ptr() as *const _ as *mut _,
+    length: b.len(),
   }
 }
 
-/// An opaque object that represents the underlying Envoy Http filter config. This has one to one
-/// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
-pub trait EnvoyHttpFilterConfig {
-  // TODO: add methods like defining metrics, filter metadata, etc.
+/// Host count information for a cluster at a specific priority level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClusterHostCount {
+  /// Total number of hosts in the cluster at this priority level.
+  pub total: usize,
+  /// Number of healthy hosts in the cluster at this priority level.
+  pub healthy: usize,
+  /// Number of degraded hosts in the cluster at this priority level.
+  pub degraded: usize,
 }
 
-pub struct EnvoyHttpFilterConfigImpl {
-  raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
-}
+/// The identifier for an EnvoyCounter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct EnvoyCounterId(pub usize);
 
-impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {}
+/// The identifier for an EnvoyCounterVec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct EnvoyCounterVecId(pub usize);
 
-/// An opaque object that represents the underlying Envoy Http filter. This has one to one
-/// mapping with the Envoy Http filter object as well as [`HttpFilter`] object per HTTP stream.
-///
-/// The Envoy filter object is inherently not thread-safe, and it is always recommended to
-/// access it from the same thread as the one that [`HttpFilter`] even hooks are called.
-#[automock]
-#[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
-pub trait EnvoyHttpFilter {
-  /// Get the value of the request header with the given key.
-  /// If the header is not found, this returns `None`.
-  ///
-  /// To handle multiple values for the same key, use
-  /// [`EnvoyHttpFilter::get_request_header_values`] variant.
-  fn get_request_header_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
+/// The identifier for an EnvoyGauge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct EnvoyGaugeId(pub usize);
 
-  /// Get the values of the request header with the given key.
-  ///
-  /// If the header is not found, this returns an empty vector.
-  fn get_request_header_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
+/// The identifier for an EnvoyGaugeVec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct EnvoyGaugeVecId(pub usize);
 
-  /// Get all request headers.
-  ///
-  /// Returns a list of key-value pairs of the request headers.
-  /// If there are no headers or headers are not available, this returns an empty list.
-  fn get_request_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
+/// The identifier for an EnvoyHistogram.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct EnvoyHistogramId(pub usize);
 
-  /// Set the request header with the given key and value.
-  ///
-  /// This will overwrite the existing value if the header is already present.
-  /// In case of multiple values for the same key, this will remove all the existing values and
-  /// set the new value.
-  ///
-  /// Returns true if the header is set successfully.
-  fn set_request_header(&mut self, key: &str, value: &[u8]) -> bool;
+/// The identifier for an EnvoyHistogramVec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct EnvoyHistogramVecId(pub usize);
 
-  /// Remove the request header with the given key.
-  ///
-  /// Returns true if the header is removed successfully.
-  fn remove_request_header(&mut self, key: &str) -> bool;
-
-  /// Get the value of the request trailer with the given key.
-  /// If the trailer is not found, this returns `None`.
-  ///
-  /// To handle multiple values for the same key, use
-  /// [`EnvoyHttpFilter::get_request_trailer_values`] variant.
-  fn get_request_trailer_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
-
-  /// Get the values of the request trailer with the given key.
-  ///
-  /// If the trailer is not found, this returns an empty vector.
-  fn get_request_trailer_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
-
-  /// Get all request trailers.
-  ///
-  /// Returns a list of key-value pairs of the request trailers.
-  /// If there are no trailers or trailers are not available, this returns an empty list.
-  fn get_request_trailers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
-
-  /// Set the request trailer with the given key and value.
-  ///
-  /// This will overwrite the existing value if the trailer is already present.
-  /// In case of multiple values for the same key, this will remove all the existing values and
-  /// set the new value.
-  ///
-  /// Returns true if the trailer is set successfully.
-  fn set_request_trailer(&mut self, key: &str, value: &[u8]) -> bool;
-
-  /// Remove the request trailer with the given key.
-  ///
-  /// Returns true if the trailer is removed successfully.
-  fn remove_request_trailer(&mut self, key: &str) -> bool;
-
-  /// Get the value of the response header with the given key.
-  /// If the header is not found, this returns `None`.
-  ///
-  /// To handle multiple values for the same key, use
-  /// [`EnvoyHttpFilter::get_response_header_values`] variant.
-  fn get_response_header_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
-
-  /// Get the values of the response header with the given key.
-  ///
-  /// If the header is not found, this returns an empty vector.
-  fn get_response_header_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
-
-  /// Get all response headers.
-  ///
-  /// Returns a list of key-value pairs of the response headers.
-  /// If there are no headers or headers are not available, this returns an empty list.
-  fn get_response_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
-
-  /// Set the response header with the given key and value.
-  ///
-  /// This will overwrite the existing value if the header is already present.
-  /// In case of multiple values for the same key, this will remove all the existing values and
-  /// set the new value.
-  ///
-  /// Returns true if the header is set successfully.
-  fn set_response_header(&mut self, key: &str, value: &[u8]) -> bool;
-
-  /// Remove the response header with the given key.
-  ///
-  /// Returns true if the header is removed successfully.
-  fn remove_response_header(&mut self, key: &str) -> bool;
-
-  /// Get the value of the response trailer with the given key.
-  /// If the trailer is not found, this returns `None`.
-  ///
-  /// To handle multiple values for the same key, use
-  /// [`EnvoyHttpFilter::get_response_trailer_values`] variant.
-  fn get_response_trailer_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
-
-  /// Get the values of the response trailer with the given key.
-  ///
-  /// If the trailer is not found, this returns an empty vector.
-  fn get_response_trailer_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
-  /// Get all response trailers.
-  ///
-  /// Returns a list of key-value pairs of the response trailers.
-  /// If there are no trailers or trailers are not available, this returns an empty list.
-  fn get_response_trailers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
-
-  /// Set the response trailer with the given key and value.
-  ///
-  /// This will overwrite the existing value if the trailer is already present.
-  /// In case of multiple values for the same key, this will remove all the existing values and
-  /// set the new value.
-  ///
-  /// Returns true if the operation is successful.
-  fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool;
-
-  /// Remove the response trailer with the given key.
-  ///
-  /// Returns true if the trailer is removed successfully.
-  fn remove_response_trailer(&mut self, key: &str) -> bool;
-
-  /// Send a response to the downstream with the given status code, headers, and body.
-  ///
-  /// The headers are passed as a list of key-value pairs.
-  fn send_response<'a>(
-    &mut self,
-    status_code: u32,
-    headers: Vec<(&'a str, &'a [u8])>,
-    body: Option<&'a [u8]>,
-  );
-
-  /// Get the number-typed dynamic metadata value with the given key.
-  /// If the metadata is not found or is the wrong type, this returns `None`.
-  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64>;
-
-  /// Set the number-typed dynamic metadata value with the given key.
-  /// If the namespace is not found, this will create a new namespace.
-  ///
-  /// Returns true if the operation is successful.
-  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
-
-  /// Get the string-typed dynamic metadata value with the given key.
-  /// If the metadata is not found or is the wrong type, this returns `None`.
-  fn get_dynamic_metadata_string<'a>(
-    &'a self,
-    namespace: &str,
-    key: &str,
-  ) -> Option<EnvoyBuffer<'a>>;
-
-  /// Set the string-typed dynamic metadata value with the given key.
-  /// If the namespace is not found, this will create a new namespace.
-  ///
-  /// Returns true if the operation is successful.
-  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
-
-  /// Get the bytes-typed filter state value with the given key.
-  /// If the filter state is not found or is the wrong type, this returns `None`.
-  fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
-
-  /// Set the bytes-typed filter state value with the given key.
-  /// If the filter state is not found, this will create a new filter state.
-  ///
-  /// Returns true if the operation is successful.
-  fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool;
-
-  /// Get the currently buffered request body. The body is represented as a list of [`EnvoyBuffer`].
-  /// Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be modified in place.
-  /// However, the vector itself is a "copied view". For example, adding or removing
-  /// [`EnvoyBuffer`] from the vector has no effect on the underlying Envoy buffer. To write beyond
-  /// the end of the buffer, use [`EnvoyHttpFilter::append_request_body`]. To remove data from the
-  /// buffer, use [`EnvoyHttpFilter::drain_request_body`].
-  ///
-  /// To write completely new data, use [`EnvoyHttpFilter::drain_request_body`] for the size of the
-  /// buffer, and then use [`EnvoyHttpFilter::append_request_body`] to write the new data.
-  ///
-  /// ```
-  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
-  ///
-  /// // This is the test setup.
-  /// let mut envoy_filter = MockEnvoyHttpFilter::default();
-  /// // Mutable static storage is used for the test to simulate the response body operation.
-  /// static mut BUFFER: [u8; 10] = *b"helloworld";
-  /// envoy_filter
-  ///   .expect_get_request_body()
-  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
-  /// envoy_filter.expect_drain_request_body().return_const(true);
-  ///
-  ///
-  /// // Calculate the size of the request body in bytes.
-  /// let buffers = envoy_filter.get_request_body().unwrap();
-  /// let mut size = 0;
-  /// for buffer in &buffers {
-  ///   size += buffer.as_slice().len();
-  /// }
-  /// assert_eq!(size, 10);
-  ///
-  /// // drain the entire request body.
-  /// assert!(envoy_filter.drain_request_body(10));
-  ///
-  /// // Now start writing new data from the beginning of the request body.
-  /// ```
-  ///
-  /// This returns None if the request body is not available.
-  fn get_request_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
-
-  /// Drain the given number of bytes from the front of the request body.
-  ///
-  /// Returns false if the request body is not available.
-  ///
-  /// Note that after changing the request body, it is caller's responsibility to modify the
-  /// content-length header if necessary.
-  fn drain_request_body(&mut self, number_of_bytes: usize) -> bool;
-
-  /// Append the given data to the end of request body.
-  ///
-  /// Returns false if the request body is not available.
-  ///
-  /// Note that after changing the request body, it is caller's responsibility to modify the
-  /// content-length header if necessary.
-  fn append_request_body(&mut self, data: &[u8]) -> bool;
-
-  /// Get the currently buffered response body. The body is represented as a list of
-  /// [`EnvoyBuffer`]. Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be
-  /// modified in place. However, the buffer itself is immutable. For example, adding or removing
-  /// [`EnvoyBuffer`] from the vector has no effect on the underlying Envoy buffer. To write the
-  /// contents by changing its length, use [`EnvoyHttpFilter::drain_response_body`] or
-  /// [`EnvoyHttpFilter::append_response_body`].
-  ///
-  /// To write completely new data, use [`EnvoyHttpFilter::drain_response_body`] for the size of the
-  /// buffer, and then use [`EnvoyHttpFilter::append_response_body`] to write the new data.
-  ///
-  /// ```
-  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
-  ///
-  /// // This is the test setup.
-  /// let mut envoy_filter = MockEnvoyHttpFilter::default();
-  /// // Mutable static storage is used for the test to simulate the response body operation.
-  /// static mut BUFFER: [u8; 10] = *b"helloworld";
-  /// envoy_filter
-  ///   .expect_get_response_body()
-  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
-  /// envoy_filter.expect_drain_response_body().return_const(true);
-  ///
-  ///
-  /// // Calculate the size of the response body in bytes.
-  /// let buffers = envoy_filter.get_response_body().unwrap();
-  /// let mut size = 0;
-  /// for buffer in &buffers {
-  ///   size += buffer.as_slice().len();
-  /// }
-  /// assert_eq!(size, 10);
-  ///
-  /// // drain the entire response body.
-  /// assert!(envoy_filter.drain_response_body(10));
-  ///
-  /// // Now start writing new data from the beginning of the request body.
-  /// ```
-  ///
-  /// Returns None if the response body is not available.
-  fn get_response_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
-
-  /// Drain the given number of bytes from the front of the response body.
-  ///
-  /// Returns false if the response body is not available.
-  ///
-  /// Note that after changing the response body, it is caller's responsibility to modify the
-  /// content-length header if necessary.
-  fn drain_response_body(&mut self, number_of_bytes: usize) -> bool;
-
-  /// Append the given data to the end of the response body.
-  ///
-  /// Returns false if the response body is not available.
-  ///
-  /// Note that after changing the response body, it is caller's responsibility to modify the
-  /// content-length header if necessary.
-  fn append_response_body(&mut self, data: &[u8]) -> bool;
-
-  /// Clear the route cache calculated during a previous phase of the filter chain.
-  ///
-  /// This is useful when the filter wants to force a re-evaluation of the route selection after
-  /// modifying the request headers, etc that affect the routing decision.
-  fn clear_route_cache(&mut self);
-
-  /// Get the value of the attribute with the given ID as a string.
-  ///
-  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
-  fn get_attribute_string<'a>(
-    &'a self,
-    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
-  ) -> Option<EnvoyBuffer<'a>>;
-
-  /// Get the value of the attribute with the given ID as an integer.
-  ///
-  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
-  fn get_attribute_int(
-    &self,
-    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
-  ) -> Option<i64>;
-
-  /// Send an HTTP callout to the given cluster with the given headers and body.
-  /// Multiple callouts can be made from the same filter. Different callouts can be
-  /// distinguished by the `callout_id` parameter.
-  ///
-  /// Headers must contain the `:method`, ":path", and `host` headers.
-  ///
-  /// This returns the status of the callout. The meaning of the status is
-  ///
-  ///   * Success: The callout was sent successfully.
-  ///   * MissingRequiredHeaders: One of the required headers is missing: `:method`, `:path`, or
-  ///     `host`.
-  ///   * ClusterNotFound: The cluster with the given name was not found.
-  ///   * DuplicateCalloutId: The callout ID is already in use.
-  ///   * CouldNotCreateRequest: The request could not be created. This happens when, for example,
-  ///     there's no healthy upstream host in the cluster.
-  ///
-  /// The callout result will be delivered to the [`HttpFilter::on_http_callout_done`] method.
-  fn send_http_callout<'a>(
-    &mut self,
-    _callout_id: u32,
-    _cluster_name: &'a str,
-    _headers: Vec<(&'a str, &'a [u8])>,
-    _body: Option<&'a [u8]>,
-    _timeout_milliseconds: u64,
-  ) -> abi::envoy_dynamic_module_type_http_callout_init_result;
-}
-
-/// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
-/// filter object.
-///
-/// This is not meant to be used directly.
-pub struct EnvoyHttpFilterImpl {
-  raw_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-}
-
-impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
-  fn get_request_header_value(&self, key: &str) -> Option<EnvoyBuffer> {
-    self.get_header_value_impl(
-      key,
-      abi::envoy_dynamic_module_callback_http_get_request_header,
-    )
-  }
-
-  fn get_request_header_values(&self, key: &str) -> Vec<EnvoyBuffer> {
-    self.get_header_values_impl(
-      key,
-      abi::envoy_dynamic_module_callback_http_get_request_header,
-    )
-  }
-
-  fn get_request_headers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
-    self.get_headers_impl(
-      abi::envoy_dynamic_module_callback_http_get_request_headers_count,
-      abi::envoy_dynamic_module_callback_http_get_request_headers,
-    )
-  }
-
-  fn set_request_header(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_request_header(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
-      )
-    }
-  }
-
-  fn get_request_trailer_value(&self, key: &str) -> Option<EnvoyBuffer> {
-    self.get_header_value_impl(
-      key,
-      abi::envoy_dynamic_module_callback_http_get_request_trailer,
-    )
-  }
-
-  fn get_request_trailer_values(&self, key: &str) -> Vec<EnvoyBuffer> {
-    self.get_header_values_impl(
-      key,
-      abi::envoy_dynamic_module_callback_http_get_request_trailer,
-    )
-  }
-
-  fn get_request_trailers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
-    self.get_headers_impl(
-      abi::envoy_dynamic_module_callback_http_get_request_trailers_count,
-      abi::envoy_dynamic_module_callback_http_get_request_trailers,
-    )
-  }
-
-  fn set_request_trailer(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_request_trailer(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
-      )
-    }
-  }
-
-  fn get_response_header_value(&self, key: &str) -> Option<EnvoyBuffer> {
-    self.get_header_value_impl(
-      key,
-      abi::envoy_dynamic_module_callback_http_get_response_header,
-    )
-  }
-
-  fn get_response_header_values(&self, key: &str) -> Vec<EnvoyBuffer> {
-    self.get_header_values_impl(
-      key,
-      abi::envoy_dynamic_module_callback_http_get_response_header,
-    )
-  }
-
-  fn get_response_headers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
-    self.get_headers_impl(
-      abi::envoy_dynamic_module_callback_http_get_response_headers_count,
-      abi::envoy_dynamic_module_callback_http_get_response_headers,
-    )
-  }
-
-  fn set_response_header(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_response_header(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
-      )
-    }
-  }
-
-  fn get_response_trailer_value(&self, key: &str) -> Option<EnvoyBuffer> {
-    self.get_header_value_impl(
-      key,
-      abi::envoy_dynamic_module_callback_http_get_response_trailer,
-    )
-  }
-
-  fn get_response_trailer_values(&self, key: &str) -> Vec<EnvoyBuffer> {
-    self.get_header_values_impl(
-      key,
-      abi::envoy_dynamic_module_callback_http_get_response_trailer,
-    )
-  }
-
-  fn get_response_trailers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
-    self.get_headers_impl(
-      abi::envoy_dynamic_module_callback_http_get_response_trailers_count,
-      abi::envoy_dynamic_module_callback_http_get_response_trailers,
-    )
-  }
-
-  fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_response_trailer(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
-      )
-    }
-  }
-
-  fn send_response(&mut self, status_code: u32, headers: Vec<(&str, &[u8])>, body: Option<&[u8]>) {
-    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
-    let body_length = body.map(|s| s.len()).unwrap_or(0);
-
-    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
-    // not because of any formal layout guarantees but because:
-    // 1) tuples _in practice_ are laid out packed and in order
-    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
-    //    pointer and length
-    // If these assumptions change, this will break. (Vec is guaranteed to point to a contiguous
-    // array, so it's safe to cast to a pointer)
-    let headers_ptr = headers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
-
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_send_response(
-        self.raw_ptr,
-        status_code,
-        headers_ptr,
-        headers.len(),
-        body_ptr as *mut _,
-        body_length,
-      )
-    }
-  }
-
-  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64> {
-    let namespace_ptr = namespace.as_ptr();
-    let namespace_size = namespace.len();
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let mut value: f64 = 0f64;
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
-        self.raw_ptr,
-        namespace_ptr as *const _ as *mut _,
-        namespace_size,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        &mut value as *mut _ as *mut _,
-      )
-    };
-    if success {
-      Some(value)
+impl From<envoy_dynamic_module_type_metrics_result>
+  for Result<(), envoy_dynamic_module_type_metrics_result>
+{
+  fn from(result: envoy_dynamic_module_type_metrics_result) -> Self {
+    if result == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
     } else {
-      None
+      Err(result)
     }
   }
-
-  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
-    let namespace_ptr = namespace.as_ptr();
-    let namespace_size = namespace.len();
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
-        self.raw_ptr,
-        namespace_ptr as *const _ as *mut _,
-        namespace_size,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value,
-      )
-    }
-  }
-
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer> {
-    let namespace_ptr = namespace.as_ptr();
-    let namespace_size = namespace.len();
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let mut result_ptr: *const u8 = std::ptr::null();
-    let mut result_size: usize = 0;
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
-        self.raw_ptr,
-        namespace_ptr as *const _ as *mut _,
-        namespace_size,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        &mut result_ptr as *mut _ as *mut _,
-        &mut result_size as *mut _ as *mut _,
-      )
-    };
-    if success {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
-    } else {
-      None
-    }
-  }
-
-  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
-    let namespace_ptr = namespace.as_ptr();
-    let namespace_size = namespace.len();
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
-        self.raw_ptr,
-        namespace_ptr as *const _ as *mut _,
-        namespace_size,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
-      )
-    }
-  }
-
-  fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer> {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let mut result_ptr: *const u8 = std::ptr::null();
-    let mut result_size: usize = 0;
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_filter_state_bytes(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        &mut result_ptr as *mut _ as *mut _,
-        &mut result_size as *mut _ as *mut _,
-      )
-    };
-    if success {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
-    } else {
-      None
-    }
-  }
-
-  fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_filter_state_bytes(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
-      )
-    }
-  }
-
-  fn get_request_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
-    let mut size: usize = 0;
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_request_body_vector_size(self.raw_ptr, &mut size)
-    };
-    if !ok || size == 0 {
-      return None;
-    }
-
-    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_request_body_vector(
-        self.raw_ptr,
-        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
-      )
-    };
-    if success {
-      Some(buffers)
-    } else {
-      None
-    }
-  }
-
-  fn drain_request_body(&mut self, number_of_bytes: usize) -> bool {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_drain_request_body(self.raw_ptr, number_of_bytes)
-    }
-  }
-
-  fn append_request_body(&mut self, data: &[u8]) -> bool {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_append_request_body(
-        self.raw_ptr,
-        data.as_ptr() as *const _ as *mut _,
-        data.len(),
-      )
-    }
-  }
-
-  fn get_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
-    let mut size: usize = 0;
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_response_body_vector_size(self.raw_ptr, &mut size)
-    };
-    if !ok || size == 0 {
-      return None;
-    }
-
-    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_response_body_vector(
-        self.raw_ptr,
-        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
-      )
-    };
-    if success {
-      Some(buffers)
-    } else {
-      None
-    }
-  }
-
-  fn drain_response_body(&mut self, number_of_bytes: usize) -> bool {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_drain_response_body(self.raw_ptr, number_of_bytes)
-    }
-  }
-
-  fn append_response_body(&mut self, data: &[u8]) -> bool {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_append_response_body(
-        self.raw_ptr,
-        data.as_ptr() as *const _ as *mut _,
-        data.len(),
-      )
-    }
-  }
-
-  fn clear_route_cache(&mut self) {
-    unsafe { abi::envoy_dynamic_module_callback_http_clear_route_cache(self.raw_ptr) }
-  }
-
-  fn remove_request_header(&mut self, key: &str) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_request_header(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        std::ptr::null_mut(),
-        0,
-      )
-    }
-  }
-
-  fn remove_request_trailer(&mut self, key: &str) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_request_trailer(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        std::ptr::null_mut(),
-        0,
-      )
-    }
-  }
-
-  fn remove_response_header(&mut self, key: &str) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_response_header(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        std::ptr::null_mut(),
-        0,
-      )
-    }
-  }
-
-  fn remove_response_trailer(&mut self, key: &str) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_set_response_trailer(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        std::ptr::null_mut(),
-        0,
-      )
-    }
-  }
-
-  fn get_attribute_string(
-    &self,
-    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
-  ) -> Option<EnvoyBuffer> {
-    let mut result_ptr: *const u8 = std::ptr::null();
-    let mut result_size: usize = 0;
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_get_attribute_string(
-        self.raw_ptr,
-        attribute_id,
-        &mut result_ptr as *mut _ as *mut _,
-        &mut result_size as *mut _ as *mut _,
-      )
-    };
-    if success {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
-    } else {
-      None
-    }
-  }
-
-  fn get_attribute_int(
-    &self,
-    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
-  ) -> Option<i64> {
-    let mut result: i64 = 0;
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_get_attribute_int(
-        self.raw_ptr,
-        attribute_id,
-        &mut result as *mut _ as *mut _,
-      )
-    };
-    if success {
-      Some(result)
-    } else {
-      None
-    }
-  }
-
-  fn send_http_callout<'a>(
-    &mut self,
-    callout_id: u32,
-    cluster_name: &'a str,
-    headers: Vec<(&'a str, &'a [u8])>,
-    body: Option<&'a [u8]>,
-    timeout_milliseconds: u64,
-  ) -> abi::envoy_dynamic_module_type_http_callout_init_result {
-    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
-    let body_length = body.map(|s| s.len()).unwrap_or(0);
-    let headers_ptr = headers.as_ptr() as *const abi::envoy_dynamic_module_type_module_http_header;
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_http_callout(
-        self.raw_ptr,
-        callout_id,
-        cluster_name.as_ptr() as *const _ as *mut _,
-        cluster_name.len(),
-        headers_ptr as *const _ as *mut _,
-        headers.len(),
-        body_ptr as *const _ as *mut _,
-        body_length,
-        timeout_milliseconds,
-      )
-    }
-  }
-}
-
-impl EnvoyHttpFilterImpl {
-  fn new(raw_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr) -> Self {
-    Self { raw_ptr }
-  }
-
-  /// Implement the common logic for getting all headers/trailers.
-  fn get_headers_impl(
-    &self,
-    count_callback: unsafe extern "C" fn(
-      filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-    ) -> usize,
-    getter_callback: unsafe extern "C" fn(
-      filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-      result_buffer_ptr: *mut abi::envoy_dynamic_module_type_http_header,
-    ) -> bool,
-  ) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
-    let count = unsafe { count_callback(self.raw_ptr) };
-    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(count);
-    let success = unsafe {
-      getter_callback(
-        self.raw_ptr,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_http_header,
-      )
-    };
-    unsafe {
-      headers.set_len(count);
-    }
-    if success {
-      headers
-    } else {
-      Vec::default()
-    }
-  }
-
-  /// This implements the common logic for getting the header/trailer values.
-  fn get_header_value_impl(
-    &self,
-    key: &str,
-    callback: unsafe extern "C" fn(
-      filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-      key: abi::envoy_dynamic_module_type_buffer_module_ptr,
-      key_length: usize,
-      result_buffer_ptr: *mut abi::envoy_dynamic_module_type_buffer_envoy_ptr,
-      result_buffer_length_ptr: *mut usize,
-      index: usize,
-    ) -> usize,
-  ) -> Option<EnvoyBuffer> {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-
-    let mut result_ptr: *const u8 = std::ptr::null();
-    let mut result_size: usize = 0;
-
-    unsafe {
-      callback(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        &mut result_ptr as *mut _ as *mut _,
-        &mut result_size as *mut _ as *mut _,
-        0, // Only the first value is needed.
-      )
-    };
-
-    if result_ptr.is_null() {
-      None
-    } else {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
-    }
-  }
-
-  /// This implements the common logic for getting the header/trailer values.
-  ///
-  /// TODO: use smallvec or similar to avoid the heap allocations for majority of the cases.
-  fn get_header_values_impl(
-    &self,
-    key: &str,
-    callback: unsafe extern "C" fn(
-      filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-      key: abi::envoy_dynamic_module_type_buffer_module_ptr,
-      key_length: usize,
-      result_buffer_ptr: *mut abi::envoy_dynamic_module_type_buffer_envoy_ptr,
-      result_buffer_length_ptr: *mut usize,
-      index: usize,
-    ) -> usize,
-  ) -> Vec<EnvoyBuffer> {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let mut result_ptr: *const u8 = std::ptr::null();
-    let mut result_size: usize = 0;
-
-    // Get the first value to get the count.
-    let counts = unsafe {
-      callback(
-        self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        &mut result_ptr as *mut _ as *mut _,
-        &mut result_size as *mut _ as *mut _,
-        0,
-      )
-    };
-
-    let mut results = Vec::new();
-    if counts == 0 {
-      return results;
-    }
-
-    // At this point, we assume at least one value is present.
-    results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
-    // So, we iterate from 1 to counts - 1.
-    for i in 1 .. counts {
-      let mut result_ptr: *const u8 = std::ptr::null();
-      let mut result_size: usize = 0;
-      unsafe {
-        callback(
-          self.raw_ptr,
-          key_ptr as *const _ as *mut _,
-          key_size,
-          &mut result_ptr as *mut _ as *mut _,
-          &mut result_size as *mut _ as *mut _,
-          i,
-        )
-      };
-      // Within the range, all results are guaranteed to be non-null by Envoy.
-      results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
-    }
-    results
-  }
-}
-
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
-  envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
-  name_ptr: *const u8,
-  name_size: usize,
-  config_ptr: *const u8,
-  config_size: usize,
-) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
-  // This assumes that the name is a valid UTF-8 string. Should we relax? At the moment,
-  // it is a String at protobuf level.
-  let name = if !name_ptr.is_null() {
-    std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_size)).unwrap_or_default()
-  } else {
-    ""
-  };
-  let config = if !config_ptr.is_null() {
-    std::slice::from_raw_parts(config_ptr, config_size)
-  } else {
-    b""
-  };
-
-  let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
-    raw_ptr: envoy_filter_config_ptr,
-  };
-
-  envoy_dynamic_module_on_http_filter_config_new_impl(
-    &mut envoy_filter_config,
-    name,
-    config,
-    NEW_HTTP_FILTER_CONFIG_FUNCTION
-      .get()
-      .expect("NEW_HTTP_FILTER_CONFIG_FUNCTION must be set"),
-  )
 }
 
 /// We wrap the Box<dyn T> in another Box to be able to pass the address of the Box to C, and
@@ -1260,6 +523,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
 //
 // Implementation note: this can be a simple function taking a type parameter, but we have it as
 // a macro to align with the other macro drop_wrapped_c_void_ptr!.
+#[macro_export]
 macro_rules! wrap_into_c_void_ptr {
   ($t:expr) => {{
     let boxed = Box::new($t);
@@ -1272,9 +536,10 @@ macro_rules! wrap_into_c_void_ptr {
 //
 // Implementation note: this cannot be a function as we need to cast as *mut *mut dyn T which is
 // not feasible via usual function type params.
+#[macro_export]
 macro_rules! drop_wrapped_c_void_ptr {
-  ($ptr:expr, $trait_:ident < $($args:ident),* >) => {{
-    let config = $ptr as *mut *mut dyn $trait_< $($args),* >;
+  ($ptr:expr, $trait_:ident $(< $($args:ident),* >)?) => {{
+    let config = $ptr as *mut *mut dyn $trait_$(< $($args),* >)?;
 
     // Drop the Box<*mut $t>, and then the Box<$t>, which also
     // drops the underlying object.
@@ -1285,162 +550,946 @@ macro_rules! drop_wrapped_c_void_ptr {
   }};
 }
 
-fn envoy_dynamic_module_on_http_filter_config_new_impl(
-  envoy_filter_config: &mut EnvoyHttpFilterConfigImpl,
+// =============================================================================
+// Network Filter Support
+// =============================================================================
+
+/// Declare the init functions for the dynamic module with network filter support only.
+///
+/// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
+/// loaded.
+///
+/// The second argument has [`NewNetworkFilterConfigFunction`] type, and it is called when the new
+/// network filter configuration is created.
+///
+/// Note that if a module needs to support both HTTP and Network filters,
+/// [`declare_all_init_functions`] should be used instead.
+#[macro_export]
+macro_rules! declare_network_filter_init_functions {
+  ($f:ident, $new_network_filter_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION,
+        $new_network_filter_config_fn,
+        "NEW_NETWORK_FILTER_CONFIG_FUNCTION"
+      );
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+/// Declare the init functions for the dynamic module with any combination of filter types.
+///
+/// This macro allows a single module to provide any combination of HTTP, Network, Listener,
+/// UDP Listener, Bootstrap filters, and Certificate Validators.
+///
+/// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
+/// loaded.
+///
+/// The remaining arguments are keyword-labeled filter config functions. Omitted filters won't be
+/// registered.
+/// Supported filters:
+/// - `http:` — [`NewHttpFilterConfigFunction`] for HTTP filters
+/// - `network:` — [`NewNetworkFilterConfigFunction`] for Network filters
+/// - `listener:` — [`NewListenerFilterConfigFunction`] for Listener filters
+/// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters
+/// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions
+/// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
+/// - `upstream_http_tcp_bridge:` — [`NewUpstreamHttpTcpBridgeConfigFunction`] for upstream HTTP TCP
+///   bridges
+/// - `http_per_route:` — [`NewHttpFilterPerRouteConfigFunction`] for HTTP per-route configs
+/// - `load_balancer:` — [`NewLoadBalancerConfigFunction`] for load balancer policies
+/// - `cluster:` — [`NewClusterConfigFunction`] for custom clusters
+/// - `tracer:` — [`NewTracerConfigFunction`] for tracers
+/// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
+/// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
+///
+/// # Examples
+///
+/// HTTP only:
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// declare_all_init_functions!(my_program_init, http: my_new_http_filter_config_fn);
+///
+/// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
+///   _envoy_filter_config: &mut EC,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
+///   Some(Box::new(MyHttpFilterConfig {}))
+/// }
+///
+/// struct MyHttpFilterConfig {}
+///
+/// impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MyHttpFilterConfig {}
+/// ```
+///
+/// Network + UDP Listener:
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// declare_all_init_functions!(my_program_init,
+///   network: my_new_network_filter_config_fn,
+///   udp_listener: my_new_udp_listener_filter_config_fn,
+/// );
+///
+/// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
+///   _envoy_filter_config: &mut EC,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn NetworkFilterConfig<ENF>>> {
+///   Some(Box::new(MyNetworkFilterConfig {}))
+/// }
+///
+/// struct MyNetworkFilterConfig {}
+///
+/// impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for MyNetworkFilterConfig {
+///   fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+///     Box::new(MyNetworkFilter {})
+///   }
+/// }
+///
+/// struct MyNetworkFilter {}
+///
+/// impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for MyNetworkFilter {}
+///
+/// fn my_new_udp_listener_filter_config_fn<
+///   EC: EnvoyUdpListenerFilterConfig,
+///   ELF: EnvoyUdpListenerFilter,
+/// >(
+///   _envoy_filter_config: &mut EC,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn UdpListenerFilterConfig<ELF>>> {
+///   Some(Box::new(MyUdpListenerFilterConfig {}))
+/// }
+///
+/// struct MyUdpListenerFilterConfig {}
+///
+/// impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilterConfig<ELF> for MyUdpListenerFilterConfig {
+///   fn new_udp_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn UdpListenerFilter<ELF>> {
+///     Box::new(MyUdpListenerFilter {})
+///   }
+/// }
+///
+/// struct MyUdpListenerFilter {}
+///
+/// impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilter<ELF> for MyUdpListenerFilter {}
+/// ```
+#[macro_export]
+macro_rules! declare_all_init_functions {
+  ($f:ident, $($filter_type:ident : $filter_fn:expr),+ $(,)?) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      $(
+        declare_all_init_functions!(@register $filter_type : $filter_fn);
+      )+
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+
+  (@register http : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HTTP_FILTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register http_per_route : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION"
+    );
+  };
+  (@register network : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_NETWORK_FILTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register listener : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_LISTENER_FILTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register udp_listener : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register bootstrap : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
+      $fn,
+      "NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION"
+    );
+  };
+  (@register load_balancer : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_LOAD_BALANCER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_LOAD_BALANCER_CONFIG_FUNCTION"
+    );
+  };
+  (@register cluster : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_CLUSTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register cert_validator : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_CERT_VALIDATOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register upstream_http_tcp_bridge : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
+      $fn,
+      "NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION"
+    );
+  };
+  (@register tracer : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_TRACER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_TRACER_CONFIG_FUNCTION"
+    );
+  };
+  (@register dns_resolver : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_DNS_RESOLVER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_DNS_RESOLVER_CONFIG_FUNCTION"
+    );
+  };
+  (@register transport_socket : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION,
+      $fn,
+      "NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION"
+    );
+  };
+}
+
+/// The function signature for the new network filter configuration function.
+///
+/// This is called when a new network filter configuration is created, and it must return a new
+/// [`NetworkFilterConfig`] object. Returning `None` will cause the network filter configuration to
+/// be rejected.
+///
+/// The first argument `envoy_filter_config` is a mutable reference to an
+/// [`EnvoyNetworkFilterConfig`] object that provides access to Envoy operations.
+/// The second argument `name` is the name of the filter configuration as specified in the Envoy
+/// config.
+/// The third argument `config` is the raw configuration bytes.
+pub type NewNetworkFilterConfigFunction<EC, ENF> = fn(
+  envoy_filter_config: &mut EC,
   name: &str,
   config: &[u8],
-  new_fn: &NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
-) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
-  if let Some(config) = new_fn(envoy_filter_config, name, config) {
-    wrap_into_c_void_ptr!(config)
-  } else {
-    std::ptr::null()
-  }
-}
+) -> Option<Box<dyn NetworkFilterConfig<ENF>>>;
 
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
-  config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
-) {
-  drop_wrapped_c_void_ptr!(config_ptr,
-    HttpFilterConfig<EnvoyHttpFilterConfigImpl,EnvoyHttpFilterImpl>);
-}
+/// The global init function for network filter configurations. This is set via the
+/// `declare_network_filter_init_functions` macro, and is not intended to be set directly.
+pub static NEW_NETWORK_FILTER_CONFIG_FUNCTION: OnceLock<
+  NewNetworkFilterConfigFunction<
+    network::EnvoyNetworkFilterConfigImpl,
+    network::EnvoyNetworkFilterImpl,
+  >,
+> = OnceLock::new();
 
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_new(
-  filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
-  filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
-  let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
-    raw_ptr: filter_envoy_ptr,
+// =============================================================================
+// Listener Filter Support
+// =============================================================================
+
+/// Declare the init functions for the dynamic module with listener filter support only.
+///
+/// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
+/// loaded.
+///
+/// The second argument has [`NewListenerFilterConfigFunction`] type, and it is called when the new
+/// listener filter configuration is created.
+#[macro_export]
+macro_rules! declare_listener_filter_init_functions {
+  ($f:ident, $new_listener_filter_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION,
+        $new_listener_filter_config_fn,
+        "NEW_LISTENER_FILTER_CONFIG_FUNCTION"
+      );
+      if ($f(server_factory_context_ptr)) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
   };
-  let filter_config = {
-    let raw = filter_config_ptr
-      as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>;
-    &mut **raw
+}
+
+/// The function signature for the new listener filter configuration function.
+///
+/// This is called when a new listener filter configuration is created, and it must return a new
+/// [`ListenerFilterConfig`] object. Returning `None` will cause the listener filter configuration
+/// to be rejected.
+///
+/// The first argument `envoy_filter_config` is a mutable reference to an
+/// [`EnvoyListenerFilterConfig`] object that provides access to Envoy operations.
+/// The second argument `name` is the name of the filter configuration as specified in the Envoy
+/// config.
+/// The third argument `config` is the raw configuration bytes.
+pub type NewListenerFilterConfigFunction<EC, ELF> =
+  fn(
+    envoy_filter_config: &mut EC,
+    name: &str,
+    config: &[u8],
+  ) -> Option<Box<dyn listener::ListenerFilterConfig<ELF>>>;
+
+/// The global init function for listener filter configurations. This is set via the
+/// `declare_listener_filter_init_functions` macro, and is not intended to be set directly.
+pub static NEW_LISTENER_FILTER_CONFIG_FUNCTION: OnceLock<
+  NewListenerFilterConfigFunction<
+    listener::EnvoyListenerFilterConfigImpl,
+    listener::EnvoyListenerFilterImpl,
+  >,
+> = OnceLock::new();
+
+// =============================================================================
+// UDP Listener Filter Support
+// =============================================================================
+
+/// Declare the init functions for the dynamic module with UDP listener filter support only.
+///
+/// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
+/// loaded.
+///
+/// The second argument has [`NewUdpListenerFilterConfigFunction`] type, and it is called when the
+/// new UDP listener filter configuration is created.
+#[macro_export]
+macro_rules! declare_udp_listener_filter_init_functions {
+  ($f:ident, $new_udp_listener_filter_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION,
+        $new_udp_listener_filter_config_fn,
+        "NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION"
+      );
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
   };
-  envoy_dynamic_module_on_http_filter_new_impl(&mut envoy_filter_config, filter_config)
 }
 
-fn envoy_dynamic_module_on_http_filter_new_impl(
-  envoy_filter_config: &mut EnvoyHttpFilterConfigImpl,
-  filter_config: &mut dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
-) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
-  let filter = filter_config.new_http_filter(envoy_filter_config);
-  wrap_into_c_void_ptr!(filter)
-}
+/// The function signature for the new UDP listener filter configuration function.
+///
+/// This is called when a new UDP listener filter configuration is created, and it must return a new
+/// [`UdpListenerFilterConfig`] object. Returning `None` will cause the filter configuration
+/// to be rejected.
+///
+/// The first argument `envoy_filter_config` is a mutable reference to an
+/// [`EnvoyUdpListenerFilterConfig`] object that provides access to Envoy operations.
+/// The second argument `name` is the name of the filter configuration as specified in the Envoy
+/// config.
+/// The third argument `config` is the raw configuration bytes.
+pub type NewUdpListenerFilterConfigFunction<EC, ELF> =
+  fn(
+    envoy_filter_config: &mut EC,
+    name: &str,
+    config: &[u8],
+  ) -> Option<Box<dyn udp_listener::UdpListenerFilterConfig<ELF>>>;
 
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_destroy(
-  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
-) {
-  drop_wrapped_c_void_ptr!(filter_ptr, HttpFilter<EnvoyHttpFilterImpl>);
-}
+/// The global init function for UDP listener filter configurations. This is set via the
+/// `declare_udp_listener_filter_init_functions` macro, and is not intended to be set directly.
+pub static NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION: OnceLock<
+  NewUdpListenerFilterConfigFunction<
+    udp_listener::EnvoyUdpListenerFilterConfigImpl,
+    udp_listener::EnvoyUdpListenerFilterImpl,
+  >,
+> = OnceLock::new();
 
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_stream_complete(
-  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
-) {
-  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-  let filter = &mut **filter;
-  filter.on_stream_complete(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
-}
+// ============================================================================
+// Bootstrap Extension
+// ============================================================================
 
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_headers(
-  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
-  end_of_stream: bool,
-) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
-  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-  let filter = &mut **filter;
-  filter.on_request_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
-}
+/// A global variable that holds the factory function to create a new bootstrap extension config.
+/// This is set by the [`declare_bootstrap_init_functions`] macro.
+pub static NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION: OnceLock<NewBootstrapExtensionConfigFunction> =
+  OnceLock::new();
 
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_body(
-  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
-  end_of_stream: bool,
-) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
-  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-  let filter = &mut **filter;
-  filter.on_request_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
-}
+/// The type of the factory function that creates a new bootstrap extension configuration.
+pub type NewBootstrapExtensionConfigFunction = fn(
+  &mut dyn EnvoyBootstrapExtensionConfig,
+  &str,
+  &[u8],
+) -> Option<Box<dyn BootstrapExtensionConfig>>;
 
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_trailers(
-  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
-) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
-  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-  let filter = &mut **filter;
-  filter.on_request_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
-}
-
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_headers(
-  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
-  end_of_stream: bool,
-) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
-  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-  let filter = &mut **filter;
-  filter.on_response_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
-}
-
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
-  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
-  end_of_stream: bool,
-) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
-  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-  let filter = &mut **filter;
-  filter.on_response_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
-}
-
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
-  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
-) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
-  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-  let filter = &mut **filter;
-  filter.on_response_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
-}
-
-#[no_mangle]
-unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
-  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
-  callout_id: u32,
-  result: abi::envoy_dynamic_module_type_http_callout_result,
-  headers: *const abi::envoy_dynamic_module_type_http_header,
-  headers_size: usize,
-  body_vector: *const abi::envoy_dynamic_module_type_envoy_buffer,
-  body_vector_size: usize,
-) {
-  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
-  let filter = &mut **filter;
-  let headers = if headers_size > 0 {
-    Some(unsafe {
-      std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
-    })
-  } else {
-    None
+/// Declare the init functions for the bootstrap extension dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewBootstrapExtensionConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// declare_bootstrap_init_functions!(my_program_init, my_new_bootstrap_extension_config_fn);
+///
+/// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_new_bootstrap_extension_config_fn(
+///   _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+///   Some(Box::new(MyBootstrapExtensionConfig {}))
+/// }
+///
+/// struct MyBootstrapExtensionConfig {}
+///
+/// impl BootstrapExtensionConfig for MyBootstrapExtensionConfig {
+///   fn new_bootstrap_extension(
+///     &self,
+///     _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+///   ) -> Box<dyn BootstrapExtension> {
+///     Box::new(MyBootstrapExtension {})
+///   }
+/// }
+///
+/// struct MyBootstrapExtension {}
+///
+/// impl BootstrapExtension for MyBootstrapExtension {
+///   fn on_server_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {
+///     // Use envoy_log_info! macro for logging.
+///     // envoy_log_info!("Bootstrap extension initialized!");
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_bootstrap_init_functions {
+  ($f:ident, $new_bootstrap_extension_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
+        $new_bootstrap_extension_config_fn,
+        "NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION"
+      );
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
   };
-  let body = if body_vector_size > 0 {
-    Some(unsafe { std::slice::from_raw_parts(body_vector as *const EnvoyBuffer, body_vector_size) })
-  } else {
-    None
+}
+
+// =================================================================================================
+// Cluster Dynamic Module
+// =================================================================================================
+
+/// The type of the factory function that creates a new cluster configuration.
+///
+/// The `envoy_cluster_metrics` parameter provides access to metric-defining and metric-recording
+/// callbacks. The caller receives an `Arc` so it can be stored and used at runtime
+/// (e.g., during cluster lifecycle events) for recording metrics.
+pub type NewClusterConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_cluster_metrics: std::sync::Arc<dyn cluster::EnvoyClusterMetrics>,
+) -> Option<Box<dyn cluster::ClusterConfig>>;
+
+/// Global storage for the cluster config factory function.
+pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = OnceLock::new();
+
+/// Declare the init functions for the cluster dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewClusterConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use std::sync::Arc;
+///
+/// declare_cluster_init_functions!(my_program_init, my_new_cluster_config_fn);
+///
+/// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_new_cluster_config_fn(
+///   _name: &str,
+///   _config: &[u8],
+///   envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics>,
+/// ) -> Option<Box<dyn ClusterConfig>> {
+///   let counter_id = envoy_cluster_metrics.define_counter("my_counter").ok()?;
+///   Some(Box::new(MyClusterConfig {
+///     counter_id,
+///     envoy_cluster_metrics,
+///   }))
+/// }
+///
+/// struct MyClusterConfig {
+///   counter_id: EnvoyCounterId,
+///   envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics>,
+/// }
+///
+/// impl ClusterConfig for MyClusterConfig {
+///   fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+///     Box::new(MyCluster {
+///       counter_id: self.counter_id,
+///       envoy_cluster_metrics: self.envoy_cluster_metrics.clone(),
+///     })
+///   }
+/// }
+///
+/// struct MyCluster {
+///   counter_id: EnvoyCounterId,
+///   envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics>,
+/// }
+///
+/// impl Cluster for MyCluster {
+///   fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+///     self
+///       .envoy_cluster_metrics
+///       .increment_counter(self.counter_id, 1)
+///       .ok();
+///     envoy_cluster.pre_init_complete();
+///   }
+///
+///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Box<dyn ClusterLb> {
+///     Box::new(MyClusterLb {})
+///   }
+/// }
+///
+/// struct MyClusterLb {}
+///
+/// impl ClusterLb for MyClusterLb {
+///   fn choose_host(
+///     &mut self,
+///     _context: Option<&dyn ClusterLbContext>,
+///     _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+///   ) -> HostSelectionResult {
+///     HostSelectionResult::NoHost
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_cluster_init_functions {
+  ($f:ident, $new_cluster_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_CONFIG_FUNCTION,
+        $new_cluster_config_fn,
+        "NEW_CLUSTER_CONFIG_FUNCTION"
+      );
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
   };
-  filter.on_http_callout_done(
-    &mut EnvoyHttpFilterImpl::new(envoy_ptr),
-    callout_id,
-    result,
-    headers,
-    body,
-  )
+}
+
+// =================================================================================================
+// Load Balancer Dynamic Module Support
+// =================================================================================================
+
+/// The function signature for creating a new load balancer configuration.
+///
+/// The `envoy_lb_config` parameter provides access to metric-defining and metric-recording
+/// callbacks. The caller receives an `Arc` so it can be stored and used at runtime
+/// (e.g., in `choose_host`) for recording metrics.
+pub type NewLoadBalancerConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_lb_config: std::sync::Arc<dyn load_balancer::EnvoyLbConfig>,
+) -> Option<Box<dyn load_balancer::LoadBalancerConfig>>;
+
+/// Global function for creating load balancer configurations.
+pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a load balancer dynamic module.
+///
+/// This macro generates the necessary `extern "C"` functions for the load balancer module.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use std::sync::Arc;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_lb_config(
+///   name: &str,
+///   config: &[u8],
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
+/// ) -> Option<Box<dyn LoadBalancerConfig>> {
+///   let counter_id = envoy_lb_config.define_counter("my_counter").ok()?;
+///   Some(Box::new(MyLbConfig {
+///     counter_id,
+///     envoy_lb_config,
+///   }))
+/// }
+///
+/// declare_load_balancer_init_functions!(program_init, new_lb_config);
+///
+/// struct MyLbConfig {
+///   counter_id: EnvoyCounterId,
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
+/// }
+///
+/// impl LoadBalancerConfig for MyLbConfig {
+///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer> {
+///     Box::new(MyLoadBalancer {
+///       next_index: 0,
+///       counter_id: self.counter_id,
+///       envoy_lb_config: self.envoy_lb_config.clone(),
+///     })
+///   }
+/// }
+///
+/// struct MyLoadBalancer {
+///   next_index: usize,
+///   counter_id: EnvoyCounterId,
+///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
+/// }
+///
+/// impl LoadBalancer for MyLoadBalancer {
+///   fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<HostSelection> {
+///     let count = envoy_lb.get_healthy_hosts_count(0);
+///     if count == 0 {
+///       return None;
+///     }
+///     let index = self.next_index % count;
+///     self.next_index += 1;
+///     self
+///       .envoy_lb_config
+///       .increment_counter(self.counter_id, 1)
+///       .ok();
+///     Some(HostSelection::at_default_priority(index as u32))
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_load_balancer_init_functions {
+  ($f:ident, $new_lb_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_LOAD_BALANCER_CONFIG_FUNCTION,
+        $new_lb_config_fn,
+        "NEW_LOAD_BALANCER_CONFIG_FUNCTION"
+      );
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+// =============================================================================
+// Certificate Validator
+// =============================================================================
+
+/// The function signature for creating a new cert validator configuration.
+pub type NewCertValidatorConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn cert_validator::CertValidatorConfig>>;
+
+/// Global function for creating cert validator configurations.
+pub static NEW_CERT_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewCertValidatorConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a cert validator dynamic module.
+///
+/// This macro generates the necessary `extern "C"` functions for the cert validator module.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::cert_validator::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_cert_validator_config(name: &str, config: &[u8]) -> Option<Box<dyn CertValidatorConfig>> {
+///   Some(Box::new(MyCertValidatorConfig {}))
+/// }
+///
+/// declare_cert_validator_init_functions!(program_init, new_cert_validator_config);
+///
+/// struct MyCertValidatorConfig {}
+///
+/// impl CertValidatorConfig for MyCertValidatorConfig {
+///   fn do_verify_cert_chain(
+///     &self,
+///     _envoy_cert_validator: &EnvoyCertValidator,
+///     certs: &[&[u8]],
+///     host_name: &str,
+///     is_server: bool,
+///   ) -> ValidationResult {
+///     ValidationResult::successful()
+///   }
+///
+///   fn get_ssl_verify_mode(&self, _handshaker_provides_certificates: bool) -> i32 {
+///     0x03
+///   }
+///
+///   fn update_digest(&self) -> &[u8] {
+///     b"my_cert_validator"
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_cert_validator_init_functions {
+  ($f:ident, $new_cert_validator_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION,
+        $new_cert_validator_config_fn,
+        "NEW_CERT_VALIDATOR_CONFIG_FUNCTION"
+      );
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+// =================================================================================================
+// Upstream HTTP TCP Bridge Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new upstream HTTP TCP bridge configuration.
+pub type NewUpstreamHttpTcpBridgeConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn UpstreamHttpTcpBridgeConfig>>;
+
+/// Global storage for the upstream HTTP TCP bridge config factory function.
+pub static NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION: OnceLock<
+  NewUpstreamHttpTcpBridgeConfigFunction,
+> = OnceLock::new();
+
+// =================================================================================================
+// Tracer Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new tracer configuration.
+///
+/// The `ctx` provides access to metrics definition and update APIs. Metrics should be defined
+/// during configuration creation and the context stored for runtime metric updates.
+pub type NewTracerConfigFunction =
+  fn(ctx: TracerConfigContext, name: &str, config: &[u8]) -> Option<Box<dyn TracerConfig>>;
+
+/// Global storage for the tracer config factory function.
+pub static NEW_TRACER_CONFIG_FUNCTION: OnceLock<NewTracerConfigFunction> = OnceLock::new();
+
+// =================================================================================================
+// DNS Resolver Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new DNS resolver configuration.
+///
+/// The `envoy_dns_resolver_config` parameter provides access to the Envoy-side DNS resolver
+/// configuration. The caller receives an `Arc` so it can be stored and used at runtime
+/// (e.g., during resolution) for recording metrics.
+pub type NewDnsResolverConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_dns_resolver_config: std::sync::Arc<dyn dns_resolver::EnvoyDnsResolverConfig>,
+) -> Option<Box<dyn dns_resolver::DnsResolverConfig>>;
+
+/// Global storage for the DNS resolver config factory function.
+pub static NEW_DNS_RESOLVER_CONFIG_FUNCTION: OnceLock<NewDnsResolverConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a DNS resolver dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewDnsResolverConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use std::sync::Arc;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_dns_resolver_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _envoy_dns_resolver_config: Arc<dyn EnvoyDnsResolverConfig>,
+/// ) -> Option<Box<dyn DnsResolverConfig>> {
+///   Some(Box::new(MyDnsResolverConfig {}))
+/// }
+///
+/// declare_dns_resolver_init_functions!(program_init, new_dns_resolver_config);
+///
+/// struct MyDnsResolverConfig {}
+///
+/// impl DnsResolverConfig for MyDnsResolverConfig {
+///   fn new_resolver(
+///     &self,
+///     envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
+///   ) -> Box<dyn DnsResolverInstance> {
+///     Box::new(MyDnsResolver { envoy_callback })
+///   }
+/// }
+///
+/// struct MyDnsResolver {
+///   envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
+/// }
+///
+/// impl DnsResolverInstance for MyDnsResolver {
+///   fn resolve(
+///     &self,
+///     _dns_name: &str,
+///     _lookup_family: DnsLookupFamily,
+///     _query_id: u64,
+///   ) -> Option<Box<dyn DnsActiveQuery>> {
+///     None
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_dns_resolver_init_functions {
+  ($f:ident, $new_dns_resolver_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_DNS_RESOLVER_CONFIG_FUNCTION,
+        $new_dns_resolver_config_fn,
+        "NEW_DNS_RESOLVER_CONFIG_FUNCTION"
+      );
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+// =================================================================================================
+// Transport Socket Dynamic Module Support
+// =================================================================================================
+
+/// The factory function signature for creating a new transport socket factory configuration.
+pub type NewTransportSocketFactoryConfigFunction<ETS> =
+  fn(
+    name: &str,
+    config: &[u8],
+    is_upstream: bool,
+  ) -> Option<Box<dyn transport_socket::TransportSocketFactoryConfig<ETS>>>;
+
+/// Global storage for the transport socket factory configuration function.
+pub static NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION: OnceLock<
+  NewTransportSocketFactoryConfigFunction<EnvoyTransportSocketImpl>,
+> = OnceLock::new();
+
+/// Declare the init functions for a transport socket dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with
+/// [`NewTransportSocketFactoryConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_transport_socket_factory_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _is_upstream: bool,
+/// ) -> Option<Box<dyn TransportSocketFactoryConfig<EnvoyTransportSocketImpl>>> {
+///   None
+/// }
+///
+/// declare_transport_socket_init_functions!(program_init, new_transport_socket_factory_config);
+/// ```
+#[macro_export]
+macro_rules! declare_transport_socket_init_functions {
+  ($f:ident, $new_transport_socket_factory_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+        envoy_proxy_dynamic_modules_rust_sdk::NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION,
+        $new_transport_socket_factory_config_fn,
+        "NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION"
+      );
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
 }

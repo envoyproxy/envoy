@@ -22,8 +22,7 @@ public:
          const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
          const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
          const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
-         const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
-         TimeSource& time_source);
+         const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options);
 
   /**
    * Sets new addresses. This can be called dynamically during operation, and
@@ -60,7 +59,7 @@ protected:
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
       const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
-      TimeSource& time_source, absl::Status& creation_status);
+      absl::Status& creation_status);
 
 private:
   const Network::TransportSocketOptionsConstSharedPtr override_transport_socket_options_;
@@ -86,6 +85,7 @@ public:
   // Upstream:HostDescription observers are delegated to logical_host_.
   bool canary() const override { return logical_host_->canary(); }
   MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
+  std::size_t metadataHash() const override { return logical_host_->metadataHash(); }
   const MetadataConstSharedPtr localityMetadata() const override {
     return logical_host_->localityMetadata();
   }
@@ -125,12 +125,18 @@ public:
     return logical_host_->lastHcPassTime();
   }
   uint32_t priority() const override { return logical_host_->priority(); }
-  Network::UpstreamTransportSocketFactory&
-  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
-                                const envoy::config::core::v3::Metadata* metadata) const override {
-    return logical_host_->resolveTransportSocketFactory(dest_address, metadata);
+  Network::UpstreamTransportSocketFactory& resolveTransportSocketFactory(
+      const Network::Address::InstanceConstSharedPtr& dest_address,
+      const envoy::config::core::v3::Metadata* metadata,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
+          nullptr) const override {
+    return logical_host_->resolveTransportSocketFactory(dest_address, metadata,
+                                                        transport_socket_options);
   }
-  OptRef<HostLbPolicyData> lbPolicyData() const override { return logical_host_->lbPolicyData(); }
+  size_t lbPolicyDataCount() const override { return logical_host_->lbPolicyDataCount(); }
+  OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const override {
+    return logical_host_->lbPolicyDataAt(index);
+  }
 
   // Upstream:HostDescription mutators are all no-ops, because logical_host_ is
   // const. These should never be called except during coverage tests.
@@ -146,7 +152,7 @@ public:
   void canary(bool) override {}
   void setLastHcPassTime(MonotonicTime) override {}
   void priority(uint32_t) override {}
-  void setLbPolicyData(HostLbPolicyDataPtr) override {}
+  void addLbPolicyData(HostLbPolicyDataPtr) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;

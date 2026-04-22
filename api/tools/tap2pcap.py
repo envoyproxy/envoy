@@ -73,7 +73,7 @@ def tap2pcap(tap_path, pcap_path):
         pass
 
     text2pcap_args = [
-        'text2pcap', '-D', '-t', '%Y-%m-%d %H:%M:%S.', '-6' if ipv6 else '-4',
+        'text2pcap', '-D', '-t', '%Y-%m-%d %H:%M:%S.%f', '-6' if ipv6 else '-4',
         '%s,%s' % (remote_address, local_address), '-T',
         '%d,%d' % (remote_port, local_port), '-', pcap_path
     ]

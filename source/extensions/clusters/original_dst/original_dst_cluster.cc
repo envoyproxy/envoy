@@ -76,9 +76,9 @@ HostSelectionResponse OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerC
         HostSharedPtr host(std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
             HostImpl::create(
                 info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, nullptr,
-                1, envoy::config::core::v3::Locality().default_instance(),
+                1, std::make_shared<envoy::config::core::v3::Locality>(),
                 envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
-                envoy::config::core::v3::UNKNOWN, parent_->cluster_->time_source_),
+                envoy::config::core::v3::UNKNOWN),
             std::unique_ptr<HostImpl>)));
         ENVOY_LOG(debug, "Created host {} {}.", *host, host->address()->asString());
 
@@ -156,7 +156,7 @@ OriginalDstCluster::LoadBalancer::metadataOverrideHost(LoadBalancerContext* cont
   const auto streamInfos = {
       const_cast<const StreamInfo::StreamInfo*>(context->requestStreamInfo()),
       context->downstreamConnection() ? &context->downstreamConnection()->streamInfo() : nullptr};
-  const ProtobufWkt::Value* value = nullptr;
+  const Protobuf::Value* value = nullptr;
   for (const auto streamInfo : streamInfos) {
     if (streamInfo == nullptr) {
       continue;
@@ -164,17 +164,17 @@ OriginalDstCluster::LoadBalancer::metadataOverrideHost(LoadBalancerContext* cont
     const auto& metadata = streamInfo->dynamicMetadata();
     value = &Config::Metadata::metadataValue(&metadata, metadata_key_.value());
     // Path can refer to a list, in which case we extract the first element.
-    if (value->kind_case() == ProtobufWkt::Value::kListValue) {
+    if (value->kind_case() == Protobuf::Value::kListValue) {
       const auto& values = value->list_value().values();
       if (!values.empty()) {
         value = &(values[0]);
       }
     }
-    if (value->kind_case() == ProtobufWkt::Value::kStringValue) {
+    if (value->kind_case() == Protobuf::Value::kStringValue) {
       break;
     }
   }
-  if (value == nullptr || value->kind_case() != ProtobufWkt::Value::kStringValue) {
+  if (value == nullptr || value->kind_case() != Protobuf::Value::kStringValue) {
     return nullptr;
   }
   const std::string& metadata_override_host = value->string_value();
@@ -240,9 +240,9 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
   all_hosts->emplace_back(host);
-  priority_set_.updateHosts(
-      0, HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()), {},
-      {std::move(host)}, {}, random_.random(), absl::nullopt, absl::nullopt);
+  priority_set_.updateHosts(0,
+                            HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
+                            {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {

@@ -52,9 +52,9 @@ public:
     if (buffer_size_specified_) {
       config.mutable_buffer_size_kb()->set_value(buffer_size_);
     }
-    auto* boostrap_extension = bootstrap.add_bootstrap_extensions();
-    boostrap_extension->mutable_typed_config()->PackFrom(config);
-    boostrap_extension->set_name("envoy.bootstrap.internal_listener");
+    auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
+    bootstrap_extension->mutable_typed_config()->PackFrom(config);
+    bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
   }
   void initialize() override {
     config_helper_.prependFilter(R"EOF(
@@ -323,6 +323,31 @@ TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest5KB) {
   initialize();
   EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 5120",
                       internalConnectionBufferSizeTest());
+}
+
+TEST_F(InternalUpstreamIntegrationTest, TcpProxyHalfCloseLeak) {
+  // Setup the environment with the internal listeners and TCP proxy filter chains.
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      codec_client_->makeRequestWithBody(default_request_headers_, 1024, true /* end_stream */);
+  waitForNextUpstreamRequest();
+
+  // Tear down the client side of the internal connection. This leaves the server side of the
+  // internal connection unaware that the client is dead.
+  codec_client_->close();
+
+  // Upstream sends final data and immediately closes. This puts the internal connection into the
+  // CloseAfterFlush state waiting for a Write event to drain the buffer.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1024, true);
+  cleanupUpstreamAndDownstream();
+
+  // Verify that the connection does not leak by waiting for the active connection gauge to drop to
+  // zero. If the server side of the internal connection fails to clean up the downstream connection
+  // then this wait will time out because the connection is stuck in CloseAfterFlush indefinitely.
+  test_server_->waitForGaugeEq("listener.envoy_internal_internal_listener.downstream_cx_active", 0);
 }
 
 } // namespace

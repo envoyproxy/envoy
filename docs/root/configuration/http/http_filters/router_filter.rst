@@ -83,8 +83,8 @@ can be specified using a ',' delimited list. The supported policies are:
     request, including any retries that take place.
 
 gateway-error
-  This policy is similar to the *5xx* policy but will only retry requests that result in a 502, 503,
-  or 504.
+  This policy is similar to the *5xx* policy but will attempt a retry if the upstream server responds
+  with 502, 503, or 504 response code, or does not respond at all (disconnect/reset/read timeout).
 
 reset
   Envoy will attempt a retry if the upstream server does not respond at all (disconnect/reset/read timeout.)
@@ -376,6 +376,19 @@ or :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rew
 Envoy will put the original path header in this header. This can be useful for logging and
 debugging.
 
+.. _config_http_filters_router_x-envoy-original-host:
+
+x-envoy-original-host
+^^^^^^^^^^^^^^^^^^^^^
+
+If the route utilizes
+:ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`,
+:ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`,
+:ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`,
+:ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`,
+Envoy will put the original host header in this header. This can be useful for logging and
+debugging.
+
 .. _config_http_filters_router_x-envoy-upstream-stream-duration-ms:
 
 x-envoy-upstream-stream-duration-ms
@@ -454,9 +467,15 @@ statistics:
   upstream_rq_retry_limit_exceeded, Counter, Total requests not retried due to exceeding :ref:`the configured number of maximum retries <config_http_filters_router_x-envoy-max-retries>`
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
   upstream_rq_retry_success, Counter, Total request retry successes
-  upstream_rq_time, Histogram, Request time milliseconds
+  upstream_rq_time, Histogram, Time from when the downstream request is fully received to when the upstream response is complete
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
   upstream_rq_total, Counter, Total requests initiated by the router to the upstream
+
+.. note::
+   The ``upstream_rq_<*xx>`` and ``upstream_rq_<*>`` stats only count **final** responses that
+   were sent to the downstream client. Responses that triggered a retry are not counted here;
+   they are counted in ``cluster.<name>.retry.upstream_rq_<*>`` instead. See
+   :ref:`cluster retry statistics <config_cluster_manager_cluster_stats_retry>` for details.
 
 Runtime
 -------

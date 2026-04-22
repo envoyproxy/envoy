@@ -6,6 +6,7 @@
 
 #ifndef NULL_PLUGIN
 #include "proxy_wasm_intrinsics.h"
+
 #include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #else
 #include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
@@ -96,9 +97,11 @@ FilterDataStatus DupReplyContext::onRequestBody(size_t, bool) {
 
 class LocalReplyInRequestAndResponseContext : public Context {
 public:
-  explicit LocalReplyInRequestAndResponseContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit LocalReplyInRequestAndResponseContext(uint32_t id, RootContext* root)
+      : Context(id, root) {}
   FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
   FilterHeadersStatus onResponseHeaders(uint32_t, bool) override;
+
 private:
   EnvoyRootContext* root() { return static_cast<EnvoyRootContext*>(Context::root()); }
 };
@@ -165,15 +168,16 @@ FilterDataStatus InvalidGrpcStatusReplyContext::onRequestBody(size_t size, bool)
 static RegisterContextFactory register_DupReplyContext(CONTEXT_FACTORY(DupReplyContext),
                                                        ROOT_FACTORY(EnvoyRootContext),
                                                        "send local reply twice");
-static RegisterContextFactory register_LocalReplyInRequestAndResponseContext(CONTEXT_FACTORY(LocalReplyInRequestAndResponseContext),
-                                                         ROOT_FACTORY(EnvoyRootContext),
-                                                         "local reply in request and response");
+static RegisterContextFactory register_LocalReplyInRequestAndResponseContext(
+    CONTEXT_FACTORY(LocalReplyInRequestAndResponseContext), ROOT_FACTORY(EnvoyRootContext),
+    "local reply in request and response");
 static RegisterContextFactory register_PanicInRequestContext(CONTEXT_FACTORY(PanicInRequestContext),
-                                                         ROOT_FACTORY(EnvoyRootContext),
-                                                         "panic during request processing");
-static RegisterContextFactory register_PanicInResponseContext(CONTEXT_FACTORY(PanicInResponseContext),
-                                                         ROOT_FACTORY(EnvoyRootContext),
-                                                         "panic during response processing");
+                                                             ROOT_FACTORY(EnvoyRootContext),
+                                                             "panic during request processing");
+static RegisterContextFactory
+    register_PanicInResponseContext(CONTEXT_FACTORY(PanicInResponseContext),
+                                    ROOT_FACTORY(EnvoyRootContext),
+                                    "panic during response processing");
 
 static RegisterContextFactory
     register_InvalidGrpcStatusReplyContext(CONTEXT_FACTORY(InvalidGrpcStatusReplyContext),

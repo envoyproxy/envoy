@@ -129,10 +129,6 @@ frames {
       value: "empty"
     }
     headers {
-      key: "x-squash-debug"
-      value: "empty"
-    }
-    headers {
       key: "grpc-accept-encoding"
       value: "identity"
     }

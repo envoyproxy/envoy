@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Load Balancing Policy]
+
+// Configuration for a load balancing policy implemented via dynamic modules.
+// This enables custom load balancing algorithms to be implemented in dynamic modules
+// (shared libraries loaded at runtime).
+//
+// The dynamic module must implement the load balancer ABI functions defined in
+// :repo:`abi.h <source/extensions/dynamic_modules/abi/abi.h>`.
+// [#extension: envoy.load_balancing_policies.dynamic_modules]
+message DynamicModulesLoadBalancerConfig {
+  // The dynamic module configuration.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name to identify the load balancer implementation within the module.
+  // This is passed to the module's ``envoy_dynamic_module_on_lb_config_new``
+  // function.
+  string lb_policy_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The configuration for the module's load balancer implementation.
+  // This is passed to the module's ``envoy_dynamic_module_on_lb_config_new``
+  // function. The configuration can be any protobuf message. However, it is recommended to use
+  // ``google.protobuf.Struct``, ``google.protobuf.StringValue``, or ``google.protobuf.BytesValue``.
+  // These types are passed directly as bytes to the module, so the module does not need to have
+  // knowledge of protobuf encoding. Otherwise, the serialized bytes of the type are passed.
+  // If not specified, an empty configuration is passed.
+  google.protobuf.Any lb_policy_config = 3;
+}

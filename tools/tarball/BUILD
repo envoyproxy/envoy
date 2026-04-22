@@ -4,5 +4,5 @@ licenses(["notice"])  # Apache 2
 
 unpacker(
     name = "unpack",
-    zstd = "//tools/zstd",
+    zstd = "@zstd//:zstd_cli",
 )

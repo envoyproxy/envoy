@@ -29,17 +29,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config) {
-#ifdef ENVOY_ENABLE_YAML
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(config, bootstrap);
-  return bootstrap;
-#else
-  UNREFERENCED_PARAMETER(config);
-  PANIC("YAML support compiled out: can't parse YAML");
-#endif
-}
-
 using ::testing::_;
 using ::testing::AssertionFailure;
 using ::testing::AssertionResult;
@@ -154,21 +143,18 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
   }
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_, false);
+        tls_context, factory_context_, {}, false);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
-        std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
 
-    std::vector<std::string> server_names;
     auto& config_factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(
         "envoy.transport_sockets.quic");
-    return *config_factory.createTransportSocketFactory(quic_config, factory_context_,
-                                                        server_names);
+    return *config_factory.createTransportSocketFactory(quic_config, factory_context_, {});
   }
 }
 
@@ -223,7 +209,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
     envoy::service::discovery::v3::DiscoveryResponse lds;
     lds.set_version_info("0");
     for (auto& listener : config_helper.bootstrap().static_resources().listeners()) {
-      ProtobufWkt::Any* resource = lds.add_resources();
+      Protobuf::Any* resource = lds.add_resources();
       resource->PackFrom(listener);
     }
 #ifdef ENVOY_ENABLE_YAML
@@ -377,12 +363,12 @@ bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   test_server_->server().dispatcher().post([&]() {
     listeners = test_server_->server().listenerManager().listeners();
-    l.Lock();
+    l.lock();
     listeners_ready = true;
-    l.Unlock();
+    l.unlock();
   });
   l.LockWhen(absl::Condition(&listeners_ready));
-  l.Unlock();
+  l.unlock();
 
   for (auto& listener : listeners) {
     if (listener.get().name() == listener_name) {
@@ -404,12 +390,12 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   test_server->server().dispatcher().post([&listeners, &listeners_ready, &l, &test_server]() {
     listeners = test_server->server().listenerManager().listeners();
-    l.Lock();
+    l.lock();
     listeners_ready = true;
-    l.Unlock();
+    l.unlock();
   });
   l.LockWhen(absl::Condition(&listeners_ready));
-  l.Unlock();
+  l.unlock();
 
   auto listener_it = listeners.cbegin();
   auto port_it = port_names.cbegin();
@@ -535,25 +521,19 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   listener_access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
 }
-
-std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
-                                                  bool allow_excess_entries,
-                                                  Network::ClientConnection* client_connection) {
-
+std::vector<std::string>
+BaseIntegrationTest::waitForAccessLogEntries(const std::string& filename,
+                                             Network::ClientConnection* client_connection,
+                                             absl::optional<uint32_t> min_entries) {
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
+  std::vector<std::string> entries;
   const int num_iterations = TIMEOUT_FACTOR * 1000;
   for (int i = 0; i < num_iterations; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
-    std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
-    if (entries.size() >= entry + 1) {
-      // Often test authors will waitForAccessLog() for multiple requests, and
-      // not increment the entry number for the second wait. Guard against that.
-      EXPECT_TRUE(allow_excess_entries || entries.size() == entry + 1)
-          << "Waiting for entry index " << entry << " but it was not the last entry as there were "
-          << entries.size() << "\n"
-          << contents;
-      return entries[entry];
+    entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
+    if (min_entries.has_value() && entries.size() >= min_entries.value()) {
+      return entries;
     }
     if (i % 25 == 0 && client_connection != nullptr) {
       // The QUIC default delayed ack timer is 25ms. Wait for any pending ack timers to expire,
@@ -562,8 +542,33 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
-  RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: '", contents, "'"));
-  return "";
+  if (min_entries.has_value()) {
+    RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: '", contents, "'"));
+  }
+  return entries;
+}
+
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
+                                                  bool allow_excess_entries,
+                                                  Network::ClientConnection* client_connection) {
+  std::vector<std::string> entries =
+      waitForAccessLogEntries(filename, client_connection, entry + 1);
+
+  // Often test authors will waitForAccessLog() for multiple requests, and
+  // not increment the entry number for the second wait. Guard against that.
+  EXPECT_TRUE(allow_excess_entries || entries.size() == entry + 1)
+      << "Waiting for entry index " << entry << " but it was not the last entry as there were "
+      << entries.size() << "\n"
+      << absl::StrJoin(entries, "\n");
+  RELEASE_ASSERT(entries.size() > entry, absl::StrCat("Log entry ", entry, " not found."));
+  return entries[entry];
+}
+
+std::string BaseIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
+  if (version_ == Network::Address::IpVersion::v4) {
+    return "listener.127.0.0.1_0." + stat_name;
+  }
+  return "listener.[__1]_0." + stat_name;
 }
 
 void BaseIntegrationTest::createXdsUpstream() {
@@ -582,12 +587,11 @@ void BaseIntegrationTest::createXdsUpstream() {
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_, false);
+        tls_context, factory_context_, {}, false);
 
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
-        std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
   }
   xds_upstream_ = fake_upstreams_.back().get();
@@ -874,5 +878,17 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   test_server_->statStore().forEachCounter(nullptr, check_metric);
   test_server_->statStore().forEachGauge(nullptr, check_metric);
   test_server_->statStore().forEachHistogram(nullptr, check_metric);
+}
+
+envoy::config::bootstrap::v3::Bootstrap
+BaseIntegrationTest::configToBootstrap(const std::string& config) {
+#ifdef ENVOY_ENABLE_YAML
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(config, bootstrap);
+  return bootstrap;
+#else
+  UNREFERENCED_PARAMETER(config);
+  PANIC("YAML support compiled out: can't parse YAML");
+#endif
 }
 } // namespace Envoy

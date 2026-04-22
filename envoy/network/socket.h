@@ -201,19 +201,7 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 #define ENVOY_IPV6_MTU_DISCOVER_VALUE IPV6_PMTUDISC_DO
 #endif
 
-/**
- * Interface representing a single filter chain info.
- */
-class FilterChainInfo {
-public:
-  virtual ~FilterChainInfo() = default;
-
-  /**
-   * @return the name of this filter chain.
-   */
-  virtual absl::string_view name() const PURE;
-};
-
+class FilterChainInfo;
 class ListenerInfo;
 
 using FilterChainInfoConstSharedPtr = std::shared_ptr<const FilterChainInfo>;
@@ -259,6 +247,11 @@ public:
    * @return SNI value for downstream host.
    */
   virtual absl::string_view requestedServerName() const PURE;
+
+  /**
+   * @return requestedApplicationProtocols value for downstream host.
+   */
+  virtual const std::vector<std::string>& requestedApplicationProtocols() const PURE;
 
   /**
    * @return Connection ID of the downstream connection, or unset if not available.
@@ -343,6 +336,12 @@ public:
    * @param SNI value requested.
    */
   virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
+
+  /**
+   * @param protocols Application protocols requested.
+   */
+  virtual void
+  setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) PURE;
 
   /**
    * @param id Connection ID of the downstream connection.

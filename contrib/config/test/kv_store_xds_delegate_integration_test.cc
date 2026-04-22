@@ -308,19 +308,19 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
       // SDS.
       initXdsStream(*getSdsUpstream(), sds_connection_, sds_stream_);
       EXPECT_TRUE(compareSotwDiscoveryRequest(
-          /*expected_type_url=*/Config::TypeUrl::get().Secret, /*expected_version=*/"",
+          /*expected_type_url=*/Config::TestTypeUrl::get().Secret, /*expected_version=*/"",
           /*expected_resource_names=*/{std::string(CLIENT_CERT_NAME)}, /*expect_node=*/true,
           /*expected_error_code=*/Grpc::Status::WellKnownGrpcStatus::Ok,
           /*expected_error_message=*/"", sds_stream_.get()));
       auto sds_resource = getClientSecret();
       sendSotwDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
-          Config::TypeUrl::get().Secret, {sds_resource}, "1", sds_stream_.get());
+          Config::TestTypeUrl::get().Secret, {sds_resource}, "1", sds_stream_.get());
     }
     {
       // RTDS.
       initXdsStream(*getRtdsUpstream(), rtds_connection_, rtds_stream_);
       EXPECT_TRUE(compareSotwDiscoveryRequest(
-          /*expected_type_url=*/Config::TypeUrl::get().Runtime,
+          /*expected_type_url=*/Config::TestTypeUrl::get().Runtime,
           /*expected_version=*/"",
           /*expected_resource_names=*/{"some_rtds_layer"}, /*expect_node=*/true,
           /*expected_error_code=*/Grpc::Status::WellKnownGrpcStatus::Ok,
@@ -332,7 +332,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
             baz: meh
       )EOF");
       sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-          Config::TypeUrl::get().Runtime, {rtds_resource}, "1", rtds_stream_.get());
+          Config::TestTypeUrl::get().Runtime, {rtds_resource}, "1", rtds_stream_.get());
     }
   };
 
@@ -351,7 +351,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
 
   // Send an update to the RTDS resource, from the RTDS cluster to the Envoy test server.
   EXPECT_TRUE(compareSotwDiscoveryRequest(
-      /*expected_type_url=*/Config::TypeUrl::get().Runtime, /*expected_version=*/"1",
+      /*expected_type_url=*/Config::TestTypeUrl::get().Runtime, /*expected_version=*/"1",
       /*expected_resource_names=*/{"some_rtds_layer"}, /*expect_node=*/false,
       /*expected_error_code=*/Grpc::Status::WellKnownGrpcStatus::Ok,
       /*expected_error_message=*/"", rtds_stream_.get()));
@@ -361,7 +361,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
       baz: saz
   )EOF");
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {rtds_resource}, "2", rtds_stream_.get());
+      Config::TestTypeUrl::get().Runtime, {rtds_resource}, "2", rtds_stream_.get());
   test_server_->waitForCounterGe("runtime.load_success", 3);
 
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
@@ -399,7 +399,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
             baz: jazz
   )EOF");
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"3", rtds_stream_.get());
+      Config::TestTypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"3", rtds_stream_.get());
 
   test_server_->waitForCounterGe("runtime.load_success", 3);
 
@@ -421,7 +421,7 @@ public:
   // We only have a cds_config making wildcard requests, so we only need to implement the iterate
   // function.
   void iterate(ConstIterateCb cb) const override {
-    const Config::XdsConfigSourceId source_id{CDS_CLUSTER_NAME, Config::TypeUrl::get().Cluster};
+    const Config::XdsConfigSourceId source_id{CDS_CLUSTER_NAME, Config::TestTypeUrl::get().Cluster};
     const std::string cluster_name = "cluster_A";
     const std::string key = absl::StrCat(source_id.toKey(), "+", cluster_name);
 

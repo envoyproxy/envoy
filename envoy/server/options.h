@@ -223,6 +223,11 @@ public:
   virtual std::chrono::milliseconds fileFlushIntervalMsec() const PURE;
 
   /**
+   * @return uint64_t the minimum size in kilobytes before the log buffer is flushed.
+   */
+  virtual uint64_t fileFlushMinSizeKB() const PURE;
+
+  /**
    * @return const std::string& the server's cluster.
    */
   virtual const std::string& serviceClusterName() const PURE;

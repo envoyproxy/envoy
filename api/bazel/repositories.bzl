@@ -12,7 +12,23 @@ def external_http_archive(name, **kwargs):
         **kwargs
     )
 
-def api_dependencies():
+def api_dependencies(bzlmod = False):
+    # Dependencies needed for both WORKSPACE and bzlmod
+    external_http_archive(
+        name = "prometheus_metrics_model",
+        build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "com_github_chrusty_protoc_gen_jsonschema",
+    )
+    external_http_archive(
+        name = "envoy_toolshed",
+    )
+
+    # WORKSPACE-only dependencies (available in BCR for bzlmod or not needed)
+    if bzlmod:
+        return
+
     external_http_archive(
         name = "bazel_skylib",
     )
@@ -22,17 +38,14 @@ def api_dependencies():
     external_http_archive(
         name = "com_envoyproxy_protoc_gen_validate",
         patch_args = ["-p1"],
-        patches = ["@envoy_api//bazel:pgv.patch"],
+        patches = ["@envoy//bazel:pgv.patch"],
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
     external_http_archive(
         name = "com_google_googleapis",
     )
     external_http_archive(
-        name = "com_github_cncf_xds",
-    )
-    external_http_archive(
-        name = "prometheus_metrics_model",
-        build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
+        name = "xds",
     )
     external_http_archive(
         name = "rules_buf",
@@ -41,21 +54,19 @@ def api_dependencies():
         name = "rules_proto",
     )
     external_http_archive(
-        name = "com_github_openzipkin_zipkinapi",
+        name = "zipkin-api",
+        location_name = "zipkin_api",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
     external_http_archive(
-        name = "opentelemetry_proto",
+        name = "opentelemetry-proto",
+        location_name = "opentelemetry_proto",
         build_file_content = OPENTELEMETRY_BUILD_CONTENT,
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
     external_http_archive(
         name = "dev_cel",
-    )
-    external_http_archive(
-        name = "com_github_chrusty_protoc_gen_jsonschema",
-    )
-    external_http_archive(
-        name = "envoy_toolshed",
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
@@ -89,12 +100,17 @@ api_cc_py_proto_library(
         "zipkin-jsonv2.proto",
         "zipkin.proto",
     ],
-    visibility = ["//visibility:public"],
 )
 
 go_proto_library(
     name = "zipkin_go_proto",
     proto = ":zipkin",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "zipkin-api",
+    actual = ":zipkin_cc_proto",
     visibility = ["//visibility:public"],
 )
 """
@@ -104,8 +120,8 @@ OPENTELEMETRY_BUILD_CONTENT = """
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library", "py_grpc_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library", "go_grpc_library")
-load("@rules_proto//proto:defs.bzl", "proto_library")
 
 package(default_visibility = ["//visibility:public"])
 

@@ -31,9 +31,9 @@ class LocalRateLimitClientImpl : public RateLimitClient,
                                  public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   explicit LocalRateLimitClientImpl(
-      Envoy::ThreadLocal::TypedSlot<ThreadLocalGlobalRateLimitClientImpl>& global_client_tls,
+      GlobalRateLimitClientImpl* global_client,
       Envoy::ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_cache_tls)
-      : global_client_tls_(global_client_tls), buckets_cache_tls_(buckets_cache_tls) {}
+      : global_client_(global_client), buckets_cache_tls_(buckets_cache_tls) {}
 
   void createBucket(const BucketId& bucket_id, size_t id, const BucketAction& default_bucket_action,
                     std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
@@ -44,24 +44,20 @@ public:
   std::shared_ptr<CachedBucket> getBucket(size_t id) override;
 
 private:
-  inline std::shared_ptr<GlobalRateLimitClientImpl> getGlobalClient() {
-    return (global_client_tls_.get().has_value()) ? global_client_tls_.get()->global_client
-                                                  : nullptr;
-  }
   inline std::shared_ptr<BucketsCache> getBucketsCache() {
     return (buckets_cache_tls_.get().has_value()) ? buckets_cache_tls_.get()->quota_buckets_
                                                   : nullptr;
   }
 
   // Lockless access to global resources via TLS.
-  ThreadLocal::TypedSlot<ThreadLocalGlobalRateLimitClientImpl>& global_client_tls_;
+  GlobalRateLimitClientImpl* global_client_;
   ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_cache_tls_;
 };
 
-inline std::unique_ptr<RateLimitClient> createLocalRateLimitClient(
-    ThreadLocal::TypedSlot<ThreadLocalGlobalRateLimitClientImpl>& global_client_tls,
-    ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_cache_tls_) {
-  return std::make_unique<LocalRateLimitClientImpl>(global_client_tls, buckets_cache_tls_);
+inline std::unique_ptr<RateLimitClient>
+createLocalRateLimitClient(GlobalRateLimitClientImpl* global_client,
+                           ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_cache_tls_) {
+  return std::make_unique<LocalRateLimitClientImpl>(global_client, buckets_cache_tls_);
 }
 
 } // namespace RateLimitQuota

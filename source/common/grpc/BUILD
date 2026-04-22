@@ -77,7 +77,7 @@ envoy_cc_library(
     hdrs = ["status.h"],
     deps = [
         "//envoy/grpc:status",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -108,7 +108,7 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -125,7 +125,7 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -145,7 +145,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/grpc:status_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -182,7 +182,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:thread_annotations",
         "//source/common/tracing:http_tracer_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -222,7 +222,7 @@ envoy_cc_library(
         ":buffered_message_ttl_manager_lib",
         ":typed_async_client_lib",
         "//source/common/protobuf:utility_lib",
-        "@com_google_absl//absl/container:btree",
+        "@abseil-cpp//absl/container:btree",
     ],
 )
 

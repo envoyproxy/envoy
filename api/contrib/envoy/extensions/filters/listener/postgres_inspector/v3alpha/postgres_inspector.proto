@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.listener.postgres_inspector.v3alpha;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.listener.postgres_inspector.v3alpha";
+option java_outer_classname = "PostgresInspectorProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/listener/postgres_inspector/v3alpha";
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Postgres Inspector]
+// Postgres Inspector :ref:`configuration overview <extension_envoy.filters.listener.postgres_inspector>`.
+// [#extension: envoy.filters.listener.postgres_inspector]
+
+message PostgresInspector {
+  // Enable extraction of connection metadata (user, database, application name) from
+  // the startup message. This metadata is made available for access logging and stats.
+  //
+  // Defaults to ``true``.
+  google.protobuf.BoolValue enable_metadata_extraction = 1;
+
+  // The maximum size of the startup message that the postgres inspector will accept.
+  // Messages larger than this will be rejected. If not specified, defaults to 10KB.
+  //
+  // PostgreSQL defines MAX_STARTUP_PACKET_LENGTH as 10KB.
+  // Valid range is 256 bytes to 10KB.
+  google.protobuf.UInt32Value max_startup_message_size = 2
+      [(validate.rules).uint32 = {lte: 10000 gte: 256}];
+
+  // Timeout for the inspector to receive and process the startup message.
+  // The timeout starts when the connection is accepted by the listener.
+  // If the timeout is reached before the startup message is fully received and processed,
+  // the connection will be closed.
+  //
+  // If not specified, defaults to 10 seconds. Minimum is 1 second.
+  google.protobuf.Duration startup_timeout = 3 [(validate.rules).duration = {gte {seconds: 1}}];
+}
+
+// StartupMetadata stores connection attributes extracted from the PostgreSQL startup message.
+// This is attached as typed dynamic metadata under the key ``envoy.postgres_inspector``.
+message StartupMetadata {
+  // The username supplied in the startup message.
+  string user = 1;
+
+  // The database name supplied in the startup message. If not provided, it may default to the user name.
+  string database = 2;
+
+  // The application name supplied in the startup message.
+  string application_name = 3;
+}

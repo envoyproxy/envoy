@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
+        "//envoy/config:xds_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:resource_name_lib",
@@ -121,7 +122,6 @@ envoy_cc_library(
         "//source/common/tcp:conn_pool_lib",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
-        "//source/extensions/filters/network/http_connection_manager:config",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -273,12 +273,13 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "load_stats_reporter_lib",
-    srcs = ["load_stats_reporter.cc"],
-    hdrs = ["load_stats_reporter.h"],
+    srcs = ["load_stats_reporter_impl.cc"],
+    hdrs = ["load_stats_reporter_impl.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/stats:stats_macros",
         "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:load_stats_reporter_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
@@ -292,6 +293,19 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "locality_pool_lib",
+    srcs = ["locality_pool.cc"],
+    hdrs = ["locality_pool.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/singleton:manager_interface",
+        "//envoy/upstream:locality_lib",
+        "//source/common/shared_pool:shared_pool_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -384,6 +398,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "//source/common/stats:deferred_creation",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
@@ -411,6 +426,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/common/stats:stats_matcher_lib",
         "//source/server:transport_socket_config_lib",
     ],
 )
@@ -418,14 +434,23 @@ envoy_cc_library(
 envoy_cc_library(
     name = "transport_socket_match_lib",
     srcs = ["transport_socket_match_impl.cc"],
+    hdrs = ["transport_socket_match_impl.h"],
     deps = [
         ":upstream_includes",
+        "//envoy/matcher:matcher_interface",
+        "//envoy/server:factory_context_interface",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
+        "//source/common/matcher:field_matcher_lib",
+        "//source/common/matcher:matcher_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//source/extensions/matching/common_inputs/transport_socket:config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/transport_socket/v3:pkg_cc_proto",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -437,10 +462,11 @@ envoy_cc_library(
     ],
     deps = [
         ":load_balancer_context_base_lib",
+        ":locality_pool_lib",
         ":resource_manager_lib",
-        ":scheduler_lib",
         ":upstream_factory_context_lib",
         "//envoy/event:timer_interface",
+        "//envoy/filter:config_provider_manager_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:dns_interface",
         "//envoy/runtime:runtime_interface",
@@ -461,23 +487,26 @@ envoy_cc_library(
         "//source/common/common:packed_struct_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
+        "//source/common/http:filter_chain_helper_lib",
         "//source/common/http/http1:codec_stats_lib",
         "//source/common/http/http2:codec_stats_lib",
         "//source/common/http/http3:codec_stats_lib",
         "//source/common/init:manager_lib",
+        "//source/common/matcher:matcher_lib",
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/stats:deferred_creation",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/matching/common_inputs/transport_socket:config_lib",
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/transport_socket/v3:pkg_cc_proto",
     ],
 )
 
@@ -563,7 +592,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/upstream:upstream_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -582,7 +611,7 @@ envoy_cc_library(
         "//envoy/registry",
         "//envoy/upstream:upstream_interface",
         "//source/common/network:resolver_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
     # Ensure this factory in the source is always linked in.

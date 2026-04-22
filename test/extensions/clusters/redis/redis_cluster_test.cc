@@ -18,6 +18,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/clusters/redis/mocks.h"
+#include "test/extensions/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -31,6 +32,9 @@
 
 using testing::_;
 using testing::ContainerEq;
+using testing::DoAll;
+using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -84,6 +88,28 @@ const std::string NoWarmupConfig = R"EOF(
         cluster_refresh_rate: 4s
         cluster_refresh_timeout: 0.25s
   )EOF";
+
+const std::string ZoneDiscoveryConfig = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  dns_lookup_family: V4_ONLY
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 22120
+  cluster_type:
+    name: envoy.clusters.redis
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        cluster_refresh_rate: 4s
+        cluster_refresh_timeout: 0.25s
+        enable_zone_discovery: true
+  )EOF";
 } // namespace
 
 static const int ResponseFlagSize = 11;
@@ -96,7 +122,11 @@ public:
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
          const Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
-         Stats::Scope&, const std::string&, const std::string&, bool) override {
+         Stats::Scope&, const std::string&, const std::string&, bool,
+         absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
+         absl::optional<
+             NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>)
+      override {
     EXPECT_EQ(22120, host->address()->ip()->port());
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{
         create_(host->address()->asString())};
@@ -124,9 +154,8 @@ protected:
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
 
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        server_context_, server_context_.cluster_manager_,
-        [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
-        ssl_context_manager_, std::move(outlier_event_logger), false);
+        server_context_, [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
+        std::move(outlier_event_logger), false);
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
@@ -159,9 +188,8 @@ protected:
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
     NiceMock<Envoy::Api::MockApi> api;
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        server_context_, server_context_.cluster_manager_,
-        [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
-        ssl_context_manager_, std::move(outlier_event_logger), false);
+        server_context_, [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
+        std::move(outlier_event_logger), false);
 
     RedisClusterFactory factory = RedisClusterFactory();
     auto status =
@@ -209,6 +237,41 @@ protected:
   void expectClusterSlotFailure() {
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     pool_callbacks_->onFailure();
+  }
+
+  // Sets up a zone discovery test with two nodes (primary=127.0.0.1, replica=127.0.0.2).
+  // Initializes the cluster, creates mock clients, sets up INFO expectations, and delivers
+  // CLUSTER SLOTS. Returns the zone_client for the replica node so the caller can deliver
+  // INFO responses via client_->client_callbacks_ and zone_client->client_callbacks_.
+  Extensions::NetworkFilters::Common::Redis::Client::MockClient* setupZoneDiscoveryWithTwoNodes() {
+    setupFromV3Yaml(ZoneDiscoveryConfig);
+    const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+    expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+    expectRedisResolve(true);
+
+    EXPECT_CALL(membership_updated_, ready());
+    EXPECT_CALL(initialized_, ready());
+    cluster_->initialize([&]() {
+      initialized_.ready();
+      return absl::OkStatus();
+    });
+
+    auto* zone_client = new Extensions::NetworkFilters::Common::Redis::Client::MockClient();
+    EXPECT_CALL(*this, create_(_)).WillOnce(Return(zone_client));
+    EXPECT_CALL(*zone_client, addConnectionCallbacks(_));
+    EXPECT_CALL(*zone_client, close());
+
+    EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+        .WillOnce(Return(&pool_request_));
+    EXPECT_CALL(*zone_client, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+        .WillOnce(Return(&pool_request_));
+
+    EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+    EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+
+    pool_callbacks_->onResponse(singleSlotPrimaryReplica("127.0.0.1", "127.0.0.2", 22120));
+
+    return zone_client;
   }
 
   NetworkFilters::Common::Redis::RespValuePtr singleSlotPrimary(const std::string& primary,
@@ -686,7 +749,6 @@ protected:
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
 
-  Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
   Event::MockTimer* resolve_timer_;
@@ -1329,6 +1391,36 @@ TEST_F(RedisClusterTest, RedisReplicaErrorResponse) {
   }
 }
 
+// Verify that a CLUSTER SLOTS response with port > 0xffff triggers validation failure.
+TEST_F(RedisClusterTest, RedisErrorResponsePortOverflow) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  // First, a valid response to initialize.
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  std::bitset<ResponseFlagSize> single_slot_primary(0xfff);
+  std::bitset<ResponseReplicaFlagSize> no_replica(0);
+  expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
+  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+
+  // Now send a response with port > 0xffff (65535). This should fail validation.
+  expectRedisResolve();
+  resolve_timer_->invokeCallback();
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(0);
+  expectClusterSlotResponse(singleSlotPrimary("127.0.0.1", 70000));
+  EXPECT_EQ(2U, cluster_->info()->configUpdateStats().update_attempt_.value());
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_failure_.value());
+}
+
 TEST_F(RedisClusterTest, DnsDiscoveryResolverBasic) {
   setupFromV3Yaml(BasicConfig);
   testDnsResolve("foo.bar.com", 22120);
@@ -1484,6 +1576,230 @@ TEST_F(RedisClusterTest, HostRemovalAfterHcFail) {
       {"127.0.0.1:22120", "127.0.0.3:22120"}));
   }
   */
+}
+
+// Test that verifies cluster destruction does not cause segfault when refresh manager
+// triggers callback after cluster is destroyed. This reproduces the issue from #38585.
+TEST_F(RedisClusterTest, NoSegfaultOnClusterDestructionWithPendingCallback) {
+  // This test verifies that destroying the cluster properly cleans up resources
+  // and doesn't cause a segfault. The key protection is in the destructor that
+  // sets is_destroying_ flag and cleans up the redis_discovery_session_.
+
+  // Create the cluster with basic configuration
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  std::bitset<ResponseFlagSize> single_slot_primary(0xfff);
+  std::bitset<ResponseReplicaFlagSize> no_replica(0);
+  expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
+  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+
+  // Now destroy the cluster. With the fix in place (destructor setting is_destroying_
+  // and resetting redis_discovery_session_), this should not crash.
+  // Without the fix, accessing resolve_timer_ after destruction would segfault.
+  cluster_.reset();
+
+  // If we reach here without crashing, the test passes.
+  // The fix ensures that:
+  // 1. The destructor sets is_destroying_ = true
+  // 2. The destructor resets redis_discovery_session_
+  // 3. Timer callbacks check is_destroying_ before accessing cluster members
+}
+
+// Tests for parseAvailabilityZone static method
+TEST_F(RedisClusterTest, ParseAvailabilityZoneValidResponse) {
+  EXPECT_EQ("us-east-1a",
+            RedisCluster::parseAvailabilityZone(
+                "# Server\nvalkey_version:8.0.0\navailability_zone:us-east-1a\nother:data\n"));
+}
+
+TEST_F(RedisClusterTest, ParseAvailabilityZoneNoZoneField) {
+  EXPECT_EQ("", RedisCluster::parseAvailabilityZone("redis_version:7.0.0\nother:field\n"));
+}
+
+TEST_F(RedisClusterTest, ParseAvailabilityZoneAtEndOfResponse) {
+  EXPECT_EQ("eu-west-1b", RedisCluster::parseAvailabilityZone(
+                              "redis_version:7.0.0\navailability_zone:eu-west-1b"));
+}
+
+TEST_F(RedisClusterTest, ParseAvailabilityZoneEmptyValue) {
+  EXPECT_EQ("", RedisCluster::parseAvailabilityZone(
+                    "redis_version:7.0.0\navailability_zone:\nother:data\n"));
+}
+
+TEST_F(RedisClusterTest, ParseAvailabilityZoneWithCarriageReturn) {
+  EXPECT_EQ("ap-northeast-1c", RedisCluster::parseAvailabilityZone(
+                                   "# Server\r\navailability_zone:ap-northeast-1c\r\nother:data"));
+}
+
+TEST_F(RedisClusterTest, ParseAvailabilityZoneEmptyResponse) {
+  EXPECT_EQ("", RedisCluster::parseAvailabilityZone(""));
+}
+
+// Zone discovery integration tests
+
+TEST_F(RedisClusterTest, ZoneDiscoveryBasicFlow) {
+  auto* zone_client = setupZoneDiscoveryWithTwoNodes();
+
+  // Deliver INFO responses via captured callbacks.
+  // client_ callbacks: [0]=CLUSTER SLOTS session, [1]=INFO zone discovery callback.
+  NetworkFilters::Common::Redis::RespValuePtr info_resp_1(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp_1->type(NetworkFilters::Common::Redis::RespType::BulkString);
+  info_resp_1->asString() = "# Server\navailability_zone:us-east-1a\n";
+  auto zone_cb_1 = std::next(client_->client_callbacks_.begin());
+  (*zone_cb_1)->onResponse(std::move(info_resp_1));
+
+  // zone_client callbacks: [0]=INFO zone discovery callback.
+  NetworkFilters::Common::Redis::RespValuePtr info_resp_2(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp_2->type(NetworkFilters::Common::Redis::RespType::BulkString);
+  info_resp_2->asString() = "# Server\navailability_zone:us-east-1b\n";
+  zone_client->client_callbacks_.front()->onResponse(std::move(info_resp_2));
+
+  // Verify hosts exist with correct zones.
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  for (const auto& host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    if (host->address()->asString() == "127.0.0.1:22120") {
+      EXPECT_EQ("us-east-1a", host->locality().zone());
+    } else {
+      EXPECT_EQ("us-east-1b", host->locality().zone());
+    }
+  }
+}
+
+TEST_F(RedisClusterTest, ZoneDiscoveryPartialZones) {
+  auto* zone_client = setupZoneDiscoveryWithTwoNodes();
+
+  // First node returns zone.
+  NetworkFilters::Common::Redis::RespValuePtr info_resp_1(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp_1->type(NetworkFilters::Common::Redis::RespType::BulkString);
+  info_resp_1->asString() = "# Server\navailability_zone:us-east-1a\n";
+  auto zone_cb_1 = std::next(client_->client_callbacks_.begin());
+  (*zone_cb_1)->onResponse(std::move(info_resp_1));
+
+  // Second node returns INFO without availability_zone field.
+  NetworkFilters::Common::Redis::RespValuePtr info_resp_2(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp_2->type(NetworkFilters::Common::Redis::RespType::BulkString);
+  info_resp_2->asString() = "redis_version:7.0.0\nother:field\n";
+  zone_client->client_callbacks_.front()->onResponse(std::move(info_resp_2));
+
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  for (const auto& host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    if (host->address()->asString() == "127.0.0.1:22120") {
+      EXPECT_EQ("us-east-1a", host->locality().zone());
+    } else {
+      EXPECT_TRUE(host->locality().zone().empty());
+    }
+  }
+}
+
+TEST_F(RedisClusterTest, ZoneDiscoveryResponseTypeMismatch) {
+  auto* zone_client = setupZoneDiscoveryWithTwoNodes();
+
+  // First node returns valid zone.
+  NetworkFilters::Common::Redis::RespValuePtr info_resp_1(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp_1->type(NetworkFilters::Common::Redis::RespType::BulkString);
+  info_resp_1->asString() = "# Server\navailability_zone:us-east-1a\n";
+  auto zone_cb_1 = std::next(client_->client_callbacks_.begin());
+  (*zone_cb_1)->onResponse(std::move(info_resp_1));
+
+  // Second node returns Error type instead of BulkString.
+  NetworkFilters::Common::Redis::RespValuePtr info_resp_2(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp_2->type(NetworkFilters::Common::Redis::RespType::Error);
+  info_resp_2->asString() = "ERR unknown command";
+  zone_client->client_callbacks_.front()->onResponse(std::move(info_resp_2));
+
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  for (const auto& host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    if (host->address()->asString() == "127.0.0.1:22120") {
+      EXPECT_EQ("us-east-1a", host->locality().zone());
+    } else {
+      EXPECT_TRUE(host->locality().zone().empty());
+    }
+  }
+}
+
+TEST_F(RedisClusterTest, ZoneDiscoveryAllFailure) {
+  auto* zone_client = setupZoneDiscoveryWithTwoNodes();
+
+  // Both INFO requests fail.
+  auto zone_cb_1 = std::next(client_->client_callbacks_.begin());
+  (*zone_cb_1)->onFailure();
+  zone_client->client_callbacks_.front()->onFailure();
+
+  // Hosts should exist without zones.
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  for (const auto& host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    EXPECT_TRUE(host->locality().zone().empty());
+  }
+}
+
+TEST_F(RedisClusterTest, ZoneDiscoveryMixedSuccessAndFailure) {
+  auto* zone_client = setupZoneDiscoveryWithTwoNodes();
+
+  // First node succeeds with zone.
+  NetworkFilters::Common::Redis::RespValuePtr info_resp(
+      new NetworkFilters::Common::Redis::RespValue());
+  info_resp->type(NetworkFilters::Common::Redis::RespType::BulkString);
+  info_resp->asString() = "# Server\navailability_zone:us-east-1a\n";
+  auto zone_cb_1 = std::next(client_->client_callbacks_.begin());
+  (*zone_cb_1)->onResponse(std::move(info_resp));
+
+  // Second node fails.
+  zone_client->client_callbacks_.front()->onFailure();
+
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  for (const auto& host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    if (host->address()->asString() == "127.0.0.1:22120") {
+      EXPECT_EQ("us-east-1a", host->locality().zone());
+    } else {
+      EXPECT_TRUE(host->locality().zone().empty());
+    }
+  }
+}
+
+TEST_F(RedisClusterTest, ZoneDiscoveryMakeRequestReturnsNull) {
+  setupFromV3Yaml(ZoneDiscoveryConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  // makeRequest returns null for the single node's INFO command.
+  EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::InfoRequest::instance_), _))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+
+  // Deliver single-primary CLUSTER SLOTS response.
+  pool_callbacks_->onResponse(singleSlotPrimary("127.0.0.1", 22120));
+
+  // finishZoneDiscovery was called immediately since the only request failed.
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_TRUE(
+      cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->locality().zone().empty());
 }
 
 } // namespace Redis

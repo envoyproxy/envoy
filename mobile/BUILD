@@ -6,16 +6,16 @@ load(
     "xcode_schemes",
     "xcodeproj",
 )
-load("@envoy//tools/python:namespace.bzl", "envoy_py_namespace")
 load("@rules_android//android:rules.bzl", "aar_import")
 load("@rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
 
-envoy_py_namespace()
-
-exports_files(["VERSION"])
+exports_files([
+    "VERSION",
+    "pyproject.toml",
+])
 
 alias(
     name = "ios_xcframework",
@@ -113,7 +113,7 @@ genrule(
 
 xcodeproj(
     name = "xcodeproj",
-    bazel_path = "./bazelw",
+    bazel_path = "bazel",
     build_mode = "bazel",
     project_name = "Envoy",
     project_options = project_options(
@@ -175,37 +175,5 @@ xcodeproj(
         "//test/swift/integration:test",
         "//test/swift/stats:test",
         "//test/swift:test",
-    ],
-)
-
-platform(
-    name = "android_armv7",
-    constraint_values = [
-        "@platforms//cpu:armv7",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_arm64",
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_x86_32",
-    constraint_values = [
-        "@platforms//cpu:x86_32",
-        "@platforms//os:android",
-    ],
-)
-
-platform(
-    name = "android_x86_64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:android",
     ],
 )

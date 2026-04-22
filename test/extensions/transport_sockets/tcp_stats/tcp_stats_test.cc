@@ -30,6 +30,8 @@ namespace {
 class TcpStatsTest : public testing::Test {
 public:
   void initialize(bool enable_periodic) {
+    // Reset the C struct tcp_info_ members.
+    memset(&tcp_info_, 0, sizeof(tcp_info_));
     envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
     if (enable_periodic) {
       proto_config.mutable_update_period()->MergeFrom(

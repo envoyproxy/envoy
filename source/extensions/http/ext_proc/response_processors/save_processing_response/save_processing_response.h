@@ -54,6 +54,9 @@ public:
                                        absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   void afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse&,
                                        absl::Status, Envoy::StreamInfo::StreamInfo&) override;
+  void afterProcessingStreamingImmediateResponse(
+      const envoy::service::ext_proc::v3::StreamedImmediateResponse& response,
+      absl::Status processing_status, Envoy::StreamInfo::StreamInfo&) override;
 
 private:
   struct SaveOptions {

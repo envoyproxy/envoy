@@ -353,17 +353,18 @@ TEST_F(HttpConnectionManagerImplTest, CannotContinueDecodingAfterRecreateStream)
   decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([this](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.setFilterConfigName("");
         bool applied_filters = false;
-        if (log_handler_.get()) {
+        if (log_handler_ != nullptr) {
           auto factory = createLogHandlerFactoryCb(log_handler_);
-          manager.applyFilterFactoryCb({}, factory);
+          factory(callbacks);
           applied_filters = true;
         }
         for (int i = 0; i < 2; i++) {
           auto factory =
               createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{decoder_filters_[i]});
-          manager.applyFilterFactoryCb({}, factory);
+          factory(callbacks);
           applied_filters = true;
         }
         return applied_filters;
@@ -396,23 +397,24 @@ TEST_F(HttpConnectionManagerImplTest, CannotContinueEncodingAfterRecreateStream)
   encoder_filters_.push_back(new NiceMock<MockStreamEncoderFilter>());
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([this](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.setFilterConfigName("");
         bool applied_filters = false;
-        if (log_handler_.get()) {
+        if (log_handler_ != nullptr) {
           auto factory = createLogHandlerFactoryCb(log_handler_);
-          manager.applyFilterFactoryCb({}, factory);
+          factory(callbacks);
           applied_filters = true;
         }
         for (int i = 0; i < 2; i++) {
           auto factory =
               createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{decoder_filters_[i]});
-          manager.applyFilterFactoryCb({}, factory);
+          factory(callbacks);
           applied_filters = true;
         }
         for (int i = 0; i < 2; i++) {
           auto factory =
               createEncoderFilterFactoryCb(StreamEncoderFilterSharedPtr{encoder_filters_[i]});
-          manager.applyFilterFactoryCb({}, factory);
+          factory(callbacks);
           applied_filters = true;
         }
         return applied_filters;
@@ -631,8 +633,8 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        EXPECT_EQ(route_config_provider_.route_config_->route_,
-                  decoder_filters_[0]->callbacks_->route());
+        EXPECT_EQ(route_config_provider_.route_config_->route_.get(),
+                  decoder_filters_[0]->callbacks_->route().ptr());
         EXPECT_EQ(ssl_connection_.get(),
                   decoder_filters_[0]->callbacks_->connection()->ssl().get());
         return FilterHeadersStatus::StopIteration;
@@ -653,8 +655,8 @@ TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   // by the first filter, we expect to get it in 1 decodeData() call.
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        EXPECT_EQ(route_config_provider_.route_config_->route_,
-                  decoder_filters_[1]->callbacks_->route());
+        EXPECT_EQ(route_config_provider_.route_config_->route_.get(),
+                  decoder_filters_[1]->callbacks_->route().ptr());
         EXPECT_EQ(ssl_connection_.get(),
                   decoder_filters_[1]->callbacks_->connection()->ssl().get());
         return FilterHeadersStatus::StopIteration;
@@ -758,9 +760,10 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp1KeepAliveWhenOverloaded) {
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
-        manager.applyFilterFactoryCb({}, factory);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
         return true;
       }));
 
@@ -805,9 +808,10 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded) {
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
-        manager.applyFilterFactoryCb({}, factory);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
         return true;
       }));
 
@@ -1044,9 +1048,10 @@ traffic_direction: OUTBOUND
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
-        manager.applyFilterFactoryCb({}, factory);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
         return true;
       }));
 
@@ -1096,9 +1101,10 @@ traffic_direction: INBOUND
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
-        manager.applyFilterFactoryCb({}, factory);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
         return true;
       }));
 
@@ -1135,9 +1141,10 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
-        manager.applyFilterFactoryCb({}, factory);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
         return true;
       }));
 
@@ -1257,7 +1264,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteNotFound) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        EXPECT_EQ(nullptr, decoder_filters_[0]->callbacks_->route());
+        EXPECT_FALSE(decoder_filters_[0]->callbacks_->route().has_value());
         return FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(*decoder_filters_[0], decodeComplete()); // end_stream=true.
@@ -1297,21 +1304,32 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
   std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster1 =
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(fake_cluster1.get()));
-  EXPECT_CALL(*route_config_, route(_, _, _, _)).WillOnce(Return(route1));
+  EXPECT_CALL(*route_config_, route(_, _, _, _))
+      .WillOnce(Return(Router::VirtualHostRoute{route1->virtual_host_, route1}));
   // First no-scope-found request will be handled by decoder_filters_[0].
   setupFilterChain(1, 0);
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        EXPECT_EQ(nullptr, decoder_filters_[0]->callbacks_->route());
+        EXPECT_FALSE(decoder_filters_[0]->callbacks_->route().has_value());
+
+        // The virtual host and the route will be stored in the stream info.
+        EXPECT_FALSE(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().has_value());
+        EXPECT_FALSE(decoder_filters_[0]->callbacks_->streamInfo().route().has_value());
 
         // Clear route and next call on callbacks_->route() will trigger a re-snapping of the
         // snapped_route_config_.
         decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
 
         // Now route config provider returns something.
-        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->streamInfo().route());
-        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        EXPECT_EQ(route1.get(), decoder_filters_[0]->callbacks_->route().ptr());
+        EXPECT_EQ(fake_cluster1->info().get(),
+                  decoder_filters_[0]->callbacks_->clusterInfo().ptr());
+
+        // The virtual host and the route will be stored in the stream info.
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr(),
+                  route1->virtual_host_.get());
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route().ptr(), route1.get());
+
         return FilterHeadersStatus::StopIteration;
 
         return FilterHeadersStatus::StopIteration;
@@ -1334,8 +1352,10 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
       std::make_shared<NiceMock<Router::MockConfig>>();
   std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
   std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
-  EXPECT_CALL(*route_config1, route(_, _, _, _)).WillRepeatedly(Return(route1));
-  EXPECT_CALL(*route_config2, route(_, _, _, _)).WillRepeatedly(Return(route2));
+  EXPECT_CALL(*route_config1, route(_, _, _, _))
+      .WillRepeatedly(Return(Router::VirtualHostRoute{route1->virtual_host_, route1}));
+  EXPECT_CALL(*route_config2, route(_, _, _, _))
+      .WillRepeatedly(Return(Router::VirtualHostRoute{route2->virtual_host_, route2}));
   EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
               computeScopeKey(_))
       .Times(3)
@@ -1372,7 +1392,13 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
   setupFilterChain(2, 0);
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> FilterHeadersStatus {
-        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
+        EXPECT_EQ(route1.get(), decoder_filters_[0]->callbacks_->route().ptr());
+
+        // The virtual host and the route will be stored in the stream info.
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr(),
+                  route1->virtual_host_.get());
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route().ptr(), route1.get());
+
         auto& test_headers = dynamic_cast<TestRequestHeaderMapImpl&>(headers);
         // Clear cached route and change scope key to "bar".
         decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
@@ -1385,8 +1411,13 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
         auto& test_headers = dynamic_cast<TestRequestHeaderMapImpl&>(headers);
         EXPECT_EQ(test_headers.get_("scope_key"), "bar");
         // Route now switched to route2 as header "scope_key" has changed.
-        EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
-        EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->streamInfo().route());
+        EXPECT_EQ(route2.get(), decoder_filters_[1]->callbacks_->route().ptr());
+
+        // The virtual host and the route will be stored in the stream info.
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr(),
+                  route2->virtual_host_.get());
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route().ptr(), route2.get());
+
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -1419,7 +1450,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
       *static_cast<const Router::MockConfig*>(
           scopedRouteConfigProvider()->config<Router::MockScopedConfig>()->route_config_.get()),
       route(_, _, _, _))
-      .WillOnce(Return(route1));
+      .WillOnce(Return(Router::VirtualHostRoute{route1->virtual_host_, route1}));
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
@@ -1430,9 +1461,15 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
   }));
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->streamInfo().route());
-        EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+        EXPECT_EQ(route1.get(), decoder_filters_[0]->callbacks_->route().ptr());
+        EXPECT_EQ(fake_cluster1->info().get(),
+                  decoder_filters_[0]->callbacks_->clusterInfo().ptr());
+
+        // The virtual host and the route will be stored in the stream info.
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost().ptr(),
+                  route1->virtual_host_.get());
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route().ptr(), route1.get());
+
         return FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
@@ -1482,9 +1519,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.setFilterConfigName("");
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
-        manager.applyFilterFactoryCb({}, factory);
+        factory(callbacks);
         return true;
       }));
 
@@ -1867,9 +1905,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
   auto* filter = new MockStreamFilter();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
         auto factory = createStreamFilterFactoryCb(StreamFilterSharedPtr{filter});
-        manager.applyFilterFactoryCb({}, factory);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
         return true;
       }));
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
@@ -2157,9 +2196,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
         auto factory = createDecoderFilterFactoryCb(filter);
-        manager.applyFilterFactoryCb({}, factory);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
         return true;
       }));
 
@@ -2259,13 +2299,14 @@ TEST_F(HttpConnectionManagerImplTest, LimitWorkPerIOCycle) {
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .Times(kRequestsSentPerIOCycle)
-      .WillRepeatedly(Invoke([&decoder_filters](FilterChainManager& manager) -> bool {
+      .WillRepeatedly(Invoke([&decoder_filters](FilterChainFactoryCallbacks& callbacks) -> bool {
         static int index = 0;
         int i = index++;
         FilterFactoryCb factory([&decoder_filters, i](FilterChainFactoryCallbacks& callbacks) {
           callbacks.addStreamDecoderFilter(decoder_filters[i]);
         });
-        manager.applyFilterFactoryCb({}, factory);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
         return true;
       }));
 
@@ -2388,13 +2429,14 @@ TEST_F(HttpConnectionManagerImplTest, StreamDeferralPreservesOrder) {
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .Times(TotalRequests)
-      .WillRepeatedly(Invoke([&encoder_filters](FilterChainManager& manager) -> bool {
+      .WillRepeatedly(Invoke([&encoder_filters](FilterChainFactoryCallbacks& callbacks) -> bool {
         static int index = 0;
         int i = index++;
         FilterFactoryCb factory([&encoder_filters, i](FilterChainFactoryCallbacks& callbacks) {
           callbacks.addStreamDecoderFilter(encoder_filters[i]);
         });
-        manager.applyFilterFactoryCb({}, factory);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
         return true;
       }));
 
@@ -2513,9 +2555,10 @@ TEST_F(HttpConnectionManagerImplTest, PassMatchUpstreamSchemeHintToStreamInfo) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
         auto factory = createDecoderFilterFactoryCb(filter);
-        manager.applyFilterFactoryCb({}, factory);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
         return true;
       }));
 
@@ -2745,6 +2788,118 @@ TEST_F(HttpConnectionManagerImplTest, DecodingWithAddedTrailersByNonTerminalEnco
   // Second decoder filter then completes encoding with data
   Buffer::OwnedImpl fake_response("world");
   decoder_filters_[ecoder_filter_index]->callbacks_->encodeData(fake_response, true);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteClusterWithoutRouteCache) {
+  setup();
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillOnce(Return(Router::VirtualHostRoute{}));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        // This will be noop because no cached route.
+        filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();
+
+        // The virtual host and the route will be stored in the stream info.
+        EXPECT_FALSE(filter->callbacks_->streamInfo().virtualHost().has_value());
+        EXPECT_FALSE(filter->callbacks_->streamInfo().route().has_value());
+
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Clean up.
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteCluster) {
+  setup();
+
+  cluster_manager_.initializeThreadLocalClusters({"fake_cluster, cluster_after_refresh"});
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+
+  auto mock_route_0 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillOnce(Return(Router::VirtualHostRoute{mock_route_0->virtual_host_, mock_route_0}));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        // Now we refresh the cluster by the downstream callbacks
+        EXPECT_CALL(mock_route_0->route_entry_, refreshRouteCluster(_, _))
+            .WillOnce(Invoke([&](const RequestHeaderMap&, const StreamInfo::StreamInfo&) {
+              mock_route_0->route_entry_.cluster_name_ = "cluster_after_refrsh";
+            }));
+        EXPECT_CALL(cluster_manager_, getThreadLocalCluster("cluster_after_refrsh"));
+
+        // The virtual host and the route will be stored in the stream info.
+        EXPECT_EQ(filter->callbacks_->streamInfo().virtualHost().ptr(),
+                  mock_route_0->virtual_host_.get());
+        EXPECT_EQ(filter->callbacks_->streamInfo().route().ptr(), mock_route_0.get());
+
+        filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  ResponseHeaderMapPtr response_headers{
+      new TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "2"}}};
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
+
+  // It also not allowed to update the cluster after the response headers is sent.
+  EXPECT_ENVOY_BUG(
+      {
+        EXPECT_CALL(mock_route_0->route_entry_, refreshRouteCluster(_, _)).Times(0);
+        filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();
+      },
+      "Should never try to refresh or clear the route cache when it is blocked!");
+
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  expectOnDestroy();
+
+  Buffer::OwnedImpl response_data("ok");
+  filter->callbacks_->encodeData(response_data, true);
 }
 
 } // namespace Http

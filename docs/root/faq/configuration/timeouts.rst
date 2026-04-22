@@ -23,10 +23,17 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
 
 * The HTTP protocol :ref:`idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
   is defined in a generic message used by both the HTTP connection manager as well as upstream
-  cluster HTTP connections. The idle timeout is the time at which a downstream or upstream
-  connection will be terminated if there are no active streams. The default idle timeout if not
-  otherwise specified is *1 hour*. To modify the idle timeout for downstream connections use the
-  :ref:`common_http_protocol_options
+  cluster HTTP connections. The idle timeout is defined as the period in which there are no active
+  requests or streams at the HTTP protocol layer. This timeout is independent of TCP-level activity
+  such as TCP keepalive packets. When the idle timeout is reached, the connection will be closed.
+  For HTTP/2 downstream connections, when idle timeout is reached, a drain sequence begins immediately,
+  lasting for the configured :ref:`drain_timeout
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`
+  period (see below). For other connection types, the connection terminates directly. Note that idle
+  timeout only fires when there are no active streams, unlike :ref:`max_connection_duration
+  <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` which can trigger
+  while streams are active. The default idle timeout if not otherwise specified is *1 hour*. To modify
+  the idle timeout for downstream connections use the :ref:`common_http_protocol_options
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
   field in the HTTP connection manager configuration. To modify the idle timeout for upstream
   connections use the
@@ -35,19 +42,37 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
 * The HTTP protocol :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`
   is defined in a generic message used by both the HTTP connection manager as well as upstream cluster
   HTTP connections. The maximum connection duration is the time after which a downstream or upstream
-  connection will be drained and/or closed, starting from when it was first established. If there are no
-  active streams, the connection will be closed. If there are any active streams, the drain sequence will
-  kick-in, and the connection will be force-closed after the drain period. The default value of max connection
-  duration is *0* or unlimited, which means that the connections will never be closed due to aging. It could
-  be helpful in scenarios when you are running a pool of Envoy edge-proxies and would want to close a
-  downstream connection after some time to prevent stickiness. It could also help to better load balance the
-  overall traffic among this pool, especially if the size of this pool is dynamically changing. Finally, it
-  may help with upstream connections when using a DNS name whose resolved addresses may change even if the
-  upstreams stay healthly. Forcing a maximum upstream lifetime in this scenario prevents holding onto healthy
-  connections even after they would otherwise be undiscoverable. To modify the max connection duration for downstream connections use the
+  connection will be drained and/or closed, starting from when it was first established. When max connection
+  duration is reached, the drain sequence will kick in (see :ref:`drain_timeout
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`
+  below for details). After the drain timeout period elapses, if there are no active streams at that moment,
+  the connection will be closed immediately. If active streams still exist at that moment, the connection
+  remains open until all streams complete naturally, and then closes. The drain sequence does not forcefully
+  terminate active streams. The default value of max connection duration is *0* or unlimited, which means that
+  the connections will never be closed due to aging. It could be helpful in scenarios when you are running a
+  pool of Envoy edge-proxies and would want to close a downstream connection after some time to prevent
+  stickiness. It could also help to better load balance the overall traffic among this pool, especially if the
+  size of this pool is dynamically changing. Finally, it may help with upstream connections when using a DNS
+  name whose resolved addresses may change even if the upstreams stay healthy. Forcing a maximum upstream
+  lifetime in this scenario prevents holding onto healthy connections even after they would otherwise be
+  undiscoverable. To modify the max connection duration for downstream connections use the
   :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
   field in the HTTP connection manager configuration. To modify the max connection duration for upstream connections use the
   :ref:`common_http_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.common_http_protocol_options>` field in the cluster configuration.
+
+* The HTTP connection manager :ref:`drain_timeout
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`
+  is the time that Envoy will wait between sending an initial HTTP/2 "shutdown notification" (``GOAWAY`` frame
+  with max stream ID) and a final GOAWAY frame. This grace period allows in-flight requests to be assigned
+  stream IDs and prevents a race with the final GOAWAY frame. During this grace period, Envoy will continue
+  to accept new streams. After the grace period elapses, a final GOAWAY frame is sent and Envoy will start
+  refusing new streams. At that moment, if no active streams exist, the connection closes immediately. If
+  active streams still exist, the connection remains open until all streams complete naturally,
+  then closes. The drain sequence never forcefully terminates active streams. Draining occurs either when a
+  connection hits the :ref:`idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`,
+  when :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`
+  is reached, or during general server draining. The default grace period is *5000 milliseconds (5 seconds)*
+  if this option is not specified.
 
 See :ref:`below <faq_configuration_timeouts_transport_socket>` for other connection timeouts.
 

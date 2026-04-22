@@ -2,8 +2,10 @@
 
 #include "envoy/registry/registry.h"
 
+#include "source/extensions/stat_sinks/open_telemetry/open_telemetry_http_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_proto_descriptors.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +20,13 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
   const auto& sink_config = MessageUtil::downcastAndValidate<const SinkConfig&>(
       config, server.messageValidationContext().staticValidationVisitor());
 
-  auto otlp_options = std::make_shared<OtlpOptions>(sink_config);
+  Tracers::OpenTelemetry::ResourceProviderPtr resource_provider =
+      std::make_unique<Tracers::OpenTelemetry::ResourceProviderImpl>();
+  auto otlp_options = std::make_shared<OtlpOptions>(
+      sink_config,
+      resource_provider->getResource(sink_config.resource_detectors(), server,
+                                     /*service_name=*/""),
+      server);
   std::shared_ptr<OtlpMetricsFlusher> otlp_metrics_flusher =
       std::make_shared<OtlpMetricsFlusherImpl>(otlp_options);
 
@@ -30,11 +38,23 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
         server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, server.scope(), false);
     RETURN_IF_NOT_OK_REF(client_or_error.status());
-    std::shared_ptr<OpenTelemetryGrpcMetricsExporter> grpc_metrics_exporter =
+    std::shared_ptr<OtlpMetricsExporter> grpc_metrics_exporter =
         std::make_shared<OpenTelemetryGrpcMetricsExporterImpl>(otlp_options,
                                                                client_or_error.value());
 
-    return std::make_unique<OpenTelemetryGrpcSink>(otlp_metrics_flusher, grpc_metrics_exporter);
+    return std::make_unique<OpenTelemetrySink>(
+        otlp_metrics_flusher, grpc_metrics_exporter,
+        server.timeSource().systemTime().time_since_epoch().count());
+  }
+
+  case SinkConfig::ProtocolSpecifierCase::kHttpService: {
+    std::shared_ptr<OtlpMetricsExporter> http_metrics_exporter =
+        std::make_shared<OpenTelemetryHttpMetricsExporter>(server.clusterManager(),
+                                                           sink_config.http_service(), server);
+
+    return std::make_unique<OpenTelemetrySink>(
+        otlp_metrics_flusher, http_metrics_exporter,
+        server.timeSource().systemTime().time_since_epoch().count());
   }
 
   default:

@@ -20,7 +20,7 @@ namespace Lua {
 /**
  * All lua stats. @see stats_macros.h
  */
-#define ALL_LUA_FILTER_STATS(COUNTER) COUNTER(errors)
+#define ALL_LUA_FILTER_STATS(COUNTER) COUNTER(errors) COUNTER(executions)
 
 /**
  * Struct definition for all Lua stats. @see stats_macros.h
@@ -91,10 +91,10 @@ public:
                        lua_State* state) PURE;
 
   /**
-   * @return const ProtobufWkt::Struct& the value of metadata inside the lua filter scope of current
+   * @return const Protobuf::Struct& the value of metadata inside the lua filter scope of current
    * route entry.
    */
-  virtual const ProtobufWkt::Struct& metadata() const PURE;
+  virtual const Protobuf::Struct& metadata() const PURE;
 
   /**
    * @return StreamInfo::StreamInfo& the current stream info handle. This handle is mutable to
@@ -116,7 +116,8 @@ public:
    * Set the upstream host override.
    * @param host_and_strict supplies the host and whether the host should be treated as strict.
    */
-  virtual void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) PURE;
+  virtual void
+  setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host_and_strict) PURE;
 
   /**
    * Clear the route cache explicitly.
@@ -124,11 +125,22 @@ public:
   virtual void clearRouteCache() PURE;
 
   /**
-   * @return const ProtobufWkt::Struct& the filter context from the most specific filter config
+   * @return const Protobuf::Struct& the filter context from the most specific filter config
    * from the route or virtual host. Empty struct will be returned if no route or virtual host is
    * found.
    */
-  virtual const ProtobufWkt::Struct& filterContext() const PURE;
+  virtual const Protobuf::Struct& filterContext() const PURE;
+
+  /**
+   * @return absl::string_view the value of filter config name.
+   */
+  virtual const absl::string_view filterConfigName() const PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope for creating custom Lua stats. The scope
+   * is pre-configured with the appropriate lua stat prefix.
+   */
+  virtual Stats::Scope& statsScope() PURE;
 };
 
 class Filter;
@@ -202,7 +214,10 @@ public:
             {"connectionStreamInfo", static_luaConnectionStreamInfo},
             {"setUpstreamOverrideHost", static_luaSetUpstreamOverrideHost},
             {"clearRouteCache", static_luaClearRouteCache},
-            {"filterContext", static_luaFilterContext}};
+            {"filterContext", static_luaFilterContext},
+            {"virtualHost", static_luaVirtualHost},
+            {"route", static_luaRoute},
+            {"stats", static_luaStats}};
   }
 
 private:
@@ -339,6 +354,21 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaFilterContext);
 
+  /**
+   * @return a handle to the virtual host.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaVirtualHost);
+
+  /**
+   * @return a handle to the route.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRoute);
+
+  /**
+   * @return a handle to the stats scope for creating custom stats.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaStats);
+
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
   int doHttpCall(lua_State* state, const HttpCallOptions& options);
@@ -363,6 +393,9 @@ private:
     connection_wrapper_.reset();
     public_key_wrapper_.reset();
     connection_stream_info_wrapper_.reset();
+    virtual_host_wrapper_.reset();
+    route_wrapper_.reset();
+    stats_scope_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -392,13 +425,16 @@ private:
   Filters::Common::Lua::LuaDeathRef<ConnectionStreamInfoWrapper> connection_stream_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
   Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> virtual_host_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> route_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> stats_scope_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
   TimeSource& time_source_;
 
   // The inserted crypto object pointers will not be removed from this map.
-  absl::flat_hash_map<std::string, Envoy::Common::Crypto::CryptoObjectPtr> public_key_storage_;
+  absl::flat_hash_map<std::string, Envoy::Common::Crypto::PKeyObjectPtr> public_key_storage_;
 };
 
 /**
@@ -435,6 +471,7 @@ public:
   bool clearRouteCache() const { return clear_route_cache_; }
 
   const LuaFilterStats& stats() const { return stats_; }
+  Stats::Scope& luaStatsScope() const { return *lua_stats_scope_; }
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -449,6 +486,8 @@ private:
   PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
+  // Sub-scope pre-configured with the lua stat prefix.
+  Stats::ScopeSharedPtr lua_stats_scope_;
 };
 
 using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
@@ -464,13 +503,13 @@ public:
   bool disabled() const { return disabled_; }
   absl::string_view name() const { return name_; }
   PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
-  const ProtobufWkt::Struct& filterContext() const { return filter_context_; }
+  const Protobuf::Struct& filterContext() const { return filter_context_; }
 
 private:
   const bool disabled_;
   const std::string name_;
   PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
-  const ProtobufWkt::Struct filter_context_;
+  const Protobuf::Struct filter_context_;
 };
 
 /**
@@ -550,13 +589,14 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override;
+    const Protobuf::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
     }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
-    void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
+    void
+    setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host_and_strict) override {
       callbacks_->setUpstreamOverrideHost(std::move(host_and_strict));
     }
     void clearRouteCache() override {
@@ -564,7 +604,11 @@ private:
         cb->clearRouteCache();
       }
     }
-    const ProtobufWkt::Struct& filterContext() const override { return parent_.filterContext(); }
+    const Protobuf::Struct& filterContext() const override { return parent_.filterContext(); }
+    const absl::string_view filterConfigName() const override {
+      return callbacks_->filterConfigName();
+    }
+    Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -583,17 +627,22 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override;
+    const Protobuf::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
     }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
-    void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
+    void
+    setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host_and_strict) override {
       UNREFERENCED_PARAMETER(host_and_strict);
     }
     void clearRouteCache() override {}
-    const ProtobufWkt::Struct& filterContext() const override { return parent_.filterContext(); }
+    const Protobuf::Struct& filterContext() const override { return parent_.filterContext(); }
+    const absl::string_view filterConfigName() const override {
+      return callbacks_->filterConfigName();
+    }
+    Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
@@ -625,8 +674,8 @@ private:
     return config_->perLuaCodeSetup();
   }
 
-  const ProtobufWkt::Struct& filterContext() const {
-    return per_route_config_ == nullptr ? ProtobufWkt::Struct::default_instance()
+  const Protobuf::Struct& filterContext() const {
+    return per_route_config_ == nullptr ? Protobuf::Struct::default_instance()
                                         : per_route_config_->filterContext();
   }
 

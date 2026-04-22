@@ -65,7 +65,7 @@ public:
   std::string name() const override { return kFactoryName; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new ProtobufWkt::StringValue()};
+    return ProtobufTypes::MessagePtr{new Protobuf::StringValue()};
   }
 
   Ssl::HandshakerFactoryCb
@@ -103,7 +103,7 @@ protected:
     envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
         tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
     custom_handshaker->set_name(HandshakerFactoryImplForTest::kFactoryName);
-    custom_handshaker->mutable_typed_config()->PackFrom(ProtobufWkt::StringValue());
+    custom_handshaker->mutable_typed_config()->PackFrom(Protobuf::StringValue());
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
@@ -213,7 +213,7 @@ public:
   std::string name() const override { return kFactoryName; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new ProtobufWkt::BoolValue()};
+    return ProtobufTypes::MessagePtr{new Protobuf::BoolValue()};
   }
 
   Ssl::HandshakerFactoryCb
@@ -278,7 +278,7 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
   envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
       tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
   custom_handshaker->set_name(HandshakerFactoryImplForDownstreamTest::kFactoryName);
-  custom_handshaker->mutable_typed_config()->PackFrom(ProtobufWkt::BoolValue());
+  custom_handshaker->mutable_typed_config()->PackFrom(Protobuf::BoolValue());
 
   CustomProcessObjectForTest custom_process_object_for_test(
       /*cb=*/[](SSL_CTX* ssl_ctx) { SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_TLSv1); });
@@ -290,10 +290,10 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
       .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
 
   auto server_context_config = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-      tls_context_, mock_factory_ctx, false);
+      tls_context_, mock_factory_ctx, {}, false);
   EXPECT_TRUE(server_context_config->isReady());
-  EXPECT_NO_THROW(*context_manager_->createSslServerContext(
-      *stats_store_.rootScope(), *server_context_config, std::vector<std::string>{}, nullptr));
+  EXPECT_NO_THROW(*context_manager_->createSslServerContext(*stats_store_.rootScope(),
+                                                            *server_context_config, nullptr));
 }
 
 } // namespace

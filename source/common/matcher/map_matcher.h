@@ -9,9 +9,6 @@ namespace Matcher {
 
 /**
  * Implementation of a map matcher which performs matches against the data provided by DataType.
- * If the match could not be completed, {MatchState::UnableToMatch, {}} will be returned. If the
- * match result was determined, {MatchState::MatchComplete, OnMatch} will be returned. If a match
- * result was determined to be no match, {MatchState::MatchComplete, {}} will be returned.
  */
 template <class DataType>
 class MapMatcher : public MatchTree<DataType>, Logger::Loggable<Logger::Id::matcher> {
@@ -19,36 +16,30 @@ public:
   // Adds a child to the map.
   virtual void addChild(std::string value, OnMatch<DataType>&& on_match) PURE;
 
-  typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
+  ActionMatchResult doNoMatch(const DataType& data, SkippedMatchCb skipped_match_cb) {
+    if (data_input_->get(data).availability() == DataAvailability::MoreDataMightBeAvailable) {
+      return ActionMatchResult::insufficientData();
+    }
+    return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
+  }
+
+  ActionMatchResult match(const DataType& data,
+                          SkippedMatchCb skipped_match_cb = nullptr) override {
     const auto input = data_input_->get(data);
-    ENVOY_LOG(trace, "Attempting to match {}", input);
-    if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
-      return {MatchState::UnableToMatch, absl::nullopt};
+    if (input.availability() == DataAvailability::NotAvailable) {
+      return ActionMatchResult::insufficientData();
     }
 
     // Returns `on_no_match` when input data is empty. (i.e., is absl::monostate).
-    if (absl::holds_alternative<absl::monostate>(input.data_)) {
-      return {MatchState::MatchComplete, on_no_match_};
+    auto string_data = input.stringData();
+    if (!string_data) {
+      return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
 
-    const auto result = doMatch(absl::get<std::string>(input.data_));
-    if (result) {
-      if (result->matcher_) {
-        return result->matcher_->match(data);
-      } else {
-        return {MatchState::MatchComplete, OnMatch<DataType>{result->action_cb_, nullptr}};
-      }
-    } else if (input.data_availability_ ==
-               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
-      // It's possible that we were attempting a lookup with a partial value, so delay matching
-      // until we know that we actually failed.
-      return {MatchState::UnableToMatch, absl::nullopt};
-    }
-
-    return {MatchState::MatchComplete, on_no_match_};
+    // This is safe to pass string_data because input remains alive.
+    return doMatch(data, *string_data, skipped_match_cb);
   }
 
-protected:
   template <class DataType2, class ActionFactoryContext> friend class MatchTreeFactory;
   MapMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
              absl::Status& creation_status)
@@ -64,10 +55,12 @@ protected:
   const DataInputPtr<DataType> data_input_;
   const absl::optional<OnMatch<DataType>> on_no_match_;
 
-  // The inner match method. Attempts to match against the resulting data string. If the match
-  // result was determined, the OnMatch will be returned. If a match result was determined to be no
-  // match, {} will be returned.
-  virtual absl::optional<OnMatch<DataType>> doMatch(const std::string& data) PURE;
+  // The inner match method. Attempts to match against the resulting data string.
+  // If a match is found, handleRecursionAndSkips must be called on it.
+  // Otherwise ActionMatchResult::noMatch() or ActionMatchResult::insufficientData() should be
+  // returned.
+  virtual ActionMatchResult doMatch(const DataType& data, absl::string_view key,
+                                    SkippedMatchCb skipped_match_cb) PURE;
 };
 
 } // namespace Matcher

@@ -16,6 +16,7 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
@@ -41,6 +42,7 @@
 #include "test/common/tls/test_data/san_multiple_dns_1_cert_info.h"
 #include "test/common/tls/test_data/san_multiple_dns_cert_info.h"
 #include "test/common/tls/test_data/san_uri_cert_info.h"
+#include "test/common/tls/test_data/selfsigned_cert_info.h"
 #include "test/common/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
 #include "test/common/tls/test_private_key_method_provider.h"
 #include "test/mocks/buffer/mocks.h"
@@ -59,6 +61,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
@@ -267,6 +270,33 @@ public:
 
   const std::string& expectedPeerIssuer() const { return expected_peer_issuer_; }
 
+  TestUtilOptions&
+  setExpectedSha256PeerCertificateIssuerDigest(const std::string& expected_issuer_hash) {
+    expected_issuer_peer_certificate_hash_ = expected_issuer_hash;
+    return *this;
+  }
+
+  const std::string& expectedSha256PeerCertificateIssuerDigest() const {
+    return expected_issuer_peer_certificate_hash_;
+  }
+
+  TestUtilOptions&
+  setExpectedSerialNumberPeerCertificateIssuer(const std::string& expected_issuer_serial) {
+    expected_issuer_peer_certificate_serial_ = expected_issuer_serial;
+    return *this;
+  }
+
+  const std::string& expectedSerialNumberPeerCertificateIssuer() const {
+    return expected_issuer_peer_certificate_serial_;
+  }
+
+  TestUtilOptions& setExpectEmptyPeerCertificateIssuer() {
+    expect_empty_peer_certificate_issuer_ = true;
+    return *this;
+  }
+
+  bool expectEmptyPeerCertificateIssuer() const { return expect_empty_peer_certificate_issuer_; }
+
   TestUtilOptions& setExpectedPeerSubject(const std::string& expected_peer_subject) {
     expected_peer_subject_ = expected_peer_subject;
     return *this;
@@ -402,6 +432,7 @@ private:
   bool expect_no_cert_{false};
   bool expect_no_cert_chain_{false};
   bool expect_private_key_method_{false};
+  bool expect_empty_peer_certificate_issuer_{false};
   NiceMock<Runtime::MockLoader> runtime_;
   Network::ConnectionEvent expected_server_close_event_{Network::ConnectionEvent::RemoteClose};
   std::string expected_sha256_digest_;
@@ -416,6 +447,8 @@ private:
   std::string expected_serial_number_;
   std::vector<std::string> expected_serial_numbers_;
   std::string expected_peer_issuer_;
+  std::string expected_issuer_peer_certificate_hash_;
+  std::string expected_issuer_peer_certificate_serial_;
   std::string expected_peer_subject_;
   Ssl::ParsedX509NamePtr expected_parsed_peer_subject_;
   std::string expected_local_subject_;
@@ -473,16 +506,17 @@ void testUtil(const TestUtilOptions& options) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.serverCtxYaml()),
                             server_tls_context);
-  auto server_cfg = THROW_OR_RETURN_VALUE(
-      ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context, false),
-      std::unique_ptr<ServerContextConfigImpl>);
+  auto server_cfg =
+      THROW_OR_RETURN_VALUE(ServerContextConfigImpl::create(
+                                server_tls_context, transport_socket_factory_context, {}, false),
+                            std::unique_ptr<ServerContextConfigImpl>);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
-  auto server_ssl_socket_factory = THROW_OR_RETURN_VALUE(
-      ServerSslSocketFactory::create(std::move(server_cfg), manager,
-                                     *server_stats_store.rootScope(), std::vector<std::string>{}),
-      std::unique_ptr<ServerSslSocketFactory>);
+  auto server_ssl_socket_factory =
+      THROW_OR_RETURN_VALUE(ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                           *server_stats_store.rootScope()),
+                            std::unique_ptr<ServerSslSocketFactory>);
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(options.version()));
@@ -628,6 +662,24 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
         EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
       }
+      if (!options.expectedSha256PeerCertificateIssuerDigest().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSha256PeerCertificateIssuerDigest(),
+                  server_connection->ssl()->sha256PeerCertificateIssuerDigest());
+        EXPECT_EQ(options.expectedSha256PeerCertificateIssuerDigest(),
+                  server_connection->ssl()->sha256PeerCertificateIssuerDigest());
+      }
+      if (!options.expectedSerialNumberPeerCertificateIssuer().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSerialNumberPeerCertificateIssuer(),
+                  server_connection->ssl()->serialNumberPeerCertificateIssuer());
+        EXPECT_EQ(options.expectedSerialNumberPeerCertificateIssuer(),
+                  server_connection->ssl()->serialNumberPeerCertificateIssuer());
+      }
+      if (options.expectEmptyPeerCertificateIssuer()) {
+        EXPECT_EQ("", server_connection->ssl()->sha256PeerCertificateIssuerDigest());
+        EXPECT_EQ("", server_connection->ssl()->serialNumberPeerCertificateIssuer());
+      }
       if (!options.expectedPeerSubject().empty()) {
         EXPECT_EQ(options.expectedPeerSubject(),
                   server_connection->ssl()->subjectPeerCertificate());
@@ -677,6 +729,12 @@ void testUtil(const TestUtilOptions& options) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
+
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedPeerCert(),
+                  server_connection->ssl()->pemEncodedPeerCertificate());
+        EXPECT_EQ(options.expectedPeerCert(),
+                  server_connection->ssl()->pemEncodedPeerCertificate());
       }
       if (!options.expectedPeerCertChain().empty()) {
         std::string cert_chain = absl::StrReplaceAll(
@@ -685,6 +743,15 @@ void testUtil(const TestUtilOptions& options) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(cert_chain, server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
         EXPECT_EQ(cert_chain, server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
+
+        // Assert twice to ensure a cached value is returned and still valid.
+        absl::Span<const std::string> pem_chain =
+            server_connection->ssl()->pemEncodedPeerCertificateChain();
+        std::string concatenated_chain = absl::StrJoin(pem_chain, "");
+        EXPECT_EQ(options.expectedPeerCertChain(), concatenated_chain);
+        pem_chain = server_connection->ssl()->pemEncodedPeerCertificateChain();
+        concatenated_chain = absl::StrJoin(pem_chain, "");
+        EXPECT_EQ(options.expectedPeerCertChain(), concatenated_chain);
       }
       if (!options.expectedValidFromTimePeerCert().empty()) {
         const std::string formatted = TestUtility::formatTime(
@@ -703,6 +770,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha256PeerCertificateDigest());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha1PeerCertificateDigest());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->pemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
         EXPECT_EQ(absl::nullopt, server_connection->ssl()->parsedSubjectPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
@@ -715,6 +783,7 @@ void testUtil(const TestUtilOptions& options) {
       if (options.expectNoCertChain()) {
         EXPECT_EQ(EMPTY_STRING,
                   server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
+        EXPECT_TRUE(server_connection->ssl()->pemEncodedPeerCertificateChain().empty());
       }
       if (!options.expectedSni().empty()) {
         EXPECT_EQ(options.expectedSni(), server_connection->ssl()->sni());
@@ -903,6 +972,11 @@ public:
   TestUtilOptionsV2& setExpectedTransportFailureReasonContains(
       const std::string& expected_transport_failure_reason_contains) {
     expected_transport_failure_reason_contains_ = expected_transport_failure_reason_contains;
+#ifdef ENVOY_SSL_OPENSSL
+    if (expected_transport_failure_reason_contains_ == "TLSV1.*_BAD_CERTIFICATE_HASH_VALUE") {
+      expected_transport_failure_reason_contains_ = "ssl/tls alert handshake failure";
+    }
+#endif
     return *this;
   }
 
@@ -950,11 +1024,11 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   ASSERT(transport_socket.has_typed_config());
   transport_socket.typed_config().UnpackTo(&tls_context);
 
-  auto server_cfg =
-      *ServerContextConfigImpl::create(tls_context, transport_socket_factory_context, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, transport_socket_factory_context,
+                                                     server_names, false);
 
-  auto factory_or_error = ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), server_names);
+  auto factory_or_error = ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                         *server_stats_store.rootScope());
   THROW_IF_NOT_OK_REF(factory_or_error.status());
   auto server_ssl_socket_factory = std::move(*factory_or_error);
 
@@ -1257,13 +1331,12 @@ TEST_P(SslSocketTest, ServerTransportSocketOptions) {
   ;
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
-  auto server_ssl_socket_factory =
-      ServerSslSocketFactory::create(std::move(server_cfg), manager,
-                                     *server_stats_store.rootScope(), std::vector<std::string>{})
-          .value();
+  auto server_ssl_socket_factory = ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                  *server_stats_store.rootScope())
+                                       .value();
   auto ssl_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
   auto ssl_handshaker = dynamic_cast<const SslHandshakerImpl*>(ssl_socket->ssl().get());
   auto shared_ptr_ptr = static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(
@@ -1357,6 +1430,189 @@ TEST_P(SslSocketTest, GetCertDigests) {
                .setExpectedSha1Digests(sha1Digests)
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL) // test checks first serial #
                .setExpectedSerialNumbers(serialNumbers));
+}
+
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigest) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
+               .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
+               .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
+}
+
+// Verify that validatedPeerIssuer() returns the correct issuer when the client sends only a
+// leaf certificate with no intermediate chain. BoringSSL's X509_verify_cert builds the validated
+// chain using the trust store, so validated_chain_[1] is the CA that signed the leaf.
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestLeafOnly) {
+  // no_san_cert.pem contains a single leaf cert signed directly by ca_cert.pem (Root CA).
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectedSha256PeerCertificateIssuerDigest(TEST_CA_CERT_256_HASH)
+               .setExpectedSerialNumberPeerCertificateIssuer(TEST_CA_CERT_SERIAL));
+}
+
+// Verify that validatedPeerIssuer() returns the correct issuer even when the client sends a
+// chain containing a decoy CA that did not sign the leaf. BoringSSL's X509_verify_cert re-orders
+// the chain correctly, so validated_chain_[1] is the actual issuer (Intermediate CA), not the
+// decoy (Root CA).
+//
+// Client sends: leaf (san_dns3) + Root CA (decoy) + Intermediate CA (actual issuer).
+// After validation: validated_chain_ = [leaf, Intermediate CA, Root CA].
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestDecoyInChain) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_with_decoy_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert_chain.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSerialNumber(TEST_SAN_DNS3_CERT_SERIAL)
+               .setExpectedSha256PeerCertificateIssuerDigest(TEST_INTERMEDIATE_CA_CERT_256_HASH)
+               .setExpectedSerialNumberPeerCertificateIssuer(TEST_INTERMEDIATE_CA_CERT_SERIAL));
+}
+
+// Verify that sha256PeerCertificateIssuerDigest() and serialNumberPeerCertificateIssuer()
+// return empty strings when mTLS is not configured (no client certificate).
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestNonMtls) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: false
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(
+      test_options.setExpectNoCert().setExpectNoCertChain().setExpectEmptyPeerCertificateIssuer());
+}
+
+// Verify that sha256PeerCertificateIssuerDigest() and serialNumberPeerCertificateIssuer()
+// return empty strings when the client certificate is not trusted (ACCEPT_UNTRUSTED).
+// The validated chain is empty, so no issuer is available.
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestUntrusted) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"
+      trust_chain_verification: ACCEPT_UNTRUSTED
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
+               .setExpectEmptyPeerCertificateIssuer());
+}
+
+// Verify that sha256PeerCertificateIssuerDigest() and serialNumberPeerCertificateIssuer()
+// return empty strings for a self-signed client certificate. The validated chain has only
+// one entry (the self-signed cert itself), so there is no issuer certificate.
+TEST_P(SslSocketTest, GetIssuerPeerCertificateDigestSelfSigned) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSerialNumber(TEST_SELFSIGNED_CERT_SERIAL)
+               .setExpectEmptyPeerCertificateIssuer());
 }
 
 TEST_P(SslSocketTest, GetCertDigestsInvalidFiles) {
@@ -2135,7 +2391,8 @@ TEST_P(SslSocketTest, CertWithNotECCapable) {
   // TODO(luyao): We might need to modify ssl socket to set proper stats for failed handshake
   testUtil(test_options.setExpectedServerStats("")
                .setExpectedSni("server1.example.com")
-               .setExpectedTransportFailureReasonContains("HANDSHAKE_FAILURE_ON_CLIENT_HELLO"));
+               .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                   "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
 }
 
 TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
@@ -2586,7 +2843,8 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
   testUtil(test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY));
+               .setExpectedVerifyErrorCode(SSL_SELECT(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY,
+                                                      X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)));
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
@@ -2680,7 +2938,8 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_CERTIFICATE_EXPIRED"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_CERTIFICATE_EXPIRED", "ssl/tls alert certificate expired")));
 }
 
 // Expired certificates will not be accepted when explicitly disallowed via
@@ -2695,7 +2954,8 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_CERTIFICATE_EXPIRED"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_CERTIFICATE_EXPIRED", "ssl/tls alert certificate expired")));
 }
 
 // Expired certificates will be accepted when explicitly allowed via allow_expired_certificate.
@@ -3212,7 +3472,8 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3240,7 +3501,8 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertifi
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3450,7 +3712,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCert
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3479,7 +3742,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClient
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3611,12 +3875,12 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -3671,12 +3935,13 @@ TEST_P(SslSocketTest, HalfClose) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -3757,12 +4022,13 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -3849,12 +4115,13 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -3957,12 +4224,13 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -4054,17 +4322,17 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml1), server_tls_context1);
-  auto server_cfg1 = *ServerContextConfigImpl::create(server_tls_context1,
-                                                      transport_socket_factory_context, false);
+  auto server_cfg1 = *ServerContextConfigImpl::create(
+      server_tls_context1, transport_socket_factory_context, server_names1, false);
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml2), server_tls_context2);
-  auto server_cfg2 = *ServerContextConfigImpl::create(server_tls_context2,
-                                                      transport_socket_factory_context, false);
+  auto server_cfg2 = *ServerContextConfigImpl::create(
+      server_tls_context2, transport_socket_factory_context, server_names2, false);
   auto server_ssl_socket_factory1 = *ServerSslSocketFactory::create(
-      std::move(server_cfg1), manager, *server_stats_store.rootScope(), server_names1);
+      std::move(server_cfg1), manager, *server_stats_store.rootScope());
   auto server_ssl_socket_factory2 = *ServerSslSocketFactory::create(
-      std::move(server_cfg2), manager, *server_stats_store.rootScope(), server_names2);
+      std::move(server_cfg2), manager, *server_stats_store.rootScope());
 
   auto socket1 = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(ip_version));
@@ -4215,11 +4483,11 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg =
-      *ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context, false);
+  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context,
+                                                     transport_socket_factory_context, {}, false);
 
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), {});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
   auto tcp_socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(ip_version));
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
@@ -4858,17 +5126,17 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context1);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context1, factory_context_, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context1, factory_context_, {}, false);
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
-  auto server2_cfg = *ServerContextConfigImpl::create(tls_context2, factory_context_, false);
+  auto server2_cfg = *ServerContextConfigImpl::create(tls_context2, factory_context_, {}, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
   auto server2_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server2_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+      std::move(server2_cfg), manager, *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -4992,10 +5260,10 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_ctx_proto;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
-  auto server_cfg =
-      *ServerContextConfigImpl::create(server_ctx_proto, transport_socket_factory_context, false);
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_cfg = *ServerContextConfigImpl::create(server_ctx_proto,
+                                                     transport_socket_factory_context, {}, false);
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version));
@@ -5256,11 +5524,11 @@ TEST_P(SslSocketTest, SslError) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
   ContextManagerImpl manager(factory_context_.serverFactoryContext());
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -5299,7 +5567,7 @@ TEST_P(SslSocketTest, SslError) {
   EXPECT_EQ(1UL, server_stats_store.counter("ssl.connection_error").value());
 }
 
-TEST_P(SslSocketTest, ProtocolVersions) {
+BORINGSSL_TEST_P(SslSocketTest, ProtocolVersions) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
@@ -5826,11 +6094,12 @@ TEST_P(SslSocketTest, SetSignatureAlgorithms) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(server_tls_context, factory_context_, {}, false);
   ContextManagerImpl manager(factory_context_.serverFactoryContext());
   Stats::TestUtil::TestStore server_stats_store;
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
+  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                                                   *server_stats_store.rootScope());
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version_));
@@ -6122,10 +6391,12 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-  // Ensure that complete crl chains succeed with unrevoked certificates.
+// Ensure that complete crl chains succeed with unrevoked certificates.
+#ifndef ENVOY_SSL_OPENSSL
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
+#endif
 }
 
 TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
@@ -6208,10 +6479,12 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-  // Ensure that complete crl chains succeed with unrevoked certificates.
+// Ensure that complete crl chains succeed with unrevoked certificates.
+#ifndef ENVOY_SSL_OPENSSL
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
+#endif
 }
 
 TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
@@ -6438,14 +6711,13 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
   EXPECT_TRUE(server_cfg->tlsCertificates().empty());
   EXPECT_FALSE(server_cfg->isReady());
 
   ContextManagerImpl manager(factory_context_.serverFactoryContext());
   auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *factory_context_.store_.rootScope(),
-      std::vector<std::string>{});
+      std::move(server_cfg), manager, *factory_context_.store_.rootScope());
   auto transport_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
   EXPECT_FALSE(transport_socket->startSecureTransport());                                  // Noop
   transport_socket->configureInitialCongestionWindow(200, std::chrono::microseconds(223)); // Noop
@@ -6531,11 +6803,10 @@ protected:
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
                               downstream_tls_context_);
     auto server_cfg =
-        *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_, false);
+        *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_, {}, false);
     manager_ = std::make_unique<ContextManagerImpl>(factory_context_.serverFactoryContext());
     server_ssl_socket_factory_ = *ServerSslSocketFactory::create(std::move(server_cfg), *manager_,
-                                                                 *server_stats_store_.rootScope(),
-                                                                 std::vector<std::string>{});
+                                                                 *server_stats_store_.rootScope());
 
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(version_));
@@ -6842,7 +7113,7 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
 }
 
 // Test asynchronous signing (ECDHE) using a private key provider.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -6876,7 +7147,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
 }
 
 // Test asynchronous decryption (RSA).
-TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
@@ -6913,7 +7184,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
 }
 
 // Test synchronous signing (ECDHE).
-TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -6947,7 +7218,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
 }
 
 // Test synchronous decryption (RSA).
-TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
@@ -6984,7 +7255,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
 }
 
 // Test fallback for key provider.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderFallbackSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderFallbackSuccess) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
@@ -7025,7 +7296,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderFallbackSuccess) {
 }
 
 // Test asynchronous signing (ECDHE) failure (invalid signature).
-TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7060,7 +7331,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignFailure) {
 }
 
 // Test synchronous signing (ECDHE) failure (invalid signature).
-TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7095,7 +7366,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
 }
 
 // Test the sign operation return with an error.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderSignFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderSignFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7129,7 +7400,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderSignFailure) {
 }
 
 // Test the decrypt operation return with an error.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
@@ -7166,7 +7437,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderDecryptFailure) {
 }
 
 // Test the sign operation return with an error in complete.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignCompleteFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignCompleteFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7201,7 +7472,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignCompleteFailure) {
 }
 
 // Test the decrypt operation return with an error in complete.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_params:
@@ -7242,7 +7513,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptCompleteFailure) {
 
 // Test having one cert with private key method and another with just
 // private key.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertSuccess) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -7282,7 +7553,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertSuccess) {
 // Test having two certs with private key methods. This will
 // synchronously fail because the second certificate is a ECDSA one and
 // the RSA method can't handle it.
-TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
+BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -7328,7 +7599,7 @@ TEST_P(SslSocketTest, RsaPrivateKeyProviderMultiCertFail) {
 }
 
 // Test ECDSA private key method provider mode.
-TEST_P(SslSocketTest, EcdsaPrivateKeyProviderSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, EcdsaPrivateKeyProviderSuccess) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -7362,7 +7633,7 @@ TEST_P(SslSocketTest, EcdsaPrivateKeyProviderSuccess) {
 // Test having two certs with different private key method modes. It's expected that the ECDSA
 // provider mode is being used. RSA provider mode is set to fail with "async_method_error", but
 // that's not happening.
-TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertSuccess) {
+BORINGSSL_TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertSuccess) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -7406,7 +7677,7 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertSuccess) {
 }
 
 // Test having two certs with different private key method modes. ECDSA provider is set to fail.
-TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
+BORINGSSL_TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -7452,7 +7723,7 @@ TEST_P(SslSocketTest, RsaAndEcdsaPrivateKeyProviderMultiCertFail) {
 }
 
 // Test private key provider and cert validation can work together.
-TEST_P(SslSocketTest, PrivateKeyProviderWithCertValidation) {
+BORINGSSL_TEST_P(SslSocketTest, PrivateKeyProviderWithCertValidation) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7774,7 +8045,7 @@ TEST_P(SslSocketTest, Sni) {
   testUtil(test_options.setExpectedSni("foo.bar.com"));
 }
 
-TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
+BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7817,7 +8088,7 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
-TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
+BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -7855,7 +8126,7 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 }
 
-TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
+BORINGSSL_TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
@@ -7885,7 +8156,7 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
   testUtilV2(test_options);
 }
 
-TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
+BORINGSSL_TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
@@ -7903,14 +8174,65 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
 
-  // Enable the rsa_key_usage enforcement.
-  client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
   TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/false, version_,
                                  /*skip_server_failure_reason_check=*/true);
   // Client connection is failed with key_usage_mismatch.
   test_options.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
   // Server connection error was not populated in this case.
   test_options.setExpectedServerStats("");
+  testUtilV2(test_options);
+}
+
+// Test that TLS handshakes succeed when certificate compression is enabled via runtime flag.
+// This verifies the certificate compression feature (RFC 8879) integration with brotli, zstd,
+// and zlib algorithms when the runtime flag is enabled.
+TEST_P(SslSocketTest, CertificateCompressionEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "true"}});
+
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+
+  updateFilterChain(server_tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+
+  // TLS handshake should succeed with compression algorithms registered.
+  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/true, version_);
+  testUtilV2(test_options);
+}
+
+// Test that TLS handshakes succeed with certificate compression disabled (default behavior).
+// This verifies backward compatibility when the runtime flag is disabled.
+TEST_P(SslSocketTest, CertificateCompressionDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "false"}});
+
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+
+  updateFilterChain(server_tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+
+  // TLS handshake should succeed without compression algorithms (backward compatibility).
+  TestUtilOptionsV2 test_options(listener, client_tls_context, /*expect_success=*/true, version_);
   testUtilV2(test_options);
 }
 

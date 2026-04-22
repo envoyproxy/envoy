@@ -2,6 +2,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -37,6 +38,23 @@ typed_config:
               name: ":method"
               string_match:
                 exact: "GET"
+        principals:
+          - any: true
+)EOF";
+
+const std::string RBAC_CONFIG_WITH_CUSTOM_HEADER_DENY = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules:
+    action: DENY
+    policies:
+      "deny policy":
+        permissions:
+          - header:
+              name: "x-internal"
+              string_match:
+                exact: "true"
         principals:
           - any: true
 )EOF";
@@ -734,6 +752,65 @@ TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
               testing::HasSubstr("rbac_access_denied_matched_policy[deny_policy]"));
 }
 
+// Test that RBAC cannot be bypassed by sending duplicate headers.
+TEST_P(RBACIntegrationTest, MultiValueHeaderBypassPrevented) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.rbac_match_headers_individually",
+                                    "true");
+  config_helper_.prependFilter(RBAC_CONFIG_WITH_CUSTOM_HEADER_DENY);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Create headers with duplicate x-internal values
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "sni.lyft.com"},
+      {"x-forwarded-for", "10.0.0.1"},
+      {"x-internal", "true"},
+  };
+  headers.addCopy(Http::LowerCaseString("x-internal"), "other");
+
+  auto response = codec_client_->makeRequestWithBody(headers, 1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  // With the fix, one of the values is "true" so request should be denied.
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[deny_policy]"));
+}
+
+// Test that duplicate headers bypass RBAC when individual matching is disabled (old behavior).
+TEST_P(RBACIntegrationTest, MultiValueHeaderConcatenatedMatchAllowsBypass) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.rbac_match_headers_individually",
+                                    "false");
+  config_helper_.prependFilter(RBAC_CONFIG_WITH_CUSTOM_HEADER_DENY);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Create headers with duplicate x-internal values
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "sni.lyft.com"},
+      {"x-forwarded-for", "10.0.0.1"},
+      {"x-internal", "true"},
+  };
+  headers.addCopy(Http::LowerCaseString("x-internal"), "other");
+
+  auto response = codec_client_->makeRequestWithBody(headers, 1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 TEST_P(RBACIntegrationTest, RouteMetadataMatcherAllow) {
   config_helper_.prependFilter(RBAC_CONFIG_WITH_SOURCED_METADATA_ROUTE);
   // Set route metadata
@@ -747,12 +824,12 @@ TEST_P(RBACIntegrationTest, RouteMetadataMatcherAllow) {
               baz: bat
           )EOF";
 
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         TestUtility::loadFromYaml(yaml, value);
         auto default_route =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_metadata()->mutable_filter_metadata()->insert(
-            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+            Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
       });
   initialize();
 
@@ -791,12 +868,12 @@ TEST_P(RBACIntegrationTest, RouteMetadataMatcherDeny) {
               foo: baz
           )EOF";
 
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         TestUtility::loadFromYaml(yaml, value);
         auto default_route =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_metadata()->mutable_filter_metadata()->insert(
-            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+            Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
       });
   initialize();
 
@@ -833,12 +910,12 @@ TEST_P(RBACIntegrationTest, DEPRECATED_FEATURE_TEST(DynamicMetadataMatcherAllow)
               baz: bat
           )EOF";
 
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         TestUtility::loadFromYaml(yaml, value);
         auto default_route =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_metadata()->mutable_filter_metadata()->insert(
-            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+            Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
       });
   initialize();
 
@@ -877,12 +954,12 @@ TEST_P(RBACIntegrationTest, DynamicMetadataMatcherDeny) {
               foo: baz
           )EOF";
 
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         TestUtility::loadFromYaml(yaml, value);
         auto default_route =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_metadata()->mutable_filter_metadata()->insert(
-            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+            Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
       });
   initialize();
 
@@ -1594,6 +1671,10 @@ typed_config:
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
 )EOF",
                     save_upstream_config, Network::Test::ipVersionToDnsFamily(GetParam()));
 
@@ -1636,6 +1717,10 @@ typed_config:
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
 )EOF",
         Network::Test::ipVersionToDnsFamily(GetParam()));
 

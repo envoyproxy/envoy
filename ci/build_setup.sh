@@ -11,8 +11,6 @@ if [[ -n "$NO_BUILD_SETUP" ]]; then
     return
 fi
 
-CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
-
 export PPROF_PATH=/thirdparty_build/bin/pprof
 
 if [[ -z "${NUM_CPUS}" ]]; then
@@ -54,17 +52,20 @@ export BUILD_DIR
 
 # Environment setup.
 export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"
-export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
-export PATH=${LLVM_ROOT}/bin:${PATH}
 
 if [[ -f "/etc/redhat-release" ]]; then
   BAZEL_BUILD_EXTRA_OPTIONS+=("--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1")
 fi
 
 function cleanup() {
-  # Remove build artifacts. This doesn't mess with incremental builds as these
-  # are just symlinks.
-  rm -rf "${ENVOY_SRCDIR}"/bazel-* clang.bazelrc
+    if [[ "${ENVOY_BUILD_SKIP_CLEANUP}" == "true" ]]; then
+        echo "Skipping cleanup as requested."
+        return
+    fi
+
+    # Remove build artifacts. This doesn't mess with incremental builds as these
+    # are just symlinks.
+    rm -rf "${ENVOY_SRCDIR}"/bazel-* clang.bazelrc
 }
 
 cleanup
@@ -73,10 +74,23 @@ trap cleanup EXIT
 # NB: do not use bazel before here to ensure correct directories.
 _bazel="$(which bazel)"
 
+# Use separate output_base for separate workspaces/mods
+case $CI_TARGET in
+    config|docs|verify_examples)
+        ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-docs}"
+        ;;
+    external)
+        ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-external}"
+        ;;
+    *)
+        ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-base}"
+        ;;
+esac
+
 BAZEL_STARTUP_OPTIONS=(
     "${BAZEL_STARTUP_EXTRA_OPTIONS[@]}"
     "--output_user_root=${BUILD_DIR}/bazel_root"
-    "--output_base=${BUILD_DIR}/bazel_root/base")
+    "--output_base=${BUILD_DIR}/bazel_root/${ENVOY_OUTPUT_BASE_DIR}")
 
 bazel () {
     local startup_options
@@ -101,11 +115,18 @@ BAZEL_BUILD_OPTIONS=(
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
-
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
   "--test_env=HEAPCHECK=")
 
-if [[ -z "${ENVOY_RBE}" ]]; then
+rc_output=$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info --announce_rc "${BAZEL_BUILD_OPTIONS[@]}" 2>&1) || {
+    echo "bazel info failed:" >&2
+    echo "$rc_output" >&2
+    exit 1
+}
+if grep -q "remote_executor" <<<"$rc_output"; then
+
+    echo "Remote execution detected, not setting test_tmpdir."
+else
     BAZEL_BUILD_OPTIONS+=("--test_tmpdir=${ENVOY_TEST_TMPDIR}")
     echo "Setting test_tmpdir to ${ENVOY_TEST_TMPDIR}."
 fi
@@ -116,14 +137,6 @@ BAZEL_GLOBAL_OPTION_LIST="${BAZEL_GLOBAL_OPTIONS[*]}"
 export BAZEL_STARTUP_OPTION_LIST
 export BAZEL_BUILD_OPTION_LIST
 export BAZEL_GLOBAL_OPTION_LIST
-
-if [[ -z "${ENVOY_RBE}" ]]; then
-    if [[ -e "${LLVM_ROOT}" ]]; then
-        "${CURRENT_SCRIPT_DIR}/../bazel/setup_clang.sh" "${LLVM_ROOT}"
-    else
-        echo "LLVM_ROOT not found, not setting up llvm."
-    fi
-fi
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean "${BAZEL_BUILD_OPTIONS[@]}" --expunge
 

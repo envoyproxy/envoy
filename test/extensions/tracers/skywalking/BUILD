@@ -58,7 +58,7 @@ envoy_extension_cc_test(
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//test/test_common:utility_lib",
-        "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
+        "@cpp2sky//source:cpp2sky_data_lib",
     ],
 )
 

@@ -6,6 +6,10 @@ debian_bookworm:
   image: debian:bookworm-slim
   ext: bookworm.changes
 
+debian_trixie:
+  image: debian:trixie-slim
+  ext: trixie.changes
+
 ubuntu_focal:
   image: ubuntu:20.04
   ext: focal.changes
@@ -13,3 +17,7 @@ ubuntu_focal:
 ubuntu_jammy:
   image: ubuntu:22.04
   ext: jammy.changes
+
+ubuntu_noble:
+  image: ubuntu:24.04
+  ext: noble.changes

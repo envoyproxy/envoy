@@ -138,7 +138,8 @@ public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const envoy::config::listener::v3::Listener& config,
-                                 Server::DrainManagerPtr drain_manager);
+                                 Server::DrainManagerPtr drain_manager, Stats::ScopeSharedPtr scope,
+                                 Stats::ScopeSharedPtr listener_scope);
 
   Init::Manager& initManager() override;
   Network::DrainDecision& drainDecision() override;
@@ -167,7 +168,8 @@ public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
-                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager);
+                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager,
+                                Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope);
 
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
@@ -243,17 +245,23 @@ public:
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
    */
-  bool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !added_via_api_; }
+  bool blockLdsUpdate(uint64_t new_hash) {
+    // Receiving LDS update with FCDS config will cause full listener update. Therefore,
+    // we should not block the update if FCDS is configured, regardless of the hash.
+    return (!configInternal().has_fcds_config() && new_hash == maybe_stale_hash_) ||
+           !added_via_api_;
+  }
   bool blockRemove() { return !added_via_api_; }
 
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
     return addresses_;
   }
-  const envoy::config::listener::v3::Listener& config() const { return config_; }
+  const std::string& configName() const { return configInternal().name(); }
   const std::vector<Network::ListenSocketFactoryPtr>& getSocketFactories() const {
     return socket_factories_;
   }
   void debugLog(const std::string& message);
+  void dumpListenerConfig(Protobuf::Any& dump) const;
   void initialize();
   DrainManager& localDrainManager() const {
     return listener_factory_context_->listener_factory_context_base_->drainManager();
@@ -288,6 +296,9 @@ public:
   }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
+  }
+  std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+    return per_connection_buffer_high_watermark_timeout_;
   }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return listener_filters_timeout_;
@@ -350,7 +361,8 @@ public:
 private:
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, absl::Status& creation_status);
+               bool workers_started, uint64_t hash, Stats::ScopeSharedPtr scope,
+               Stats::ScopeSharedPtr listener_scope, absl::Status& creation_status);
   struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
     UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
         : config_(config) {}
@@ -402,8 +414,7 @@ private:
   absl::Status buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
                                        uint32_t concurrency);
   void buildListenSocketOptions(const envoy::config::listener::v3::Listener& config,
-                                std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
-                                    envoy::config::core::v3::SocketOption>>>& address_opts_list);
+                                std::vector<Network::Socket::OptionsSharedPtr>& address_opts_list);
   absl::Status createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
   absl::Status validateFilterChains(const envoy::config::listener::v3::Listener& config);
   absl::Status buildFilterChains(const envoy::config::listener::v3::Listener& config);
@@ -420,6 +431,12 @@ private:
     ensureSocketOptions(options);
     Network::Socket::appendOptions(options, append_options);
   }
+  // configInternal returns the listener config. If FCDS is enabled, the config filter chain
+  // is expected to be partial and only contain filter chains added statically or with LDS.
+  // If FCDS is enabled, avoid using the config object for decisions based on filter chains.
+  const envoy::config::listener::v3::Listener& configInternal() const {
+    return config_maybe_partial_filter_chains_;
+  }
 
   ListenerManagerImpl& parent_;
   std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
@@ -430,11 +447,16 @@ private:
   const bool mptcp_enabled_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
+  const std::chrono::milliseconds per_connection_buffer_high_watermark_timeout_;
   const uint64_t listener_tag_;
   const std::string name_;
   const bool added_via_api_;
   const bool workers_started_;
-  const uint64_t hash_;
+  // Note: when FCDS is enabled and filter chains change, the stored hash may become stale.
+  // We deliberately skip recomputing it for performance, since the hash is only used
+  // to decide on in-place LDS updates, and when FCDS is configured, LDS update force a full
+  // listener update anyway.
+  const uint64_t maybe_stale_hash_;
   const uint32_t tcp_backlog_size_;
   const uint32_t max_connections_to_accept_per_socket_event_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
@@ -451,7 +473,10 @@ private:
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   Filter::QuicListenerFilterFactoriesList quic_listener_filter_factories_;
   AccessLog::InstanceSharedPtrVector access_logs_;
-  const envoy::config::listener::v3::Listener config_;
+  // When FCDS is enabled for the listener, config_maybe_partial_filter_chains_ is inconsistent with
+  // the state of filter chains, as these can change during the lifetime of the listener. Keeping
+  // the config object consistent for every FCDS update has significant performance penalty.
+  const envoy::config::listener::v3::Listener config_maybe_partial_filter_chains_;
   const std::string version_info_;
   // Using std::vector instead of hash map for supporting multiple zero port addresses.
   std::vector<Network::Socket::OptionsSharedPtr> listen_socket_options_list_;

@@ -793,6 +793,55 @@ TEST_P(IntegrationTest, MultipleRequestsWithMultipleFrames) {
   cleanup();
 }
 
+TEST_P(IntegrationTest, UpstreamEndStreamFrameThenDisconnect) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  initialize(defaultConfig(true), std::make_unique<FakeStreamCodecFactory>());
+
+  EXPECT_TRUE(makeClientConnectionForTest());
+
+  FakeStreamCodecFactory::FakeRequest request;
+  request.host_ = "service_name_0";
+  request.method_ = "hello";
+  request.path_ = "/path_or_anything";
+  request.protocol_ = "fake_fake_fake";
+  request.data_ = {{"version", "v1"}};
+
+  sendRequestForTest(request);
+
+  waitForUpstreamConnectionForTest();
+  const std::function<bool(const std::string&)> data_validator =
+      [](const std::string& data) -> bool { return data.find("v1") != std::string::npos; };
+  waitForUpstreamRequestForTest(data_validator);
+
+  FakeStreamCodecFactory::FakeResponse response;
+  response.protocol_ = "fake_fake_fake";
+  response.status_ = StreamStatus(0, true);
+  response.data_["zzzz"] = "OK";
+  response.stream_frame_flags_ = FrameFlags(1, 0);
+  sendResponseForTest(response);
+
+  FakeStreamCodecFactory::FakeCommonFrame error;
+  error.data_["zzzz"] = "OK";
+  error.stream_frame_flags_ =
+      FrameFlags(1, FrameFlags::FLAG_END_STREAM | FrameFlags::FLAG_DRAIN_CLOSE);
+  sendResponseForTest(response);
+
+  // Partial cleanup (upstream only)
+  AssertionResult result = upstream_connection_->close();
+  RELEASE_ASSERT(result, result.message());
+  result = upstream_connection_->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  upstream_connection_.reset();
+
+  // Run the event loop after the upstream connection is closed and reset, but before closing the
+  // client connection.
+  integration_->dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
+
+  client_connection_->close(Envoy::Network::ConnectionCloseType::NoFlush);
+}
+
 } // namespace
 } // namespace GenericProxy
 } // namespace NetworkFilters

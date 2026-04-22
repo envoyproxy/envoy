@@ -9,8 +9,6 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
-#include "absl/synchronization/mutex.h"
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -30,6 +28,7 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
 using ::testing::HasSubstr;
@@ -102,6 +101,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTestWithSimulatedTime
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP2, Http::CodecType::HTTP3},
                              {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+class MultiplexedIntegrationTestWithSimulatedTimeHttp2Only : public Event::TestUsingSimulatedTime,
+                                                             public MultiplexedIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTestWithSimulatedTimeHttp2Only,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
@@ -217,6 +224,51 @@ TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeout) {
         hcm.mutable_stream_idle_timeout()->set_seconds(0);
         constexpr uint64_t IdleTimeoutMs = 400;
         hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
+      });
+  initialize();
+  const size_t stream_flow_control_window =
+      downstream_protocol_ == Http::CodecType::HTTP3 ? 32 * 1024 : 65535;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value();
+  http2_options.mutable_initial_stream_window_size()->set_value(stream_flow_control_window);
+#ifdef ENVOY_ENABLE_QUIC
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window);
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetInitialSessionFlowControlWindowToSend(stream_flow_control_window);
+  }
+#endif
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(stream_flow_control_window + 2000, true);
+  std::string flush_timeout_counter(downstreamProtocol() == Http::CodecType::HTTP3
+                                        ? "http3.tx_flush_timeout"
+                                        : "http2.tx_flush_timeout");
+  test_server_->waitForCounterEq(flush_timeout_counter, 1);
+  ASSERT_TRUE(response->waitForReset());
+}
+
+// Test that the codec stream flush timeout can be overridden independently from
+// the connection manager stream idle timeout.
+TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeoutOverride) {
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        // Disable the generic stream idle timeout. This will be overridden by the
+        // stream_flush_timeout and the test should work exactly the same as the
+        // CodecStreamIdleTimeout test.
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(0);
+
+        hcm.mutable_stream_flush_timeout()->set_seconds(0);
+        constexpr uint64_t FlushTimeoutMs = 400;
+        hcm.mutable_stream_flush_timeout()->set_nanos(FlushTimeoutMs * 1000 * 1000);
       });
   initialize();
   const size_t stream_flow_control_window =
@@ -811,11 +863,6 @@ TEST_P(MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   // Verifies a headers metadata added.
   std::set<std::string> expected_metadata_keys = {"headers"};
   expected_metadata_keys.insert("metadata");
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    // HTTP/3 Sends "end stream" in an empty DATA frame which results in the test filter
-    // adding the "data" metadata header.
-    expected_metadata_keys.insert("data");
-  }
   verifyExpectedMetadata(upstream_request_->metadataMap(), expected_metadata_keys);
 
   // Sends a headers only request with metadata. An empty data frame carries end_stream.
@@ -927,11 +974,6 @@ void MetadataIntegrationTest::verifyHeadersOnlyTest() {
   // Verifies a headers metadata added.
   std::set<std::string> expected_metadata_keys = {"headers"};
   expected_metadata_keys.insert("metadata");
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    // HTTP/3 Sends "end stream" in an empty DATA frame which results in the test filter
-    // adding the "data" metadata header.
-    expected_metadata_keys.insert("data");
-  }
   verifyExpectedMetadata(upstream_request_->metadataMap(), expected_metadata_keys);
 
   // Verifies zero length data received, and end_stream is true.
@@ -1271,7 +1313,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
   test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
 }
 
-TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyResets) {
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, GoAwayQuicklyAfterTooManyResets) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
   const int total_streams = 100;
@@ -1294,6 +1336,70 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyRes
   // Envoy should disconnect client due to premature reset check
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", num_reset_streams);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestResetAndNoRecursion) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2 ||
+      upstreamProtocol() != Http::CodecType::HTTP2) {
+    // This test is only valid for HTTP/2 and HTTP/3.
+    return;
+  }
+
+  config_helper_.setDownstreamHttp2MaxConcurrentStreams(60000);
+  config_helper_.setUpstreamHttp2MaxConcurrentStreams(60000);
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_circuit_breakers()
+        ->add_thresholds()
+        ->mutable_max_requests()
+        ->set_value(60000);
+  });
+
+  config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
+                                    absl::StrCat(100));
+
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}};
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const int pending_streams = 1800; // 18000 in local or this consume too much resource.
+  std::vector<std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>> encoder_decoders;
+  encoder_decoders.reserve(pending_streams);
+
+  const int pending_streams_per_iteration = pending_streams / 4;
+  for (size_t i = 0; i < 4; i++) {
+    for (size_t j = 0; j < pending_streams_per_iteration; ++j) {
+      // Send and wait
+      encoder_decoders.emplace_back(codec_client_->startRequest(headers));
+    }
+    test_server_->waitForCounterEq("http.config_test.downstream_rq_total",
+                                   pending_streams_per_iteration * (i + 1),
+                                   TestUtility::DefaultTimeout * 5);
+  }
+
+  // Reset 50 streams and then the connection should be closed because too much premature resets.
+  // All streams should be reset correctly without recursion.
+  for (int i = 0; i < 50; ++i) {
+    // Send and reset
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->sendReset(*request_encoder_);
+    ASSERT_TRUE(response->waitForReset());
+  }
+
+  // Envoy should disconnect client due to premature reset check
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", pending_streams + 50,
+                                 TestUtility::DefaultTimeout * 5);
+  // If there is recursion, this result won't be 1.
   test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
 }
 
@@ -3008,6 +3114,9 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
             ->mutable_timeout()
             ->set_seconds(0);
       });
+  config_helper_.setDownstreamHttp2MaxConcurrentStreams(20001);
+  config_helper_.setUpstreamHttp2MaxConcurrentStreams(20001);
+
   beginSession();
 
   std::string buffer;
@@ -3208,7 +3317,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
     EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
   } else if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), "http2.violation.of.messaging.rule");
   } else {
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
@@ -3441,10 +3550,192 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClos
   // Close upstream, check cleanup.
   fake_upstreams_[0].reset();
 
-  ASSERT_TRUE(response_decoder->waitForReset());
+  ASSERT_TRUE(response_decoder->waitForAnyTermination());
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
   test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
+  // There are four streams created in total, client stream, Envoy server stream,
+  // Envoy client stream and upstream server stream.
+  // When we close a stream actively with a specific reset reason, we expect the peer
+  // to receive the related error code in onStreamClose().
+  // But note, the onStreamClose() for the active closing side will also be called.
+  // But the error code for active closing side will always be 0 if the Oghttp2 is used.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_ignore_upstream_reason",
+                                    "true");
+
+  initialize();
+
+  {
+    // At the downstream side, because a complete local reply will be send before resetting
+    // the stream, so the stream close code observed at downstream side will be NO_ERROR (0).
+    // So, we expect 1 log entry with "closed: 2" for Oghttp2 and 2 log entries with "closed: 2"
+    // for other implementations.
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 1;
+    } else {
+      log_num = 2;
+    }
+
+    // The ProtocolError will be translated to OGHTTP2_PROTOCOL_ERROR (1).
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 1", log_num, {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the downstream stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::ProtocolError);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+
+      cleanupUpstreamAndDownstream();
+    });
+  }
+
+  {
+    // For reason LocalReset, it will be translated to default HTTP2 stream error code.
+    // At the downstream side, because a complete local reply will be send before resetting
+    // the stream, so the stream close code observed at downstream side will be NO_ERROR (0).
+    // So, we expect 1 log entry with "closed: 2" for Oghttp2 and 2 log entries with "closed: 2"
+    // for other implementations.
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 1;
+    } else {
+      log_num = 2;
+    }
+
+    // The LocalReset will be translated to default code OGHTTP2_INTERNAL_ERROR (2).
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 2", log_num, {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+
+      cleanupUpstreamAndDownstream();
+    });
+  }
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationToDownstream) {
+  // There are four streams created in total, client stream, Envoy server stream,
+  // Envoy client stream and upstream server stream.
+  // When we close a stream actively with a specific reset reason, we expect the peer
+  // to receive the related error code in onStreamClose().
+  // But note, the onStreamClose() for the active closing side will also be called.
+  // But the error code for active closing side will always be 0 if the Oghttp2 is used.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_ignore_upstream_reason",
+                                    "false");
+
+  initialize();
+
+  {
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 2;
+    } else {
+      log_num = 4;
+    }
+
+    // The ProtocolError will be translated to OGHTTP2_PROTOCOL_ERROR (1).
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 1", log_num, {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the downstream stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::ProtocolError);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+
+      cleanupUpstreamAndDownstream();
+    });
+  }
+
+  {
+    // For reason LocalReset, it will be translated to default HTTP2 stream error code.
+    // At the downstream side, because a complete local reply will be send before resetting
+    // the stream, so the stream close code observed at downstream side will be NO_ERROR (0).
+    // So, we expect 1 log entry with "closed: 2" for Oghttp2 and 2 log entries with "closed: 2"
+    // for other implementations.
+    size_t log_num = 0;
+    if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
+      log_num = 1;
+    } else {
+      log_num = 2;
+    }
+
+    // The LocalReset will be translated to default code OGHTTP2_INTERNAL_ERROR (2).
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 2", log_num, {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the stream.
+      upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+
+      cleanupUpstreamAndDownstream();
+    });
+  }
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "false");
+
+  std::vector<Http::StreamResetReason> reasons = {Http::StreamResetReason::ProtocolError,
+                                                  Http::StreamResetReason::LocalReset};
+  std::vector<Http::StreamResetReason> result_reasons = {Http::StreamResetReason::RemoteReset,
+                                                         Http::StreamResetReason::RemoteReset};
+
+  // There are four streams created in total, client stream, Envoy server stream,
+  // Envoy client stream and upstream server stream.
+  // When we close a stream actively with a specific reset reason, we expect the peer
+  // to receive the related error code in onStreamClose().
+  // But note, the onStreamClose() for the active closing side will also be called.
+  // But the error code for active closing side will always be 0 if the Oghttp2 is used.
+
+  initialize();
+  for (size_t i = 0; i < reasons.size(); ++i) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    // In legacy code path, both the ProtocolError and LocalReset will be translated
+    // to OGHTTP2_NO_ERROR (0). So, we expect 4 log entries with "closed: 0" for both cases.
+    EXPECT_LOG_CONTAINS_N_TIMES("debug", "closed: 0", 4, {
+      auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+      auto response = std::move(encoder_decoder.second);
+      waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+      // This will result in the router to send a local reply. And because the downstream request
+      // is not complete yet, it will finally result in resetting of the stream.
+      upstream_request_->encodeResetStream(reasons[i]);
+      ASSERT_TRUE(response->waitForReset());
+      EXPECT_EQ(result_reasons[i], response->resetReason());
+    });
+
+    cleanupUpstreamAndDownstream();
+  }
 }
 
 } // namespace Envoy

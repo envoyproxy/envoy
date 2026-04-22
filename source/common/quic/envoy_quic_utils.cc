@@ -1,17 +1,54 @@
 #include "source/common/quic/envoy_quic_utils.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <memory>
+#include <string>
 
-#include "envoy/common/platform.h"
-#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/api/os_sys_calls_common.h"
+#include "envoy/http/header_map.h"
+#include "envoy/http/stream_reset_handler.h"
+#include "envoy/network/address.h"
+#include "envoy/network/io_handle.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
+#include "envoy/network/socket_interface.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/http/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/http_option_limits.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
-#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/quic/quic_io_handle_wrapper.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/cert_compression.h"
 
+#include "absl/numeric/int128.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "openssl/crypto.h"
+#include "openssl/ec.h"
+#include "openssl/ec_key.h"
+#include "openssl/evp.h"
+#include "openssl/nid.h"
+#include "openssl/rsa.h"
+#include "openssl/ssl.h"
+#include "openssl/x509.h"
+#include "quiche/common/http/http_header_block.h"
+#include "quiche/common/quiche_ip_address_family.h"
+#include "quiche/quic/core/quic_config.h"
+#include "quiche/quic/core/quic_constants.h"
+#include "quiche/quic/core/quic_error_codes.h"
+#include "quiche/quic/core/quic_tag.h"
+#include "quiche/quic/core/quic_time.h"
+#include "quiche/quic/core/quic_types.h"
+#include "quiche/quic/platform/api/quic_socket_address.h"
 
 namespace Envoy {
 namespace Quic {
@@ -181,11 +218,11 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
   }
 }
 
-Network::ConnectionSocketPtr
-createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
-                       Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       const bool prefer_gro) {
+Network::ConnectionSocketPtr createConnectionSocket(
+    const Network::Address::InstanceConstSharedPtr& peer_addr,
+    Network::Address::InstanceConstSharedPtr& local_addr,
+    const Network::ConnectionSocket::OptionsSharedPtr& options, quic::QuicNetworkHandle network,
+    std::function<void(Network::ConnectionSocket&, quic::QuicNetworkHandle)> custom_bind_func) {
   ASSERT(peer_addr != nullptr);
   // NOTE: If changing the default cache size from 4 entries, make sure to profile it using
   // the benchmark test: //test/common/network:io_socket_handle_impl_benchmark
@@ -209,10 +246,16 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
     ENVOY_LOG_MISC(error, "Failed to create quic socket");
     return connection_socket;
   }
-  connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
-  connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.disable_quic_ip_packet_info_socket_options")) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
+  }
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.disable_quic_rx_queue_overflow_socket_options")) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
-  if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
@@ -247,7 +290,14 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   if (local_addr != nullptr) {
     connection_socket->bind(local_addr);
     ASSERT(local_addr->ip());
+  } else if (network != quic::kInvalidNetworkHandle && custom_bind_func != nullptr) {
+    custom_bind_func(*connection_socket, network);
+    if (!connection_socket->isOpen()) {
+      ENVOY_LOG_MISC(error, "Custom bind function failed");
+      return connection_socket;
+    }
   }
+
   if (auto result = connection_socket->connect(peer_addr); result.return_value_ == -1) {
     connection_socket->close();
     ENVOY_LOG_MISC(error, "Fail to connect socket: ({}) {}", result.errno_,
@@ -256,6 +306,8 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
 
   local_addr = connection_socket->connectionInfoProvider().localAddress();
+  ENVOY_LOG_MISC(trace, "connected to local address: {}",
+                 local_addr != nullptr ? local_addr->asString() : "<none>");
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
@@ -391,6 +443,14 @@ quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte) {
   // bits of the TOS byte of the IP header.
   constexpr uint8_t kEcnMask = 0b00000011;
   return static_cast<quic::QuicEcnCodepoint>(tos_byte & kEcnMask);
+}
+
+void registerCertCompression(SSL_CTX* ssl_ctx) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.tls_certificate_compression_brotli")) {
+    Extensions::TransportSockets::Tls::CertCompression::registerBrotli(ssl_ctx);
+  }
+  Extensions::TransportSockets::Tls::CertCompression::registerZlib(ssl_ctx);
 }
 
 } // namespace Quic

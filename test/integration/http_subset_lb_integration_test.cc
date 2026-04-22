@@ -98,8 +98,7 @@ public:
           auto* resp_header = vhost->add_response_headers_to_add();
           auto* header = resp_header->mutable_header();
           header->set_key(host_type_header_);
-          header->set_value(
-              fmt::format(R"EOF(%UPSTREAM_METADATA(["envoy.lb", "{}"])%)EOF", type_key_));
+          header->set_value(fmt::format(R"EOF(%UPSTREAM_METADATA(envoy.lb:{})%)EOF", type_key_));
 
           resp_header = vhost->add_response_headers_to_add();
           header = resp_header->mutable_header();

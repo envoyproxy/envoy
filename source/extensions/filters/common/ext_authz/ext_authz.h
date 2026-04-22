@@ -28,6 +28,7 @@ struct TracingConstantValues {
   const std::string TraceStatus = "ext_authz_status";
   const std::string TraceUnauthz = "ext_authz_unauthorized";
   const std::string TraceOk = "ext_authz_ok";
+  const std::string TraceError = "ext_authz_error";
   const std::string HttpStatus = "ext_authz_http_status";
 };
 
@@ -110,6 +111,8 @@ struct Response {
   // "setCopy") to the response sent back to the downstream client on OK auth responses
   // only if the headers were returned from the authz server.
   UnsafeHeaderVector response_headers_to_overwrite_if_exists{};
+  // Whether the authorization server returned any headers with an invalid append action type.
+  bool saw_invalid_append_actions{false};
   // A set of HTTP headers consumed by the authorization server, will be removed
   // from the request to the upstream server.
   std::vector<std::string> headers_to_remove{};
@@ -125,7 +128,7 @@ struct Response {
 
   // A set of metadata returned by the authorization server, that will be emitted as filter's
   // dynamic metadata that other filters can leverage.
-  ProtobufWkt::Struct dynamic_metadata{};
+  Protobuf::Struct dynamic_metadata{};
 
   // The gRPC status returned by the authorization server when it is making a
   // gRPC call.

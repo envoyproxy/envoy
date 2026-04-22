@@ -34,7 +34,7 @@ public:
   // The MockStreamInfo will register the singleton time system to SimulatedTimeSystem and ignore
   // the TestRealTimeSystem in the MockTracerFactoryContext.
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-  absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
+  absl::flat_hash_map<std::string, Protobuf::Value> aws_metadata_;
   NiceMock<Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Tracing::MockConfig> tracing_config_;

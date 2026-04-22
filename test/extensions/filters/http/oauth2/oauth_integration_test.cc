@@ -15,22 +15,89 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 namespace {
+
+static const std::string TEST_FLOW_ID = "8c18b8fcf575b593";
 static const std::string TEST_STATE_CSRF_TOKEN =
     "8c18b8fcf575b593.qE67JkhE3H/0rpNYWCkQXX65Yzk5gEe7uETE3m8tylY=";
-// {"url":"http://traffic.example.com/not/_oauth","csrf_token":"${extracted}"}
+// {"url":"http://traffic.example.com/not/_oauth","csrf_token":"${extracted}","flow_id":"${extracted}"}
 static const std::string TEST_ENCODED_STATE =
     "eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwiY3NyZl90b2tlbiI6IjhjMThiOGZjZj"
-    "U3NWI1OTMucUU2N0praEUzSC8wcnBOWVdDa1FYWDY1WXprNWdFZTd1RVRFM204dHlsWT0ifQ";
+    "U3NWI1OTMucUU2N0praEUzSC8wcnBOWVdDa1FYWDY1WXprNWdFZTd1RVRFM204dHlsWT0iLCJmbG93X2lkIjoiOGMxOGI4"
+    "ZmNmNTc1YjU5MyJ9";
 static const std::string TEST_STATE_CSRF_TOKEN_1 =
     "8c18b8fcf575b593.ZpkXMDNFiinkL87AoSDONKulBruOpaIiSAd7CNkgOEo=";
-// {"url":"http://traffic.example.com/not/_oauth","csrf_token": "${extracted}}"}
+// {"url":"http://traffic.example.com/not/_oauth","csrf_token":"${extracted}}","flow_id":"${extracted}"}
 static const std::string TEST_ENCODED_STATE_1 =
     "eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwiY3NyZl90b2tlbiI6IjhjMThiOGZjZj"
-    "U3NWI1OTMuWnBrWE1ETkZpaW5rTDg3QW9TRE9OS3VsQnJ1T3BhSWlTQWQ3Q05rZ09Fbz0ifQ";
+    "U3NWI1OTMuWnBrWE1ETkZpaW5rTDg3QW9TRE9OS3VsQnJ1T3BhSWlTQWQ3Q05rZ09Fbz0iLCJmbG93X2lkIjoiOGMxOGI4"
+    "ZmNmNTc1YjU5MyJ9";
 static const std::string TEST_ENCRYPTED_CODE_VERIFIER =
     "Fc1bBwAAAAAVzVsHAAAAACcWO_WnprqLTdaCdFE7rj83_Jej1OihEIfOcQJFRCQZirutZ-XL7LK2G2KgRnVCCA";
 static const std::string TEST_ENCRYPTED_CODE_VERIFIER_1 =
     "Fc1bBwAAAAAVzVsHAAAAANRgXgBre6UErcWdPGZOl-o0px-SribGBqMNhaB6Smp-pjDSB20RXanapU6gVN4E1A";
+static const std::string TEST_ENCRYPTED_ACCESS_TOKEN =
+    "Fc1bBwAAAAAVzVsHAAAAALw-JhWF2XQOvdUKxWoMN1w"; // "bar"
+static const std::string TEST_ENCRYPTED_REFRESH_TOKEN =
+    "Fc1bBwAAAAAVzVsHAAAAAM9NnfacsjScJzcyWlSKX6E"; // "foo"
+
+/**
+ * Decrypt an AES-256-CBC encrypted string.
+ */
+std::string decrypt(absl::string_view encrypted, absl::string_view secret) {
+  // Decode the Base64Url-encoded input
+  std::string decoded = Base64Url::decode(encrypted);
+  std::vector<unsigned char> combined(decoded.begin(), decoded.end());
+
+  if (combined.size() <= 16) {
+    return "";
+  }
+
+  // Extract the IV (first 16 bytes)
+  std::vector<unsigned char> iv(combined.begin(), combined.begin() + 16);
+
+  // Extract the ciphertext (remaining bytes)
+  std::vector<unsigned char> ciphertext(combined.begin() + 16, combined.end());
+
+  // Generate the key from the secret using SHA-256
+  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH);
+  SHA256(reinterpret_cast<const unsigned char*>((std::string(secret)).c_str()), secret.size(),
+         key.data());
+
+  EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+  RELEASE_ASSERT(ctx, "Failed to create context");
+
+  std::vector<unsigned char> plaintext(ciphertext.size() + EVP_MAX_BLOCK_LENGTH);
+  int len = 0, plaintext_len = 0;
+
+  // Initialize decryption operation
+  if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data()) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
+    return "";
+  }
+
+  // Decrypt the ciphertext
+  if (EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size()) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
+    return "";
+  }
+  plaintext_len += len;
+
+  // Finalize decryption
+  if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
+    return "";
+  }
+
+  plaintext_len += len;
+
+  EVP_CIPHER_CTX_free(ctx);
+
+  // Resize to actual plaintext length
+  plaintext.resize(plaintext_len);
+
+  return std::string(plaintext.begin(), plaintext.end());
+}
+
 class OauthIntegrationTest : public HttpIntegrationTest,
                              public Grpc::GrpcClientIntegrationParamTest {
 public:
@@ -39,6 +106,7 @@ public:
     skip_tag_extraction_rule_check_ = true;
     enableHalfClose(true);
   }
+
   envoy::service::discovery::v3::DiscoveryResponse genericSecretResponse(absl::string_view name,
                                                                          absl::string_view value) {
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
@@ -67,7 +135,7 @@ public:
                        const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().Listener);
+    response.set_type_url(Config::TestTypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
       response.add_resources()->PackFrom(listener_config);
     }
@@ -278,12 +346,13 @@ typed_config:
     validate_headers.addReferenceKey(
         Http::Headers::get().Cookie,
         absl::StrCat(default_cookie_names_.oauth_expires_, "=", expires));
-    validate_headers.addReferenceKey(Http::Headers::get().Cookie,
-                                     absl::StrCat(default_cookie_names_.bearer_token_, "=", token));
-
     validate_headers.addReferenceKey(
         Http::Headers::get().Cookie,
-        absl::StrCat(default_cookie_names_.refresh_token_, "=", refreshToken));
+        absl::StrCat(default_cookie_names_.bearer_token_, "=", decrypt(token, hmac_secret)));
+
+    validate_headers.addReferenceKey(Http::Headers::get().Cookie,
+                                     absl::StrCat(default_cookie_names_.refresh_token_, "=",
+                                                  decrypt(refreshToken, hmac_secret)));
 
     OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_, ""};
     validator.setParams(validate_headers, std::string(hmac_secret));
@@ -348,8 +417,10 @@ typed_config:
         {"x-forwarded-proto", "http"},
         {":authority", "authority"},
         {"authority", "Bearer token"},
-        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", csrf_token)},
-        {"cookie", absl::StrCat(default_cookie_names_.code_verifier_, "=", code_verifier)}};
+        {"cookie",
+         absl::StrCat(default_cookie_names_.oauth_nonce_, ".", TEST_FLOW_ID, "=", csrf_token)},
+        {"cookie", absl::StrCat(default_cookie_names_.code_verifier_, ".", TEST_FLOW_ID, "=",
+                                code_verifier)}};
 
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
@@ -387,7 +458,8 @@ typed_config:
         {"authority", "Bearer token"},
         {"cookie", absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac)},
         {"cookie", absl::StrCat(default_cookie_names_.oauth_expires_, "=", oauth_expires)},
-        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", csrf_token)},
+        {"cookie",
+         absl::StrCat(default_cookie_names_.oauth_nonce_, ".", TEST_FLOW_ID, "=", csrf_token)},
         {"cookie", absl::StrCat(default_cookie_names_.bearer_token_, "=", bearer_token)},
         {"cookie", absl::StrCat(default_cookie_names_.refresh_token_, "=", refresh_token)},
     };
@@ -407,10 +479,15 @@ typed_config:
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     Http::TestRequestHeaderMapImpl headers{
-        {":method", "GET"},          {":path", "/request1"},
-        {":scheme", "http"},         {"x-forwarded-proto", "http"},
-        {":authority", "authority"}, {"Cookie", "RefreshToken=efddf321;BearerToken=ff1234fc"},
-        {":authority", "authority"}, {"authority", "Bearer token"}};
+        {":method", "GET"},
+        {":path", "/request1"},
+        {":scheme", "http"},
+        {"x-forwarded-proto", "http"},
+        {":authority", "authority"},
+        {"Cookie", "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN +
+                       ";BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN},
+        {":authority", "authority"},
+        {"authority", "Bearer token"}};
 
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
@@ -780,9 +857,10 @@ TEST_P(OauthIntegrationTest, HmacChangeCausesReauth) {
       {"x-forwarded-proto", "http"},
       {":authority", "authority"},
       {"authority", "Bearer token"},
-      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", TEST_STATE_CSRF_TOKEN)},
-      {"cookie",
-       absl::StrCat(default_cookie_names_.code_verifier_, "=", TEST_ENCRYPTED_CODE_VERIFIER)}};
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, ".", TEST_FLOW_ID, "=",
+                              TEST_STATE_CSRF_TOKEN)},
+      {"cookie", absl::StrCat(default_cookie_names_.code_verifier_, ".", TEST_FLOW_ID, "=",
+                              TEST_ENCRYPTED_CODE_VERIFIER)}};
 
   auto encoder_decoder = codec_client_->startRequest(headers);
   request_encoder_ = &encoder_decoder.first;
@@ -833,7 +911,8 @@ TEST_P(OauthIntegrationTest, HmacChangeCausesReauth) {
       {"cookie", absl::StrCat(default_cookie_names_.oauth_expires_, "=", oauth_expires)},
       {"cookie", absl::StrCat(default_cookie_names_.bearer_token_, "=", bearer_token)},
       {"cookie", absl::StrCat(default_cookie_names_.refresh_token_, "=", refresh_token)},
-      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", TEST_STATE_CSRF_TOKEN)}};
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, ".", TEST_FLOW_ID, "=",
+                              TEST_STATE_CSRF_TOKEN)}};
 
   auto encoder_decoder2 = codec_client_->startRequest(headers_with_cookies);
   request_encoder_ = &encoder_decoder2.first;

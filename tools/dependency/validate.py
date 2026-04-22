@@ -23,7 +23,7 @@ EXTENSION_LABEL_RE = re.compile(r'(//source/extensions/.*):')
 IGNORE_DEPS = set([
     'envoy',
     'envoy_api',
-    'envoy_api',
+    'envoy_repo',
     'platforms',
     'bazel_tools',
     'local_config_cc',
@@ -58,6 +58,11 @@ class DependencyError(Exception):
     pass
 
 
+class MissingDependencyMetadataError(DependencyError):
+    """Error when a dependency is missing required metadata."""
+    pass
+
+
 class DependencyInfo:
     """Models dependency info in bazel/repositories.bzl."""
 
@@ -72,10 +77,25 @@ class DependencyInfo:
 
         Returns:
           Set of dependency identifiers that match use_category.
+
+        Raises:
+          MissingDependencyMetadataError: If a dependency has no use_category.
         """
-        return set(
-            name for name, metadata in self.repository_locations.items()
-            if use_category in metadata['use_category'])
+        result = set()
+        missing_metadata = []
+        for name, metadata in self.repository_locations.items():
+            use_categories = metadata.get('use_category', [])
+            if not use_categories:
+                missing_metadata.append(name)
+            if use_category in use_categories:
+                result.add(name)
+
+        if missing_metadata:
+            raise MissingDependencyMetadataError(
+                f"Dependencies missing 'use_category' in bazel/deps.yaml or api/bazel/deps.yaml: "
+                f"{', '.join(sorted(missing_metadata))}")
+
+        return result
 
     def get_metadata(self, dependency):
         """Obtain repository metadata for a dependency.
@@ -133,7 +153,10 @@ class BuildGraph:
         return deps - exclude_deps
 
     async def _deps_query(self, query_string):
-        return self._mangle_deps_set(await query(query_string))
+        return self._mangle_deps_set(
+            await query(
+                query_string,
+                query_options=tuple(os.environ.get("BAZEL_QUERY_OPTION_LIST", "").split())))
 
     def _filtered_deps_query(self, targets):
         return f'filter("^@.*//", deps(set({" ".join(targets)})))'
@@ -196,7 +219,8 @@ class Validator(object):
           DependencyError: on a dependency validation error.
         """
         # Validate that //source doesn't depend on test_only
-        queried_source_deps = await self._build_graph.query_external_deps('//source/...')
+        queried_source_deps = await self._build_graph.query_external_deps(
+            '//source/...', exclude=["//source/extensions/dynamic_modules/sdk/cpp/..."])
         expected_test_only_deps = self._dep_info.deps_by_use_category('test_only')
         bad_test_only_deps = expected_test_only_deps.intersection(queried_source_deps)
         if len(bad_test_only_deps) > 0:
@@ -206,6 +230,9 @@ class Validator(object):
         # test_only.
         marginal_test_deps = await self._build_graph.query_external_deps(
             '//test/...', exclude=['//source/...'])
+        # Disregard openssl since it's conditional on --config=openssl. Without
+        # this exclusion, it is falsely flagged as a test_only dependency.
+        marginal_test_deps = marginal_test_deps.difference(['openssl'])
         bad_test_deps = marginal_test_deps.difference(expected_test_only_deps)
         unknown_bad_test_deps = [dep for dep in bad_test_deps if not test_only_ignore(dep)]
         print(f'Validating {len(expected_test_only_deps)} test-only dependencies...')

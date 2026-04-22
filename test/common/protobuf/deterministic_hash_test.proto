@@ -36,6 +36,7 @@ message RepeatedFields {
   repeated float floats = 9;
   repeated FooEnum enums = 10;
   repeated Recursion messages = 11;
+  repeated AnyContainer anys = 12;
 };
 
 message SingleFields {

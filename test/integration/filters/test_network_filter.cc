@@ -74,14 +74,27 @@ static Registry::RegisterFactory<TestNetworkFilterConfigFactory,
 class TestDrainerNetworkFilter : public Network::ReadFilter {
 public:
   TestDrainerNetworkFilter(const test::integration::filters::TestDrainerNetworkFilterConfig& config)
-      : bytes_to_drain_(config.bytes_to_drain()) {}
+      : bytes_to_drain_(config.bytes_to_drain()), direct_response_(config.direct_response()),
+        drain_all_data_(config.drain_all_data()) {}
 
   Network::FilterStatus onData(Buffer::Instance& buffer, bool) override {
-    buffer.drain(bytes_to_drain_);
+    if (drain_all_data_) {
+      buffer.drain(buffer.length());
+    } else {
+      buffer.drain(bytes_to_drain_);
+    }
     return Network::FilterStatus::Continue;
   }
 
-  Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
+  Network::FilterStatus onNewConnection() override {
+    if (!direct_response_.empty()) {
+      Buffer::OwnedImpl data(direct_response_);
+      read_callbacks_->connection().write(data, false);
+    }
+
+    return Network::FilterStatus::Continue;
+  }
+
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
   }
@@ -89,6 +102,8 @@ public:
 private:
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{};
   int bytes_to_drain_;
+  const std::string direct_response_;
+  const bool drain_all_data_;
 };
 
 class TestDrainerNetworkFilterConfigFactory

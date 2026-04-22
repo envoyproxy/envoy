@@ -18,6 +18,7 @@ namespace ProtoMessageExtraction {
 enum class ExtractedMessageDirective {
   EXTRACT_REDACT,
   EXTRACT,
+  EXTRACT_REPEATED_CARDINALITY,
 };
 
 using FieldPathToExtractType =
@@ -29,7 +30,7 @@ struct ExtractedMessageMetadata {
   absl::optional<std::string> target_resource;
   absl::optional<std::string> target_resource_callback;
   absl::optional<std::string> resource_location;
-  ProtobufWkt::Struct extracted_message;
+  Protobuf::Struct extracted_message;
 };
 
 // A proto-extraction interface for extracting that converts a source message

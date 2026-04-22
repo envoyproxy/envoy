@@ -3,10 +3,14 @@
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/quic/envoy_quic_client_packet_writer_factory.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_network_connection.h"
+#include "source/common/runtime/runtime_features.h"
 
+#include "quiche/quic/core/http/quic_spdy_client_session.h"
 #include "quiche/quic/core/quic_connection.h"
 
 namespace Envoy {
@@ -50,17 +54,34 @@ public:
     Network::ConnectionSocketPtr socket_;
   };
 
-  // A connection socket will be created with given |local_addr|. If binding
-  // port not provided in |local_addr|, pick up a random port.
-  EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
-                            Network::Address::InstanceConstSharedPtr& initial_peer_address,
-                            quic::QuicConnectionHelperInterface& helper,
-                            quic::QuicAlarmFactory& alarm_factory,
-                            const quic::ParsedQuicVersionVector& supported_versions,
-                            Network::Address::InstanceConstSharedPtr local_addr,
-                            Event::Dispatcher& dispatcher,
-                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
+  class EnvoyQuicMigrationHelper : public quic::QuicMigrationHelper {
+  public:
+    EnvoyQuicMigrationHelper(EnvoyQuicClientConnection& connection,
+                             OptRef<EnvoyQuicNetworkObserverRegistry> registry,
+                             QuicClientPacketWriterFactory& writer_factory,
+                             quic::QuicNetworkHandle initial_network)
+        : quic::QuicMigrationHelper(), connection_(connection), registry_(registry),
+          writer_factory_(writer_factory), initial_network_(initial_network) {}
+
+    quic::QuicNetworkHandle FindAlternateNetwork(quic::QuicNetworkHandle network) override;
+
+    std::unique_ptr<quic::QuicPathContextFactory> CreateQuicPathContextFactory() override;
+
+    void OnMigrationToPathDone(std::unique_ptr<quic::QuicClientPathValidationContext> context,
+                               bool success) override;
+
+    quic::QuicNetworkHandle GetDefaultNetwork() override;
+
+    quic::QuicNetworkHandle GetCurrentNetwork() override;
+
+  private:
+    EnvoyQuicClientConnection& connection_;
+    OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
+    QuicClientPacketWriterFactory& writer_factory_;
+    quic::QuicNetworkHandle initial_network_;
+  };
+
+  using EnvoyQuicMigrationHelperPtr = std::unique_ptr<EnvoyQuicMigrationHelper>;
 
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
@@ -69,7 +90,7 @@ public:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket,
-                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
+                            quic::ConnectionIdGeneratorInterface& generator);
 
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
@@ -120,6 +141,17 @@ public:
   void
   probeAndMigrateToServerPreferredAddress(const quic::QuicSocketAddress& server_preferred_address);
 
+  // Called if the associated QUIC session will handle migration.
+  EnvoyQuicMigrationHelper&
+  getOrCreateMigrationHelper(QuicClientPacketWriterFactory& writer_factory,
+                             quic::QuicNetworkHandle initial_network,
+                             OptRef<EnvoyQuicNetworkObserverRegistry> registry);
+
+  // Called if this class will handle migration.
+  void setWriterFactory(QuicClientPacketWriterFactory& writer_factory) {
+    writer_factory_ = writer_factory;
+  }
+
 private:
   friend class EnvoyQuicClientConnectionPeer;
 
@@ -136,13 +168,23 @@ private:
   private:
     EnvoyQuicClientConnection& connection_;
   };
-  EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
-                            quic::QuicConnectionHelperInterface& helper,
-                            quic::QuicAlarmFactory& alarm_factory,
-                            const quic::ParsedQuicVersionVector& supported_versions,
-                            Event::Dispatcher& dispatcher,
-                            Network::ConnectionSocketPtr&& connection_socket,
-                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
+
+  class EnvoyQuicClinetPathContextFactory : public quic::QuicPathContextFactory {
+  public:
+    EnvoyQuicClinetPathContextFactory(QuicClientPacketWriterFactory& writer_factory,
+                                      EnvoyQuicClientConnection& connection)
+        : writer_factory_(writer_factory), connection_(connection) {}
+
+    // quic::QuicPathContextFactory
+    void CreatePathValidationContext(
+        quic::QuicNetworkHandle network, quic::QuicSocketAddress peer_address,
+        std::unique_ptr<quic::QuicPathContextFactory::CreationResultDelegate> result_delegate)
+        override;
+
+  private:
+    QuicClientPacketWriterFactory& writer_factory_;
+    EnvoyQuicClientConnection& connection_;
+  };
 
   void onFileEvent(uint32_t events, Network::ConnectionSocket& connection_socket);
 
@@ -157,8 +199,13 @@ private:
   bool migrate_port_on_path_degrading_{false};
   uint8_t num_socket_switches_{0};
   size_t num_packets_with_unknown_dst_address_{0};
-  const bool prefer_gro_;
   const bool disallow_mmsg_;
+  // If set, the session will handle migration and this class will act as a migration helper.
+  // Otherwise, writer_factory_ must be set. And this class will handle port migration upon path
+  // degrading and migration to the server preferred address.
+  EnvoyQuicMigrationHelperPtr migration_helper_;
+  // TODO(danzh): Remove this once migration is fully handled by Quiche.
+  OptRef<QuicClientPacketWriterFactory> writer_factory_;
 };
 
 } // namespace Quic

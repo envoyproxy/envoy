@@ -32,6 +32,8 @@ struct SslStats {
 
 SslStats generateSslStats(Stats::Scope& store);
 
+Stats::Gauge& createCertificateExpirationGauge(Stats::Scope& scope, const std::string& cert_name);
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

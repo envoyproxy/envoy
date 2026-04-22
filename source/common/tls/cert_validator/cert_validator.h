@@ -41,6 +41,10 @@ struct ValidationResults {
   absl::optional<uint8_t> tls_alert;
   // The detailed error messages populated during validation.
   absl::optional<std::string> error_details;
+  // The validated certificate chain built by the cert validator.
+  // chain[0] = leaf, chain[1] = direct issuer, ..., chain[n] = trust anchor.
+  // Only populated on successful validation when a trust store is configured.
+  std::vector<bssl::UniquePtr<X509>> validated_chain;
 };
 
 class CertValidator {
@@ -90,10 +94,12 @@ public:
    * @param contexts the store context
    * @param handshaker_provides_certificates whether or not a handshaker implementation provides
    * certificates itself.
+   * @param scope the stats scope.
    * @return the ssl verification mode flag or an error if initialization failed.
    */
   virtual absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                                                    bool handshaker_provides_certificates) PURE;
+                                                    bool handshaker_provides_certificates,
+                                                    Stats::Scope& scope) PURE;
 
   /**
    * Called when calculation hash for session context ids. This hash MUST include all

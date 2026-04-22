@@ -86,10 +86,10 @@ envoy_cc_library(
         "//source/common/common:thread_annotations",
         "//source/common/http:headers_lib",
         "//source/common/network:transport_socket_options_lib",
-        "@com_google_absl//absl/container:node_hash_set",
-        "@com_google_absl//absl/hash",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -100,10 +100,10 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         ":ssl_socket_base",
-        "@com_google_absl//absl/container:node_hash_set",
-        "@com_google_absl//absl/hash",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -114,10 +114,10 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         ":ssl_socket_base",
-        "@com_google_absl//absl/container:node_hash_set",
-        "@com_google_absl//absl/hash",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -150,6 +150,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
@@ -162,6 +163,7 @@ envoy_cc_library(
     deps = [
         ":context_config_lib",
         ":server_context_lib",
+        "//source/common/ssl:ssl_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
@@ -182,6 +184,7 @@ envoy_cc_library(
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
+        ":cert_compression_lib",
         ":stats_lib",
         ":utility_lib",
         "//envoy/ssl:context_config_interface",
@@ -203,11 +206,11 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
         "//source/common/tls/cert_validator:cert_validator_lib",
         "//source/common/tls/private_key:private_key_manager_lib",
-        "@com_github_google_quiche//:quic_core_crypto_proof_source_lib",
-        "@com_google_absl//absl/container:node_hash_set",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+        "@quiche//:quic_core_crypto_proof_source_lib",
     ],
 )
 
@@ -254,8 +257,25 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:hex_lib",
         "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/ssl:ssl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "cert_compression_lib",
+    srcs = ["cert_compression.cc"],
+    hdrs = ["cert_compression.h"],
+    external_deps = ["ssl"],
+    deps = [
+        "//bazel:zlib",
+        "//envoy/ssl:context_config_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "@brotli//:brotlidec",
+        "@brotli//:brotlienc",
     ],
 )

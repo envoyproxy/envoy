@@ -442,47 +442,27 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabled) {
   EXPECT_EQ(21, buffer1.length());
 }
 
+class TestWatermarkBuffer : public Buffer::WatermarkBuffer {
+public:
+  using WatermarkBuffer::overflowWatermarkForTestOnly;
+  using WatermarkBuffer::WatermarkBuffer;
+};
+
 TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
-// Disabling execution with TSAN as it causes the test to use too much memory
-// and time, making the test fail in some settings (such as CI)
-#if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(memory_sanitizer))
-  ENVOY_LOG_MISC(critical, "WatermarkBufferTest::OverflowWatermarkDisabledOnVeryHighValue not "
-                           "supported by this compiler configuration");
-#else
   // Verifies that the overflow watermark is disabled when its value is higher
-  // than uint32_t max value
-  int high_watermark_buffer1 = 0;
-  int overflow_watermark_buffer1 = 0;
-  Buffer::WatermarkBuffer buffer1{[&]() -> void {}, [&]() -> void { ++high_watermark_buffer1; },
-                                  [&]() -> void { ++overflow_watermark_buffer1; }};
+  // than uint64_t max value
+  TestWatermarkBuffer buffer1{[&]() -> void {}, [&]() -> void {}, [&]() -> void {}};
 
   // Make sure the overflow threshold will be above std::numeric_limits<uint32_t>::max()
   const uint64_t overflow_multiplier = 3;
-  const uint32_t high_watermark_threshold =
-      (std::numeric_limits<uint32_t>::max() / overflow_multiplier) + 1;
+  uint64_t high_watermark_threshold =
+      (std::numeric_limits<uint64_t>::max() / overflow_multiplier) + 1;
   buffer1.setWatermarks(high_watermark_threshold, overflow_multiplier);
+  EXPECT_EQ(buffer1.overflowWatermarkForTestOnly(), 0);
 
-  // Add many segments instead of full uint32_t::max to get around std::bad_alloc exception
-  const uint32_t segment_denominator = 128;
-  const uint32_t big_segment_len = std::numeric_limits<uint32_t>::max() / segment_denominator + 1;
-  for (uint32_t i = 0; i < segment_denominator; ++i) {
-    auto reservation = buffer1.reserveSingleSlice(big_segment_len);
-    reservation.commit(big_segment_len);
-  }
-  EXPECT_GT(buffer1.length(), std::numeric_limits<uint32_t>::max());
-  EXPECT_LT(buffer1.length(), high_watermark_threshold * overflow_multiplier);
-  EXPECT_EQ(1, high_watermark_buffer1);
-  EXPECT_EQ(0, overflow_watermark_buffer1);
-
-  // Reserve and commit additional space on the buffer beyond the expected
-  // high_watermark_threshold * overflow_multiplier threshold.
-  const uint64_t size = high_watermark_threshold * overflow_multiplier - buffer1.length() + 1;
-  auto reservation = buffer1.reserveSingleSlice(size);
-  reservation.commit(size);
-  EXPECT_EQ(buffer1.length(), high_watermark_threshold * overflow_multiplier + 1);
-  EXPECT_EQ(1, high_watermark_buffer1);
-  EXPECT_EQ(0, overflow_watermark_buffer1);
-#endif
+  high_watermark_threshold = (std::numeric_limits<uint64_t>::max() / overflow_multiplier) - 1;
+  buffer1.setWatermarks(high_watermark_threshold, overflow_multiplier);
+  EXPECT_EQ(buffer1.overflowWatermarkForTestOnly(), high_watermark_threshold * overflow_multiplier);
 }
 
 TEST_F(WatermarkBufferTest, OverflowWatermarkEqualHighWatermark) {

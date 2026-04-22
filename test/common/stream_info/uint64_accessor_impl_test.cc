@@ -26,7 +26,7 @@ TEST(UInt64AccessorImplTest, TestProto) {
   auto message = accessor.serializeAsProto();
   EXPECT_NE(nullptr, message);
 
-  auto* uint64_struct = dynamic_cast<ProtobufWkt::UInt64Value*>(message.get());
+  auto* uint64_struct = dynamic_cast<Protobuf::UInt64Value*>(message.get());
   EXPECT_NE(nullptr, uint64_struct);
   EXPECT_EQ(init_value, uint64_struct->value());
 }

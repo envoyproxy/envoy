@@ -15,7 +15,7 @@ bundled(
         "//distribution:envoy-dwarf": "dbg/envoy.dwp",
         "//distribution:envoy-contrib-binary": "dbg/envoy-contrib",
         "//distribution:envoy-contrib-dwarf": "dbg/envoy-contrib.dwp",
-        "@com_github_ncopa_suexec//:su-exec": "utils/su-exec",
+        "@su-exec": "utils/su-exec",
     },
 )
 
@@ -36,7 +36,7 @@ pkg_tar(
     srcs = [
         ":release_files",
     ],
-    compressor = "//tools/zstd",
+    compressor = "@zstd//:zstd_cli",
     compressor_args = "-T0",
     extension = "tar.zst",
 )

@@ -1,0 +1,19 @@
+date: October 13, 2025
+
+bug_fixes:
+- area: dependency
+  change: |
+    Resolve dependency CVEs:
+
+    - CVE-2025-0725: curl
+    - CVE-2024-7246: gRPC
+    - CVE-2024-11407: gRPC
+    - CVE-2025-27817: kafka
+    - CVE-2025-27818: kafka
+    - CVE-2024-51745: wasmtime
+    - CVE-2025-53901: wasmtime.
+
+new_features:
+- area: wasm
+  change: |
+    Added support for wasm plugins written in Go with the github.com/proxy-wasm/proxy-wasm-go-sdk and compiled with Go v1.24+.

@@ -693,6 +693,7 @@ public:
   };
   const std::string& caCert() const override { return s_; }
   const std::string& caCertPath() const override { return s_; }
+  const std::string& caCertName() const override { return s_; }
   const std::string& certificateRevocationList() const override { return s_; }
   const std::string& certificateRevocationListPath() const override { return s_; }
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
@@ -732,7 +733,7 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
   auto validator =
       std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
-  EXPECT_THAT(validator->initializeSslContexts(ctx, false).status().message(),
+  EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
               testing::ContainsRegex("Failed to create string SAN matcher of type.*"));
 }
 
@@ -750,8 +751,144 @@ TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
   auto validator =
       std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
-  EXPECT_THAT(validator->initializeSslContexts(ctx, false).status().message(),
+  EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
               testing::ContainsRegex("Failed to load trusted CA certificates from.*"));
+}
+
+class CleanMockCertValidationConfig : public Ssl::CertificateValidationContextConfig {
+public:
+  explicit CleanMockCertValidationConfig(const std::string& ca_name) : ca_name_(ca_name) {}
+
+  const std::string& caCert() const override { return empty_; }
+  const std::string& caCertPath() const override { return empty_; }
+  const std::string& caCertName() const override { return ca_name_; }
+  const std::string& certificateRevocationList() const override { return empty_; }
+  const std::string& certificateRevocationListPath() const override { return empty_; }
+
+  // Return EMPTY vectors to avoid validation errors
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
+  subjectAltNameMatchers() const override {
+    return empty_matchers_;
+  }
+  const std::vector<std::string>& verifyCertificateHashList() const override { return empty_strs_; }
+  const std::vector<std::string>& verifyCertificateSpkiList() const override { return empty_strs_; }
+
+  bool allowExpiredCertificate() const override { return false; }
+  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+      TrustChainVerification
+      trustChainVerification() const override {
+    return envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+        ACCEPT_UNTRUSTED;
+  }
+  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  customValidatorConfig() const override {
+    return custom_config_;
+  }
+  Api::Api& api() const override { return *api_; }
+  bool onlyVerifyLeafCertificateCrl() const override { return false; }
+  absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
+  bool autoSniSanMatch() const override { return false; }
+
+private:
+  std::string ca_name_;
+  std::string empty_;
+  std::vector<std::string> empty_strs_;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> empty_matchers_;
+  absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_config_;
+  Api::ApiPtr api_ = Api::createApiForTest();
+};
+
+TEST(DefaultCertValidatorTest, DefaultValidatorCaExpirationStats) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  auto config = std::make_unique<CleanMockCertValidationConfig>("test_ca_cert");
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  std::vector<SSL_CTX*> ssl_contexts;
+  auto result = validator->initializeSslContexts(ssl_contexts, true, *store.rootScope());
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  std::string expected_metric_name = "ssl.certificate.test_ca_cert.expiration_unix_time_seconds";
+  auto gauge_opt = store.findGaugeByString(expected_metric_name);
+  EXPECT_TRUE(gauge_opt.has_value());
+  // No real certificate, so should get sentinel max value
+  EXPECT_EQ(gauge_opt->get().value(), std::chrono::seconds::max().count());
+}
+
+// Test that ValidationResults contains detailed error information when SAN validation fails.
+TEST(DefaultCertValidatorTest, TestCertificateValidationErrorDetailsForSanFailure) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(*test_store.rootScope());
+
+  // Load a certificate with DNS SANs
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+
+  // Create SAN matchers that won't match the certificate (using regex as DNS requires it)
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw(nomatch\.example\.com)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+
+  // Create the validator with no config (so verify_trusted_ca_ is false)
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats, context);
+
+  // Call verifyCertificate directly which populates error_details on SAN mismatch
+  std::string error_details;
+  uint8_t tls_alert;
+  Ssl::ClientValidationStatus status = default_validator->verifyCertificate(
+      cert.get(), /*verify_san_list=*/{}, subject_alt_name_matchers, /*stream_info=*/{},
+      &error_details, &tls_alert);
+
+  // Validation should fail because the SAN doesn't match
+  EXPECT_EQ(Ssl::ClientValidationStatus::Failed, status);
+
+  // The error_details should be populated with a meaningful error message including cert SANs
+  EXPECT_EQ(error_details,
+            "verify cert failed: SAN matcher, certificate SANs are [server1.example.com]");
+}
+
+// Test that TestSslExtendedSocketInfo properly stores and retrieves certificate validation errors.
+TEST(DefaultCertValidatorTest, TestSslExtendedSocketInfoCertValidationError) {
+  TestSslExtendedSocketInfo extended_socket_info;
+
+  // Initially the error should be empty
+  EXPECT_TRUE(extended_socket_info.certificateValidationError().empty());
+
+  // Set an error
+  const std::string error_msg = "verify cert failed: X509_verify_cert: certificate has expired";
+  extended_socket_info.setCertificateValidationError(error_msg);
+
+  // Verify the error is stored and retrievable
+  EXPECT_EQ(error_msg, extended_socket_info.certificateValidationError());
+}
+
+// Test that empty cert chain returns appropriate error details.
+TEST(DefaultCertValidatorTest, TestEmptyCertChainErrorDetails) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(*test_store.rootScope());
+
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats, context);
+
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+
+  ValidationResults results = default_validator->doVerifyCertChain(
+      *cert_chain, /*callback=*/nullptr,
+      /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
+
+  EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
+  EXPECT_TRUE(results.error_details.has_value());
+  EXPECT_EQ(results.error_details.value(), "verify cert failed: empty cert chain");
 }
 
 } // namespace Tls

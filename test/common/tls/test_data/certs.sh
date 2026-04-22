@@ -154,6 +154,12 @@ generate_x509_cert_no_extension() {
     openssl x509 -req -days "$days" -in "${1}_cert.csr" -sha256 -CA "${2}_cert.pem" -CAkey \
             "${2}_key.pem" -out "${1}_cert.pem" -extensions v3_req -extfile "${1}_cert.cfg"
     generate_info_header "$1"
+    # Older OpenSSLs do not correctly generate this certificate. See
+    # https://github.com/openssl/openssl/issues/28397
+    if openssl asn1parse -in "${1}_cert.pem" | grep -F 'cont [ 3 ]' > /dev/null; then
+      echo "ERROR: ${1}_cert.pem was not generated correctly. Use a newer OpenSSL."
+      exit 1
+    fi
 }
 
 # $1=<certificate name> $2=<CA name> $3=[days]
@@ -240,6 +246,14 @@ generate_x509_cert no_san_cn ca
 generate_rsa_key san_dns
 generate_x509_cert san_dns ca
 
+# Generate san_dns_cert_with_single_crl_dp.pem (certificate with single CRL Distribution Point).
+generate_rsa_key san_dns_cert_with_single_crl_dp
+generate_x509_cert san_dns_cert_with_single_crl_dp ca
+
+# Generate san_dns_cert_with_multiple_crl_dps.pem (certificate with multiple CRL Distribution Points).
+generate_rsa_key san_dns_cert_with_multiple_crl_dps
+generate_x509_cert san_dns_cert_with_multiple_crl_dps ca
+
 # Generate san_dns2_cert.pem (duplicate of san_dns_cert.pem, but with a different private key).
 cp -f san_dns_cert.cfg san_dns2_cert.cfg
 generate_rsa_key san_dns2
@@ -254,6 +268,10 @@ rm -f san_dns3_cert.cfg
 
 # Concatenate san_dns3_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
 cat san_dns3_cert.pem intermediate_ca_cert.pem > san_dns3_chain.pem
+
+# Concatenate san_dns3_cert.pem, Root CA (ca_cert.pem, decoy), and Intermediate CA to create a chain with a decoy CA.
+# This is used to test that the correct issuer is identified even when the chain includes a CA that did not sign the leaf.
+cat san_dns3_cert.pem ca_cert.pem intermediate_ca_cert.pem > san_dns3_with_decoy_chain.pem
 
 # Generate san_dns3_certkeychain.p12 with no password.
 openssl pkcs12 -export -out san_dns3_certkeychain.p12 -inkey san_dns3_key.pem -in san_dns3_cert.pem -certfile san_dns3_chain.pem -keypbe NONE -certpbe NONE -nomaciter -passout pass:
@@ -446,8 +464,10 @@ generate_rsa_key no_subject
 generate_x509_cert_nosubject no_subject ca
 
 # Generate a certificate with no extensions
-generate_rsa_key no_extension
-generate_x509_cert_no_extension no_extension ca
+# This is skipped for now because OpenSSL cannot generate it correctly.
+# See https://github.com/openssl/openssl/issues/28397.
+# generate_rsa_key no_extension
+# generate_x509_cert_no_extension no_extension ca
 
 # Generate unit test certificate
 generate_rsa_key unittest

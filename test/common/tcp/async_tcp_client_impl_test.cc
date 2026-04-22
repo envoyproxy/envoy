@@ -47,7 +47,7 @@ public:
     conn_info.connection_ = connection_;
 
     conn_info.host_description_ = Upstream::makeTestHost(
-        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80", simTime());
+        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80");
 
     EXPECT_CALL(cluster_manager_.thread_local_cluster_, tcpConn_(_)).WillOnce(Return(conn_info));
     EXPECT_CALL(*connection_, connect());
@@ -93,10 +93,10 @@ TEST_F(AsyncTcpClientImplTest, RstClose) {
 
   EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
       .WillOnce(InvokeWithoutArgs([&]() -> void {
-        EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::LocalReset);
+        EXPECT_EQ(client_->detectedCloseType(), StreamInfo::DetectedCloseType::LocalReset);
       }));
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
-    EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::LocalReset);
+    EXPECT_EQ(client_->detectedCloseType(), StreamInfo::DetectedCloseType::LocalReset);
   }));
   client_->close(Network::ConnectionCloseType::AbortReset);
   ASSERT_FALSE(client_->connected());
@@ -145,11 +145,11 @@ TEST_F(AsyncTcpClientImplTest, TestCloseType) {
   expectCreateConnection();
   EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
       .WillOnce(InvokeWithoutArgs([&]() -> void {
-        EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::Normal);
+        EXPECT_EQ(client_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
       }));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
-    EXPECT_EQ(client_->detectedCloseType(), Network::DetectedCloseType::Normal);
+    EXPECT_EQ(client_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
   }));
   client_->close(Network::ConnectionCloseType::Abort);
   ASSERT_FALSE(client_->connected());

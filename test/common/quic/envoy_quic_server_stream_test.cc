@@ -263,7 +263,7 @@ protected:
 };
 
 TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
-  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr& headers, bool) {
         EXPECT_EQ(host_, headers->getHostValue());
         EXPECT_EQ("/", headers->getPathValue());
@@ -273,7 +273,6 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
         EXPECT_EQ("a=b; c=d",
                   headers->get(Http::Headers::get().Cookie)[0]->value().getStringView());
       }));
-  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
   quiche::HttpHeaderBlock spdy_headers;
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";
@@ -316,8 +315,9 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeHeaderOnClosedStream) {
               onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
 
-  EXPECT_ENVOY_BUG(quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false),
-                   "encodeHeaders is called on write-closed stream.");
+  // No data should be sent on the closed stream.
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _)).Times(0);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
 }
 
 TEST_F(EnvoyQuicServerStreamTest, EncodeDataOnClosedStream) {
@@ -376,10 +376,13 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
   size_t offset = receiveRequestHeaders(false);
   // Received header bytes do not include the HTTP/3 frame overhead.
   EXPECT_EQ(quic_stream_->stream_bytes_read() - 2,
             quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_LE(quic_stream_->stream_bytes_read() - 2,
+            quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
   size_t body_size = receiveRequestBody(offset, request_body_, true, request_body_.size() * 2);
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
@@ -390,13 +393,18 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
             quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
   EXPECT_GE(27, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_GE(27, quic_stream_->bytesMeter()->wireBytesSent());
+  EXPECT_GE(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(),
+            quic_stream_->bytesMeter()->headerBytesSent());
 
   quic_stream_->encodeTrailers(response_trailers_);
   EXPECT_GE(52, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_GE(52, quic_stream_->bytesMeter()->wireBytesSent());
+  EXPECT_GE(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(),
+            quic_stream_->bytesMeter()->headerBytesSent());
 }
 
 TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
@@ -453,6 +461,9 @@ TEST_F(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
 }
 
 TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
+  const bool disable_data_read_immediately = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.quic_disable_data_read_immediately");
+
   std::string large_request(1024, 'a');
   // Sending such large request will cause read to be disabled.
   size_t payload_offset = receiveRequest(large_request, false, 512);
@@ -460,13 +471,15 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   // Disable reading one more time.
   quic_stream_->readDisable(true);
   std::string second_part_request = bodyToHttp3StreamPayload("bbb");
-  // Receiving more data in the same event loop will push the receiving pipe line.
-  EXPECT_CALL(stream_decoder_, decodeData(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool finished_reading) {
-        EXPECT_EQ(3u, buffer.length());
-        EXPECT_EQ("bbb", buffer.toString());
-        EXPECT_FALSE(finished_reading);
-      }));
+  if (!disable_data_read_immediately) {
+    // Receiving more data in the same event loop will push the receiving pipe line.
+    EXPECT_CALL(stream_decoder_, decodeData(_, _))
+        .WillOnce([](Buffer::Instance& buffer, bool finished_reading) {
+          EXPECT_EQ(3u, buffer.length());
+          EXPECT_EQ("bbb", buffer.toString());
+          EXPECT_FALSE(finished_reading);
+        });
+  }
   quic::QuicStreamFrame frame(stream_id_, false, payload_offset, second_part_request);
   quic_stream_->OnStreamFrame(frame);
   payload_offset += second_part_request.length();
@@ -485,15 +498,26 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_)).Times(0);
   receiveTrailers(payload_offset);
 
-  // Unblock stream now. The remaining data in the receiving buffer should be
-  // pushed to upstream.
-  EXPECT_CALL(stream_decoder_, decodeData(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool finished_reading) {
-        EXPECT_EQ(3u, buffer.length());
-        EXPECT_EQ("ccc", buffer.toString());
-        EXPECT_FALSE(finished_reading);
-      }));
+  // Unblock stream now.
+  if (disable_data_read_immediately) {
+    // All the data should be pushed to upstream only after re-enabling read.
+    EXPECT_CALL(stream_decoder_, decodeData(_, _))
+        .WillOnce([](Buffer::Instance& buffer, bool finished_reading) {
+          EXPECT_EQ(6u, buffer.length());
+          EXPECT_EQ("bbbccc", buffer.toString());
+          EXPECT_FALSE(finished_reading);
+        });
+  } else {
+    // The remaining data in the receiving buffer should be pushed to upstream.
+    EXPECT_CALL(stream_decoder_, decodeData(_, _))
+        .WillOnce([](Buffer::Instance& buffer, bool finished_reading) {
+          EXPECT_EQ(3u, buffer.length());
+          EXPECT_EQ("ccc", buffer.toString());
+          EXPECT_FALSE(finished_reading);
+        });
+  }
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_));
+  // Only after the read block counter goes back to zero and event loop runs, reading continues.
   quic_stream_->readDisable(false);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
@@ -534,13 +558,37 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
+TEST_F(EnvoyQuicServerStreamTest, FinPassedUpWhenReadDisableUponHeaders) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_disable_data_read_immediately",
+                                true);
+
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
+      .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr&, bool) {
+        quic_stream_->readDisable(true);
+      }));
+  spdy_request_headers_[":method"] = "GET";
+  std::string header_data = spdyHeaderToHttp3StreamPayload(spdy_request_headers_);
+  quic::QuicStreamFrame frame(stream_id_, /*fin=*/true, 0, header_data);
+  quic_stream_->OnStreamFrame(frame);
+
+  EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+  EXPECT_EQ(quic_stream_->read_side_closed(), true);
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
 TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
+  const bool disable_data_read_immediately = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.quic_disable_data_read_immediately");
+
   std::string payload(1024, 'a');
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr&, bool) {
         quic_stream_->readDisable(true);
       }));
-  EXPECT_CALL(stream_decoder_, decodeData(_, _));
+  if (!disable_data_read_immediately) {
+    EXPECT_CALL(stream_decoder_, decodeData(_, _));
+  }
   std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
                                   bodyToHttp3StreamPayload(payload));
   quic::QuicStreamFrame frame(stream_id_, false, 0, data);
@@ -548,7 +596,7 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
   // Stream should be blocked in the next event loop.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  // Receiving more date shouldn't trigger decoding.
+  // Receiving more data shouldn't trigger decoding since read is still disabled.
   EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
   data = bodyToHttp3StreamPayload(payload);
   quic::QuicStreamFrame frame2(stream_id_, false, 0, data);
@@ -891,10 +939,10 @@ TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
 TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
   setUpCapsuleProtocol(false, true);
   Buffer::OwnedImpl buffer(capsule_fragment_);
-  EXPECT_CALL(quic_connection_, SendMessage(_, _, _))
-      .WillOnce([this](quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice> message, bool) {
+  EXPECT_CALL(quic_connection_, SendDatagram(_, _, _))
+      .WillOnce([this](quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice> message, bool) {
         EXPECT_EQ(message.data()->AsStringView(), datagram_fragment_);
-        return quic::MESSAGE_STATUS_SUCCESS;
+        return quic::DATAGRAM_STATUS_SUCCESS;
       });
   quic_stream_->encodeData(buffer, /*end_stream=*/true);
 }
@@ -902,7 +950,7 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
 TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   setUpCapsuleProtocol(true, false);
   EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
-  quic_session_.OnMessageReceived(datagram_fragment_);
+  quic_session_.OnDatagramReceived(datagram_fragment_);
 }
 #endif
 
@@ -934,6 +982,43 @@ TEST_F(EnvoyQuicServerStreamTest, DuplicatedPathHeader) {
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   quic_stream_->OnStreamHeaderList(true, 0, header_list);
+}
+
+TEST_F(EnvoyQuicServerStreamTest, DisallowObsTextBehavior) {
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _)).Times(testing::AnyNumber());
+  {
+    // Default behavior is to disallow obs text.
+    envoy::config::core::v3::Http3ProtocolOptions options;
+    auto stream = std::make_unique<EnvoyQuicServerStream>(
+        stream_id_ + 12, &quic_session_, quic::BIDIRECTIONAL, stats_, options,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+    // \x80 is obsolete text
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::REJECT,
+              stream->validateHeader("custom-header", "foo\x80"));
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::ACCEPT,
+              stream->validateHeader("custom-header", "foo"));
+  }
+  {
+    envoy::config::core::v3::Http3ProtocolOptions options;
+    options.mutable_disallow_obs_text()->set_value(true);
+    auto stream = std::make_unique<EnvoyQuicServerStream>(
+        stream_id_ + 16, &quic_session_, quic::BIDIRECTIONAL, stats_, options,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+    // \x80 is obsolete text
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::REJECT,
+              stream->validateHeader("custom-header", "foo\x80"));
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::ACCEPT,
+              stream->validateHeader("custom-header", "foo"));
+  }
+  {
+    envoy::config::core::v3::Http3ProtocolOptions options;
+    options.mutable_disallow_obs_text()->set_value(false);
+    auto stream = std::make_unique<EnvoyQuicServerStream>(
+        stream_id_ + 20, &quic_session_, quic::BIDIRECTIONAL, stats_, options,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+    EXPECT_EQ(Http::HeaderUtility::HeaderValidationResult::ACCEPT,
+              stream->validateHeader("custom-header", "foo\x80"));
+  }
 }
 
 } // namespace Quic

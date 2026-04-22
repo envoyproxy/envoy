@@ -52,7 +52,7 @@ absl::StatusOr<FormatterPtr> SubstitutionFormatStringUtils::fromProtoConfig(
 }
 
 FormatterPtr
-SubstitutionFormatStringUtils::createJsonFormatter(const ProtobufWkt::Struct& struct_format,
+SubstitutionFormatStringUtils::createJsonFormatter(const Protobuf::Struct& struct_format,
                                                    bool omit_empty_values,
                                                    const std::vector<CommandParserPtr>& commands) {
   return std::make_unique<JsonFormatterImpl>(struct_format, omit_empty_values, commands);

@@ -44,7 +44,7 @@ XRayTracerFactory::createTracerDriverTyped(const envoy::config::trace::v3::XRayC
   const std::string endpoint = fmt::format("{}:{}", proto_config.daemon_endpoint().address(),
                                            proto_config.daemon_endpoint().port_value());
 
-  auto aws = absl::flat_hash_map<std::string, ProtobufWkt::Value>{};
+  auto aws = absl::flat_hash_map<std::string, Protobuf::Value>{};
   for (const auto& field : proto_config.segment_fields().aws().fields()) {
     aws.emplace(field.first, field.second);
   }

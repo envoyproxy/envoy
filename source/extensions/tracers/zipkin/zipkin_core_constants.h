@@ -53,6 +53,10 @@ public:
 
   // Zipkin b3 single header
   const Tracing::TraceContextHandler B3{"b3"};
+
+  // W3C trace context headers
+  const Tracing::TraceContextHandler TRACE_PARENT{"traceparent"};
+  const Tracing::TraceContextHandler TRACE_STATE{"tracestate"};
 };
 
 using ZipkinCoreConstants = ConstSingleton<ZipkinCoreConstantValues>;

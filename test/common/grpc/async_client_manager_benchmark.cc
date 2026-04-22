@@ -28,17 +28,15 @@ namespace {
 
 class AsyncClientManagerImplTest {
 public:
-  AsyncClientManagerImplTest() : api_(Api::createApiForTest()), stat_names_(scope_.symbolTable()) {
+  AsyncClientManagerImplTest()
+      : api_(Api::createApiForTest()), stat_names_(context_.store_.symbolTable()) {
     ON_CALL(context_, api()).WillByDefault(testing::ReturnRef(*api_));
     async_client_manager_ = std::make_unique<AsyncClientManagerImpl>(
-        cm_, context_.threadLocal(), context_, stat_names_,
-        envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig());
+        envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig(), context_,
+        stat_names_);
   }
 
-  Upstream::MockClusterManager cm_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  Stats::MockStore store_;
-  Stats::MockScope& scope_{store_.mockScope()};
   Api::ApiPtr api_;
   StatNames stat_names_;
   std::unique_ptr<AsyncClientManagerImpl> async_client_manager_;
@@ -55,7 +53,8 @@ void testGetOrCreateAsyncClientWithConfig(::benchmark::State& state) {
     for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
           async_client_man_test.async_client_manager_
-              ->getOrCreateRawAsyncClient(grpc_service, async_client_man_test.scope_, true)
+              ->getOrCreateRawAsyncClient(grpc_service,
+                                          *async_client_man_test.context_.store_.rootScope(), true)
               .value();
     }
   }
@@ -73,8 +72,8 @@ void testGetOrCreateAsyncClientWithHashConfig(::benchmark::State& state) {
     for (int i = 0; i < 1000; i++) {
       RawAsyncClientSharedPtr foo_client0 =
           async_client_man_test.async_client_manager_
-              ->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key_a,
-                                                     async_client_man_test.scope_, true)
+              ->getOrCreateRawAsyncClientWithHashKey(
+                  config_with_hash_key_a, *async_client_man_test.context_.store_.rootScope(), true)
               .value();
     }
   }

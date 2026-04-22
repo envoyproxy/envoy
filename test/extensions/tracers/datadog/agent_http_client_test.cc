@@ -16,9 +16,9 @@
 #include "datadog/dict_writer.h"
 #include "datadog/error.h"
 #include "datadog/expected.h"
-#include "datadog/json.hpp"
 #include "datadog/optional.h"
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -676,6 +676,16 @@ TEST_F(DatadogAgentHttpClientTest, SkipReportIfCollectorClusterHasBeenRemoved) {
     EXPECT_EQ(1U, stats_.reports_dropped_.value());
     EXPECT_EQ(1U, stats_.reports_failed_.value());
   }
+}
+
+TEST_F(DatadogAgentHttpClientTest, ConfigJson) {
+  // Verify that the config() method returns valid JSON
+  const std::string config = client_.config();
+  // Parse the config string to verify it's valid JSON
+  EXPECT_NO_THROW({
+    const auto json = nlohmann::json::parse(config);
+    EXPECT_TRUE(json.is_object());
+  });
 }
 
 } // namespace

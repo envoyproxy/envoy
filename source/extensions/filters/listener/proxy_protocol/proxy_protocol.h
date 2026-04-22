@@ -139,6 +139,14 @@ public:
   bool isVersionV1Allowed() const;
   bool isVersionV2Allowed() const;
 
+  /**
+   * Get the TLV storage location configuration.
+   */
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::TlvLocation
+  tlvLocation() const {
+    return tlv_location_;
+  }
+
 private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
   const bool allow_requests_without_proxy_protocol_;
@@ -146,6 +154,8 @@ private:
   absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
   bool allow_v1_{true};
   bool allow_v2_{true};
+  const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::TlvLocation
+      tlv_location_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

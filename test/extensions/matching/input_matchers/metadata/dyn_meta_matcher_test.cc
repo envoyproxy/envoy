@@ -31,6 +31,10 @@ constexpr absl::string_view kFilterNamespace = "meta_matcher";
 constexpr absl::string_view kMetadataKey = "service_name";
 constexpr absl::string_view kMetadataValue = "test_service";
 
+using ::Envoy::Matcher::DataInputGetResult;
+using ::Envoy::Matcher::HasNoMatch;
+using ::Envoy::Matcher::HasStringAction;
+
 class MetadataMatcherTest : public ::testing::Test {
 public:
   MetadataMatcherTest()
@@ -107,11 +111,8 @@ TEST_F(MetadataMatcherTest, DynamicMetadataMatched) {
   Envoy::Http::Matching::HttpMatchingDataImpl data =
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree();
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, ::Envoy::Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(MetadataMatcherTest, DynamicMetadataNotMatched) {
@@ -120,10 +121,7 @@ TEST_F(MetadataMatcherTest, DynamicMetadataNotMatched) {
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree();
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, ::Envoy::Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(MetadataMatcherTest, DynamicMetadataNotMatchedWithInvert) {
@@ -132,11 +130,8 @@ TEST_F(MetadataMatcherTest, DynamicMetadataNotMatchedWithInvert) {
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(true);
 
-  const auto result = matcher_tree->match(data_);
   // The match was completed, no match found but the invert flag was set.
-  EXPECT_EQ(result.match_state_, ::Envoy::Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(MetadataMatcherTest, BadData) {
@@ -148,11 +143,8 @@ TEST_F(MetadataMatcherTest, BadData) {
   const auto& v = matcher_config.value();
   auto value_matcher = Envoy::Matchers::ValueMatcher::create(v, factory_context_);
 
-  ::Envoy::Matcher::MatchingDataType data = absl::monostate();
-  EXPECT_NO_THROW(Matcher(value_matcher, false).match(data));
-
-  ::Envoy::Matcher::MatchingDataType data2 = std::string("test");
-  EXPECT_NO_THROW(Matcher(value_matcher, false).match(data2));
+  EXPECT_NO_THROW(Matcher(value_matcher, false).match(DataInputGetResult::NoData()));
+  EXPECT_NO_THROW(Matcher(value_matcher, false).match(DataInputGetResult::CreateString("test")));
 }
 
 } // namespace Metadata

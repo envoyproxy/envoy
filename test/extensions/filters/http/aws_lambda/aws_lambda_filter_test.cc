@@ -67,7 +67,7 @@ public:
   }
 
   void setupClusterMetadata() {
-    ProtobufWkt::Struct cluster_metadata;
+    Protobuf::Struct cluster_metadata;
     TestUtility::loadFromYaml(metadata_yaml_, cluster_metadata);
     metadata_.mutable_filter_metadata()->insert({"com.amazonaws.lambda", cluster_metadata});
     ON_CALL(*decoder_callbacks_.cluster_info_, metadata()).WillByDefault(ReturnRef(metadata_));
@@ -204,7 +204,7 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigWrongClusterMetadata) {
 
   setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
 
-  ProtobufWkt::Struct cluster_metadata;
+  Protobuf::Struct cluster_metadata;
   envoy::config::core::v3::Metadata metadata;
   TestUtility::loadFromYaml(metadata_yaml, cluster_metadata);
   metadata.mutable_filter_metadata()->insert({"WrongMetadataKey", cluster_metadata});

@@ -31,6 +31,7 @@ public:
   }
   void raiseGoAway(Http::GoAwayErrorCode error_code) { onGoAway(error_code); }
   Event::Timer* idleTimer() { return idle_timer_.get(); }
+  void triggerIdleTimeout() { onIdleTimeout(); }
   using Http::CodecClient::onSettings;
 
   DestroyCb destroy_cb_;

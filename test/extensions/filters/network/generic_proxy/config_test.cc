@@ -273,7 +273,7 @@ TEST(BasicFilterConfigTest, CreatingCodecFactory) {
 TEST(BasicFilterConfigTest, CreatingFilterFactories) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> filters_proto_config;
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> filters_proto_config;
   envoy::config::core::v3::TypedExtensionConfig codec_config;
 
   const std::string yaml_config_0 = R"EOF(
@@ -369,6 +369,9 @@ TEST(BasicFilterConfigTest, TestConfigurationWithTracing) {
       route_config_name: test_route
     tracing:
       max_path_tag_length: 128
+      custom_tags:
+      - tag: "trace-id"
+        value: "%REQUEST_PROPERTY(X-TRACE-ID)%"
       provider:
         name: zipkin
         typed_config:

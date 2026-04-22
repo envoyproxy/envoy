@@ -9,11 +9,12 @@
 #include "envoy/stats/timespan.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/common/trie_lookup_table.h"
+#include "source/common/common/radix_tree.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "source/extensions/filters/network/redis_proxy/router.h"
@@ -31,6 +32,7 @@ struct ResponseValues {
   const std::string UpstreamFailure = "upstream failure";
   const std::string UpstreamProtocolError = "upstream protocol error";
   const std::string AuthRequiredError = "NOAUTH Authentication required.";
+  const std::string UnsupportedProtocol = "NOPROTO unsupported protocol version";
 };
 
 using Response = ConstSingleton<ResponseValues>;
@@ -204,6 +206,23 @@ private:
 };
 
 /**
+ * ObjectRequest hashes the third argument as the key.
+ * OBJECT subcommand key [arguments] -> [0]=OBJECT, [1]=subcommand, [2]=key
+ */
+class ObjectRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  ObjectRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                bool delay_command_latency)
+      : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+};
+
+/**
  * TransactionRequest handles commands that are part of a Redis transaction.
  * This includes MULTI, EXEC, DISCARD, and also all the commands that are
  * part of the transaction.
@@ -285,11 +304,12 @@ private:
 };
 
 /**
- * KeysRequest sends the command to all Redis server. The response from each Redis (which
- * must be an array) is merged and returned to the user. If there is any error or failure in
- * processing the fragmented commands, an error will be returned.
+ * ScanRequest is a specialized request for the SCAN command. It sends the command to all Redis
+ * servers and merges the results. The SCAN command is used to incrementally iterate over keys in
+ * the database, and it may return multiple pages of results. This request handles the pagination
+ * by sending multiple requests to the Redis servers until all keys are retrieved.
  */
-class KeysRequest : public FragmentedRequest {
+class ScanRequest : public FragmentedRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -297,11 +317,118 @@ public:
                                 const StreamInfo::StreamInfo& stream_info);
 
 private:
-  KeysRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+  ScanRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
               bool delay_command_latency)
       : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
+ * ShardInfoRequest sends the INFO command to a specific shard identified by shard_id.
+ * This allows querying INFO from individual shards including sections like Persistence and
+ * Replication that don't make sense when aggregated across the cluster.
+ * Command format: INFO.SHARD <shard_id> [section]
+ */
+class ShardInfoRequest : public FragmentedRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  ShardInfoRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                   bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+  // RedisProxy::CommandSplitter::FragmentedRequest
+  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
+ * RandomShardRequest sends the command to a single random shard. This is used for commands like
+ * RANDOMKEY and CLUSTER that don't require responses from all shards, just one representative
+ * response. This optimizes performance by avoiding the overhead of sending to all shards.
+ */
+class RandomShardRequest : public FragmentedRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  RandomShardRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
+                     TimeSource& time_source, bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+
+  // RedisProxy::CommandSplitter::FragmentedRequest
+  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
+ * ClusterScopeCmdRequest sends the command to all Redis servers, and the responses are handled
+ * specifically to its type. This class uses the strategy pattern with response handlers defined in
+ * cluster_response_handler.h
+ */
+class ClusterScopeCmdRequest : public FragmentedRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+  // Interface methods for response handlers
+  void clearPendingHandle(uint32_t shard_index) {
+    if (shard_index < pending_requests_.size()) {
+      pending_requests_[shard_index].handle_ = nullptr;
+    }
+  }
+
+  void sendResponse(Common::Redis::RespValuePtr&& response) {
+    callbacks_.onResponse(std::move(response));
+  }
+
+  void updateRequestStats(bool success) { updateStats(success); }
+
+  size_t getTotalShardCount() const { return pending_requests_.size(); }
+
+private:
+  friend class ClusterScopeConfigTest;
+
+  ClusterScopeCmdRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
+                         TimeSource& time_source, bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+
+  // Initialize response handler based on the incoming request
+  // Returns true on success, false on failure
+  bool initializeResponseHandler(const Common::Redis::RespValue& request, uint32_t shard_count) {
+    response_handler_ = ClusterResponseHandlerFactory::createFromRequest(request, shard_count);
+    if (!response_handler_) {
+      ENVOY_LOG(warn,
+                "ClusterScopeCmdRequest: failed to initialize response handler for command: {}",
+                request.asArray().empty() ? "unknown" : request.asArray()[0].asString());
+      return false;
+    } else {
+      ENVOY_LOG(debug, "ClusterScopeCmdRequest: initialized response handler for command: {}",
+                request.asArray().empty() ? "unknown" : request.asArray()[0].asString());
+      return true;
+    }
+  }
+
+  // RedisProxy::CommandSplitter::FragmentedRequest
+  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override {
+    if (response_handler_) {
+      response_handler_->handleResponse(std::move(value), index, *this);
+    } else {
+      // No handler available for this command - send unsupported command error
+      ENVOY_LOG(warn, "No response handler set for ClusterScopeCmdRequest, command not supported");
+      updateStats(false);
+      callbacks_.onResponse(Common::Redis::Utility::makeError(Response::get().UpstreamFailure));
+    }
+  }
+
+  std::unique_ptr<BaseClusterScopeResponseHandler> response_handler_;
 };
 
 /**
@@ -409,12 +536,16 @@ private:
   RouterPtr router_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
+  CommandHandlerFactory<ObjectRequest> object_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
-  CommandHandlerFactory<KeysRequest> keys_handler_;
+  CommandHandlerFactory<ScanRequest> scan_handler_;
+  CommandHandlerFactory<ShardInfoRequest> shard_info_handler_;
+  CommandHandlerFactory<RandomShardRequest> random_shard_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   CommandHandlerFactory<TransactionRequest> transaction_handler_;
-  TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
+  CommandHandlerFactory<ClusterScopeCmdRequest> cluster_scope_handler_;
+  RadixTree<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;

@@ -30,8 +30,25 @@ namespace ListenerFilters {
 namespace HttpInspector {
 namespace {
 
+// See https://github.com/envoyproxy/envoy/issues/21245.
+enum class Http1ParserImpl {
+  HttpParser, // http-parser from node.js
+  BalsaParser // Balsa from QUICHE
+};
+
+// Allows pretty printed test names.
+static std::string http1ParserImplToString(Http1ParserImpl impl) {
+  switch (impl) {
+  case Http1ParserImpl::HttpParser:
+    return "HttpParser";
+  case Http1ParserImpl::BalsaParser:
+    return "BalsaParser";
+  }
+  return "UnknownHttp1Impl";
+}
+
 std::string testParamToString(const ::testing::TestParamInfo<Http1ParserImpl>& info) {
-  return TestUtility::http1ParserImplToString(info.param);
+  return http1ParserImplToString(info.param);
 }
 
 class HttpInspectorTest : public testing::TestWithParam<Http1ParserImpl> {

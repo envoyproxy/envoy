@@ -48,8 +48,8 @@ public:
     // be used. That means the body will be the same as the original body and we don't need
     // to format it.
     if (formatter_ != nullptr) {
-      body = formatter_->formatWithContext(
-          {&request_headers, &response_headers, &response_trailers, body}, stream_info);
+      body = formatter_->format({&request_headers, &response_headers, &response_trailers, body},
+                                stream_info);
     }
     content_type = content_type_;
   }
@@ -167,6 +167,7 @@ public:
       body_formatter_ = std::move(*formatter_or_error);
     }
 
+    mappers_.reserve(config.mappers().size());
     for (const auto& mapper : config.mappers()) {
       auto mapper_or_error = ResponseMapper::create(mapper, context);
       SET_AND_RETURN_IF_NOT_OK(mapper_or_error.status(), creation_status);
@@ -206,7 +207,7 @@ public:
   }
 
 private:
-  std::list<ResponseMapperPtr> mappers_;
+  std::vector<ResponseMapperPtr> mappers_;
   BodyFormatterPtr body_formatter_;
 };
 

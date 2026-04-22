@@ -1,31 +1,33 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
 #include <openssl/safestack.h>
+#include <openssl/ssl.h>
+#include <openssl/x509v3.h>
 
 #include <cstdint>
 
+#include "envoy/common/exception.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/registry/registry.h"
+#include "envoy/router/string_accessor.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_validator/factory.h"
-#include "source/common/tls/cert_validator/utility.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
-#include "openssl/ssl.h"
-#include "openssl/x509v3.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,11 +36,13 @@ namespace Tls {
 
 using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig;
 
+namespace {
 absl::StatusOr<std::shared_ptr<SpiffeData>>
-SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) {
-  ENVOY_LOG(info, "Parsing trust_bundles");
+parseTrustBundles(absl::string_view trust_bundle_mapping_str) {
+  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::secret), info, "Parsing trust_bundles");
 
-  auto json_parse_result = Envoy::Json::Factory::loadFromString(trust_bundle_mapping_str);
+  auto json_parse_result =
+      Envoy::Json::Factory::loadFromString(std::string(trust_bundle_mapping_str));
   if (!json_parse_result.ok()) {
     return absl::InvalidArgumentError("Invalid JSON found in SPIFFE bundle");
   }
@@ -63,9 +67,10 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
             // TODO: Duplicates are currently ignored and only the last value is used.
             // This is because our json parser auto de-dupes keys in the dict and
             // only include the last one in this iteration function.
-            spiffe_data->trust_bundle_stores_[domain_name] = X509StorePtr(X509_STORE_new());
+            spiffe_data->trust_bundle_stores_[domain_name][""] = X509StorePtr(X509_STORE_new());
 
-            ENVOY_LOG(info, "Loading domain '{}' from SPIFFE bundle map", domain_name);
+            ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::secret), info,
+                                "Loading domain '{}' from SPIFFE bundle map", domain_name);
 
             const auto keys = domain_object.getObjectArray("keys");
 
@@ -75,7 +80,8 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
               return false;
             }
 
-            ENVOY_LOG(info, "Found '{}' keys for domain '{}'", keys->size(), domain_name);
+            ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::secret), info,
+                                "Found '{}' keys for domain '{}'", keys->size(), domain_name);
 
             for (const auto& key : *keys) {
               const auto use = key->getString("use");
@@ -108,7 +114,7 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
                       fmt::format("Invalid x509 object in certs for domain '{}'", domain_name));
                   return false;
                 }
-                if (X509_STORE_add_cert(spiffe_data->trust_bundle_stores_[domain_name].get(),
+                if (X509_STORE_add_cert(spiffe_data->trust_bundle_stores_[domain_name][""].get(),
                                         x509.get()) != 1) {
                   parsing_status = absl::InternalError(
                       fmt::format("Failed to add x509 object while loading certs for domain '{}'",
@@ -125,47 +131,28 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
   RETURN_IF_NOT_OK_REF(status);
   RETURN_IF_NOT_OK_REF(parsing_status);
 
-  ENVOY_LOG(info, "Successfully loaded SPIFFE bundle map");
+  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::secret), info,
+                      "Successfully loaded SPIFFE bundle map");
   return spiffe_data;
 }
 
-void SPIFFEValidator::initializeCertificateRefresh(
-    Server::Configuration::CommonFactoryContext& context) {
-  file_watcher_ = context.mainThreadDispatcher().createFilesystemWatcher();
-  THROW_IF_NOT_OK(file_watcher_->addWatch(
-      trust_bundle_file_name_, Filesystem::Watcher::Events::Modified, [this](uint32_t) {
-        ENVOY_LOG(info, "Updating SPIFFE bundle map from file '{}'", trust_bundle_file_name_);
+} // namespace
 
-        auto read_result =
-            Envoy::Config::DataSource::readFile(trust_bundle_file_name_, api_, false);
-        if (!read_result.ok()) {
-          return absl::OkStatus();
-          ENVOY_LOG(error, "Failed to open SPIFFE bundle map file '{}'", trust_bundle_file_name_);
-        }
-
-        auto new_trust_bundle = parseTrustBundles(*read_result);
-
-        if (new_trust_bundle.ok()) {
-          updateSpiffeData(*new_trust_bundle);
-        } else {
-          ENVOY_LOG(error, "Failed to load SPIFFE bundle map from '{}': '{}'",
-                    trust_bundle_file_name_, new_trust_bundle.status().message());
-        }
-        return absl::OkStatus();
-      }));
-}
+SINGLETON_MANAGER_REGISTRATION(spiffe_trust_bundles);
 
 SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                                  SslStats& stats,
-                                 Server::Configuration::CommonFactoryContext& context)
-    : api_(config->api()), stats_(stats), time_source_(context.timeSource()) {
+                                 Server::Configuration::CommonFactoryContext& context,
+                                 Stats::Scope& scope, absl::Status& creation_status)
+    : stats_(stats), time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
 
   SPIFFEConfig message;
-  THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
-      config->customValidatorConfig().value().typed_config(),
-      ProtobufMessage::getStrictValidationVisitor(), message));
+  SET_AND_RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+                               config->customValidatorConfig().value().typed_config(),
+                               ProtobufMessage::getStrictValidationVisitor(), message),
+                           creation_status);
 
   if (!config->subjectAltNameMatchers().empty()) {
     for (const auto& matcher : config->subjectAltNameMatchers()) {
@@ -182,23 +169,17 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 
   // If a trust bundle map is provided, use that...
   if (message.has_trust_bundles()) {
-    std::string trust_bundles_str = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(message.trust_bundles(), false, config->api()), std::string);
-    auto parse_result = parseTrustBundles(trust_bundles_str);
-
-    THROW_IF_NOT_OK_REF(parse_result.status());
-
-    spiffe_data_ = *parse_result;
-
-    if (message.trust_bundles().has_filename()) {
-      trust_bundle_file_name_ = message.trust_bundles().filename();
-      // Set up dynamic refresh with tls_ and file watcher
-      tls_ = ThreadLocal::TypedSlot<ThreadLocalSpiffeState>::makeUnique(context.threadLocal());
-      tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalSpiffeState>(); });
-      updateSpiffeData(spiffe_data_);
-      initializeCertificateRefresh(context);
-    }
-
+    bundle_map_ = context.singletonManager().getTyped<SpiffeTrustBundles>(
+        SINGLETON_MANAGER_REGISTERED_NAME(spiffe_trust_bundles), [&]() {
+          return std::make_shared<SpiffeTrustBundles>(
+              context.mainThreadDispatcher(), context.threadLocal(), context.api(),
+              parseTrustBundles,
+              Config::DataSource::ProviderOptions{.modify_watch = true, .hash_content = true});
+        });
+    auto provider_status = bundle_map_->getOrCreate(message.trust_bundles());
+    SET_AND_RETURN_IF_NOT_OK(provider_status.status(), creation_status);
+    bundle_provider_ = *std::move(provider_status);
+    initializeCertExpirationStats(scope, config->caCertName());
     return;
   }
 
@@ -206,21 +187,27 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   spiffe_data_ = std::make_shared<SpiffeData>();
   spiffe_data_->trust_bundle_stores_.reserve(message.trust_domains().size());
   for (auto& domain : message.trust_domains()) {
-    if (spiffe_data_->trust_bundle_stores_.find(domain.name()) !=
-        spiffe_data_->trust_bundle_stores_.end()) {
-      throw EnvoyException(absl::StrCat(
-          "Multiple trust bundles are given for one trust domain for ", domain.name()));
+    if (auto it = spiffe_data_->trust_bundle_stores_.find(domain.name());
+        it != spiffe_data_->trust_bundle_stores_.end()) {
+      if (auto local_it = it->second.find(domain.workload_trust_domain());
+          local_it != it->second.end()) {
+        creation_status = absl::InvalidArgumentError(
+            absl::StrCat("Multiple trust bundles are given for one trust domain for ",
+                         domain.name(), ", workload: ", domain.workload_trust_domain()));
+        return;
+      }
     }
 
-    auto cert = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(domain.trust_bundle(), true, config->api()), std::string);
-    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
+    auto cert = Config::DataSource::read(domain.trust_bundle(), true, config->api());
+    SET_AND_RETURN_IF_NOT_OK(cert.status(), creation_status);
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert->data()), cert->size()));
     RELEASE_ASSERT(bio != nullptr, "");
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
         PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
     if (list == nullptr || sk_X509_INFO_num(list.get()) == 0) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           absl::StrCat("Failed to load trusted CA certificate for ", domain.name()));
+      return;
     }
 
     auto store = X509StorePtr(X509_STORE_new());
@@ -251,8 +238,11 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
     if (has_crl) {
       X509_STORE_set_flags(store.get(), X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
-    spiffe_data_->trust_bundle_stores_[domain.name()] = std::move(store);
+    spiffe_data_->trust_bundle_stores_[domain.name()][domain.workload_trust_domain()] =
+        std::move(store);
   }
+
+  initializeCertExpirationStats(scope, config->caCertName());
 }
 
 absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
@@ -263,7 +253,7 @@ absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
 
   auto spiffe_data = getSpiffeData();
   for (auto& ca : spiffe_data->ca_certs_) {
-    X509_NAME* name = X509_get_subject_name(ca.get());
+    const X509_NAME* name = X509_get_subject_name(ca.get());
 
     // Check for duplicates.
     if (sk_X509_NAME_find(list.get(), nullptr, name)) {
@@ -294,21 +284,22 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
   }
 }
 
-absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
+absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool,
+                                                           Stats::Scope&) {
   return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 }
 
-bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
-                                                           STACK_OF(X509)* cert_chain,
-                                                           X509_VERIFY_PARAM* verify_param,
-                                                           std::string& error_details) {
+bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
+    X509& leaf_cert, STACK_OF(X509)* cert_chain, X509_VERIFY_PARAM* verify_param,
+    absl::string_view workload_trust_domain, std::string& error_details,
+    std::vector<bssl::UniquePtr<X509>>& validated_chain) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
     error_details = "verify cert failed: cert precheck";
     stats_.fail_verify_error_.inc();
     return false;
   }
 
-  auto trust_bundle = getTrustBundleStore(&leaf_cert);
+  auto trust_bundle = getTrustBundleStore(&leaf_cert, workload_trust_domain);
   if (!trust_bundle) {
     error_details = "verify cert failed: no trust bundle store";
     stats_.fail_verify_error_.inc();
@@ -324,7 +315,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
     return false;
   }
   if (allow_expired_certificate_) {
-    CertValidatorUtil::setIgnoreCertificateExpiration(new_store_ctx.get());
+    X509_STORE_CTX_set_flags(new_store_ctx.get(), X509_V_FLAG_NO_CHECK_TIME);
   }
   auto ret = X509_verify_cert(new_store_ctx.get());
   if (!ret) {
@@ -332,6 +323,15 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
                                  Utility::getX509VerificationErrorInfo(new_store_ctx.get()));
     stats_.fail_verify_error_.inc();
     return false;
+  }
+
+  // Capture the validated chain built by X509_verify_cert.
+  STACK_OF(X509)* verified_chain = X509_STORE_CTX_get0_chain(new_store_ctx.get());
+  if (verified_chain != nullptr) {
+    for (size_t i = 0; i < sk_X509_num(verified_chain); i++) {
+      X509* cert = sk_X509_value(verified_chain, i);
+      validated_chain.emplace_back(bssl::UpRef(cert));
+    }
   }
 
   // Do SAN matching.
@@ -343,11 +343,14 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
   return san_match;
 }
 
+constexpr absl::string_view WorkloadTrustDomainKey =
+    "envoy.tls.cert_validator.spiffe.workload_trust_domain";
+
 ValidationResults SPIFFEValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
-    const Network::TransportSocketOptionsConstSharedPtr& /*transport_socket_options*/,
-    SSL_CTX& ssl_ctx, const CertValidator::ExtraValidationContext& /*validation_context*/,
-    bool /*is_server*/, absl::string_view /*host_name*/) {
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
+    const CertValidator::ExtraValidationContext& validation_context, bool is_server,
+    absl::string_view /*host_name*/) {
   if (sk_X509_num(&cert_chain) == 0) {
     stats_.fail_verify_error_.inc();
     return {ValidationResults::ValidationStatus::Failed,
@@ -355,18 +358,38 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
             "verify cert failed: empty cert chain"};
   }
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
+  const Router::StringAccessor* obj = nullptr;
+  if (is_server) {
+    if (auto* cb = validation_context.callbacks; cb) {
+      const StreamInfo::StreamInfo& info = cb->connection().streamInfo();
+      obj = info.filterState().getDataReadOnly<Router::StringAccessor>(WorkloadTrustDomainKey);
+    }
+  } else {
+    if (transport_socket_options) {
+      for (const auto& obj_meta : transport_socket_options->downstreamSharedFilterStateObjects()) {
+        if (obj_meta.name_ == WorkloadTrustDomainKey) {
+          obj = dynamic_cast<const Router::StringAccessor*>(obj_meta.data_.get());
+          break;
+        }
+      }
+    }
+  }
+  absl::string_view workload_trust_domain = obj ? obj->asString() : "";
   std::string error_details;
-  bool verified = verifyCertChainUsingTrustBundleStore(*leaf_cert, &cert_chain,
-                                                       SSL_CTX_get0_param(&ssl_ctx), error_details);
+  std::vector<bssl::UniquePtr<X509>> validated_chain;
+  bool verified =
+      verifyCertChainUsingTrustBundleStore(*leaf_cert, &cert_chain, SSL_CTX_get0_param(&ssl_ctx),
+                                           workload_trust_domain, error_details, validated_chain);
   return verified ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                       Envoy::Ssl::ClientValidationStatus::Validated, absl::nullopt,
-                                      absl::nullopt}
+                                      absl::nullopt, std::move(validated_chain)}
                   : ValidationResults{ValidationResults::ValidationStatus::Failed,
                                       Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt,
                                       error_details};
 }
 
-X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
+X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert,
+                                                 absl::string_view workload_trust_domain) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
       X509_get_ext_d2i(leaf_cert, NID_subject_alt_name, nullptr, nullptr)));
   if (!san_names) {
@@ -391,8 +414,14 @@ X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
 
   auto spiffe_data = getSpiffeData();
   auto target_store = spiffe_data->trust_bundle_stores_.find(trust_domain);
-  return target_store != spiffe_data->trust_bundle_stores_.end() ? target_store->second.get()
-                                                                 : nullptr;
+  if (target_store == spiffe_data->trust_bundle_stores_.end()) {
+    return nullptr;
+  }
+  auto it = target_store->second.find(workload_trust_domain);
+  if (it == target_store->second.end()) {
+    return nullptr;
+  }
+  return it->second.get();
 }
 
 bool SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {
@@ -439,6 +468,27 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   return "";
 }
 
+void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope,
+                                                    const std::string& cert_name) {
+  // TODO(peterl328): Due to current interface, we only receive one cert name.
+  // Since we may have multiple certificates here, we will use the provided cert name and append
+  // an index to it. Assumes the order in the ca_certs_ vector doesn't change.
+  int idx = 0;
+  OptRef<SpiffeData> spiffe_data = getSpiffeData();
+  if (!spiffe_data) {
+    return;
+  }
+  for (bssl::UniquePtr<X509>& cert : spiffe_data->ca_certs_) {
+    // Add underscore between cert name and index to avoid collisions
+    std::string cert_name_with_idx = absl::StrCat(cert_name, "_", idx);
+
+    Stats::Gauge& expiration_gauge = createCertificateExpirationGauge(scope, cert_name_with_idx);
+    expiration_gauge.set(Utility::getExpirationUnixTime(cert.get()).count());
+
+    idx++;
+  }
+}
+
 absl::optional<uint32_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
   auto spiffe_data = getSpiffeData();
   if (spiffe_data->ca_certs_.empty()) {
@@ -471,8 +521,13 @@ class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) override {
-    return std::make_unique<SPIFFEValidator>(config, stats, context);
+                      Server::Configuration::CommonFactoryContext& context,
+                      Stats::Scope& scope) override {
+    absl::Status creation_status = absl::OkStatus();
+    auto validator =
+        std::make_unique<SPIFFEValidator>(config, stats, context, scope, creation_status);
+    RETURN_IF_NOT_OK(creation_status);
+    return validator;
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.spiffe"; }

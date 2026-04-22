@@ -60,7 +60,7 @@ public:
         expected_(std::make_unique<TraceProperties>(
             "Service 1", "AWS::Service::Proxy", "test_value", "egress hostname", "POST",
             "/first/second", "Mozilla/5.0 (Macintosh; Intel Mac OS X)", "egress")) {}
-  absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
+  absl::flat_hash_map<std::string, Protobuf::Value> aws_metadata_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Tracing::MockConfig> config_;
   std::unique_ptr<MockDaemonBroker> broker_;
@@ -584,7 +584,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, XRayDaemonTest,
 TEST_P(XRayDaemonTest, VerifyUdpPacketContents) {
   NiceMock<Tracing::MockConfig> config_;
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
-  absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata;
+  absl::flat_hash_map<std::string, Protobuf::Value> aws_metadata;
   NiceMock<Server::MockInstance> server;
   Network::Test::UdpSyncPeer xray_fake_daemon(GetParam());
   const std::string daemon_endpoint = xray_fake_daemon.localAddress()->asString();

@@ -83,8 +83,6 @@ public:
 
   /*
    * @return true if @param histogram needs to be flushed to sinks.
-   * Note that this is used only if runtime flag envoy.reloadable_features.enable_include_histograms
-   * (which is false by default) is set to true.
    */
   virtual bool includeHistogram(const Histogram& histogram) PURE;
 };

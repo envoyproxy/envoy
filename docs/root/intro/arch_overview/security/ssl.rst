@@ -33,7 +33,12 @@ Underlying implementation
 -------------------------
 
 Currently Envoy is written to use `BoringSSL <https://boringssl.googlesource.com/boringssl>`_ as the
-TLS provider.
+default TLS provider.
+
+`OpenSSL <https://openssl.org>`_ can also be used as an alternative, when Envoy is built using
+the ``--config=openssl`` Bazel option. OpenSSL libraries are not statically linked into the main Envoy executable;
+they must be present at runtime and are loaded dynamically. HTTP/3 (QUIC) is not available with OpenSSL builds.
+OpenSSL builds are not currently covered by the :repo:`Envoy security policy <SECURITY.md>`.
 
 .. _arch_overview_ssl_fips:
 
@@ -44,10 +49,12 @@ BoringSSL can be built in a
 `FIPS-compliant mode <https://boringssl.googlesource.com/boringssl/+/main/crypto/fipsmodule/FIPS.md>`_,
 following the build instructions from the `Security Policy for BoringCrypto module
 <https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3678.pdf>`_,
-using ``--define boringssl=fips`` Bazel option. Currently, this option is only available on Linux-x86_64.
+using ``--config=boringssl-fips`` Bazel option. Currently, the BoringSSL/FIPS build will only work Linux-x86_64.
 
-The correctness of the FIPS build can be verified by checking the presence of ``BoringSSL-FIPS``
-in the :option:`--version` output.
+AWS-LC FIPS can also be used with ``--config=aws-lc-fips``, and has wider architecture support.
+
+When Envoy has been built for FIPS, you should see ``BoringSSL-FIPS`` or ``AWS-LC-FIPS``
+in the :option:`--version` output. When built with OpenSSL, the output will show ``OpenSSL``.
 
 It's important to note that while using FIPS-compliant module is necessary for FIPS compliance,
 it's not sufficient by itself, and depending on the context, additional steps might be necessary.
@@ -190,15 +197,6 @@ Envoy will not use a must-staple certificate for new connections after its OCSP 
 
 OCSP responses are never stapled to TLS requests that do not indicate support for OCSP stapling
 via the ``status_request`` extension.
-
-The following runtime flags are provided to adjust the requirements of OCSP responses and override
-the OCSP policy. These flags default to ``true``.
-
-* ``envoy.reloadable_features.require_ocsp_response_for_must_staple_certs``: Disabling this allows
-  the operator to omit an OCSP response for must-staple certs in the config.
-* ``envoy.reloadable_features.check_ocsp_policy``: Disabling this will disable OCSP policy
-  checking. OCSP responses are stapled when available if the client supports it, even if the
-  response is expired. Stapling is skipped if no response is present.
 
 OCSP responses are ignored for :ref:`UpstreamTlsContexts
 <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.

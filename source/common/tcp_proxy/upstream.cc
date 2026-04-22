@@ -18,6 +18,52 @@ namespace TcpProxy {
 using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
+// Constants for tunnel request ID metadata.
+const std::string& tunnelRequestIdMetadataNamespace() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.tcp_proxy");
+}
+
+const std::string& tunnelRequestIdMetadataKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "tunnel_request_id");
+}
+
+// Helper function to generate and store request ID in dynamic metadata.
+void generateAndStoreRequestId(const TunnelingConfigHelper& config, Http::RequestHeaderMap& headers,
+                               StreamInfo::StreamInfo& downstream_info) {
+  if (config.requestIDExtension() != nullptr) {
+    // For tunneling requests there is no way to get the external request ID as the incoming
+    // traffic could be anything - HTTPS, MySQL, Postgres, etc.
+    config.requestIDExtension()->set(headers, /*edge_request=*/true,
+                                     /*keep_external_id=*/false);
+    // Also store the request ID in dynamic metadata to allow TCP access logs to format it,
+    // and optionally emit it under a custom key if configured.
+    const auto rid_sv = headers.getRequestIdValue();
+    if (!rid_sv.empty()) {
+      const std::string rid(rid_sv);
+      // If the request ID header override is configured, mirror the generated request ID to that
+      // header and remove the default x-request-id to honor the configured header.
+      const std::string& override_header = config.requestIDHeader();
+      if (!override_header.empty()) {
+        const Http::LowerCaseString custom_header(override_header);
+        headers.setCopy(custom_header, rid);
+        if (custom_header.get() != Http::Headers::get().RequestId.get()) {
+          headers.remove(Http::Headers::get().RequestId);
+        }
+      }
+
+      // Write dynamic metadata under the configured key (or default).
+      const std::string& key_override = config.requestIDMetadataKey();
+      const absl::string_view md_key =
+          key_override.empty() ? tunnelRequestIdMetadataKey() : absl::string_view(key_override);
+      Protobuf::Struct md;
+      auto& fields = *md.mutable_fields();
+      // Assign the request id to the configured key.
+      fields[std::string(md_key)].mutable_string_value()->assign(rid.data(), rid.size());
+      downstream_info.setDynamicMetadata(tunnelRequestIdMetadataNamespace(), md);
+    }
+  }
+}
+
 TcpUpstream::TcpUpstream(Tcp::ConnectionPool::ConnectionDataPtr&& data,
                          Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
     : upstream_conn_data_(std::move(data)) {
@@ -60,8 +106,26 @@ Ssl::ConnectionInfoConstSharedPtr TcpUpstream::getUpstreamConnectionSslInfo() {
   return nullptr;
 }
 
-Tcp::ConnectionPool::ConnectionData*
-TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
+absl::string_view TcpUpstream::localCloseReason() const {
+  if (upstream_conn_data_ != nullptr) {
+    return upstream_conn_data_->connection().localCloseReason();
+  }
+  return "";
+}
+
+StreamInfo::DetectedCloseType TcpUpstream::detectedCloseType() const {
+  if (upstream_conn_data_ != nullptr &&
+      upstream_conn_data_->connection().streamInfo().upstreamInfo()) {
+    return upstream_conn_data_->connection()
+        .streamInfo()
+        .upstreamInfo()
+        ->upstreamDetectedCloseType();
+  }
+  return StreamInfo::DetectedCloseType::Normal;
+}
+
+Tcp::ConnectionPool::ConnectionData* TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event,
+                                                                    absl::string_view details) {
   // TODO(botengyao): propagate RST back to upstream connection if RST is received from downstream.
   if (event == Network::ConnectionEvent::RemoteClose) {
     // The close call may result in this object being deleted. Latch the
@@ -74,7 +138,9 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   } else if (event == Network::ConnectionEvent::LocalClose) {
     upstream_conn_data_->connection().close(
         Network::ConnectionCloseType::NoFlush,
-        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose);
+        !details.empty()
+            ? details
+            : StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose);
   }
   return nullptr;
 }
@@ -86,6 +152,10 @@ HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
       upstream_callbacks_(callbacks), type_(type) {}
 
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
+
+StreamInfo::DetectedCloseType HttpUpstream::detectedCloseType() const {
+  return detected_close_type_;
+}
 
 bool HttpUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   if (type_ == Http::CodecType::HTTP1) {
@@ -120,6 +190,10 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
       headers->addReference(Http::Headers::get().Scheme, scheme);
     }
   }
+
+  // Optionally generate a request ID before evaluating configured headers so
+  // it is available to header formatters.
+  generateAndStoreRequestId(config_, *headers, downstream_info_);
 
   config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
                                             downstream_info_);
@@ -161,7 +235,7 @@ void HttpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb) {
 }
 
 Tcp::ConnectionPool::ConnectionData*
-HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
+HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_view /*details*/) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     resetEncoder(Network::ConnectionEvent::LocalClose, false);
@@ -169,10 +243,30 @@ HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   return nullptr;
 }
 
-void HttpUpstream::onResetStream(Http::StreamResetReason, absl::string_view) {
+void HttpUpstream::onResetStream(Http::StreamResetReason reason, absl::string_view) {
   read_half_closed_ = true;
   write_half_closed_ = true;
-  resetEncoder(Network::ConnectionEvent::LocalClose);
+  Network::ConnectionEvent event;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.map_http_stream_reset_to_tcp_rst")) {
+    // Map remote-originated resets to RemoteClose.
+    switch (reason) {
+    case Http::StreamResetReason::RemoteReset:
+    case Http::StreamResetReason::RemoteRefusedStreamReset:
+    case Http::StreamResetReason::RemoteConnectionFailure:
+      event = Network::ConnectionEvent::RemoteClose;
+      detected_close_type_ = StreamInfo::DetectedCloseType::RemoteReset;
+      break;
+    default:
+      event = Network::ConnectionEvent::LocalClose;
+      detected_close_type_ = StreamInfo::DetectedCloseType::Normal;
+      break;
+    }
+  } else {
+    event = Network::ConnectionEvent::LocalClose;
+    detected_close_type_ = StreamInfo::DetectedCloseType::Normal;
+  }
+  resetEncoder(event);
 }
 
 void HttpUpstream::onAboveWriteBufferHighWatermark() {
@@ -257,10 +351,10 @@ void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                               Upstream::HostDescriptionConstSharedPtr host) {
   if (downstream_info_.downstreamAddressProvider().connectionID()) {
-    downstream_info_.upstreamInfo()->setUpstreamConnectionId(conn_data->connection().id());
+    uint64_t connection_id = conn_data->connection().id();
+    downstream_info_.upstreamInfo()->setUpstreamConnectionId(connection_id);
     ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
-              conn_data->connection().id(),
-              downstream_info_.downstreamAddressProvider().connectionID().value());
+              connection_id, downstream_info_.downstreamAddressProvider().connectionID().value());
   }
 
   upstream_handle_ = nullptr;
@@ -309,7 +403,7 @@ std::unique_ptr<Router::GenericConnPool> HttpConnPool::createConnPool(
     return nullptr;
   }
 
-  ProtobufWkt::Any message;
+  Protobuf::Any message;
   if (cluster.info()->upstreamConfig()) {
     message = cluster.info()->upstreamConfig()->typed_config();
   }
@@ -377,14 +471,14 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
       downstream_info_.downstreamAddressProvider().connectionID()) {
     // info.downstreamAddressProvider() is being called to get the upstream connection ID,
     // because the StreamInfo object here is of the upstream connection.
-    downstream_info_.upstreamInfo()->setUpstreamConnectionId(
-        info.downstreamAddressProvider().connectionID().value());
+    uint64_t connection_id = info.downstreamAddressProvider().connectionID().value();
+    downstream_info_.upstreamInfo()->setUpstreamConnectionId(connection_id);
     ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
-              info.downstreamAddressProvider().connectionID().value(),
-              downstream_info_.downstreamAddressProvider().connectionID().value());
+              connection_id, downstream_info_.downstreamAddressProvider().connectionID().value());
   }
 
   upstream_handle_ = nullptr;
+  downstream_info_.setUpstreamBytesMeter(request_encoder.getStream().bytesMeter());
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
   upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
@@ -404,6 +498,10 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
   callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, address_provider, ssl_info);
 }
 
+StreamInfo::DetectedCloseType CombinedUpstream::detectedCloseType() const {
+  return StreamInfo::DetectedCloseType::Normal;
+}
+
 CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
                                    Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                                    Http::StreamDecoderFilterCallbacks& decoder_callbacks,
@@ -421,6 +519,8 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
   if (config_.usePost()) {
     downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
   }
+
+  generateAndStoreRequestId(config_, *downstream_headers_, downstream_info_);
 
   config_.headerEvaluator().evaluateHeaders(
       *downstream_headers_, {downstream_info_.getRequestHeaders()}, downstream_info_);
@@ -455,7 +555,7 @@ bool CombinedUpstream::readDisable(bool disable) {
 }
 
 Tcp::ConnectionPool::ConnectionData*
-CombinedUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
+CombinedUpstream::onDownstreamEvent(Network::ConnectionEvent event, absl::string_view /*details*/) {
   if (!upstream_request_) {
     return nullptr;
   }

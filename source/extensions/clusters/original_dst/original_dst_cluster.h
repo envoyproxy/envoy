@@ -159,12 +159,12 @@ private:
   };
 
   HostMultiMapConstSharedPtr getCurrentHostMap() {
-    absl::ReaderMutexLock lock(&host_map_lock_);
+    absl::ReaderMutexLock lock(host_map_lock_);
     return host_map_;
   }
 
   void setHostMap(const HostMultiMapConstSharedPtr& new_host_map) {
-    absl::WriterMutexLock lock(&host_map_lock_);
+    absl::WriterMutexLock lock(host_map_lock_);
     host_map_ = new_host_map;
   }
 

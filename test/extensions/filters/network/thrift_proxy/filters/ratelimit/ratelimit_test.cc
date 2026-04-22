@@ -331,13 +331,13 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponseWithDynamicMetadata) {
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 
   Filters::Common::RateLimit::DynamicMetadataPtr dynamic_metadata =
-      std::make_unique<ProtobufWkt::Struct>();
+      std::make_unique<Protobuf::Struct>();
   auto* fields = dynamic_metadata->mutable_fields();
   (*fields)["name"] = ValueUtil::stringValue("my-limit");
   (*fields)["x"] = ValueUtil::numberValue(3);
   EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
-                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+                                           const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.thrift.rate_limit");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, *dynamic_metadata));
       }));

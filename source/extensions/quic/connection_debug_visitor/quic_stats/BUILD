@@ -7,6 +7,7 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -15,18 +16,17 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "quic_stats_lib",
-    srcs = ["quic_stats.cc"],
-    hdrs = ["quic_stats.h"],
-    tags = ["nofips"],
+    srcs = envoy_select_enable_http3(["quic_stats.cc"]),
+    hdrs = envoy_select_enable_http3(["quic_stats.h"]),
     visibility = [
         "//test:__subpackages__",
     ],
-    deps = [
+    deps = envoy_select_enable_http3([
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:envoy_quic_connection_debug_visitor_factory_interface",
         "@envoy_api//envoy/extensions/quic/connection_debug_visitor/quic_stats/v3:pkg_cc_proto",
-    ],
+    ]),
     alwayslink = LEGACY_ALWAYSLINK,
 )
 
@@ -36,14 +36,7 @@ envoy_cc_extension(
         "//source/common/quic:__subpackages__",
         "//test:__subpackages__",
     ],
-    tags = ["nofips"],
-    deps = select(
-        {
-            "//bazel:boringssl_fips": [],
-            "//bazel:boringssl_disabled": [],
-            "//conditions:default": [
-                ":quic_stats_lib",
-            ],
-        },
-    ),
+    deps = envoy_select_enable_http3([
+        ":quic_stats_lib",
+    ]),
 )

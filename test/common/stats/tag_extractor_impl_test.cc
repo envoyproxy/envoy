@@ -516,6 +516,32 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {proxy_protocol_version});
   regex_tester.testRegex("proxy_proto.test_stat_prefix.versions.v2.error", "proxy_proto.error",
                          {proxy_protocol_prefix, proxy_protocol_version});
+
+  // TLS certificates
+  Tag certificate_name;
+  certificate_name.name_ = tag_names.TLS_CERTIFICATE;
+  certificate_name.value_ = "server_cert";
+
+  // Listener test
+  listener_address.value_ = "0.0.0.0_0";
+  regex_tester.testRegex(
+      "listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time_seconds",
+      "listener.ssl.certificate.expiration_unix_time_seconds",
+      {listener_address, certificate_name});
+
+  // Cluster test
+  Tag test_cluster;
+  test_cluster.name_ = tag_names.CLUSTER_NAME;
+  test_cluster.value_ = "test_cluster";
+  regex_tester.testRegex(
+      "cluster.test_cluster.ssl.certificate.server_cert.expiration_unix_time_seconds",
+      "cluster.ssl.certificate.expiration_unix_time_seconds", {test_cluster, certificate_name});
+
+  // resource name test
+  Tag sds_resource;
+  sds_resource.name_ = tag_names.XDS_RESOURCE_NAME;
+  sds_resource.value_ = "xds_trusted_ca";
+  regex_tester.testRegex("sds.xds_trusted_ca.update_attempt", "sds.update_attempt", {sds_resource});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

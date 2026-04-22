@@ -8,7 +8,7 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Common {
 
-void ImplBase::log(const Formatter::HttpFormatterContext& log_context,
+void ImplBase::log(const Formatter::Context& log_context,
                    const StreamInfo::StreamInfo& stream_info) {
 
   if (filter_ && !filter_->evaluate(log_context, stream_info)) {

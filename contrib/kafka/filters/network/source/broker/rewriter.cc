@@ -25,7 +25,7 @@ template <typename T> static T& extractResponseData(AbstractResponseSharedPtr& a
   using TSharedPtr = std::shared_ptr<Response<T>>;
   TSharedPtr cast = std::dynamic_pointer_cast<typename TSharedPtr::element_type>(arg);
   if (nullptr == cast) {
-    throw new EnvoyException("bug: response class not matching response API key");
+    throw EnvoyException("bug: response class not matching response API key");
   } else {
     return cast->data_;
   }

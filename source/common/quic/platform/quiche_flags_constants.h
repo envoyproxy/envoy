@@ -35,8 +35,12 @@
   /* TODO(#8826) Ideally we should use the negotiated value from upstream which is not accessible  \
    * for now. 512MB is way too large, but the actual bytes buffered should be bound by the         \
    * negotiated upstream flow control window. */                                                   \
-  KEY_VALUE_PAIR(quic_buffered_data_threshold,                                                     \
-                 2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE)   \
+  /* TODO(wbpcode) 2 * Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE was       \
+   * used in previous implementation and the previous value of HTTP2                               \
+   * DEFAULT_INITIAL_STREAM_WINDOW_SIZE is 256MiB. But we updated HTTP2                            \
+   * DEFAULT_INITIAL_STREAM_WINDOW_SIZE to 1MiB for safety now. To ensure no behavior change here, \
+   * we update it to 512 MiB manually*/                                                            \
+  KEY_VALUE_PAIR(quic_buffered_data_threshold, uint32_t(2 * 256 * 1024 * 1024))                    \
   /* Envoy should send server preferred address without a client option by default. */             \
   KEY_VALUE_PAIR(quic_always_support_server_preferred_address, true)
 

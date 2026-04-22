@@ -14,7 +14,7 @@ envoy_cc_library(
     srcs = ["zlib_compressor_impl.cc"],
     hdrs = ["zlib_compressor_impl.h"],
     deps = [
-        "//bazel/foreign_cc:zlib",
+        "//bazel:zlib",
         "//envoy/compression/compressor:compressor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",

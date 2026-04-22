@@ -28,7 +28,11 @@ class EnvoyQuicClientSession : public QuicFilterManagerConnectionImpl,
 public:
   EnvoyQuicClientSession(
       const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
-      std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
+      std::unique_ptr<EnvoyQuicClientConnection> connection,
+      quic::QuicForceBlockablePacketWriter* absl_nullable writer,
+      EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* absl_nullable migration_helper,
+      const quic::QuicConnectionMigrationConfig& migration_config,
+      const quic::QuicServerId& server_id,
       std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config, Event::Dispatcher& dispatcher,
       uint32_t send_buffer_limit,
       EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
@@ -54,6 +58,10 @@ public:
   // Set up socket and start handshake.
   void connect() override;
 
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override {
+    return false;
+  }
+
   // quic::QuicSession
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
@@ -65,8 +73,12 @@ public:
   void OnNewEncryptionKeyAvailable(quic::EncryptionLevel level,
                                    std::unique_ptr<quic::QuicEncrypter> encrypter) override;
 
+  // quic::QuicClientSessionWithMigration
+  void StartDraining() override;
+
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
   std::vector<std::string> GetAlpnsToOffer() const override;
+  void OnConfigNegotiated() override;
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
@@ -91,6 +103,16 @@ public:
   // Register this session to the given registry for receiving network change events.
   void registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry);
 
+  const quic::TransportParameters::ParameterMap& received_custom_transport_parameters() {
+    return received_custom_transport_parameters_;
+  }
+  const absl::optional<quic::QuicSocketAddress>& received_ipv6_alternate_server_address() {
+    return received_ipv6_alternate_server_address_;
+  }
+  const absl::optional<quic::QuicSocketAddress>& received_ipv4_alternate_server_address() {
+    return received_ipv4_alternate_server_address_;
+  }
+
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
 protected:
@@ -101,9 +123,10 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override;
   bool ShouldCreateOutgoingBidirectionalStream() override {
-    ASSERT(quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream());
-    // Prefer creating an "invalid" stream outside of current stream bounds to
-    // crashing when dereferencing a nullptr in QuicHttpClientConnectionImpl::newStream
+    // quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream()
+    // might return false, but we want to create the stream anyway
+    // because otherwise we crash dereferencing a nullptr, so we
+    // don't even ask it, and just return true.
     return true;
   }
   // QuicFilterManagerConnectionImpl
@@ -126,8 +149,12 @@ private:
   OptRef<QuicTransportSocketFactoryBase> transport_socket_factory_;
   std::vector<std::string> configured_alpns_;
   quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
+  const bool session_handles_migration_;
   QuicNetworkConnectivityObserverPtr network_connectivity_observer_;
   OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
+  quic::TransportParameters::ParameterMap received_custom_transport_parameters_;
+  absl::optional<quic::QuicSocketAddress> received_ipv6_alternate_server_address_;
+  absl::optional<quic::QuicSocketAddress> received_ipv4_alternate_server_address_;
 };
 
 } // namespace Quic

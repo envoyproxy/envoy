@@ -1,0 +1,6 @@
+date: July 24, 2025
+
+behavior_changes:
+- area: wasm
+  change: |
+    Bumped up V8 version to ``12.9.202.27`` to address multiple CVEs.

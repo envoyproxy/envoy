@@ -23,6 +23,48 @@ endpoints in a locality, then a weighted round robin schedule is used, where
 higher weighted endpoints will appear more often in the rotation to achieve the
 effective weighting.
 
+.. _arch_overview_load_balancing_types_client_side_weighted_round_robin:
+
+Client-side weighted round robin
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Envoy also provides a client-side weighted round robin policy implemented as an
+extension: :ref:`ClientSideWeightedRoundRobin
+<envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`.
+Unlike classic round robin, endpoint weights are derived from load reports sent by
+upstreams via ORCA (Open Request Cost Aggregation), incorporating queries-per-second (QPS),
+errors-per-second (EPS) and utilization to adaptively balance load.
+
+This policy supports:
+
+- :ref:`Slow start <arch_overview_load_balancing_slow_start>` via
+  :ref:`SlowStartConfig
+  <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.SlowStartConfig>`, allowing
+  new or recovered endpoints to ramp up traffic gradually.
+
+Note that ClientSideWeightedRoundRobin is intended to select endpoints only within a single
+locality. To use ClientSideWeightedRoundRobin across multiple localities, configure it as the
+child endpoint-picking policy under the :ref:`WrrLocality
+<envoy_v3_api_msg_extensions.load_balancing_policies.wrr_locality.v3.WrrLocality>` policy.
+
+Example configuration using WrrLocality with ClientSideWeightedRoundRobin as child:
+
+.. code-block:: yaml
+
+  load_balancing_policy:
+    policies:
+    - typed_extension_config:
+        name: envoy.load_balancing_policies.wrr_locality
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.wrr_locality.v3.WrrLocality
+          endpoint_picking_policy:
+            typed_extension_config:
+              name: envoy.load_balancing_policies.client_side_weighted_round_robin
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
+
+See the API reference above for full configuration details.
+
 .. _arch_overview_load_balancing_types_least_request:
 
 Weighted least request

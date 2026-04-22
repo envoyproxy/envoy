@@ -81,6 +81,9 @@ protected:
   void floodClient(const Http2Frame& frame, uint32_t num_frames, const std::string& flood_stat);
 
   void setNetworkConnectionBufferSize();
+
+  // Avoid hiding the other form of beginSession.
+  using Http2RawFrameIntegrationTest::beginSession;
   void beginSession() override;
   void prefillOutboundDownstreamQueue(uint32_t data_frame_count, uint32_t data_frame_size = 10);
   IntegrationStreamDecoderPtr prefillOutboundUpstreamQueue(uint32_t frame_count);
@@ -376,7 +379,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   EXPECT_GE(22000, buffer_factory->sumMaxBufferSizes());
   // Verify that all buffers have watermarks set.
   EXPECT_THAT(buffer_factory->highWatermarkRange(),
-              testing::Pair(256 * 1024 * 1024, 1024 * 1024 * 1024));
+              testing::Pair(16 * 1024 * 1024, 1024 * 1024 * 1024));
 }
 
 // Verify that the server can detect flood triggered by a DATA frame from a decoder filter call

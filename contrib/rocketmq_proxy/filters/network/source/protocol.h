@@ -48,9 +48,9 @@ public:
 
   virtual ~CommandCustomHeader() = default;
 
-  virtual void encode(ProtobufWkt::Value& root) PURE;
+  virtual void encode(Protobuf::Value& root) PURE;
 
-  virtual void decode(const ProtobufWkt::Value& ext_fields) PURE;
+  virtual void decode(const Protobuf::Value& ext_fields) PURE;
 
   const std::string& targetBrokerName() const { return target_broker_name_; }
 
@@ -264,9 +264,9 @@ public:
 
   void producerGroup(std::string producer_group) { producer_group_ = std::move(producer_group); }
 
-  void encode(ProtobufWkt::Value& root) override;
+  void encode(Protobuf::Value& root) override;
 
-  void decode(const ProtobufWkt::Value& ext_fields) override;
+  void decode(const Protobuf::Value& ext_fields) override;
 
   const std::string& producerGroup() const { return producer_group_; }
 
@@ -336,9 +336,9 @@ public:
       : msg_id_(std::move(msg_id)), queue_id_(queue_id), queue_offset_(queue_offset),
         transaction_id_(std::move(transaction_id)) {}
 
-  void encode(ProtobufWkt::Value& root) override;
+  void encode(Protobuf::Value& root) override;
 
-  void decode(const ProtobufWkt::Value& ext_fields) override;
+  void decode(const Protobuf::Value& ext_fields) override;
 
   const std::string& msgId() const { return msg_id_; }
 
@@ -376,9 +376,9 @@ private:
  */
 class GetRouteInfoRequestHeader : public RoutingCommandCustomHeader {
 public:
-  void encode(ProtobufWkt::Value& root) override;
+  void encode(Protobuf::Value& root) override;
 
-  void decode(const ProtobufWkt::Value& ext_fields) override;
+  void decode(const Protobuf::Value& ext_fields) override;
 };
 
 /**
@@ -398,9 +398,9 @@ class PopMessageRequestHeader : public RoutingCommandCustomHeader {
 public:
   friend class Decoder;
 
-  void encode(ProtobufWkt::Value& root) override;
+  void encode(Protobuf::Value& root) override;
 
-  void decode(const ProtobufWkt::Value& ext_fields) override;
+  void decode(const Protobuf::Value& ext_fields) override;
 
   const std::string& consumerGroup() const { return consumer_group_; }
 
@@ -460,9 +460,9 @@ private:
  */
 class PopMessageResponseHeader : public CommandCustomHeader {
 public:
-  void decode(const ProtobufWkt::Value& ext_fields) override;
+  void decode(const Protobuf::Value& ext_fields) override;
 
-  void encode(ProtobufWkt::Value& root) override;
+  void encode(Protobuf::Value& root) override;
 
   // This function is for testing only.
   int64_t popTimeForTest() const { return pop_time_; }
@@ -517,9 +517,9 @@ private:
  */
 class AckMessageRequestHeader : public RoutingCommandCustomHeader {
 public:
-  void decode(const ProtobufWkt::Value& ext_fields) override;
+  void decode(const Protobuf::Value& ext_fields) override;
 
-  void encode(ProtobufWkt::Value& root) override;
+  void encode(Protobuf::Value& root) override;
 
   absl::string_view consumerGroup() const { return consumer_group_; }
 
@@ -559,9 +559,9 @@ private:
  */
 class UnregisterClientRequestHeader : public CommandCustomHeader {
 public:
-  void encode(ProtobufWkt::Value& root) override;
+  void encode(Protobuf::Value& root) override;
 
-  void decode(const ProtobufWkt::Value& ext_fields) override;
+  void decode(const Protobuf::Value& ext_fields) override;
 
   void clientId(absl::string_view client_id) {
     client_id_ = std::string(client_id.data(), client_id.length());
@@ -592,9 +592,9 @@ private:
  */
 class GetConsumerListByGroupRequestHeader : public CommandCustomHeader {
 public:
-  void encode(ProtobufWkt::Value& root) override;
+  void encode(Protobuf::Value& root) override;
 
-  void decode(const ProtobufWkt::Value& ext_fields) override;
+  void decode(const Protobuf::Value& ext_fields) override;
 
   void consumerGroup(absl::string_view consumer_group) {
     consumer_group_ = std::string(consumer_group.data(), consumer_group.length());
@@ -611,7 +611,7 @@ private:
  */
 class GetConsumerListByGroupResponseBody {
 public:
-  void encode(ProtobufWkt::Struct& root);
+  void encode(Protobuf::Struct& root);
 
   void add(absl::string_view consumer_id) {
     consumer_id_list_.emplace_back(consumer_id.data(), consumer_id.length());
@@ -626,13 +626,13 @@ private:
  */
 class HeartbeatData : public Logger::Loggable<Logger::Id::rocketmq> {
 public:
-  bool decode(ProtobufWkt::Struct& doc);
+  bool decode(Protobuf::Struct& doc);
 
   const std::string& clientId() const { return client_id_; }
 
   const std::vector<std::string>& consumerGroups() const { return consumer_groups_; }
 
-  void encode(ProtobufWkt::Struct& root);
+  void encode(Protobuf::Struct& root);
 
   void clientId(absl::string_view client_id) {
     client_id_ = std::string(client_id.data(), client_id.size());

@@ -22,22 +22,38 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/utility.h"
 
-#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Tracing {
 
-// TODO(perf): Avoid string creations/copies in this entire file.
-static std::string buildResponseCode(const StreamInfo::StreamInfo& info) {
-  return info.responseCode() ? std::to_string(info.responseCode().value()) : "0";
+namespace {
+constexpr absl::string_view HttpResponseCode0 = "0";
+constexpr absl::string_view HttpResponseCode200 = "200";
+constexpr absl::string_view DefaultValue = "-";
+} // namespace
+
+// Helper method to set http status code.
+static void setSpanHttpStatusCode(Span& span, const StreamInfo::StreamInfo& stream_info) {
+  if (!stream_info.responseCode()) {
+    span.setTag(Tracing::Tags::get().HttpStatusCode, HttpResponseCode0);
+  } else {
+    const uint16_t code = stream_info.responseCode().value();
+    if (code == 200) {
+      // Optimization for the hottest path to avoid string conversion.
+      span.setTag(Tracing::Tags::get().HttpStatusCode, HttpResponseCode200);
+    } else {
+      span.setTag(Tracing::Tags::get().HttpStatusCode, std::to_string(code));
+    }
+  }
 }
 
 static absl::string_view valueOrDefault(const Http::HeaderEntry* header,
-                                        const char* default_value) {
-  return header ? header->value().getStringView() : default_value;
+                                        absl::string_view default_value) {
+  return (header != nullptr) ? header->value().getStringView() : default_value;
 }
 
-static void addTagIfNotNull(Span& span, const std::string& tag, const Http::HeaderEntry* entry) {
+static void addTagIfNotNull(Span& span, absl::string_view tag, const Http::HeaderEntry* entry) {
   if (entry != nullptr) {
     span.setTag(tag, entry->value().getStringView());
   }
@@ -145,8 +161,9 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
         Http::Utility::buildOriginalUri(*request_headers, tracing_config.maxPathTagLength()));
     span.setTag(Tracing::Tags::get().HttpMethod, request_headers->getMethodValue());
     span.setTag(Tracing::Tags::get().DownstreamCluster,
-                valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
-    span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
+                valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), DefaultValue));
+    span.setTag(Tracing::Tags::get().UserAgent,
+                valueOrDefault(request_headers->UserAgent(), DefaultValue));
     span.setTag(
         Tracing::Tags::get().HttpProtocol,
         Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
@@ -154,8 +171,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     const auto& remote_address = stream_info.downstreamAddressProvider().directRemoteAddress();
 
     if (remote_address->type() == Network::Address::Type::Ip) {
-      const auto remote_ip = remote_address->ip();
-      span.setTag(Tracing::Tags::get().PeerAddress, remote_ip->addressAsString());
+      span.setTag(Tracing::Tags::get().PeerAddress, remote_address->ip()->addressAsString());
     } else {
       span.setTag(Tracing::Tags::get().PeerAddress, remote_address->logicalName());
     }
@@ -173,7 +189,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
   span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
 
-  setCommonTags(span, stream_info, tracing_config);
+  setCommonTags(span, stream_info, tracing_config, false);
   onUpstreamResponseHeaders(span, response_headers);
   onUpstreamResponseTrailers(span, response_trailers);
 
@@ -195,7 +211,7 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span, const StreamInfo::Strea
     span.setTag(Tracing::Tags::get().PeerAddress, upstream_address->asStringView());
   }
 
-  setCommonTags(span, stream_info, tracing_config);
+  setCommonTags(span, stream_info, tracing_config, true);
 
   span.finishSpan();
 }
@@ -215,20 +231,18 @@ void HttpTracerUtility::onUpstreamResponseTrailers(
 }
 
 void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& stream_info,
-                                      const Config& tracing_config) {
+                                      const Config& tracing_config, bool upstream_span) {
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
   // Cluster info.
-  if (auto cluster_info = stream_info.upstreamClusterInfo();
-      cluster_info.has_value() && cluster_info.value() != nullptr) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info.value()->name());
-    span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                cluster_info.value()->observabilityName());
+  if (const auto cluster_info = stream_info.upstreamClusterInfo()) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info->name());
+    span.setTag(Tracing::Tags::get().UpstreamClusterName, cluster_info->observabilityName());
   }
 
-  // Post response data.
-  span.setTag(Tracing::Tags::get().HttpStatusCode, buildResponseCode(stream_info));
+  setSpanHttpStatusCode(span, stream_info);
+
   span.setTag(Tracing::Tags::get().ResponseFlags,
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
 
@@ -240,15 +254,7 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
     span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
 
-  ReadOnlyHttpTraceContext trace_context{stream_info.getRequestHeaders() != nullptr
-                                             ? *stream_info.getRequestHeaders()
-                                             : *Http::StaticEmptyHeaders::get().request_headers};
-  CustomTagContext ctx{trace_context, stream_info};
-  if (const CustomTagMap* custom_tag_map = tracing_config.customTags(); custom_tag_map) {
-    for (const auto& it : *custom_tag_map) {
-      it.second->applySpan(span, ctx);
-    }
-  }
+  tracing_config.modifySpan(span, upstream_span);
 }
 
 } // namespace Tracing

@@ -51,19 +51,19 @@ protected:
           callback_(std::move(callback)) {}
 
     void cancel(CancelReason) override {
-      ENVOY_LOG(debug, "cancelling query [{}]", dns_name_);
-      absl::MutexLock lock(&mutex_);
+      ENVOY_LOG(trace, "cancelling query [{}]", dns_name_);
+      absl::MutexLock lock(mutex_);
       cancelled_ = true;
     }
 
     void addTrace(uint8_t trace) override {
-      absl::MutexLock lock(&mutex_);
+      absl::MutexLock lock(mutex_);
       traces_.push_back(
           Trace{trace, std::chrono::steady_clock::now()}); // NO_CHECK_FORMAT(real_time)
     }
 
     std::string getTraces() override {
-      absl::MutexLock lock(&mutex_);
+      absl::MutexLock lock(mutex_);
       std::vector<std::string> string_traces;
       string_traces.reserve(traces_.size());
       std::transform(traces_.begin(), traces_.end(), std::back_inserter(string_traces),
@@ -75,7 +75,7 @@ protected:
     }
 
     bool isCancelled() {
-      absl::MutexLock lock(&mutex_);
+      absl::MutexLock lock(mutex_);
       return cancelled_;
     }
 

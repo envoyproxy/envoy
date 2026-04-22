@@ -22,7 +22,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace LoadBalancingPolices {
+namespace LoadBalancingPolicies {
 namespace OverrideHost {
 namespace {
 
@@ -292,6 +292,6 @@ TEST_P(OverrideHostIntegrationTest, UseFirstEndpointFromHeaders) {
 
 } // namespace
 } // namespace OverrideHost
-} // namespace LoadBalancingPolices
+} // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

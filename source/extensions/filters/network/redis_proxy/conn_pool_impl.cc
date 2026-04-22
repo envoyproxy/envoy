@@ -8,12 +8,16 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/stats/utility.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
 
 namespace Envoy {
@@ -46,26 +50,34 @@ InstanceImpl::InstanceImpl(
     Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
-    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
+    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator,
+    const std::string& local_zone)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
       stats_scope_(std::move(stats_scope)), redis_command_stats_(redis_command_stats),
       redis_cluster_stats_{REDIS_CLUSTER_STATS(POOL_COUNTER(*stats_scope_))},
-      refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache) {}
+      refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache),
+      aws_iam_authenticator_(aws_iam_authenticator), aws_iam_config_(aws_iam_config),
+      local_zone_(local_zone) {}
 
 void InstanceImpl::init() {
   // Note: `this` and `cluster_name` have a a lifetime of the filter.
   // That may be shorter than the tls callback if the listener is torn down shortly after it is
   // created. We use a weak pointer to make sure this object outlives the tls callbacks.
   std::weak_ptr<InstanceImpl> this_weak_ptr = this->shared_from_this();
-  tls_->set([this_weak_ptr](
-                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    if (auto this_shared_ptr = this_weak_ptr.lock()) {
-      return std::make_shared<ThreadLocalPool>(
-          this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_, this_shared_ptr->dns_cache_);
-    }
-    return nullptr;
-  });
+  tls_->set(
+      [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        if (auto this_shared_ptr = this_weak_ptr.lock()) {
+          return std::make_shared<ThreadLocalPool>(
+              this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_, this_shared_ptr->api_,
+              this_shared_ptr->dns_cache_, this_shared_ptr->aws_iam_config_,
+              this_shared_ptr->aws_iam_authenticator_);
+        }
+        return nullptr;
+      });
 }
 
 uint16_t InstanceImpl::shardSize() { return tls_->getTyped<ThreadLocalPool>().shardSize(); }
@@ -100,14 +112,19 @@ InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
-    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
-    : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
+    Api::Api& api, const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator)
+    : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)), api_(api),
       dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
       client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
       redis_cluster_stats_(parent->redis_cluster_stats_),
-      refresh_manager_(parent->refresh_manager_) {
+      refresh_manager_(parent->refresh_manager_), aws_iam_authenticator_(aws_iam_authenticator),
+      aws_iam_config_(aws_iam_config), client_zone_(parent->localZone()) {
+
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
@@ -149,16 +166,16 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   ASSERT(cluster_ == nullptr);
   auto& cluster = get_cluster();
   cluster_ = &cluster;
-  // Update username and password when cluster updates.
-  auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
-  auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), shared_parent->api_);
+  // Update username and password when cluster updates. authPassword is ignored by the client when
+  // AWS IAM Authentication is enabled.
+  auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), api_);
+  auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), api_);
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>& hosts_added,
-             const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> absl::Status {
+             const std::vector<Upstream::HostSharedPtr>& hosts_removed) {
         onHostsAdded(hosts_added);
         onHostsRemoved(hosts_removed);
-        return absl::OkStatus();
       });
 
   ASSERT(host_address_map_.empty());
@@ -268,11 +285,15 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
     if (config_->connectionRateLimitEnabled() && rate_limiter->consume(1, false) == 0) {
       redis_cluster_stats_.connection_rate_limited_.inc();
     } else {
+      ASSERT(cluster_ != nullptr);
+      const auto credentials =
+          ProtocolOptionsConfigImpl::authCredentials(cluster_->info(), api_, host);
       client = std::make_unique<ThreadLocalActiveClient>(*this);
       client->host_ = host;
-      client->redis_client_ =
-          client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
-                                 auth_username_, auth_password_, false);
+      client->redis_client_ = client_factory_.create(
+          host, dispatcher_, config_, redis_command_stats_, *(stats_scope_), credentials.username,
+          credentials.password, false, aws_iam_config_, aws_iam_authenticator_);
+
       client->redis_client_->addConnectionCallbacks(*client);
     }
   }
@@ -291,7 +312,7 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
   unique_hosts.reserve(Envoy::Extensions::Clusters::Redis::MaxSlot);
   for (uint16_t size = 0; size < Envoy::Extensions::Clusters::Redis::MaxSlot; size++) {
     Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
-        size, request, Common::Redis::Client::ReadPolicy::Primary);
+        size, request, Common::Redis::Client::ReadPolicy::Primary, client_zone_);
     Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
         cluster_->loadBalancer().chooseHost(&lb_context));
     if (!host) {
@@ -314,8 +335,8 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
 
   Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
       key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
-      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
-
+      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy(),
+      client_zone_);
   Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
       cluster_->loadBalancer().chooseHost(&lb_context));
   if (!host) {
@@ -338,7 +359,8 @@ InstanceImpl::ThreadLocalPool::makeRequestToShard(uint16_t shard_index, RespVari
 
   Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
       shard_index, getRequest(request),
-      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
+      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy(),
+      client_zone_);
 
   Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
       cluster_->loadBalancer().chooseHost(&lb_context));
@@ -406,9 +428,9 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
     Upstream::HostSharedPtr new_host{THROW_OR_RETURN_VALUE(
         Upstream::HostImpl::create(
             cluster_->info(), "", address_ptr, nullptr, nullptr, 1,
-            envoy::config::core::v3::Locality(),
+            std::make_shared<const envoy::config::core::v3::Locality>(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-            envoy::config::core::v3::UNKNOWN, dispatcher_.timeSource()),
+            envoy::config::core::v3::UNKNOWN),
         std::unique_ptr<Upstream::HostImpl>)};
     host_address_map_[host_address_map_key] = new_host;
     created_via_redirect_hosts_.push_back(new_host);
@@ -432,9 +454,14 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(Upstream::HostConstSharedPtr& h
   uint32_t client_idx = transaction.current_client_idx_;
   // If there is an active transaction, establish a new connection if necessary.
   if (transaction.active_ && !transaction.connection_established_) {
+    ASSERT(cluster_ != nullptr);
+    const auto auth_credentials =
+        ProtocolOptionsConfigImpl::authCredentials(cluster_->info(), api_, host);
+
     transaction.clients_[client_idx] =
         client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
-                               auth_username_, auth_password_, true);
+                               auth_credentials.username, auth_credentials.password, true,
+                               aws_iam_config_, aws_iam_authenticator_);
     if (transaction.connection_cb_) {
       transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
     }

@@ -22,8 +22,22 @@ envoy_cc_test_library(
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "locality_wrr_test",
+    srcs = ["locality_wrr_test.cc"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "//source/common/upstream:upstream_includes",
+        "//source/extensions/load_balancing_policies/common:locality_wrr_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -89,6 +103,22 @@ envoy_cc_test_library(
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "orca_weight_manager_test",
+    srcs = ["orca_weight_manager_test.cc"],
+    deps = [
+        "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
 

@@ -18,8 +18,8 @@ envoy_cc_library(
         "//source/common/common:regex_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],
 )

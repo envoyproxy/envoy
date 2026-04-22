@@ -174,7 +174,7 @@ UdpListenerWorkerRouterImpl::UdpListenerWorkerRouterImpl(uint32_t concurrency)
     : workers_(concurrency) {}
 
 void UdpListenerWorkerRouterImpl::registerWorkerForListener(UdpListenerCallbacks& listener) {
-  absl::WriterMutexLock lock(&mutex_);
+  absl::WriterMutexLock lock(mutex_);
 
   ASSERT(listener.workerIndex() < workers_.size());
   ASSERT(workers_.at(listener.workerIndex()) == nullptr);
@@ -182,14 +182,14 @@ void UdpListenerWorkerRouterImpl::registerWorkerForListener(UdpListenerCallbacks
 }
 
 void UdpListenerWorkerRouterImpl::unregisterWorkerForListener(UdpListenerCallbacks& listener) {
-  absl::WriterMutexLock lock(&mutex_);
+  absl::WriterMutexLock lock(mutex_);
 
   ASSERT(workers_.at(listener.workerIndex()) == &listener);
   workers_.at(listener.workerIndex()) = nullptr;
 }
 
 void UdpListenerWorkerRouterImpl::deliver(uint32_t dest_worker_index, UdpRecvData&& data) {
-  absl::ReaderMutexLock lock(&mutex_);
+  absl::ReaderMutexLock lock(mutex_);
 
   ASSERT(dest_worker_index < workers_.size(),
          "UdpListenerCallbacks::destination returned out-of-range value");

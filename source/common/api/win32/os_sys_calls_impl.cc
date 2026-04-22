@@ -1,3 +1,5 @@
+#include "source/common/api/os_sys_calls_impl.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <io.h>
@@ -5,8 +7,6 @@
 
 #include <cstdint>
 #include <string>
-
-#include "source/common/api/os_sys_calls_impl.h"
 
 #define DWORD_MAX UINT32_MAX
 
@@ -481,6 +481,15 @@ SysCallIntResult OsSysCallsImpl::getaddrinfo(const char* node, const char* servi
 }
 
 void OsSysCallsImpl::freeaddrinfo(addrinfo* res) { ::freeaddrinfo(res); }
+
+SysCallIntResult OsSysCallsImpl::getrlimit(int resource, struct rlimit* rlim) {
+  // Windows does not support all resource limits.
+  return {0, 0};
+}
+
+SysCallIntResult OsSysCallsImpl::setrlimit(int resource, const struct rlimit* rlim) {
+  PANIC("not implemented");
+}
 
 } // namespace Api
 } // namespace Envoy

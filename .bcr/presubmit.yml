@@ -1,0 +1,20 @@
+matrix:
+  unix_platform:
+  - debian11
+  - ubuntu2404
+  - macos_arm64
+  bazel:
+  - 7.x
+  - 8.x
+  - 9.*
+tasks:
+  verify_targets:
+    name: Verify build targets
+    platform: ${{ unix_platform }}
+    bazel: ${{ bazel }}
+    build_targets:
+    - "@envoy//envoy/..."
+    build_flags:
+    - "--java_runtime_version=remotejdk_21"
+    - "--cxxopt=-std=c++20"
+    - "--host_cxxopt=-std=c++20"

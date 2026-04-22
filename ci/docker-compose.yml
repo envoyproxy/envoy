@@ -1,0 +1,121 @@
+x-envoy-build-base: &envoy-build-base
+  image: >-
+    ${ENVOY_BUILD_IMAGE:?ERROR: ENVOY_BUILD_IMAGE is not set! either set it in your environment or use ci/run_envoy_docker.sh to set it}
+  cpus: ${ENVOY_DOCKER_CPUS:-0}
+  user: root:root
+  working_dir: ${ENVOY_DOCKER_SOURCE_DIR:-/source}
+  stdin_open: true
+  tty: true
+  platform: ${ENVOY_DOCKER_PLATFORM:-}
+  environment:
+  # Core build environment
+  - BUILD_DIR=/build
+  - DOCKER_COMMAND
+  - ENVOY_DOCKER_SOURCE_DIR=${ENVOY_DOCKER_SOURCE_DIR:-/source}
+  - ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}"
+  - ENVOY_OCI_DIR
+
+  # Proxy settings
+  - HTTP_PROXY
+  - HTTPS_PROXY
+  - NO_PROXY
+  - GOPROXY
+
+  # Bazel configuration
+  - BAZEL_STARTUP_OPTIONS
+  - BAZEL_BUILD_EXTRA_OPTIONS
+  - BAZEL_EXTRA_TEST_OPTIONS
+  - BAZEL_REMOTE_CACHE
+  - BAZEL_STARTUP_EXTRA_OPTIONS
+  - BAZEL_REMOTE_INSTANCE
+  - BAZELISK_BASE_URL
+  - CLANG_TIDY_TARGETS
+
+  # CI/CD variables
+  - CI_BRANCH
+  - CI_SHA1
+  - CI_TARGET_BRANCH
+  - BUILD_REASON
+  - GITHUB_REF_NAME
+  - GITHUB_REF_TYPE
+  - GITHUB_TOKEN
+  - GITHUB_APP_ID
+  - GITHUB_INSTALL_ID
+  - ENVOY_DEFLAKE_JOBS
+  - ENVOY_DEFLAKE_RUNS
+  - ENVOY_DEFLAKE_TARGET
+  - ENVOY_DEFLAKE_TEST
+
+  # Build configuration
+  - NUM_CPUS
+  - ENVOY_BRANCH
+  - ENVOY_BUILD_IMAGE
+  - ENVOY_DOCS_PATH
+  - ENVOY_SRCDIR
+  - ENVOY_BUILD_TARGET
+  - ENVOY_BUILD_DEBUG_INFORMATION
+  - ENVOY_BUILD_FILTER_EXAMPLE
+  - ENVOY_COMMIT
+  - ENVOY_HEAD_REF
+  - ENVOY_OUTPUT_BASE_DIR
+  - ENVOY_REPO
+  - ENVOY_BUILD_ARCH
+  - ENVOY_GEN_COMPDB_OPTIONS
+
+  # Publishing and artifacts
+  - ENVOY_DOCKER_SAVE_IMAGE
+  - ENVOY_PUBLISH_DRY_RUN
+  - ENVOY_TARBALL_DIR
+
+  - MOBILE_DOCS_CHECKOUT_DIR
+  - SYSTEM_STAGEDISPLAYNAME
+  - SYSTEM_JOBDISPLAYNAME
+  - SSH_AUTH_SOCK
+
+  entrypoint:
+  - "/bin/bash"
+  - "-c"
+  - |
+    set -e
+
+    if [[ -n "${USER_GID:-}" ]]; then
+        groupmod -g "$USER_GID" envoybuild >/dev/null
+    fi
+    if [[ -n "${USER_UID:-}" ]]; then
+        usermod -u "$USER_UID" envoybuild >/dev/null
+    fi
+    usermod -d /build envoybuild >/dev/null
+    if [[ -f /.build-id ]]; then
+        build_id="$(cat /.build-id)"
+        echo "Envoy build image: $${build_id}"
+    fi
+    chown envoybuild:envoybuild /build
+    chown envoybuild /proc/self/fd/2 2>/dev/null || true
+    [[ -e /entrypoint-extra.sh ]] && /entrypoint-extra.sh
+    sudo -EHs -u envoybuild bash -c 'cd ${ENVOY_DOCKER_SOURCE_DIR:-/source} && exec ${DOCKER_COMMAND:-bash}'
+
+services:
+  envoy-build:
+    <<: *envoy-build-base
+    volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build${MOUNT_ACCESS_MODE:-}
+    - ${SOURCE_DIR:-..}:/source${MOUNT_ACCESS_MODE:-}
+    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}${MOUNT_ACCESS_MODE:-}
+
+  envoy-build-gpg:
+    <<: *envoy-build-base
+    volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
+    - ${SOURCE_DIR:-..}:/source
+    - ${ENVOY_GPG_DIR-${HOME}/.gnupg}:/build/.gnupg
+    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
+
+  envoy-build-dind:
+    privileged: true
+    <<: *envoy-build-base
+    volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
+    - ${SOURCE_DIR:-..}:/source
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
+    - ${ENVOY_ENTRYPOINT_EXTRA:-./docker-entrypoint-extra.sh}:/entrypoint-extra.sh

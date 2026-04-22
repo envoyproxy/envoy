@@ -112,10 +112,10 @@ func getOrCreateState(s *C.processState) *processState {
 		req = createRequest(r)
 	}
 	if s.is_encoding == 0 {
-		if req.decodingState.processState == nil {
-			req.decodingState.processState = s
+		if req.decodingState.processState.processState == nil {
+			req.decodingState.processState.processState = s
 		}
-		return &req.decodingState
+		return &req.decodingState.processState
 	}
 
 	// s.is_encoding == 1
@@ -157,8 +157,11 @@ func getRequest(r *C.httpRequest) *httpRequest {
 func getState(s *C.processState) *processState {
 	r := s.req
 	req := getRequest(r)
+	if req == nil {
+		return nil
+	}
 	if s.is_encoding == 0 {
-		return &req.decodingState
+		return &req.decodingState.processState
 	}
 	// s.is_encoding == 1
 	return &req.encodingState
@@ -237,6 +240,10 @@ func envoyGoFilterOnHttpHeader(s *C.processState, endStream, headerNum, headerBy
 //export envoyGoFilterOnHttpData
 func envoyGoFilterOnHttpData(s *C.processState, endStream, buffer, length uint64) uint64 {
 	state := getState(s)
+	if state == nil {
+		// safe to do as the C++ side hasDestroyed() check prevents acting on the returned value
+		return uint64(api.Continue)
+	}
 
 	req := state.request
 	if req.pInfo.paniced {
@@ -351,6 +358,10 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64,
 //export envoyGoFilterOnHttpStreamComplete
 func envoyGoFilterOnHttpStreamComplete(r *C.httpRequest) {
 	req := getRequest(r)
+	if req == nil {
+		return
+	}
+
 	defer req.recoverPanic()
 
 	f := req.httpFilter
@@ -360,6 +371,10 @@ func envoyGoFilterOnHttpStreamComplete(r *C.httpRequest) {
 //export envoyGoFilterOnHttpDestroy
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
+	if req == nil {
+		return
+	}
+
 	// do nothing even when req.panic is true, since filter is already destroying.
 	defer req.recoverPanic()
 
@@ -381,6 +396,9 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 //export envoyGoRequestSemaDec
 func envoyGoRequestSemaDec(r *C.httpRequest) {
 	req := getRequest(r)
+	if req == nil {
+		return
+	}
 	defer req.recoverPanic()
 	req.resumeWaitCallback()
 }

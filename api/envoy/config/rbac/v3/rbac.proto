@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.rbac.v3;
 
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/cel.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/filter_state.proto";
@@ -173,6 +174,7 @@ message RBAC {
 // A policy matches if and only if at least one of its permissions match the
 // action taking place AND at least one of its principals match the downstream
 // AND the condition is true if specified.
+// [#next-free-field: 6]
 message Policy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Policy";
 
@@ -199,6 +201,12 @@ message Policy {
   // Only be used when condition is not used.
   google.api.expr.v1alpha1.CheckedExpr checked_condition = 4
       [(udpa.annotations.field_migrate).oneof_promotion = "expression_specifier"];
+
+  // CEL expression configuration that modifies the evaluation behavior of the ``condition`` field.
+  // If specified, string conversion, concatenation, and manipulation functions may be enabled
+  // for the CEL expression. See :ref:`CelExpressionConfig <envoy_v3_api_msg_config.core.v3.CelExpressionConfig>`
+  // for more details.
+  core.v3.CelExpressionConfig cel_config = 5;
 }
 
 // SourcedMetadata enables matching against metadata from different sources in the request processing
@@ -248,10 +256,14 @@ message Permission {
     // When any is set, it matches any action.
     bool any = 3 [(validate.rules).bool = {const: true}];
 
-    // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
-    // available for HTTP request.
-    // Note: the pseudo-header :path includes the query and fragment string. Use the ``url_path``
-    // field if you want to match the URL path without the query and fragment string.
+    // A header (or pseudo-header such as ``:path`` or ``:method``) on the incoming HTTP request. Only available
+    // for HTTP request.
+    //
+    // .. note::
+    //
+    //   The pseudo-header ``:path`` includes the query and fragment string. Use the ``url_path`` field if you
+    //   want to match the URL path without the query and fragment string.
+    //
     route.v3.HeaderMatcher header = 4;
 
     // A URL path on the incoming HTTP request. Only available for HTTP.
@@ -276,8 +288,7 @@ message Permission {
     // the value of ``not_rule`` would not match, this permission would match.
     Permission not_rule = 8;
 
-    // The request server from the client's connection request. This is
-    // typically TLS SNI.
+    // The request server from the client's connection request. This is typically TLS SNI.
     //
     // .. attention::
     //
@@ -294,8 +305,7 @@ message Permission {
     //   * A :ref:`listener filter <arch_overview_listener_filters>` may
     //     overwrite a connection's requested server name within Envoy.
     //
-    // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to
-    // setup SNI.
+    // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn how to setup SNI.
     type.matcher.v3.StringMatcher requested_server_name = 9;
 
     // Extension for configuring custom matchers for RBAC.
@@ -351,12 +361,10 @@ message Principal {
   oneof identifier {
     option (validate.required) = true;
 
-    // A set of identifiers that all must match in order to define the
-    // downstream.
+    // A set of identifiers that all must match in order to define the downstream.
     Set and_ids = 1;
 
-    // A set of identifiers at least one must match in order to define the
-    // downstream.
+    // A set of identifiers at least one must match in order to define the downstream.
     Set or_ids = 2;
 
     // When any is set, it matches any downstream.
@@ -380,24 +388,33 @@ message Principal {
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // A CIDR block that describes the downstream remote/origin address.
-    // Note: This is always the physical peer even if the
-    // :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>` is
-    // inferred from for example the x-forwarder-for header, proxy protocol,
-    // etc.
+    //
+    // .. note::
+    //
+    //   This is always the physical peer even if the
+    //   :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>` is inferred from the
+    //   x-forwarder-for header, the proxy protocol, etc.
+    //
     core.v3.CidrRange direct_remote_ip = 10;
 
     // A CIDR block that describes the downstream remote/origin address.
-    // Note: This may not be the physical peer and could be different from the
-    // :ref:`direct_remote_ip
-    // <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`. E.g, if the
-    // remote ip is inferred from for example the x-forwarder-for header, proxy
-    // protocol, etc.
+    //
+    // .. note::
+    //
+    //   This may not be the physical peer and could be different from the :ref:`direct_remote_ip
+    //   <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`. E.g, if the remote ip is inferred from
+    //   the x-forwarder-for header, the proxy protocol, etc.
+    //
     core.v3.CidrRange remote_ip = 11;
 
-    // A header (or pseudo-header such as :path or :method) on the incoming HTTP
-    // request. Only available for HTTP request. Note: the pseudo-header :path
-    // includes the query and fragment string. Use the ``url_path`` field if you
-    // want to match the URL path without the query and fragment string.
+    // A header (or pseudo-header such as ``:path`` or ``:method``) on the incoming HTTP request. Only available
+    // for HTTP request.
+    //
+    // .. note::
+    //
+    //   The pseudo-header ``:path`` includes the query and fragment string. Use the ``url_path`` field if you
+    //   want to match the URL path without the query and fragment string.
+    //
     route.v3.HeaderMatcher header = 6;
 
     // A URL path on the incoming HTTP request. Only available for HTTP.
@@ -434,7 +451,7 @@ message Action {
   // The action to take if the matcher matches. Every action either allows or denies a request,
   // and can also carry out action-specific operations.
   //
-  // Actions:
+  // **Actions:**
   //
   //  * ``ALLOW``: If the request gets matched on ALLOW, it is permitted.
   //  * ``DENY``: If the request gets matched on DENY, it is not permitted.
@@ -443,7 +460,7 @@ message Action {
   //    ``envoy.common`` will be set to the value ``true``.
   //  * If the request cannot get matched, it will fallback to ``DENY``.
   //
-  // Log behavior:
+  // **Log behavior:**
   //
   //  If the RBAC matcher contains at least one LOG action, the dynamic
   //  metadata key ``access_log_hint`` will be set based on if the request

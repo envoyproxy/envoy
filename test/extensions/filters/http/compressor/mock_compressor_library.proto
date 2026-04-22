@@ -4,3 +4,6 @@ package test.mock_compressor_library;
 
 message Unregistered {
 }
+
+message Registered {
+}

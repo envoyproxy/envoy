@@ -40,6 +40,9 @@ public:
       : BaseIntegrationTest(GetParam(), rbac_config) {}
 
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
+    // Enable debug logging for all loggers to ensure coverage of debug log statements
+    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
     rbac_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:

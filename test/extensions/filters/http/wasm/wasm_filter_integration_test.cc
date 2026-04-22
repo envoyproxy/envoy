@@ -28,7 +28,7 @@ public:
     }
     // Wasm filters are expensive to setup and sometime default is not enough,
     // It needs to increase timeout to avoid flaky tests
-    setListenersBoundTimeout(10 * TestUtility::DefaultTimeout);
+    setListenersBoundTimeout(30 * TestUtility::DefaultTimeout);
   }
 
   void TearDown() override { fake_upstream_connection_.reset(); }
@@ -235,6 +235,16 @@ TEST_P(WasmFilterIntegrationTest, BodyBufferedMultipleChunksManipulation) {
   runTest(request_headers, request_body, expected_request_headers, "request_very_long_body.end",
           upstream_response_headers, upstream_response_body, expected_response_headers,
           "upstream_very_long_body.end");
+}
+
+TEST_P(WasmFilterIntegrationTest, PanicReturn503) {
+  setupWasmFilter("", "panic");
+  HttpIntegrationTest::initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 TEST_P(WasmFilterIntegrationTest, LargeRequestHitBufferLimit) {

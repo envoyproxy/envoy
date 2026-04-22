@@ -46,10 +46,11 @@ public:
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreSharedPtr clusterStore() {
     return cluster_store_;
   }
-  Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
+  Extensions::Common::DynamicForwardProxy::DnsCache& cache() const { return *dns_cache_; }
   Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
+  bool allowDynamicHostFromFilterState() const { return allow_dynamic_host_from_filter_state_; }
   bool saveUpstreamAddress() const { return save_upstream_address_; };
-  const std::chrono::milliseconds clusterInitTimeout() const { return cluster_init_timeout_; };
+  std::chrono::milliseconds clusterInitTimeout() const { return cluster_init_timeout_; };
 
   LoadClusterEntryHandlePtr
   addDynamicCluster(Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr cluster,
@@ -58,7 +59,7 @@ public:
 
 private:
   struct LoadClusterEntryHandleImpl
-      : public LoadClusterEntryHandle,
+      : LoadClusterEntryHandle,
         RaiiMapOfListElement<std::string, LoadClusterEntryHandleImpl*> {
     LoadClusterEntryHandleImpl(
         absl::flat_hash_map<std::string, std::list<LoadClusterEntryHandleImpl*>>& parent,
@@ -70,18 +71,18 @@ private:
   };
 
   // Per-thread cluster info including pending clusters.
-  // The lifetime of ThreadLocalClusterInfo, which is allocated on each working thread
-  // may exceed lifetime of the parent object (ProxyFilterConfig), which is allocated
+  // The lifetime of ThreadLocalClusterInfo, which is allocated on each working thread,
+  // may exceed the lifetime of the parent object (ProxyFilterConfig), which is allocated
   // and deleted on the main thread.
-  // Currently ThreadLocalClusterInfo does not hold any references to the parent object
+  // Currently, ThreadLocalClusterInfo does not hold any references to the parent object
   // and therefore does not need to check if the parent object is still valid.
   // IMPORTANT: If a reference to the parent object is added here, the validity of
   // that object must be checked before using it. It is best achieved via
   // combination of shared and weak pointers.
-  struct ThreadLocalClusterInfo : public ThreadLocal::ThreadLocalObject,
-                                  public Envoy::Upstream::ClusterUpdateCallbacks,
+  struct ThreadLocalClusterInfo : ThreadLocal::ThreadLocalObject,
+                                  Envoy::Upstream::ClusterUpdateCallbacks,
                                   Logger::Loggable<Logger::Id::forward_proxy> {
-    ThreadLocalClusterInfo(ProxyFilterConfig& parent) {
+    explicit ThreadLocalClusterInfo(const ProxyFilterConfig& parent) {
       // run in each worker thread.
       handle_ = parent.cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
     }
@@ -103,6 +104,7 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalClusterInfo> tls_slot_;
   const std::chrono::milliseconds cluster_init_timeout_;
   const bool save_upstream_address_;
+  const bool allow_dynamic_host_from_filter_state_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -137,8 +139,8 @@ public:
   void onDestroy() override;
 
   Http::FilterHeadersStatus
-  loadDynamicCluster(Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr cluster,
-                     Http::RequestHeaderMap& headers, uint16_t default_port);
+  loadDynamicCluster(const Extensions::Common::DynamicForwardProxy::DfpClusterSharedPtr& cluster,
+                     const Http::RequestHeaderMap& headers, uint16_t default_port);
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks
   void onLoadDnsCacheComplete(

@@ -26,9 +26,15 @@ envoy_cc_test(
     srcs = ["logical_host_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:filter_state_lib",
         "//source/extensions/clusters/common:logical_host_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:transport_socket_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:transport_socket_match_mocks",
     ],
 )
 
@@ -40,7 +46,6 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/common:logical_host_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
-        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:registry_lib",

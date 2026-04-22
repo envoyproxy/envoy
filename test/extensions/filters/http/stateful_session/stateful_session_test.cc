@@ -1,4 +1,3 @@
-#include <memory>
 
 #include "source/extensions/filters/http/stateful_session/stateful_session.h"
 #include "source/server/generic_factory_context.h"
@@ -35,7 +34,8 @@ public:
     TestUtility::loadFromYaml(std::string(config), proto_config);
     Envoy::Server::GenericFactoryContextImpl generic_context(context_);
 
-    config_ = std::make_shared<StatefulSessionConfig>(proto_config, generic_context);
+    config_ = std::make_shared<StatefulSessionConfig>(proto_config, generic_context, "",
+                                                      context_.scope());
 
     filter_ = std::make_shared<StatefulSession>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -105,7 +105,8 @@ TEST_F(StatefulSessionTest, NormalSessionStateTest) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
+        EXPECT_EQ("1.2.3.4", host.host);
+        EXPECT_FALSE(host.strict);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -145,7 +146,8 @@ TEST_F(StatefulSessionTest, SessionStateOverrideByRoute) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
+        EXPECT_EQ("1.2.3.4", host.host);
+        EXPECT_FALSE(host.strict);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -189,7 +191,8 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
       .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
+        EXPECT_EQ("1.2.3.4", host.host);
+        EXPECT_FALSE(host.strict);
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -217,13 +220,282 @@ TEST_F(StatefulSessionTest, NullSessionState) {
 
 TEST(EmpytProtoConfigTest, EmpytProtoConfigTest) {
   ProtoConfig empty_proto_config;
-  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> generic_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  StatefulSessionConfig config(empty_proto_config, generic_context);
+  StatefulSessionConfig config(empty_proto_config, context, "", context.scope());
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
   EXPECT_EQ(nullptr, config.createSessionState(request_headers));
+}
+
+// Test stats functionality.
+TEST_F(StatefulSessionTest, StatsRouted) {
+  const std::string config_with_stats = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+stat_prefix: "test"
+)EOF";
+  initialize(config_with_stats);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  auto raw_session_state = new testing::NiceMock<Http::MockSessionState>();
+  EXPECT_CALL(*factory_, create(_))
+      .WillOnce(Return(testing::ByMove(std::unique_ptr<Http::SessionState>(raw_session_state))));
+  EXPECT_CALL(*raw_session_state, upstreamAddress())
+      .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
+
+  // Initial stats should be zero.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Mock that the host didn't change (successful routing).
+  EXPECT_CALL(*raw_session_state, onUpdate(_, _)).WillOnce(::testing::Return(false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  // Verify routed counter incremented.
+  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+}
+
+TEST_F(StatefulSessionTest, StatsFailedOpen) {
+  const std::string config_with_stats = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+stat_prefix: "test"
+)EOF";
+  initialize(config_with_stats);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  auto raw_session_state = new testing::NiceMock<Http::MockSessionState>();
+  EXPECT_CALL(*factory_, create(_))
+      .WillOnce(Return(testing::ByMove(std::unique_ptr<Http::SessionState>(raw_session_state))));
+  EXPECT_CALL(*raw_session_state, upstreamAddress())
+      .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
+
+  // Initial stats should be zero.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Mock that the host changed (failed override, fallback occurred).
+  EXPECT_CALL(*raw_session_state, onUpdate(_, _)).WillOnce(::testing::Return(true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  // Verify failed_open counter incremented.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+}
+
+TEST_F(StatefulSessionTest, StatsFailedClosed) {
+  const std::string strict_config = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+strict: true
+stat_prefix: "test"
+)EOF";
+
+  initialize(strict_config);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+
+  auto raw_session_state = new testing::NiceMock<Http::MockSessionState>();
+  EXPECT_CALL(*factory_, create(_))
+      .WillOnce(Return(testing::ByMove(std::unique_ptr<Http::SessionState>(raw_session_state))));
+  EXPECT_CALL(*raw_session_state, upstreamAddress())
+      .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
+
+  // Initial stats should be zero.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Simulate no healthy upstream (503) in strict mode, upstream_info is nullptr.
+  encoder_callbacks_.stream_info_.setUpstreamInfo(nullptr);
+  encoder_callbacks_.stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  // Verify failed_closed counter incremented.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+}
+
+TEST_F(StatefulSessionTest, StatsNoSession) {
+  const std::string config_with_stats = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+stat_prefix: "test"
+)EOF";
+  initialize(config_with_stats);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  // Return nullptr to simulate no session state.
+  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(testing::ByMove(nullptr)));
+
+  // Initial stats should be zero.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.no_session").value());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // The encoder_callbacks_.stream_info_ mock has upstreamInfo() and upstreamHost() set up by
+  // default, so no_session stat will be incremented.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  // Verify no_session counter incremented.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.test.no_session").value());
+}
+
+TEST_F(StatefulSessionTest, StatsNoSessionNotIncrementedWhenDisabled) {
+  const std::string config_with_stats = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+stat_prefix: "test"
+)EOF";
+  initialize(config_with_stats, DisableYaml);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  // Filter is disabled per-route, so factory should not be called.
+  EXPECT_CALL(*factory_, create(_)).Times(0);
+
+  // Initial stats should be zero.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.no_session").value());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  // Verify no_session counter is NOT incremented when filter is disabled.
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.no_session").value());
+}
+
+TEST_F(StatefulSessionTest, OverrideHostWithCustomStatus) {
+  const std::string strict_config = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+strict: true
+stat_prefix: "test"
+status_on_strict_destination_not_found: 421
+)EOF";
+
+  initialize(strict_config);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+
+  auto raw_session_state = new testing::NiceMock<Http::MockSessionState>();
+  EXPECT_CALL(*factory_, create(_))
+      .WillOnce(Return(testing::ByMove(std::unique_ptr<Http::SessionState>(raw_session_state))));
+  EXPECT_CALL(*raw_session_state, upstreamAddress())
+      .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
+
+  Upstream::LoadBalancerContext::OverrideHost captured_host;
+  EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
+      .WillOnce(testing::SaveArg<0>(&captured_host));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Verify the override host is set with the custom status code.
+  EXPECT_EQ("127.0.0.1:8080", captured_host.host);
+  EXPECT_TRUE(captured_host.strict);
+  EXPECT_EQ(Http::Code::MisdirectedRequest, captured_host.status_on_strict_destination_not_found);
+}
+
+TEST_F(StatefulSessionTest, OverrideHostWithDefaultStatus) {
+  const std::string strict_config = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+strict: true
+stat_prefix: "test"
+)EOF";
+
+  initialize(strict_config);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
+
+  auto raw_session_state = new testing::NiceMock<Http::MockSessionState>();
+  EXPECT_CALL(*factory_, create(_))
+      .WillOnce(Return(testing::ByMove(std::unique_ptr<Http::SessionState>(raw_session_state))));
+  EXPECT_CALL(*raw_session_state, upstreamAddress())
+      .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
+
+  Upstream::LoadBalancerContext::OverrideHost captured_host;
+  EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
+      .WillOnce(testing::SaveArg<0>(&captured_host));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Verify the override host is set with the default status code (503).
+  EXPECT_EQ("127.0.0.1:8080", captured_host.host);
+  EXPECT_TRUE(captured_host.strict);
+  EXPECT_EQ(Http::Code::ServiceUnavailable, captured_host.status_on_strict_destination_not_found);
+}
+
+TEST_F(StatefulSessionTest, StatusOnStrictDestinationNotFoundIgnoredWithoutStrict) {
+  const std::string config_yaml = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+strict: false
+status_on_strict_destination_not_found: 421
+)EOF";
+
+  Http::MockSessionStateFactoryConfig config_factory;
+  Registry::InjectFactory<Http::SessionStateFactoryConfig> registration(config_factory);
+  auto mock_factory = std::make_shared<NiceMock<Http::MockSessionStateFactory>>();
+  EXPECT_CALL(config_factory, createSessionStateFactory(_, _)).WillOnce(Return(mock_factory));
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+  Envoy::Server::GenericFactoryContextImpl generic_context(context_);
+
+  // When strict is false, status_on_strict_destination_not_found is ignored and defaults to 503.
+  StatefulSessionConfig config(proto_config, generic_context, "", context_.scope());
+  EXPECT_FALSE(config.isStrict());
+  EXPECT_EQ(Http::Code::ServiceUnavailable, config.statusOnMissingStrictDestination());
 }
 
 } // namespace

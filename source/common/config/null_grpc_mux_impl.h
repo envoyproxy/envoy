@@ -27,13 +27,16 @@ public:
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
 
-  absl::Status updateMuxSource(Grpc::RawAsyncClientPtr&&, Grpc::RawAsyncClientPtr&&, Stats::Scope&,
-                               BackOffStrategyPtr&&,
+  absl::Status updateMuxSource(Grpc::RawAsyncClientSharedPtr&&, Grpc::RawAsyncClientSharedPtr&&,
+                               Stats::Scope&, BackOffStrategyPtr&&,
                                const envoy::config::core::v3::ApiConfigSource&) override {
     return absl::UnimplementedError("");
   }
 
   EdsResourcesCacheOptRef edsResourcesCache() override { return absl::nullopt; }
+
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
 
   void onWriteable() override {}
   void onStreamEstablished() override {}

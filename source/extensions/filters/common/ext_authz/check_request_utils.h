@@ -109,11 +109,15 @@ public:
    * @param callbacks supplies the network layer context from which data can be extracted.
    * @param request is the reference to the check request that will be filled up.
    * @param include_peer_certificate whether to include the peer certificate in the check request.
+   * @param include_tls_session whether to include the TLS session details in the check request.
+   * @param destination_labels optional labels to include in the destination peer.
+   * @param metadata_context metadata to pass to the ext_authz service.
    */
   static void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
                              envoy::service::auth::v3::CheckRequest& request,
                              bool include_peer_certificate, bool include_tls_session,
-                             const Protobuf::Map<std::string, std::string>& destination_labels);
+                             const Protobuf::Map<std::string, std::string>& destination_labels,
+                             envoy::config::core::v3::Metadata&& metadata_context);
 
   static MatcherSharedPtr toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                                             bool add_http_headers,

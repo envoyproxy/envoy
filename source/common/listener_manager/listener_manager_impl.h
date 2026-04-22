@@ -19,6 +19,7 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/listener_manager/filter_chain_factory_context_callback.h"
@@ -86,8 +87,8 @@ public:
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                          const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return std::make_unique<LdsApiImpl>(
-        lds_config, lds_resources_locator, server_.clusterManager(), server_.initManager(),
-        *server_.stats().rootScope(), server_.listenerManager(),
+        lds_config, lds_resources_locator, server_.xdsManager(), server_.clusterManager(),
+        server_.initManager(), *server_.stats().rootScope(), server_.listenerManager(),
         server_.messageValidationContext().dynamicValidationVisitor());
   }
   absl::StatusOr<Filter::NetworkFilterFactoriesList> createNetworkFilterFactoryList(
@@ -126,6 +127,12 @@ public:
   getTcpListenerConfigProviderManager() override {
     return &tcp_listener_config_provider_manager_;
   }
+
+protected:
+  absl::StatusOr<Network::SocketSharedPtr> createListenSocketInternal(
+      Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
+      const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+      const Network::SocketCreationOptions& creation_options, uint32_t worker_index);
 
 private:
   Instance& server_;
@@ -230,11 +237,13 @@ public:
   void stopListeners(StopListenersType stop_listeners_type,
                      const Network::ExtraShutdownListenerOptions& options) override;
   void stopWorkers() override;
-  void beginListenerUpdate() override { error_state_tracker_.clear(); }
+  void beginListenerUpdate() override { lds_error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
   bool isWorkerStarted() override { return workers_started_; }
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
+  ListenerUpdateCallbacksHandlePtr
+  addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
@@ -242,6 +251,13 @@ public:
   std::unique_ptr<ListenerComponentFactory> factory_;
 
 private:
+  struct ListenerUpdateCallbacksHandleImpl : public ListenerUpdateCallbacksHandle,
+                                             RaiiListElement<ListenerUpdateCallbacks*> {
+    ListenerUpdateCallbacksHandleImpl(ListenerUpdateCallbacks& cb,
+                                      std::list<ListenerUpdateCallbacks*>& parent)
+        : RaiiListElement<ListenerUpdateCallbacks*>(parent, &cb) {}
+  };
+
   using ListenerList = std::list<ListenerImplPtr>;
   /**
    * Callback invoked when a listener initialization is completed on worker.
@@ -328,6 +344,11 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
+  template <typename F> void notifyListenerCallbacks(F notify_fn);
+  void notifyListenerUpdateCallbacks(absl::string_view listener_name,
+                                     Network::ListenerConfig& listener_config);
+  void notifyListenerRemovalCallbacks(const std::string& listener_name);
+
   absl::Status setNewOrDrainingSocketFactory(const std::string& name, ListenerImpl& listener);
   absl::Status createListenSocketFactory(ListenerImpl& listener);
 
@@ -354,14 +375,15 @@ private:
   absl::optional<StopListenersType> stop_listeners_type_;
   Stats::ScopeSharedPtr scope_;
   ListenerManagerStats stats_;
-  ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  ConfigTracker::EntryOwnerPtr listeners_config_tracker_entry_;
   LdsApiPtr lds_api_;
   const bool enable_dispatcher_stats_{};
   using UpdateFailureState = envoy::admin::v3::UpdateFailureState;
-  absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
+  absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> lds_error_state_tracker_;
   FailureStates overall_error_state_;
   Quic::QuicStatNames& quic_stat_names_;
   absl::flat_hash_set<uint64_t> stopped_listener_tags_;
+  std::list<ListenerUpdateCallbacks*> update_callbacks_;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
@@ -371,12 +393,14 @@ public:
 
   absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
-                   FilterChainFactoryContextCreator& context_creator) const override;
+                   FilterChainFactoryContextCreator& context_creator,
+                   bool added_via_api) const override;
 
 private:
   absl::StatusOr<Network::DrainableFilterChainSharedPtr> buildFilterChainInternal(
       const envoy::config::listener::v3::FilterChain& filter_chain,
-      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const;
+      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
+      bool added_via_api) const;
 
   ListenerImpl& listener_;
   ProtobufMessage::ValidationVisitor& validator_;
@@ -387,9 +411,11 @@ private:
 class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {
 public:
   std::unique_ptr<ListenerManager>
-  createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
+  createListenerManager(const Protobuf::Message& config, Instance& server,
+                        std::unique_ptr<ListenerComponentFactory>&& factory,
                         WorkerFactory& worker_factory, bool enable_dispatcher_stats,
                         Quic::QuicStatNames& quic_stat_names) override {
+    (void)config;
     return std::make_unique<ListenerManagerImpl>(server, std::move(factory), worker_factory,
                                                  enable_dispatcher_stats, quic_stat_names);
   }

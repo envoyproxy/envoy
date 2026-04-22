@@ -88,9 +88,9 @@ public:
 
   const EntryMap& values() const;
 
-  static Entry createEntry(const ProtobufWkt::Value& value, absl::string_view raw_string);
+  static Entry createEntry(const Protobuf::Value& value, absl::string_view raw_string);
   static void addEntry(Snapshot::EntryMap& values, const std::string& key,
-                       const ProtobufWkt::Value& value, absl::string_view raw_string = "");
+                       const Protobuf::Value& value, absl::string_view raw_string = "");
 
 private:
   const std::vector<OverrideLayerConstPtr> layers_;
@@ -164,11 +164,10 @@ private:
  */
 class ProtoLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto,
-             absl::Status& creation_status);
+  ProtoLayer(absl::string_view name, const Protobuf::Struct& proto, absl::Status& creation_status);
 
 private:
-  absl::Status walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix);
+  absl::Status walkProtoValue(const Protobuf::Value& v, const std::string& prefix);
 };
 
 class LoaderImpl;
@@ -201,7 +200,7 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
   Config::SubscriptionPtr subscription_;
   std::string resource_name_;
   Init::TargetImpl init_target_;
-  ProtobufWkt::Struct proto_;
+  Protobuf::Struct proto_;
 };
 
 using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;

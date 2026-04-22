@@ -49,11 +49,11 @@ public:
    * Expectations and assertions should be made on onJwksSuccessImpl in place
    * of onJwksSuccess.
    */
-  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override {
+  void onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) override {
     ASSERT(jwks);
     onJwksSuccessImpl(*jwks.get());
   }
-  MOCK_METHOD(void, onJwksSuccessImpl, (const google::jwt_verify::Jwks& jwks));
+  MOCK_METHOD(void, onJwksSuccessImpl, (const Envoy::JwtVerify::Jwks& jwks));
   MOCK_METHOD(void, onJwksError, (JwksFetcher::JwksReceiver::Failure reason));
 };
 

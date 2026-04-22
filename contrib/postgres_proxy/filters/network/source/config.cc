@@ -19,7 +19,12 @@ NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromPro
   config_options.enable_sql_parsing_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_sql_parsing, true);
   config_options.terminate_ssl_ = proto_config.terminate_ssl();
+  if (config_options.terminate_ssl_) {
+    ENVOY_LOG(info,
+              "postgres_proxy: terminate_ssl is deprecated, please use downstream_ssl instead.");
+  }
   config_options.upstream_ssl_ = proto_config.upstream_ssl();
+  config_options.downstream_ssl_ = proto_config.downstream_ssl();
 
   PostgresFilterConfigSharedPtr filter_config(
       std::make_shared<PostgresFilterConfig>(config_options, context.scope()));

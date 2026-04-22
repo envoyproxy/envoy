@@ -64,6 +64,8 @@ public:
     // Getting the last cert in the chain as the root CA cert.
     EXPECT_CALL(cert_validation_ctx_config_, caCert()).WillRepeatedly(ReturnRef(root_ca_cert_));
     EXPECT_CALL(cert_validation_ctx_config_, caCertPath()).WillRepeatedly(ReturnRef(path_string_));
+    EXPECT_CALL(cert_validation_ctx_config_, caCertName()).WillRepeatedly(ReturnRef(cert_name_));
+
     EXPECT_CALL(cert_validation_ctx_config_, trustChainVerification)
         .WillRepeatedly(Return(envoy::extensions::transport_sockets::tls::v3::
                                    CertificateValidationContext::VERIFY_TRUST_CHAIN));
@@ -90,6 +92,7 @@ public:
 
 protected:
   const std::string path_string_{"some_path"};
+  const std::string cert_name_{"some_cert_name"};
   const std::string alpn_{"h2,http/1.1"};
   const std::string sig_algs_{"rsa_pss_rsae_sha256"};
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
@@ -398,7 +401,9 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
                                        {leaf_cert_}, ocsp_response, cert_sct, &verify_context_,
                                        &error_details, &verify_details, nullptr, nullptr))
       << error_details;
-  EXPECT_EQ("verify cert failed: verify SAN list", error_details);
+  EXPECT_EQ("verify cert failed: verify SAN list, expected SANs: [non-example.com], certificate "
+            "SANs: [www.example.org, mail.example.org, mail.example.com, 127.0.0.1]",
+            error_details);
   EXPECT_NE(verify_details, nullptr);
   EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
 }

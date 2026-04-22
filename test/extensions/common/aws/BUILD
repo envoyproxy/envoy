@@ -3,7 +3,6 @@ load(
     "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_package",
-    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2
@@ -24,6 +23,8 @@ envoy_cc_mock(
         "//source/extensions/common/aws:credentials_provider_interface",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:signer_interface",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_lib",
+        "//source/extensions/common/aws/signers:iam_roles_anywhere_sigv4_signer_impl_lib",
         "//source/extensions/common/aws/signers:sigv4a_signer_impl_lib",
     ],
 )
@@ -58,11 +59,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    copts = envoy_select_boringssl(
-        [
-            "-DENVOY_SSL_FIPS",
-        ],
-    ),
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:utility_lib",

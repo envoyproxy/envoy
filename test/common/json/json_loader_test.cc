@@ -505,15 +505,15 @@ TEST_F(JsonLoaderTest, LoadFromStruct) {
     ],
   })EOF";
 
-  const ProtobufWkt::Struct src = TestUtility::jsonToStruct(json_string);
+  const Protobuf::Struct src = TestUtility::jsonToStruct(json_string);
   ObjectSharedPtr json = Factory::loadFromProtobufStruct(src);
   const auto output_json = json->asJsonString();
   EXPECT_TRUE(TestUtility::jsonStringEqual(output_json, json_string));
 }
 
 TEST_F(JsonLoaderTest, LoadFromStructUnknownValueCase) {
-  ProtobufWkt::Struct src;
-  ProtobufWkt::Value value_not_set;
+  Protobuf::Struct src;
+  Protobuf::Value value_not_set;
   (*src.mutable_fields())["field"] = value_not_set;
   EXPECT_THROW_WITH_MESSAGE(Factory::loadFromProtobufStruct(src), EnvoyException,
                             "Protobuf value case not implemented");
@@ -532,6 +532,26 @@ TEST_F(JsonLoaderTest, InvalidJsonToMsgpack) {
   EXPECT_EQ(0, Factory::jsonToMsgpack("{\"hello\":}").size());
   EXPECT_EQ(0, Factory::jsonToMsgpack("\"hello\":\"world\"}").size());
   EXPECT_EQ(0, Factory::jsonToMsgpack("{\"hello\":\"world\"").size());
+}
+
+TEST_F(JsonLoaderTest, EmptyListAsJsonString) {
+  std::list<std::string> list{};
+  std::string json_string = Factory::listAsJsonString(list);
+  EXPECT_EQ(json_string, "[]");
+}
+
+TEST_F(JsonLoaderTest, ValidListAsJsonString) {
+  std::list<std::string> list{"item1", "item2", "item3"};
+  std::string json_string = Factory::listAsJsonString(list);
+  EXPECT_EQ(json_string, R"(["item1","item2","item3"])");
+}
+
+TEST_F(JsonLoaderTest, NestedListAsJsonString) {
+  std::list<std::string> list{"item1", "item2", "item3"};
+  std::list<std::string> nested_list{"nested_item1", "nested_item2"};
+  list.push_back(Factory::listAsJsonString(nested_list));
+  std::string json_string = Factory::listAsJsonString(list);
+  EXPECT_EQ(json_string, R"(["item1","item2","item3","[\"nested_item1\",\"nested_item2\"]"])");
 }
 
 } // namespace

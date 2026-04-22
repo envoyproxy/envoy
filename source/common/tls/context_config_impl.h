@@ -20,7 +20,18 @@ namespace Tls {
 
 static const std::string INLINE_STRING = "<inline>";
 
-class ContextConfigImpl : public virtual Ssl::ContextConfig {
+struct TlsCertificateConfigProviderSharedPtrWithName {
+  const std::string certificate_name_;
+  Secret::TlsCertificateConfigProviderSharedPtr provider_;
+};
+
+struct CertificateValidationContextConfigProviderSharedPtrWithName {
+  const std::string certificate_name_;
+  Secret::CertificateValidationContextConfigProviderSharedPtr provider_;
+};
+
+class ContextConfigImpl : public virtual Ssl::ContextConfig,
+                          public Logger::Loggable<Logger::Id::misc> {
 public:
   // Ssl::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
@@ -59,7 +70,7 @@ public:
         (tls_certificate_providers_.empty() || !tls_certificate_configs_.empty());
     const bool combined_cvc_is_ready =
         (default_cvc_ == nullptr || validation_context_config_ != nullptr);
-    const bool cvc_is_ready = (certificate_validation_context_provider_ == nullptr ||
+    const bool cvc_is_ready = (certificate_validation_context_provider_.provider_ == nullptr ||
                                default_cvc_ != nullptr || validation_context_config_ != nullptr);
     return tls_is_ready && combined_cvc_is_ready && cvc_is_ready;
   }
@@ -71,7 +82,8 @@ public:
 
   absl::StatusOr<Ssl::CertificateValidationContextConfigPtr> getCombinedValidationContextConfig(
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
-          dynamic_cvc);
+          dynamic_cvc,
+      const std::string& name);
 
 protected:
   ContextConfigImpl(const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
@@ -103,10 +115,10 @@ private:
   // Otherwise, default_cvc_ is nullptr.
   std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
       default_cvc_;
-  std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
+  std::vector<TlsCertificateConfigProviderSharedPtrWithName> tls_certificate_providers_;
   // Handle for TLS certificate dynamic secret callback.
   std::vector<Envoy::Common::CallbackHandlePtr> tc_update_callback_handles_;
-  Secret::CertificateValidationContextConfigProviderSharedPtr
+  CertificateValidationContextConfigProviderSharedPtrWithName
       certificate_validation_context_provider_;
   // Handle for certificate validation context dynamic secret callback.
   Envoy::Common::CallbackHandlePtr cvc_update_callback_handle_;
@@ -144,6 +156,12 @@ public:
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
   bool enforceRsaKeyUsage() const override { return enforce_rsa_key_usage_; }
+  void setSecretUpdateCallback(std::function<absl::Status()> callback) override;
+  OptRef<Ssl::UpstreamTlsCertificateSelectorFactory>
+  tlsCertificateSelectorFactory() const override {
+    return tls_certificate_selector_factory_ ? makeOptRef(*tls_certificate_selector_factory_)
+                                             : absl::nullopt;
+  }
 
 private:
   ClientContextConfigImpl(
@@ -155,10 +173,12 @@ private:
   static const unsigned DEFAULT_MAX_VERSION;
 
   const std::string server_name_indication_;
-  const bool auto_host_sni_;
-  const bool allow_renegotiation_;
-  const bool enforce_rsa_key_usage_;
+  const bool auto_host_sni_ : 1;
+  const bool allow_renegotiation_ : 1;
+  const bool enforce_rsa_key_usage_ : 1;
   const size_t max_session_keys_;
+  // Certificate selector contains a reference to this context so should be destroyed first.
+  Ssl::UpstreamTlsCertificateSelectorFactoryPtr tls_certificate_selector_factory_;
 };
 
 } // namespace Tls

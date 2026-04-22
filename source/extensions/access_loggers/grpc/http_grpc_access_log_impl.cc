@@ -6,6 +6,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/utility.h"
@@ -27,10 +28,12 @@ HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
 HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                                      const HttpGrpcAccessLogConfig config,
                                      ThreadLocal::SlotAllocator& tls,
-                                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
+                                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+                                     const Formatter::CommandParserPtrVector& command_parsers)
     : Common::ImplBase(std::move(filter)),
       config_(std::make_shared<const HttpGrpcAccessLogConfig>(std::move(config))),
-      tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
+      tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)),
+      common_properties_config_(config.common_config(), command_parsers) {
   for (const auto& header : config_->additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
   }
@@ -50,17 +53,18 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
       });
 }
 
-void HttpGrpcAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
+void HttpGrpcAccessLog::emitLog(const Formatter::Context& context,
                                 const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
   envoy::data::accesslog::v3::HTTPAccessLogEntry log_entry;
 
-  const auto& request_headers = context.requestHeaders();
+  const Http::RequestHeaderMap& request_headers =
+      context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers);
 
-  GrpcCommon::Utility::extractCommonAccessLogProperties(
-      *log_entry.mutable_common_properties(), request_headers, stream_info,
-      config_->common_config(), context.accessLogType());
+  GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
+                                                        common_properties_config_, request_headers,
+                                                        stream_info, context);
 
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {
@@ -135,8 +139,10 @@ void HttpGrpcAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
   }
 
   // HTTP response properties.
-  const auto& response_headers = context.responseHeaders();
-  const auto& response_trailers = context.responseTrailers();
+  const Http::ResponseHeaderMap& response_headers =
+      context.responseHeaders().value_or(*Http::StaticEmptyHeaders::get().response_headers);
+  const Http::ResponseTrailerMap& response_trailers =
+      context.responseTrailers().value_or(*Http::StaticEmptyHeaders::get().response_trailers);
 
   auto* response_properties = log_entry.mutable_response();
   if (stream_info.responseCode()) {

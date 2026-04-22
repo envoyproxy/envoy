@@ -36,6 +36,8 @@ TEST_P(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
   auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr, {});
   conn_socket_.setRequestedServerName(serverName);
   EXPECT_EQ(expectedServerName, conn_socket_.requestedServerName());
+  conn_socket_.setRequestedApplicationProtocols({"h2", "http/1.1"});
+  EXPECT_THAT(conn_socket_.requestedApplicationProtocols(), testing::ElementsAre("h2", "http/1.1"));
 }
 
 TEST_P(ConnectionSocketImplTest, IpVersion) {

@@ -43,7 +43,6 @@ void copyOkResponseMutations(ResponsePtr& response,
       }
     } else {
       switch (header.append_action()) {
-        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
       case Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         response->response_headers_to_add.emplace_back(header.header().key(),
                                                        header.header().value());
@@ -59,6 +58,9 @@ void copyOkResponseMutations(ResponsePtr& response,
       case Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         response->response_headers_to_set.emplace_back(header.header().key(),
                                                        header.header().value());
+        break;
+      default:
+        response->saw_invalid_append_actions = true;
         break;
       }
     }
@@ -115,6 +117,21 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
       const auto& ok_response = response->ok_response();
       copyOkResponseMutations(authz_response, ok_response);
     }
+  } else if (response->has_error_response()) {
+    // If error_response is present, treat it as an error and not denial.
+    span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceError);
+    authz_response->status = CheckStatus::Error;
+
+    // For error responses, don't set a default status_code.
+    // Let the filter use status_on_error configuration.
+    const auto& error_response = response->error_response();
+    copyHeaderFieldIntoResponse(authz_response, error_response.headers());
+
+    const uint32_t status_code = error_response.status().code();
+    if (status_code > 0) {
+      authz_response->status_code = static_cast<Http::Code>(status_code);
+    }
+    authz_response->body = error_response.body();
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;
@@ -151,7 +168,6 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   Response response{};
   response.status = CheckStatus::Error;
-  response.status_code = Http::Code::Forbidden;
   response.grpc_status = status;
   callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;

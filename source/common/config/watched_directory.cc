@@ -18,7 +18,14 @@ WatchedDirectory::WatchedDirectory(const envoy::config::core::v3::WatchedDirecto
   watcher_ = dispatcher.createFilesystemWatcher();
   SET_AND_RETURN_IF_NOT_OK(watcher_->addWatch(absl::StrCat(config.path(), "/"),
                                               Filesystem::Watcher::Events::MovedTo,
-                                              [this](uint32_t) { return cb_(); }),
+                                              [this](uint32_t) {
+                                                // Check if callback is set before invoking to avoid
+                                                // crash if watch triggers before setCallback().
+                                                if (cb_) {
+                                                  return cb_();
+                                                }
+                                                return absl::OkStatus();
+                                              }),
                            creation_status);
 }
 

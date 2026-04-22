@@ -21,6 +21,7 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
@@ -293,7 +294,7 @@ public:
   void onDownstreamEvent(Network::ConnectionEvent event) override {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
-      resetEncoder(event, /*by_downstream=*/true);
+      resetEncoder(event, /*by_local_close=*/true);
     }
   };
 
@@ -311,7 +312,7 @@ public:
   }
 
 private:
-  class ResponseDecoder : public Http::ResponseDecoder {
+  class ResponseDecoder : public Http::ResponseDecoderImplBase {
   public:
     ResponseDecoder(HttpUpstreamImpl& parent) : parent_(parent) {}
 
@@ -360,7 +361,14 @@ private:
   };
 
   const std::string resolveTargetTunnelPath();
-  void resetEncoder(Network::ConnectionEvent event, bool by_downstream = false);
+
+  /**
+   * Resets the encoder for the upstream connection.
+   * @param event the event that caused the reset.
+   * @param by_local_close whether the reset was initiated by a local close (e.g. session idle
+   * timeout, envoy termination, etc.) or by upstream close.
+   */
+  void resetEncoder(Network::ConnectionEvent event, bool by_local_close = false);
 
   ResponseDecoder response_decoder_;
   Http::RequestEncoder* request_encoder_{};

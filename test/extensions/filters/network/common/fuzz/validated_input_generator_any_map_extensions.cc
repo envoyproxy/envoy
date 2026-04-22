@@ -19,7 +19,7 @@ namespace ProtobufMessage {
 
 ValidatedInputGenerator::AnyMap composeFiltersAnyMap() {
   static const auto dummy_proto_msg = []() -> std::unique_ptr<Protobuf::Message> {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   };
 
   static ValidatedInputGenerator::AnyMap any_map;

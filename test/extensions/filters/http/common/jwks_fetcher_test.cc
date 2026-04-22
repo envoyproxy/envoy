@@ -10,7 +10,6 @@
 #include "test/extensions/filters/http/common/mock.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
@@ -51,14 +50,33 @@ http_uri:
     seconds: 5
 )";
 
+Router::RetryPolicyConstSharedPtr
+getRetryPolicy(const RemoteJwks& remote_jwks,
+               Server::Configuration::CommonFactoryContext& context) {
+  if (remote_jwks.has_retry_policy()) {
+    envoy::config::route::v3::RetryPolicy route_retry_policy =
+        Http::Utility::convertCoreToRouteRetryPolicy(remote_jwks.retry_policy(),
+                                                     "5xx,gateway-error,connect-failure,reset");
+    // Use the null validation visitor because it was used by the async client in the previous
+    // implementation.
+    auto policy_or_error = Router::RetryPolicyImpl::create(
+        route_retry_policy, ProtobufMessage::getNullValidationVisitor(), context);
+    THROW_IF_NOT_OK_REF(policy_or_error.status());
+    return std::move(policy_or_error.value());
+  }
+  return nullptr;
+}
+
 class JwksFetcherTest : public testing::Test {
 public:
   void setupFetcher(const std::string& config_str) {
     TestUtility::loadFromYaml(config_str, remote_jwks_);
     mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"pubkey_cluster"});
-    fetcher_ = JwksFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
-                                   remote_jwks_);
+
+    fetcher_ = JwksFetcher::create(
+        mock_factory_ctx_.server_factory_context_.cluster_manager_,
+        getRetryPolicy(remote_jwks_, mock_factory_ctx_.server_factory_context_), remote_jwks_);
     EXPECT_TRUE(fetcher_ != nullptr);
   }
 
@@ -214,8 +232,10 @@ public:
     TestUtility::loadFromYaml(config_str, remote_jwks_);
     mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"pubkey_cluster"});
-    fetcher_ = JwksFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
-                                   remote_jwks_);
+
+    fetcher_ = JwksFetcher::create(
+        mock_factory_ctx_.server_factory_context_.cluster_manager_,
+        getRetryPolicy(remote_jwks_, mock_factory_ctx_.server_factory_context_), remote_jwks_);
     EXPECT_TRUE(fetcher_ != nullptr);
   }
 
@@ -279,34 +299,26 @@ TEST_P(JwksFetcherRetryingTest, TestCompleteRetryPolicy) {
              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             RetryingParameters const& rp = GetParam();
 
-            EXPECT_TRUE(options.retry_policy.has_value());
+            EXPECT_TRUE(options.parsed_retry_policy != nullptr);
             EXPECT_TRUE(options.buffer_body_for_retry);
-            EXPECT_TRUE(options.retry_policy.value().has_num_retries());
-            EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries),
-                      rp.expected_num_retries_);
+            EXPECT_EQ(options.parsed_retry_policy->numRetries(), rp.expected_num_retries_);
 
-            EXPECT_TRUE(options.retry_policy.value().has_retry_back_off());
-            EXPECT_TRUE(options.retry_policy.value().retry_back_off().has_base_interval());
-            EXPECT_EQ(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(),
-                                               base_interval),
+            EXPECT_TRUE(options.parsed_retry_policy->baseInterval().has_value());
+            EXPECT_EQ(options.parsed_retry_policy->baseInterval()->count(),
                       rp.expected_backoff_base_interval_ms_);
-            EXPECT_TRUE(options.retry_policy.value().retry_back_off().has_max_interval());
-            EXPECT_EQ(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(),
-                                               max_interval),
+            EXPECT_TRUE(options.parsed_retry_policy->maxInterval().has_value());
+            EXPECT_EQ(options.parsed_retry_policy->maxInterval()->count(),
                       rp.expected_backoff_max_interval_ms_);
 
-            EXPECT_TRUE(options.retry_policy.value().has_per_try_timeout());
-            EXPECT_LE(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(),
-                                               max_interval),
-                      PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value(), per_try_timeout));
+            EXPECT_LE(options.parsed_retry_policy->maxInterval()->count(),
+                      options.parsed_retry_policy->perTryTimeout().count());
 
-            const std::string& retry_on = options.retry_policy.value().retry_on();
-            std::set<std::string> retry_on_modes = absl::StrSplit(retry_on, ',');
+            const auto retry_on = options.parsed_retry_policy->retryOn();
 
-            EXPECT_EQ(retry_on_modes.count("5xx"), 1);
-            EXPECT_EQ(retry_on_modes.count("gateway-error"), 1);
-            EXPECT_EQ(retry_on_modes.count("connect-failure"), 1);
-            EXPECT_EQ(retry_on_modes.count("reset"), 1);
+            EXPECT_TRUE(retry_on & Router::RetryPolicy::RETRY_ON_5XX);
+            EXPECT_TRUE(retry_on & Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR);
+            EXPECT_TRUE(retry_on & Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE);
+            EXPECT_TRUE(retry_on & Router::RetryPolicy::RETRY_ON_RESET);
 
             return nullptr;
           }));
@@ -330,8 +342,7 @@ TEST_F(JwksFetcherTest, TestSchemeHeaderHttps) {
       .WillOnce(testing::Invoke(
           [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_THAT(message->headers(),
-                        HeaderHasValueRef(Http::Headers::get().Scheme, "https"));
+            EXPECT_THAT(message->headers(), ContainsHeader(Http::Headers::get().Scheme, "https"));
             return nullptr;
           }));
 
@@ -356,35 +367,7 @@ TEST_F(JwksFetcherTest, TestSchemeHeaderHttp) {
       .WillOnce(testing::Invoke(
           [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_THAT(message->headers(), HeaderHasValueRef(Http::Headers::get().Scheme, "http"));
-            return nullptr;
-          }));
-
-  MockJwksReceiver receiver;
-
-  // Act
-  fetcher_->fetch(parent_span_, receiver);
-}
-
-TEST_F(JwksFetcherTest, TestSchemeHeaderLegacy) {
-  // Setup
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri", "false"}});
-  setupFetcher(R"(
-    http_uri:
-      uri: https://pubkey_server/pubkey_path
-      cluster: pubkey_cluster
-    )");
-  auto& cm = mock_factory_ctx_.server_factory_context_.cluster_manager_;
-  Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
-
-  // Expect no :scheme header due to the disabled runtime guard.
-  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
-             const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_TRUE(message->headers().get(Http::Headers::get().Scheme).empty());
+            EXPECT_THAT(message->headers(), ContainsHeader(Http::Headers::get().Scheme, "http"));
             return nullptr;
           }));
 

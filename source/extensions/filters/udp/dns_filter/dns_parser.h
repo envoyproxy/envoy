@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/random_generator.h"
+#include "envoy/formatter/http_formatter_context.h"
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
@@ -184,7 +185,7 @@ PACKED_STRUCT(struct DnsHeader {
 /**
  * DnsQueryContext contains all the data necessary for responding to a query from a given client.
  */
-class DnsQueryContext {
+class DnsQueryContext : public Formatter::Context::Extension {
 public:
   DnsQueryContext(Network::Address::InstanceConstSharedPtr local,
                   Network::Address::InstanceConstSharedPtr peer, DnsParserCounters& counters,

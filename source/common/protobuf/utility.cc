@@ -29,7 +29,7 @@ namespace {
 
 // Validates that the max value of nanoseconds and seconds doesn't cause an
 // overflow in the protobuf time-util computations.
-absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration) {
+absl::Status validateDurationNoThrow(const Protobuf::Duration& duration) {
   // Apply a strict max boundary to the `seconds` value to avoid overflow when
   // both seconds and nanoseconds are at their highest values.
   // Note that protobuf internally converts to the input's seconds and
@@ -54,7 +54,7 @@ absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration) {
   return absl::OkStatus();
 }
 
-void validateDuration(const ProtobufWkt::Duration& duration) {
+void validateDuration(const Protobuf::Duration& duration) {
   const absl::Status result = validateDurationNoThrow(duration);
   if (!result.ok()) {
     throwEnvoyExceptionOrPanic(std::string(result.message()));
@@ -341,7 +341,7 @@ public:
                          absl::Span<const Protobuf::Message* const>, bool) override {
     const Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     if (reflectable_message->GetDescriptor()->full_name() == "google.protobuf.Duration") {
-      ProtobufWkt::Duration duration_message;
+      Protobuf::Duration duration_message;
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
       duration_message.CheckTypeAndMergeFrom(message);
 #else
@@ -393,7 +393,7 @@ void MessageUtil::recursivePgvCheck(const Protobuf::Message& message) {
   THROW_IF_NOT_OK(ProtobufMessage::traverseMessage(visitor, message, true));
 }
 
-void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Message& message) {
+void MessageUtil::packFrom(Protobuf::Any& any_message, const Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   any_message.PackFrom(message);
 #else
@@ -402,8 +402,7 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
 #endif
 }
 
-absl::Status MessageUtil::unpackTo(const ProtobufWkt::Any& any_message,
-                                   Protobuf::Message& message) {
+absl::Status MessageUtil::unpackTo(const Protobuf::Any& any_message, Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   if (!any_message.UnpackTo(&message)) {
     return absl::InternalError(absl::StrCat("Unable to unpack as ",
@@ -430,17 +429,17 @@ std::string MessageUtil::convertToStringForLogs(const Protobuf::Message& message
 #endif
 }
 
-ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
-  ProtobufWkt::Struct struct_obj;
-  ProtobufWkt::Value val;
+Protobuf::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
+  Protobuf::Struct struct_obj;
+  Protobuf::Value val;
   val.set_string_value(value);
   (*struct_obj.mutable_fields())[key] = val;
   return struct_obj;
 }
 
-ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std::string>& fields) {
-  ProtobufWkt::Struct struct_obj;
-  ProtobufWkt::Value val;
+Protobuf::Struct MessageUtil::keyValueStruct(const std::map<std::string, std::string>& fields) {
+  Protobuf::Struct struct_obj;
+  Protobuf::Value val;
   for (const auto& pair : fields) {
     val.set_string_value(pair.second);
     (*struct_obj.mutable_fields())[pair.first] = val;
@@ -669,31 +668,31 @@ std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
 #endif
 }
 
-bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {
-  ProtobufWkt::Value::KindCase kind = v1.kind_case();
+bool ValueUtil::equal(const Protobuf::Value& v1, const Protobuf::Value& v2) {
+  Protobuf::Value::KindCase kind = v1.kind_case();
   if (kind != v2.kind_case()) {
     return false;
   }
 
   switch (kind) {
-  case ProtobufWkt::Value::KIND_NOT_SET:
-    return v2.kind_case() == ProtobufWkt::Value::KIND_NOT_SET;
+  case Protobuf::Value::KIND_NOT_SET:
+    return v2.kind_case() == Protobuf::Value::KIND_NOT_SET;
 
-  case ProtobufWkt::Value::kNullValue:
+  case Protobuf::Value::kNullValue:
     return true;
 
-  case ProtobufWkt::Value::kNumberValue:
+  case Protobuf::Value::kNumberValue:
     return v1.number_value() == v2.number_value();
 
-  case ProtobufWkt::Value::kStringValue:
+  case Protobuf::Value::kStringValue:
     return v1.string_value() == v2.string_value();
 
-  case ProtobufWkt::Value::kBoolValue:
+  case Protobuf::Value::kBoolValue:
     return v1.bool_value() == v2.bool_value();
 
-  case ProtobufWkt::Value::kStructValue: {
-    const ProtobufWkt::Struct& s1 = v1.struct_value();
-    const ProtobufWkt::Struct& s2 = v2.struct_value();
+  case Protobuf::Value::kStructValue: {
+    const Protobuf::Struct& s1 = v1.struct_value();
+    const Protobuf::Struct& s2 = v2.struct_value();
     if (s1.fields_size() != s2.fields_size()) {
       return false;
     }
@@ -710,9 +709,9 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
     return true;
   }
 
-  case ProtobufWkt::Value::kListValue: {
-    const ProtobufWkt::ListValue& l1 = v1.list_value();
-    const ProtobufWkt::ListValue& l2 = v2.list_value();
+  case Protobuf::Value::kListValue: {
+    const Protobuf::ListValue& l1 = v1.list_value();
+    const Protobuf::ListValue& l2 = v2.list_value();
     if (l1.values_size() != l2.values_size()) {
       return false;
     }
@@ -727,57 +726,57 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   return false;
 }
 
-const ProtobufWkt::Value& ValueUtil::nullValue() {
-  static const auto* v = []() -> ProtobufWkt::Value* {
-    auto* vv = new ProtobufWkt::Value();
-    vv->set_null_value(ProtobufWkt::NULL_VALUE);
+const Protobuf::Value& ValueUtil::nullValue() {
+  static const auto* v = []() -> Protobuf::Value* {
+    auto* vv = new Protobuf::Value();
+    vv->set_null_value(Protobuf::NULL_VALUE);
     return vv;
   }();
   return *v;
 }
 
-ProtobufWkt::Value ValueUtil::stringValue(absl::string_view str) {
-  ProtobufWkt::Value val;
+Protobuf::Value ValueUtil::stringValue(absl::string_view str) {
+  Protobuf::Value val;
   val.set_string_value(str);
   return val;
 }
 
-ProtobufWkt::Value ValueUtil::optionalStringValue(const absl::optional<std::string>& str) {
+Protobuf::Value ValueUtil::optionalStringValue(const absl::optional<std::string>& str) {
   if (str.has_value()) {
     return ValueUtil::stringValue(str.value());
   }
   return ValueUtil::nullValue();
 }
 
-ProtobufWkt::Value ValueUtil::boolValue(bool b) {
-  ProtobufWkt::Value val;
+Protobuf::Value ValueUtil::boolValue(bool b) {
+  Protobuf::Value val;
   val.set_bool_value(b);
   return val;
 }
 
-ProtobufWkt::Value ValueUtil::structValue(const ProtobufWkt::Struct& obj) {
-  ProtobufWkt::Value val;
+Protobuf::Value ValueUtil::structValue(const Protobuf::Struct& obj) {
+  Protobuf::Value val;
   (*val.mutable_struct_value()) = obj;
   return val;
 }
 
-ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& values) {
-  auto list = std::make_unique<ProtobufWkt::ListValue>();
+Protobuf::Value ValueUtil::listValue(const std::vector<Protobuf::Value>& values) {
+  auto list = std::make_unique<Protobuf::ListValue>();
   for (const auto& value : values) {
     *list->add_values() = value;
   }
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
   val.set_allocated_list_value(list.release());
   return val;
 }
 
-uint64_t DurationUtil::durationToMilliseconds(const ProtobufWkt::Duration& duration) {
+uint64_t DurationUtil::durationToMilliseconds(const Protobuf::Duration& duration) {
   validateDuration(duration);
   return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
 }
 
 absl::StatusOr<uint64_t>
-DurationUtil::durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration) {
+DurationUtil::durationToMillisecondsNoThrow(const Protobuf::Duration& duration) {
   const absl::Status result = validateDurationNoThrow(duration);
   if (!result.ok()) {
     return result;
@@ -785,13 +784,13 @@ DurationUtil::durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duratio
   return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
 }
 
-uint64_t DurationUtil::durationToSeconds(const ProtobufWkt::Duration& duration) {
+uint64_t DurationUtil::durationToSeconds(const Protobuf::Duration& duration) {
   validateDuration(duration);
   return Protobuf::util::TimeUtil::DurationToSeconds(duration);
 }
 
 void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
-                                           ProtobufWkt::Timestamp& timestamp) {
+                                           Protobuf::Timestamp& timestamp) {
   // Converts to millisecond-precision Timestamp by explicitly casting to millisecond-precision
   // time_point.
   timestamp.MergeFrom(Protobuf::util::TimeUtil::MillisecondsToTimestamp(
@@ -812,7 +811,7 @@ std::string TypeUtil::descriptorFullNameToTypeUrl(absl::string_view type) {
   return "type.googleapis.com/" + std::string(type);
 }
 
-void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with) {
+void StructUtil::update(Protobuf::Struct& obj, const Protobuf::Struct& with) {
   auto& obj_fields = *obj.mutable_fields();
 
   for (const auto& [key, val] : with.fields()) {
@@ -828,24 +827,24 @@ void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& wit
     // Otherwise, the strategy depends on the value kind.
     switch (val.kind_case()) {
     // For scalars, the last one wins.
-    case ProtobufWkt::Value::kNullValue:
-    case ProtobufWkt::Value::kNumberValue:
-    case ProtobufWkt::Value::kStringValue:
-    case ProtobufWkt::Value::kBoolValue:
+    case Protobuf::Value::kNullValue:
+    case Protobuf::Value::kNumberValue:
+    case Protobuf::Value::kStringValue:
+    case Protobuf::Value::kBoolValue:
       obj_key = val;
       break;
     // If we got a structure, recursively update.
-    case ProtobufWkt::Value::kStructValue:
+    case Protobuf::Value::kStructValue:
       update(*obj_key.mutable_struct_value(), val.struct_value());
       break;
     // For lists, append the new values.
-    case ProtobufWkt::Value::kListValue: {
+    case Protobuf::Value::kListValue: {
       auto& obj_key_vec = *obj_key.mutable_list_value()->mutable_values();
       const auto& vals = val.list_value().values();
       obj_key_vec.MergeFrom(vals);
       break;
     }
-    case ProtobufWkt::Value::KIND_NOT_SET:
+    case Protobuf::Value::KIND_NOT_SET:
       break;
     }
   }

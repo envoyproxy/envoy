@@ -12,6 +12,7 @@ import stat
 import sys
 import traceback
 import shutil
+import shlex
 from functools import cached_property
 from typing import Callable, Dict, Iterator, List, Pattern, Tuple, Union
 
@@ -29,6 +30,9 @@ class FormatConfig:
         self.path = path
         self.args = args
         self.source_path = source_path
+        # This is also an ugly hack - we pull in these tools as python libs and
+        # and then execute them - without the following it tries to use host python
+        os.environ["PATH"] = f"{os.path.dirname(sys.executable)}:{os.environ['PATH']}"
 
     def __getitem__(self, k):
         return self.config.__getitem__(k)
@@ -76,7 +80,6 @@ class FormatConfig:
         """Mapping of named paths."""
         paths = self._normalize("paths", cb=lambda paths: tuple(f"./{p}" for p in paths))
         paths["build_fixer_py"] = self._build_fixer_path
-        paths["header_order_py"] = self._header_order_path
         return paths
 
     @cached_property
@@ -102,10 +105,6 @@ class FormatConfig:
     @property
     def _build_fixer_path(self) -> str:
         return os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
-
-    @property
-    def _header_order_path(self) -> str:
-        return os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
 
     def _normalize(
             self,
@@ -428,6 +427,10 @@ class FormatChecker:
             return True
         return False
 
+    def is_docs_build_file(self, file_path):
+        return self.is_build_file(file_path) and (
+            file_path.lstrip(".").lstrip("/").startswith("docs/"))
+
     def is_external_build_file(self, file_path):
         return self.is_build_file(file_path) and (file_path.startswith("./bazel/external/"))
 
@@ -712,12 +715,6 @@ class FormatChecker:
             report_error(
                 "Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
                 "in envoy/common/platform.h instead")
-        if self.config.re["designated_initializer"].search(line):
-            # Designated initializers are not part of the C++14 standard and are not supported
-            # by MSVC
-            report_error(
-                "Don't use designated initializers in struct initialization, "
-                "they are not part of C++14")
         if " ?: " in line:
             # The ?: operator is non-standard, it is a GCC extension
             report_error("Don't use the '?:' operator, it is a non-standard GCC extension")
@@ -824,7 +821,8 @@ class FormatChecker:
                 "//source/common/protobuf instead.")
         if (self.envoy_build_rule_check and not self.is_starlark_file(file_path)
                 and not self.is_workspace_file(file_path)
-                and not self.is_external_build_file(file_path) and "@envoy//" in line):
+                and not self.is_external_build_file(file_path)
+                and not self.is_docs_build_file(file_path) and "@envoy//" in line):
             report_error("Superfluous '@envoy//' prefix")
         if not self.allow_listed_for_build_urls(file_path) and (" urls = " in line
                                                                 or " url = " in line):
@@ -833,7 +831,8 @@ class FormatChecker:
     def fix_build_line(self, file_path, line, line_number):
         if (self.envoy_build_rule_check and not self.is_starlark_file(file_path)
                 and not self.is_workspace_file(file_path)
-                and not self.is_external_build_file(file_path)):
+                and not self.is_external_build_file(file_path)
+                and not self.is_docs_build_file(file_path)):
             line = line.replace("@envoy//", "//")
         return line
 
@@ -878,23 +877,18 @@ class FormatChecker:
 
         error_messages = []
 
-        if not file_path.endswith(self.config.suffixes["proto"]):
-            error_messages += self.fix_header_order(file_path)
         error_messages += self.clang_format(file_path)
         return error_messages
 
     def check_source_path(self, file_path):
         error_messages = []
-        if self.run_code_validation:
+        # This dynamic module SDK will be built into a shared library which we prefer to use
+        # standard library rather then the absl equivalents. We simply skip the content check
+        # for this directory to avoid false positives.
+        if self.run_code_validation and "dynamic_modules/sdk/cpp" not in file_path:
             error_messages = self.check_file_contents(file_path, self.check_source_line)
-        if not file_path.endswith(self.config.suffixes["proto"]):
+        if file_path.endswith((".cc", ".h")):
             error_messages += self.check_namespace(file_path)
-            command = (
-                "%s --include_dir_order %s --path %s | diff %s -" % (
-                    self.config.paths["header_order_py"], self.include_dir_order, file_path,
-                    file_path))
-            error_messages += self.execute_command(
-                command, "header_order.py check failed", file_path)
         error_messages.extend(self.clang_format(file_path, check=True))
         return error_messages
 
@@ -921,25 +915,20 @@ class FormatChecker:
                     error_messages.append("  %s:%s" % (file_path, num))
             return error_messages
 
-    def fix_header_order(self, file_path):
-        command = "%s --rewrite --include_dir_order %s --path %s" % (
-            self.config.paths["header_order_py"], self.include_dir_order, file_path)
-        if os.system(command) != 0:
-            return ["header_order.py rewrite error: %s" % (file_path)]
-        return []
-
     def clang_format(self, file_path, check=False):
         result = []
-        command = (
-            f"{self.config.clang_format_path} {file_path} | diff {file_path} -"
-            if check else f"{self.config.clang_format_path} -i {file_path}")
-
+        quoted_path = shlex.quote(file_path)
         if check:
+            command = f"{self.config.clang_format_path} {quoted_path} | diff {quoted_path} -"
             result = self.execute_command(command, "clang-format check failed", file_path)
         else:
-            if os.system(command) != 0:
+            ret = subprocess.run(
+                [self.config.clang_format_path, "-i", file_path],
+                capture_output=True,
+                text=True
+            )
+            if ret.returncode != 0:
                 result = [f"clang-format rewrite error: {file_path}"]
-
         return result
 
     def check_format(self, file_path, fail_on_diff=False):
@@ -1061,6 +1050,7 @@ class FormatChecker:
         self.config.buildifier_path
         self.config.buildozer_path
         self.check_visibility()
+        self.run_rustfmt()
         # We first run formatting on non-BUILD files, since the BUILD file format
         # requires analysis of srcs/hdrs in the BUILD file, and we don't want these
         # to be rewritten by other multiprocessing pooled processes.
@@ -1103,6 +1093,28 @@ class FormatChecker:
         except subprocess.CalledProcessError as e:
             if (e.returncode != 0 and e.returncode != 1):
                 self.error_messages.append("Failed to check visibility with command %s" % command)
+
+    def run_rustfmt(self):
+        # Run bazel
+        command = "bazel run @rules_rust//:rustfmt"
+        try:
+            subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
+        except subprocess.CalledProcessError as e:
+            self.error_messages.append(
+                f"ERROR: something went wrong while executing: {e.cmd}\n{e.output.decode()}")
+            return
+        if self.args.operation_type == "check":
+            try:
+                diff = subprocess.check_output(
+                    "git diff --name-only -- '*.rs'", shell=True,
+                    stderr=subprocess.STDOUT).strip().decode()
+                if diff:
+                    self.error_messages.append(
+                        f"ERROR: rustfmt diff detected. Please run 'bazel run @rules_rust//:rustfmt':\n{diff}"
+                    )
+            except subprocess.CalledProcessError as e:
+                self.error_messages.append(
+                    f"ERROR: git diff failed: {e.output.decode()}")
 
     def included_for_memcpy(self, file_path):
         return file_path in self.config.paths["memcpy"]["include"]

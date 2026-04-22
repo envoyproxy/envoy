@@ -29,6 +29,10 @@ namespace Network {
 namespace Address {
 namespace {
 
+Ipv6Instance v4MappedV6Instance(const std::string& address) {
+  return Ipv6Instance(address, /*port=*/0, /*sock_interface=*/nullptr, /*v6only=*/false);
+}
+
 bool addressesEqual(const InstanceConstSharedPtr& a, const Instance& b) {
   if (a == nullptr || a->type() != Type::Ip || b.type() != Type::Ip) {
     return false;
@@ -202,6 +206,40 @@ TEST(Ipv4InstanceTest, PortOnly) {
   EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
+TEST(Ipv4InstanceTest, NetnsComparison) {
+  Ipv4Instance address1("1.2.3.4", nullptr, "/var/run/netns/11111");
+  Ipv4Instance address2("1.2.3.4", nullptr, "/var/run/netns/22222");
+  // Same netns as address1.
+  Ipv4Instance address3("1.2.3.4", nullptr, "/var/run/netns/11111");
+
+  EXPECT_EQ(address1, address3);
+  EXPECT_NE(address1, address2);
+}
+
+TEST(Ipv4InstanceTest, WithNetworkNamespace) {
+  const auto ns1 = "/var/run/netns/11111";
+  Ipv4Instance address1("1.2.3.4", nullptr);
+  EXPECT_EQ(absl::nullopt, address1.networkNamespace());
+  Ipv4Instance address2("1.2.3.4", nullptr, ns1);
+  EXPECT_EQ(ns1, address2.networkNamespace());
+
+  const auto address3 = address1.withNetworkNamespace(ns1);
+  EXPECT_NE(nullptr, address3);
+  EXPECT_EQ(ns1, address3->networkNamespace());
+  EXPECT_EQ(*address3, address2);
+
+  const auto ns2 = "/var/run/netns/22222";
+  EXPECT_EQ(*address1.withNetworkNamespace(ns2), *address2.withNetworkNamespace(ns2));
+
+  // Override with empty string.
+  const auto address4 = address2.withNetworkNamespace("");
+  EXPECT_NE(nullptr, address4);
+  EXPECT_EQ(absl::nullopt, address4->networkNamespace());
+  EXPECT_EQ("1.2.3.4:0", address4->asString());
+  EXPECT_EQ("1.2.3.4", address4->ip()->addressAsString());
+  EXPECT_EQ(0U, address4->ip()->port());
+}
+
 TEST(Ipv4InstanceTest, Multicast) {
   Ipv4Instance address("230.0.0.1");
   EXPECT_EQ("230.0.0.1:0", address.asString());
@@ -226,6 +264,36 @@ TEST(Ipv4InstanceTest, Broadcast) {
   EXPECT_TRUE(
       addressesEqual(Network::Utility::parseInternetAddressNoThrow("255.255.255.255"), address));
   EXPECT_FALSE(address.ip()->isUnicastAddress());
+}
+
+TEST(Ipv4InstanceTest, LinkLocal) {
+  // Link-local addresses.
+  EXPECT_TRUE(Ipv4Instance("169.254.0.0").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(Ipv4Instance("169.254.42.43").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(Ipv4Instance("169.254.255.255").ip()->isLinkLocalAddress());
+
+  // Not link-local addresses.
+  EXPECT_FALSE(Ipv4Instance("169.255.0.0").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(Ipv4Instance("169.255.255.255").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(Ipv4Instance("170.254.0.0").ip()->isLinkLocalAddress());
+}
+
+TEST(Ipv4InstanceTest, Teredo) {
+  // Teredo addresses are not applicable to IPv4.
+  EXPECT_FALSE(Ipv4Instance("20.1.1.1").ip()->isTeredoAddress());
+  EXPECT_FALSE(Ipv4Instance("200.1.1.1").ip()->isTeredoAddress());
+}
+
+TEST(Ipv4InstanceTest, SiteLocal) {
+  // Site-local addresses are not applicable to IPv4.
+  EXPECT_FALSE(Ipv4Instance("1.2.3.4").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv4Instance("200.1.1.1").ip()->isSiteLocalAddress());
+}
+
+TEST(Ipv4InstanceTest, UniqueLocal) {
+  // Unique Local Addresses (ULA) are not applicable to IPv4.
+  EXPECT_FALSE(Ipv4Instance("1.2.3.4").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(Ipv4Instance("200.1.1.1").ip()->isUniqueLocalAddress());
 }
 
 TEST(Ipv4InstanceTest, BadAddress) {
@@ -300,6 +368,40 @@ TEST(Ipv6InstanceTest, ScopeIdStripping) {
   EXPECT_EQ(0U, no_scope_address->ip()->ipv6()->scopeId());
 }
 
+TEST(Ipv6InstanceTest, NetnsCompare) {
+  Ipv6Instance address1("::0001", 80, nullptr, true, "/var/run/netns/11111");
+  Ipv6Instance address2("::0001", 80, nullptr, true, "/var/run/netns/22222");
+  // Same netns as address1.
+  Ipv6Instance address3("::0001", 80, nullptr, true, "/var/run/netns/11111");
+
+  EXPECT_NE(address1, address2);
+  EXPECT_EQ(address1, address3);
+}
+
+TEST(Ipv6InstanceTest, WithNetworkNamespace) {
+  const auto ns1 = "/var/run/netns/11111";
+  Ipv6Instance address1("::0001", 80, nullptr, true);
+  EXPECT_EQ(absl::nullopt, address1.networkNamespace());
+  Ipv6Instance address2("::0001", 80, nullptr, true, ns1);
+  EXPECT_EQ(ns1, address2.networkNamespace());
+
+  const auto address3 = address1.withNetworkNamespace(ns1);
+  EXPECT_NE(nullptr, address3);
+  EXPECT_EQ(ns1, address3->networkNamespace());
+  EXPECT_EQ(*address3, address2);
+
+  const auto ns2 = "/var/run/netns/22222";
+  EXPECT_EQ(*address1.withNetworkNamespace(ns2), *address2.withNetworkNamespace(ns2));
+
+  // Override with empty string.
+  const auto address4 = address2.withNetworkNamespace("");
+  EXPECT_NE(nullptr, address4);
+  EXPECT_EQ(absl::nullopt, address4->networkNamespace());
+  EXPECT_EQ("[::1]:80", address4->asString());
+  EXPECT_EQ("::1", address4->ip()->addressAsString());
+  EXPECT_EQ(80U, address4->ip()->port());
+}
+
 TEST(Ipv6InstanceTest, PortOnly) {
   Ipv6Instance address(443);
   EXPECT_EQ("[::]:443", address.asString());
@@ -341,6 +443,85 @@ TEST(Ipv6InstanceTest, Broadcast) {
   EXPECT_FALSE(address.ip()->isUnicastAddress());
 }
 
+TEST(Ipv6InstanceTest, LinkLocal) {
+  // Link-local addresses are in the range "fe80::0" to "febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff".
+  EXPECT_TRUE(Ipv6Instance("fe80:0:0:0:0:0:0:0").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fe80::0").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fe80::1").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fe80::42:43").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fe80::ffff:ffff:ffff:ffff").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fe81::1").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fe90::1").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("febf::0").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff").ip()->isLinkLocalAddress());
+
+  // Not link-local addresses.
+  EXPECT_FALSE(Ipv6Instance("::fe80").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("fec0::0").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("ff00::0").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("ab80::0").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("abcd::0").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("::ffff").ip()->isLinkLocalAddress());
+}
+
+TEST(Ipv6InstanceTest, V4MappedLinkLocal) {
+  // Link-local addresses in the range ::ffff:169.254.0.0/16.
+  EXPECT_TRUE(v4MappedV6Instance("::ffff:169.254.0.0").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(v4MappedV6Instance("::ffff:169.254.42.42").ip()->isLinkLocalAddress());
+  EXPECT_TRUE(v4MappedV6Instance("::ffff:169.254.255.255").ip()->isLinkLocalAddress());
+
+  // Not link-local addresses.
+  EXPECT_FALSE(v4MappedV6Instance("::ffff:169.255.0.0").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(v4MappedV6Instance("::ffff:170.254.0.0").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(v4MappedV6Instance("::ffff:0.0.0.0").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(v4MappedV6Instance("::ffff:192.168.1.1").ip()->isLinkLocalAddress());
+  EXPECT_FALSE(v4MappedV6Instance("::ffff:10.54.1.1").ip()->isLinkLocalAddress());
+}
+
+TEST(Ipv6InstanceTest, Teredo) {
+  // Teredo addresses are in the range 2001::/32.
+  EXPECT_TRUE(Ipv6Instance("2001:0:0:0:0:0:0:0").ip()->isTeredoAddress());
+  EXPECT_TRUE(Ipv6Instance("2001::1").ip()->isTeredoAddress());
+  EXPECT_TRUE(Ipv6Instance("2001::42:43").ip()->isTeredoAddress());
+  EXPECT_TRUE(Ipv6Instance("2001::ffff:ffff:ffff:ffff").ip()->isTeredoAddress());
+
+  // Not Teredo addresses.
+  EXPECT_FALSE(Ipv6Instance("2002::0").ip()->isTeredoAddress());
+  EXPECT_FALSE(Ipv6Instance("2002::1").ip()->isTeredoAddress());
+  EXPECT_FALSE(Ipv6Instance("3001::1").ip()->isTeredoAddress());
+}
+
+TEST(Ipv6InstanceTest, UniqueLocal) {
+  // Unique Local Addresses (ULA) are in the range fc00::/7.
+  EXPECT_TRUE(Ipv6Instance("fc00:0:0:0:0:0:0:0").ip()->isUniqueLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fc00::1").ip()->isUniqueLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fc00::42:43").ip()->isUniqueLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fdff::ffff:ffff:ffff:ffff:ffff:ffff").ip()->isUniqueLocalAddress());
+
+  // Not ULA addresses.
+  EXPECT_FALSE(Ipv6Instance("fec0:0:0:0:0:0:0:0").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(
+      Ipv6Instance("feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("fe00::0").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("fe80::0").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("ff00::0").ip()->isUniqueLocalAddress());
+}
+
+TEST(Ipv6InstanceTest, SiteLocal) {
+  // Site-local addresses are in the range fec0::/10.
+  EXPECT_TRUE(Ipv6Instance("fec0:0:0:0:0:0:0:0").ip()->isSiteLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fec0::1").ip()->isSiteLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fec0::42:43").ip()->isSiteLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff").ip()->isSiteLocalAddress());
+
+  // Not site-local addresses.
+  EXPECT_FALSE(Ipv6Instance("fc00:0:0:0:0:0:0:0").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("fdff::ffff:ffff:ffff:ffff:ffff:ffff").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("ff00::0").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("2002::1").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("3001::1").ip()->isSiteLocalAddress());
+}
+
 TEST(Ipv6InstanceTest, BadAddress) {
   EXPECT_THROW(Ipv6Instance("foo"), EnvoyException);
   EXPECT_THROW(Ipv6Instance("bar", 1), EnvoyException);
@@ -352,6 +533,8 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(Type::Pipe, address->type());
   EXPECT_EQ(nullptr, address->ip());
   EXPECT_EQ(nullptr, address->envoyInternalAddress());
+  EXPECT_EQ(absl::nullopt, address->networkNamespace());
+  EXPECT_EQ(nullptr, address->withNetworkNamespace("/var/run/netns/1"));
 }
 
 TEST(InternalInstanceTest, Basic) {
@@ -363,6 +546,8 @@ TEST(InternalInstanceTest, Basic) {
   EXPECT_NE(nullptr, address.envoyInternalAddress());
   EXPECT_EQ(nullptr, address.sockAddr());
   EXPECT_EQ(static_cast<decltype(address.sockAddrLen())>(0), address.sockAddrLen());
+  EXPECT_EQ(absl::nullopt, address.networkNamespace());
+  EXPECT_EQ(nullptr, address.withNetworkNamespace("/var/run/netns/1"));
 }
 
 TEST(InternalInstanceTest, BasicWithId) {

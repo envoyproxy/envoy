@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.sse_to_metadata.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.sse_to_metadata.v3";
+option java_outer_classname = "SseToMetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/sse_to_metadata/v3;sse_to_metadatav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: SSE-To-Metadata Filter]
+//
+// The SSE-To-Metadata filter extracts values from Server-Sent Events (SSE) HTTP response bodies
+// and writes them to dynamic metadata. This is useful for LLM token usage tracking,
+// logging, and other observability use cases.
+//
+// The filter specifically handles SSE format (text/event-stream) and uses pluggable content
+// parsers to extract values from the SSE data fields. The content parser is a typed extension
+// that can be configured to handle different content types (JSON, plaintext, XML, etc.).
+//
+// The filter only processes responses with Content-Type "text/event-stream"
+// (the standard SSE content type). Content-Type parameters such as charset are ignored.
+//
+// See SSE-To-Metadata :ref:`configuration overview <config_http_filters_sse_to_metadata>` for more details.
+// [#extension: envoy.filters.http.sse_to_metadata]
+
+message SseToMetadata {
+  // Rules for processing SSE streams and extracting metadata.
+  //
+  // The filter parses the SSE protocol (events delimited by blank lines), then delegates
+  // to a content parser to parse event content and extract metadata. The content parser
+  // determines which values to extract and how to write them to metadata.
+  message ProcessingRules {
+    // Content parser configuration for parsing event content and extracting metadata.
+    //
+    // The content parser specifies:
+    // - How to parse the event data (e.g., JSON, XML, plaintext)
+    // - Which values to extract from the parsed content (e.g., JSON paths like usage.total_tokens)
+    // - How to map extracted values to metadata (namespace, key, type conversions)
+    // - When to write metadata (on_present, on_missing, on_error actions)
+    // [#extension-category: envoy.content_parsers]
+    config.core.v3.TypedExtensionConfig content_parser = 1
+        [(validate.rules).message = {required: true}];
+
+    // Maximum size in bytes for a single SSE event before it's considered invalid
+    // and discarded. This protects against unbounded memory growth from malicious
+    // or malformed streams that never send event delimiters (blank lines).
+    //
+    // Default is 8192 bytes (8KB), which is sufficient for most legitimate events.
+    // Set to 0 to disable the limit (not recommended for production).
+    // Maximum allowed value is 10485760 bytes (10MB).
+    google.protobuf.UInt32Value max_event_size = 2 [(validate.rules).uint32 = {lte: 10485760}];
+  }
+
+  // Rules for processing SSE response streams.
+  ProcessingRules response_rules = 1 [(validate.rules).message = {required: true}];
+}

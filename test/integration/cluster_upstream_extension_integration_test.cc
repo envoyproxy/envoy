@@ -26,7 +26,7 @@ public:
                                 const std::string& key1, const std::string& key2,
                                 const std::string& value) {
 
-    ProtobufWkt::Struct struct_obj;
+    Protobuf::Struct struct_obj;
     (*struct_obj.mutable_fields())[key2] = ValueUtil::stringValue(value);
     (*metadata.mutable_filter_metadata())[key1] = struct_obj;
   }

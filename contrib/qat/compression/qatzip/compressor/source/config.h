@@ -36,7 +36,7 @@ class QatzipCompressorFactory : public Envoy::Compression::Compressor::Compresso
 public:
   QatzipCompressorFactory(
       const envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip& qatzip,
-      Server::Configuration::FactoryContext& context);
+      Server::Configuration::GenericFactoryContext& context);
 
   // Envoy::Compression::Compressor::CompressorFactory
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override;
@@ -68,7 +68,7 @@ public:
 
   Envoy::Compression::Compressor::CompressorFactoryPtr
   createCompressorFactoryFromProto(const Protobuf::Message& proto_config,
-                                   Server::Configuration::FactoryContext& context) override;
+                                   Server::Configuration::GenericFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip>();
@@ -80,7 +80,7 @@ private:
 #ifndef QAT_DISABLED
   Envoy::Compression::Compressor::CompressorFactoryPtr createCompressorFactoryFromProtoTyped(
       const envoy::extensions::compression::qatzip::compressor::v3alpha::Qatzip& config,
-      Server::Configuration::FactoryContext& context);
+      Server::Configuration::GenericFactoryContext& context);
 #endif
 
   const std::string name_;

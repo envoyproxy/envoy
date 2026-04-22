@@ -70,7 +70,7 @@ private:
   }
 
   // Updates the internal data structures with a given cluster load assignment.
-  void update(const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
+  void update(envoy::config::endpoint::v3::ClusterLoadAssignment&& cluster_load_assignment);
 
   // EdsResourceRemovalCallback
   void onCachedResourceRemoved(absl::string_view resource_name) override;

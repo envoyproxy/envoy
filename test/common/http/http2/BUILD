@@ -44,7 +44,7 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:http2_adapter",
+        "@quiche//:http2_adapter",
     ],
 )
 
@@ -55,8 +55,8 @@ envoy_cc_test_library(
         "//source/common/http/http2:codec_lib",
         "//test/mocks:common_lib",
         "//test/mocks/server:overload_manager_mocks",
-        "@com_github_google_quiche//:http2_adapter",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
+        "@quiche//:http2_adapter",
     ],
 )
 
@@ -73,10 +73,12 @@ envoy_cc_test(
         "//test/common/http:common_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/http:conn_pool_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:test_runtime_lib",
@@ -93,7 +95,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
-        "@com_github_google_quiche//:http2_hpack_hpack_lib",
+        "@quiche//:http2_hpack_hpack_lib",
     ],
 )
 
@@ -146,8 +148,8 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:http2_adapter",
-        "@com_github_google_quiche//:http2_adapter_mock_http2_visitor",
+        "@quiche//:http2_adapter",
+        "@quiche//:http2_adapter_mock_http2_visitor",
     ],
 )
 

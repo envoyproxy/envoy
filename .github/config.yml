@@ -1,12 +1,19 @@
 agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
-  repo: envoyproxy/envoy-build-ubuntu
-  sha: d38457962937370aa867620a5cc7d01c568621fc0d1a57e044847599372a8571
-  mobile-sha: 5ff2c9ce8f3abdb89d305095a39fd0e7ee97422cc017d9578e738f9a56bc33d8
-  # this is authoritative, but is not currently used in github ci
-  gcr-sha: 56b66cc84065c88a141963cedbbe4198850ffae0dacad769f516d0e9081439da
-  tag: cb86d91cf406995012e330ab58830e6ee10240cb
+  repo: docker.io/envoyproxy/envoy-build
+  repo-gcr: gcr.io/envoy-ci/envoy-build
+  # default ci caching (ci)
+  sha: 20656853fae51927cda557e7af80ccff175f5de6f84bd0f092cd8672b2a6e0fe
+  sha-ci: 20656853fae51927cda557e7af80ccff175f5de6f84bd0f092cd8672b2a6e0fe
+  sha-devtools: 6e7a82d4f1ba040f4ebef0c1aae00cdbd205ff7a1284c20cc20984fdfa4a91d8
+  sha-docker: 85b6c3e76f093d9c9d10a968b5615cc8d82f38d7aef311100d542e4d640f5a74
+  sha-gcc: 439e870260c1599646d05b8b5d3bf1b6dd585c2e3cdac78dcb9f4081564c27fd
+  sha-mobile: bd1338a8951376211e4f4f6ff3171675670c4c582b0966f1d247abd3ba6a8a67
+  sha-worker: 25a68eff24b7414a346977d545687b87851d1c5746c466798050fa12fc5d0686
+  # TODO: remove this dupe (currently used by ci request handler)
+  mobile-sha: bd1338a8951376211e4f4f6ff3171675670c4c582b0966f1d247abd3ba6a8a67
+  tag: 86873047235e9b8232df989a5999b9bebf9db69c
 
 config:
   envoy:
@@ -27,7 +34,9 @@ checks:
     name: Envoy/Checks
     on-run:
     - check-build
+    - check-build-openssl
     - check-coverage
+    - check-runtime
     - check-san
     required: true
   macos:
@@ -85,6 +94,11 @@ checks:
     required: true
     on-run:
     - mobile-perf
+  mobile-python:
+    name: Mobile/Python
+    required: true
+    on-run:
+    - mobile-python
   mobile-release-validation:
     name: Mobile/Release validation
     required: true
@@ -99,8 +113,10 @@ checks:
     name: Envoy/Prechecks
     on-run:
     - precheck-deps
+    - precheck-external
     - precheck-format
     - precheck-publish
+    - precheck-publish-config
     required: true
     # yamllint disable rule:line-length
     advice:
@@ -146,7 +162,7 @@ checks:
     name: >-
       Envoy/Publish and verify
     on-run:
-    - publish
+    - release
     - verify
     required: true
 
@@ -167,9 +183,18 @@ run:
   check-build:
     paths:
     - "**/*"
+  check-build-openssl:
+    paths:
+    - "**/*"
   check-coverage:
     paths:
     - "**/*"
+  check-runtime:
+    paths:
+    - source/server/cgroup_cpu_util.*
+    - test/server/*cgroup*
+    # this can be switched to always run once related ci lands.
+    push: paths
   check-san:
     paths:
     - "**/*"
@@ -212,6 +237,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -223,6 +249,7 @@ run:
     - .github/config.yml
     - api/**/*
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - envoy/**/*
     - mobile/.bazelrc
@@ -238,10 +265,13 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
+    - test/run_envoy_bazel_coverage.sh
     - tools/code_format/check_format.py
+    - tools/coverage/**/*
   mobile-format:
     paths:
     - .bazelrc
@@ -295,6 +325,18 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+  mobile-python:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - .github/workflows/mobile-python.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
   mobile-release-validation:
     paths:
     - .bazelrc
@@ -311,6 +353,7 @@ run:
     - .bazelversion
     - .github/config.yml
     - bazel/external/quiche.BUILD
+    - bazel/repositories.bzl
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
@@ -328,13 +371,19 @@ run:
     - "**/go.mod"
     - "**/Dockerfile*"
     push: paths
+  precheck-external:
+    paths:
+    - "**/*"
   precheck-format:
     paths:
     - "**/*"
   precheck-publish:
     paths:
     - "**/*"
-  publish:
+  precheck-publish-config:
+    paths:
+    - "**/*"
+  release:
     paths:
     - .bazelrc
     - .bazelversion
@@ -343,6 +392,7 @@ run:
     - bazel/**/*
     - ci/**/*
     - contrib/**/*
+    - distribution/**/*
     - envoy/**/*
     - examples/**/*
     - source/**/*
@@ -353,10 +403,13 @@ run:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - .github/workflows/envoy-publish.yml
+    - .github/workflows/_publish_verify.yml
     - api/**/*
     - bazel/**/*
     - ci/**/*
     - contrib/**/*
+    - distribution/**/*
     - envoy/**/*
     - examples/**/*
     - source/**/*
@@ -379,7 +432,7 @@ tables:
     title: Build image
     table-title: Container image/s (as used in this CI run)
     filter: |
-      "https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?page=1&name=" as $dockerLink
+      "https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=" as $dockerLink
       | .request["build-image"]
       | del(.changed)
       | with_entries(
@@ -391,7 +444,7 @@ tables:
     title: Build image (current)
     table-title: Current or previous container image
     filter: |
-      "https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?page=1&name=" as $dockerLink
+      "https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=" as $dockerLink
       | if .request["build-image"].changed then
           .request["build-image-current"]
           | with_entries(

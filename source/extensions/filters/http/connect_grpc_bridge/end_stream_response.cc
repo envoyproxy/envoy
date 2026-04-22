@@ -56,8 +56,8 @@ std::string statusCodeToString(const Grpc::Status::GrpcStatus status) {
   }
 }
 
-ProtobufWkt::Struct convertToStruct(const Error& error) {
-  ProtobufWkt::Struct obj;
+Protobuf::Struct convertToStruct(const Error& error) {
+  Protobuf::Struct obj;
   (*obj.mutable_fields())["code"] = ValueUtil::stringValue(statusCodeToString(error.code));
 
   if (!error.message.empty()) {
@@ -65,7 +65,7 @@ ProtobufWkt::Struct convertToStruct(const Error& error) {
   }
 
   if (!error.details.empty()) {
-    auto details_list = std::make_unique<ProtobufWkt::ListValue>();
+    auto details_list = std::make_unique<Protobuf::ListValue>();
     for (const auto& detail : error.details) {
       const auto& value = detail.value();
       *details_list->add_values() = ValueUtil::structValue(MessageUtil::keyValueStruct({
@@ -74,30 +74,30 @@ ProtobufWkt::Struct convertToStruct(const Error& error) {
       }));
     }
 
-    ProtobufWkt::Value details_value;
+    Protobuf::Value details_value;
     details_value.set_allocated_list_value(details_list.release());
     (*obj.mutable_fields())["details"] = details_value;
   }
   return obj;
 }
 
-ProtobufWkt::Struct convertToStruct(const EndStreamResponse& response) {
-  ProtobufWkt::Struct obj;
+Protobuf::Struct convertToStruct(const EndStreamResponse& response) {
+  Protobuf::Struct obj;
 
   if (response.error.has_value()) {
     (*obj.mutable_fields())["error"] = ValueUtil::structValue(convertToStruct(*response.error));
   }
 
   if (!response.metadata.empty()) {
-    ProtobufWkt::Struct metadata_obj;
+    Protobuf::Struct metadata_obj;
     for (const auto& [name, values] : response.metadata) {
-      auto values_list = std::make_unique<ProtobufWkt::ListValue>();
+      auto values_list = std::make_unique<Protobuf::ListValue>();
 
       for (const auto& value : values) {
         *values_list->add_values() = ValueUtil::stringValue(value);
       }
 
-      ProtobufWkt::Value values_value;
+      Protobuf::Value values_value;
       values_value.set_allocated_list_value(values_list.release());
       (*metadata_obj.mutable_fields())[name] = values_value;
     }
@@ -110,12 +110,12 @@ ProtobufWkt::Struct convertToStruct(const EndStreamResponse& response) {
 } // namespace
 
 bool serializeJson(const Error& error, std::string& out) {
-  ProtobufWkt::Struct message = convertToStruct(error);
+  Protobuf::Struct message = convertToStruct(error);
   return Protobuf::util::MessageToJsonString(message, &out).ok();
 }
 
 bool serializeJson(const EndStreamResponse& response, std::string& out) {
-  ProtobufWkt::Struct message = convertToStruct(response);
+  Protobuf::Struct message = convertToStruct(response);
   return Protobuf::util::MessageToJsonString(message, &out).ok();
 }
 

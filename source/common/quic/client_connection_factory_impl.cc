@@ -1,5 +1,16 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 
+#include <exception>
+
+#include "envoy/extensions/quic/client_writer_factory/v3/default_client_writer.pb.h"
+#include "envoy/registry/registry.h"
+
+#include "source/common/config/utility.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/quic/envoy_quic_client_packet_writer_factory.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -10,15 +21,20 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, ui
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       buffer_limit_(buffer_limit), max_packet_length_(max_packet_length) {
   quiche::FlagRegistry::getInstance();
+  // Allow migration to server preferred address by default.
+  migration_config_.allow_server_preferred_address = true;
+  migration_config_.max_port_migrations_per_session = kMaxNumSocketSwitches;
+  migration_config_.migrate_session_on_network_change = false;
 }
 
 std::unique_ptr<PersistentQuicInfoImpl>
 createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
-                                   const Upstream::ClusterInfo& cluster) {
+                                   const Upstream::ClusterInfo& cluster,
+                                   Server::Configuration::ServerFactoryContext& server_context) {
   auto quic_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
       dispatcher, cluster.perConnectionBufferLimitBytes());
   const envoy::config::core::v3::QuicProtocolOptions& quic_config =
-      cluster.http3Options().quic_protocol_options();
+      cluster.httpProtocolOptions().http3Options().quic_protocol_options();
   Quic::convertQuicConfig(quic_config, quic_info->quic_config_);
   quic::QuicTime::Delta crypto_timeout =
       quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
@@ -30,6 +46,40 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
   }
   quic_info->max_packet_length_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_config, max_packet_length, 0);
+
+  uint32_t num_timeouts_to_trigger_port_migration =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_config, num_timeouts_to_trigger_port_migration, 0);
+  quic_info->migration_config_.allow_port_migration = (num_timeouts_to_trigger_port_migration > 0);
+  if (quic_config.has_connection_migration()) {
+    quic_info->migration_config_.migrate_session_on_network_change = true;
+    quic_info->migration_config_.migrate_session_early = true;
+    if (quic_config.connection_migration().has_migrate_idle_connections()) {
+      quic_info->migration_config_.migrate_idle_session = true;
+      quic_info->migration_config_.idle_migration_period =
+          quic::QuicTime::Delta::FromSeconds(PROTOBUF_GET_SECONDS_OR_DEFAULT(
+              quic_config.connection_migration().migrate_idle_connections(),
+              max_idle_time_before_migration, 30));
+    } else {
+      quic_info->migration_config_.migrate_idle_session = false;
+    }
+    quic_info->migration_config_.max_time_on_non_default_network =
+        quic::QuicTime::Delta::FromSeconds(PROTOBUF_GET_SECONDS_OR_DEFAULT(
+            quic_config.connection_migration(), max_time_on_non_default_network, 128));
+  }
+  envoy::config::core::v3::TypedExtensionConfig client_writer_config;
+  if (quic_config.has_client_packet_writer()) {
+    client_writer_config = quic_config.client_packet_writer();
+  } else {
+    client_writer_config.set_name("envoy.quic.packet_writer.default");
+    envoy::extensions::quic::client_writer_factory::v3::DefaultClientWriter empty_default_config;
+    client_writer_config.mutable_typed_config()->PackFrom(empty_default_config);
+  }
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<QuicClientPacketWriterConfigFactory>(
+      client_writer_config);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      client_writer_config, server_context.messageValidationVisitor(), factory);
+  quic_info->writer_factory_ = factory.createQuicClientPacketWriterFactory(
+      *message, dispatcher, server_context.messageValidationVisitor());
   return quic_info;
 }
 
@@ -51,21 +101,64 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
   quic::ParsedQuicVersionVector quic_versions = quic::CurrentSupportedHttp3Versions();
   ASSERT(!quic_versions.empty());
+  ASSERT(info_impl->writer_factory_ != nullptr);
+  quic::QuicNetworkHandle current_network = quic::kInvalidNetworkHandle;
+  if (network_observer_registry != nullptr) {
+    current_network = network_observer_registry->getDefaultNetwork();
+    if (current_network == quic::kInvalidNetworkHandle) {
+      // In case the platform default network is invalid, pick another working network.
+      current_network =
+          network_observer_registry->getAlternativeNetwork(quic::kInvalidNetworkHandle);
+    }
+    // If current_network is still invalid at this point, the created socket
+    // will likely not work. Let the connection figure it out and fail by
+    // itself.
+  }
+  QuicClientPacketWriterFactory::CreationResult creation_result =
+      info_impl->writer_factory_->createSocketAndQuicPacketWriter(server_addr, current_network,
+                                                                  local_addr, options);
+  const bool use_migration_in_quiche =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_migration_in_quiche");
+  quic::QuicForceBlockablePacketWriter* wrapper = nullptr;
+  if (use_migration_in_quiche) {
+    wrapper = new quic::QuicForceBlockablePacketWriter();
+    // Owns the inner writer.
+    wrapper->set_writer(creation_result.writer_.release());
+  }
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
-      quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
-      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, options, generator,
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_quic_client_udp_gro"));
+      quic::QuicUtils::CreateRandomConnectionId(), info_impl->conn_helper_,
+      info_impl->alarm_factory_,
+      (use_migration_in_quiche
+           ? wrapper
+           : static_cast<quic::QuicPacketWriter*>(creation_result.writer_.release())),
+      /*owns_writer=*/true, quic_versions, dispatcher, std::move(creation_result.socket_),
+      generator);
   // Override the max packet length of the QUIC connection if the option value is not 0.
   if (info_impl->max_packet_length_ > 0) {
     connection->SetMaxPacketLength(info_impl->max_packet_length_);
   }
 
+  EnvoyQuicClientConnection::EnvoyQuicMigrationHelper* migration_helper = nullptr;
+  quic::QuicConnectionMigrationConfig migration_config = info_impl->migration_config_;
+  if (use_migration_in_quiche) {
+    migration_helper = &connection->getOrCreateMigrationHelper(
+        *info_impl->writer_factory_, current_network,
+        makeOptRefFromPtr<EnvoyQuicNetworkObserverRegistry>(network_observer_registry));
+  } else {
+    // The connection needs to be aware of the writer factory so it can create migration probing
+    // sockets.
+    connection->setWriterFactory(*info_impl->writer_factory_);
+    // Disable all kinds of migration in QUICHE as the session won't be setup to handle it.
+    migration_config = quicConnectionMigrationDisableAllConfig();
+  }
   // TODO (danzh) move this temporary config and initial RTT configuration to h3 pool.
   quic::QuicConfig config = info_impl->quic_config_;
   // Update config with latest srtt, if available.
   if (rtt_cache.has_value()) {
     Http::HttpServerPropertiesCache::Origin origin("https", server_id.host(), server_id.port());
-    std::chrono::microseconds rtt = rtt_cache.value().get().getSrtt(origin);
+    std::chrono::microseconds rtt = rtt_cache.value().get().getSrtt(
+        origin, Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.use_canonical_suffix_for_initial_rtt_estimate"));
     if (rtt.count() != 0) {
       config.SetInitialRoundTripTimeUsToSend(rtt.count());
     }
@@ -73,9 +166,10 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
 
   // QUICHE client session always use the 1st version to start handshake.
   auto session = std::make_unique<EnvoyQuicClientSession>(
-      config, quic_versions, std::move(connection), server_id, std::move(crypto_config), dispatcher,
-      info_impl->buffer_limit_, info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache,
-      scope, transport_socket_options, transport_socket_factory);
+      config, quic_versions, std::move(connection), wrapper, migration_helper, migration_config,
+      server_id, std::move(crypto_config), dispatcher, info_impl->buffer_limit_,
+      info_impl->crypto_stream_factory_, quic_stat_names, rtt_cache, scope,
+      transport_socket_options, transport_socket_factory);
   if (network_observer_registry != nullptr) {
     session->registerNetworkObserver(*network_observer_registry);
   }

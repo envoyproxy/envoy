@@ -149,6 +149,49 @@ The following overload actions are supported:
     - Envoy will reset expensive streams to terminate them. See
       :ref:`below <config_overload_manager_reset_streams>` for details on configuration.
 
+  * - envoy.overload_actions.close_idle_http_connections
+    - Envoy will close idle downstream HTTP/3 QUIC connections when the action is active.
+      When the action is *saturated*, connections will be closed aggressively (ignoring the idle timer threshold).
+      When the action is in a *scaled active* state, the idle timer threshold is still respected.
+      Note that this action is currently only supported for HTTP/3 QUIC connections.
+
+.. _config_overload_manager_shrink_heap:
+
+Shrink Heap
+^^^^^^^^^^^
+
+The ``envoy.overload_actions.shrink_heap`` overload action will periodically attempt to
+release free memory from the heap back to the operating system when the action is triggered.
+This is useful for reducing memory fragmentation and returning unused memory to the system,
+particularly when using tcmalloc.
+
+The action can be optionally configured with
+:ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>`:
+
+.. list-table::
+  :header-rows: 1
+  :widths: 1, 1, 2
+
+  * - Parameter
+    - Default
+    - Description
+  * - timer_interval
+    - 10s
+    - Interval at which the shrink heap action checks if memory should be released
+  * - max_unfreed_memory_bytes
+    - 104857600 (100MB)
+    - Maximum amount of unfreed memory to retain before releasing to the system
+
+Example configuration:
+
+.. literalinclude:: _include/shrink_heap_overload.yaml
+    :language: yaml
+    :lines: 45-53
+    :emphasize-lines: 2-5
+    :linenos:
+    :caption: :download:`shrink_heap_overload.yaml <_include/shrink_heap_overload.yaml>`
+
+If no ``typed_config`` is provided, the action will use default values.
 
 Load Shed Points
 ----------------
@@ -211,6 +254,20 @@ The following core load shed points are supported:
     - Envoy will send local reply directly before creating an upstream request in
       the router if Envoy is under resource pressure, typically memory. This change
       makes load shed check availabe in HTTP decoder filters.
+
+  * - envoy.load_shed_points.connection_pool_new_connection
+    - Envoy will stop creating new connections in the connection pool when
+      it is under pressure (typically memory pressure). If a new connection is
+      rejected by this load shed point and there is no available capacity
+      to serve the downstream request, the downstream request will fail.
+
+  * - envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch
+    - Envoy will send a ``GOAWAY`` while processing HTTP2 requests at the codec
+      level AND immediately force close the downstream connection. If both this and
+      ``http2_server_go_away_on_dispatch`` are configured and shouldShedLoad()
+      returns true for both, this takes precedence. This is a disruptive action
+      (causes downstream connections to ungracefully close) that should only be
+      used with a very high threshold (if at all).
 
 .. _config_overload_manager_reducing_timeouts:
 

@@ -78,6 +78,14 @@ struct Manager {
   virtual void initialize(const Watcher& watcher) PURE;
 
   /**
+   * Update the manager to notify a new watcher when initialization is complete. The previous
+   * watcher will be discarded from the manager. It is an error to call this method on a manager
+   * that is in initialized state.
+   * @param watcher the watcher to notify when initialization is complete.
+   */
+  virtual void updateWatcher(const Watcher& watcher) PURE;
+
+  /**
    * Add unready targets information into the config dump.
    */
   virtual void dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& dumps) PURE;

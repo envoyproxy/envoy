@@ -17,10 +17,12 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
+#include "envoy/http/header_evaluator.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/router/path_matcher.h"
 #include "envoy/router/path_rewriter.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -33,7 +35,9 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-
+namespace Formatter {
+class Formatter;
+}
 namespace Upstream {
 class ClusterManager;
 class LoadBalancerContext;
@@ -57,6 +61,7 @@ public:
    * @param stream_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                                       const Formatter::Context& context,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
@@ -94,11 +99,27 @@ public:
   virtual std::string newUri(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
-   * Returns the response body to send with direct responses.
-   * @return std::string& the response body specified in the route configuration,
-   *         or an empty string if no response body is specified.
+   * Format the response body for direct responses. Users should pass
+   * a string reference to populate, `body`, and the return value may
+   * or may not be the same reference based on if a formatter is applied.
+   * If a formatter is applied, the return value will be the same reference.
+   * If no formatter is applied, the return value will be the configured body.
+   * @param request_headers supplies the request headers.
+   * @param response_headers supplies the response headers.
+   * @param stream_info holds additional information about the request.
+   * @param body_out a string in which a formatted body may be stored.
+   * @return std::string& the response body.
    */
-  virtual const std::string& responseBody() const PURE;
+  virtual absl::string_view formatBody(const Http::RequestHeaderMap& request_headers,
+                                       const Http::ResponseHeaderMap& response_headers,
+                                       const StreamInfo::StreamInfo& stream_info,
+                                       std::string& body_out) const PURE;
+
+  /**
+   * @return the content type to use for the direct response body, or empty string if not
+   * configured (in which case the default "text/plain" will be used).
+   */
+  virtual absl::string_view responseContentType() const PURE;
 
   /**
    * Do potentially destructive header transforms on Path header prior to redirection. For
@@ -196,6 +217,9 @@ public:
 };
 
 using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
+
+class RetryPolicy;
+using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
 
 /**
  * Route level retry policy.
@@ -313,7 +337,13 @@ public:
 /**
  * RetryStatus whether request should be retried or not.
  */
-enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
+enum class RetryStatus {
+  No,
+  NoOverflow,
+  NoRetryLimitExceeded,
+  Yes,
+  NoRuntime,
+};
 
 /**
  * InternalRedirectPolicy from the route configuration.
@@ -376,6 +406,15 @@ public:
     Unknown,
     Yes,
     No,
+  };
+
+  enum class DoRetryType {
+    // Retry the request immediately.
+    Immediately,
+    // Retry the request with ratelimited backoff delay.
+    Ratelimited,
+    // Retry the request with exponential backoff delay.
+    Exponential,
   };
 
   using DoRetryCallback = std::function<void()>;
@@ -483,19 +522,27 @@ public:
 
   /**
    * Returns a reference to the PriorityLoad that should be used for the next retry.
+   * @param stream_info request stream information.
    * @param priority_set current priority set.
    * @param original_priority_load original priority load.
    * @param priority_mapping_func see @Upstream::RetryPriority::PriorityMappingFunc.
    * @return HealthyAndDegradedLoad that should be used to select a priority for the next retry.
    */
   virtual const Upstream::HealthyAndDegradedLoad& priorityLoadForRetry(
-      const Upstream::PrioritySet& priority_set,
+      StreamInfo::StreamInfo* stream_info, const Upstream::PrioritySet& priority_set,
       const Upstream::HealthyAndDegradedLoad& original_priority_load,
       const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) PURE;
   /**
    * return how many times host selection should be reattempted during host selection.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  /**
+   * @return the type of retry to perform when a retry is triggered.
+   * This is used to determine whether to apply a backoff delay or not, and if so, what type of
+   * backoff to apply.
+   */
+  virtual DoRetryType doRetryType() const PURE;
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;
@@ -544,6 +591,16 @@ public:
    * @return true if host name should be suffixed with "-shadow".
    */
   virtual bool disableShadowHostSuffixAppend() const PURE;
+
+  /**
+   * @return the header evaluator for manipulating headers in mirrored requests.
+   */
+  virtual const Http::HeaderEvaluator& headerEvaluator() const PURE;
+
+  /**
+   * @return the literal value to rewrite the host header with, or empty if no rewrite.
+   */
+  virtual absl::string_view hostRewriteLiteral() const PURE;
 };
 
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
@@ -677,16 +734,6 @@ public:
   virtual bool includeIsTimeoutRetryHeader() const PURE;
 
   /**
-   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
-   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
-   *         as other limits may apply.
-   *         If a per route limit exists, it takes precedence over this configuration.
-   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
-   *         rather than no limit applies.
-   */
-  virtual uint32_t retryShadowBufferLimit() const PURE;
-
-  /**
    * This is a helper to get the route's per-filter config if it exists, up along the config
    * hierarchy (Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
@@ -719,6 +766,8 @@ public:
    */
   virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
 };
+
+using VirtualHostConstSharedPtr = std::shared_ptr<const VirtualHost>;
 
 /**
  * Route level hedging policy.
@@ -782,12 +831,12 @@ public:
    * Creates a new MetadataMatchCriteria, merging existing
    * metadata criteria with the provided criteria. The result criteria is the
    * combination of both sets of criteria, with those from the metadata_matches
-   * ProtobufWkt::Struct taking precedence.
+   * Protobuf::Struct taking precedence.
    * @param metadata_matches supplies the new criteria.
    * @return MetadataMatchCriteriaConstPtr the result criteria.
    */
   virtual MetadataMatchCriteriaConstPtr
-  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
+  mergeMatchCriteria(const Protobuf::Struct& metadata_matches) const PURE;
 
   /**
    * Creates a new MetadataMatchCriteria with criteria vector reduced to given names
@@ -902,23 +951,6 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
-   * Returns the final host value for the request, taking into account route-level mutations.
-   *
-   * The value returned is computed with the following logic in order:
-   *
-   * 1. If a host rewrite is configured for the route, it returns that value.
-   * 2. If a host rewrite header is specified, it attempts to use the value from that header.
-   * 3. If a host rewrite path regex is configured, it applies the regex to the request path and
-   *    returns the result.
-   * 4. If none of the above apply, it returns the original host value from the request headers.
-   *
-   * @param headers The constant reference to the request headers.
-   * @note This function will not attempt to restore the port in the host value. If port information
-   *       is required, it should be handled separately.
-   */
-  virtual const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const PURE;
-
-  /**
    * Returns the HTTP status code to use when configured cluster is not found.
    * @return Http::Code to use when configured cluster is not found.
    */
@@ -934,11 +966,15 @@ public:
    * using current values of headers. Note that final path may be different if
    * headers change before finalization.
    * @param headers supplies the request headers.
-   * @return absl::optional<std::string> the value of the URL path after rewrite or absl::nullopt
-   *         if rewrite is not configured.
+   * @param context supplies the formatter context for path generation.
+   * @param stream_info holds additional information about the request.
+   * @return std::string the value of the URL path after rewrite or empty string
+   *         if rewrite is not configured or rewrite failed.
    */
-  virtual absl::optional<std::string>
-  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const PURE;
+  virtual std::string
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers,
+                             const Formatter::Context& context,
+                             const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For
@@ -946,11 +982,13 @@ public:
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
    * @param stream_info holds additional information about the request.
-   * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
+   * @param keep_original_host_or_path insert x-envoy-original-path header if path rewritten,
+   *        or x-envoy-original-host header if host rewritten.
    */
   virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                                      const Formatter::Context& context,
                                       const StreamInfo::StreamInfo& stream_info,
-                                      bool insert_envoy_original_path) const PURE;
+                                      bool keep_original_host_or_path) const PURE;
 
   /**
    * Returns the request header transforms that would be applied if finalizeRequestHeaders were
@@ -989,7 +1027,7 @@ public:
    * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy even
    *         if it is empty and does not allow retries.
    */
-  virtual const RetryPolicy& retryPolicy() const PURE;
+  virtual const RetryPolicyConstSharedPtr& retryPolicy() const PURE;
 
   /**
    * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes
@@ -1009,13 +1047,20 @@ public:
   virtual const PathRewriterSharedPtr& pathRewriter() const PURE;
 
   /**
-   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
-   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
-   *         as other limits may apply.
-   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
-   *         rather than no limit applies.
+   * @return uint64_t the maximum bytes which should be buffered for request bodies. This enables
+   *         buffering larger request bodies beyond the connection buffer limit for use cases
+   *         with large payloads, shadowing, or retries.
+   *
+   *         This method consolidates the functionality of the previous
+   *         per_request_buffer_limit_bytes and request_body_buffer_limit fields. It supports both
+   *         legacy configurations using per_request_buffer_limit_bytes and new configurations using
+   *         request_body_buffer_limit.
+   *
+   *         If neither is set, falls back to connection buffer limits. Unlike some other buffer
+   *         limits, 0 here indicates buffering should not be performed rather than no limit
+   * applies.
    */
-  virtual uint32_t retryShadowBufferLimit() const PURE;
+  virtual uint64_t requestBodyBufferLimit() const PURE;
 
   /**
    * @return const std::vector<ShadowPolicy>& the shadow policies for the route. The vector is empty
@@ -1033,6 +1078,12 @@ public:
    *         disabled idle timeout, while nullopt indicates deference to the global timeout.
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the route's flush timeout. Zero indicates a
+   *         disabled idle timeout, while nullopt indicates deference to the global timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> flushTimeout() const PURE;
 
   /**
    * @return true if new style max_stream_duration config should be used over the old style.
@@ -1143,6 +1194,12 @@ public:
    * @return EarlyDataPolicy& the configured early data option.
    */
   virtual const EarlyDataPolicy& earlyDataPolicy() const PURE;
+
+  /**
+   * Refresh the target cluster of the route with the request attributes if possible.
+   */
+  virtual void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 /**
@@ -1204,6 +1261,18 @@ public:
    * @return the tracing custom tags.
    */
   virtual const Tracing::CustomTagMap& getCustomTags() const PURE;
+
+  /**
+   * This method returns operation name formatter of span for the route.
+   * @return the operation formatter.
+   */
+  virtual OptRef<const Formatter::Formatter> operation() const PURE;
+
+  /**
+   * This method returns operation name formatter of upstream span for the route.
+   * @return the operation name formatter.
+   */
+  virtual OptRef<const Formatter::Formatter> upstreamOperation() const PURE;
 };
 
 using RouteTracingConstPtr = std::unique_ptr<const RouteTracing>;
@@ -1279,11 +1348,18 @@ public:
    * @return const VirtualHost& the virtual host that owns the route.
    */
   virtual const VirtualHost& virtualHost() const PURE;
+
+  /**
+   * @return VirtualHostConstSharedPtr the virtual host that owns the route, extended to allow a
+   * caller to extend or transfer ownership.
+   */
+  virtual VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
 class RouteEntryAndRoute : public RouteEntry, public Route {};
+using RouteEntryAndRouteConstSharedPtr = std::shared_ptr<const RouteEntryAndRoute>;
 
 /**
  * RouteCallback, returns one of these enums to the route matcher to indicate
@@ -1376,6 +1452,17 @@ public:
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 };
 
+struct VirtualHostRoute {
+  VirtualHostConstSharedPtr vhost;
+  RouteConstSharedPtr route;
+
+  // Override -> operator to access methods of route directly.
+  const Route* operator->() const { return route.get(); }
+
+  // Convert the VirtualHostRoute to RouteConstSharedPtr.
+  operator RouteConstSharedPtr() const { return route; }
+};
+
 /**
  * The router configuration.
  */
@@ -1387,11 +1474,11 @@ public:
    * @param headers supplies the request headers.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
-   * @return the route or nullptr if there is no matching route for the request.
+   * @return the route result or nullptr if there is no matching route for the request.
    */
-  virtual RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
-                                    const StreamInfo::StreamInfo& stream_info,
-                                    uint64_t random_value) const PURE;
+  virtual VirtualHostRoute route(const Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo& stream_info,
+                                 uint64_t random_value) const PURE;
 
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
@@ -1408,9 +1495,9 @@ public:
    * @return the route accepted by the callback or nullptr if no match found or none of route is
    * accepted by the callback.
    */
-  virtual RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                                    const StreamInfo::StreamInfo& stream_info,
-                                    uint64_t random_value) const PURE;
+  virtual VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo& stream_info,
+                                 uint64_t random_value) const PURE;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;

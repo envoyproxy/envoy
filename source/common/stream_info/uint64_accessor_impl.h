@@ -14,7 +14,7 @@ public:
 
   // From FilterState::Object
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<ProtobufWkt::UInt64Value>();
+    auto message = std::make_unique<Protobuf::UInt64Value>();
     message->set_value(value_);
     return message;
   }

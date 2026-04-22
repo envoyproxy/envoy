@@ -7,7 +7,7 @@ if [[ -z "${ANDROID_HOME}" ]]; then
   exit 1
 fi
 
-bazel build --config=mobile-release-android //examples/java/hello_world:hello_envoy
+bazel build --config=mobile-android-release //examples/java/hello_world:hello_envoy
 
 "${ANDROID_HOME}/platform-tools/adb" install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
 "${ANDROID_HOME}/platform-tools/adb" shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity

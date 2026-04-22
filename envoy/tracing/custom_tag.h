@@ -10,6 +10,9 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+namespace Formatter {
+class Context;
+}
 namespace Tracing {
 
 /**
@@ -18,6 +21,7 @@ namespace Tracing {
 struct CustomTagContext {
   const TraceContext& trace_context;
   const StreamInfo::StreamInfo& stream_info;
+  const Formatter::Context& formatter_context;
 };
 
 class Span;

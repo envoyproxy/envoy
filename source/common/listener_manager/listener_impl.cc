@@ -5,6 +5,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 #include "envoy/network/exception.h"
@@ -30,6 +32,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/stats_matcher_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -239,6 +242,8 @@ absl::Status ListenSocketFactoryImpl::doFinalPreWorkerInit() {
   return absl::OkStatus();
 }
 
+constexpr absl::string_view StatsMatcherMetadataKey = "envoy.stats_matcher";
+
 namespace {
 std::string listenerStatsScope(const envoy::config::listener::v3::Listener& config) {
   if (!config.stat_prefix().empty()) {
@@ -254,15 +259,50 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
   // Listener creation will fail shortly when the address is used.
   return absl::StrCat("invalid_address_listener");
 }
+
+absl::StatusOr<std::pair<Stats::ScopeSharedPtr, Stats::ScopeSharedPtr>>
+generateListenerStatsScope(const envoy::config::listener::v3::Listener& config,
+                           Envoy::Server::Instance& server) {
+  auto& stats = server.stats();
+  Stats::StatsMatcherSharedPtr scope_matcher;
+
+  // Check for a per-listener stats matcher in typed_filter_metadata. If present, unpack it as
+  // StatsMatcher and use it to restrict which stats are created for this listener's scope.
+  const auto& typed_meta = config.metadata().typed_filter_metadata();
+  if (auto it = typed_meta.find(StatsMatcherMetadataKey); it != typed_meta.end()) {
+    envoy::config::metrics::v3::StatsMatcher stats_matcher_proto;
+    if (auto status = MessageUtil::unpackTo(it->second, stats_matcher_proto); status.ok()) {
+      MessageUtil::validate(stats_matcher_proto,
+                            server.messageValidationContext().staticValidationVisitor());
+      scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(
+          stats_matcher_proto, stats.symbolTable(), server.serverFactoryContext());
+    } else {
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::config), warn,
+                          "Failed to unpack stats matcher for listener {}: {}", config.name(),
+                          status.message());
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.strict_stats_matcher_unpacked")) {
+        return absl::InvalidArgumentError(fmt::format(
+            "Failed to unpack stats matcher for listener {}: {}", config.name(), status.message()));
+      }
+    }
+  }
+
+  Stats::ScopeSharedPtr scope = stats.createScope("", false, {}, scope_matcher);
+  Stats::ScopeSharedPtr listener_scope = stats.createScope(
+      fmt::format("listener.{}.", listenerStatsScope(config)), false, {}, std::move(scope_matcher));
+
+  return std::make_pair(std::move(scope), std::move(listener_scope));
+}
 } // namespace
 
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
-    const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
-    : Server::FactoryContextImplBase(
-          server, validation_visitor, server.stats().createScope(""),
-          server.stats().createScope(fmt::format("listener.{}.", listenerStatsScope(config))),
-          std::make_shared<ListenerInfoImpl>(config)),
+    const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager,
+    Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope)
+    : Server::FactoryContextImplBase(server, validation_visitor, std::move(scope),
+                                     std::move(listener_scope),
+                                     std::make_shared<ListenerInfoImpl>(config)),
       drain_manager_(std::move(drain_manager)) {}
 
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
@@ -274,9 +314,14 @@ ListenerImpl::create(const envoy::config::listener::v3::Listener& config,
                      const std::string& version_info, ListenerManagerImpl& parent,
                      const std::string& name, bool added_via_api, bool workers_started,
                      uint64_t hash) {
+  auto stats_scope_pair_or_error = generateListenerStatsScope(config, parent.server_);
+  RETURN_IF_NOT_OK_REF(stats_scope_pair_or_error.status());
+
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<ListenerImpl>(new ListenerImpl(
-      config, version_info, parent, name, added_via_api, workers_started, hash, creation_status));
+  auto ret = std::unique_ptr<ListenerImpl>(
+      new ListenerImpl(config, version_info, parent, name, added_via_api, workers_started, hash,
+                       std::move(stats_scope_pair_or_error->first),
+                       std::move(stats_scope_pair_or_error->second), creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -284,7 +329,8 @@ ListenerImpl::create(const envoy::config::listener::v3::Listener& config,
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, absl::Status& creation_status)
+                           uint64_t hash, Stats::ScopeSharedPtr scope,
+                           Stats::ScopeSharedPtr listener_scope, absl::Status& creation_status)
     : parent_(parent),
       socket_type_(config.has_internal_listener()
                        ? Network::Socket::Type::Stream
@@ -294,8 +340,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
+      per_connection_buffer_high_watermark_timeout_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, per_connection_buffer_high_watermark_timeout, 0))),
       listener_tag_(parent_.factory_->nextListenerTag()), name_(name),
-      added_via_api_(added_via_api), workers_started_(workers_started), hash_(hash),
+      added_via_api_(added_via_api), workers_started_(workers_started), maybe_stale_hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       max_connections_to_accept_per_socket_event_(
@@ -310,13 +358,14 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                             [this]() { dynamic_init_manager_->initialize(local_init_watcher_); }),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
-      config_(config), version_info_(version_info),
+      config_maybe_partial_filter_chains_(config), version_info_(version_info),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, *this,
-          parent_.factory_->createDrainManager(config.drain_type()))),
+          parent_.factory_->createDrainManager(config.drain_type()), std::move(scope),
+          std::move(listener_scope))),
       reuse_port_(getReusePortOrDefault(parent_.server_, config, socket_type_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config.name() +
                             ".connection_limit"),
@@ -339,13 +388,12 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
-  std::vector<std::reference_wrapper<
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>>>
-      address_opts_list;
+  std::vector<Network::Socket::OptionsSharedPtr> address_opts_list;
   if (config.has_internal_listener()) {
     addresses_.emplace_back(
         std::make_shared<Network::Address::EnvoyInternalInstance>(config.name()));
-    address_opts_list.emplace_back(std::ref(config.socket_options()));
+    address_opts_list.emplace_back(
+        Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   } else {
     // All the addresses should be same socket type, so get the first address's socket type is
     // enough.
@@ -354,7 +402,18 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto address = std::move(address_or_error.value());
     SET_AND_RETURN_IF_NOT_OK(checkIpv4CompatAddress(address, config.address()), creation_status);
     addresses_.emplace_back(address);
-    address_opts_list.emplace_back(std::ref(config.socket_options()));
+    auto opts = std::make_shared<Network::Socket::Options>();
+    Network::Socket::OptionsSharedPtr keepalive_opts;
+    if (config.has_tcp_keepalive()) {
+      keepalive_opts = Network::SocketOptionFactory::buildTcpKeepaliveOptions(
+          Network::parseTcpKeepaliveConfig(config.tcp_keepalive()));
+    }
+    if (keepalive_opts != nullptr && !keepalive_opts->empty()) {
+      addListenSocketOptions(opts, keepalive_opts);
+    }
+    addListenSocketOptions(
+        opts, Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
+    address_opts_list.emplace_back(opts);
 
     for (auto i = 0; i < config.additional_addresses_size(); i++) {
       if (socket_type_ !=
@@ -373,12 +432,28 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           checkIpv4CompatAddress(address, config.additional_addresses(i).address()),
           creation_status);
       addresses_.emplace_back(additional_address);
-      if (config.additional_addresses(i).has_socket_options()) {
-        address_opts_list.emplace_back(
-            std::ref(config.additional_addresses(i).socket_options().socket_options()));
+      auto opts = std::make_shared<Network::Socket::Options>();
+
+      Network::Socket::OptionsSharedPtr additional_keepalive_opts;
+      if (config.additional_addresses(i).has_tcp_keepalive()) {
+        additional_keepalive_opts = Network::SocketOptionFactory::buildTcpKeepaliveOptions(
+            Network::parseTcpKeepaliveConfig(config.additional_addresses(i).tcp_keepalive()));
       } else {
-        address_opts_list.emplace_back(std::ref(config.socket_options()));
+        additional_keepalive_opts = keepalive_opts;
       }
+      if (additional_keepalive_opts != nullptr && !additional_keepalive_opts->empty()) {
+        addListenSocketOptions(opts, additional_keepalive_opts);
+      }
+
+      if (config.additional_addresses(i).has_socket_options()) {
+        addListenSocketOptions(
+            opts, Network::SocketOptionFactory::buildLiteralOptions(
+                      config.additional_addresses(i).socket_options().socket_options()));
+      } else {
+        addListenSocketOptions(
+            opts, Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
+      }
+      address_opts_list.emplace_back(opts);
     }
   }
 
@@ -432,8 +507,10 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
+      per_connection_buffer_high_watermark_timeout_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, per_connection_buffer_high_watermark_timeout, 0))),
       listener_tag_(origin.listener_tag_), name_(name), added_via_api_(added_via_api),
-      workers_started_(workers_started), hash_(hash),
+      workers_started_(workers_started), maybe_stale_hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       max_connections_to_accept_per_socket_event_(
@@ -448,7 +525,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
-      config_(config), version_info_(version_info),
+      config_maybe_partial_filter_chains_(config), version_info_(version_info),
       listen_socket_options_list_(origin.listen_socket_options_list_),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
@@ -662,9 +739,7 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
 
 void ListenerImpl::buildListenSocketOptions(
     const envoy::config::listener::v3::Listener& config,
-    std::vector<std::reference_wrapper<
-        const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>>>&
-        address_opts_list) {
+    std::vector<Network::Socket::OptionsSharedPtr>& address_opts_list) {
   listen_socket_options_list_.insert(listen_socket_options_list_.begin(), addresses_.size(),
                                      nullptr);
   for (std::vector<std::reference_wrapper<
@@ -689,10 +764,8 @@ void ListenerImpl::buildListenSocketOptions(
       addListenSocketOptions(listen_socket_options_list_[i],
                              Network::SocketOptionFactory::buildReusePortOptions());
     }
-    if (!address_opts_list[i].get().empty()) {
-      addListenSocketOptions(
-          listen_socket_options_list_[i],
-          Network::SocketOptionFactory::buildLiteralOptions(address_opts_list[i]));
+    if (!address_opts_list[i]->empty()) {
+      addListenSocketOptions(listen_socket_options_list_[i], address_opts_list[i]);
     }
     if (socket_type_ == Network::Socket::Type::Datagram) {
       // Needed for recvmsg to return destination address in IP header.
@@ -877,7 +950,7 @@ void ListenerImpl::buildOriginalDstListenerFilter(
             "envoy.filters.listener.original_dst");
 
     Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(), nullptr, *listener_factory_context_);
+        Envoy::Protobuf::Empty(), nullptr, *listener_factory_context_);
     auto* cfg_provider_manager = parent_.factory_->getTcpListenerConfigProviderManager();
     auto filter_config_provider = cfg_provider_manager->createStaticFilterConfigProvider(
         callback, "envoy.filters.listener.original_dst");
@@ -908,9 +981,11 @@ void ListenerImpl::buildProxyProtocolListenerFilter(
 PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config_message, ListenerImpl& listener_impl,
-    DrainManagerPtr drain_manager)
+    DrainManagerPtr drain_manager, Stats::ScopeSharedPtr scope,
+    Stats::ScopeSharedPtr listener_scope)
     : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-          server, validation_visitor, config_message, std::move(drain_manager))),
+          server, validation_visitor, config_message, std::move(drain_manager), std::move(scope),
+          std::move(listener_scope))),
       listener_impl_(listener_impl) {}
 
 Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() { PANIC("not implemented"); }
@@ -974,9 +1049,14 @@ bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterMana
   return false;
 }
 
+void ListenerImpl::dumpListenerConfig(Protobuf::Any& dump) const {
+  dump.PackFrom(config_maybe_partial_filter_chains_);
+}
+
 void ListenerImpl::debugLog(const std::string& message) {
   UNREFERENCED_PARAMETER(message);
-  ENVOY_LOG(debug, "{}: name={}, hash={}, tag={}, address={}", message, name_, hash_, listener_tag_,
+  ENVOY_LOG(debug, "{}: name={}, original_hash={}, tag={}, address={}", message, name_,
+            maybe_stale_hash_, listener_tag_,
             absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()));
 }
 
@@ -1004,7 +1084,7 @@ ListenerImpl::~ListenerImpl() {
 Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 absl::Status ListenerImpl::addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
-  RETURN_IF_NOT_OK(buildConnectionBalancer(config(), *socket_factory->localAddress()));
+  RETURN_IF_NOT_OK(buildConnectionBalancer(configInternal(), *socket_factory->localAddress()));
   if (buildUdpListenerWorkerRouter(*socket_factory->localAddress(),
                                    parent_.server_.options().concurrency())) {
     parent_.server_.hotRestart().registerUdpForwardingListener(socket_factory->localAddress(),
@@ -1022,6 +1102,12 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
     return false;
   }
 
+  // If FCDS is used, LDS updates will cause full listener update. It's expected that if FCDS is
+  // used, dynamic filter chain updates will be applied using FCDS rather than LDS.
+  if (configInternal().has_fcds_config()) {
+    return false;
+  }
+
   // Full listener update currently rejects tcp listener having 0 filter chain.
   // In place filter chain update could survive under zero filter chain but we should keep the
   // same behavior for now. This also guards the below filter chain access.
@@ -1030,11 +1116,11 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   }
 
   // See buildProxyProtocolListenerFilter().
-  if (usesProxyProto(config()) ^ usesProxyProto(new_config)) {
+  if (usesProxyProto(configInternal()) ^ usesProxyProto(new_config)) {
     return false;
   }
 
-  if (ListenerMessageUtil::filterChainOnlyChange(config(), new_config)) {
+  if (ListenerMessageUtil::filterChainOnlyChange(configInternal(), new_config)) {
     // We need to calculate the reuse port's default value then ensure whether it is changed or not.
     // Since reuse port's default value isn't the YAML bool field default value. When
     // `enable_reuse_port` is specified, `ListenerMessageUtil::filterChainOnlyChange` use the YAML
@@ -1061,14 +1147,10 @@ ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::List
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
                                    std::function<void(Network::DrainableFilterChain&)> callback) {
-  for (const auto& message_and_filter_chain : filter_chain_manager_->filterChainsByMessage()) {
-    if (another_listener.filter_chain_manager_->filterChainsByMessage().find(
-            message_and_filter_chain.first) ==
-        another_listener.filter_chain_manager_->filterChainsByMessage().end()) {
-      // The filter chain exists in `this` listener but not in the listener passed in.
-      callback(*message_and_filter_chain.second);
-    }
+  for (const auto& draining_filter_chain : filter_chain_manager_->drainingFilterChains()) {
+    callback(*draining_filter_chain);
   }
+
   // Filter chain manager maintains an optional default filter chain besides the filter chains
   // indexed by message.
   if (auto eq = MessageUtil();
@@ -1128,7 +1210,7 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
     return false;
   }
 
-  // Second, check if the listener has the same addresses.
+  // Second, check if the listener has the same addresses (including network namespaces if Linux).
   // The listener support listening on the zero port address for test. Multiple zero
   // port addresses are also supported. For comparing two listeners with multiple
   // zero port addresses, only need to ensure there are the same number of zero
@@ -1147,7 +1229,7 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
   }
 
   // Third, check if the listener has the same socket options.
-  return ListenerMessageUtil::socketOptionsEqual(config(), other.config());
+  return ListenerMessageUtil::socketOptionsEqual(configInternal(), other.configInternal());
 }
 
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
@@ -1155,15 +1237,17 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
     return false;
   }
   // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
-  // sure we are not duplicating the address. This avoids ambiguity about which non-binding
-  // listener is used or even worse for the binding to port != 0 and reuse port case multiple
-  // different listeners receiving connections destined for the same port.
+  // sure we are not duplicating the address in the same network namespace. This avoids ambiguity
+  // about which non-binding listener is used or even worse for the binding to port != 0 and reuse
+  // port case multiple different listeners receiving connections destined for the same port.
   for (auto& other_addr : other.addresses()) {
     if (other_addr->ip() == nullptr ||
         (other_addr->ip() != nullptr && (other_addr->ip()->port() != 0 || !bindToPort()))) {
       if (find_if(addresses_.begin(), addresses_.end(),
                   [&other_addr](const Network::Address::InstanceConstSharedPtr& addr) {
-                    return *other_addr == *addr;
+                    const bool same_netns =
+                        addr->networkNamespace() == other_addr->networkNamespace();
+                    return same_netns && *other_addr == *addr;
                   }) != addresses_.end()) {
         return true;
       }
@@ -1207,21 +1291,35 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
     return false;
   }
 
+  if (lhs.has_tcp_keepalive() != rhs.has_tcp_keepalive()) {
+    return false;
+  }
+
+  if (lhs.has_tcp_keepalive() &&
+      !Protobuf::util::MessageDifferencer::Equals(lhs.tcp_keepalive(), rhs.tcp_keepalive())) {
+    return false;
+  }
+
   if (lhs.additional_addresses_size() != rhs.additional_addresses_size()) {
     return false;
   }
   // Assume people won't change the order of additional addresses.
   for (auto i = 0; i < lhs.additional_addresses_size(); i++) {
-    if (lhs.additional_addresses(i).has_socket_options() !=
-        rhs.additional_addresses(i).has_socket_options()) {
+    auto& lhs_addr = lhs.additional_addresses(i);
+    auto& rhs_addr = rhs.additional_addresses(i);
+    if (lhs_addr.has_socket_options() != rhs_addr.has_socket_options()) {
       return false;
     }
-    if (lhs.additional_addresses(i).has_socket_options()) {
+    if (lhs_addr.has_tcp_keepalive() != rhs_addr.has_tcp_keepalive()) {
+      return false;
+    }
+
+    if (lhs_addr.has_socket_options()) {
       is_equal =
-          std::equal(lhs.additional_addresses(i).socket_options().socket_options().begin(),
-                     lhs.additional_addresses(i).socket_options().socket_options().end(),
-                     rhs.additional_addresses(i).socket_options().socket_options().begin(),
-                     rhs.additional_addresses(i).socket_options().socket_options().end(),
+          std::equal(lhs_addr.socket_options().socket_options().begin(),
+                     lhs_addr.socket_options().socket_options().end(),
+                     rhs_addr.socket_options().socket_options().begin(),
+                     rhs_addr.socket_options().socket_options().end(),
                      [](const ::envoy::config::core::v3::SocketOption& option,
                         const ::envoy::config::core::v3::SocketOption& other_option) {
                        return Protobuf::util::MessageDifferencer::Equals(option, other_option);
@@ -1229,6 +1327,11 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
       if (!is_equal) {
         return false;
       }
+    }
+
+    if (lhs_addr.has_tcp_keepalive() && !Protobuf::util::MessageDifferencer::Equals(
+                                            lhs_addr.tcp_keepalive(), rhs_addr.tcp_keepalive())) {
+      return false;
     }
   }
 

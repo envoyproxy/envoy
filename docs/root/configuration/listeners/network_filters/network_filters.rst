@@ -18,11 +18,13 @@ filters.
   ext_authz_filter
   ext_proc_filter
   generic_proxy_filter
+  geoip_filter
   golang_filter
   kafka_broker_filter
   kafka_mesh_filter
   local_rate_limit_filter
   mongo_proxy_filter
+  reverse_tunnel_filter
   mysql_proxy_filter
   postgres_proxy_filter
   rate_limit_filter
@@ -32,6 +34,7 @@ filters.
   set_filter_state
   sni_cluster_filter
   sni_dynamic_forward_proxy_filter
+  tcp_bandwidth_limit_filter
   tcp_proxy_filter
   thrift_proxy_filter
   wasm_filter

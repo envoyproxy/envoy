@@ -106,7 +106,7 @@ public:
 
   MOCK_METHOD(bool, connect, ());
   MOCK_METHOD(void, close, (Network::ConnectionCloseType type));
-  MOCK_METHOD(Network::DetectedCloseType, detectedCloseType, (), (const));
+  MOCK_METHOD(StreamInfo::DetectedCloseType, detectedCloseType, (), (const));
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, readDisable, (bool disable));
   MOCK_METHOD(void, setAsyncTcpClientCallbacks, (AsyncTcpClientCallbacks & callbacks));

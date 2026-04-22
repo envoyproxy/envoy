@@ -21,8 +21,8 @@ public:
    * @param config supplies the matcher configuration
    * @return a new MatcherExtension
    */
-  virtual MatcherConstSharedPtr create(const Protobuf::Message& config,
-                                       ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual MatcherConstPtr create(const Protobuf::Message& config,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   // @brief the category of the matcher extension type for factory registration.
   std::string category() const override { return "envoy.rbac.matchers"; }
@@ -35,7 +35,7 @@ public:
 template <typename M, typename P>
 class BaseMatcherExtensionFactory : public Filters::Common::RBAC::MatcherExtensionFactory {
 public:
-  Filters::Common::RBAC::MatcherConstSharedPtr
+  Filters::Common::RBAC::MatcherConstPtr
   create(const Protobuf::Message& config,
          ProtobufMessage::ValidationVisitor& validation_visitor) override {
     const auto& matcher_typed_config =
@@ -44,7 +44,7 @@ public:
 
     const auto proto_message = MessageUtil::anyConvert<P>(matcher_typed_config.typed_config());
 
-    return std::make_shared<M>(proto_message);
+    return std::make_unique<M>(proto_message);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return std::make_unique<P>(); }

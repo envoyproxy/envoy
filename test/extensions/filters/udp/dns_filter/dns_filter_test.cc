@@ -4,6 +4,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -2561,6 +2562,43 @@ server_config:
   // Validate stats
   EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
   EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+// Test that the bootstrap typed_dns_resolver_config is used when client_config is not set.
+TEST_F(DnsFilterTest, BootstrapTypedDnsResolverTest) {
+  // Create bootstrap config with typed DNS resolver configuration.
+  const std::string dns_config_yaml = R"EOF(
+name: envoy.network.dns_resolver.getaddrinfo
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+)EOF";
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  TestUtility::loadFromYaml(dns_config_yaml, typed_config);
+  auto& bootstrap = listener_factory_.server_factory_context_.bootstrap();
+  bootstrap.mutable_typed_dns_resolver_config()->MergeFrom(typed_config);
+
+  // Create DNS filter configuration.
+  const std::string filter_config_yaml = R"EOF(
+stat_prefix: bar
+server_config:
+  inline_dns_table:
+    virtual_domains:
+      - name: www.foo.com
+        endpoint:
+          address_list:
+            address:
+            - 10.0.0.1
+)EOF";
+  envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+  DnsFilterEnvoyConfig envoy_config(listener_factory_, filter_config);
+
+  // Verify the filter is configured with bootstrap DNS resolver configuration.
+  const auto& resolver_config = envoy_config.typedDnsResolverConfig();
+  EXPECT_EQ(resolver_config.name(), "envoy.network.dns_resolver.getaddrinfo");
+  EXPECT_EQ(resolver_config.typed_config().type_url(),
+            "type.googleapis.com/"
+            "envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig");
 }
 
 } // namespace

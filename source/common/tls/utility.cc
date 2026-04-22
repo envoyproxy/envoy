@@ -1,13 +1,18 @@
 #include "source/common/tls/utility.h"
 
+#include <fmt/format.h>
+#include <fmt/ranges.h>
+
 #include <cstdint>
 #include <vector>
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/ssl/ssl.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/x509v3.h"
@@ -30,9 +35,9 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
   const auto days_until_expiry = Utility::getDaysUntilExpiration(cert, time_source).value_or(0);
   certificate_details->set_days_until_expiration(days_until_expiry);
 
-  ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
+  Protobuf::Timestamp* valid_from = certificate_details->mutable_valid_from();
   TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
-  ProtobufWkt::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
+  Protobuf::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
   TimestampUtil::systemClockToTimestamp(Utility::getExpirationTime(*cert), *expiration_time);
 
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
@@ -112,7 +117,7 @@ std::string getRFC2253NameFromCertificate(X509& cert, CertName desired_name) {
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   RELEASE_ASSERT(buf != nullptr, "");
 
-  X509_NAME* name = nullptr;
+  const X509_NAME* name = nullptr;
   switch (desired_name) {
   case CertName::Issuer:
     name = X509_get_issuer_name(&cert);
@@ -143,7 +148,7 @@ std::string getRFC2253NameFromCertificate(X509& cert, CertName desired_name) {
  * @return Envoy::Ssl::ParsedX509NamePtr returns the struct contains the parsed values.
  */
 Envoy::Ssl::ParsedX509NamePtr parseX509NameFromCertificate(X509& cert, CertName desired_name) {
-  X509_NAME* name = nullptr;
+  const X509_NAME* name = nullptr;
   switch (desired_name) {
   case CertName::Issuer:
     name = X509_get_issuer_name(&cert);
@@ -156,8 +161,7 @@ Envoy::Ssl::ParsedX509NamePtr parseX509NameFromCertificate(X509& cert, CertName 
   auto parsed = std::make_unique<Envoy::Ssl::ParsedX509Name>();
   int cnt = X509_NAME_entry_count(name);
   for (int i = 0; i < cnt; i++) {
-    const X509_NAME_ENTRY* ent;
-    ent = X509_NAME_get_entry(name, i);
+    const X509_NAME_ENTRY* ent = X509_NAME_get_entry(name, i);
 
     const ASN1_OBJECT* fn = X509_NAME_ENTRY_get_object(ent);
     int fn_nid = OBJ_obj2nid(fn);
@@ -207,17 +211,31 @@ inline bssl::UniquePtr<ASN1_TIME> currentASN1Time(TimeSource& time_source) {
 
 std::string Utility::getSerialNumberFromCertificate(X509& cert) {
   ASN1_INTEGER* serial_number = X509_get_serialNumber(&cert);
-  BIGNUM num_bn;
-  BN_init(&num_bn);
-  ASN1_INTEGER_to_BN(serial_number, &num_bn);
-  char* char_serial_number = BN_bn2hex(&num_bn);
-  BN_free(&num_bn);
+  bssl::UniquePtr<BIGNUM> num_bn{BN_new()};
+  ASN1_INTEGER_to_BN(serial_number, num_bn.get());
+  char* char_serial_number = BN_bn2hex(num_bn.get());
   if (char_serial_number != nullptr) {
     std::string serial_number(char_serial_number);
     OPENSSL_free(char_serial_number);
     return serial_number;
   }
   return "";
+}
+
+std::string Utility::getSha256DigestFromCertificate(X509& cert) {
+  std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
+  unsigned int n;
+  X509_digest(&cert, EVP_sha256(), computed_hash.data(), &n);
+  RELEASE_ASSERT(n == computed_hash.size(), "");
+  return Hex::encode(computed_hash);
+}
+
+std::string Utility::getSha1DigestFromCertificate(X509& cert) {
+  std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
+  unsigned int n;
+  X509_digest(&cert, EVP_sha1(), computed_hash.data(), &n);
+  RELEASE_ASSERT(n == computed_hash.size(), "");
+  return Hex::encode(computed_hash);
 }
 
 std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type) {
@@ -237,19 +255,19 @@ std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type) {
 
 std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
   std::string san;
-  ASN1_STRING* str = nullptr;
+  const ASN1_STRING* str = nullptr;
   switch (general_name->type) {
   case GEN_DNS:
     str = general_name->d.dNSName;
-    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(str)), ASN1_STRING_length(str));
     break;
   case GEN_URI:
     str = general_name->d.uniformResourceIdentifier;
-    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(str)), ASN1_STRING_length(str));
     break;
   case GEN_EMAIL:
     str = general_name->d.rfc822Name;
-    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(str)), ASN1_STRING_length(str));
     break;
   case GEN_IPADD: {
     if (general_name->d.ip->length == 4) {
@@ -270,7 +288,7 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     break;
   }
   case GEN_OTHERNAME: {
-    ASN1_TYPE* value = general_name->d.otherName->value;
+    const ASN1_TYPE* value = general_name->d.otherName->value;
     if (value == nullptr) {
       break;
     }
@@ -282,12 +300,11 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       break;
     case V_ASN1_ENUMERATED:
     case V_ASN1_INTEGER: {
-      BIGNUM san_bn;
-      BN_init(&san_bn);
-      value->type == V_ASN1_ENUMERATED ? ASN1_ENUMERATED_to_BN(value->value.enumerated, &san_bn)
-                                       : ASN1_INTEGER_to_BN(value->value.integer, &san_bn);
-      char* san_char = BN_bn2dec(&san_bn);
-      BN_free(&san_bn);
+      bssl::UniquePtr<BIGNUM> san_bn{BN_new()};
+      value->type == V_ASN1_ENUMERATED
+          ? ASN1_ENUMERATED_to_BN(value->value.enumerated, san_bn.get())
+          : ASN1_INTEGER_to_BN(value->value.integer, san_bn.get());
+      char* san_char = BN_bn2dec(san_bn.get());
       if (san_char != nullptr) {
         san.assign(san_char);
         OPENSSL_free(san_char);
@@ -304,94 +321,96 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       break;
     }
     case V_ASN1_BIT_STRING: {
-      ASN1_BIT_STRING* tmp_str = value->value.bit_string;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_BIT_STRING* tmp_str = value->value.bit_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_OCTET_STRING: {
-      ASN1_OCTET_STRING* tmp_str = value->value.octet_string;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_OCTET_STRING* tmp_str = value->value.octet_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_PRINTABLESTRING: {
-      ASN1_PRINTABLESTRING* tmp_str = value->value.printablestring;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_PRINTABLESTRING* tmp_str = value->value.printablestring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_T61STRING: {
-      ASN1_T61STRING* tmp_str = value->value.t61string;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_T61STRING* tmp_str = value->value.t61string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_IA5STRING: {
-      ASN1_IA5STRING* tmp_str = value->value.ia5string;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_IA5STRING* tmp_str = value->value.ia5string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_GENERALSTRING: {
-      ASN1_GENERALSTRING* tmp_str = value->value.generalstring;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_GENERALSTRING* tmp_str = value->value.generalstring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_BMPSTRING: {
-      // `ASN1_BMPSTRING` is encoded using `UCS-4`, which needs conversion to UTF-8.
+      // `ASN1_BMPSTRING` is encoded using `UTF-16`, which needs conversion to UTF-8.
       unsigned char* tmp = nullptr;
-      if (ASN1_STRING_to_UTF8(&tmp, value->value.bmpstring) < 0) {
+      int length = ASN1_STRING_to_UTF8(&tmp, value->value.bmpstring);
+      if (length < 0) {
         break;
       }
-      san.assign(reinterpret_cast<const char*>(tmp));
+      san.assign(reinterpret_cast<const char*>(tmp), length);
       OPENSSL_free(tmp);
       break;
     }
     case V_ASN1_UNIVERSALSTRING: {
       // `ASN1_UNIVERSALSTRING` is encoded using `UCS-4`, which needs conversion to UTF-8.
       unsigned char* tmp = nullptr;
-      if (ASN1_STRING_to_UTF8(&tmp, value->value.universalstring) < 0) {
+      int length = ASN1_STRING_to_UTF8(&tmp, value->value.universalstring);
+      if (length < 0) {
         break;
       }
-      san.assign(reinterpret_cast<const char*>(tmp));
+      san.assign(reinterpret_cast<const char*>(tmp), length);
       OPENSSL_free(tmp);
       break;
     }
     case V_ASN1_UTCTIME: {
-      ASN1_UTCTIME* tmp_str = value->value.utctime;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_UTCTIME* tmp_str = value->value.utctime;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_GENERALIZEDTIME: {
-      ASN1_GENERALIZEDTIME* tmp_str = value->value.generalizedtime;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_GENERALIZEDTIME* tmp_str = value->value.generalizedtime;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_VISIBLESTRING: {
-      ASN1_VISIBLESTRING* tmp_str = value->value.visiblestring;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_VISIBLESTRING* tmp_str = value->value.visiblestring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_UTF8STRING: {
-      ASN1_UTF8STRING* tmp_str = value->value.utf8string;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_UTF8STRING* tmp_str = value->value.utf8string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_SET: {
-      ASN1_STRING* tmp_str = value->value.set;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_STRING* tmp_str = value->value.set;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_SEQUENCE: {
-      ASN1_STRING* tmp_str = value->value.sequence;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_STRING* tmp_str = value->value.sequence;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
@@ -419,6 +438,17 @@ Envoy::Ssl::ParsedX509NamePtr Utility::parseSubjectFromCertificate(X509& cert) {
   return parseX509NameFromCertificate(cert, CertName::Subject);
 }
 
+std::chrono::seconds Utility::getExpirationUnixTime(const X509* cert) {
+  if (cert == nullptr) {
+    return std::chrono::seconds::max();
+  }
+  // Obtain the expiration time as system time
+  SystemTime expiration_time = Utility::getExpirationTime(*cert);
+
+  // Convert the time to duration since epoch
+  return std::chrono::duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch());
+}
+
 absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
                                                          TimeSource& time_source) {
   if (cert == nullptr) {
@@ -439,7 +469,7 @@ std::vector<std::string> Utility::getCertificateExtensionOids(X509& cert) {
 
   int count = X509_get_ext_count(&cert);
   for (int pos = 0; pos < count; pos++) {
-    X509_EXTENSION* extension = X509_get_ext(&cert, pos);
+    const X509_EXTENSION* extension = X509_get_ext(&cert, pos);
     RELEASE_ASSERT(extension != nullptr, "");
 
     char oid[MAX_OID_LENGTH];
@@ -465,7 +495,7 @@ absl::string_view Utility::getCertificateExtensionValue(X509& cert,
     return {};
   }
 
-  X509_EXTENSION* extension = X509_get_ext(&cert, pos);
+  const X509_EXTENSION* extension = X509_get_ext(&cert, pos);
   if (extension == nullptr) {
     return {};
   }
@@ -527,8 +557,27 @@ std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
   const int n = X509_STORE_CTX_get_error(ctx);
   const int depth = X509_STORE_CTX_get_error_depth(ctx);
   std::string error_details =
-      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
-                   X509_verify_cert_error_string(n));
+      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ");
+
+  if (n == X509_V_ERR_UNABLE_TO_GET_CRL || n == X509_V_ERR_CRL_NOT_YET_VALID ||
+      n == X509_V_ERR_CRL_HAS_EXPIRED || n == X509_V_ERR_CERT_REVOKED) {
+    const std::string crl_error_msg =
+        fmt::format("certificate revocation check against provided CRLs failed: {}",
+                    X509_verify_cert_error_string(n));
+    absl::StrAppend(&error_details, crl_error_msg);
+    X509* cert = X509_STORE_CTX_get_current_cert(ctx);
+    if (cert != nullptr) {
+      std::vector<std::string> crldps = getCertificateCrlDpsForLogging(cert);
+      if (!crldps.empty()) {
+        const std::string error_msg =
+            fmt::format(", certificate CRL distribution points: [{}]", fmt::join(crldps, ", "));
+        absl::StrAppend(&error_details, error_msg);
+      }
+    }
+  } else {
+    absl::StrAppend(&error_details, X509_verify_cert_error_string(n));
+  }
+
   return error_details;
 }
 
@@ -554,6 +603,39 @@ std::vector<std::string> Utility::mapX509Stack(stack_st_X509& stack,
   }
 
   return result;
+}
+
+std::vector<std::string> Utility::getCertificateSansForLogging(X509* cert) {
+  std::vector<std::string> sans;
+  // X509_get_ext_d2i should be available in all supported BoringSSL versions.
+  bssl::UniquePtr<GENERAL_NAMES> san_names(
+      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+  if (san_names != nullptr) {
+    for (const GENERAL_NAME* general_name : san_names.get()) {
+      sans.push_back(Utility::generalNameAsString(general_name));
+    }
+  }
+  return sans;
+}
+
+std::vector<std::string> Utility::getCertificateCrlDpsForLogging(X509* cert) {
+  std::vector<std::string> crldps;
+  bssl::UniquePtr<CRL_DIST_POINTS> dist_points(static_cast<CRL_DIST_POINTS*>(
+      X509_get_ext_d2i(cert, NID_crl_distribution_points, nullptr, nullptr)));
+  if (dist_points != nullptr) {
+    for (const DIST_POINT* dp : dist_points.get()) {
+      if (dp->distpoint != nullptr && dp->distpoint->type == 0) {
+        GENERAL_NAMES* names =
+            ENVOY_OPENSSL_CAST(reinterpret_cast<GENERAL_NAMES*>, dp->distpoint->name.fullname);
+        if (names != nullptr) {
+          for (const GENERAL_NAME* general_name : names) {
+            crldps.push_back(Utility::generalNameAsString(general_name));
+          }
+        }
+      }
+    }
+  }
+  return crldps;
 }
 
 } // namespace Tls

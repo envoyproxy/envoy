@@ -18,7 +18,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/codec_wrappers.h"
 #include "source/common/network/filter_impl.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -82,7 +81,8 @@ public:
    * Close the underlying network connection. This is immediate and will not attempt to flush any
    * pending write data.
    */
-  void close(Network::ConnectionCloseType type = Network::ConnectionCloseType::NoFlush);
+  void close(Network::ConnectionCloseType type = Network::ConnectionCloseType::NoFlush,
+             absl::string_view details = "");
 
   /**
    * Send a codec level go away indication to the peer.
@@ -118,6 +118,16 @@ public:
    */
   RequestEncoder& newStream(ResponseDecoder& response_decoder);
 
+  /**
+   * Create a new stream. Note: The CodecClient will NOT buffer multiple requests for HTTP1
+   * connections. Thus, calling newStream() before the previous request has been fully encoded
+   * is an error. Pipelining is supported however.
+   * @param response_decoder_handle supplies the decoder to use for response callbacks if it's still
+   * alive.
+   * @return StreamEncoder& the encoder to use for encoding the request.
+   */
+  RequestEncoder& newStream(ResponseDecoderHandlePtr response_decoder_handle);
+
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) {
     connection_->setConnectionStats(stats);
   }
@@ -144,6 +154,9 @@ public:
   void connect();
 
   bool connectCalled() const { return connect_called_; }
+
+  // Get the underlying connection of the codec client for lifetimeCallbacks.
+  const Network::Connection& connection() const { return *connection_; }
 
 protected:
   /**
@@ -174,7 +187,8 @@ protected:
 
   void onIdleTimeout() {
     host_->cluster().trafficStats()->upstream_cx_idle_timeout_.inc();
-    close();
+    close(Network::ConnectionCloseType::NoFlush,
+          StreamInfo::LocalCloseReasons::get().IdleTimeoutOnConnection);
   }
 
   void disableIdleTimer() {
@@ -184,6 +198,12 @@ protected:
   }
 
   void enableIdleTimer() {
+    // Bug fix (default): only enable idle timer when connection is established.
+    // Old behavior (when flag is disabled): enable idle timer even when connection is not yet
+    // established.
+    if (!connected_ && enable_idle_timer_only_when_connected_) {
+      return;
+    }
     if (idle_timer_ != nullptr) {
       idle_timer_->enableTimer(idle_timeout_.value());
     }
@@ -197,6 +217,7 @@ protected:
   ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
+  const bool enable_idle_timer_only_when_connected_;
 
 private:
   /**
@@ -235,6 +256,23 @@ private:
         : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent),
           header_validator_(
               parent.host_->cluster().makeHeaderValidator(parent.codec_->protocol())) {
+      switch (parent.protocol()) {
+      case Protocol::Http10:
+      case Protocol::Http11:
+        // HTTP/1.1 codec does not support half-close on the response completion.
+        wait_encode_complete_ = false;
+        break;
+      case Protocol::Http2:
+      case Protocol::Http3:
+        wait_encode_complete_ = true;
+        break;
+      }
+    }
+
+    ActiveRequest(CodecClient& parent, ResponseDecoderHandlePtr inner_handle)
+        : ResponseDecoderWrapper(std::move(inner_handle)), RequestEncoderWrapper(nullptr),
+          parent_(parent), header_validator_(parent.host_->cluster().makeHeaderValidator(
+                               parent.codec_->protocol())) {
       switch (parent.protocol()) {
       case Protocol::Http10:
       case Protocol::Http11:
@@ -305,6 +343,7 @@ private:
   void onBelowWriteBufferLowWatermark() override {
     codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
+  RequestEncoder& enlistAndCreateEncoder(ActiveRequestPtr request);
 
   std::list<ActiveRequestPtr> active_requests_;
   Http::ConnectionCallbacks* codec_callbacks_{};

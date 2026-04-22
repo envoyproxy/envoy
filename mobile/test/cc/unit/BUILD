@@ -36,7 +36,19 @@ envoy_cc_test(
     },
     repository = "@envoy",
     deps = [
-        "//examples/cc/fetch_client:fetch_client_lib",
+        "//library/cc:engine_builder_lib",
+        "@envoy_build_config//:extension_registry",
+        "@envoy_build_config//:test_extensions",
+    ],
+)
+
+envoy_cc_test(
+    name = "engine_handle_test",
+    srcs = ["engine_handle_test.cc"],
+    repository = "@envoy",
+    deps = [
+        "//library/cc:engine_builder_lib",
+        "//library/common:internal_engine_lib_no_stamp",
         "@envoy_build_config//:extension_registry",
         "@envoy_build_config//:test_extensions",
     ],

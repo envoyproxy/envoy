@@ -14,8 +14,8 @@ public:
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                          const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return std::make_unique<LdsApiImpl>(
-        lds_config, lds_resources_locator, parent_.clusterManager(), parent_.initManager(),
-        *parent_.stats().rootScope(), parent_.listenerManager(),
+        lds_config, lds_resources_locator, parent_.xdsManager(), parent_.clusterManager(),
+        parent_.initManager(), *parent_.stats().rootScope(), parent_.listenerManager(),
         parent_.messageValidationContext().dynamicValidationVisitor());
   }
   absl::StatusOr<Filter::NetworkFilterFactoriesList> createNetworkFilterFactoryList(
@@ -71,9 +71,11 @@ private:
 class ValidationListenerManagerFactoryImpl : public ListenerManagerFactory {
 public:
   std::unique_ptr<ListenerManager>
-  createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
+  createListenerManager(const Protobuf::Message& config, Instance& server,
+                        std::unique_ptr<ListenerComponentFactory>&& factory,
                         WorkerFactory& worker_factory, bool enable_dispatcher_stats,
                         Quic::QuicStatNames& quic_stat_names) override {
+    (void)config;
     ASSERT(!factory);
     return std::make_unique<ListenerManagerImpl>(
         server, std::make_unique<ValidationListenerComponentFactory>(server), worker_factory,

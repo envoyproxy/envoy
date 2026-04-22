@@ -44,11 +44,11 @@ public:
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
-                         StreamInfo::StreamInfo&) override {
+                         StreamInfo::StreamInfo& info) override {
     // The caller expects both the socket and the transport socket to be moved.
     socket.reset();
     transport_socket.reset();
-    return Network::ServerConnectionPtr{createServerConnection_()};
+    return Network::ServerConnectionPtr{createServerConnection_(info)};
   }
 
   Network::ClientConnectionPtr
@@ -119,7 +119,7 @@ public:
               (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
-  MOCK_METHOD(Network::ServerConnection*, createServerConnection_, ());
+  MOCK_METHOD(Network::ServerConnection*, createServerConnection_, (StreamInfo::StreamInfo & info));
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
               (Network::Address::InstanceConstSharedPtr address,
                Network::Address::InstanceConstSharedPtr source_address,

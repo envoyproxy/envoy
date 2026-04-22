@@ -97,7 +97,7 @@ private:
   const std::string plugin_name_;
   const std::string so_id_;
   const std::string so_path_;
-  const ProtobufWkt::Any plugin_config_;
+  const Protobuf::Any plugin_config_;
   uint32_t concurrency_;
 
   GolangFilterStats stats_;
@@ -126,7 +126,7 @@ public:
 
 private:
   const std::string plugin_name_;
-  const ProtobufWkt::Any plugin_config_;
+  const Protobuf::Any plugin_config_;
 
   Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};
@@ -162,7 +162,12 @@ enum class DestroyReason {
   Terminate,
 };
 
+// Value returned by ciphersuiteId() when no ciphersuite is negotiated.
+// See envoy/ssl/connection.h for reference.
+constexpr uint16_t SSL_INVALID_CIPHERSUITE_ID = 0xffff;
+
 enum class EnvoyValue {
+  // Stream info values (1-99)
   RouteName = 1,
   FilterChainName,
   Protocol,
@@ -175,6 +180,28 @@ enum class EnvoyValue {
   UpstreamRemoteAddress,
   UpstreamClusterName,
   VirtualClusterName,
+
+  // SSL values (100-199)
+  SslConnectionExists = 100,
+  SslPeerCertificatePresented,
+  SslPeerCertificateValidated,
+  SslCiphersuiteId,
+  SslValidFromPeerCertificate,
+  SslExpirationPeerCertificate,
+  SslSha256PeerCertificateDigest,
+  SslSerialNumberPeerCertificate,
+  SslSubjectPeerCertificate,
+  SslIssuerPeerCertificate,
+  SslSubjectLocalCertificate,
+  SslTlsVersion,
+  SslCiphersuiteString,
+  SslSessionId,
+  SslUrlEncodedPemEncodedPeerCertificate,
+  SslUrlEncodedPemEncodedPeerCertificateChain,
+  SslUriSanPeerCertificate,
+  SslUriSanLocalCertificate,
+  SslDnsSansPeerCertificate,
+  SslDnsSansLocalCertificate,
 };
 
 class Filter;
@@ -271,8 +298,7 @@ public:
   }
 
   // AccessLog::Instance
-  void log(const Formatter::HttpFormatterContext& log_context,
-           const StreamInfo::StreamInfo& info) override;
+  void log(const Formatter::Context& log_context, const StreamInfo::StreamInfo& info) override;
 
   CAPIStatus clearRouteCache(bool refresh);
   void clearRouteCacheInternal(bool refresh);
@@ -301,6 +327,7 @@ public:
   CAPIStatus setTrailer(ProcessorState& state, absl::string_view key, absl::string_view value,
                         headerAction act);
   CAPIStatus removeTrailer(ProcessorState& state, absl::string_view key);
+  CAPIStatus setUpstreamOverrideHost(ProcessorState& state, absl::string_view host, bool strict);
 
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
@@ -313,6 +340,7 @@ public:
   CAPIStatus getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
                                GoInt32* rc);
   CAPIStatus getSecret(absl::string_view key, uint64_t* value_data, int* value_len);
+  CAPIStatus setDrainConnectionUponCompletion();
 
   bool isProcessingInGo() {
     return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();
@@ -320,6 +348,8 @@ public:
   void deferredDeleteRequest(HttpRequestInternal* req);
 
 private:
+  friend class TestFilter;
+
   bool hasDestroyed() {
     Thread::LockGuard lock(mutex_);
     return has_destroyed_;

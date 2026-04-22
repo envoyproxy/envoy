@@ -12,7 +12,7 @@ set -e
 export HOMEBREW_NO_AUTO_UPDATE=1
 RETRY_ATTEMPTS=10
 RETRY_INTERVAL=3
-XCODE_VERSION=15.3
+XCODE_VERSION=16.1
 
 function retry () {
     local returns=1 i=1
@@ -48,7 +48,7 @@ brew cleanup --prune=all
 # Remove broken symlinks.
 brew cleanup --prune-prefix
 
-DEPS="automake cmake coreutils libtool ninja"
+DEPS="automake coreutils libtool"
 for DEP in ${DEPS}
 do
     install "${DEP}"
@@ -57,7 +57,7 @@ done
 # https://github.com/actions/runner-images/blob/main/images/macos/macos-14-Readme.md#xcode
 sudo xcode-select --switch "/Applications/Xcode_${XCODE_VERSION}.app"
 
-retry ./bazelw version
+retry bazel version
 
 # Unset default variables so we don't have to install Android SDK/NDK.
 unset ANDROID_HOME

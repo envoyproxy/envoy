@@ -16,7 +16,7 @@
 #include "source/extensions/filters/network/generic_proxy/interface/stream.h"
 #include "source/extensions/filters/network/generic_proxy/router/upstream.h"
 
-#include "quiche/common/quiche_linked_hash_map.h"
+#include "absl/container/linked_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
