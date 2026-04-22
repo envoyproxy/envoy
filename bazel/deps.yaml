@@ -906,7 +906,7 @@ fips_go_ppc64le:
   project_name: "Go (Linux ppc64le)"
   project_desc: "Go programming language (Linux ppc64le)"
   project_url: "https://golang.org/"
-  release_date: "2022-05-10"
+  release_date: "2026-04-07"
   use_category:
   - build
   - dataplane_core
@@ -919,7 +919,7 @@ fips_cmake_src:
   project_name: "CMake (source)"
   project_desc: "CMake built from source for ppc64le FIPS builds"
   project_url: "https://cmake.org/"
-  release_date: "2026-01-27"
+  release_date: "2026-04-21"
   use_category:
   - build
   - dataplane_core
