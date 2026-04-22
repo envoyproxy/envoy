@@ -1150,7 +1150,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
         EXPECT_EQ(options.expectedTlsGroup(), client_connection->ssl()->tlsGroupString());
         uint16_t group_id = client_connection->ssl()->tlsGroupId();
         EXPECT_NE(0, group_id);
-        const char* group_name = SSL_get_group_name(client_connection->ssl()->tlsGroupId());
+        const char* group_name = SSL_get_group_name(group_id);
         EXPECT_NE(nullptr, group_name);
         EXPECT_EQ(options.expectedTlsGroup(), group_name);
       }
@@ -5902,7 +5902,6 @@ TEST_P(SslSocketTest, CipherSuites) {
   updateFilterChain(tls_context, *filter_chain);
   TestUtilOptionsV2 cipher_test_options(listener, client, true, version_);
   cipher_test_options.setExpectedCiphersuite(common_cipher_suite);
-  cipher_test_options.setExpectedTlsGroup("X25519");
   std::string stats = "ssl.ciphers." + common_cipher_suite;
   cipher_test_options.setExpectedServerStats(stats).setExpectedClientStats(stats);
   testUtilV2(cipher_test_options);
@@ -6018,6 +6017,7 @@ TEST_P(SslSocketTest, EcdhCurves) {
   TestUtilOptionsV2 ecdh_curves_test_options(listener, client, true, version_);
   std::string stats = "ssl.curves.X25519";
   ecdh_curves_test_options.setExpectedServerStats(stats).setExpectedClientStats(stats);
+  ecdh_curves_test_options.setExpectedTlsGroup("X25519");
   testUtilV2(ecdh_curves_test_options);
   client_params->clear_ecdh_curves();
   server_params->clear_ecdh_curves();
