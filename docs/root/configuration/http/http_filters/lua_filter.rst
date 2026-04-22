@@ -300,6 +300,22 @@ situation.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
+``requestHeaders()``
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local request_headers = handle:requestHeaders()
+
+Returns the downstream request headers. This is primarily useful in ``envoy_on_response`` to
+inspect the original request headers alongside the response. The returned handle is **read-only**;
+any attempt to modify it will result in a script error.
+
+Returns ``nil`` if request headers are not available (e.g., in certain edge cases where the
+request has not been fully initialized).
+
+Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
+
 ``body()``
 ^^^^^^^^^^
 
