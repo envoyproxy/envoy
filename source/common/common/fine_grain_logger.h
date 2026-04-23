@@ -46,6 +46,12 @@ public:
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
+   * Gets a logger from map given a file and name.
+   */
+  SpdLoggerSharedPtr getFineGrainLogEntryForFlush(absl::string_view file, absl::string_view name)
+      ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
+
+  /**
    * Gets the default verbosity log level.
    */
   spdlog::level::level_enum getVerbosityDefaultLevel() const
@@ -55,7 +61,8 @@ public:
    * Initializes Fine-Grain Logger, gets log level from setting vector, and registers it in global
    * map if not done.
    */
-  void initFineGrainLogger(const std::string& key, std::atomic<spdlog::logger*>& logger)
+  void initFineGrainLogger(absl::string_view file, absl::string_view logger_name,
+                           std::atomic<spdlog::logger*>& logger)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
@@ -199,12 +206,7 @@ FineGrainLogContext& getFineGrainLogContext();
     static std::atomic<spdlog::logger*> flogger{nullptr};                                          \
     spdlog::logger* local_flogger = flogger.load(std::memory_order_acquire);                       \
     if (!local_flogger) {                                                                          \
-      const std::string logger_name(NAME);                                                         \
-      std::string key = __FILE__;                                                                  \
-      if (!logger_name.empty()) {                                                                  \
-        key = key + ":" + logger_name;                                                             \
-      }                                                                                            \
-      ::Envoy::getFineGrainLogContext().initFineGrainLogger(key, flogger);                         \
+      ::Envoy::getFineGrainLogContext().initFineGrainLogger(__FILE__, NAME, flogger);              \
       local_flogger = flogger.load(std::memory_order_acquire);                                     \
     }                                                                                              \
     return local_flogger;                                                                          \
@@ -241,12 +243,8 @@ FineGrainLogContext& getFineGrainLogContext();
  */
 #define FINE_GRAIN_FLUSH_LOG(NAME)                                                                 \
   do {                                                                                             \
-    const std::string logger_name(NAME);                                                           \
-    std::string key = __FILE__;                                                                    \
-    if (!logger_name.empty()) {                                                                    \
-      key = key + ":" + logger_name;                                                               \
-    }                                                                                              \
-    SpdLoggerSharedPtr p = ::Envoy::getFineGrainLogContext().getFineGrainLogEntry(key);            \
+    SpdLoggerSharedPtr p =                                                                         \
+        ::Envoy::getFineGrainLogContext().getFineGrainLogEntryForFlush(__FILE__, NAME);            \
     if (p) {                                                                                       \
       p->flush();                                                                                  \
     }                                                                                              \

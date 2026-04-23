@@ -58,7 +58,7 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   // Test multiple log levels at once
   const std::string file = "xxxx_test_logger_file_xxxx";
   std::atomic<spdlog::logger*> logger;
-  getFineGrainLogContext().initFineGrainLogger(file, logger);
+  getFineGrainLogContext().initFineGrainLogger(file, "", logger);
   query = fmt::format("/logging?paths={}:trace,{}:trace", __FILE__, file);
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
   FINE_GRAIN_LOG(trace, "", "After post 4: level for this file is trace now!");
@@ -144,8 +144,8 @@ TEST_P(AdminInstanceTest, LogLevelFineGrainGlobSupport) {
   const std::string file_two = "admin/logs_handler_test_two.cc";
   std::atomic<spdlog::logger*> logger_one;
   std::atomic<spdlog::logger*> logger_two;
-  getFineGrainLogContext().initFineGrainLogger(file_one, logger_one);
-  getFineGrainLogContext().initFineGrainLogger(file_two, logger_two);
+  getFineGrainLogContext().initFineGrainLogger(file_one, "", logger_one);
+  getFineGrainLogContext().initFineGrainLogger(file_two, "", logger_two);
   query = fmt::format("/logging?{}=critical", "logs_handle*");
   EXPECT_EQ(Http::Code::OK, postCallback(query, header_map, response));
   FINE_GRAIN_LOG(critical, "", "After post {}, level for this file is critical now!", query);

@@ -119,8 +119,8 @@ TEST(FineGrainLog, multipleUpdatesBasename) {
   const std::string file_1 = "envoy/src/foo.cc";
   const std::string file_2 = "envoy/src/bar.cc";
   static std::atomic<spdlog::logger*> flogger{nullptr};
-  getFineGrainLogContext().initFineGrainLogger(file_1, flogger);
-  getFineGrainLogContext().initFineGrainLogger(file_2, flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_1, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_2, "", flogger);
 
   const std::pair<absl::string_view, int> update_1 =
       std::make_pair("foo", static_cast<int>(spdlog::level::debug));
@@ -140,8 +140,8 @@ TEST(FineGrainLog, multipleMatchesBasename) {
   const std::string file_1 = "envoy/src/a.cc";
   const std::string file_2 = "envoy/a.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
-  getFineGrainLogContext().initFineGrainLogger(file_1, flogger);
-  getFineGrainLogContext().initFineGrainLogger(file_2, flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_1, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_2, "", flogger);
 
   const std::pair<absl::string_view, int> update_1 =
       std::make_pair("a", static_cast<int>(spdlog::level::warn));
@@ -160,9 +160,9 @@ TEST(FineGrainLog, globStarUpdate) {
   const std::string file_2 = "envoy/src/bar.cc";
   const std::string file_3 = "envoy/baz.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
-  getFineGrainLogContext().initFineGrainLogger(file_1, flogger);
-  getFineGrainLogContext().initFineGrainLogger(file_2, flogger);
-  getFineGrainLogContext().initFineGrainLogger(file_3, flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_1, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_2, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_3, "", flogger);
 
   const std::pair<absl::string_view, int> update_1 =
       std::make_pair("envoy/*", static_cast<int>(spdlog::level::warn));
@@ -228,9 +228,9 @@ TEST(FineGrainLog, globQuestionUpdate) {
   const std::string file_2 = "envoy/f__.cc";
   const std::string file_3 = "/bar.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
-  getFineGrainLogContext().initFineGrainLogger(file_1, flogger);
-  getFineGrainLogContext().initFineGrainLogger(file_2, flogger);
-  getFineGrainLogContext().initFineGrainLogger(file_3, flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_1, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_2, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_3, "", flogger);
 
   const std::pair<absl::string_view, int> update_1 =
       std::make_pair("f??", static_cast<int>(spdlog::level::warn));
@@ -260,7 +260,7 @@ TEST(FineGrainLog, globQuestionUpdate) {
 TEST(FineGrainLog, inOrderGlobUpdate) {
   const std::string file_1 = "envoy/src/foo.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
-  getFineGrainLogContext().initFineGrainLogger(file_1, flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_1, "", flogger);
 
   const std::pair<absl::string_view, int> update_1 =
       std::make_pair("f??", static_cast<int>(spdlog::level::warn));
@@ -278,7 +278,7 @@ TEST(FineGrainLog, inOrderGlobUpdate) {
 TEST(FineGrainLog, earlyExitGlobUpdate) {
   const std::string file_1 = "envoy/src/foo.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
-  getFineGrainLogContext().initFineGrainLogger(file_1, flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_1, "", flogger);
 
   // f?? appears before ff?.
   const std::pair<absl::string_view, int> update_1 =
@@ -295,7 +295,7 @@ TEST(FineGrainLog, earlyExitGlobUpdate) {
 TEST(FineGrainLog, invalidGlobLevelUpdate) {
   const std::string file_1 = "envoy/src/foo.cc";
   std::atomic<spdlog::logger*> flogger{nullptr};
-  getFineGrainLogContext().initFineGrainLogger(file_1, flogger);
+  getFineGrainLogContext().initFineGrainLogger(file_1, "", flogger);
 
   const std::pair<absl::string_view, int> update_1 = std::make_pair("f??", 9);
   getFineGrainLogContext().updateVerbositySetting({update_1});
@@ -341,8 +341,8 @@ TEST(FineGrainLog, updateWithGlobAndLoggerName) {
   const std::string key1 = "envoy/src/foo.cc:misc";
   const std::string key2 = "envoy/src/bar.cc:misc";
   std::atomic<spdlog::logger*> flogger{nullptr};
-  getFineGrainLogContext().initFineGrainLogger(key1, flogger);
-  getFineGrainLogContext().initFineGrainLogger(key2, flogger);
+  getFineGrainLogContext().initFineGrainLogger(key1, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(key2, "", flogger);
   const std::pair<absl::string_view, int> update =
       std::make_pair("envoy/*", static_cast<int>(spdlog::level::warn));
   getFineGrainLogContext().updateVerbositySetting({update});
@@ -358,8 +358,8 @@ TEST(FineGrainLog, updateWithSameFileAndDifferentLoggerName) {
   const std::string key1 = "envoy/src/foo.cc:logger1";
   const std::string key2 = "envoy/src/foo.cc:logger2";
   std::atomic<spdlog::logger*> flogger{nullptr};
-  getFineGrainLogContext().initFineGrainLogger(key1, flogger);
-  getFineGrainLogContext().initFineGrainLogger(key2, flogger);
+  getFineGrainLogContext().initFineGrainLogger(key1, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(key2, "", flogger);
   const std::pair<absl::string_view, int> update =
       std::make_pair("foo", static_cast<int>(spdlog::level::warn));
   getFineGrainLogContext().updateVerbositySetting({update});
@@ -381,9 +381,9 @@ TEST(FineGrainLog, updateWithLoggerNameOnly) {
   getFineGrainLogContext().removeFineGrainLogEntryForTest(key2);
   getFineGrainLogContext().removeFineGrainLogEntryForTest(key3);
   std::atomic<spdlog::logger*> flogger{nullptr};
-  getFineGrainLogContext().initFineGrainLogger(key1, flogger);
-  getFineGrainLogContext().initFineGrainLogger(key2, flogger);
-  getFineGrainLogContext().initFineGrainLogger(key3, flogger);
+  getFineGrainLogContext().initFineGrainLogger(key1, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(key2, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(key3, "", flogger);
 
   SpdLoggerSharedPtr p1 = getFineGrainLogContext().getFineGrainLogEntry(key1);
   SpdLoggerSharedPtr p2 = getFineGrainLogContext().getFineGrainLogEntry(key2);
