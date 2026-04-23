@@ -5,6 +5,7 @@
 #include "envoy/common/time.h"
 #include "envoy/tracing/trace_driver.h"
 
+#include "absl/types/optional.h"
 #include "datadog/span.h"
 
 namespace Envoy {
@@ -54,6 +55,11 @@ public:
 private:
   datadog::tracing::Optional<datadog::tracing::Span> span_;
   const bool use_local_decision_{false};
+  // Tracks the most recent sampled state from setSampled(). The decision is
+  // deferred and applied in injectContext()/finishSpan() so that a later
+  // setSampled(true) (e.g. from a route cache refresh) can undo an earlier
+  // setSampled(false) set during startSpan().
+  absl::optional<bool> sampled_;
 };
 
 } // namespace Datadog

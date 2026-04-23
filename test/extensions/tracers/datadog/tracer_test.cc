@@ -159,6 +159,12 @@ TEST_F(DatadogTracerTest, SpanProperties) {
   EXPECT_EQ("envoy.proxy", dd_span.name());
   EXPECT_EQ("do.thing", dd_span.resource_name());
   EXPECT_EQ("envoy", dd_span.service_name());
+  // The sampling decision is deferred to injectContext()/finishSpan(), so
+  // the trace segment does not have it set immediately after startSpan().
+  // Verify it is applied after injecting context.
+  EXPECT_FALSE(dd_span.trace_segment().sampling_decision());
+  Tracing::TestTraceContextImpl inject_context{};
+  span->injectContext(inject_context, Tracing::UpstreamContext());
   ASSERT_TRUE(dd_span.trace_segment().sampling_decision());
   EXPECT_EQ(int(datadog::tracing::SamplingPriority::USER_DROP),
             dd_span.trace_segment().sampling_decision()->priority);
@@ -328,9 +334,10 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
       // of "traceparent" always containing a sampling decision in its flags. See
       // the main body of the test, below, for more information.
       {__LINE__, datadog::tracing::nullopt, true, datadog::tracing::PropagationStyle::W3C, 0},
-      // This is the only case, at least in this test, where Envoy's decision
-      // affects the resulting sampling priority.
-      {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::DATADOG, -1},
+      // Envoy's drop decision is now deferred to injectContext()/finishSpan(),
+      // so the trace segment does not have a sampling decision immediately.
+      {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::DATADOG,
+       datadog::tracing::nullopt},
       {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::W3C, 0},
 
       {__LINE__, -1, true, datadog::tracing::PropagationStyle::DATADOG, -1},
