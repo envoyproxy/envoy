@@ -904,7 +904,8 @@ TEST_P(ExtProcIntegrationTest,
 
 // With trailers, both directions, server fully buffers.
 // TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
-TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
+TEST_P(ExtProcIntegrationTest,
+       DISABLED_TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(10 * 1024, 's');
