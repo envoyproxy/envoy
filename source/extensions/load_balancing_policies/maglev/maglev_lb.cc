@@ -7,6 +7,7 @@
 namespace Envoy {
 namespace Upstream {
 namespace {
+
 bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
   // Don't use compact maglev on 32-bit platforms.
   if constexpr (!(ENVOY_BIT_ARRAY_SUPPORTED)) {
@@ -41,7 +42,14 @@ public:
                     bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats) {
 
     MaglevTableSharedPtr maglev_table;
-    if (shouldUseCompactTable(normalized_host_weights.size(), table_size)) {
+    if (normalized_host_weights.size() == 1) {
+      maglev_table =
+          std::make_shared<DegenerateMaglevTable>(normalized_host_weights, max_normalized_weight,
+                                                  table_size, use_hostname_for_hashing, stats);
+      ENVOY_LOG(debug,
+                "creating single host maglev table given table size {} and number of hosts {}",
+                table_size, normalized_host_weights.size());
+    } else if (shouldUseCompactTable(normalized_host_weights.size(), table_size)) {
       maglev_table =
           std::make_shared<CompactMaglevTable>(normalized_host_weights, max_normalized_weight,
                                                table_size, use_hostname_for_hashing, stats);
@@ -189,6 +197,7 @@ void OriginalMaglevTable::constructImplementationInternals(
     }
   }
 }
+
 CompactMaglevTable::CompactMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
                                        double max_normalized_weight, uint64_t table_size,
                                        bool use_hostname_for_hashing,
@@ -254,6 +263,23 @@ void CompactMaglevTable::constructImplementationInternals(
   }
 }
 
+DegenerateMaglevTable::DegenerateMaglevTable(
+    const NormalizedHostWeightVector& normalized_host_weights, double max_normalized_weight,
+    uint64_t table_size, bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats)
+    : MaglevTable(table_size, stats) {
+  constructMaglevTableInternal(normalized_host_weights, max_normalized_weight,
+                               use_hostname_for_hashing);
+}
+
+void DegenerateMaglevTable::constructImplementationInternals(
+    std::vector<TableBuildEntry>& table_build_entries, double /*max_normalized_weight*/) {
+  ASSERT(table_build_entries.size() == 1,
+         "DegenerateMaglevTable is intended for the case of a single host!");
+  TableBuildEntry& entry = table_build_entries[0];
+  single_host_ = entry.host_;
+  ++entry.count_;
+}
+
 void OriginalMaglevTable::logMaglevTable(bool use_hostname_for_hashing) const {
   for (uint64_t i = 0; i < table_.size(); ++i) {
     const absl::string_view key_to_hash = hashKey(table_[i], use_hostname_for_hashing);
@@ -273,6 +299,10 @@ void CompactMaglevTable::logMaglevTable(bool use_hostname_for_hashing) const {
     ENVOY_LOG(trace, "maglev: i={} address={} host={}", i, host->address()->asString(),
               key_to_hash);
   }
+}
+
+void DegenerateMaglevTable::logMaglevTable(bool /*use_hostname_for_hashing*/) const {
+  ENVOY_LOG(trace, "maglev: single host {}", single_host_->address()->asString());
 }
 
 MaglevTable::MaglevTable(uint64_t table_size, MaglevLoadBalancerStats& stats)
@@ -308,6 +338,11 @@ HostSelectionResponse CompactMaglevTable::chooseHost(uint64_t hash, uint32_t att
   const uint32_t index = table_.get(hash % table_size_);
   ASSERT(index < host_table_.size(), "Compact MaglevTable index into host table out of range");
   return {host_table_[index]};
+}
+
+HostSelectionResponse DegenerateMaglevTable::chooseHost(uint64_t /*hash*/,
+                                                        uint32_t /*attempt*/) const {
+  return {single_host_};
 }
 
 MaglevLoadBalancer::MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats,

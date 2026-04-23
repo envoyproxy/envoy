@@ -384,6 +384,9 @@ case $CI_TARGET in
         if [[ -n "$ENVOY_DEFLAKE_JOBS" ]]; then
             _BAZEL_ARGS+=(--jobs="$ENVOY_DEFLAKE_JOBS")
         fi
+        echo "Deflake args: " >&2
+        echo "  ${_BAZEL_ARGS[*]}" >&2
+        echo "" >&2
         bazel test "${_BAZEL_ARGS[@]}"
         ;;
 
