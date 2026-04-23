@@ -14,6 +14,19 @@
 namespace Envoy {
 namespace SharedPool {
 
+namespace {
+struct Counted {
+  explicit Counted(int v) : v_(v) { ++live; }
+  ~Counted() { --live; }
+  bool operator==(const Counted& o) const { return v_ == o.v_; }
+  int v_;
+  inline static std::atomic<int> live{0};
+};
+struct CountedHash {
+  size_t operator()(const Counted& c) const { return static_cast<size_t>(c.v_); }
+};
+} // namespace
+
 class SharedPoolTest : public testing::Test {
 protected:
   SharedPoolTest()
@@ -224,17 +237,6 @@ TEST_F(SharedPoolTest, HashCollision) {
 }
 
 TEST_F(SharedPoolTest, DispatcherTeardownDropsCrossThreadDeleteFreesObject) {
-  struct Counted {
-    explicit Counted(int v) : v_(v) { ++live; }
-    ~Counted() { --live; }
-    bool operator==(const Counted& o) const { return v_ == o.v_; }
-    int v_;
-    inline static std::atomic<int> live{0};
-  };
-  struct CountedHash {
-    size_t operator()(const Counted& c) const { return static_cast<size_t>(c.v_); }
-  };
-
   ASSERT_EQ(0, Counted::live.load());
 
   testing::NiceMock<Event::MockDispatcher> dispatcher;
