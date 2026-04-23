@@ -652,8 +652,10 @@ void HeaderValidator::sanitizeHeadersWithUnderscores(::Envoy::Http::HeaderMap& h
 
   ASSERT(drop_headers.empty() || underscore_action == HeaderValidatorConfig::DROP_HEADER);
   for (const auto& name : drop_headers) {
-    stats_.incDroppedHeadersWithUnderscores();
-    header_map.remove(::Envoy::Http::LowerCaseString(name));
+    const size_t removed_headers = header_map.remove(::Envoy::Http::LowerCaseString(name));
+    for (size_t i = 0; i < removed_headers; ++i) {
+      stats_.incDroppedHeadersWithUnderscores();
+    }
   }
 }
 
