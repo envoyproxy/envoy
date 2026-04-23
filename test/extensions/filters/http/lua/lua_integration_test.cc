@@ -757,10 +757,9 @@ typed_config:
 
   ASSERT_TRUE(response->waitForEndStream());
 
-  EXPECT_EQ("/test/request/headers", response->headers()
-                                         .get(Http::LowerCaseString("x-echoed-path"))[0]
-                                         ->value()
-                                         .getStringView());
+  EXPECT_EQ(
+      "/test/request/headers",
+      response->headers().get(Http::LowerCaseString("x-echoed-path"))[0]->value().getStringView());
   EXPECT_EQ("foo.lyft.com", response->headers()
                                 .get(Http::LowerCaseString("x-echoed-authority"))[0]
                                 ->value()

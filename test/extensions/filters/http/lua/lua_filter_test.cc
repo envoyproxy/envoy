@@ -949,11 +949,9 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponse) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(encoder_callbacks_, requestHeaders())
       .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
-  EXPECT_LOG_CONTAINS_ALL_OF(
-      Envoy::ExpectedLogMessages({{"trace", "/test"}, {"trace", "hello"}}), {
-        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-                  filter_->encodeHeaders(response_headers, true));
-      });
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"trace", "/test"}, {"trace", "hello"}}), {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
@@ -975,7 +973,8 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseNil) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_CALL(encoder_callbacks_, requestHeaders()).WillOnce(Return(Http::RequestHeaderMapOptRef{}));
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{}));
   EXPECT_LOG_CONTAINS("trace", "no request headers", {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   });
@@ -1022,8 +1021,7 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInRequest) {
   EXPECT_CALL(decoder_callbacks_, requestHeaders())
       .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
   EXPECT_LOG_CONTAINS("trace", "/test", {
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-              filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   });
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
