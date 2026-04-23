@@ -46,7 +46,7 @@
 - **OAuth2** — per-route configuration, `TLS_CLIENT_AUTH` (RFC 8705 mTLS client auth), `OauthExpires` cookie cleared on logout, `oauth2_encrypt_tokens` runtime guard removed (encryption now default, opt-out via `disable_token_encryption`).
 - **RBAC** header matcher now validates each header value individually (guarded) to prevent concatenation-based bypasses.
 - Query-parameter values added via `query_parameter_mutations` are now URL-encoded to prevent injection.
-- **OpenSSL** can now be used as an alternative to the default BoringSSL (build with `--config=openssl` Bazel flag); HTTP/3 (QUIC) is disabled and OpenSSL builds are not covered by the Envoy security policy.  
+- **OpenSSL** can now be used as an alternative to the default BoringSSL (build with `--config=openssl` Bazel flag); HTTP/3 (QUIC) is disabled and OpenSSL builds are not covered by the Envoy security policy.
 
 ### Observability
 - New formatters: `SPAN_ID`, `QUERY_PARAMS`, `UPSTREAM_LOCAL_CLOSE_REASON`, `DOWNSTREAM_LOCAL_CLOSE_REASON`, `UPSTREAM_DETECTED_CLOSE_TYPE`, `DOWNSTREAM_DETECTED_CLOSE_TYPE`, `%UPSTREAM_HOSTS_ATTEMPTED%` and related attempt/connection-ID formatters, `%FILE_CONTENT(...)%`, `%SECRET(name)%`.
