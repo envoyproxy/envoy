@@ -157,7 +157,11 @@ protected:
       }
     });
     tls_store_emptied_ = std::make_unique<absl::Notification>();
-    GlobalTlsStores::registerEmptiedCb([&]() { tls_store_emptied_->Notify(); });
+    GlobalTlsStores::registerEmptiedCb([&]() {
+      if (tls_store_emptied_ != nullptr && !tls_store_emptied_->HasBeenNotified()) {
+        tls_store_emptied_->Notify();
+      }
+    });
   }
 
   void updateConfigInPlace(std::function<void(envoy::config::bootstrap::v3::Bootstrap&)> modifier) {
@@ -210,7 +214,10 @@ protected:
     cleanupUpstreamAndDownstream();
   }
 
-  void TearDown() override { cleanUp(); }
+  void TearDown() override {
+    cleanUp();
+    GlobalTlsStores::registerEmptiedCb(nullptr);
+  }
 
   // Send a request through the envoy & possibly to traffic_upstream_. Returns
   // the response's status code.
@@ -533,6 +540,86 @@ bucket_action:
   sendRlqsResponse(1, rlqs_response);
   absl::SleepFor(absl::Seconds(0.5));
   ASSERT_EQ(sendRequest(&headers), "429");
+}
+
+// Verify that the callback registered via registerEmptiedCb fires every time
+// the stores map becomes empty.
+TEST_P(FilterPersistenceTest, TestEmptiedCallbackFiresMultipleTimes) {
+  uint32_t emptied_count = 0;
+  auto n1 = std::make_shared<absl::Notification>();
+  GlobalTlsStores::registerEmptiedCb([&emptied_count, &n1]() {
+    emptied_count++;
+    if (!n1->HasBeenNotified()) {
+      n1->Notify();
+    }
+  });
+
+  auto remove_rlqs = [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* hcm_filter = listener->mutable_filter_chains(0)->mutable_filters(0);
+    HttpConnectionManager hcm_config;
+    hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
+    auto* filters = hcm_config.mutable_http_filters();
+    for (int i = 0; i < filters->size();) {
+      if (filters->Get(i).name() == "envoy.filters.http.rate_limit_quota") {
+        filters->DeleteSubrange(i, 1);
+      } else {
+        i++;
+      }
+    }
+    hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
+  };
+
+  // 1. Initial removal of the RLQS filter to trigger the first call of the callback.
+  updateConfigInPlace(remove_rlqs);
+  ASSERT_TRUE(n1->WaitForNotificationWithTimeout(absl::Seconds(3)));
+  EXPECT_EQ(emptied_count, 1);
+
+  // 2. Add the filter back and verify it works.
+  updateConfigInPlace([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* hcm_filter = listener->mutable_filter_chains(0)->mutable_filters(0);
+    HttpConnectionManager hcm_config;
+    hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
+    // Prepend the RLQS filter.
+    (void)hcm_config.add_http_filters();
+    for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
+      hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+    }
+    TestUtility::loadFromYaml(kDefaultRateLimitQuotaFilter, *hcm_config.mutable_http_filters(0));
+    hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
+  });
+  absl::flat_hash_map<std::string, std::string> headers = {{"environment", "staging"}};
+  ASSERT_EQ(sendRequest(&headers), "200");
+
+  // 3. Remove the filter again. The callback should be called a second time.
+  n1 = std::make_shared<absl::Notification>();
+  updateConfigInPlace(remove_rlqs);
+  ASSERT_TRUE(n1->WaitForNotificationWithTimeout(absl::Seconds(3)));
+  EXPECT_EQ(emptied_count, 2);
+
+  // Restore the callback for TearDown/subsequent tests.
+  GlobalTlsStores::registerEmptiedCb([&]() {
+    if (tls_store_emptied_ != nullptr && !tls_store_emptied_->HasBeenNotified()) {
+      tls_store_emptied_->Notify();
+    }
+  });
+
+  // Add it back one last time so TearDown has something to wipe and the
+  // notification is triggered.
+  tls_store_emptied_ = std::make_unique<absl::Notification>();
+  updateConfigInPlace([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* hcm_filter = listener->mutable_filter_chains(0)->mutable_filters(0);
+    HttpConnectionManager hcm_config;
+    hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
+    (void)hcm_config.add_http_filters();
+    for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
+      hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+    }
+    TestUtility::loadFromYaml(kDefaultRateLimitQuotaFilter, *hcm_config.mutable_http_filters(0));
+    hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
+  });
 }
 
 } // namespace
