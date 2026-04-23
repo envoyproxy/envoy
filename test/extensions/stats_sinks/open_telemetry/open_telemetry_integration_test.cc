@@ -464,8 +464,7 @@ public:
         // histogram seen once cluster_0's sample is present so the outer
         // waitForMetricsRequest loop keeps polling otherwise.
         const int num_points = metric.histogram().data_points().size();
-        EXPECT_GE(num_points, 1);
-        EXPECT_LE(num_points, 2);
+        EXPECT_THAT(num_points, testing::Between(1, 2));
         for (const auto& dp : metric.histogram().data_points()) {
           bool is_cluster_0 = false;
           for (const auto& attr : dp.attributes()) {
