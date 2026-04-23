@@ -450,14 +450,16 @@ public:
       if (metric.name() == getFullStatName("custom.upstream_rq_time") && metric.has_histogram()) {
         // Require exactly 1 data point for cluster_0.
         // otlp_collector's own upstream_rq_time
-        // sample (from stats-export RPCs) may or may 
+        // sample (from stats-export RPCs) may or may
         // include another data point, which we are not
         // interested in.
-        const int data_points_with_cluster_0 = std::ranges::count_if(metric.histogram().data_points(), [](const auto& dp) {
-          return std::ranges::any_of(dp.attributes(), [](const auto& attr) {
-            return attr.key() == "envoy.cluster_name" && attr.value().string_value() == "cluster_0";
-          });
-        });
+        const int data_points_with_cluster_0 =
+            std::ranges::count_if(metric.histogram().data_points(), [](const auto& dp) {
+              return std::ranges::any_of(dp.attributes(), [](const auto& attr) {
+                return attr.key() == "envoy.cluster_name" &&
+                       attr.value().string_value() == "cluster_0";
+              });
+            });
         EXPECT_EQ(1, data_points_with_cluster_0);
         known_histogram_exists = true;
       }
