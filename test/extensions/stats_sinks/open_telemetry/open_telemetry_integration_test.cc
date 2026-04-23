@@ -134,6 +134,20 @@ public:
       driver_.sendResponse(otlp_collector_request_);
     }
 
+    // Drain any metrics-export streams that piled up on the connection while we were
+    // looping above. Each iteration of the loop only handles one stream, but the
+    // stats flush timer keeps firing and queuing more. Leaving them unresponded to
+    // keeps cluster.otlp_collector.upstream_rq_active > 0, which then trips the
+    // subsequent expectUpstreamRequestFinished() wait in the EnvoyGrpc variant.
+    while (true) {
+      FakeStreamPtr pending;
+      if (!fake_metrics_service_connection_->waitForNewStream(*dispatcher_, pending,
+                                                              std::chrono::milliseconds(10))) {
+        break;
+      }
+      driver_.sendResponse(pending);
+    }
+
     EXPECT_TRUE(known_counter_exists);
     EXPECT_TRUE(known_gauge_exists);
     EXPECT_TRUE(known_histogram_exists);
@@ -418,6 +432,16 @@ public:
   void checkCustomMetrics(
       const Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>& metrics,
       bool& known_counter_exists, bool& known_gauge_exists, bool& known_histogram_exists) {
+    // Aggregation invariant: the converted histogram must appear as a single
+    // Metric entry with per-cluster data points, not as multiple Metric entries.
+    int custom_histogram_metric_count = 0;
+    for (const auto& m : metrics) {
+      if (m.name() == getFullStatName("custom.upstream_rq_time") && m.has_histogram()) {
+        ++custom_histogram_metric_count;
+      }
+    }
+    EXPECT_LE(custom_histogram_metric_count, 1);
+
     for (const opentelemetry::proto::metrics::v1::Metric& metric : metrics) {
       // The metrics are aggregated into single metric with 2 data points, one for attribute
       // envoy.cluster_name="cluster_0" and envoy.cluster_name="otlp_collector".
@@ -434,8 +458,30 @@ public:
       }
 
       if (metric.name() == getFullStatName("custom.upstream_rq_time") && metric.has_histogram()) {
-        known_histogram_exists = true;
-        EXPECT_EQ(1, metric.histogram().data_points().size());
+        // Accept 1 or 2 data points: otlp_collector's own upstream_rq_time
+        // sample (from stats-export RPCs) may or may not have landed by this
+        // flush. Find cluster_0's data point and validate it; only mark the
+        // histogram seen once cluster_0's sample is present so the outer
+        // waitForMetricsRequest loop keeps polling otherwise.
+        const int num_points = metric.histogram().data_points().size();
+        EXPECT_GE(num_points, 1);
+        EXPECT_LE(num_points, 2);
+        for (const auto& dp : metric.histogram().data_points()) {
+          bool is_cluster_0 = false;
+          for (const auto& attr : dp.attributes()) {
+            if (attr.key() == "envoy.cluster_name" && attr.value().string_value() == "cluster_0") {
+              is_cluster_0 = true;
+              break;
+            }
+          }
+          if (is_cluster_0) {
+            known_histogram_exists = true;
+            EXPECT_EQ(dp.bucket_counts().size(),
+                      Stats::HistogramSettingsImpl::defaultBuckets().size() + 1);
+            EXPECT_TRUE(dp.time_unix_nano() > 0);
+            break;
+          }
+        }
       }
     }
   }
