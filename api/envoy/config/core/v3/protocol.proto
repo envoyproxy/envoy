@@ -57,7 +57,7 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message QuicProtocolOptions {
   // Config for QUIC connection migration across network interfaces, i.e. cellular to WIFI, upon
   // network change events from the platform, i.e. the current network gets
@@ -179,6 +179,11 @@ message QuicProtocolOptions {
   // If not specified, memory reduction is set to infinite by QUIC connection (disabled).
   google.protobuf.Duration memory_reduction_timeout = 12
       [(validate.rules).duration = {gte {seconds: 1}}];
+
+  // If true, the QUIC connection will signal support for `SCONE <https://datatracker.ietf.org/doc/draft-ietf-scone-protocol/>`_ (Standard
+  // Communication with Network Elements) and process SCONE packets.
+  // If not present, the QUICHE default behavior will be used.
+  google.protobuf.BoolValue enable_scone = 13;
 }
 
 message UpstreamHttpProtocolOptions {

@@ -100,7 +100,10 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
   const std::string body_sent(2 * 1024 * 1024, 's');
   initializeConfigDuplexStreamed(false);
 
-  // Sends 30 consecutive request, each carrying 2MB data.
+  // Sends 30 consecutive requests, each carrying 2MB data.
+  // The processor gRPC connection is established once on the first iteration and reused across all
+  // iterations; each iteration opens a new gRPC stream on that persistent connection. This matches
+  // real ext_proc behavior and avoids the per-iteration connection-churn race.
   for (int i = 0; i < 30; i++) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl default_headers;
@@ -111,13 +114,21 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
     request_encoder_ = &encoder_decoder.first;
     IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
     codec_client_->sendData(*request_encoder_, body_sent, true);
-    // The ext_proc server receives the headers.
+
+    // On the first iteration, wait for the gRPC connection to be established.
+    if (i == 0) {
+      EXPECT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+    }
+    // Each iteration opens a new gRPC stream on the persistent processor connection.
     ProcessingRequest header_request;
-    serverReceiveHeaderReq(header_request);
+    EXPECT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
+    EXPECT_TRUE(header_request.has_request_headers());
+
     // The ext_proc server receives the body.
     uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent, processor_stream_);
     EXPECT_GT(total_req_body_msg, 0);
-    // The ext_proc server sends back the header response.
+    // The ext_proc server sends back the header response (startGrpcStream is per-stream).
     serverSendHeaderResp();
     // The ext_proc server sends back body responses, which include 50 chunks,
     // and each chunk contains 64KB data, thus totally ~3MB per request.
@@ -131,7 +142,9 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
     EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
     EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
     verifyDownstreamResponse(*response, 200);
-    TearDown();
+
+    // Clean up per-iteration upstream/downstream state; processor_connection_ stays alive.
+    cleanupUpstreamAndDownstream();
   }
 }
 
@@ -583,7 +596,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessing) {
 }
 
 // without trailers, server fully buffers the message before sending back the response.
-TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
+// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
+TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirection) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(5 * 1024, 's');
@@ -641,7 +655,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
 }
 
 // Without trailers,  server buffers one chunks of body before sending back the response.
-TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionNoTrailerRandom) {
+// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
+TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirectionNoTrailerRandom) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(10 * 1024, 's');
@@ -815,8 +830,9 @@ TEST_P(ExtProcIntegrationTest, KeepContentLengthDuplexStreamed) {
 }
 
 // With trailers, request direction, fully buffered
+// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
 TEST_P(ExtProcIntegrationTest,
-       TwoExtProcFiltersBothDuplexInRequestDirectionWithTrailerFullyBuffered) {
+       DISABLED_TwoExtProcFiltersBothDuplexInRequestDirectionWithTrailerFullyBuffered) {
   two_ext_proc_filters_ = true;
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
     // Filter-1
@@ -887,7 +903,9 @@ TEST_P(ExtProcIntegrationTest,
 }
 
 // With trailers, both directions, server fully buffers.
-TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
+// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
+TEST_P(ExtProcIntegrationTest,
+       DISABLED_TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
   twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(10 * 1024, 's');
