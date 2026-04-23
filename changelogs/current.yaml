@@ -170,6 +170,15 @@ minor_behavior_changes:
   change: |
     Strict parsing of HTTP/1 chunked encoding is now available. It is disabled by default and can be
     enabled by setting the runtime guard ``envoy.reloadable_features.strict_chunk_parsing`` to ``true``.
+- area: tracing
+  change: |
+    The HTTP connection manager now skips ``HttpTracerUtility::finalizeDownstreamSpan`` for spans
+    whose tracer reports the span will not be recorded (via the new ``Tracing::Span::isRecording()``
+    predicate). On deployments with low sampling rates this removes per-request tag and
+    string-formatting work that the tracer would discard at export. Span creation and propagation
+    headers are unaffected; tracer drivers that do not override ``isRecording()`` keep legacy
+    behavior. This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.skip_finalize_non_recording_span`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

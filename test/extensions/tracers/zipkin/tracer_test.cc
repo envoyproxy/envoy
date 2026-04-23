@@ -584,6 +584,13 @@ TEST_F(ZipkinTracerTest, FinishNotSampledSpan) {
   // Creates a root-span with a CS annotation
   SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
   span->setSampled(false);
+
+  // isRecording() must track sampled state — HCM consults this to skip finalizeDownstreamSpan.
+  EXPECT_FALSE(span->isRecording());
+  span->setSampled(true);
+  EXPECT_TRUE(span->isRecording());
+  span->setSampled(false);
+
   span->finishSpan();
 
   // Test if the reporter's reportSpan method was NOT called upon finishing the span

@@ -9,7 +9,12 @@ using testing::ReturnPointee;
 namespace Envoy {
 namespace Tracing {
 
-MockSpan::MockSpan() = default;
+MockSpan::MockSpan() {
+  // Default to recording so existing tests that don't stub isRecording() see the same
+  // behavior as the Tracing::Span base class (which returns true). Tests that want to
+  // exercise the non-recording HCM skip path can override this via EXPECT_CALL/ON_CALL.
+  ON_CALL(*this, isRecording()).WillByDefault(Return(true));
+}
 MockSpan::~MockSpan() = default;
 
 MockConfig::MockConfig() {

@@ -3320,6 +3320,70 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   conn_manager_->onData(fake_input, false);
 }
 
+// When the active span reports isRecording()==false, the HCM skips
+// HttpTracerUtility::finalizeDownstreamSpan to avoid per-tag string building and storage
+// work on spans whose driver-level export pipeline will drop them. Propagation and
+// per-request span creation are unaffected (exercised elsewhere).
+TEST_F(HttpConnectionManagerImplTest, SkipFinalizeDownstreamSpanWhenNotRecording) {
+  setup(SetupOpts().setTracing(true));
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(*span, isRecording()).WillRepeatedly(Return(false));
+
+  // finalizeDownstreamSpan-owned methods must not fire when the span is non-recording.
+  EXPECT_CALL(*span, setTag(_, _)).Times(0);
+  EXPECT_CALL(*span, log(_, _)).Times(0);
+  EXPECT_CALL(*span, finishSpan()).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        decoder_->streamInfo().setResponseCodeDetails("");
+        response_encoder_.getStream().resetStream(StreamResetReason::LocalReset);
+        data.drain(4);
+        return Http::okStatus();
+      }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// With the runtime flag disabled, the HCM runs finalizeDownstreamSpan even on non-recording
+// spans — rollback path for operators who need the legacy behavior.
+TEST_F(HttpConnectionManagerImplTest, FinalizeDownstreamSpanWhenNotRecordingRuntimeFlagOff) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.skip_finalize_non_recording_span", "false"}});
+  setup(SetupOpts().setTracing(true));
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(*span, isRecording()).WillRepeatedly(Return(false));
+
+  // Finalize must still run when the flag is disabled, matching legacy behavior.
+  EXPECT_CALL(*span, finishSpan());
+  EXPECT_CALL(*span, setTag(_, _)).Times(AnyNumber());
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        decoder_->streamInfo().setResponseCodeDetails("");
+        response_encoder_.getStream().resetStream(StreamResetReason::LocalReset);
+        data.drain(4);
+        return Http::okStatus();
+      }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, NoPath) {
   setup();
 
