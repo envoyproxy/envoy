@@ -570,7 +570,6 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       const auto elapsed = now - primary_host_info->host_info_->lastUsedTime();
       std::chrono::milliseconds refresh_interval(
           primary_host_info->failure_backoff_strategy_->nextBackOffMs());
-      const auto uncapped_refresh_interval = refresh_interval;
       if (elapsed >= host_ttl_) {
         refresh_interval = std::chrono::milliseconds(0);
       } else {
@@ -578,17 +577,12 @@ void DnsCacheImpl::finishResolve(const std::string& host,
             std::chrono::duration_cast<std::chrono::milliseconds>(host_ttl_ - elapsed);
         refresh_interval = std::min(refresh_interval, until_eviction);
       }
-      // If (and only if) the host_ttl cap above reduced the failure backoff, floor the
-      // resulting interval at min_refresh_interval_ (dns_min_refresh_rate). The cap bounds
-      // eviction delay; this floor prevents arming a ms-scale alarm that can kick rapid-fire
-      // resolves and race with dispatcher/resolver teardown in integration tests (observed
-      // as a LeakSanitizer leak in proxy_filter_integration_test DoubleResolution). When the
-      // cap does not kick in, the user-configured failure backoff is passed through unchanged.
-      if (refresh_interval < uncapped_refresh_interval) {
-        const auto min_refresh_ms =
-            std::chrono::duration_cast<std::chrono::milliseconds>(min_refresh_interval_);
-        refresh_interval = std::max(refresh_interval, min_refresh_ms);
-      }
+      // Floor the result at min_refresh_interval_ (dns_min_refresh_rate) to prevent arming
+      // a ms-scale alarm that can kick rapid-fire resolves and race with dispatcher/resolver
+      // teardown in integration tests (observed as a LeakSanitizer leak in
+      // proxy_filter_integration_test DoubleResolution).
+      refresh_interval = std::max(refresh_interval,
+          std::chrono::duration_cast<std::chrono::milliseconds>(min_refresh_interval_));
       primary_host_info->refresh_timer_->enableTimer(refresh_interval);
       ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', (failure) refresh rate {} ms", host,
                 refresh_interval.count());
