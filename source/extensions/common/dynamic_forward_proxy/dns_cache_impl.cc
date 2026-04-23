@@ -293,7 +293,7 @@ void DnsCacheImpl::onReResolveAlarm(const std::string& host) {
   auto last_used_time = primary_host.host_info_->lastUsedTime();
   ENVOY_LOG(debug, "host='{}' TTL check: now={} last_used={} TTL {}", host, now_duration.count(),
             last_used_time.count(), host_ttl_.count());
-  if ((now_duration - last_used_time) > host_ttl_) {
+  if ((now_duration - last_used_time) >= host_ttl_) {
     ENVOY_LOG(debug, "host='{}' TTL expired, removing", host);
     removeHost(host, primary_host, true);
   } else {
