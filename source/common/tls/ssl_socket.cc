@@ -264,7 +264,9 @@ void SslSocket::drainErrorQueue() {
         saw_cert_verify_failed = true;
       }
     } else if (ERR_GET_LIB(err) == ERR_LIB_SYS) {
-      if (ERR_GET_REASON(err) == ECONNRESET) {
+      if (ERR_GET_REASON(err) == ECONNRESET &&
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
         detected_io_error_ = Api::IoError::IoErrorCode::ConnectionReset;
       }
       // Any syscall errors that result in connection closure are already tracked in other
