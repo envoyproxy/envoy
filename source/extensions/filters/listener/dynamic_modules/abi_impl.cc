@@ -1124,11 +1124,7 @@ envoy_dynamic_module_type_listener_filter_scheduler_module_ptr
 envoy_dynamic_module_callback_listener_filter_scheduler_new(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
-  Event::Dispatcher* dispatcher = filter->dispatcher();
-  if (dispatcher == nullptr) {
-    return nullptr;
-  }
-  return new DynamicModuleListenerFilterScheduler(filter->weak_from_this(), *dispatcher);
+  return new DynamicModuleListenerFilterScheduler(filter->weak_from_this());
 }
 
 void envoy_dynamic_module_callback_listener_filter_scheduler_delete(
@@ -1147,8 +1143,7 @@ envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr
 envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
     envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr) {
   auto* filter_config = static_cast<DynamicModuleListenerFilterConfig*>(filter_config_envoy_ptr);
-  return new DynamicModuleListenerFilterConfigScheduler(filter_config->weak_from_this(),
-                                                        filter_config->main_thread_dispatcher_);
+  return new DynamicModuleListenerFilterConfigScheduler(filter_config->weak_from_this());
 }
 
 void envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(

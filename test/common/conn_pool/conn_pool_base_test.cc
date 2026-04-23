@@ -95,6 +95,7 @@ public:
               (const Upstream::HostDescriptionConstSharedPtr& n, absl::string_view,
                ConnectionPool::PoolFailureReason, AttachContext&));
   MOCK_METHOD(void, onPoolReady, (ActiveClient&, AttachContext&));
+  void setSkipPendingOverflowForTest(bool value) { skip_pending_overflow_on_active_rq_ = value; }
 };
 
 class ConnPoolImplBaseTest : public testing::Test {
@@ -688,6 +689,49 @@ TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
 
   // Clean up.
   closeStream();
+}
+
+// Test that when max_active_requests circuit breaker fires in attachStreamToClient(),
+// upstream_rq_active_overflow is incremented and upstream_rq_pending_overflow is not
+// (runtime flag enabled by default).
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflow) {
+  // Allow 2 concurrent streams per connection so the client stays Ready after the first stream,
+  // and cap active requests at 1 so the second newStreamImpl() overflows the circuit breaker.
+  concurrent_streams_ = 2;
+  cluster_->resetResourceManager(1024, 1024, 1, 1, 1);
+
+  // Attach first stream — rq counter reaches its limit (1/1); client stays Ready.
+  newActiveClientAndStream(ActiveClient::State::Ready);
+
+  // Second stream: finds the Ready client, attachStreamToClient() overflows.
+  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _));
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_active_overflow_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
+
+  closeStreamAndDrainClient();
+}
+
+// Test legacy behavior: when the runtime flag is disabled, both upstream_rq_active_overflow
+// and upstream_rq_pending_overflow are incremented for the max_active_requests path.
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflowLegacy) {
+  // Simulate the legacy behavior where skip_pending_overflow_count_on_active_rq is false.
+  // We set the cached flag directly since the pool is constructed before the test body runs.
+  pool_.setSkipPendingOverflowForTest(false);
+
+  concurrent_streams_ = 2;
+  cluster_->resetResourceManager(1024, 1024, 1, 1, 1);
+
+  newActiveClientAndStream(ActiveClient::State::Ready);
+
+  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _));
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_active_overflow_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
+
+  closeStreamAndDrainClient();
 }
 
 } // namespace ConnectionPool
