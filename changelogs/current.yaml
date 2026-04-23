@@ -1,7 +1,6 @@
-date: Pending
+date: April 23, 2026
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: tcp_proxy
   change: |
     The TCP proxy filter now requires :ref:`max_early_data_bytes
@@ -36,7 +35,6 @@ behavior_changes:
     codebase have been updated.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: conn_pool
   change: |
     Added new ``upstream_rq_active_overflow`` counter incremented when a request is rejected
@@ -172,7 +170,6 @@ minor_behavior_changes:
     enabled by setting the runtime guard ``envoy.reloadable_features.strict_chunk_parsing`` to ``true``.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: grpc
   change: |
     Fixed the router to return ``DEADLINE_EXCEEDED`` (gRPC status ``4``) instead of ``UNAVAILABLE`` (gRPC
@@ -416,7 +413,6 @@ bug_fixes:
     ``StrictDnsClusterImpl`` involving the ``Locality`` shared pool during server shutdown.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: oauth2
   change: |
     Removed the runtime guard ``envoy.reloadable_features.oauth2_encrypt_tokens``. Token cookies (access,
@@ -1085,7 +1081,6 @@ new_features:
     Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
     that closes idle downstream HTTP connections when the overload action is active. Currently only HTTP/3 idle connections
     trimming is supported, and HTTP/1 and HTTP/2 support are to be implemented.
-
 - area: contrib
   change: |
     Added a new :ref:`Kafka stats sink <config_stat_sinks_kafka>` contrib extension
@@ -1120,5 +1115,3 @@ new_features:
     field in ``QuicProtocolOptions``, and support in Envoy Mobile via a new ``enableScone()`` API in
     ``EngineBuilder``. SCONE bandwidth and timestamp data are now propagated to the application via
     new ``scone_max_kbps`` and ``scone_timestamp_ms`` fields in the ``envoy_stream_intel`` struct.
-
-deprecated:
