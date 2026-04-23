@@ -466,13 +466,7 @@ public:
         const int num_points = metric.histogram().data_points().size();
         EXPECT_THAT(num_points, testing::Between(1, 2));
         for (const auto& dp : metric.histogram().data_points()) {
-          bool is_cluster_0 = false;
-          for (const auto& attr : dp.attributes()) {
-            if (attr.key() == "envoy.cluster_name" && attr.value().string_value() == "cluster_0") {
-              is_cluster_0 = true;
-              break;
-            }
-          }
+          bool is_cluster_0 = std::ranges::any_of(dp.attributes(), [](auto& attr) {return attr.key() == "envoy.cluster_name" && attr.value().string_value() == "cluster_0";});
           if (is_cluster_0) {
             known_histogram_exists = true;
             EXPECT_EQ(dp.bucket_counts().size(),
