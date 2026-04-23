@@ -458,20 +458,18 @@ public:
       }
 
       if (metric.name() == getFullStatName("custom.upstream_rq_time") && metric.has_histogram()) {
-        // Accept 1 or 2 data points: otlp_collector's own upstream_rq_time
-        // sample (from stats-export RPCs) may or may not have landed by this
-        // flush. Find cluster_0's data point and validate it; only mark the
-        // histogram seen once cluster_0's sample is present so the outer
-        // waitForMetricsRequest loop keeps polling otherwise.
-        const int num_points = metric.histogram().data_points().size();
-        EXPECT_THAT(num_points, testing::Between(1, 2));
-        for (const auto& dp : metric.histogram().data_points()) {
-          bool is_cluster_0 = std::ranges::any_of(dp.attributes(), [](auto& attr) {return attr.key() == "envoy.cluster_name" && attr.value().string_value() == "cluster_0";});
-          if (is_cluster_0) {
-            known_histogram_exists = true;
-            break;
-          }
-        }
+        // Require exactly 1 data point for cluster_0.
+        // otlp_collector's own upstream_rq_time
+        // sample (from stats-export RPCs) may or may 
+        // include another data point, which we are not
+        // interested in.
+        const int data_points_with_cluster_0 = std::ranges::count_if(metric.histogram().data_points(), [](const auto& dp) {
+          return std::ranges::any_of(dp.attributes(), [](const auto& attr) {
+            return attr.key() == "envoy.cluster_name" && attr.value().string_value() == "cluster_0";
+          });
+        });
+        EXPECT_EQ(1, data_points_with_cluster_0);
+        known_histogram_exists = true;
       }
     }
   }
