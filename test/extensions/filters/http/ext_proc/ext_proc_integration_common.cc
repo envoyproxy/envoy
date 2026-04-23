@@ -379,9 +379,61 @@ void ExtProcIntegrationTest::handleUpstreamRequestWithResponse(const Buffer::Ins
 
 void ExtProcIntegrationTest::waitForFirstMessage(FakeUpstream& grpc_upstream,
                                                  ProcessingRequest& request) {
-  ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
-  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  // Helper to dump diagnostic state before an assertion failure so that CI logs contain
+  // enough information to distinguish between "Envoy cancelled the side stream before HEADERS
+  // were sent" and "HEADERS were sent but the test-thread dispatcher was starved".
+  const auto dump_diagnostics = [this, &grpc_upstream]() {
+    ENVOY_LOG_MISC(error,
+                   "waitForFirstMessage: upstream_address={} processor_connection_={}",
+                   grpc_upstream.localAddress()->asString(),
+                   processor_connection_ != nullptr ? "non-null" : "null");
+    if (test_server_) {
+      const auto cval = [this](const std::string& name) -> uint64_t {
+        auto c = test_server_->counter(name);
+        return c ? c->value() : 0;
+      };
+      const auto gval = [this](const std::string& name) -> uint64_t {
+        auto g = test_server_->gauge(name);
+        return g ? g->value() : 0;
+      };
+      ENVOY_LOG_MISC(error,
+                     "waitForFirstMessage: cluster.ext_proc_server_0: "
+                     "upstream_cx_total={} upstream_cx_active={} upstream_cx_connect_fail={} "
+                     "upstream_rq_total={} upstream_rq_active={} upstream_rq_tx_reset={} "
+                     "upstream_rq_rx_reset={}",
+                     cval("cluster.ext_proc_server_0.upstream_cx_total"),
+                     gval("cluster.ext_proc_server_0.upstream_cx_active"),
+                     cval("cluster.ext_proc_server_0.upstream_cx_connect_fail"),
+                     cval("cluster.ext_proc_server_0.upstream_rq_total"),
+                     gval("cluster.ext_proc_server_0.upstream_rq_active"),
+                     cval("cluster.ext_proc_server_0.upstream_rq_tx_reset"),
+                     cval("cluster.ext_proc_server_0.upstream_rq_rx_reset"));
+    }
+  };
+
+  {
+    testing::AssertionResult r =
+        grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_);
+    if (!r) {
+      dump_diagnostics();
+    }
+    ASSERT_TRUE(r);
+  }
+  {
+    testing::AssertionResult r =
+        processor_connection_->waitForNewStream(*dispatcher_, processor_stream_);
+    if (!r) {
+      dump_diagnostics();
+    }
+    ASSERT_TRUE(r);
+  }
+  {
+    testing::AssertionResult r = processor_stream_->waitForGrpcMessage(*dispatcher_, request);
+    if (!r) {
+      dump_diagnostics();
+    }
+    ASSERT_TRUE(r);
+  }
 }
 
 void ExtProcIntegrationTest::processGenericMessage(

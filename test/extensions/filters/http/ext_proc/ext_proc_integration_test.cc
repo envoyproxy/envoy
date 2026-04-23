@@ -123,6 +123,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
   ENVOY_LOG(trace, "GetAndCloseStreamWithTracing waiting for first message");
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
 
   ENVOY_LOG(trace, "GetAndCloseStreamWithTracing starting gRPC stream");
   processor_stream_->startGrpcStream();
@@ -187,6 +188,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
   EXPECT_FALSE(processor_stream_->headers().get(LowerCaseString("traceparent")).empty())
       << "expected traceparent header";
 
@@ -215,6 +217,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithUpstreamResetLogging) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
 
   processor_stream_->startGrpcStream();
   processor_stream_->encodeResetStream();
@@ -263,6 +266,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOutOfLine) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
   processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
   resp1.mutable_request_headers();
@@ -284,6 +288,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOutOfLineLater) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
   processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
   resp1.mutable_request_headers();
@@ -305,6 +310,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamOnResponse) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
   processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
   resp1.mutable_request_headers();
@@ -329,6 +335,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOnResponse) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
   processor_stream_->startGrpcStream();
   ProcessingResponse resp1;
   resp1.mutable_request_headers();
@@ -3797,6 +3804,7 @@ TEST_P(ExtProcIntegrationTest, SendClusterMetadata) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
   EXPECT_TRUE(request_headers_msg.has_metadata_context());
   const auto& received_metadata = request_headers_msg.metadata_context();
 
@@ -4215,6 +4223,7 @@ TEST_P(ExtProcIntegrationTest, RetryOnResponseError) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
   // Fail the stream immediately.
   processor_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "8"}, {"foo", "bar"}},
@@ -4351,6 +4360,7 @@ TEST_P(ExtProcIntegrationTest, RetryStatsVerification) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
 
   // First failure - resource-exhausted.
   processor_stream_->encodeHeaders(
@@ -4425,6 +4435,7 @@ TEST_P(ExtProcIntegrationTest, RetryOnDeadlineExceeded) {
 
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+  ASSERT_NE(processor_stream_, nullptr);
 
   // First attempt, deadline-exceeded.
   processor_stream_->encodeHeaders(
