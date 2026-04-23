@@ -434,8 +434,29 @@ public:
       }
 
       if (metric.name() == getFullStatName("custom.upstream_rq_time") && metric.has_histogram()) {
-        known_histogram_exists = true;
-        EXPECT_EQ(1, metric.histogram().data_points().size());
+        // Accept 1 or 2 data points: otlp_collector may or may not have recorded
+        // an upstream_rq_time sample by the time this flush is inspected. Find
+        // the data point for cluster_0 specifically and validate it.
+        const int num_points = metric.histogram().data_points().size();
+        EXPECT_GE(num_points, 1);
+        EXPECT_LE(num_points, 2);
+        for (const auto& dp : metric.histogram().data_points()) {
+          bool is_cluster_0 = false;
+          for (const auto& attr : dp.attributes()) {
+            if (attr.key() == "envoy.cluster_name" &&
+                attr.value().string_value() == "cluster_0") {
+              is_cluster_0 = true;
+              break;
+            }
+          }
+          if (is_cluster_0) {
+            known_histogram_exists = true;
+            EXPECT_EQ(dp.bucket_counts().size(),
+                      Stats::HistogramSettingsImpl::defaultBuckets().size() + 1);
+            EXPECT_TRUE(dp.time_unix_nano() > 0);
+            break;
+          }
+        }
       }
     }
   }
