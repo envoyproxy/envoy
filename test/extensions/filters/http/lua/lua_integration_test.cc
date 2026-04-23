@@ -744,7 +744,7 @@ typed_config:
   initializeFilter(FILTER_AND_CODE);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/test/request/headers"},
+                                                 {":path", "/test/long/url"},
                                                  {":scheme", "http"},
                                                  {":authority", "foo.lyft.com"},
                                                  {"x-forwarded-for", "10.0.0.1"}};
@@ -758,7 +758,7 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ(
-      "/test/request/headers",
+      "/test/long/url",
       response->headers().get(Http::LowerCaseString("x-echoed-path"))[0]->value().getStringView());
   EXPECT_EQ("foo.lyft.com", response->headers()
                                 .get(Http::LowerCaseString("x-echoed-authority"))[0]
