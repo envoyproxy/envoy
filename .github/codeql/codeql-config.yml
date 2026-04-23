@@ -12,4 +12,4 @@ name: "Envoy CodeQL config"
 # by the standard v1 layout. Do not broaden to bin/** or to libstdc++
 # (include/c++/** without the v1/ suffix).
 paths-ignore:
-  - '**/include/c++/v1/**'
+- '**/include/c++/v1/**'
