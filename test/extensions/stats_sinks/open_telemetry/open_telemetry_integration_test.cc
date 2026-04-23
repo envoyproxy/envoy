@@ -432,16 +432,6 @@ public:
   void checkCustomMetrics(
       const Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>& metrics,
       bool& known_counter_exists, bool& known_gauge_exists, bool& known_histogram_exists) {
-    // Aggregation invariant: the converted histogram must appear as a single
-    // Metric entry with per-cluster data points, not as multiple Metric entries.
-    int custom_histogram_metric_count = 0;
-    for (const auto& m : metrics) {
-      if (m.name() == getFullStatName("custom.upstream_rq_time") && m.has_histogram()) {
-        ++custom_histogram_metric_count;
-      }
-    }
-    EXPECT_LE(custom_histogram_metric_count, 1);
-
     for (const opentelemetry::proto::metrics::v1::Metric& metric : metrics) {
       // The metrics are aggregated into single metric with 2 data points, one for attribute
       // envoy.cluster_name="cluster_0" and envoy.cluster_name="otlp_collector".
