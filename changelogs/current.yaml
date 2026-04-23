@@ -210,6 +210,11 @@ bug_fixes:
     properly as the API definition requires.
     The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
     to the dynamic module side as the configuration.
+- area: dynamic_modules
+  change: |
+    Fixed a crash in the HTTP filter when a stream was already above the downstream write-buffer
+    high watermark at filter-chain construction time. Downstream watermark callback registration is
+    now deferred until the in-module filter has been constructed.
 - area: http_11_proxy
   change: |
     Fixed bug where providing an empty inner socket config would cause Envoy to crash.
