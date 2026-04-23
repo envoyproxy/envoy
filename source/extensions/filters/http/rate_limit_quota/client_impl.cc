@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <utility>
 
 #include "envoy/type/v3/ratelimit_strategy.pb.h"
 #include "envoy/type/v3/token_bucket.pb.h"
@@ -23,8 +24,9 @@ void LocalRateLimitClientImpl::createBucket(
     std::chrono::milliseconds fallback_ttl, bool initial_request_allowed) {
   // Intentionally crash if the local client is initialized with a null global
   // client or TLS slot due to a bug.
-  global_client_->createBucket(bucket_id, id, default_bucket_action, std::move(fallback_action),
-                               fallback_ttl, initial_request_allowed);
+  tls_store_->global_client->createBucket(bucket_id, id, default_bucket_action,
+                                          std::move(fallback_action), fallback_ttl,
+                                          initial_request_allowed);
 }
 
 std::shared_ptr<CachedBucket> LocalRateLimitClientImpl::getBucket(size_t id) {

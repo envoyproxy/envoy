@@ -58,6 +58,9 @@ public:
 class GlobalRateLimitClientImpl : public Grpc::AsyncStreamCallbacks<
                                       envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>,
                                   public Event::DeferredDeletable,
+                                  // Required to safely capture 'this' in asynchronous callbacks
+                                  // posted to the main dispatcher, as they may outlive the client.
+                                  public std::enable_shared_from_this<GlobalRateLimitClientImpl>,
                                   public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   // Note: rlqs_client is owned directly to ensure that it does not outlive the
@@ -188,14 +191,14 @@ private:
  * Create a shared rate limit client. It should be shared to each worker
  * thread via TLS.
  */
-inline std::unique_ptr<GlobalRateLimitClientImpl>
+inline std::shared_ptr<GlobalRateLimitClientImpl>
 createGlobalRateLimitClientImpl(Server::Configuration::FactoryContext& context,
                                 absl::string_view domain_name,
                                 std::chrono::milliseconds send_reports_interval,
                                 ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
                                 const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key) {
   Envoy::Event::Dispatcher& main_dispatcher = context.serverFactoryContext().mainThreadDispatcher();
-  return std::make_unique<GlobalRateLimitClientImpl>(config_with_hash_key, context, domain_name,
+  return std::make_shared<GlobalRateLimitClientImpl>(config_with_hash_key, context, domain_name,
                                                      send_reports_interval, buckets_tls,
                                                      main_dispatcher);
 }

@@ -14,6 +14,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/rate_limit_quota/filter_persistence.h"
 #include "source/extensions/filters/http/rate_limit_quota/global_client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/matcher.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
@@ -50,11 +51,13 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
+                       std::shared_ptr<GlobalTlsStores::TlsStore> tls_store,
                        std::unique_ptr<RateLimitClient> local_client,
                        Grpc::GrpcServiceConfigWithHashKey config_with_hash_key,
                        Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher)
       : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
-        factory_context_(factory_context), matcher_(matcher), client_(std::move(local_client)),
+        factory_context_(factory_context), matcher_(matcher), tls_store_(std::move(tls_store)),
+        client_(std::move(local_client)),
         time_source_(factory_context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
@@ -95,6 +98,9 @@ private:
   // shouldn't be recorded.
   bool first_skipped_match_ = true;
 
+  // Anchors the lifetime of the global client and its resources for the
+  // duration of the filter.
+  std::shared_ptr<GlobalTlsStores::TlsStore> tls_store_;
   // Own a local, filter-specific client to provider functions needed by worker
   // threads.
   std::unique_ptr<RateLimitClient> client_;

@@ -64,11 +64,10 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
 
   return [&, config = std::move(config), config_with_hash_key, tls_store = std::move(tls_store),
           matcher = std::move(matcher)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    std::unique_ptr<RateLimitClient> local_client =
-        createLocalRateLimitClient(tls_store->global_client.get(), tls_store->buckets_tls);
+    std::unique_ptr<RateLimitClient> local_client = createLocalRateLimitClient(tls_store);
 
     callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
-        config, context, std::move(local_client), config_with_hash_key, matcher));
+        config, context, tls_store, std::move(local_client), config_with_hash_key, matcher));
   };
 }
 

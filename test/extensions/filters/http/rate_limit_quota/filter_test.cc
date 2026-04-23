@@ -118,8 +118,12 @@ public:
     Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
+    // Initialize the TLS store for the filter to hold.
+    tls_store_ =
+        std::make_shared<GlobalTlsStores::TlsStore>(context_, "mock_target", "mock_domain");
+
     mock_local_client_ = new MockRateLimitClient();
-    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
+    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, tls_store_,
                                                      absl::WrapUnique(mock_local_client_),
                                                      config_with_hash_key, match_tree_);
     if (set_callback) {
@@ -186,6 +190,7 @@ public:
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 
   MockRateLimitClient* mock_local_client_ = nullptr;
+  std::shared_ptr<GlobalTlsStores::TlsStore> tls_store_ = nullptr;
   FilterConfigConstSharedPtr filter_config_;
   FilterConfig config_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree_ = nullptr;
@@ -985,8 +990,9 @@ bucket_matchers:
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
       Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
+  tls_store_ = std::make_shared<GlobalTlsStores::TlsStore>(context_, "mock_target", "mock_domain");
   mock_local_client_ = new MockRateLimitClient();
-  filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
+  filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, tls_store_,
                                                    absl::WrapUnique(mock_local_client_),
                                                    config_with_hash_key, match_tree_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -1160,8 +1166,9 @@ matcher_list:
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
       Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
+  tls_store_ = std::make_shared<GlobalTlsStores::TlsStore>(context_, "mock_target", "mock_domain");
   mock_local_client_ = new MockRateLimitClient();
-  filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
+  filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, tls_store_,
                                                    absl::WrapUnique(mock_local_client_),
                                                    config_with_hash_key, match_tree_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);

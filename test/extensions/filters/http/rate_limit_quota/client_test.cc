@@ -14,15 +14,14 @@
 #include "envoy/type/v3/ratelimit_strategy.pb.h"
 #include "envoy/type/v3/token_bucket.pb.h"
 
-#include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
+#include "source/extensions/filters/http/rate_limit_quota/filter_persistence.h"
 #include "source/extensions/filters/http/rate_limit_quota/global_client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
 
 #include "test/extensions/filters/http/rate_limit_quota/client_test_utils.h"
 #include "test/mocks/grpc/mocks.h"
-#include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/logging.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -102,16 +101,21 @@ protected:
 
   void SetUp() override {
     mock_stream_client = std::make_unique<RateLimitTestClient>();
-    buckets_tls_ = std::make_unique<ThreadLocal::TypedSlot<ThreadLocalBucketsCache>>(
-        mock_stream_client->context_.server_factory_context_.thread_local_);
-    auto initial_tl_buckets_cache =
-        std::make_shared<ThreadLocalBucketsCache>(std::make_shared<BucketsCache>());
-    buckets_tls_->set([initial_tl_buckets_cache](Unused) { return initial_tl_buckets_cache; });
 
     mock_stream_client->expectClientCreationWithFactory();
-    global_client_ = std::make_unique<GlobalRateLimitClientImpl>(
+    tls_store_ = std::make_shared<GlobalTlsStores::TlsStore>(mock_stream_client->context_,
+                                                             "mock_target", mock_domain_);
+
+    // Use the TlsStore's buckets_tls.
+    auto initial_tl_buckets_cache =
+        std::make_shared<ThreadLocalBucketsCache>(std::make_shared<BucketsCache>());
+    tls_store_->buckets_tls.set(
+        [initial_tl_buckets_cache](Unused) { return initial_tl_buckets_cache; });
+
+    global_client_ = std::make_shared<GlobalRateLimitClientImpl>(
         mock_stream_client->config_with_hash_key_, mock_stream_client->context_, mock_domain_,
-        reporting_interval_, *buckets_tls_, *mock_stream_client->dispatcher_);
+        reporting_interval_, tls_store_->buckets_tls, *mock_stream_client->dispatcher_);
+    tls_store_->global_client = global_client_;
     // Set callbacks to handle asynchronous timing.
     auto callbacks = std::make_unique<GlobalClientCallbacks>();
     cb_ptr_ = callbacks.get();
@@ -121,12 +125,22 @@ protected:
   }
 
   void TearDown() override {
-    // Normally called by TlsStore destructor as part of filter factory cb deletion.
-    mock_stream_client->dispatcher_->deferredDelete(std::move(global_client_));
+    if (global_client_ != nullptr) {
+      struct SharedClientDeleter : public Event::DeferredDeletable {
+        SharedClientDeleter(std::shared_ptr<GlobalRateLimitClientImpl> client)
+            : client_(std::move(client)) {}
+        void deleteIsPending() override { client_->deleteIsPending(); }
+        std::shared_ptr<GlobalRateLimitClientImpl> client_;
+      };
+      mock_stream_client->dispatcher_->deferredDelete(
+          std::make_unique<SharedClientDeleter>(std::move(global_client_)));
+    }
+    tls_store_ = nullptr;
   }
 
   std::unique_ptr<RateLimitTestClient> mock_stream_client = nullptr;
-  std::unique_ptr<GlobalRateLimitClientImpl> global_client_ = nullptr;
+  std::shared_ptr<GlobalRateLimitClientImpl> global_client_ = nullptr;
+  std::shared_ptr<GlobalTlsStores::TlsStore> tls_store_ = nullptr;
   ThreadLocal::TypedSlotPtr<ThreadLocalBucketsCache> buckets_tls_ = nullptr;
   GlobalClientCallbacks* cb_ptr_ = nullptr;
 
@@ -312,7 +326,7 @@ TEST_F(GlobalClientTest, TestInitialCreation) {
                                std::chrono::milliseconds::zero(), true);
   // Expect the bucket cache to update with a new bucket quickly.
   cb_ptr_->waitForExpectedBuckets();
-  auto cache_ref = buckets_tls_->get();
+  auto cache_ref = tls_store_->buckets_tls.get();
   ASSERT_TRUE(cache_ref.has_value());
   ASSERT_TRUE(cache_ref->quota_buckets_);
   ASSERT_EQ(cache_ref->quota_buckets_->size(), 1);
@@ -370,7 +384,7 @@ TEST_F(GlobalClientTest, TestCreationWithDefaultDeny) {
                                std::chrono::milliseconds::zero(), false);
   // Expect the bucket cache to update with a new bucket quickly.
   cb_ptr_->waitForExpectedBuckets();
-  auto cache_ref = buckets_tls_->get();
+  auto cache_ref = tls_store_->buckets_tls.get();
   ASSERT_TRUE(cache_ref.has_value());
   ASSERT_TRUE(cache_ref->quota_buckets_);
   ASSERT_EQ(cache_ref->quota_buckets_->size(), 1);
@@ -410,7 +424,7 @@ TEST_F(GlobalClientTest, BasicUsageReporting) {
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
   // Get bucket from TLS.
-  std::shared_ptr<QuotaUsage> quota_usage = getQuotaUsage(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<QuotaUsage> quota_usage = getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_);
   setAtomic(1, quota_usage->num_requests_allowed);
   setAtomic(2, quota_usage->num_requests_denied);
 
@@ -426,7 +440,7 @@ TEST_F(GlobalClientTest, BasicUsageReporting) {
   waitForNotification(cb_ptr_->report_sent);
   // After the expected report goes out, the atomics should be reset for the
   // next aggregation interval.
-  quota_usage = getQuotaUsage(*buckets_tls_, sample_id_hash_);
+  quota_usage = getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_);
   EXPECT_EQ(quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 0);
   EXPECT_EQ(quota_usage->num_requests_denied.load(std::memory_order_relaxed), 0);
 }
@@ -455,7 +469,7 @@ TEST_F(GlobalClientTest, TestStreamCreationFailures) {
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
   // Bucket should be created, even with the stream failure.
-  std::shared_ptr<QuotaUsage> quota_usage = getQuotaUsage(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<QuotaUsage> quota_usage = getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_);
   EXPECT_GT(quota_usage->num_requests_allowed, 0);
   EXPECT_LT(quota_usage->num_requests_allowed, 4);
   // With the timer cb, the stream should be reattempted, fail starting and
@@ -465,7 +479,7 @@ TEST_F(GlobalClientTest, TestStreamCreationFailures) {
     waitForNotification(cb_ptr_->report_sent);
     // Refresh state from the buckets cache in TLS. Expect the atomics to have
     // reset after the dropped reports.
-    quota_usage = getQuotaUsage(*buckets_tls_, sample_id_hash_);
+    quota_usage = getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_);
     EXPECT_EQ(quota_usage->num_requests_allowed, 0);
     setAtomic(4 + i, quota_usage->num_requests_allowed);
   }
@@ -478,7 +492,7 @@ TEST_F(GlobalClientTest, TestStreamCreationFailures) {
 
   mock_stream_client->timer_->invokeCallback();
   waitForNotification(cb_ptr_->report_sent);
-  quota_usage = getQuotaUsage(*buckets_tls_, sample_id_hash_);
+  quota_usage = getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_);
   EXPECT_EQ(quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 0);
 }
 
@@ -501,7 +515,7 @@ TEST_F(GlobalClientTest, TestStreamFailureMidUse) {
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
   // Get bucket from TLS.
-  std::shared_ptr<QuotaUsage> quota_usage = getQuotaUsage(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<QuotaUsage> quota_usage = getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_);
   setAtomic(1, quota_usage->num_requests_allowed);
   setAtomic(2, quota_usage->num_requests_denied);
 
@@ -515,7 +529,7 @@ TEST_F(GlobalClientTest, TestStreamFailureMidUse) {
 
   // After the expected report goes out, the atomics should be reset for the
   // next aggregation interval.
-  quota_usage = getQuotaUsage(*buckets_tls_, sample_id_hash_);
+  quota_usage = getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_);
   EXPECT_EQ(quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 0);
   EXPECT_EQ(quota_usage->num_requests_denied.load(std::memory_order_relaxed), 0);
   // Close the stream to show the internal restart mechanism.
@@ -541,8 +555,9 @@ TEST_F(GlobalClientTest, TestStreamFailureMidUse) {
 
   // Wait for the second bucket creation to complete.
   cb_ptr_->waitForExpectedBuckets();
-  quota_usage = getQuotaUsage(*buckets_tls_, sample_id_hash_);
-  std::shared_ptr<QuotaUsage> quota_usage2 = getQuotaUsage(*buckets_tls_, sample_id_hash2);
+  quota_usage = getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_);
+  std::shared_ptr<QuotaUsage> quota_usage2 =
+      getQuotaUsage(tls_store_->buckets_tls, sample_id_hash2);
   EXPECT_EQ(quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 3);
   EXPECT_EQ(quota_usage->num_requests_denied.load(std::memory_order_relaxed), 4);
   EXPECT_EQ(quota_usage2->num_requests_allowed.load(std::memory_order_relaxed), 1);
@@ -599,9 +614,9 @@ TEST_F(GlobalClientTest, TestBasicResponseProcessing) {
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
 
-  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
-  setAtomic(2, getQuotaUsage(*buckets_tls_, sample_id_hash2)->num_requests_allowed);
-  setAtomic(3, getQuotaUsage(*buckets_tls_, sample_id_hash3)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_)->num_requests_allowed);
+  setAtomic(2, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash2)->num_requests_allowed);
+  setAtomic(3, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash3)->num_requests_allowed);
 
   RateLimitQuotaUsageReports expected_reports = buildReports(
       std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_},
@@ -630,15 +645,17 @@ TEST_F(GlobalClientTest, TestBasicResponseProcessing) {
   waitForNotification(cb_ptr_->response_processed);
 
   // Expect the buckets in TLS to have matching assignments.
-  std::shared_ptr<CachedBucket> deny_all_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<CachedBucket> deny_all_bucket =
+      getBucket(tls_store_->buckets_tls, sample_id_hash_);
   ASSERT_TRUE(deny_all_bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*deny_all_bucket->cached_action, deny_action));
 
-  std::shared_ptr<CachedBucket> allow_all_bucket = getBucket(*buckets_tls_, sample_id_hash2);
+  std::shared_ptr<CachedBucket> allow_all_bucket =
+      getBucket(tls_store_->buckets_tls, sample_id_hash2);
   ASSERT_TRUE(allow_all_bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*allow_all_bucket->cached_action, allow_action));
 
-  std::shared_ptr<CachedBucket> token_bucket = getBucket(*buckets_tls_, sample_id_hash3);
+  std::shared_ptr<CachedBucket> token_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash3);
   ASSERT_TRUE(token_bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*token_bucket->cached_action, token_bucket_action));
 
@@ -690,7 +707,7 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
       /*initial_request_allowed=*/true);
   cb_ptr_->waitForExpectedBuckets();
 
-  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_)->num_requests_allowed);
   mock_stream_client->timer_->invokeCallback();
   waitForNotification(cb_ptr_->report_sent);
 
@@ -706,7 +723,7 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
   waitForNotification(cb_ptr_->response_processed);
 
   // Verify the integrity of the token bucket configuration.
-  std::shared_ptr<CachedBucket> token_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<CachedBucket> token_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash_);
   ASSERT_TRUE(token_bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*token_bucket->cached_action, token_bucket_action));
 
@@ -726,7 +743,7 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
   waitForNotification(cb_ptr_->response_processed);
 
   // Get the updated token bucket out of the cache.
-  token_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  token_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash_);
   ASSERT_TRUE(token_bucket->cached_action);
   // Confirm that the action is still the same.
   EXPECT_TRUE(unordered_differencer_.Equals(*token_bucket->cached_action, token_bucket_action));
@@ -748,7 +765,7 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
   waitForNotification(cb_ptr_->action_expired);
 
   // Confirm the final token bucket state only has the default action.
-  token_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  token_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash_);
 
   EXPECT_FALSE(token_bucket->cached_action);
 }
@@ -778,8 +795,8 @@ TEST_F(GlobalClientTest, TestResponseProcessingForNonExistentBucket) {
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
 
-  EXPECT_OK(tryGetBucket(*buckets_tls_, sample_id_hash_));
-  EXPECT_FALSE(tryGetBucket(*buckets_tls_, sample_id_hash2).ok());
+  EXPECT_OK(tryGetBucket(tls_store_->buckets_tls, sample_id_hash_));
+  EXPECT_FALSE(tryGetBucket(tls_store_->buckets_tls, sample_id_hash2).ok());
 
   auto deny_action = buildBlanketAction(sample_bucket_id_, true);
   auto allow_action = buildBlanketAction(sample_bucket_id2, false);
@@ -793,12 +810,13 @@ TEST_F(GlobalClientTest, TestResponseProcessingForNonExistentBucket) {
 
   // Expect the second bucket hash to not be in the bucket cache as it wasn't
   // there before the response included it.
-  std::shared_ptr<CachedBucket> deny_all_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<CachedBucket> deny_all_bucket =
+      getBucket(tls_store_->buckets_tls, sample_id_hash_);
   ASSERT_TRUE(deny_all_bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*deny_all_bucket->cached_action, deny_action));
 
   absl::StatusOr<std::shared_ptr<CachedBucket>> allow_all_bucket =
-      tryGetBucket(*buckets_tls_, sample_id_hash2);
+      tryGetBucket(tls_store_->buckets_tls, sample_id_hash2);
   EXPECT_FALSE(allow_all_bucket.ok());
 
   EXPECT_EQ(mock_stream_client->expiration_timers_.size(), 1);
@@ -843,8 +861,8 @@ TEST_F(GlobalClientTest, TestResponseEdgeCases) {
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
 
-  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
-  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash2)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash2)->num_requests_allowed);
 
   RateLimitQuotaUsageReports expected_reports = buildReports(
       std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_},
@@ -889,11 +907,11 @@ TEST_F(GlobalClientTest, TestResponseEdgeCases) {
       });
 
   // Expect the buckets in TLS to still only have the default action.
-  std::shared_ptr<CachedBucket> bucket1 = getBucket(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<CachedBucket> bucket1 = getBucket(tls_store_->buckets_tls, sample_id_hash_);
   ASSERT_FALSE(bucket1->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(bucket1->default_action, default_allow_action));
 
-  std::shared_ptr<CachedBucket> bucket2 = getBucket(*buckets_tls_, sample_id_hash2);
+  std::shared_ptr<CachedBucket> bucket2 = getBucket(tls_store_->buckets_tls, sample_id_hash2);
   ASSERT_FALSE(bucket2->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(bucket2->default_action, default_allow_action2));
 
@@ -964,9 +982,9 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
       mock_stream_client->stream_,
       sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
 
-  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
-  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash2)->num_requests_allowed);
-  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash3)->num_requests_denied);
+  setAtomic(1, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash2)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash3)->num_requests_denied);
   mock_stream_client->timer_->invokeCallback();
   waitForNotification(cb_ptr_->report_sent);
 
@@ -990,17 +1008,19 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   waitForNotification(cb_ptr_->response_processed);
 
   // Expect the buckets in TLS to have matching assignments.
-  std::shared_ptr<CachedBucket> deny_all_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<CachedBucket> deny_all_bucket =
+      getBucket(tls_store_->buckets_tls, sample_id_hash_);
   ASSERT_TRUE(deny_all_bucket && deny_all_bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*deny_all_bucket->cached_action, deny_action));
 
-  std::shared_ptr<CachedBucket> token_bucket = getBucket(*buckets_tls_, sample_id_hash2);
+  std::shared_ptr<CachedBucket> token_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash2);
   ASSERT_TRUE(token_bucket && token_bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*token_bucket->cached_action, token_bucket_action));
   ASSERT_TRUE(token_bucket->fallback_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*token_bucket->fallback_action, fallback_tb_action));
 
-  std::shared_ptr<CachedBucket> allow_all_bucket = getBucket(*buckets_tls_, sample_id_hash3);
+  std::shared_ptr<CachedBucket> allow_all_bucket =
+      getBucket(tls_store_->buckets_tls, sample_id_hash3);
   ASSERT_TRUE(allow_all_bucket && allow_all_bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*allow_all_bucket->cached_action, allow_action));
 
@@ -1015,8 +1035,8 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   waitForNotification(cb_ptr_->action_expired);
 
   // Get the new cached bucket replacing the expired one.
-  EXPECT_NE(token_bucket, getBucket(*buckets_tls_, sample_id_hash2));
-  token_bucket = getBucket(*buckets_tls_, sample_id_hash2);
+  EXPECT_NE(token_bucket, getBucket(tls_store_->buckets_tls, sample_id_hash2));
+  token_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash2);
   // Expect a fallback timer for the expired bucket while the other two are
   // unaffected.
   ASSERT_EQ(mock_stream_client->fallback_timers_.size(), 1);
@@ -1039,8 +1059,8 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   waitForNotification(cb_ptr_->fallback_expired);
 
   // Get the new cached bucket replacing the expired one.
-  EXPECT_NE(token_bucket, getBucket(*buckets_tls_, sample_id_hash2));
-  token_bucket = getBucket(*buckets_tls_, sample_id_hash2);
+  EXPECT_NE(token_bucket, getBucket(tls_store_->buckets_tls, sample_id_hash2));
+  token_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash2);
   // Expect the second bucket to have lost its fallback timer & cached action.
   ASSERT_FALSE(token_bucket->cached_action);
   ASSERT_FALSE(token_bucket->token_bucket_limiter);
@@ -1055,8 +1075,8 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   waitForNotification(cb_ptr_->action_expired);
 
   // Get the new cached bucket replacing the expired one.
-  EXPECT_NE(deny_all_bucket, getBucket(*buckets_tls_, sample_id_hash_));
-  deny_all_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  EXPECT_NE(deny_all_bucket, getBucket(tls_store_->buckets_tls, sample_id_hash_));
+  deny_all_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash_);
   // Don't expect a fallback timer for the first bucket.
   ASSERT_EQ(mock_stream_client->fallback_timers_.size(), 1);
   // Expect the first bucket to have lost its cached action.
@@ -1071,8 +1091,8 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   waitForNotification(cb_ptr_->action_expired);
 
   // Get the new cached bucket replacing the expired one.
-  EXPECT_NE(allow_all_bucket, getBucket(*buckets_tls_, sample_id_hash3));
-  allow_all_bucket = getBucket(*buckets_tls_, sample_id_hash3);
+  EXPECT_NE(allow_all_bucket, getBucket(tls_store_->buckets_tls, sample_id_hash3));
+  allow_all_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash3);
   // Expect a fallback timer for the third bucket.
   ASSERT_EQ(mock_stream_client->fallback_timers_.size(), 2);
   // Expect the third bucket to have replaced its cached action with the
@@ -1097,7 +1117,7 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   waitForNotification(cb_ptr_->response_processed);
 
   // Re-get the updated third bucket after the TLS push.
-  allow_all_bucket = getBucket(*buckets_tls_, sample_id_hash3);
+  allow_all_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash3);
   // Expect the third bucket to have a new cached action & no fallback timer.
   ASSERT_EQ(mock_stream_client->expiration_timers_.size(), 4);
   ASSERT_TRUE(allow_all_bucket && allow_all_bucket->cached_action);
@@ -1115,16 +1135,16 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   waitForNotification(cb_ptr_->action_expired);
 
   // Get the new cached bucket replacing the expired one.
-  EXPECT_NE(allow_all_bucket, getBucket(*buckets_tls_, sample_id_hash3));
-  allow_all_bucket = getBucket(*buckets_tls_, sample_id_hash3);
+  EXPECT_NE(allow_all_bucket, getBucket(tls_store_->buckets_tls, sample_id_hash3));
+  allow_all_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash3);
   Event::MockTimer* replacement_allow_all_fallback_timer =
       RateLimitTestClient::assertMockTimer(allow_all_bucket->fallback_expiration_timer.get());
   replacement_allow_all_fallback_timer->invokeCallback();
   waitForNotification(cb_ptr_->fallback_expired);
 
   // Get the new cached bucket replacing the expired one.
-  EXPECT_NE(allow_all_bucket, getBucket(*buckets_tls_, sample_id_hash3));
-  allow_all_bucket = getBucket(*buckets_tls_, sample_id_hash3);
+  EXPECT_NE(allow_all_bucket, getBucket(tls_store_->buckets_tls, sample_id_hash3));
+  allow_all_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash3);
   // Expect the third bucket to have lost its fallback timer & cached action.
   ASSERT_FALSE(allow_all_bucket->cached_action);
   ASSERT_FALSE(allow_all_bucket->fallback_expiration_timer);
@@ -1160,7 +1180,7 @@ TEST_F(GlobalClientTest, TestFallbackToDuplicateTokenBucket) {
                                std::chrono::seconds(300), true);
   cb_ptr_->waitForExpectedBuckets();
 
-  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_)->num_requests_allowed);
   mock_stream_client->timer_->invokeCallback();
   waitForNotification(cb_ptr_->report_sent);
 
@@ -1176,7 +1196,7 @@ TEST_F(GlobalClientTest, TestFallbackToDuplicateTokenBucket) {
   waitForNotification(cb_ptr_->response_processed);
 
   // Expect the bucket in TLS to have a matching assignment.
-  std::shared_ptr<CachedBucket> token_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<CachedBucket> token_bucket = getBucket(tls_store_->buckets_tls, sample_id_hash_);
   ASSERT_TRUE(token_bucket && token_bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*token_bucket->cached_action, token_bucket_action));
   ASSERT_TRUE(token_bucket->fallback_action);
@@ -1194,7 +1214,8 @@ TEST_F(GlobalClientTest, TestFallbackToDuplicateTokenBucket) {
 
   // Get the new CachedBucket, which should have carried over the existing token
   // bucket.
-  std::shared_ptr<CachedBucket> new_token_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<CachedBucket> new_token_bucket =
+      getBucket(tls_store_->buckets_tls, sample_id_hash_);
 
   EXPECT_NE(token_bucket.get(), new_token_bucket.get());
   // Expect a fallback timer for the expired bucket.
@@ -1235,12 +1256,12 @@ TEST_F(GlobalClientTest, TestAbandonAction) {
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
 
-  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_)->num_requests_allowed);
   mock_stream_client->timer_->invokeCallback();
   waitForNotification(cb_ptr_->report_sent);
 
   // Expect the bucket in TLS.
-  std::shared_ptr<CachedBucket> bucket_before = getBucket(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<CachedBucket> bucket_before = getBucket(tls_store_->buckets_tls, sample_id_hash_);
   ASSERT_TRUE(bucket_before);
 
   // Test abandon-action response handling.
@@ -1253,7 +1274,7 @@ TEST_F(GlobalClientTest, TestAbandonAction) {
   waitForNotification(cb_ptr_->response_processed);
 
   // Expect the bucket to be wiped.
-  std::shared_ptr<CachedBucket> bucket_after = getBucket(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<CachedBucket> bucket_after = getBucket(tls_store_->buckets_tls, sample_id_hash_);
   ASSERT_FALSE(bucket_after);
 }
 
@@ -1277,7 +1298,7 @@ TEST_F(GlobalClientTest, TestResponseBucketMissingId) {
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
 
-  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(tls_store_->buckets_tls, sample_id_hash_)->num_requests_allowed);
 
   RateLimitQuotaUsageReports expected_reports = buildReports(
       std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
@@ -1303,7 +1324,8 @@ TEST_F(GlobalClientTest, TestResponseBucketMissingId) {
   });
 
   // Expect the deny-all bucket to have made it into TLS.
-  std::shared_ptr<CachedBucket> deny_all_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  std::shared_ptr<CachedBucket> deny_all_bucket =
+      getBucket(tls_store_->buckets_tls, sample_id_hash_);
   ASSERT_TRUE(deny_all_bucket->cached_action);
   EXPECT_TRUE(unordered_differencer_.Equals(*deny_all_bucket->cached_action, deny_action));
 }
@@ -1315,7 +1337,7 @@ protected:
   void SetUp() override {
     GlobalClientTest::SetUp();
     // Create the local client for testing.
-    local_client_ = std::make_unique<LocalRateLimitClientImpl>(global_client_.get(), *buckets_tls_);
+    local_client_ = std::make_unique<LocalRateLimitClientImpl>(tls_store_);
   }
 
   std::unique_ptr<LocalRateLimitClientImpl> local_client_ = nullptr;

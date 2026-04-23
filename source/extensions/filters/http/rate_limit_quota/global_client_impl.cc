@@ -78,6 +78,7 @@ void GlobalRateLimitClientImpl::deleteIsPending() {
   async_client_->reset();
 }
 
+// Atomically read usage counters & reset them to 0.
 void getUsageFromBucket(const CachedBucket& cached_bucket, TimeSource& time_source,
                         BucketQuotaUsage& usage) {
   std::shared_ptr<QuotaUsage> cached_usage = cached_bucket.quota_usage;
@@ -152,12 +153,16 @@ void GlobalRateLimitClientImpl::createBucket(const BucketId& bucket_id, size_t i
                                              std::chrono::milliseconds fallback_ttl,
                                              bool initial_request_allowed) {
   // Mutable to move fallback_action ownership into the main thread then into
-  // the created bucket.
-  main_dispatcher_.post([&, bucket_id, id, default_bucket_action,
+  // the created bucket. Captures a weak_ptr to 'this' as the posted operation
+  // can outlive the global client itself.
+  main_dispatcher_.post([weak_this = weak_from_this(), bucket_id, id, default_bucket_action,
                          fallback_action_ptr = std::move(fallback_action), fallback_ttl,
                          initial_request_allowed]() mutable {
-    createBucketImpl(bucket_id, id, default_bucket_action, std::move(fallback_action_ptr),
-                     fallback_ttl, initial_request_allowed);
+    if (auto shared_this = weak_this.lock()) {
+      shared_this->createBucketImpl(bucket_id, id, default_bucket_action,
+                                    std::move(fallback_action_ptr), fallback_ttl,
+                                    initial_request_allowed);
+    }
   });
 }
 
@@ -274,8 +279,13 @@ void GlobalRateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& res
   if (response == nullptr) {
     return;
   }
-  main_dispatcher_.post(
-      [&, response = std::move(response)]() { onQuotaResponseImpl(response.get()); });
+  // Captures a weak_ptr to 'this' as the posted operation can outlive the
+  // global client itself.
+  main_dispatcher_.post([weak_this = weak_from_this(), response = std::move(response)]() {
+    if (auto shared_this = weak_this.lock()) {
+      shared_this->onQuotaResponseImpl(response.get());
+    }
+  });
 }
 
 // Updating a cached_bucket shouldn't reset the cached token bucket if the
@@ -432,12 +442,17 @@ void GlobalRateLimitClientImpl::onSendReportsTimer() {
 
 void GlobalRateLimitClientImpl::startActionExpirationTimer(CachedBucket* cached_bucket, size_t id) {
   // Pointer safety as all writes are against the source-of-truth.
-  cached_bucket->action_expiration_timer = main_dispatcher_.createTimer([&, id, cached_bucket]() {
-    onActionExpirationTimer(cached_bucket, id);
-    if (callbacks_ != nullptr) {
-      callbacks_->onActionExpiration();
-    }
-  });
+  cached_bucket->action_expiration_timer =
+      main_dispatcher_.createTimer([weak_this = weak_from_this(), id, cached_bucket]() {
+        auto shared_this = weak_this.lock();
+        if (!shared_this) {
+          return;
+        }
+        shared_this->onActionExpirationTimer(cached_bucket, id);
+        if (shared_this->callbacks_ != nullptr) {
+          shared_this->callbacks_->onActionExpiration();
+        }
+      });
   std::chrono::milliseconds ttl = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::seconds(cached_bucket->cached_action->quota_assignment_action()
                                .assignment_time_to_live()
@@ -521,12 +536,17 @@ void GlobalRateLimitClientImpl::onActionExpirationTimer(CachedBucket* bucket, si
 void GlobalRateLimitClientImpl::startFallbackExpirationTimer(CachedBucket* cached_bucket,
                                                              size_t id) {
   // Pointer safety as all writes are against the source-of-truth.
-  cached_bucket->fallback_expiration_timer = main_dispatcher_.createTimer([&, id, cached_bucket]() {
-    onFallbackExpirationTimer(cached_bucket, id);
-    if (callbacks_ != nullptr) {
-      callbacks_->onFallbackExpiration();
-    }
-  });
+  cached_bucket->fallback_expiration_timer =
+      main_dispatcher_.createTimer([weak_this = weak_from_this(), id, cached_bucket]() {
+        auto shared_this = weak_this.lock();
+        if (!shared_this) {
+          return;
+        }
+        shared_this->onFallbackExpirationTimer(cached_bucket, id);
+        if (shared_this->callbacks_ != nullptr) {
+          shared_this->callbacks_->onFallbackExpiration();
+        }
+      });
   cached_bucket->fallback_expiration_timer->enableTimer(cached_bucket->fallback_ttl);
 }
 
