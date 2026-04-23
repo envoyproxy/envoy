@@ -349,6 +349,9 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   ENVOY_STREAM_LOG(debug, "Processing body response", *filter_callbacks_);
   const auto& common_response = response.response();
 
+  ENVOY_LOG_MISC(error, "FLAKE_DEBUG: handleBodyResponse cb_state={} body_mode={}",
+                 static_cast<int>(callback_state_), static_cast<int>(body_mode_));
+
   absl::StatusOr<bool> result;
   switch (callback_state_) {
   case CallbackState::BufferedBodyCallback:
@@ -641,6 +644,7 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
                    "Injecting {} bytes of data to filter stream in FULL_DUPLEX_STREAMED mode. "
                    "end_of_stream is {}",
                    *filter_callbacks_, buffer.length(), end_of_stream);
+  ENVOY_LOG_MISC(error, "FLAKE_DEBUG: duplexInject eos={} len={}", end_of_stream, buffer.length());
   injectDataToFilterChain(buffer, end_of_stream);
   // Assume mutations are applied in FULL_DUPLEX_STREAMED_MODE.
   logMutation(callback_state_, Effect::MutationApplied);

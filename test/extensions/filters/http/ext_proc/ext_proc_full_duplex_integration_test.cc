@@ -657,6 +657,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
 TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirectionNoTrailerRandom) {
   twoExtProcFiltersFullDuplexConfig();
 
+  Logger::Registry::setLogLevel(spdlog::level::trace);
+
   const std::string body_sent(10 * 1024, 's');
   IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true, false);
 

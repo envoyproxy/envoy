@@ -485,6 +485,8 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
     parent_.state().observed_decode_end_stream_ = end_stream;
     ENVOY_STREAM_LOG(trace, "injectDecodedDataToFilterChain with end_stream updated: {}", parent_,
                      end_stream);
+    ENVOY_STREAM_LOG(error, "FLAKE_DEBUG: injectDecoded end_stream={} data_len={}", parent_,
+                     end_stream, data.length());
   }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
@@ -1906,6 +1908,8 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
     parent_.state_.observed_encode_end_stream_ = end_stream;
     ENVOY_STREAM_LOG(trace, "injectEncodedDataToFilterChain with end_stream updated: {}", parent_,
                      end_stream);
+    ENVOY_STREAM_LOG(error, "FLAKE_DEBUG: injectEncoded end_stream={} data_len={}", parent_,
+                     end_stream, data.length());
   }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);

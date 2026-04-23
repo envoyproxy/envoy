@@ -842,7 +842,8 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
   while (!end_stream) {
     ProcessingRequest body_request;
     if (!processor_stream->waitForGrpcMessage(*dispatcher_, body_request)) {
-      ADD_FAILURE() << "Timed out waiting for gRPC message in serverReceiveBodyDuplexStreamed";
+      ADD_FAILURE() << "Timed out waiting for gRPC message in serverReceiveBodyDuplexStreamed (stream="
+                    << (processor_stream == processor_stream_ ? "0" : "1") << ")";
       return total_req_body_msg;
     }
     if (response) {

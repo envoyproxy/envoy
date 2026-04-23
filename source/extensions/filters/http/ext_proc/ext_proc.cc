@@ -704,6 +704,9 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 }
 
 void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, bool end_stream) {
+  ENVOY_LOG_MISC(error, "FLAKE_DEBUG: sendRequest filter={} stream={} req_case={} end_stream={}",
+                 static_cast<const void*>(this), static_cast<const void*>(stream_),
+                 static_cast<int>(req.request_case()), end_stream);
   if (processing_request_modifier_) {
     ProcessingRequestModifier::Params params = {
         .traffic_direction = state.trafficDirection(),
@@ -806,6 +809,8 @@ void Filter::closeStream() {
 
   if (stream_) {
     ENVOY_STREAM_LOG(debug, "Calling close on stream", *decoder_callbacks_);
+    ENVOY_LOG_MISC(error, "FLAKE_DEBUG: closeStream filter={} stream={} nullify",
+                   static_cast<const void*>(this), static_cast<const void*>(stream_));
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
@@ -823,6 +828,8 @@ void Filter::halfCloseAndWaitForRemoteClose() {
 
   if (stream_) {
     ENVOY_STREAM_LOG(debug, "Calling half-close on stream", *decoder_callbacks_);
+    ENVOY_LOG_MISC(error, "FLAKE_DEBUG: halfClose filter={} stream={} nullify",
+                   static_cast<const void*>(this), static_cast<const void*>(stream_));
     if (stream_->halfCloseAndDeleteOnRemoteClose()) {
       stats_.streams_closed_.inc();
     }
@@ -1251,6 +1258,10 @@ std::pair<bool, Http::FilterDataStatus> Filter::sendStreamChunk(ProcessorState& 
 FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_STREAM_LOG(trace, "decodeData({}): end_stream = {}", *decoder_callbacks_, data.length(),
                    end_stream);
+  ENVOY_LOG_MISC(error, "FLAKE_DEBUG: decodeData filter={} len={} end_stream={} state_cb={} state_mode={}",
+                 static_cast<const void*>(this), data.length(), end_stream,
+                 static_cast<int>(decoding_state_.callbackState()),
+                 static_cast<int>(decoding_state_.bodyMode()));
   const auto status = onData(decoding_state_, data, end_stream);
   ENVOY_STREAM_LOG(trace, "decodeData returning {}", *decoder_callbacks_, static_cast<int>(status));
   return status;
@@ -1732,6 +1743,14 @@ bool eosSeenInBody(ProcessorState& state,
 
 void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
                                                const bool eos_seen_in_body) {
+
+  ENVOY_LOG_MISC(error,
+                 "FLAKE_DEBUG: closeGrpcStream? filter={} stream={} case={} eos_seen={} stream_null={} req_cb={} req_mode={} resp_cb={} resp_mode={}",
+                 static_cast<const void*>(this), static_cast<const void*>(stream_),
+                 static_cast<int>(response.response_case()), eos_seen_in_body, stream_ == nullptr,
+                 static_cast<int>(decoding_state_.callbackState()), static_cast<int>(decoding_state_.bodyMode()),
+                 static_cast<int>(encoding_state_.callbackState()), static_cast<int>(encoding_state_.bodyMode()));
+
   // Bail out if the gRPC stream has already been closed. This can happen in scenarios
   // like immediate responses or rejected header mutations.
   if (stream_ == nullptr || !Runtime::runtimeFeatureEnabled(
@@ -1776,6 +1795,9 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
     break;
   }
 
+  ENVOY_LOG_MISC(error, "FLAKE_DEBUG: closeGrpcStream decision filter={} last_response={}",
+                 static_cast<const void*>(this), last_response);
+
   if (last_response) {
     ENVOY_STREAM_LOG(debug, "Closing gRPC stream after receiving last response",
                      *decoder_callbacks_);
@@ -1784,6 +1806,13 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
 }
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
+
+  ENVOY_LOG_MISC(error,
+                 "FLAKE_DEBUG: onReceiveMessage filter={} stream={} resp_case={} req_body_mode={} resp_body_mode={}",
+                 static_cast<const void*>(this), static_cast<const void*>(stream_),
+                 static_cast<int>(r->response_case()),
+                 static_cast<int>(decoding_state_.bodyMode()),
+                 static_cast<int>(encoding_state_.bodyMode()));
 
   if (config_->observabilityMode()) {
     ENVOY_STREAM_LOG(trace, "Ignoring received message when observability mode is enabled",
@@ -1968,6 +1997,7 @@ absl::Status Filter::handleStreamingImmediateResponse(
 }
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& message) {
+  ENVOY_LOG_MISC(error, "FLAKE_DEBUG: onGrpcError status={} msg={}", static_cast<int>(status), message);
   ENVOY_STREAM_LOG(warn, "Received gRPC error on stream: {}, message {}", *decoder_callbacks_,
                    status, message);
   stats_.streams_failed_.inc();
@@ -1995,7 +2025,10 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
   }
 }
 
-void Filter::onGrpcClose() { onGrpcCloseWithStatus(Grpc::Status::Aborted); }
+void Filter::onGrpcClose() {
+  ENVOY_LOG_MISC(error, "FLAKE_DEBUG: onGrpcClose");
+  onGrpcCloseWithStatus(Grpc::Status::Aborted);
+}
 
 void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   ENVOY_STREAM_LOG(debug, "Received gRPC stream close", *decoder_callbacks_);
