@@ -582,12 +582,12 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       // a ms-scale alarm that can kick rapid-fire resolves and race with dispatcher/resolver
       // teardown in integration tests (observed as a LeakSanitizer leak in
       // proxy_filter_integration_test DoubleResolution).
-      refresh_interval = std::max(refresh_interval,
-          std::chrono::duration_cast<std::chrono::milliseconds>(min_refresh_interval_));
+      refresh_interval =
+          std::max(refresh_interval,
+                   std::chrono::duration_cast<std::chrono::milliseconds>(min_refresh_interval_));
       primary_host_info->refresh_timer_->enableTimer(refresh_interval);
-      ENVOY_LOG(debug,
-                "DNS refresh rate reset for host '{}', (failure) raw={} ms armed={} ms", host,
-                raw_backoff_ms.count(), refresh_interval.count());
+      ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', (failure) raw={} ms armed={} ms",
+                host, raw_backoff_ms.count(), refresh_interval.count());
     }
   }
 }

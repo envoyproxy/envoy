@@ -241,10 +241,9 @@ TEST_F(SharedPoolTest, DispatcherTeardownDropsCrossThreadDeleteFreesObject) {
 
   testing::NiceMock<Event::MockDispatcher> dispatcher;
   std::vector<Event::PostCb> posted_cbs;
-  EXPECT_CALL(dispatcher, post(testing::_))
-      .WillRepeatedly(testing::Invoke([&](Event::PostCb cb) {
-        posted_cbs.push_back(std::move(cb));
-      }));
+  EXPECT_CALL(dispatcher, post(testing::_)).WillRepeatedly(testing::Invoke([&](Event::PostCb cb) {
+    posted_cbs.push_back(std::move(cb));
+  }));
 
   auto pool = std::make_shared<ObjectSharedPool<Counted, CountedHash>>(dispatcher);
   auto obj = pool->getObject(Counted{7});
