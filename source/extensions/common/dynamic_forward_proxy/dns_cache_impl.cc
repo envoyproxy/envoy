@@ -568,8 +568,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       // which can exceed host_ttl by a large margin.
       const auto now = main_thread_dispatcher_.timeSource().monotonicTime().time_since_epoch();
       const auto elapsed = now - primary_host_info->host_info_->lastUsedTime();
-      std::chrono::milliseconds refresh_interval(
+      const std::chrono::milliseconds raw_backoff_ms(
           primary_host_info->failure_backoff_strategy_->nextBackOffMs());
+      std::chrono::milliseconds refresh_interval(raw_backoff_ms);
       if (elapsed >= host_ttl_) {
         refresh_interval = std::chrono::milliseconds(0);
       } else {
@@ -584,8 +585,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       refresh_interval = std::max(refresh_interval,
           std::chrono::duration_cast<std::chrono::milliseconds>(min_refresh_interval_));
       primary_host_info->refresh_timer_->enableTimer(refresh_interval);
-      ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', (failure) refresh rate {} ms", host,
-                refresh_interval.count());
+      ENVOY_LOG(debug,
+                "DNS refresh rate reset for host '{}', (failure) raw={} ms armed={} ms", host,
+                raw_backoff_ms.count(), refresh_interval.count());
     }
   }
 }
