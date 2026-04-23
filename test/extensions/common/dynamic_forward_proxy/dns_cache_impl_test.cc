@@ -929,10 +929,14 @@ TEST_F(DnsCacheImplTest, ResolveFailureBackoffCappedByHostTtl) {
 }
 
 TEST_F(DnsCacheImplTest, ResolveFailureBackoffZeroFlooredByMinRefresh) {
-  // Stub random() to return 0 so the jittered exponential backoff yields 0.
+  // Stub random() to return 0 so the jittered exponential backoff yields 0
+  // (nextBackOffMs() returns random() % base_interval == 0).
   ON_CALL(context_.server_context_.api_.random_, random()).WillByDefault(Return(0));
+  *config_.mutable_dns_failure_refresh_rate()->mutable_base_interval() =
+      Protobuf::util::TimeUtil::SecondsToDuration(2);
+  *config_.mutable_dns_failure_refresh_rate()->mutable_max_interval() =
+      Protobuf::util::TimeUtil::SecondsToDuration(5);
   *config_.mutable_host_ttl() = Protobuf::util::TimeUtil::SecondsToDuration(60);
-  *config_.mutable_dns_refresh_rate() = Protobuf::util::TimeUtil::SecondsToDuration(60);
   *config_.mutable_dns_min_refresh_rate() = Protobuf::util::TimeUtil::SecondsToDuration(1);
   initialize();
   InSequence s;
@@ -1168,6 +1172,7 @@ TEST_F(DnsCacheImplTest, ResolveFailureWithFailureRefreshRate) {
       Protobuf::util::TimeUtil::SecondsToDuration(7);
   *config_.mutable_dns_failure_refresh_rate()->mutable_max_interval() =
       Protobuf::util::TimeUtil::SecondsToDuration(10);
+  *config_.mutable_dns_min_refresh_rate() = Protobuf::util::TimeUtil::SecondsToDuration(1);
   initialize();
   InSequence s;
 
@@ -1221,6 +1226,7 @@ TEST_F(DnsCacheImplTest, ResolveFailureAfterResolveSuccessWithFailureRefreshRate
       Protobuf::util::TimeUtil::SecondsToDuration(2);
   *config_.mutable_dns_failure_refresh_rate()->mutable_max_interval() =
       Protobuf::util::TimeUtil::SecondsToDuration(5);
+  *config_.mutable_dns_min_refresh_rate() = Protobuf::util::TimeUtil::SecondsToDuration(1);
   initialize();
   InSequence s;
 

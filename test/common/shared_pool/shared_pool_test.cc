@@ -17,6 +17,8 @@ namespace SharedPool {
 namespace {
 struct Counted {
   explicit Counted(int v) : v_(v) { ++live; }
+  Counted(const Counted& o) : v_(o.v_) { ++live; }
+  Counted(Counted&& o) noexcept : v_(o.v_) { ++live; }
   ~Counted() { --live; }
   bool operator==(const Counted& o) const { return v_ == o.v_; }
   int v_;
