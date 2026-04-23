@@ -171,11 +171,11 @@ private:
   GenericConnectionPoolCallbacks* callbacks_{};
   Http::StreamDecoderFilterCallbacks* decoder_filter_callbacks_;
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
+  uint64_t cached_tunnel_response_status_{0};
   std::unique_ptr<HttpUpstream> upstream_;
   std::unique_ptr<CombinedUpstream> combined_upstream_;
   StreamInfo::StreamInfo& downstream_info_;
   std::unique_ptr<Router::GenericConnPool> generic_conn_pool_;
-  uint64_t cached_tunnel_response_status_{0};
 };
 
 class TcpUpstream : public GenericUpstream {
