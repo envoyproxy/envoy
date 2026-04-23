@@ -129,6 +129,11 @@ message RateLimitDescriptor {
   // Optional hits_addend for the rate limit descriptor. If set the value will override the
   // request level hits_addend.
   google.protobuf.UInt64Value hits_addend = 3;
+
+  // If true, the hits_addend value will be treated as negative, effectively adding to
+  // the rate limit budget instead of consuming from it. This can be used to refill previously consumed
+  // rate limit tokens.
+  bool is_negative_hits = 4;
 }
 
 // Configuration used to enable local rate limiting.

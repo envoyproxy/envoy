@@ -471,7 +471,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.set_metadata",
     ],
     rbe_pool = "4core",
-    shard_count = 8,
+    shard_count = 4,
     tags = [
         "cpu:3",
         "skip_on_windows",

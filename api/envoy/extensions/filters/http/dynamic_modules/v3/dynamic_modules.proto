@@ -6,6 +6,7 @@ import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
 
 import "google/protobuf/any.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.dynamic_modules.v3";
@@ -90,16 +91,32 @@ message DynamicModuleFilterPerRoute {
   // receives this configuration, it passes the ``per_route_config_name`` to the dynamic module's
   // HTTP per-route filter config init function together with the ``filter_config``. That way a
   // module can decide which in-module filter implementation to use based on the name at load time.
-  string per_route_config_name = 2;
+  //
+  // .. note::
+  //   This is deprecated in favor of ``filter_name``. Please use ``filter_name`` instead of
+  //   ``per_route_config_name`` to specify the name for the filter implementation.
+  //   If both ``per_route_config_name`` and ``filter_name`` are specified, Envoy uses
+  //   ``filter_name`` and ignores ``per_route_config_name``.
+  //
+  string per_route_config_name = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // The configuration for the filter chosen by ``per_route_config_name``.
+  // The name for this filter configuration.
+  //
+  // This can be used to distinguish between different filter implementations inside a dynamic
+  // module. For example, a module can have completely different filter implementations. When Envoy
+  // receives this configuration, it passes the ``filter_name`` to the dynamic module's
+  // HTTP per-route filter config init function together with the ``filter_config``. That way a
+  // module can decide which in-module filter implementation to use based on the name at load time.
+  string filter_name = 4;
+
+  // The configuration for the filter chosen by ``filter_name``.
   //
   // This is passed to the module's HTTP per-route filter initialization function. Together with
-  // the ``per_route_config_name``, the module can decide which in-module filter implementation to
-  // use and fine-tune the behavior of the filter on a specific route.
+  // the ``filter_name``, the module can decide which in-module filter implementation to use and fine-tune the behavior of the filter on a specific route.
   //
   // For example, if a module has two filter implementations, one for logging and one for header
-  // manipulation, ``per_route_config_name`` is used to choose either logging or header
+  // manipulation, ``filter_name`` is used to choose either logging or header
   // manipulation. The ``filter_config`` can be used to configure the logging level or the header
   // manipulation behavior.
   //

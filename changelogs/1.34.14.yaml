@@ -1,0 +1,6 @@
+date: April 10, 2026
+
+bug_fixes:
+- area: docker
+  change: |
+    Updates/fixes for release images.

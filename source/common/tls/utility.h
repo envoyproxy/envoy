@@ -50,6 +50,20 @@ bool labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern);
 std::string getSerialNumberFromCertificate(X509& cert);
 
 /**
+ * Computes the SHA-256 digest of a certificate and returns it as a hex-encoded string.
+ * @param cert the certificate
+ * @return std::string the hex-encoded SHA-256 digest of the certificate.
+ */
+std::string getSha256DigestFromCertificate(X509& cert);
+
+/**
+ * Computes the SHA-1 digest of a certificate and returns it as a hex-encoded string.
+ * @param cert the certificate
+ * @return std::string the hex-encoded SHA-1 digest of the certificate.
+ */
+std::string getSha1DigestFromCertificate(X509& cert);
+
+/**
  * Maps a stack of x509 certificates to a vector of strings extracted from the certificates.
  * @param stack the stack of certificates
  * @param field_extractor the function to extract the field from each certificate.

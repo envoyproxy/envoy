@@ -79,6 +79,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scone_state",
+    srcs = envoy_select_enable_http3(["scone_state.cc"]),
+    hdrs = envoy_select_enable_http3(["scone_state.h"]),
+    deps = envoy_select_enable_http3([
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/types:optional",
+        "//envoy/stream_info:filter_state_interface",
+    ]),
+)
+
+envoy_cc_library(
     name = "quic_stat_names_lib",
     srcs = ["quic_stat_names.cc"],
     hdrs = ["quic_stat_names.h"],
@@ -311,6 +322,7 @@ envoy_cc_library(
     ]),
     deps = envoy_select_enable_http3([
         ":envoy_quic_client_connection_lib",
+        ":scone_state",
         ":envoy_quic_client_crypto_stream_factory_lib",
         ":envoy_quic_proof_verifier_lib",
         ":envoy_quic_stream_lib",
