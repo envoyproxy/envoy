@@ -478,6 +478,12 @@ new_features:
     in dynamic modules.
 - area: dynamic_modules
   change: |
+    Rust SDK: a single dynamic module can now host multiple access loggers via the new
+    ``access_logger:`` arm of ``declare_all_init_functions!``, which registers a factory that
+    dispatches to different ``AccessLoggerConfig`` implementations by ``logger_name``. The
+    legacy ``declare_access_logger!`` macro is preserved as a single-config shim.
+- area: dynamic_modules
+  change: |
     Added upstream HTTP TCP bridge extension for dynamic modules. This enables modules to transform
     HTTP requests into raw TCP data for upstream connections and convert TCP responses back into HTTP
     responses via explicit send callbacks. See :ref:`envoy.upstreams.http.dynamic_modules
