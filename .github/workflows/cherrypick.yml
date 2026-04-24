@@ -1,0 +1,141 @@
+name: Cherry-pick to release branches
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  repository_dispatch:
+    types:
+    - cherrypick
+
+jobs:
+  cherrypick:
+    name: Cherry-pick PR
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        fetch-depth: 0
+
+    - name: Cherry-pick and create PRs
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        PR_NUMBER="${{ github.event.client_payload.pr_number }}"
+        TARGET_BRANCHES="${{ github.event.client_payload.target_branches }}"
+        MERGE_SHA="${{ github.event.client_payload.merge_commit_sha }}"
+        RESULTS_FILE=$(mktemp)
+
+        # Fetch PR metadata
+        PR_DATA=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
+        ORIGINAL_TITLE=$(echo "$PR_DATA" | jq -r '.title')
+        PR_COMMIT_COUNT=$(echo "$PR_DATA" | jq -r '.commits')
+        PR_ADDITIONS=$(echo "$PR_DATA" | jq -r '.additions')
+        PR_DELETIONS=$(echo "$PR_DATA" | jq -r '.deletions')
+        PR_CHANGED_FILES=$(echo "$PR_DATA" | jq -r '.changed_files')
+
+        # Determine cherry-pick strategy based on merge method.
+        # - 2+ parents: regular merge commit -> cherry-pick with -m 1
+        # - 1 parent, single commit: squash (or trivial rebase) -> cherry-pick directly
+        # - 1 parent, multi-commit: compare diff stats of the merge commit against
+        #   the PR totals to distinguish squash (all changes in one commit) from
+        #   rebase (changes spread across N commits)
+        PARENT_COUNT=$(git cat-file -p "$MERGE_SHA" | grep -c '^parent ')
+        STRATEGY="squash"
+
+        if [ "$PARENT_COUNT" -gt 1 ]; then
+            STRATEGY="merge"
+        elif [ "$PR_COMMIT_COUNT" -gt 1 ]; then
+            COMMIT_ADDITIONS=$(git diff --numstat "${MERGE_SHA}^..${MERGE_SHA}" \
+                | grep -v '^-' | awk '{s+=$1} END {print s+0}')
+            COMMIT_DELETIONS=$(git diff --numstat "${MERGE_SHA}^..${MERGE_SHA}" \
+                | grep -v '^-' | awk '{s+=$2} END {print s+0}')
+            COMMIT_FILES=$(git diff --name-only "${MERGE_SHA}^..${MERGE_SHA}" | wc -l)
+
+            if [ "$COMMIT_ADDITIONS" -eq "$PR_ADDITIONS" ] \
+               && [ "$COMMIT_DELETIONS" -eq "$PR_DELETIONS" ] \
+               && [ "$COMMIT_FILES" -eq "$PR_CHANGED_FILES" ]; then
+                STRATEGY="squash"
+            else
+                STRATEGY="rebase"
+            fi
+        fi
+
+        for BRANCH in $TARGET_BRANCHES; do
+            SHORT_BRANCH="${BRANCH#*/}"
+            NEW_BRANCH="cherrypick/${BRANCH}/${PR_NUMBER}"
+            BP_TITLE="[bp/${SHORT_BRANCH}] ${ORIGINAL_TITLE}"
+
+            # Fetch target branch
+            if ! git fetch origin "${BRANCH}" 2>/dev/null; then
+                echo "**${BRANCH}**: branch not found." >> "$RESULTS_FILE"
+                continue
+            fi
+
+            # Check if a cherry-pick branch already exists on the remote
+            if git ls-remote --exit-code --heads origin "${NEW_BRANCH}" >/dev/null 2>&1; then
+                echo "**${BRANCH}**: branch \`${NEW_BRANCH}\` already exists on the remote;" \
+                    "a cherry-pick may have already been attempted." >> "$RESULTS_FILE"
+                continue
+            fi
+
+            # Create working branch from target
+            git checkout -b "${NEW_BRANCH}" "origin/${BRANCH}"
+
+            # Cherry-pick
+            CP_SUCCESS=true
+            case "$STRATEGY" in
+                merge)
+                    git cherry-pick -x -m 1 "$MERGE_SHA" || CP_SUCCESS=false
+                    ;;
+                rebase)
+                    SHAS=$(git rev-list --reverse "${MERGE_SHA}~${PR_COMMIT_COUNT}..${MERGE_SHA}")
+                    git cherry-pick -x $SHAS || CP_SUCCESS=false
+                    ;;
+                *)
+                    git cherry-pick -x "$MERGE_SHA" || CP_SUCCESS=false
+                    ;;
+            esac
+
+            if [ "$CP_SUCCESS" = false ]; then
+                git cherry-pick --abort 2>/dev/null || true
+                git checkout main 2>/dev/null || true
+                git branch -D "${NEW_BRANCH}" 2>/dev/null || true
+                echo "**${BRANCH}**: cherry-pick failed due to conflicts. Please cherry-pick manually." >> "$RESULTS_FILE"
+                continue
+            fi
+
+            # Push cherry-pick branch
+            if ! git push origin "${NEW_BRANCH}"; then
+                git checkout main
+                git branch -D "${NEW_BRANCH}" 2>/dev/null || true
+                echo "**${BRANCH}**: failed to push cherry-pick branch." >> "$RESULTS_FILE"
+                continue
+            fi
+
+            # Create pull request
+            BP_BODY="Automated cherry-pick of #${PR_NUMBER} to \`${BRANCH}\`."
+            if PR_URL=$(gh pr create \
+                --repo "${GITHUB_REPOSITORY}" \
+                --base "${BRANCH}" \
+                --head "${NEW_BRANCH}" \
+                --title "${BP_TITLE}" \
+                --body "${BP_BODY}"); then
+                echo "**${BRANCH}**: cherry-pick PR created successfully: ${PR_URL}" >> "$RESULTS_FILE"
+            else
+                echo "**${BRANCH}**: failed to create pull request." >> "$RESULTS_FILE"
+            fi
+
+            git checkout main
+        done
+
+        # Post results as comment on the original PR
+        if [ -s "$RESULTS_FILE" ]; then
+            gh pr comment "${PR_NUMBER}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --body-file "$RESULTS_FILE"
+        fi
+        rm -f "$RESULTS_FILE"

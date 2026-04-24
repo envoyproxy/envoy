@@ -51,6 +51,7 @@ use(
 )
 use("github.com/envoyproxy/envoy/ci/repokitteh/modules/versionchange.star")
 use("github.com/envoyproxy/envoy/ci/repokitteh/modules/workflows.star")
+use("github.com/envoyproxy/envoy/ci/repokitteh/modules/cherrypick.star")
 
 def _backport():
     github.issue_label("backport/review")
