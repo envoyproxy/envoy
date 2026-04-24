@@ -735,7 +735,10 @@ int main(int argc, const char **argv) {
         str << "#include \"" << opt::prefix << "/" << hdr << "\"" << std::endl;
       }
     }
-    std::system((std::string("sed -i ") + subts.str() + files.str()).c_str());
+    if (std::system((std::string("sed -i ") + subts.str() + files.str()).c_str()) != 0) {
+      std::cerr << "sed command failed" << std::endl;
+      return 1;
+    }
   }
 
   clang::tooling::ClangTool tool(CompilationDatabase(), { tmpfile });

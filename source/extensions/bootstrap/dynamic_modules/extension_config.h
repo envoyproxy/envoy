@@ -4,6 +4,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
@@ -49,6 +50,8 @@ using OnBootstrapExtensionHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_http_callout_done);
 using OnBootstrapExtensionTimerFiredType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_timer_fired);
+using OnBootstrapExtensionFileChangedType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_file_changed);
 using OnBootstrapExtensionAdminRequestType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_admin_request);
 using OnBootstrapExtensionClusterAddOrUpdateType =
@@ -183,6 +186,7 @@ public:
   OnBootstrapExtensionConfigScheduledType on_bootstrap_extension_config_scheduled_ = nullptr;
   OnBootstrapExtensionHttpCalloutDoneType on_bootstrap_extension_http_callout_done_ = nullptr;
   OnBootstrapExtensionTimerFiredType on_bootstrap_extension_timer_fired_ = nullptr;
+  OnBootstrapExtensionFileChangedType on_bootstrap_extension_file_changed_ = nullptr;
   OnBootstrapExtensionAdminRequestType on_bootstrap_extension_admin_request_ = nullptr;
   OnBootstrapExtensionClusterAddOrUpdateType on_bootstrap_extension_cluster_add_or_update_ =
       nullptr;
@@ -196,6 +200,11 @@ public:
 
   // The main thread dispatcher.
   Event::Dispatcher& main_thread_dispatcher_;
+
+  // File watchers created by
+  // envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch. Envoy owns the
+  // lifetime — watchers are destroyed when the config is destroyed.
+  std::vector<Filesystem::WatcherPtr> file_watchers_;
 
   // The server factory context for accessing cluster manager lazily. ClusterManager is not
   // available during bootstrap extension creation, so we store the context and access it when
@@ -467,14 +476,19 @@ using DynamicModuleBootstrapExtensionConfigSharedPtr =
  */
 class DynamicModuleBootstrapExtensionConfigScheduler {
 public:
-  DynamicModuleBootstrapExtensionConfigScheduler(
-      std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config, Event::Dispatcher& dispatcher)
-      : config_(std::move(config)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleBootstrapExtensionConfigScheduler(
+      std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config)
+      : config_(std::move(config)) {}
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleBootstrapExtensionConfig> config_shared = config.lock()) {
-        config_shared->onScheduled(event_id);
+    // Lock the config so its dispatcher member stays valid across `post`.
+    auto config_shared = config_.lock();
+    if (!config_shared) {
+      return;
+    }
+    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleBootstrapExtensionConfig> cs = config.lock()) {
+        cs->onScheduled(event_id);
       }
     });
   }
@@ -483,8 +497,6 @@ private:
   // The config that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the config.
   std::weak_ptr<DynamicModuleBootstrapExtensionConfig> config_;
-  // The dispatcher is used to post the event to the main thread.
-  Event::Dispatcher& dispatcher_;
 };
 
 /**

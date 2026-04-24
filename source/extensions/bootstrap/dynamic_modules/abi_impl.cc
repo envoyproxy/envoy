@@ -5,6 +5,7 @@
 #include "envoy/server/admin.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/thread.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
@@ -22,8 +23,7 @@ envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr
 envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
-  return new DynamicModuleBootstrapExtensionConfigScheduler(config->weak_from_this(),
-                                                            config->main_thread_dispatcher_);
+  return new DynamicModuleBootstrapExtensionConfigScheduler(config->weak_from_this());
 }
 
 void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(
@@ -491,7 +491,42 @@ bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
 
 void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
     envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
+  using namespace Envoy;
+  // The underlying `Event::Timer` `deregisters` from the dispatcher's timer list in its
+  // destructor, which is only safe on the dispatcher thread. Callers that hold the timer handle
+  // from a context that may be dropped off the main thread must route deletion through the
+  // scheduler ABI.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   delete static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
+}
+
+// -------------------- File Watcher Callbacks --------------------
+
+bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path, uint32_t events) {
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+
+  // Create a new filesystem watcher for this path. Envoy owns the watcher lifetime.
+  auto envoy_watcher = config->main_thread_dispatcher_.createFilesystemWatcher();
+  const std::string path_str(path.ptr, path.length);
+  auto status = envoy_watcher->addWatch(
+      path_str, events,
+      [weak_config = config->weak_from_this(), path_str](uint32_t events) -> absl::Status {
+        if (auto config_shared = weak_config.lock()) {
+          if (config_shared->in_module_config_ != nullptr &&
+              config_shared->on_bootstrap_extension_file_changed_ != nullptr) {
+            config_shared->on_bootstrap_extension_file_changed_(
+                config_shared->thisAsVoidPtr(), config_shared->in_module_config_,
+                {path_str.data(), path_str.size()}, events);
+          }
+        }
+        return absl::OkStatus();
+      });
+  if (status.ok()) {
+    config->file_watchers_.push_back(std::move(envoy_watcher));
+  }
+  return status.ok();
 }
 
 // -------------------- Admin Handler Callbacks --------------------

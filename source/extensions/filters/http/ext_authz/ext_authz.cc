@@ -12,6 +12,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/matchers.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
@@ -82,7 +83,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
     : allow_partial_message_(config.with_request_body().allow_partial_message()),
       failure_mode_allow_(config.failure_mode_allow()),
       failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
-      clear_route_cache_(config.clear_route_cache()),
+      shadow_mode_(config.shadow_mode()), clear_route_cache_(config.clear_route_cache()),
       max_request_bytes_(config.with_request_body().max_request_bytes()),
       max_denied_response_body_bytes_(config.max_denied_response_body_bytes()),
 
@@ -406,6 +407,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (!config_->filterEnabled(decoder_callbacks_->streamInfo().dynamicMetadata())) {
     stats_.disabled_.inc();
     if (config_->denyAtDisable()) {
+      if (config_->shadowMode()) {
+        ENVOY_STREAM_LOG(trace,
+                         "ext_authz filter is disabled (deny_at_disable). Shadow mode: setting "
+                         "filter state and continuing.",
+                         *decoder_callbacks_);
+        auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+        response->status_code = config_->statusOnError();
+        setShadowFilterState(*response);
+        // Set the response flag so access logs reflect what enforce mode would have logged,
+        // enabling operators to correlate shadow-denied-on-disable with real denials.
+        decoder_callbacks_->streamInfo().setResponseFlag(
+            StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
+        return Http::FilterHeadersStatus::Continue;
+      }
       ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.",
                        *decoder_callbacks_);
       decoder_callbacks_->streamInfo().setResponseFlag(
@@ -674,6 +690,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                                           response->dynamic_metadata);
     }
   }
+
   switch (response->status) {
   case CheckStatus::OK: {
     // Any changes to request headers or query parameters can affect how the request is going to be
@@ -959,6 +976,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
     }
+    if (config_->shadowMode()) {
+      setShadowFilterState(*response);
+    }
     stats_.ok_.inc();
     continueDecoding();
     break;
@@ -985,6 +1005,13 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                                false};
         config_->httpContext().codeStats().chargeResponseStat(info, false);
       }
+    }
+
+    // In shadow mode, set the dynamic metadata and continue without sending a local reply.
+    if (config_->shadowMode()) {
+      setShadowFilterState(*response);
+      continueDecoding();
+      break;
     }
 
     // Check headers are valid.
@@ -1046,6 +1073,13 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
     }
     stats_.error_.inc();
+
+    // In shadow mode, always continue on error (equivalent to forced fail-open).
+    if (config_->shadowMode()) {
+      setShadowFilterState(*response);
+      continueDecoding();
+      break;
+    }
 
     // Validate error response headers and clear custom attributes if invalid.
     validateAndClearInvalidErrorResponseAttributes(response);
@@ -1253,6 +1287,70 @@ void Filter::addErrorResponseHeaders(
     ENVOY_STREAM_LOG(trace, " '{}':'{}'", *decoder_callbacks_, key, value);
     response_headers.addCopy(Http::LowerCaseString(key), value);
   }
+}
+
+void ShadowDecisionObject::populateProto(ShadowDecisionProto& msg) const {
+  msg.set_check_result(check_result_);
+  if (status_code_ != static_cast<Http::Code>(0)) {
+    msg.set_status_code(static_cast<uint32_t>(status_code_));
+  }
+  for (const auto& [key, value] : response_headers_) {
+    auto* hv = msg.add_response_headers();
+    hv->set_key(key);
+    hv->set_value(value);
+  }
+}
+
+ProtobufTypes::MessagePtr ShadowDecisionObject::serializeAsProto() const {
+  auto msg = std::make_unique<ShadowDecisionProto>();
+  populateProto(*msg);
+  return msg;
+}
+
+absl::optional<std::string> ShadowDecisionObject::serializeAsString() const {
+  ShadowDecisionProto msg;
+  populateProto(msg);
+  return MessageUtil::getJsonStringFromMessageOrError(msg);
+}
+
+void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response) {
+  using Filters::Common::ExtAuthz::CheckStatus;
+  using ShadowDecisionProto = envoy::extensions::filters::http::ext_authz::v3::ShadowDecision;
+
+  ShadowDecisionProto::CheckResult check_result = ShadowDecisionProto::UNSPECIFIED;
+  Http::Code status_code = static_cast<Http::Code>(0);
+  Filters::Common::ExtAuthz::UnsafeHeaderVector response_headers;
+
+  switch (response.status) {
+  case CheckStatus::OK:
+    check_result = ShadowDecisionProto::OK;
+    status_code = Http::Code::OK;
+    break;
+  case CheckStatus::Denied:
+    check_result = ShadowDecisionProto::DENIED;
+    status_code = response.status_code;
+    response_headers = std::move(response.headers_to_set);
+    stats_.shadow_denied_.inc();
+    break;
+  case CheckStatus::Error:
+    check_result = ShadowDecisionProto::ERROR;
+    status_code = response.status_code != static_cast<Http::Code>(0) ? response.status_code
+                                                                     : config_->statusOnError();
+    stats_.shadow_error_.inc();
+    break;
+  default:
+    IS_ENVOY_BUG("unexpected CheckStatus value in shadow mode");
+    return;
+  }
+
+  auto object = std::make_shared<ShadowDecisionObject>(check_result, status_code,
+                                                       std::move(response_headers));
+
+  // Suffix the key with ".shadow" so it doesn't collide with ExtAuthzLoggingInfo, which
+  // already uses the filter's configured name as its FilterState key (with a different lifespan).
+  decoder_callbacks_->streamInfo().filterState()->setData(
+      absl::StrCat(decoder_callbacks_->filterConfigName(), ".shadow"), std::move(object),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 } // namespace ExtAuthz

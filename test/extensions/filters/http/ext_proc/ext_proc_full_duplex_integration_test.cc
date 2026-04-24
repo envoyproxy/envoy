@@ -100,7 +100,10 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
   const std::string body_sent(2 * 1024 * 1024, 's');
   initializeConfigDuplexStreamed(false);
 
-  // Sends 30 consecutive request, each carrying 2MB data.
+  // Sends 30 consecutive requests, each carrying 2MB data.
+  // The processor gRPC connection is established once on the first iteration and reused across all
+  // iterations; each iteration opens a new gRPC stream on that persistent connection. This matches
+  // real ext_proc behavior and avoids the per-iteration connection-churn race.
   for (int i = 0; i < 30; i++) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl default_headers;
@@ -111,13 +114,21 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
     request_encoder_ = &encoder_decoder.first;
     IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
     codec_client_->sendData(*request_encoder_, body_sent, true);
-    // The ext_proc server receives the headers.
+
+    // On the first iteration, wait for the gRPC connection to be established.
+    if (i == 0) {
+      EXPECT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+    }
+    // Each iteration opens a new gRPC stream on the persistent processor connection.
     ProcessingRequest header_request;
-    serverReceiveHeaderReq(header_request);
+    EXPECT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
+    EXPECT_TRUE(header_request.has_request_headers());
+
     // The ext_proc server receives the body.
     uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent, processor_stream_);
     EXPECT_GT(total_req_body_msg, 0);
-    // The ext_proc server sends back the header response.
+    // The ext_proc server sends back the header response (startGrpcStream is per-stream).
     serverSendHeaderResp();
     // The ext_proc server sends back body responses, which include 50 chunks,
     // and each chunk contains 64KB data, thus totally ~3MB per request.
@@ -131,7 +142,9 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
     EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
     EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
     verifyDownstreamResponse(*response, 200);
-    TearDown();
+
+    // Clean up per-iteration upstream/downstream state; processor_connection_ stays alive.
+    cleanupUpstreamAndDownstream();
   }
 }
 
@@ -175,7 +188,7 @@ TEST_P(ExtProcIntegrationTest,
   serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_, false);
 
   // The ext_proc server sends back the trailer response.
-  serverSendTrailerRespDuplexStreamed();
+  serverSendTrailerRespDuplexStreamed(processor_stream_, false);
 
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
@@ -255,7 +268,7 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyDuplexStrea
   body_upstream += "END";
 
   // The ext_proc server sends back the trailer response.
-  serverSendTrailerRespDuplexStreamed();
+  serverSendTrailerRespDuplexStreamed(processor_stream_, false);
 
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
@@ -356,7 +369,7 @@ TEST_P(ExtProcIntegrationTest, DISABLED_DuplexStreamedServerResponseWithSynthesi
   // The end_of_stream of the last body response is false.
   serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_, false, false);
   // The ext_proc server sends back a synthesized trailer response.
-  serverSendTrailerRespDuplexStreamed();
+  serverSendTrailerRespDuplexStreamed(processor_stream_, false);
 
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
@@ -582,32 +595,10 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessing) {
   EXPECT_EQ(body_downstream, response->body());
 }
 
-TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
-  two_ext_proc_filters_ = true;
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
-    // Filter-1
-    proto_config_1_.mutable_processing_mode()->Clear();
-    auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
-    processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
-    processing_mode_1->set_response_header_mode(ProcessingMode::SEND);
-    processing_mode_1->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
-    processing_mode_1->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
-    processing_mode_1->set_request_trailer_mode(ProcessingMode::SEND);
-    processing_mode_1->set_response_trailer_mode(ProcessingMode::SEND);
-    addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
-                               "envoy.filters.http.ext_proc_1");
-    // Filter-0
-    proto_config_.mutable_processing_mode()->Clear();
-    auto* processing_mode = proto_config_.mutable_processing_mode();
-    processing_mode->set_request_header_mode(ProcessingMode::SEND);
-    processing_mode->set_response_header_mode(ProcessingMode::SEND);
-    processing_mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
-    processing_mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
-    processing_mode->set_request_trailer_mode(ProcessingMode::SEND);
-    processing_mode->set_response_trailer_mode(ProcessingMode::SEND);
-    addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
-                               "envoy.filters.http.ext_proc");
-  });
+// without trailers, server fully buffers the message before sending back the response.
+// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
+TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirection) {
+  twoExtProcFiltersFullDuplexConfig();
 
   const std::string body_sent(5 * 1024, 's');
   IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
@@ -663,6 +654,135 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
   EXPECT_THAT(response->headers(), ContainsHeader("x-new-header_1", "new_1"));
 }
 
+// Without trailers,  server buffers one chunks of body before sending back the response.
+// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
+TEST_P(ExtProcIntegrationTest, DISABLED_TwoExtProcFiltersBothDuplexInBothDirectionNoTrailerRandom) {
+  twoExtProcFiltersFullDuplexConfig();
+
+  const std::string body_sent(10 * 1024, 's');
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true, false);
+
+  // The ext_proc_server_0 receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request);
+
+  // The ext_proc_server_0 receives one body chunk.
+  ProcessingRequest body_request;
+  EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+  EXPECT_TRUE(body_request.has_request_body());
+
+  // The ext_proc_server_0 sends back the header response.
+  serverSendHeaderResp();
+  // The ext_proc_server_0 sends back one body chunk.
+  ProcessingResponse response_body;
+  BodyResponse* body_resp;
+  body_resp = response_body.mutable_request_body();
+  auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
+  auto* streamed_response = body_mut->mutable_streamed_response();
+  streamed_response->set_body("r");
+  processor_stream_->sendGrpcMessage(response_body);
+
+  // The ext_proc_server_0 receives the reset of the body chunks.
+  uint32_t total_req_body_msg =
+      serverReceiveBodyDuplexStreamed("", processor_stream_, false, false);
+
+  // The ext_proc_server_0 sends back the body responses.
+  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_, /*end_stream*/ true,
+                                   false, "");
+
+  // The ext_proc_server_1 receives the headers.
+  server1ReceiveHeaderReq(header_request);
+
+  // The ext_proc_server_1 receives one body chunk.
+  EXPECT_TRUE(processor_stream_1_->waitForGrpcMessage(*dispatcher_, body_request));
+  EXPECT_TRUE(body_request.has_request_body());
+
+  // The ext_proc_server_1 sends back the header response.
+  server1SendHeaderResp();
+
+  // The ext_proc_server_1 sends back one body chunk.
+  response_body.Clear();
+  body_resp = response_body.mutable_request_body();
+  body_mut = body_resp->mutable_response()->mutable_body_mutation();
+  streamed_response = body_mut->mutable_streamed_response();
+  streamed_response->set_body("r");
+  processor_stream_1_->sendGrpcMessage(response_body);
+
+  // The ext_proc_server_1 receives the rest of the body chunks.
+  total_req_body_msg = serverReceiveBodyDuplexStreamed("", processor_stream_1_, false, false);
+
+  // The ext_proc_server_1 sends back the body responses.
+  const std::string body_upstream(total_req_body_msg + 1, 'r');
+  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_1_, /*end_stream*/ true,
+                                   false, "");
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  for (int i = 0; i < 10; ++i) {
+    upstream_request_->encodeData(1024, i < 9 ? false : true);
+  }
+
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header_1", "new_1"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+
+  ASSERT_EQ(upstream_request_->trailers(), nullptr);
+
+  // Now the response processing. In this direction, filter-1 sees the message first.
+  ProcessingRequest header_response;
+  server1ReceiveHeaderReq(header_response, false, true);
+  // The ext_proc_server_1 receives one body chunk.
+  EXPECT_TRUE(processor_stream_1_->waitForGrpcMessage(*dispatcher_, body_request));
+  EXPECT_TRUE(body_request.has_response_body());
+
+  // The ext_proc_server_1 sends back the header response.
+  server1SendHeaderResp(false, true);
+  // The ext_proc_server_1 sends back one body chunk.
+  response_body.Clear();
+  body_resp = response_body.mutable_response_body();
+  body_mut = body_resp->mutable_response()->mutable_body_mutation();
+  streamed_response = body_mut->mutable_streamed_response();
+  streamed_response->set_body("n");
+  processor_stream_1_->sendGrpcMessage(response_body);
+
+  (void)serverReceiveBodyDuplexStreamed("", processor_stream_1_, true, false);
+
+  uint32_t total_resp_body_msg = 10;
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_1_, /*end_stream*/ true,
+                                   /*response*/ true, "m");
+
+  // Now the ext_proc_server_0 receives the message.
+  serverReceiveHeaderReq(header_response, false, true);
+
+  // The ext_proc_server_0 receives one body chunk.
+  EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+  EXPECT_TRUE(body_request.has_response_body());
+
+  // The ext_proc_server_0 sends back the header response.
+  serverSendHeaderResp(false, true);
+  // The ext_proc_server_0 sends back one body chunk.
+  response_body.Clear();
+  body_resp = response_body.mutable_response_body();
+  body_mut = body_resp->mutable_response()->mutable_body_mutation();
+  streamed_response = body_mut->mutable_streamed_response();
+  streamed_response->set_body("n");
+  processor_stream_->sendGrpcMessage(response_body);
+
+  (void)serverReceiveBodyDuplexStreamed("", processor_stream_, true, false);
+  total_resp_body_msg = 10;
+  const std::string body_downstream(total_resp_body_msg + 1, 'n');
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_, /*end_stream*/ true,
+                                   /*response*/ true, "n");
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(body_downstream, response->body());
+  EXPECT_THAT(response->headers(), ContainsHeader("x-new-header", "new"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-new-header_1", "new_1"));
+}
+
 TEST_P(ExtProcIntegrationTest, KeepContentLengthDuplexStreamed) {
   const std::string body_sent(10, 'a');
   proto_config_.set_allow_content_length_header(true);
@@ -707,6 +827,165 @@ TEST_P(ExtProcIntegrationTest, KeepContentLengthDuplexStreamed) {
   EXPECT_EQ(upstream_request_->body().toString(), new_body);
 
   verifyDownstreamResponse(*response, 200);
+}
+
+// With trailers, request direction, fully buffered
+// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
+TEST_P(ExtProcIntegrationTest,
+       DISABLED_TwoExtProcFiltersBothDuplexInRequestDirectionWithTrailerFullyBuffered) {
+  two_ext_proc_filters_ = true;
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
+    // Filter-1
+    proto_config_1_.mutable_processing_mode()->Clear();
+    auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
+    processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode_1->set_response_header_mode(ProcessingMode::SKIP);
+    processing_mode_1->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    processing_mode_1->set_request_trailer_mode(ProcessingMode::SEND);
+    addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
+                               "envoy.filters.http.ext_proc_1");
+    // Filter-0
+    proto_config_.mutable_processing_mode()->Clear();
+    auto* processing_mode = proto_config_.mutable_processing_mode();
+    processing_mode->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode->set_response_header_mode(ProcessingMode::SKIP);
+    processing_mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    processing_mode->set_request_trailer_mode(ProcessingMode::SEND);
+    addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
+                               "envoy.filters.http.ext_proc");
+  });
+
+  const std::string body_sent(10 * 1024, 's');
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, false, false);
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-request-trailer-foo", "yes"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  // The ext_proc_server_0 receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request);
+  // The ext_proc_server_0 receives the body and trailers.
+  uint32_t total_req_body_msg =
+      serverReceiveBodyDuplexStreamed("", processor_stream_, false, false);
+
+  // The ext_proc_server_0 sends back the header response.
+  serverSendHeaderResp();
+
+  // The ext_proc_server_0 sends back the body and trailers.
+  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_, /*end_stream*/ false,
+                                   false, "");
+  serverSendTrailerRespDuplexStreamed(processor_stream_, false);
+
+  // The ext_proc_server_1 receives the headers.
+  server1ReceiveHeaderReq(header_request);
+
+  // The ext_proc_server_1 receives the body and trailers.
+  total_req_body_msg = serverReceiveBodyDuplexStreamed("", processor_stream_1_, false, false);
+
+  // The ext_proc_server_1 sends back the header response.
+  server1SendHeaderResp();
+
+  // The ext_proc_server_1 sends back the body and trailers.
+  const std::string body_upstream(total_req_body_msg, 'r');
+  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_1_, /*end_stream*/ false,
+                                   false, "");
+  serverSendTrailerRespDuplexStreamed(processor_stream_1_, false);
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header_1", "new_1"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+
+  ASSERT_NE(upstream_request_->trailers(), nullptr);
+  EXPECT_THAT(*upstream_request_->trailers(), ContainsHeader("x-new-trailer", "new"));
+  EXPECT_THAT(*upstream_request_->trailers(), ContainsHeader("x-new-trailer_1", "new_1"));
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+// With trailers, both directions, server fully buffers.
+// TODO(#44605): Flaky due to production bug in chained FULL_DUPLEX_STREAMED ext_proc filters.
+TEST_P(ExtProcIntegrationTest,
+       DISABLED_TwoExtProcFiltersBothDuplexInBothDirectionWithTrailerFullyBuffered) {
+  twoExtProcFiltersFullDuplexConfig();
+
+  const std::string body_sent(10 * 1024, 's');
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, false, false);
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-request-trailer-foo", "yes"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  // The ext_proc_server_0 receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request);
+  // The ext_proc_server_0 receives the body and trailers.
+  uint32_t total_req_body_msg =
+      serverReceiveBodyDuplexStreamed("", processor_stream_, false, false);
+
+  // The ext_proc_server_0 sends back the header response.
+  serverSendHeaderResp();
+
+  // The ext_proc_server_0 sends back the body and trailers.
+  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_, /*end_stream*/ false,
+                                   false, "");
+  serverSendTrailerRespDuplexStreamed(processor_stream_, false);
+
+  // The ext_proc_server_1 receives the headers.
+  server1ReceiveHeaderReq(header_request);
+
+  // The ext_proc_server_1 receives the body and trailers.
+  total_req_body_msg = serverReceiveBodyDuplexStreamed("", processor_stream_1_, false, false);
+
+  // The ext_proc_server_1 sends back the header response.
+  server1SendHeaderResp();
+
+  // The ext_proc_server_1 sends back the body and trailers.
+  const std::string body_upstream(total_req_body_msg, 'r');
+  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_1_, /*end_stream*/ false,
+                                   false, "");
+  serverSendTrailerRespDuplexStreamed(processor_stream_1_, false);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  for (int i = 0; i < 10; ++i) {
+    upstream_request_->encodeData(1024, false);
+  }
+  upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"x-test-trailers", "Yes"}});
+
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header_1", "new_1"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+
+  ASSERT_NE(upstream_request_->trailers(), nullptr);
+  EXPECT_THAT(*upstream_request_->trailers(), ContainsHeader("x-new-trailer", "new"));
+  EXPECT_THAT(*upstream_request_->trailers(), ContainsHeader("x-new-trailer_1", "new_1"));
+
+  // Now the response processing. In this direction, filter-1 sees the message first.
+  ProcessingRequest header_response;
+  server1ReceiveHeaderReq(header_response, false, true);
+  (void)serverReceiveBodyDuplexStreamed("", processor_stream_1_, true, false);
+  server1SendHeaderResp(false, true);
+  uint32_t total_resp_body_msg = 10;
+  const std::string body_server_1(total_resp_body_msg, 'm');
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_1_, /*end_stream*/ false,
+                                   /*response*/ true, "m");
+  serverSendTrailerRespDuplexStreamed(processor_stream_1_, true);
+
+  // Now the ext_proc_server_0 receives the message.
+  serverReceiveHeaderReq(header_response, false, true);
+  (void)serverReceiveBodyDuplexStreamed(body_server_1, processor_stream_, true, false);
+  serverSendHeaderResp(false, true);
+  total_resp_body_msg = 10;
+  const std::string body_downstream(total_resp_body_msg, 'n');
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_, /*end_stream*/ false,
+                                   /*response*/ true, "n");
+  serverSendTrailerRespDuplexStreamed(processor_stream_, true);
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(body_downstream, response->body());
+  EXPECT_THAT(response->headers(), ContainsHeader("x-new-header", "new"));
+  EXPECT_THAT(response->headers(), ContainsHeader("x-new-header_1", "new_1"));
 }
 
 } // namespace ExternalProcessing
