@@ -41,7 +41,7 @@ public:
 
     // Return the prometheus output for a group of PrimitiveCounters.
     virtual void generateOutput(Buffer::Instance& output,
-                                const std::vector<const Stats::PrimitiveCounterSnapshot*>& counters,
+                                std::vector<Stats::PrimitiveCounterSnapshot*>&& counters,
                                 const std::string& prefixed_tag_extracted_name) const PURE;
 
     // Return the prometheus output for a group of Gauges.
@@ -56,7 +56,7 @@ public:
 
     // Return the prometheus output for a group of PrimitiveGauges.
     virtual void generateOutput(Buffer::Instance& output,
-                                const std::vector<const Stats::PrimitiveGaugeSnapshot*>& gauges,
+                                std::vector<Stats::PrimitiveGaugeSnapshot*>&& gauges,
                                 const std::string& prefixed_tag_extracted_name) const PURE;
 
     // Return the prometheus output for a group of Histograms.
@@ -117,7 +117,7 @@ public:
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.
    */
-  static std::string formattedTags(const std::vector<Stats::Tag>& tags);
+  static std::string formattedTags(std::vector<Stats::Tag>&& tags);
 
   /**
    * Validate the given params, returning an error on invalid arguments
@@ -132,7 +132,7 @@ public:
    * Otherwise, return nullopt.
    */
   static absl::optional<std::string>
-  metricName(const std::string& extracted_name,
+  metricName(std::string&& extracted_name,
              const Stats::CustomStatNamespaces& custom_namespace_factory);
 };
 

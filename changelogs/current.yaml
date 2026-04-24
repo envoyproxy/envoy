@@ -21,6 +21,11 @@ minor_behavior_changes:
     on the five methods that write to the per-request ``strValue`` scratch buffer
     (``getStringValue``, ``getDynamicMetadata``, ``getStringFilterState``, ``getStringProperty``,
     ``getSecret``).
+- area: stats
+  change: |
+    Optimized prometheus stats endpoint. Users should see a roughly 30-40% latency improvement in calls to the endpoint
+    for cases where the scrape results in lots of cluster stats.
+    There should be no visible changes to users, or incompatibilities.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

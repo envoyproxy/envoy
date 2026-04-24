@@ -441,7 +441,7 @@ static void BM_PrometheusFull(benchmark::State& state, bool per_endpoint_stats) 
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
   params.parse("?format=prometheus", response);
-  // per_endpoint_stats: 418M for true, 261M for false 
+  // per_endpoint_stats: 418M for true, 261M for false
   const uint64_t lower_limit = per_endpoint_stats ? 400 * 1000 * 1000 : 200 * 1000 * 1000;
   const uint64_t upper_limit = per_endpoint_stats ? 420 * 1000 * 1000 : 300 * 1000 * 1000;
 
