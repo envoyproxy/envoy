@@ -5526,3 +5526,143 @@ fn test_mock_envoy_network_filter_on_read() {
     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   );
 }
+
+// =============================================================================
+// Access Logger unit tests
+// =============================================================================
+
+#[test]
+fn test_envoy_dynamic_module_on_access_logger_config_new_impl() {
+  struct TestAccessLoggerConfig;
+  impl access_log::AccessLoggerConfig for TestAccessLoggerConfig {
+    fn new(_ctx: &access_log::ConfigContext, _name: &str, _config: &[u8]) -> Result<Self, String> {
+      Ok(TestAccessLoggerConfig)
+    }
+    fn create_logger(
+      &self,
+      _metrics: access_log::MetricsContext,
+      _logger_envoy_ptr: *mut std::ffi::c_void,
+    ) -> Box<dyn access_log::AccessLogger> {
+      unimplemented!()
+    }
+  }
+
+  let ctx = access_log::ConfigContext::new(std::ptr::null_mut());
+  let mut new_fn: NewAccessLoggerConfigFunction = |_, _, _| Some(Box::new(TestAccessLoggerConfig));
+  let result = access_log::envoy_dynamic_module_on_access_logger_config_new_impl(
+    &ctx,
+    "test_logger",
+    b"test_config",
+    &new_fn,
+    std::ptr::null_mut(),
+  );
+  assert!(!result.is_null());
+
+  unsafe {
+    access_log::envoy_dynamic_module_on_access_logger_config_destroy(result);
+  }
+
+  // None should result in a null pointer (e.g. unknown logger name).
+  new_fn = |_, _, _| None;
+  let result = access_log::envoy_dynamic_module_on_access_logger_config_new_impl(
+    &ctx,
+    "test_logger",
+    b"test_config",
+    &new_fn,
+    std::ptr::null_mut(),
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_access_logger_config_destroy() {
+  // This test ensures the wrapped trait object is dropped exactly once on `_destroy`.
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+  struct TestAccessLoggerConfig;
+  impl access_log::AccessLoggerConfig for TestAccessLoggerConfig {
+    fn new(_ctx: &access_log::ConfigContext, _name: &str, _config: &[u8]) -> Result<Self, String> {
+      Ok(TestAccessLoggerConfig)
+    }
+    fn create_logger(
+      &self,
+      _metrics: access_log::MetricsContext,
+      _logger_envoy_ptr: *mut std::ffi::c_void,
+    ) -> Box<dyn access_log::AccessLogger> {
+      unimplemented!()
+    }
+  }
+  impl Drop for TestAccessLoggerConfig {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let ctx = access_log::ConfigContext::new(std::ptr::null_mut());
+  let new_fn: NewAccessLoggerConfigFunction = |_, _, _| Some(Box::new(TestAccessLoggerConfig));
+  let config_ptr = access_log::envoy_dynamic_module_on_access_logger_config_new_impl(
+    &ctx,
+    "test_logger",
+    b"test_config",
+    &new_fn,
+    std::ptr::null_mut(),
+  );
+  assert!(!config_ptr.is_null());
+
+  unsafe {
+    access_log::envoy_dynamic_module_on_access_logger_config_destroy(config_ptr);
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_access_logger_new_destroy() {
+  // Round-trip the per-worker logger to ensure both `_new` and `_destroy` correctly own and
+  // free the boxed trait object.
+  static LOGGER_DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestAccessLoggerConfig;
+  impl access_log::AccessLoggerConfig for TestAccessLoggerConfig {
+    fn new(_ctx: &access_log::ConfigContext, _name: &str, _config: &[u8]) -> Result<Self, String> {
+      Ok(TestAccessLoggerConfig)
+    }
+    fn create_logger(
+      &self,
+      _metrics: access_log::MetricsContext,
+      _logger_envoy_ptr: *mut std::ffi::c_void,
+    ) -> Box<dyn access_log::AccessLogger> {
+      Box::new(TestAccessLogger)
+    }
+  }
+
+  struct TestAccessLogger;
+  impl access_log::AccessLogger for TestAccessLogger {
+    fn log(&mut self, _ctx: &access_log::LogContext) {}
+  }
+  impl Drop for TestAccessLogger {
+    fn drop(&mut self) {
+      LOGGER_DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let ctx = access_log::ConfigContext::new(std::ptr::null_mut());
+  let new_fn: NewAccessLoggerConfigFunction = |_, _, _| Some(Box::new(TestAccessLoggerConfig));
+  let config_ptr = access_log::envoy_dynamic_module_on_access_logger_config_new_impl(
+    &ctx,
+    "test_logger",
+    b"test_config",
+    &new_fn,
+    std::ptr::null_mut(),
+  );
+  assert!(!config_ptr.is_null());
+
+  let logger_ptr = unsafe {
+    access_log::envoy_dynamic_module_on_access_logger_new(config_ptr, std::ptr::null_mut())
+  };
+  assert!(!logger_ptr.is_null());
+
+  unsafe {
+    access_log::envoy_dynamic_module_on_access_logger_destroy(logger_ptr as *mut _);
+    access_log::envoy_dynamic_module_on_access_logger_config_destroy(config_ptr);
+  }
+  assert!(LOGGER_DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}

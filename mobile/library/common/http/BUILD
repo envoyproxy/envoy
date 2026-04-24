@@ -42,6 +42,7 @@ envoy_cc_library(
         "@envoy//source/common/http:headers_lib",
         "@envoy//source/common/http:utility_lib",
         "@envoy//source/common/network:socket_lib",
+        "@envoy//source/common/quic:scone_state",
         "@envoy//source/common/stats:timespan_lib",
     ],
 )

@@ -671,6 +671,12 @@ TEST_F(ExtractionUtilTest, ExtractStringFieldValue_OK_DefaultValue) {
       IsOkAndHolds(""));
 }
 
+TEST_F(ExtractionUtilTest, ExtractStringFieldValue_OK_RepeatedStringLeafNode) {
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
+                                      test_request_raw_proto_),
+              IsOkAndHolds("repeated-string-0"));
+}
+
 TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_EmptyPath) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "", test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
@@ -686,12 +692,6 @@ TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_UnknownField) {
       StatusIs(absl::StatusCode::kInvalidArgument));
 
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "unknown1.unknown2",
-                                      test_request_raw_proto_),
-              StatusIs(absl::StatusCode::kInvalidArgument));
-}
-
-TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_RepeatedStringLeafNode) {
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
                                       test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }

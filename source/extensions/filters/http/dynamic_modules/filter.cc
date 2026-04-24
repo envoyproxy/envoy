@@ -13,7 +13,18 @@ namespace HttpFilters {
 DynamicModuleHttpFilter::~DynamicModuleHttpFilter() { destroy(); }
 
 void DynamicModuleHttpFilter::initializeInModuleFilter() {
+  ASSERT(in_module_filter_ == nullptr);
   in_module_filter_ = config_->on_http_filter_new_(config_->in_module_config_, thisAsVoidPtr());
+  maybeRegisterDownstreamWatermarkCallbacks();
+}
+
+void DynamicModuleHttpFilter::maybeRegisterDownstreamWatermarkCallbacks() {
+  if (downstream_watermark_callbacks_registered_ || decoder_callbacks_ == nullptr ||
+      in_module_filter_ == nullptr) {
+    return;
+  }
+  decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
+  downstream_watermark_callbacks_registered_ = true;
 }
 
 void DynamicModuleHttpFilter::onStreamComplete() {
@@ -22,9 +33,11 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 
 void DynamicModuleHttpFilter::onDestroy() {
   destroyed_ = true;
-  // Remove watermark callbacks before destroying.
-  if (decoder_callbacks_ != nullptr) {
+  // Pair with the register in maybeRegisterDownstreamWatermarkCallbacks(); the underlying
+  // removeDownstreamWatermarkCallbacks() asserts the callback was previously added.
+  if (decoder_callbacks_ != nullptr && downstream_watermark_callbacks_registered_) {
     decoder_callbacks_->removeDownstreamWatermarkCallbacks(*this);
+    downstream_watermark_callbacks_registered_ = false;
   }
   destroy();
 };
@@ -63,6 +76,7 @@ void DynamicModuleHttpFilter::destroy() {
 
   decoder_callbacks_ = nullptr;
   encoder_callbacks_ = nullptr;
+  downstream_watermark_callbacks_registered_ = false;
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
@@ -279,11 +293,13 @@ void DynamicModuleHttpFilter::continueEncoding() {
 }
 
 void DynamicModuleHttpFilter::onAboveWriteBufferHighWatermark() {
+  ASSERT(in_module_filter_ != nullptr);
   config_->on_http_filter_downstream_above_write_buffer_high_watermark_(thisAsVoidPtr(),
                                                                         in_module_filter_);
 }
 
 void DynamicModuleHttpFilter::onBelowWriteBufferLowWatermark() {
+  ASSERT(in_module_filter_ != nullptr);
   config_->on_http_filter_downstream_below_write_buffer_low_watermark_(thisAsVoidPtr(),
                                                                        in_module_filter_);
 }
