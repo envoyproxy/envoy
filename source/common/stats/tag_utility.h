@@ -53,8 +53,8 @@ private:
   SymbolTable::StoragePtr full_name_storage_;
   StatName name_with_tags_;
 
-  // The tags from the constructor. The TagStatNameJoiner will no have longer lifetime than the
-  // caller. So it is safe to keep reference here.
+  // The tags are provided to the constructor. The TagStatNameJoiner must not outlive the
+  // tags; therefore, it is safe to keep a reference here.
   StatNameTagVectorOptConstRef stat_name_tags_;
 
   SymbolTable::StoragePtr joinNameAndTags(StatName name, const StatNameTagVector& stat_name_tags,
