@@ -21,6 +21,10 @@ HttpCalloutCallback::~HttpCalloutCallback() = default;
 
 HttpStreamCallback::~HttpStreamCallback() = default;
 
+Span::~Span() = default;
+
+ChildSpan::~ChildSpan() = default;
+
 RouteSpecificConfig::~RouteSpecificConfig() = default;
 
 Scheduler::~Scheduler() = default;
