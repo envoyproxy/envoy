@@ -196,7 +196,7 @@ void RequestStreamer::addHistogram(std::string&& name, MetricAggregator::CustomH
   auto* point = metric->mutable_histogram()->add_data_points();
   point->set_count(hist.count_);
   point->set_sum(hist.sum_);
-  // TODO(taoxuy): support min/max/variance for histograms as per OTLP spec.
+  // TODO(ohadvano): support min/max/variance for histograms as per OTLP spec.
   for (double bound : hist.explicit_bounds_) {
     point->add_explicit_bounds(bound);
   }
@@ -361,8 +361,6 @@ MetricAggregator::SortedAttributesVector OtlpMetricsFlusherImpl::getCombinedAttr
   }
   // Sort attributes to ensure a deterministic order, which is critical since these
   // attributes are used as part of the lookup key for metric aggregation.
-  // For the typical small number of attributes per metric (usually < 10), a
-  // simple std::sort on a small InlinedVector is extremely fast
   std::sort(attrs.begin(), attrs.end());
 
   return MetricAggregator::SortedAttributesVector(std::move(attrs));
