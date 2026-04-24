@@ -158,6 +158,7 @@ public:
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
   EngineBuilder& enableHttp3(bool http3_on);
   EngineBuilder& enableEarlyData(bool early_data_on);
+  EngineBuilder& enableScone(bool enable);
   EngineBuilder& addQuicConnectionOption(std::string option);
   EngineBuilder& addQuicClientConnectionOption(std::string option);
   // Deprecated, use addQuicConnectionOption() instead.
@@ -323,6 +324,7 @@ private:
   std::string upstream_tls_sni_;
   bool enable_http3_ = true;
   bool enable_early_data_{true};
+  bool scone_enabled_ = false;
   std::string http3_connection_options_ = "";
   std::string http3_client_connection_options_ = "";
   // EVMB is to distinguish Envoy Mobile client connections.
