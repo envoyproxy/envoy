@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3;
 
+import "envoy/config/core/v3/base.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3";
@@ -22,6 +24,9 @@ message DownstreamReverseConnectionSocketInterface {
     // Request path used when issuing the HTTP reverse-connection handshake. Defaults to
     // "/reverse_connections/request".
     string request_path = 1;
+
+    // Additional headers to include in the HTTP handshake request.
+    repeated config.core.v3.HeaderValueOption additional_headers = 2;
   }
 
   // Stat prefix to be used for downstream reverse connection socket interface stats.

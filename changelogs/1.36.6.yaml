@@ -1,0 +1,15 @@
+date: April 10, 2026
+
+bug_fixes:
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module filter may result in a incomplete body being sent to upstream
+    or downstream when some filters before or after the dynamic module filter in the chain
+    buffered the body and the dynamic module filter did not.
+- area: http
+  change: |
+    Fixed a bug where the internal redirect logic may hang up a request when the request buffer is
+    overflowed.
+- area: docker
+  change: |
+    Updates/fixes for release images.

@@ -78,7 +78,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # sni_dynamic_forward_proxy extension
 /*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @UNOWNED
 # tracers.datadog extension
-/*/extensions/tracers/datadog @dmehala @mattklein123
+/*/extensions/tracers/datadog @xlamorlette-datadog @zacharycmontoya @mattklein123
 # tracers.xray extension
 /*/extensions/tracers/xray @mattklein123 @nbaws
 # tracers.skywalking extension
@@ -172,6 +172,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/retry/priority/previous_priorities @ravenblackx @mattklein123
 /*/extensions/retry/host @ravenblackx @mattklein123
 /*/extensions/filters/network/http_connection_manager @yanavlasov @mattklein123
+/*/extensions/filters/network/tcp_bandwidth_limit @yanavlasov @nezdolik @antonkanug
 /*/extensions/filters/network/tcp_proxy @zuercher @ggreenway
 /*/extensions/filters/network/echo @yanavlasov @adisuissa
 /*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google

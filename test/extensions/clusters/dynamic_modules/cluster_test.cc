@@ -16,6 +16,7 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -1140,6 +1141,26 @@ TEST_F(DynamicModuleClusterTest, OnScheduledAfterClusterDestroyed) {
   captured_cb();
 }
 
+// `commit` must not touch the dispatcher once the owning cluster has been destroyed.
+TEST_F(DynamicModuleClusterTest, CommitAfterClusterDestroyedDoesNotTouchDispatcher) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  auto* scheduler_ptr = envoy_dynamic_module_callback_cluster_scheduler_new(cluster.get());
+  EXPECT_NE(scheduler_ptr, nullptr);
+
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+
+  envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 42);
+
+  envoy_dynamic_module_callback_cluster_scheduler_delete(scheduler_ptr);
+}
+
 // Test calling onScheduled directly.
 TEST_F(DynamicModuleClusterTest, OnScheduledDirect) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
@@ -1165,6 +1186,36 @@ TEST_F(DynamicModuleClusterTest, HandleDestructorDispatchesToMainThread) {
   // The handle destructor should post to the dispatcher. The mock dispatcher will execute
   // the posted callback inline.
   handle.reset();
+}
+
+// Covers that a worker-thread handle destruction posts the full teardown to the main dispatcher.
+TEST_F(DynamicModuleClusterTest, HandleDestructorFromWorkerThreadDefersAllTeardownToMainThread) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // The internal handle held by the thread-aware load balancer also posts on its main-thread
+  // destruction when `result` is torn down, so allow repeated posts and capture the first one
+  // from the worker-thread handle destruction.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(server_context_.dispatcher_, post(_))
+      .WillRepeatedly(testing::Invoke([&](Event::PostCb cb) {
+        if (!captured_cb) {
+          captured_cb = std::move(cb);
+        }
+      }));
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto& thread_factory = Thread::threadFactoryForTest();
+  auto thread = thread_factory.createThread([&]() { handle.reset(); });
+  thread->join();
+
+  ASSERT_TRUE(captured_cb);
+  EXPECT_NE(cluster.use_count(), 1);
+  captured_cb();
+  cluster.reset();
+  result = absl::InternalError("cleanup");
 }
 
 // Test that the server_initialized lifecycle callback is invoked.
@@ -2104,7 +2155,7 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteWithHost) {
   // Create a handle for the async completion callback.
   auto handle = std::make_shared<DynamicModuleClusterHandle>(
       std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
 
   auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
   auto* context_ptr = static_cast<void*>(&context);
@@ -2128,7 +2179,7 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteNullHost) {
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(
       std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
 
   auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
   auto* context_ptr = static_cast<void*>(&context);
@@ -2152,13 +2203,53 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteEmptyDetails) {
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(
       std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
 
   auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
   auto* context_ptr = static_cast<void*>(&context);
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(lb_envoy_ptr, context_ptr,
                                                                          nullptr, {nullptr, 0});
+}
+
+// Covers that `async_host_selection_complete` drops the event when the owning load balancer has
+// already been destroyed.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteAfterLbDestroyedDropsEvent) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  void* raw_lb_ptr = lb_instance.get();
+
+  lb_instance.reset();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _)).Times(0);
+
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      raw_lb_ptr, static_cast<void*>(&context), nullptr, {"dropped", 7});
+}
+
+// Covers pointer reuse: a new load balancer allocated at the same address as a freed one must
+// still be found by the registry.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteRegistersFreshInstancePerLb) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+
+  auto first = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  first.reset();
+  auto second = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  bool found = DynamicModuleLoadBalancer::withActiveInstance(
+      second.get(), [](const DynamicModuleLoadBalancer&) {});
+  EXPECT_TRUE(found);
 }
 
 // =============================================================================
@@ -2631,7 +2722,7 @@ TEST_F(DynamicModuleClusterTest, AddHostsWithLocalityAndMetadataABI) {
 
   // Verify metadata through the LB host metadata ABI callbacks.
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   envoy_dynamic_module_type_envoy_buffer meta_result = {nullptr, 0};
@@ -2696,7 +2787,7 @@ TEST_F(DynamicModuleClusterTest, UpdateHostHealthABI) {
 
   // Verify via the LB health callback.
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   EXPECT_EQ(envoy_dynamic_module_type_host_health_Unhealthy,
@@ -2771,7 +2862,7 @@ TEST_F(DynamicModuleClusterTest, LbHostMembershipUpdate) {
   // Create an LB. The cluster_no_op module implements on_cluster_lb_on_host_membership_update,
   // so the LB should register for membership updates.
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
 
   // Add hosts - this should trigger the membership update callback on the LB.
   std::vector<Upstream::HostSharedPtr> hosts;
@@ -2793,7 +2884,7 @@ TEST_F(DynamicModuleClusterTest, LbMemberUpdateHostAddress) {
 
   auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   // When not in a membership update callback, the function should return false.
@@ -2830,7 +2921,7 @@ TEST_F(DynamicModuleClusterTest, HostsPerLocalityWithLocality) {
 
   // Verify through the LB that locality grouping works.
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   // Should have 2 locality buckets (the healthy hosts per locality).
@@ -2855,7 +2946,7 @@ TEST_F(DynamicModuleClusterTest, UpdateHostHealthAffectsHealthyHosts) {
   ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 1}, hosts));
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   // Both hosts should be healthy initially.
@@ -2883,7 +2974,7 @@ TEST_F(DynamicModuleClusterTest, LbFindHostByAddress) {
   ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 2}, hosts));
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   // Find existing host by address via the LB callback.
@@ -2920,7 +3011,7 @@ TEST_F(DynamicModuleClusterTest, LbGetHost) {
   ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 2}, hosts));
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   // Get host by index from all hosts.
@@ -2956,7 +3047,7 @@ TEST_F(DynamicModuleClusterTest, LbGetHostIncludesUnhealthy) {
   EXPECT_TRUE(cluster->updateHostHealth(hosts[0], envoy_dynamic_module_type_host_health_Unhealthy));
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   // get_host should still return both hosts.
@@ -2987,7 +3078,7 @@ TEST_F(DynamicModuleClusterTest, AddHostsToPriority) {
       addSimpleHosts(*cluster, {"127.0.0.1:10002", "127.0.0.1:10003"}, {1, 1}, hosts_p1, 1));
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   // Verify hosts at each priority level.
@@ -3025,7 +3116,7 @@ TEST_F(DynamicModuleClusterTest, AddHostsWithPriorityABI) {
 
   // Verify via LB.
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_lb_get_hosts_count(lb_ptr, 0));
@@ -3061,7 +3152,7 @@ TEST_F(DynamicModuleClusterTest, AddHostsWithLocalityAndPriorityABI) {
 
   // Verify via LB.
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_hosts_count(lb_ptr, 0));
@@ -3090,7 +3181,7 @@ TEST_F(DynamicModuleClusterTest, UpdateHostHealthAtNonZeroPriority) {
       addSimpleHosts(*cluster, {"127.0.0.1:10002", "127.0.0.1:10003"}, {1, 1}, hosts_p1, 1));
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
   auto* lb_ptr = static_cast<void*>(lb_instance.get());
 
   // All hosts should be healthy initially.
@@ -3112,6 +3203,54 @@ TEST_F(DynamicModuleClusterTest, UpdateHostHealthAtNonZeroPriority) {
   EXPECT_TRUE(
       cluster->updateHostHealth(hosts_p1[0], envoy_dynamic_module_type_host_health_Healthy));
   EXPECT_EQ(2, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(lb_ptr, 1));
+}
+
+// The load balancer must register its membership update callback on the priority set supplied at
+// construction, which production callers always fill with the worker local set from
+// ``LoadBalancerParams``. Reference equality against the constructor argument proves the
+// subscription target and would fail if the registration moved back to the cluster main set.
+TEST_F(DynamicModuleClusterTest, LbMemberUpdateCbRegistersOnWorkerLocalPrioritySet) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+
+  Upstream::PrioritySetImpl worker_local;
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, worker_local);
+
+  EXPECT_EQ(&lb_instance->memberUpdatePrioritySet(), &worker_local);
+  EXPECT_NE(&lb_instance->memberUpdatePrioritySet(), &cluster->prioritySet());
+}
+
+// Repeated construct, update, destroy cycle on the worker local priority set to cover the
+// subscribe and unsubscribe paths under sanitizer builds.
+TEST_F(DynamicModuleClusterTest, LbRepeatedConstructTeardownWithUpdates) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+
+  Upstream::PrioritySetImpl worker_priority_set;
+  worker_priority_set.getOrCreateHostSet(0);
+
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10101", "127.0.0.1:10102"}, {1, 1}, hosts));
+
+  for (int i = 0; i < 16; ++i) {
+    auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+    auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, worker_priority_set);
+
+    Upstream::HostVectorSharedPtr all_hosts(new Upstream::HostVector{hosts[0]});
+    worker_priority_set.updateHosts(
+        0,
+        Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
+        {}, {hosts[0]}, {}, absl::nullopt, absl::nullopt);
+
+    all_hosts = std::make_shared<Upstream::HostVector>(Upstream::HostVector{hosts[0], hosts[1]});
+    worker_priority_set.updateHosts(
+        0,
+        Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
+        {}, {hosts[1]}, {}, absl::nullopt, absl::nullopt);
+  }
 }
 
 } // namespace
