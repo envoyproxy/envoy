@@ -224,6 +224,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":filter_test_common_lib",
