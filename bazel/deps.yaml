@@ -889,6 +889,45 @@ fips_ninja:
   license: "Apache-2.0"
   license_url: "https://github.com/ninja-build/ninja/blob/v{version}/COPYING"
 
+fips_clang_ppc64le:
+  project_name: "Clang (Linux ppc64le)"
+  project_desc: "LLVM/Clang compiler for ppc64le FIPS builds"
+  project_url: "https://llvm.org/"
+  release_date: "2022-03-23"
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:llvm:clang:*"
+  license: "Apache-2.0 WITH LLVM-exception"
+  license_url: "https://github.com/llvm/llvm-project/blob/llvmorg-{version}/LICENSE.TXT"
+
+fips_go_ppc64le:
+  project_name: "Go (Linux ppc64le)"
+  project_desc: "Go programming language (Linux ppc64le)"
+  project_url: "https://golang.org/"
+  release_date: "2026-04-07"
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:golang:go:*"
+  license: "BSD-3-Clause"
+  license_url: "https://go.dev/LICENSE"
+
+fips_cmake_src:
+  project_name: "CMake (source)"
+  project_desc: "CMake built from source for ppc64le FIPS builds"
+  project_url: "https://cmake.org/"
+  release_date: "2026-04-21"
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:kitware:cmake:*"
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/Kitware/CMake/blob/v{version}/Copyright.txt"
+
 fp16:
   project_name: "Conversion to/from half-precision floating point formats"
   project_desc: "Header-only library for conversion to/from half-precision floating point formats."

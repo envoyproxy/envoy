@@ -10,6 +10,7 @@
 #include "source/common/quic/quic_network_connectivity_observer.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/scone_state.h"
 
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 
@@ -79,6 +80,7 @@ public:
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
   std::vector<std::string> GetAlpnsToOffer() const override;
   void OnConfigNegotiated() override;
+  void OnSconePacket(quic::QuicBandwidth bandwidth) override;
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
