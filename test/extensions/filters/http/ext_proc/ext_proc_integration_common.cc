@@ -841,12 +841,18 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
   uint32_t total_req_body_msg = 0;
   while (!end_stream) {
     ProcessingRequest body_request;
-    EXPECT_TRUE(processor_stream->waitForGrpcMessage(*dispatcher_, body_request));
+    if (!processor_stream->waitForGrpcMessage(*dispatcher_, body_request)) {
+      ADD_FAILURE() << "Timed out waiting for gRPC message in serverReceiveBodyDuplexStreamed";
+      return total_req_body_msg;
+    }
     if (response) {
       if (body_request.has_response_trailers()) {
         end_stream = true;
       } else {
-        EXPECT_TRUE(body_request.has_response_body());
+        if (!body_request.has_response_body()) {
+          ADD_FAILURE() << "Expected response body message but got unexpected message type";
+          return total_req_body_msg;
+        }
         body_received = absl::StrCat(body_received, body_request.response_body().body());
         end_stream = body_request.response_body().end_of_stream();
         total_req_body_msg++;
@@ -855,7 +861,10 @@ uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_vi
       if (body_request.has_request_trailers()) {
         end_stream = true;
       } else {
-        EXPECT_TRUE(body_request.has_request_body());
+        if (!body_request.has_request_body()) {
+          ADD_FAILURE() << "Expected request body message but got unexpected message type";
+          return total_req_body_msg;
+        }
         body_received = absl::StrCat(body_received, body_request.request_body().body());
         end_stream = body_request.request_body().end_of_stream();
         total_req_body_msg++;

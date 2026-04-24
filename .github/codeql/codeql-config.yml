@@ -1,0 +1,15 @@
+name: "Envoy CodeQL config"
+
+# The CodeQL workflows download a prebuilt clang bundle and untar it into
+# $GITHUB_WORKSPACE/bin/clang18.1.8/. Bazel is then pointed at that path via
+# BAZEL_LLVM_PATH, which causes CodeQL to see the bundled libc++ headers as
+# project source files. Alerts whose primary location is inside those headers
+# (e.g. cpp/new-free-mismatch in <vector>) are structural false positives
+# from dataflow losing precision across allocator/template instantiations --
+# they are not fixable in Envoy and are not indicative of real libc++ bugs.
+#
+# Scope is intentionally narrow: only libc++ (clang bundle) headers, matched
+# by the standard v1 layout. Do not broaden to bin/** or to libstdc++
+# (include/c++/** without the v1/ suffix).
+paths-ignore:
+- '**/include/c++/v1/**'
