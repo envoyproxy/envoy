@@ -1607,16 +1607,15 @@ TEST_F(MetricAggregatorTests, CounterAggregationDelta) {
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
 
-  metric_aggregator_->addCounter("metric1", /*value=*/10, /*delta=*/5,
+  metric_aggregator_->addCounter("metric1", /*value=*/5,
                                  MetricAggregator::SortedAttributesVector{{"key1", ""}});
-  metric_aggregator_->addCounter("metric2", /*value=*/20, /*delta=*/15,
+  metric_aggregator_->addCounter("metric2", /*value=*/15,
                                  MetricAggregator::SortedAttributesVector{{"key1", ""}});
   metric_aggregator_->addCounter(
-      "metric1", /*value=*/15, /*delta=*/10,
+      "metric1", /*value=*/10,
       MetricAggregator::SortedAttributesVector{{"key2", ""}}); // Diff attribute
-  metric_aggregator_->addCounter("metric1", /*value=*/25, /*delta=*/20,
-                                 MetricAggregator::SortedAttributesVector{
-                                     {"key1", ""}}); // Collides with first // Collides with first
+  metric_aggregator_->addCounter("metric1", /*value=*/20,
+                                 MetricAggregator::SortedAttributesVector{{"key1", ""}});
 
   auto metrics = metric_aggregator_->releaseResult();
   EXPECT_EQ(metrics.counter_data_.size(), 3);
@@ -1630,15 +1629,15 @@ TEST_F(MetricAggregatorTests, CounterAggregationCumulative) {
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
 
-  metric_aggregator_->addCounter("metric1", /*value=*/10, /*delta=*/5,
+  metric_aggregator_->addCounter("metric1", /*value=*/10,
                                  MetricAggregator::SortedAttributesVector{{"key1", ""}});
-  metric_aggregator_->addCounter("metric2", /*value=*/20, /*delta=*/15,
+  metric_aggregator_->addCounter("metric2", /*value=*/20,
                                  MetricAggregator::SortedAttributesVector{{"key1", ""}});
   metric_aggregator_->addCounter(
-      "metric1", /*value=*/15, /*delta=*/10,
+      "metric1", /*value=*/15,
       MetricAggregator::SortedAttributesVector{{"key2", ""}}); // Diff attribute
   metric_aggregator_->addCounter(
-      "metric1", /*value=*/25, /*delta=*/20,
+      "metric1", /*value=*/25,
       MetricAggregator::SortedAttributesVector{{"key1", ""}}); // Collides with first
 
   auto metrics = metric_aggregator_->releaseResult();
@@ -1658,10 +1657,10 @@ TEST_F(MetricAggregatorTests, CounterAggregationDifferentTagOrders) {
       {"a", "1"}, {"b", "2"}, {"c", "3"}}; // Identical!
 
   metric_aggregator_->addCounter(
-      "metric_perm", /*value=*/1, /*delta=*/1,
+      "metric_perm", /*value=*/1,
       MetricAggregator::SortedAttributesVector{{"a", "1"}, {"b", "2"}, {"c", "3"}});
   metric_aggregator_->addCounter(
-      "metric_perm", /*value=*/2, /*delta=*/2,
+      "metric_perm", /*value=*/2,
       MetricAggregator::SortedAttributesVector{{"a", "1"}, {"b", "2"}, {"c", "3"}});
 
   auto metrics = metric_aggregator_->releaseResult();
@@ -1882,9 +1881,9 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationCounter) {
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
 
-  streamer_->addCounter("metric1", 10, 10, {});
-  streamer_->addCounter("metric1", 20, 20, std::move(attr1));
-  streamer_->addCounter("metric1", 30, 30, std::move(attr2));
+  streamer_->addCounter("metric1", 10, {});
+  streamer_->addCounter("metric1", 20, std::move(attr1));
+  streamer_->addCounter("metric1", 30, std::move(attr2));
   streamer_->send();
   EXPECT_EQ(requests_.size(), 2);
 
@@ -1917,8 +1916,8 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoAggregationCounter) {
 
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
 
-  streamer_->addCounter("metric1", 10, 10, {});
-  streamer_->addCounter("metric1", 20, 20, std::move(attr1));
+  streamer_->addCounter("metric1", 10, {});
+  streamer_->addCounter("metric1", 20, std::move(attr1));
   streamer_->send();
 
   EXPECT_EQ(requests_.size(), 2);

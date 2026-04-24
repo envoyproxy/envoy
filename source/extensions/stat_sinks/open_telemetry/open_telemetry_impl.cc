@@ -36,13 +36,9 @@ void MetricAggregator::addGauge(std::string&& metric_name, uint64_t value,
   }
 }
 
-void MetricAggregator::addCounter(std::string&& metric_name, uint64_t value, uint64_t delta,
+void MetricAggregator::addCounter(std::string&& metric_name, uint64_t value,
                                   SortedAttributesVector&& attributes) {
-  const uint64_t point_value =
-      (counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta
-                                                                                      : value;
-  if (point_value == 0 &&
-      counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+  if (value == 0 && counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
 
@@ -50,9 +46,9 @@ void MetricAggregator::addCounter(std::string&& metric_name, uint64_t value, uin
   auto it = counter_data_.find(key);
 
   if (it != counter_data_.end()) {
-    it->second += point_value;
+    it->second += value;
   } else {
-    counter_data_.emplace(std::move(key), point_value);
+    counter_data_.emplace(std::move(key), value);
   }
 }
 
@@ -168,11 +164,11 @@ void RequestStreamer::addGauge(std::string&& name, uint64_t value,
   dp_num_++;
 }
 
-void RequestStreamer::addCounter(std::string&& name, uint64_t value, uint64_t delta,
+void RequestStreamer::addCounter(std::string&& name, uint64_t value,
                                  MetricAggregator::SortedAttributesVector&& attributes) {
   sendIfFull();
   auto temp = counter_temporality_;
-  if (delta == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
+  if (value == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
   auto* metric = findOrCreateMetric(std::move(name));
@@ -181,9 +177,7 @@ void RequestStreamer::addCounter(std::string&& name, uint64_t value, uint64_t de
     metric->mutable_sum()->set_aggregation_temporality(temp);
   }
   auto* point = metric->mutable_sum()->add_data_points();
-  const uint64_t point_value =
-      (temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value;
-  point->set_as_int(point_value);
+  point->set_as_int(value);
   setCommonFields(point, std::move(attributes), temp);
   dp_num_++;
 }
@@ -202,6 +196,7 @@ void RequestStreamer::addHistogram(std::string&& name, MetricAggregator::CustomH
   auto* point = metric->mutable_histogram()->add_data_points();
   point->set_count(hist.count_);
   point->set_sum(hist.sum_);
+  // TODO(taoxuy): support min/max/variance for histograms as per OTLP spec.
   for (double bound : hist.explicit_bounds_) {
     point->add_explicit_bounds(bound);
   }
@@ -233,7 +228,7 @@ void RequestStreamer::addAggregationResult(MetricAggregator::AggregationResult&&
   while (!metrics.counter_data_.empty()) {
     auto node = metrics.counter_data_.extract(metrics.counter_data_.begin());
     auto& key = node.key();
-    addCounter(key.releaseName(), node.mapped(), node.mapped(), key.releaseAttributes());
+    addCounter(key.releaseName(), node.mapped(), key.releaseAttributes());
   }
   while (!metrics.histogram_data_.empty()) {
     auto node = metrics.histogram_data_.extract(metrics.histogram_data_.begin());
@@ -395,6 +390,7 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
   }
 
   // Process Counters
+  const bool report_counters_as_deltas = config_->reportCountersAsDeltas();
   for (const auto& counter : snapshot.counters()) {
     const auto& c = counter.counter_.get();
     if (predicate_(c)) {
@@ -402,7 +398,8 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
       if (metric_config.drop_stat) {
         continue;
       }
-      sink.addCounter(getMetricName(c, metric_config.conversion_action), c.value(), counter.delta_,
+      const uint64_t counter_value = report_counters_as_deltas ? counter.delta_ : c.value();
+      sink.addCounter(getMetricName(c, metric_config.conversion_action), counter_value,
                       getCombinedAttributes(c, metric_config.conversion_action));
     }
   }
@@ -411,12 +408,13 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
     if (metric_config.drop_stat) {
       continue;
     }
-    sink.addCounter(getMetricName(counter, metric_config.conversion_action), counter.value(),
-                    counter.delta(),
+    const uint64_t counter_value = report_counters_as_deltas ? counter.delta() : counter.value();
+    sink.addCounter(getMetricName(counter, metric_config.conversion_action), counter_value,
                     getCombinedAttributes(counter, metric_config.conversion_action));
   }
 
   // Process Histograms
+  const bool report_histograms_as_deltas = config_->reportHistogramsAsDeltas();
   for (const auto& histogram : snapshot.histograms()) {
     const auto& h = histogram.get();
     if (predicate_(h)) {
@@ -425,7 +423,7 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
         continue;
       }
       const Stats::HistogramStatistics& histogram_stats =
-          config_->reportHistogramsAsDeltas() ? h.intervalStatistics() : h.cumulativeStatistics();
+          report_histograms_as_deltas ? h.intervalStatistics() : h.cumulativeStatistics();
       sink.addHistogram(getMetricName(h, metric_config.conversion_action), histogram_stats,
                         getCombinedAttributes(h, metric_config.conversion_action));
     }

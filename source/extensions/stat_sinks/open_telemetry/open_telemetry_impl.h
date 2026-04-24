@@ -123,10 +123,9 @@ public:
   // same attributes exists.
   void addGauge(std::string&& metric_name, uint64_t value, SortedAttributesVector&& attributes);
 
-  // Adds a counter metric data point. Aggregates by summing the delta or value
-  // based on temporality if a point with the same attributes exists.
-  void addCounter(std::string&& metric_name, uint64_t value, uint64_t delta,
-                  SortedAttributesVector&& attributes);
+  // Adds a counter metric data point. Aggregates by summing if a point with the
+  // same attributes exists. The provided value should already respect the configured temporality.
+  void addCounter(std::string&& metric_name, uint64_t value, SortedAttributesVector&& attributes);
 
   // Adds a histogram metric data point. Aggregates counts and sums if a point
   // with the same attributes and compatible bounds exists.
@@ -163,7 +162,7 @@ public:
                 MetricAggregator::SortedAttributesVector&& attributes);
 
   // Adds a counter metric data point to the streamer.
-  void addCounter(std::string&& name, uint64_t value, uint64_t delta,
+  void addCounter(std::string&& name, uint64_t value,
                   MetricAggregator::SortedAttributesVector&& attributes);
 
   // Adds a custom histogram data point to the streamer.
