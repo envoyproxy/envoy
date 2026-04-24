@@ -182,8 +182,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/gperftools/gperftools/releases/download/gperftools-{version}/gperftools-{version}.tar.gz"],
     ),
     jemalloc = dict(
-        version = "5.3.0",
-        sha256 = "2db82d1e7119df3e71b7640219b6dfe84789bc0537983c3b7ac4f7189aecfeaa",
+        version = "5.3.1",
+        sha256 = "3826bc80232f22ed5c4662f3034f799ca316e819103bdc7bb99018a421706f92",
         strip_prefix = "jemalloc-{version}",
         urls = ["https://github.com/jemalloc/jemalloc/releases/download/{version}/jemalloc-{version}.tar.bz2"],
     ),
