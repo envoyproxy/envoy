@@ -449,6 +449,115 @@ TEST_F(SetMetadataFilterTest, LogsErrorWhenNoValueConfigured) {
       runFilter(metadata, yaml_config));
 }
 
+TEST_F(SetMetadataFilterTest, RouteSpecificConfigOverride) {
+  const std::string global_yaml = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      value:
+        global_key: global_val
+  )EOF";
+
+  const std::string route_yaml = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      value:
+        route_key: route_val
+      allow_overwrite: true
+  )EOF";
+
+  envoy::extensions::filters::http::set_metadata::v3::Config proto_global_config;
+  TestUtility::loadFromYaml(global_yaml, proto_global_config);
+  NiceMock<Stats::MockIsolatedStatsStore> local_stats_store;
+  config_ = std::make_shared<Config>(proto_global_config, *local_stats_store.rootScope(), "");
+  filter_ = std::make_shared<SetMetadataFilter>(config_);
+
+  envoy::extensions::filters::http::set_metadata::v3::Config proto_route_config;
+  TestUtility::loadFromYaml(route_yaml, proto_route_config);
+  auto route_config =
+      std::make_shared<Config>(proto_route_config, *local_stats_store.rootScope(), "");
+
+  Http::TestRequestHeaderMapImpl headers;
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+      .WillRepeatedly(testing::Return(route_config.get()));
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(req_info));
+  EXPECT_CALL(req_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+
+  const auto& filter_metadata = metadata.filter_metadata();
+  const auto it_namespace = filter_metadata.find("thenamespace");
+  ASSERT_NE(it_namespace, filter_metadata.end());
+  const auto& fields = it_namespace->second.fields();
+
+  const auto it_global = fields.find("global_key");
+  ASSERT_NE(it_global, fields.end());
+  EXPECT_EQ(it_global->second.string_value(), "global_val");
+
+  const auto it_route = fields.find("route_key");
+  ASSERT_NE(it_route, fields.end());
+  EXPECT_EQ(it_route->second.string_value(), "route_val");
+}
+
+TEST_F(SetMetadataFilterTest, RouteSpecificConfigOverwriteDenied) {
+  const std::string global_yaml = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      value:
+        key: global_val
+  )EOF";
+
+  const std::string route_yaml = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      value:
+        key: route_val
+  )EOF";
+
+  envoy::extensions::filters::http::set_metadata::v3::Config proto_global_config;
+  TestUtility::loadFromYaml(global_yaml, proto_global_config);
+  NiceMock<Stats::MockIsolatedStatsStore> local_stats_store;
+  config_ = std::make_shared<Config>(proto_global_config, *local_stats_store.rootScope(), "");
+  filter_ = std::make_shared<SetMetadataFilter>(config_);
+
+  envoy::extensions::filters::http::set_metadata::v3::Config proto_route_config;
+  TestUtility::loadFromYaml(route_yaml, proto_route_config);
+  auto route_config =
+      std::make_shared<Config>(proto_route_config, *local_stats_store.rootScope(), "");
+
+  Http::TestRequestHeaderMapImpl headers;
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+      .WillRepeatedly(testing::Return(route_config.get()));
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(req_info));
+  EXPECT_CALL(req_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+
+  const auto& filter_metadata = metadata.filter_metadata();
+  const auto it_namespace = filter_metadata.find("thenamespace");
+  ASSERT_NE(it_namespace, filter_metadata.end());
+  const auto& fields = it_namespace->second.fields();
+
+  const auto it_global = fields.find("key");
+  ASSERT_NE(it_global, fields.end());
+  EXPECT_EQ(it_global->second.string_value(), "global_val");
+
+  EXPECT_EQ(1, route_config->stats().overwrite_denied_.value());
+}
+
 } // namespace SetMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions
