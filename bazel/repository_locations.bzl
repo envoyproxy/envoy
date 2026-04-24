@@ -30,8 +30,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "bazel_features-{version}",
     ),
     bazel_gazelle = dict(
-        version = "0.47.0",
-        sha256 = "675114d8b433d0a9f54d81171833be96ebc4113115664b791e6f204d58e93446",
+        version = "0.50.0",
+        sha256 = "92329a7dbb26d0beacc43da669211546ea6627582793f4dd5f28837fde3a5c08",
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
     ),
     build_bazel_rules_apple = dict(
