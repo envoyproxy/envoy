@@ -410,6 +410,9 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
     quic_config.SetIdleNetworkTimeout(quic::QuicTimeDelta::FromSeconds(
         DurationUtil::durationToSeconds(config.idle_network_timeout())));
   }
+  if (config.has_enable_scone()) {
+    quic_config.set_parse_scone_packets(config.enable_scone().value());
+  }
 }
 
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,

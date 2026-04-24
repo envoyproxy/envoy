@@ -1,5 +1,5 @@
 {
-  "checksum": "f853e38d6b1ff233bd49d987189c7baf375aecdb13730d651420d43946303a37",
+  "checksum": "9e9be21e7a4781243f0bd2c76b8dfcb754ff750302be2a13d401ef862b6b3297",
   "crates": {
     "aho-corasick 1.1.4": {
       "name": "aho-corasick",
@@ -6532,7 +6532,7 @@
               "alias": "pki_types"
             },
             {
-              "id": "rustls-webpki 0.103.12",
+              "id": "rustls-webpki 0.103.13",
               "target": "webpki"
             },
             {
@@ -6633,14 +6633,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "rustls-webpki 0.103.12": {
+    "rustls-webpki 0.103.13": {
       "name": "rustls-webpki",
-      "version": "0.103.12",
+      "version": "0.103.13",
       "package_url": "https://github.com/rustls/webpki",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/rustls-webpki/0.103.12/download",
-          "sha256": "8279bb85272c9f10811ae6a6c547ff594d6a7f3c6c6b02ee9726d1d0dcfcdd06"
+          "url": "https://static.crates.io/crates/rustls-webpki/0.103.13/download",
+          "sha256": "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
         }
       },
       "targets": [
@@ -6689,7 +6689,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.103.12"
+        "version": "0.103.13"
       },
       "license": "ISC",
       "license_ids": [

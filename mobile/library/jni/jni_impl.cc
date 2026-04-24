@@ -1183,6 +1183,7 @@ void configureBuilder(
   builder.enableBrotliDecompression(enable_brotli_decompression == JNI_TRUE);
   builder.enableSocketTagging(enable_socket_tagging == JNI_TRUE);
   builder.enableHttp3(enable_http3 == JNI_TRUE);
+  // TODO(bsoumith): Expose enable_scone to mobile language bindings
   builder.enableEarlyData(enable_early_data == JNI_TRUE);
   builder.setHttp3ConnectionOptions(
       Envoy::JNI::javaStringToCppString(jni_helper, http3_connection_options));

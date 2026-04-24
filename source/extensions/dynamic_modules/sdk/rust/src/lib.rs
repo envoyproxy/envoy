@@ -609,6 +609,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `tracer:` — [`NewTracerConfigFunction`] for tracers
 /// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
 /// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
+/// - `access_logger:` — [`NewAccessLoggerConfigFunction`] for access loggers
 ///
 /// # Examples
 ///
@@ -797,6 +798,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION,
       $fn,
       "NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION"
+    );
+  };
+  (@register access_logger : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_ACCESS_LOGGER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_ACCESS_LOGGER_CONFIG_FUNCTION"
     );
   };
 }
@@ -1024,6 +1032,28 @@ macro_rules! declare_bootstrap_init_functions {
     }
   };
 }
+
+// =================================================================================================
+// Access Logger Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new access logger configuration.
+///
+/// The `ctx` provides access to the metrics-defining APIs that should be invoked at
+/// configuration time. The `name` is the value of `logger_name` from the `dynamic_modules`
+/// access-log configuration, allowing a single module to dispatch to different logger
+/// implementations. Returning `None` causes Envoy to reject the access-log configuration.
+pub type NewAccessLoggerConfigFunction = fn(
+  ctx: &access_log::ConfigContext,
+  name: &str,
+  config: &[u8],
+) -> Option<Box<dyn access_log::AccessLoggerConfig>>;
+
+/// The global factory function for access logger configurations. This is set via the
+/// `access_logger:` arm of [`declare_all_init_functions!`] (or the legacy
+/// [`declare_access_logger!`] shim) and is not intended to be set directly.
+pub static NEW_ACCESS_LOGGER_CONFIG_FUNCTION: OnceLock<NewAccessLoggerConfigFunction> =
+  OnceLock::new();
 
 // =================================================================================================
 // Cluster Dynamic Module

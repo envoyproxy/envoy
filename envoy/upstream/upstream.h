@@ -751,6 +751,7 @@ public:
   COUNTER(upstream_rq_completed)                                                                   \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
   COUNTER(upstream_rq_max_duration_reached)                                                        \
+  COUNTER(upstream_rq_active_overflow)                                                             \
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
