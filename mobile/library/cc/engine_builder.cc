@@ -237,6 +237,11 @@ EngineBuilder& EngineBuilder::enableEarlyData(bool early_data_on) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enableScone(bool enable) {
+  scone_enabled_ = enable;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addQuicConnectionOption(std::string option) {
   quic_connection_options_.push_back(std::move(option));
   return *this;
@@ -964,6 +969,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         migration_setting->mutable_max_time_on_non_default_network()->set_seconds(
             max_time_on_non_default_network_seconds_);
       }
+    }
+
+    if (scone_enabled_) {
+      quic_protocol_options->mutable_enable_scone()->set_value(true);
     }
 
     if (use_quic_platform_packet_writer_ || enable_quic_connection_migration_) {

@@ -390,7 +390,7 @@ envoy.filters.http.geoip:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.geoip.v3.Geoip
 envoy.filters.network.geoip:

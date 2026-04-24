@@ -47,8 +47,9 @@ absl::Status ThreadLocalGenericSecretProvider::update() {
     RETURN_IF_NOT_OK_REF(value_or_error.status());
     value = std::move(value_or_error.value());
   }
-  tls_->runOnAllThreads(
-      [value = std::move(value)](OptRef<ThreadLocalSecret> tls) { tls->value_ = value; });
+  tls_->set([value = std::move(value)](Event::Dispatcher&) {
+    return std::make_shared<ThreadLocalSecret>(value);
+  });
   return absl::OkStatus();
 }
 
