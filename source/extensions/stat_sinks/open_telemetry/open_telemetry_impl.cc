@@ -361,6 +361,8 @@ MetricAggregator::SortedAttributesVector OtlpMetricsFlusherImpl::getCombinedAttr
   }
   // Sort attributes to ensure a deterministic order, which is critical since these
   // attributes are used as part of the lookup key for metric aggregation.
+  // For the typical small number of attributes per metric (usually < 10), a
+  // simple std::sort on a small InlinedVector is extremely fast
   std::sort(attrs.begin(), attrs.end());
 
   return MetricAggregator::SortedAttributesVector(std::move(attrs));
