@@ -378,7 +378,7 @@ macro_rules! envoy_log {
 macro_rules! set_factory_once {
   ($static:expr, $fn:expr, $name:literal) => {
     if let Err(new_val) = $static.set($fn) {
-      if *$static.get().unwrap() != new_val {
+      if !::std::ptr::fn_addr_eq(*$static.get().unwrap(), new_val) {
         $crate::envoy_log_critical!(
           "Duplicate factory registration for {}. A different module already registered this \
            factory. Check dynamic_module_config for conflicting standalone and consolidated \
