@@ -85,8 +85,7 @@ SanMatcherPtr createStringSanMatcher(
                                                             context, std::move(oid))};
   }
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SAN_TYPE_UNSPECIFIED:
-    IS_ENVOY_BUG("SAN_TYPE_UNSPECIFIED is not a valid san_type");
-    return nullptr;
+    PANIC("unhandled value");
   }
   return nullptr;
 }
