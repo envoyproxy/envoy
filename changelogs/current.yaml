@@ -2,20 +2,413 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: tcp_proxy
+  change: |
+    The TCP proxy filter now requires :ref:`max_early_data_bytes
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>` to be
+    explicitly set when using :ref:`upstream_connect_mode
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>` modes
+    other than ``IMMEDIATE`` (i.e., ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``). The field
+    can be set to ``0`` to disable early data buffering while still using delayed connection modes.
+    Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
+- area: on_demand
+  change: |
+    The on-demand filter, when doing on-demand CDS, will no longer do internal redirects after CDS is
+    successful. Filters appearing in the filter chain before the on-demand filter will no longer be
+    invoked twice. This behavior can be temporarily reverted by setting the runtime guard
+    ``envoy.reloadable_features.on_demand_cluster_no_recreate_stream`` to ``false``.
+- area: boringssl/fips
+  change: |
+    The previous flag for specifying FIPS builds (i.e., ``--define=boringssl=fips``) will no longer work and
+    has been replaced by ``--config=boringssl-fips``. This change will allow us to better support custom
+    SSL libraries, and will allow FIPS-compliant Envoy to be built with the imminent switch to Bazel bzlmod.
+- area: tls
+  change: |
+    Set
+    :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`
+    to ``true`` by default. The handshake will fail if the keyUsage extension is present and incompatible with the TLS usage. In
+    the next version of Envoy, this option will be removed and the enforcing behavior will always be used.
+- area: ext_proc
+  change: |
+    The ``processing_effect_lib`` has been moved from the :ref:`extensions/filters/http/ext_proc
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` namespace to the
+    ``extensions/filters/common/processing_effect`` namespace. All path references within the Envoy
+    codebase have been updated.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: geoip
+  change: |
+    :ref:`Envoy Http Geoip filter extension
+    <envoy_v3_api_msg_extensions.filters.http.geoip.v3.Geoip>` has been promoted to stable status.
+- area: load_balancing
+  change: |
+    Changed the default behavior of ``OrcaWeightManager`` to prefer named metrics over application
+    utilization when computing utilization. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.orca_weight_manager_use_named_metrics_first`` to ``false``.
+- area: compressor
+  change: |
+    Strong ``ETag`` removal when compressing now uses the same weak ``W/`` check as
+    :ref:`weaken_etag_on_compress
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.weaken_etag_on_compress>`.
+    Previously removal applied only when ``ETag`` length was greater than 2; two-character strong
+    values are now removed as well (the only two-character weak form is ``W/``).
+- area: memory
+  change: |
+    Replaced the custom timer-based tcmalloc memory release with tcmalloc's native
+    ``ProcessBackgroundActions`` and ``SetBackgroundReleaseRate`` APIs. This provides more comprehensive
+    background memory management including per-CPU cache reclamation, cache shuffling, and size class
+    resizing, in addition to memory release. The ``tcmalloc.released_by_timer`` stat has been removed.
+- area: mcp
+  change: |
+    Changed the default metadata namespace for the MCP filter from ``mcp_proxy`` to ``envoy.filters.http.mcp``.
+    This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.mcp_filter_use_new_metadata_namespace`` to ``false``.
+- area: ext_authz
+  change: |
+    Changed the behavior of ``timeout: 0s`` in the HTTP ext_authz filter to mean "no timeout" (infinite)
+    instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
+    This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
+- area: ratelimit
+  change: |
+    Changed the behavior of ``timeout: 0s`` in the HTTP rate limit filter to mean "no timeout" (infinite)
+    instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
+    This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
+- area: upstream
+  change: |
+    EDS host metadata comparison during ``updateDynamicHostList`` now uses a cached metadata hash
+    instead of ``MessageDifferencer::Equivalent``. The hash is computed once when metadata is set,
+    making per-host comparison O(1). In rare cases where two semantically equivalent metadata messages
+    have different serializations, this may cause a spurious metadata update (false positive) but will
+    never miss an actual change.
+- area: upstream
+  change: |
+    ``ProdClusterInfoFactory`` now honors ``alt_stat_name`` when creating cluster stats scopes, so
+    stats emitted through that path use the alternate cluster name consistently with other upstream
+    cluster implementations.
+- area: histograms
+  change: |
+    Updated libcircllhist to 0.3.2, which changes how bucket bounds are interpreted. This should not impact
+    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted
+    to account for histogram changes.
+- area: stat_sinks
+  change: |
+    OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
+    stopped reporting empty delta counters and histograms.
+- area: mcp
+  change: |
+    Relaxed the MCP filter POST Content-Type check from an exact match on ``application/json`` to a
+    prefix match, so that ``application/json; charset=utf-8`` and similar media-type parameters are
+    accepted.
+- area: ext_proc
+  change: |
+    Added ``received_immediate_response`` flag in the ``ExtProcLoggingInfo`` filter state.
+- area: happy_eyeballs
+  change: |
+    Happy Eyeballs now handles interleaving of non-IP addresses. The restriction against ``additional_addresses``
+    containing non-IP addresses is removed. This behavior can be reverted by setting the runtime
+    guard ``envoy.reloadable_features.happy_eyeballs_sort_non_ip_addresses`` to ``false``.
+- area: ext_authz
+  change: |
+    Added tracking bits for processing effect for request headers and failed open occurrence in the
+    ``ExtAuthzLoggingInfo``. This new data will be automatically collected and can be accessed via
+    ``requestProcessingEffect()`` and ``failedOpen()``.
+- area: dynamic_modules
+  change: |
+    Now all the dynamic module extension factories (HTTP, network, listener, UDP listener, and so on) will
+    serialize the ``google.protobuf.Struct`` configuration message to JSON string and pass it to the
+    dynamic module side as the configuration.
+- area: oauth2
+  change: |
+    Added :ref:`per-route configuration support <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2PerRoute>`
+    to the OAuth2 HTTP filter.
+- area: oauth2
+  change: |
+    The OAuth2 filter now removes the ``OauthExpires`` cookie from a user's browser upon logging out.
+    Previously this cookie persisted beyond the logout despite the session no longer existing.
+- area: proto_api_scrubber
+  change: |
+    If :ref:`scrub_unknown_fields
+    <envoy_v3_api_field_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig.scrub_unknown_fields>`
+    is set to ``true`` in the :ref:`ProtoApiScrubberConfig
+    <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig>`,
+    unknown fields will now be scrubbed. This is disabled by default.
+- area: http
+  change: |
+    The ``route()``, ``clusterInfo()`` and ``virtualHost()`` methods on the HTTP filter callbacks
+    and stream info interfaces now are refactored to return ``OptRef<const T>`` instead of shared
+    pointers. And additional methods ``routeSharedPtr()``, ``clusterInfoSharedPtr()`` and
+    ``virtualHostSharedPtr()`` are added to return shared pointers.
+    The shorter ``route()``, ``clusterInfo()`` and ``virtualHost()`` methods are preferred for
+    most use cases where the returned reference is not used beyond the scope of the current function
+    and the caller does not want to manage shared pointer ownership. The new shared pointer methods
+    are intended for use cases where the caller needs to keep the ownerships to the route, cluster,
+    or virtual host.
+- area: http
+  change: |
+    ``StreamRateLimiter`` constructor was updated to always take a pre-constructed and initialized
+    ``TokenBucket``, and remove the first argument ``max_buffered_data`` and the ``TimeSource&``
+    argument.
+    The ``write_stats_cb`` callback signature was changed from taking a ``bool`` argument
+    "something is buffered" to a ``uint64_t`` "how many bytes are buffered".
+    If already initializing with a ``TokenBucket``, you may need to call ``maybeReset`` on that
+    bucket before passing it to ``StreamRateLimiter`` to ensure equivalent initialization.
+    If previously constructing a ``StreamRateLimiter`` using ``max_buffered_data``, use
+    ``StreamRateLimiter::simpleTokenBucket(limit_kbps, time_source)`` to initialize an equivalent
+    ``TokenBucket``.
+- area: http
+  change: |
+    Strict parsing of HTTP/1 chunked encoding is now available. It is disabled by default and can be
+    enabled by setting the runtime guard ``envoy.reloadable_features.strict_chunk_parsing`` to ``true``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: grpc
+  change: |
+    Fixed the router to return ``DEADLINE_EXCEEDED`` (gRPC status ``4``) instead of ``UNAVAILABLE`` (gRPC
+    status ``14``) when the router itself enforces a gRPC request timeout. Previously, the router sent an
+    HTTP ``504`` local reply which was mapped to ``UNAVAILABLE`` via the standard HTTP-to-gRPC status mapping,
+    causing clients to incorrectly retry requests that had already timed out. This behavior is disabled
+    by default and can be enabled by setting the runtime guard
+    ``envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded`` to ``true``.
+- area: quic
+  change: |
+    Fixed HTTP/3 client connection pool to handle early data request correctly with asynchronous certificates
+    validation. This change is gated by the runtime guard ``envoy.reloadable_features.fix_http3_early_data_timing``.
+- area: router
+  change: |
+    Fixed a bug where the router's buffer overflow check double-counted the request body size when an
+    upstream filter (e.g. the buffer filter) had already buffered all data. This caused requests with
+    body size between half and full buffer limit to incorrectly cancel internal redirects.
+- area: router
+  change: |
+    Fixed a crash in scoped RDS when on-demand update is triggered for a scope that uses inline
+    ``route_configuration`` instead of ``route_configuration_name``. The null RDS provider dereference
+    is now guarded and the on-demand callback returns ``false`` for inline-config scopes.
+- area: hot_restart
+  change: |
+    Fixed hot restart for listeners with a network namespace in the address. Previously, socket
+    hand-off didn't work cleanly because the namespace was not included in the ``PassListenSocket``
+    request, causing the parent to always fall back to binding a new socket.
 - area: dynamic_modules
   change: |
-    Fixed a crashing bug in the HTTP filter when a stream was already above the downstream write-buffer
-    high watermark at filter-chain construction time. Downstream watermark callback registration is
-    now deferred until the in-module filter has been constructed.
+    Fixed the dynamic modules network filter to always set a local close reason when closing connections. This
+    resolves an error when a dynamic modules network filter closes a connection that has an HTTP filter present.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module extensions do not handle the ``google.protobuf.Struct`` configuration
+    properly as the API definition requires.
+    The dynamic module extension factories now serialize the ``Struct`` to JSON string and pass the string
+    to the dynamic module side as the configuration.
+- area: http_11_proxy
+  change: |
+    Fixed bug where providing an empty inner socket config would cause Envoy to crash.
+- area: tls
+  change: |
+    Fixed on-demand TLS selector to enforce session resumption settings.
+- area: http
+  change: |
+    Fixed crash if a downstream watermark is hit by network filter writes before the HTTP codec is created.
+- area: http
+  change: |
+    Allow ``Keep-Alive`` response headers added via ``response_headers_to_add`` to be preserved instead
+    of being stripped by HCM sanitization. Upstream ``Keep-Alive`` headers are now stripped in the router
+    before user-configured response headers are applied, so user-added ``Keep-Alive`` headers survive.
+    Protected by runtime guard ``envoy.reloadable_features.preserve_downstream_keepalive``.
+- area: http
+  change: |
+    Fixed a bug where the internal redirect logic may hang up a request when the request buffer is
+    overflowed.
+- area: load_report
+  change: |
+    Fixed a race condition during load-report shutdown with the ADS stream by introducing proper cleanup
+    of the gRPC stream.
+- area: http
+  change: |
+    Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec
+    completion) would not be properly closed when in draining state. This could occur when a response was
+    sent before the request was fully received, causing connections to remain open indefinitely. This change
+    can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
+- area: overload_manager
+  change: |
+    Fixed a resource leak in global connection limit tracking that caused permanent connection rejections
+    when using load shedding (e.g., ``envoy.load_shed_points.tcp_listener_accept``). When connections were
+    rejected due to load shedding after passing the global connection limit check, the allocated connection
+    limit resource was not released, causing the connection counter to become incorrect and leading to
+    ``failed_updates`` in the resource monitor. This resulted in permanent connection rejections even after
+    load subsided. The fix ensures that connection limit resources are properly released when connections
+    are rejected due to load shedding. Also added defensive resource cleanup for edge cases where address
+    processing fails (e.g., ``localAddress()`` or ``peerAddress()`` errors).
+- area: drop_overload
+  change: |
+    Fixed a bug where ``drop_overload`` failed to use cached EDS resources.
+- area: scoped_rds
+  change: |
+    Fixed a bug where SRDS subscriptions would never start when a listener with scoped routes was
+    added after server initialization completed. The ``SrdsFactory`` interface
+    was incorrectly using the server-level init manager instead of the listener-level init manager,
+    causing the SRDS init target to be silently discarded.
+- area: xds
+  change: |
+    Fixed a bug where in delta-xDS when xDS-Failover is configured (gated by the experimental
+    ``envoy.restart_features.xds_failover_support`` runtime guard), in some cases the
+    :ref:`initial_resource_versions <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.initial_resource_versions>`
+    field was not updated correctly when attempting to reconnect to the xDS server.
+- area: odcds
+  change: |
+    Fixed a bug where using OD-CDS in tcp_proxy over ADS would not work in some
+    cases. This change could be reverted temporarily by setting the runtime guard
+    ``envoy.reloadable_features.tcp_proxy_odcds_over_ads_fix`` to ``false``.
+- area: http
+  change: |
+    Fixed upstream client to not close connection when idle timeout fires before the connection is
+    established. This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
+- area: oauth2
+  change: |
+    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
+- area: watchdog
+  change: |
+    Fixed a bug where the worker thread watchdogs were configured using the main thread's configuration.
+    This change can be reverted by setting the runtime guard ``envoy.restart_features.worker_threads_watchdog_fix``
+    to ``false``.
+- area: ext_proc
+  change: |
+    Fixed a bug that prevented two ext_proc filters from being configured in the same filter chain. This
+    change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.ext_proc_inject_data_with_state_update`` to ``false``.
+- area: ext_proc
+  change: |
+    Fixed message-valued CEL attribute serialization (for example
+    ``xds.virtual_host_metadata``) to use protobuf text format instead of debug string output.
+    This restores ext_proc compatibility with protobuf 30+ where debug-string output is
+    intentionally not parseable (for example ``goo.gle/debugonly`` prefixes). This change can
+    be reverted by setting runtime guard
+    ``envoy.reloadable_features.cel_message_serialize_text_format`` to ``false``.
+- area: ext_proc
+  change: |
+    Fixed a bug where unnecessary empty data chunks are processed by the filter chain. This
+    change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.ext_proc_return_stop_iteration`` to ``false``.
+- area: ratelimit
+  change: |
+    Fixed a bug in the gRPC rate limit client where the client could get into a bad state if the
+    callbacks were not properly released after a request completion, leading to potential use-after-free
+    issues. The fix ensures that callbacks and request references are cleared after completion, and adds
+    assertions to enforce correct usage patterns.
+- area: ext_authz
+  change: |
+    Fixed a bug where headers from a denied authorization response (non-``200``) were not properly propagated
+    to the client.
+- area: formatter
+  change: |
+    Added support for the ``UPSTREAM_LOCAL_CLOSE_REASON`` log formatter.
+- area: formatter
+  change: |
+    Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
+    ``ConnectionInfoProvider`` in the ``StreamInfo``.
+- area: spiffe
+  change: |
+    Reduced the number of file watches needed by :ref:`trust_bundles
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>` when the validator
+    is used in multiple places. Added support for :ref:`watched_directory
+    <envoy_v3_api_field_config.core.v3.datasource.watched_directory>` to support Kubernetes environments that rely on
+    atomic symbolic file updates. Added content hashing during file watching to handle excessive watch notifications.
+- area: odcds
+  change: |
+    Fixed a crash (SIGABRT) when destroying OdCDS handles on worker threads. The handle no longer holds
+    a direct reference to the subscription, preventing thread-safety issues during destruction. The
+    subscription now persists in ``ClusterManagerImpl`` and is looked up by a config source key.
+- area: ext_authz
+  change: |
+    Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the authorization
+    server returns a 5xx error or when HTTP call failures occur. Previously, these error scenarios always
+    returned ``403 Forbidden`` regardless of the configured error status.
+- area: release
+  change: |
+    Published contrib binaries now include the ``-contrib`` suffix in their version string.
+- area: header_mutation
+  change: |
+    Fixed an issue where query parameter values added via ``query_parameter_mutations`` were not URL-encoded,
+    allowing query parameter injection attacks. Values from formatters like ``%REQ(header)%`` are now properly
+    URL-encoded when added to the query string. This behavior is controlled by the runtime guard
+    ``envoy.reloadable_features.header_mutation_url_encode_query_params``.
+- area: mcp_router
+  change: |
+    Fixed MCP router to support session-less backends that do not return ``mcp-session-id``
+    headers. Previously, this caused a spurious ``500`` error.
+- area: health_check
+  change: |
+    Fixed a race condition where active health checks could start before required upstream TLS SDS secrets
+    were fetched, causing intermittent health check failures `#43116 <https://github.com/envoyproxy/envoy/issues/43116>`_.
+    This fix can be disabled by setting runtime guard ``envoy.reloadable_features.health_check_after_cluster_warming``
+    to ``false``.
+- area: upstream
+  change: |
+    Fixed an out-of-bounds issue in ``ThreadAwareLoadBalancerBase`` that could occur during mid-batch EDS host updates
+    due to eagerly calling ``refresh()`` before the deferred priority state resize.
+- area: upstream
+  change: |
+    Fixed ``ProdClusterInfoFactory`` of HDS to honor ``alt_stat_name`` when creating cluster stats scopes, so
+    stats emitted through that path now use the alternate cluster name consistently with other upstream
+    cluster implementations.
+- area: access_log
+  change: |
+    Fixed a crash on listener removal with a process-level access log rate limiter
+    :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: json
+  change: |
+    Fixed an off-by-one write in ``JsonEscaper::escapeString()`` that could corrupt the string null terminator
+    when the input string ends with a control character.
+- area: network
+  change: |
+    Fixed a crash in ``Utility::getAddressWithPort`` when called with a scoped IPv6 address (e.g., ``fe80::1%eth0``).
+- area: rbac
+  change: |
+    Fixed RBAC header matcher to validate each header value individually instead of concatenating multiple header values
+    into a single string. This prevents potential bypasses when requests contain multiple values for the same header.
+    The new behavior is enabled by the runtime guard ``envoy.reloadable_features.rbac_match_headers_individually``.
+- area: contrib
+  change: |
+    Fixed a segfault from a timer thread-safety violation, a ring buffer overflow, and incorrect alpha
+    calculation in the ``peak_ewma`` load balancer.
+- area: http
+  change: |
+    Fixed an issue where filter chain execution could continue on HTTP streams that had been reset but not yet
+    destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
+    had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
+    ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where dynamic module filter may result in an incomplete body being sent to upstream
+    or downstream when some filters before or after the dynamic module filter in the chain
+    buffered the body and the dynamic module filter did not.
+- area: io_socket
+  change: |
+    Fixed an issue where a userspace IO socket could fail to drain the write buffer of a connection
+    when the peer had closed for reads, causing the connection to remain open indefinitely.
+- area: config_validation
+  change: |
+    Fixed ``--mode validate`` to create bootstrap extensions during config validation. Previously,
+    bootstrap extensions were completely skipped in validation mode, which meant their configs were
+    not validated and any providers or singletons they register were unavailable to downstream config
+    elements that depend on them.
+- area: http2
+  change: |
+    Apply nghttp2 CVE-2026-27135 patch.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: oauth2
+  change: |
+    Removed the runtime guard ``envoy.reloadable_features.oauth2_encrypt_tokens``. Token cookies (access,
+    ID, refresh) remain encrypted by default; use the ``disable_token_encryption`` filter configuration
+    to turn encryption off if needed.
+- area: tcp_proxy
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection``
+    and legacy code path.
 
 new_features:
 - area: router
@@ -67,8 +460,8 @@ new_features:
   change: |
     Added :ref:`ShrinkHeapConfig <envoy_v3_api_msg_config.overload.v3.ShrinkHeapConfig>` typed
     configuration for the ``envoy.overload_actions.shrink_heap`` overload action. This allows
-    operators to configure the timer interval (``timer_interval``, minimum 1s, default 10s) and
-    the memory release threshold (``max_unfreed_memory_bytes``, default 100MB) passed to
+    operators to configure the timer interval (``timer_interval``, minimum ``1s``, default ``10s``) and
+    the memory release threshold (``max_unfreed_memory_bytes``, default ``100MB``) passed to
     ``tcmalloc::MallocExtension::ReleaseMemoryToSystem()``.
 - area: dns_resolver
   change: |
@@ -92,7 +485,7 @@ new_features:
 - area: tls
   change: |
     Added a per-connection filter state object to select a workload trust domain in the SPIFFE validator in
-    the multi-tenant deployments.
+    multi-tenant deployments.
 - area: tls
   change: |
     Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
@@ -115,7 +508,7 @@ new_features:
   change: |
     Rust SDK now provides an opt-in ``CatchUnwind`` wrapper for filter callbacks. When a
     wrapped callback panics, Envoy logs the panic and returns a fail-closed error (e.g.
-    HTTP 500, stream reset, connection close) instead of aborting the process.
+    HTTP ``500``, stream reset, connection close) instead of aborting the process.
 - area: http_11_proxy
   change: |
     Added ability to configure a default proxy address that is used when the proxy address is not
@@ -128,7 +521,7 @@ new_features:
     ``response_direction_config``, strong ``ETag`` response headers are weakened (``W/`` prefix)
     instead of removed when compression is applied, allowing caches and conditional requests to
     work while indicating the body was modified by compression. When both ``weaken_etag_on_compress``
-    and ``disable_on_etag_header`` are true, the new field takes precedence.
+    and ``disable_on_etag_header`` are ``true``, the new field takes precedence.
 - area: golang
   change: |
     Added ``DownstreamSslConnection()`` method to the Golang HTTP filter's ``StreamInfo`` interface,
@@ -203,7 +596,7 @@ new_features:
 - area: stats
   change: |
     Added support for cluster-level stats matcher, allowing more granular control over which stats
-    are enabled and reported at the cluster level. This the stats matcher could be configured via
+    are enabled and reported at the cluster level. The stats matcher could be configured via
     the xDS API dynamically on a per-cluster basis.
     See :ref:`envoy.stats_matcher <well_known_metadata_envoy_stats_matcher>` for more details.
 - area: stats
@@ -226,26 +619,26 @@ new_features:
 - area: access_log
   change: |
     Added stats customization support for the :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
-- area: dynamic modules
+- area: dynamic_modules
   change: |
     Introduced the extended ABI forward compatibility mechanism for dynamic modules
     where modules built with an SDK version can be loaded by Envoy
     binaries of the next Envoy version. For example, a module built with the v1.38 SDK
     can now be loaded by an Envoy binary of v1.39.
-- area: dynamic modules
+- area: dynamic_modules
   change: |
     Added drain and shutdown lifecycle hooks for bootstrap dynamic modules.
-- area: dynamic modules
+- area: dynamic_modules
   change: |
     Added support for dynamic modules authors to register any combination of HTTP, network, listener,
     UDP listener, and bootstrap filters in the Rust SDK.
-- area: dynamic modules
+- area: dynamic_modules
   change: |
     Added connection state and flow control ABI callbacks for the dynamic module network filter,
     including ``read_disable``, ``read_enabled``, ``get_connection_state``, ``enable_half_close``,
     ``is_half_close_enabled``, ``get_buffer_limit``, ``set_buffer_limits``, and
     ``above_high_watermark``.
-- area: dynamic modules
+- area: dynamic_modules
   change: |
     Added socket property getter and SSL/TLS information ABI callbacks for the dynamic module listener
     filter, including ``get_requested_server_name``, ``get_detected_transport_protocol``,
@@ -639,7 +1032,7 @@ new_features:
   change: |
     Added support for MCP ``tools/call`` response transcoding. Support for ``tools/list`` is planned.
     This filter is currently a work-in-progress and not recommended for production use.
-- area: http_filter
+- area: http
   change: |
     Added support for clear route cache in the :ref:`set_filter_state http filter <config_http_filters_set_filter_state>`. When
     ``clear_route_cache`` is set, the filter will clear the route cache for the current request after applying filter state updates.
@@ -657,14 +1050,14 @@ new_features:
   change: |
     Propagate upstream TCP RST to downstream when detected close type is RemoteReset.
     This behavioral change can be temporarily reverted by setting runtime guard
-    ``envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy`` to false.
+    ``envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy`` to ``false``.
 - area: tcp_proxy
   change: |
     HttpUpstream now maps remote-originated HTTP stream reset reasons (RemoteReset,
     RemoteRefusedStreamReset, RemoteConnectionFailure) to RemoteClose with
     DetectedCloseType::RemoteReset, enabling RST propagation through tunneled tcp_proxy.
     This behavioral change can be temporarily reverted by setting runtime guard
-    ``envoy.reloadable_features.map_http_stream_reset_to_tcp_rst`` to false.
+    ``envoy.reloadable_features.map_http_stream_reset_to_tcp_rst`` to ``false``.
 - area: ratelimit
   change: |
     Support populating rate limit descriptors from cluster metadata.
