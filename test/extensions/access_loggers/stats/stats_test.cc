@@ -203,8 +203,7 @@ TEST(StatsAccessLogConfigTest, ValidationFailBothEmpty) {
       "Either 'stat_prefix' or 'stats_scope' must be configured, but not both.");
 }
 
-#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
-TEST(StatsAccessLogConfigTest, ValidationFailBothSet) {
+TEST(StatsAccessLogConfigTest, DEPRECATED_FEATURE_TEST(ValidationFailBothSet)) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
@@ -215,7 +214,6 @@ TEST(StatsAccessLogConfigTest, ValidationFailBothSet) {
       AccessLogFactory().createAccessLogInstance(config, nullptr, context), EnvoyException,
       "Either 'stat_prefix' or 'stats_scope' must be configured, but not both.");
 }
-#endif
 
 TEST_F(StatsAccessLoggerTest, HistogramUnits) {
   const std::string yaml = R"EOF(
