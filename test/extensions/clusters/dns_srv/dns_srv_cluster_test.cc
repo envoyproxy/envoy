@@ -163,10 +163,11 @@ TEST_F(DnsSrvClusterTest, SameIpTwice) {
   createCluster();
 
   ASSERT_TRUE(srv_callback != nullptr);
-  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "", {
-    {srv_priority, srv_weight, srv_port1, "svc.example.com", srv_ttl},
-    {srv_priority, srv_weight, srv_port2, "svc.example.com", srv_ttl},
-  });
+  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+               {
+                   {srv_priority, srv_weight, srv_port1, "svc.example.com", srv_ttl},
+                   {srv_priority, srv_weight, srv_port2, "svc.example.com", srv_ttl},
+               });
 
   ASSERT_EQ(a_callbacks.size(), 2);
   for (auto& cb : a_callbacks) {
@@ -211,10 +212,11 @@ TEST_F(DnsSrvClusterTest, TwoDifferentHostnames) {
   createCluster();
 
   ASSERT_TRUE(srv_callback != nullptr);
-  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "", {
-    {srv_priority, srv_weight, srv_port1, "svc1.example.com", srv_ttl},
-    {srv_priority, srv_weight, srv_port2, "svc2.example.com", srv_ttl},
-  });
+  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+               {
+                   {srv_priority, srv_weight, srv_port1, "svc1.example.com", srv_ttl},
+                   {srv_priority, srv_weight, srv_port2, "svc2.example.com", srv_ttl},
+               });
 
   ASSERT_TRUE(a_callback1 != nullptr);
   a_callback1(Network::DnsResolver::ResolutionStatus::Completed, "",
@@ -260,10 +262,11 @@ TEST_F(DnsSrvClusterTest, TwoDifferentHostnamesOneFails) {
   createCluster();
 
   ASSERT_TRUE(srv_callback != nullptr);
-  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "", {
-    {srv_priority, srv_weight, srv_port, "ok.example.com", srv_ttl},
-    {srv_priority, srv_weight, srv_port, "fail.example.com", srv_ttl},
-  });
+  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+               {
+                   {srv_priority, srv_weight, srv_port, "ok.example.com", srv_ttl},
+                   {srv_priority, srv_weight, srv_port, "fail.example.com", srv_ttl},
+               });
 
   ASSERT_TRUE(a_callback1 != nullptr);
   a_callback1(Network::DnsResolver::ResolutionStatus::Completed, "",
@@ -302,10 +305,11 @@ TEST_F(DnsSrvClusterTest, OneHostnameOneIp) {
   createCluster();
 
   ASSERT_TRUE(srv_callback != nullptr);
-  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "", {
-    {srv_priority, srv_weight, srv_port, "ok.example.com", srv_ttl},
-    {srv_priority, srv_weight, srv_port, "5.6.7.8", srv_ttl},
-  });
+  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+               {
+                   {srv_priority, srv_weight, srv_port, "ok.example.com", srv_ttl},
+                   {srv_priority, srv_weight, srv_port, "5.6.7.8", srv_ttl},
+               });
 
   ASSERT_TRUE(a_callback1 != nullptr);
   a_callback1(Network::DnsResolver::ResolutionStatus::Completed, "",
@@ -345,10 +349,11 @@ TEST_F(DnsSrvClusterTest, TwoIps) {
   createCluster();
 
   ASSERT_TRUE(srv_callback != nullptr);
-  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "", {
-    {srv_priority, srv_weight, srv_port, "1.2.3.4", srv_ttl},
-    {srv_priority, srv_weight, srv_port, "5.6.7.8", srv_ttl},
-  });
+  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+               {
+                   {srv_priority, srv_weight, srv_port, "1.2.3.4", srv_ttl},
+                   {srv_priority, srv_weight, srv_port, "5.6.7.8", srv_ttl},
+               });
 
   const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   ASSERT_EQ(hosts.size(), 2);

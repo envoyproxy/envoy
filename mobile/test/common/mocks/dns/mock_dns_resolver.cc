@@ -68,6 +68,12 @@ Network::ActiveDnsQuery* MockDnsResolver::resolve(const std::string& dns_name,
   return nullptr;
 }
 
+Network::ActiveDnsQuery* resolveSrv(const std::string& dns_name, ResolveCb callback) {
+  callback(Network::DnsResolver::ResolutionStatus::Failure, "mock dns: SRV not supported",
+           std::list<Network::DnsResponse>{});
+  return nullptr;
+}
+
 absl::StatusOr<Envoy::Network::DnsResolverSharedPtr> MockDnsResolverFactory::createDnsResolver(
     Envoy::Event::Dispatcher& /*dispatcher*/, Envoy::Api::Api& /*api*/,
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) const {
