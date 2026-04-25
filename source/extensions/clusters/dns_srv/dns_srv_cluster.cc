@@ -107,7 +107,7 @@ void DnsSrvCluster::allTargetsResolved() {
   const auto& locality_lb_endpoints = load_assignment_.endpoints()[0];
   const auto& lb_endpoint = load_assignment_.endpoints()[0].lb_endpoints()[0];
 
-  PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
+  PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
   priority_state_manager.initializePriorityFor(locality_lb_endpoints);
 
   // Only update the list of targets if at least one of them was resolved successfully
@@ -139,9 +139,9 @@ void DnsSrvCluster::allTargetsResolved() {
           std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
           std::make_shared<const envoy::config::core::v3::Metadata>(
               locality_lb_endpoints.metadata()),
-          target->weight_, locality_lb_endpoints.locality(),
+          target->weight_, constLocalitySharedPool()->getObject(locality_lb_endpoints.locality()),
           lb_endpoint.endpoint().health_check_config(), target->priority_,
-          lb_endpoint.health_status(), time_source_);
+          lb_endpoint.health_status());
 
       if (!host_or_status.ok()) {
         info_->configUpdateStats().update_failure_.inc();

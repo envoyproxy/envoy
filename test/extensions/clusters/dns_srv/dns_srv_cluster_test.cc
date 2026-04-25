@@ -4,11 +4,10 @@
 #include "source/common/config/utility.h"
 #include "source/extensions/clusters/dns_srv/dns_srv_cluster.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/ssl/mocks.h"
-#include "test/common/upstream/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -46,15 +45,13 @@ protected:
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
 
     envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig dns_srv_config{};
-    ASSERT_TRUE(
-        Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                               ProtobufMessage::getStrictValidationVisitor(),
-                                               dns_srv_config)
-            .ok());
+    ASSERT_TRUE(Config::Utility::translateOpaqueConfig(
+                    cluster_config.cluster_type().typed_config(),
+                    ProtobufMessage::getStrictValidationVisitor(), dns_srv_config)
+                    .ok());
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_,
-        [this]() -> Network::DnsResolverSharedPtr { return dns_resolver_; }, ssl_context_manager_,
+        server_context_, [this]() -> Network::DnsResolverSharedPtr { return dns_resolver_; },
         nullptr, false);
 
     auto factory = Upstream::DnsSrvClusterFactory();
@@ -98,7 +95,6 @@ protected:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
   Upstream::ClusterImplBaseSharedPtr cluster_;
@@ -139,7 +135,6 @@ TEST_F(DnsSrvClusterTest, CreateClusterWithMinimalConfig) {
   EXPECT_EQ(hosts[0]->address()->ip()->addressAsString(), "1.2.3.4");
   EXPECT_EQ(hosts[0]->address()->ip()->port(), srv_port);
 }
-
 
 // Verifies that two SRV records pointing to the same hostname but different ports each result
 // in a separate host entry, even though they share the same resolved IP address.
@@ -287,7 +282,6 @@ TEST_F(DnsSrvClusterTest, TwoDifferentHostnamesOneFails) {
   EXPECT_EQ(hosts[0]->address()->ip()->port(), srv_port);
 }
 
-
 TEST_F(DnsSrvClusterTest, OneHostnameOneIp) {
   constexpr uint32_t srv_priority = 0;
   constexpr uint32_t srv_weight = 1;
@@ -319,14 +313,15 @@ TEST_F(DnsSrvClusterTest, OneHostnameOneIp) {
 
   // ASSERT_TRUE(a_callback2 != nullptr);
   // a_callback2(Network::DnsResolver::ResolutionStatus::Failure, "dns timeout",
-              // TestUtility::makeDnsResponse({}, srv_ttl));
+  // TestUtility::makeDnsResponse({}, srv_ttl));
 
   const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   ASSERT_EQ(hosts.size(), 2);
 
   EXPECT_EQ(hosts[0]->priority(), srv_priority);
   EXPECT_EQ(hosts[0]->weight(), srv_weight);
-  // this host adds before DNS is called, becuase it's already an IP. Hence, it appears first in the list.
+  // this host adds before DNS is called, becuase it's already an IP. Hence, it appears first in the
+  // list.
   EXPECT_EQ(hosts[0]->address()->ip()->addressAsString(), "5.6.7.8");
   EXPECT_EQ(hosts[0]->address()->ip()->port(), srv_port);
 
