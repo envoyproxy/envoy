@@ -39,6 +39,7 @@ message Scope {
   string prefix = 5;
 
   // The sharing name of the scope. If non-empty, the scope is shared across
-  // multiple instances with the same sharing_name.
+  // multiple instances with the same sharing_name if all fields in this message
+  // have the same values.
   string sharing_name = 6;
 }
