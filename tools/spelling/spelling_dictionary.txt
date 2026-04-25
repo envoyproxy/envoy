@@ -9,6 +9,7 @@ NUMPAT
 PUBSUB
 RANDOMKEY
 SLOWLOG
+addend
 addrlen
 defragmentation
 evictable
@@ -65,6 +66,7 @@ CIO
 cbegin
 cend
 constness
+consume
 cstr
 deadcode
 DFP
@@ -180,6 +182,7 @@ DST
 DW
 DWORD
 EAGAIN
+EINTR
 ECDH
 ECDHE
 ECDS
@@ -376,10 +379,12 @@ OCSP
 OD
 ODCDS
 OKP
+middleware
 middlewildcard
 monostate
 mpd
 msan
+multicluster
 mutators
 mybucket
 myobject
@@ -507,6 +512,7 @@ STDSTRING
 STL
 STRLEN
 STS
+subcluster
 SUBCOMMAND
 SVG
 SVID
@@ -546,6 +552,7 @@ UTC
 UTF
 UUID
 UUIDs
+Valkey
 VC
 VCHAR
 VCL
@@ -748,6 +755,7 @@ ctor
 ctrl
 customizations
 darwin
+datacenter
 datadog
 datagram
 datagrams
@@ -826,6 +834,7 @@ encodings
 endian
 endianness
 endl
+enricher
 enqueue
 enqueued
 enqueues
@@ -932,6 +941,7 @@ healths
 healthz
 hermeticity
 highp
+hit
 hoc
 hostname
 hostnames
@@ -1290,6 +1300,7 @@ refcount
 referencee
 referer
 refetch
+refill
 reframed
 refvec
 regex
@@ -1465,6 +1476,7 @@ subzone
 sudo
 suf
 superclass
+superpod
 superroot
 superset
 supportability
@@ -1506,6 +1518,8 @@ timestamps
 timeval
 tmp
 tmpfile
+tmpfs
+token
 tokenize
 tokenized
 tokenizes
@@ -1691,3 +1705,5 @@ nblk
 chr
 IWYU
 CRTP
+bitrate
+kbps

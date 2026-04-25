@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <list>
 #include <ostream>
 
@@ -33,7 +34,7 @@ public:
   void runHighWatermarkCallbacks();
   void runLowWatermarkCallbacks();
 
-  static uint64_t next_id_;
+  static std::atomic<uint64_t> next_id_;
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::list<Network::ConnectionCallbacks*> callbacks_;
@@ -153,6 +154,8 @@ public:
   MOCK_METHOD(StreamBuffer, getWriteBuffer, ());
   MOCK_METHOD(void, rawWrite, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, closeConnection, (ConnectionCloseAction close_action));
+  MOCK_METHOD(void, onFilterAboveHighWatermark, ());
+  MOCK_METHOD(void, onFilterBelowLowWatermark, ());
 };
 
 } // namespace Network

@@ -2,7 +2,7 @@ envoy_examples:
   project_name: "envoy-examples"
   project_desc: "Envoy proxy examples"
   project_url: "https://github.com/envoyproxy/examples"
-  release_date: "2026-04-02"
+  release_date: "2026-04-20"
   use_category:
   - test_only
   license: "Apache-2.0"

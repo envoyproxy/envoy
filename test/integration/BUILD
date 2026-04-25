@@ -1692,12 +1692,9 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "websocket_integration_test",
-    size = "large",
     srcs = ["websocket_integration_test.cc"],
-    rbe_pool = "2core",
-    tags = [
-        "cpu:3",
-    ],
+    rbe_pool = "linux_x64_small",
+    shard_count = 8,
     deps = [
         ":http_protocol_integration_lib",
         ":websocket_integration_test_lib",
@@ -1749,9 +1746,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "load_stats_integration_test",
-    size = "large",
     srcs = ["load_stats_integration_test.cc"],
-    rbe_pool = "4core",
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
@@ -2003,6 +1998,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/extensions/transport_sockets/tls:config",

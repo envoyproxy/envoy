@@ -439,21 +439,25 @@ private:
 
 class DynamicModuleHttpFilterConfigScheduler {
 public:
-  DynamicModuleHttpFilterConfigScheduler(std::weak_ptr<DynamicModuleHttpFilterConfig> config,
-                                         Event::Dispatcher& dispatcher)
-      : config_(std::move(config)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleHttpFilterConfigScheduler(
+      std::weak_ptr<DynamicModuleHttpFilterConfig> config)
+      : config_(std::move(config)) {}
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([config = config_, event_id]() {
-      if (std::shared_ptr<DynamicModuleHttpFilterConfig> config_shared = config.lock()) {
-        config_shared->onScheduled(event_id);
+    // Lock the config so its dispatcher member stays valid across `post`.
+    auto config_shared = config_.lock();
+    if (!config_shared) {
+      return;
+    }
+    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleHttpFilterConfig> cs = config.lock()) {
+        cs->onScheduled(event_id);
       }
     });
   }
 
 private:
   std::weak_ptr<DynamicModuleHttpFilterConfig> config_;
-  Event::Dispatcher& dispatcher_;
 };
 
 class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {
@@ -477,7 +481,7 @@ using DynamicModuleHttpPerRouteFilterConfigConstSharedPtr =
     std::shared_ptr<const DynamicModuleHttpPerRouteFilterConfig>;
 
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
-newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name,
+newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
                                    Extensions::DynamicModules::DynamicModulePtr dynamic_module);
 

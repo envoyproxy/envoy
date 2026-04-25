@@ -216,6 +216,174 @@ private:
 using SchedulerImpl = SchedulerImplBase<false>;
 using ConfigSchedulerImpl = SchedulerImplBase<true>;
 
+std::optional<std::string_view> bufferViewToOptionalStringView(const BufferView& value,
+                                                               bool found) {
+  if (!found) {
+    return {};
+  }
+  return std::string_view(value.data() == nullptr ? "" : value.data(), value.size());
+}
+
+class ChildSpanImpl;
+
+class SpanImpl : public Span {
+public:
+  SpanImpl(envoy_dynamic_module_type_http_filter_envoy_ptr host_plugin_ptr,
+           envoy_dynamic_module_type_span_envoy_ptr span_ptr)
+      : host_plugin_ptr_(host_plugin_ptr), span_ptr_(span_ptr) {}
+
+  void setTag(std::string_view key, std::string_view value) override {
+    envoy_dynamic_module_callback_http_span_set_tag(
+        span_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
+  void setOperation(std::string_view operation) override {
+    envoy_dynamic_module_callback_http_span_set_operation(
+        span_ptr_, envoy_dynamic_module_type_module_buffer{operation.data(), operation.size()});
+  }
+
+  void log(std::string_view event) override {
+    envoy_dynamic_module_callback_http_span_log(
+        host_plugin_ptr_, span_ptr_,
+        envoy_dynamic_module_type_module_buffer{event.data(), event.size()});
+  }
+
+  void setSampled(bool sampled) override {
+    envoy_dynamic_module_callback_http_span_set_sampled(span_ptr_, sampled);
+  }
+
+  std::optional<std::string_view> getBaggage(std::string_view key) override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_span_get_baggage(
+        span_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  void setBaggage(std::string_view key, std::string_view value) override {
+    envoy_dynamic_module_callback_http_span_set_baggage(
+        span_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
+  std::optional<std::string_view> getTraceID() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_span_get_trace_id(
+        span_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  std::optional<std::string_view> getSpanID() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_span_get_span_id(
+        span_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  std::unique_ptr<ChildSpan> spawnChild(std::string_view operation) override;
+
+protected:
+  const envoy_dynamic_module_type_http_filter_envoy_ptr host_plugin_ptr_;
+  envoy_dynamic_module_type_span_envoy_ptr span_ptr_;
+};
+
+class ChildSpanImpl : public ChildSpan {
+public:
+  ChildSpanImpl(envoy_dynamic_module_type_http_filter_envoy_ptr host_plugin_ptr,
+                envoy_dynamic_module_type_child_span_module_ptr child_span_ptr)
+      : host_plugin_ptr_(host_plugin_ptr), child_span_ptr_(child_span_ptr),
+        span_ptr_(reinterpret_cast<envoy_dynamic_module_type_span_envoy_ptr>(child_span_ptr)) {}
+
+  ~ChildSpanImpl() override { finish(); }
+
+  void setTag(std::string_view key, std::string_view value) override {
+    envoy_dynamic_module_callback_http_span_set_tag(
+        span_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
+  void setOperation(std::string_view operation) override {
+    envoy_dynamic_module_callback_http_span_set_operation(
+        span_ptr_, envoy_dynamic_module_type_module_buffer{operation.data(), operation.size()});
+  }
+
+  void log(std::string_view event) override {
+    envoy_dynamic_module_callback_http_span_log(
+        host_plugin_ptr_, span_ptr_,
+        envoy_dynamic_module_type_module_buffer{event.data(), event.size()});
+  }
+
+  void setSampled(bool sampled) override {
+    envoy_dynamic_module_callback_http_span_set_sampled(span_ptr_, sampled);
+  }
+
+  std::optional<std::string_view> getBaggage(std::string_view key) override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_span_get_baggage(
+        span_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  void setBaggage(std::string_view key, std::string_view value) override {
+    envoy_dynamic_module_callback_http_span_set_baggage(
+        span_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
+  std::optional<std::string_view> getTraceID() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_span_get_trace_id(
+        span_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  std::optional<std::string_view> getSpanID() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_span_get_span_id(
+        span_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  std::unique_ptr<ChildSpan> spawnChild(std::string_view operation) override {
+    if (child_span_ptr_ == nullptr) {
+      return nullptr;
+    }
+    auto* child = envoy_dynamic_module_callback_http_span_spawn_child(
+        host_plugin_ptr_, span_ptr_,
+        envoy_dynamic_module_type_module_buffer{operation.data(), operation.size()});
+    if (child == nullptr) {
+      return nullptr;
+    }
+    return std::make_unique<ChildSpanImpl>(host_plugin_ptr_, child);
+  }
+
+  void finish() override {
+    if (child_span_ptr_ == nullptr) {
+      return;
+    }
+    envoy_dynamic_module_callback_http_child_span_finish(child_span_ptr_);
+    child_span_ptr_ = nullptr;
+    span_ptr_ = nullptr;
+  }
+
+private:
+  const envoy_dynamic_module_type_http_filter_envoy_ptr host_plugin_ptr_;
+  envoy_dynamic_module_type_child_span_module_ptr child_span_ptr_;
+  envoy_dynamic_module_type_span_envoy_ptr span_ptr_;
+};
+
+std::unique_ptr<ChildSpan> SpanImpl::spawnChild(std::string_view operation) {
+  auto* child = envoy_dynamic_module_callback_http_span_spawn_child(
+      host_plugin_ptr_, span_ptr_,
+      envoy_dynamic_module_type_module_buffer{operation.data(), operation.size()});
+  if (child == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<ChildSpanImpl>(host_plugin_ptr_, child);
+}
+
 // HttpFilterHandle implementation
 class HttpFilterHandleImpl : public HttpFilterHandle {
 public:
@@ -419,6 +587,20 @@ public:
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
+  std::optional<std::string_view> getFilterStateTyped(std::string_view key) override {
+    BufferView value{nullptr, 0};
+    const bool ret = envoy_dynamic_module_callback_http_get_filter_state_typed(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, ret);
+  }
+
+  bool setFilterStateTyped(std::string_view key, std::string_view value) override {
+    return envoy_dynamic_module_callback_http_set_filter_state_typed(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
   std::optional<std::string_view> getAttributeString(AttributeID id) override {
     BufferView value{nullptr, 0};
 
@@ -456,6 +638,7 @@ public:
 
   void sendLocalResponse(uint32_t status, std::span<const HeaderView> headers,
                          std::string_view body, std::string_view detail) override {
+    local_reply_sent_ = true;
     envoy_dynamic_module_callback_http_send_response(
         host_plugin_ptr_, status,
         const_cast<envoy_dynamic_module_type_module_http_header*>(
@@ -505,6 +688,113 @@ public:
 
   void refreshRouteCluster() override {
     envoy_dynamic_module_callback_http_clear_route_cluster_cache(host_plugin_ptr_);
+  }
+
+  uint32_t getWorkerIndex() override {
+    return envoy_dynamic_module_callback_http_filter_get_worker_index(host_plugin_ptr_);
+  }
+
+  bool setSocketOptionInt(int64_t level, int64_t name, SocketOptionState state,
+                          SocketDirection direction, int64_t value) override {
+    return envoy_dynamic_module_callback_http_set_socket_option_int(
+        host_plugin_ptr_, level, name,
+        static_cast<envoy_dynamic_module_type_socket_option_state>(state),
+        static_cast<envoy_dynamic_module_type_socket_direction>(direction), value);
+  }
+
+  bool setSocketOptionBytes(int64_t level, int64_t name, SocketOptionState state,
+                            SocketDirection direction, std::string_view value) override {
+    return envoy_dynamic_module_callback_http_set_socket_option_bytes(
+        host_plugin_ptr_, level, name,
+        static_cast<envoy_dynamic_module_type_socket_option_state>(state),
+        static_cast<envoy_dynamic_module_type_socket_direction>(direction),
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
+  std::optional<int64_t> getSocketOptionInt(int64_t level, int64_t name, SocketOptionState state,
+                                            SocketDirection direction) override {
+    int64_t value = 0;
+    const bool found = envoy_dynamic_module_callback_http_get_socket_option_int(
+        host_plugin_ptr_, level, name,
+        static_cast<envoy_dynamic_module_type_socket_option_state>(state),
+        static_cast<envoy_dynamic_module_type_socket_direction>(direction), &value);
+    if (!found) {
+      return {};
+    }
+    return value;
+  }
+
+  std::optional<std::string_view> getSocketOptionBytes(int64_t level, int64_t name,
+                                                       SocketOptionState state,
+                                                       SocketDirection direction) override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_get_socket_option_bytes(
+        host_plugin_ptr_, level, name,
+        static_cast<envoy_dynamic_module_type_socket_option_state>(state),
+        static_cast<envoy_dynamic_module_type_socket_direction>(direction),
+        reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  uint64_t getBufferLimit() override {
+    return envoy_dynamic_module_callback_http_get_buffer_limit(host_plugin_ptr_);
+  }
+
+  void setBufferLimit(uint64_t limit) override {
+    envoy_dynamic_module_callback_http_set_buffer_limit(host_plugin_ptr_, limit);
+  }
+
+  std::unique_ptr<Span> getActiveSpan() override {
+    auto* span = envoy_dynamic_module_callback_http_get_active_span(host_plugin_ptr_);
+    if (span == nullptr) {
+      return nullptr;
+    }
+    return std::make_unique<SpanImpl>(host_plugin_ptr_, span);
+  }
+
+  std::optional<std::string_view> getClusterName() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_get_cluster_name(
+        host_plugin_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  std::optional<ClusterHostCounts> getClusterHostCounts(uint32_t priority) override {
+    size_t total = 0;
+    size_t healthy = 0;
+    size_t degraded = 0;
+    const bool found = envoy_dynamic_module_callback_http_get_cluster_host_count(
+        host_plugin_ptr_, priority, &total, &healthy, &degraded);
+    if (!found) {
+      return {};
+    }
+    return ClusterHostCounts{static_cast<uint64_t>(total), static_cast<uint64_t>(healthy),
+                             static_cast<uint64_t>(degraded)};
+  }
+
+  bool setUpstreamOverrideHost(std::string_view host, bool strict) override {
+    return envoy_dynamic_module_callback_http_set_upstream_override_host(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{host.data(), host.size()},
+        strict);
+  }
+
+  void resetStream(HttpFilterStreamResetReason reason, std::string_view details) override {
+    envoy_dynamic_module_callback_http_filter_reset_stream(
+        host_plugin_ptr_,
+        static_cast<envoy_dynamic_module_type_http_filter_stream_reset_reason>(reason),
+        envoy_dynamic_module_type_module_buffer{details.data(), details.size()});
+  }
+
+  void sendGoAwayAndClose(bool graceful) override {
+    envoy_dynamic_module_callback_http_filter_send_go_away_and_close(host_plugin_ptr_, graceful);
+  }
+
+  bool recreateStream(std::span<const HeaderView> headers) override {
+    return envoy_dynamic_module_callback_http_filter_recreate_stream(
+        host_plugin_ptr_,
+        const_cast<envoy_dynamic_module_type_module_http_header*>(
+            reinterpret_cast<const envoy_dynamic_module_type_module_http_header*>(headers.data())),
+        headers.size());
   }
 
   HeaderMap& requestHeaders() override { return request_headers_; }
@@ -1186,7 +1476,16 @@ envoy_dynamic_module_on_http_filter_local_reply(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint32_t response_code,
     envoy_dynamic_module_type_envoy_buffer details, bool reset_imminent) {
-  return envoy_dynamic_module_type_on_http_filter_local_reply_status_Continue;
+  auto* plugin_handle = unwrapPointer<HttpFilterHandleImpl>(filter_module_ptr);
+  if (plugin_handle == nullptr) {
+    return envoy_dynamic_module_type_on_http_filter_local_reply_status_Continue;
+  }
+  plugin_handle->local_reply_sent_ = true;
+  return static_cast<envoy_dynamic_module_type_on_http_filter_local_reply_status>(
+      plugin_handle->plugin_->onLocalReply(
+          response_code,
+          std::string_view(details.ptr == nullptr ? "" : details.ptr, details.length),
+          reset_imminent));
 }
 
 void envoy_dynamic_module_on_http_filter_config_http_callout_done(
