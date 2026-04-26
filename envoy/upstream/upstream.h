@@ -217,6 +217,18 @@ public:
       const envoy::config::core::v3::Metadata* metadata) const PURE;
 
   /**
+   * Create a dedicated connection for ORCA out-of-band load reporting
+   * (xds.service.orca.v3.OpenRcaService), separate from request and health-check pools. Dials the
+   * host's data address per gRFC A51. LogicalHost overrides this to snapshot its mutable address
+   * state under its lock. Signature mirrors createHealthCheckConnection; metadata and
+   * transport_socket_options are nullptr for v1.
+   */
+  virtual CreateConnectionData createOrcaReportingConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      const envoy::config::core::v3::Metadata* metadata) const PURE;
+
+  /**
    * @return host specific gauges.
    */
   virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>

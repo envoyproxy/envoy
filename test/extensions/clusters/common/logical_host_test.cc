@@ -1,9 +1,11 @@
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/clusters/common/logical_host.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
@@ -13,9 +15,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -163,6 +167,59 @@ TEST_F(LogicalHostTransportSocketResolutionTest, OverrideTransportSocketOptionsT
   const auto& effective_options = override_options != nullptr ? override_options : passed_options;
 
   EXPECT_TRUE(needsPerConnectionResolution(effective_options));
+}
+
+// Test fixture for LogicalHost::createOrcaReportingConnection override. This validates that the
+// override snapshots address state under the host's lock and routes through the transport socket
+// matcher when caller-supplied metadata is non-null.
+class LogicalHostOrcaReportingConnectionTest : public testing::Test {
+protected:
+  void SetUp() override {
+    cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+    address_ = *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+    auto host_or_error = Upstream::LogicalHost::create(
+        cluster_info_, /*hostname=*/"", address_, /*address_list=*/{},
+        /*locality_lb_endpoint=*/envoy::config::endpoint::v3::LocalityLbEndpoints(),
+        /*lb_endpoint=*/envoy::config::endpoint::v3::LbEndpoint(),
+        /*override_transport_socket_options=*/nullptr);
+    ASSERT_TRUE(host_or_error.ok());
+    host_ = std::shared_ptr<Upstream::LogicalHost>(std::move(*host_or_error));
+  }
+
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;
+  Network::Address::InstanceConstSharedPtr address_;
+  std::shared_ptr<Upstream::LogicalHost> host_;
+};
+
+TEST_F(LogicalHostOrcaReportingConnectionTest, DialsHostDataAddress) {
+  Event::MockDispatcher dispatcher;
+  StrictMock<Network::MockClientConnection>* connection =
+      new StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher, createClientConnection_(address_, _, _, _)).WillOnce(Return(connection));
+  EXPECT_CALL(*connection, setBufferLimits(_)).Times(AnyNumber());
+  EXPECT_CALL(*connection, connectionInfoSetter()).Times(AnyNumber());
+  EXPECT_CALL(*connection, streamInfo()).Times(AnyNumber());
+  Upstream::Host::CreateConnectionData data =
+      host_->createOrcaReportingConnection(dispatcher, nullptr, nullptr);
+  EXPECT_EQ(data.host_description_->address(), address_);
+}
+
+TEST_F(LogicalHostOrcaReportingConnectionTest, MetadataRoutesThroughMatcher) {
+  auto* matcher = dynamic_cast<Upstream::MockTransportSocketMatcher*>(
+      cluster_info_->transport_socket_matcher_.get());
+  ASSERT_NE(matcher, nullptr);
+  envoy::config::core::v3::Metadata md;
+  EXPECT_CALL(*matcher, resolve(&md, _, _))
+      .WillOnce(Return(Upstream::TransportSocketMatcher::MatchData(*matcher->socket_factory_,
+                                                                   matcher->stats_, "orca-md")));
+  Event::MockDispatcher dispatcher;
+  StrictMock<Network::MockClientConnection>* connection =
+      new StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher, createClientConnection_(address_, _, _, _)).WillOnce(Return(connection));
+  EXPECT_CALL(*connection, setBufferLimits(_)).Times(AnyNumber());
+  EXPECT_CALL(*connection, connectionInfoSetter()).Times(AnyNumber());
+  EXPECT_CALL(*connection, streamInfo()).Times(AnyNumber());
+  host_->createOrcaReportingConnection(dispatcher, nullptr, &md);
 }
 
 } // namespace Clusters

@@ -163,6 +163,14 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
+  CreateConnectionData
+  createOrcaReportingConnection(Event::Dispatcher& dispatcher,
+                                Network::TransportSocketOptionsConstSharedPtr,
+                                const envoy::config::core::v3::Metadata*) const override {
+    MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
+    return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
+  }
+
   bool disableActiveHealthCheck() const override { return disable_active_health_check_; }
   void setDisableActiveHealthCheck(bool disable_active_health_check) override {
     disable_active_health_check_ = disable_active_health_check;

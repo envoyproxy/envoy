@@ -108,5 +108,29 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
       std::make_shared<RealHostDescription>(address, shared_from_this()));
 }
 
+Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
+    Event::Dispatcher& dispatcher,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    const envoy::config::core::v3::Metadata* metadata) const {
+  Network::Address::InstanceConstSharedPtr address;
+  SharedConstAddressVector address_list_or_null;
+  {
+    absl::MutexLock lock(address_lock_);
+    address = address_;
+    address_list_or_null = address_list_or_null_;
+  }
+  // override_transport_socket_options_ takes precedence over caller-supplied options.
+  const auto& effective_options = override_transport_socket_options_ != nullptr
+                                      ? override_transport_socket_options_
+                                      : transport_socket_options;
+  Network::UpstreamTransportSocketFactory& factory =
+      (metadata != nullptr) ? resolveTransportSocketFactory(address, metadata, effective_options)
+                            : transportSocketFactory();
+  return HostImplBase::createConnection(
+      dispatcher, cluster(), address, address_list_or_null, factory,
+      /*options=*/nullptr, effective_options,
+      std::make_shared<RealHostDescription>(address, shared_from_this()));
+}
+
 } // namespace Upstream
 } // namespace Envoy

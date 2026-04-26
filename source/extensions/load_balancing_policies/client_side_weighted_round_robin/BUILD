@@ -30,6 +30,7 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:callback_impl_lib",
         "//source/extensions/load_balancing_policies/common:load_balancer_lib",
+        "//source/extensions/load_balancing_policies/common:orca_oob_manager_lib",
         "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
         "//source/extensions/load_balancing_policies/round_robin:round_robin_lb_lib",
         "@envoy_api//envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3:pkg_cc_proto",

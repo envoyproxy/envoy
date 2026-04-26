@@ -685,6 +685,23 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
             1428);
 }
 
+TEST(ClientSideWeightedRoundRobinConfigTest, OobConfigDefaultsAndOverridePropagate) {
+  envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
+      ClientSideWeightedRoundRobin proto;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  ClientSideWeightedRoundRobinLbConfig defaults(proto, dispatcher, tls);
+  EXPECT_FALSE(defaults.enable_oob_load_report);
+  EXPECT_EQ(defaults.oob_reporting_period, std::chrono::seconds(10));
+
+  proto.mutable_enable_oob_load_report()->set_value(true);
+  proto.mutable_oob_reporting_period()->set_seconds(5);
+  ClientSideWeightedRoundRobinLbConfig override(proto, dispatcher, tls);
+  EXPECT_TRUE(override.enable_oob_load_report);
+  EXPECT_EQ(override.oob_reporting_period, std::chrono::seconds(5));
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

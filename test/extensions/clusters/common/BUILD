@@ -31,6 +31,7 @@ envoy_cc_test(
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/clusters/common:logical_host_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/network:transport_socket_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",

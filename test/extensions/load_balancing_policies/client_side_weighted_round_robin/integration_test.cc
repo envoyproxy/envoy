@@ -4,6 +4,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/grpc/common.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
@@ -12,6 +13,7 @@
 
 #include "absl/strings/numbers.h"
 #include "gtest/gtest.h"
+#include "xds/data/orca/v3/orca_load_report.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -187,6 +189,118 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(ClientSideWeightedRoundRobinIntegrationTest, NormalLoadBalancing) {
   initializeConfig();
   runNormalLoadBalancing();
+}
+
+// Minimal happy-path integration test for ORCA out-of-band (OOB) reporting.
+// Verifies that when `enable_oob_load_report=true` is set on a
+// `client_side_weighted_round_robin` cluster,
+// Envoy opens one OOB gRPC stream per upstream host targeting
+// /xds.service.orca.v3.OpenRcaService/StreamCoreMetrics, and that
+// server-pushed OrcaLoadReports are observed via the cluster-scoped
+// `lb_orca_oob.*` stats.
+class ClientSideWeightedRoundRobinOobIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  ClientSideWeightedRoundRobinOobIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    // OOB reports use gRPC, so upstream connections must speak HTTP/2.
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    setUpstreamCount(2);
+  }
+
+  void initializeConfig() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+      ASSERT(cluster_0->name() == "cluster_0");
+      auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
+
+      constexpr absl::string_view endpoints_yaml = R"EOF(
+          lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: 0
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: 0
+          )EOF";
+      const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
+      TestUtility::loadFromYaml(fmt::format(endpoints_yaml, local_address, local_address),
+                                *endpoint);
+
+      auto* policy = cluster_0->mutable_load_balancing_policy();
+      const std::string policy_yaml = R"EOF(
+          policies:
+          - typed_extension_config:
+              name: envoy.load_balancing_policies.client_side_weighted_round_robin
+              typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
+                  enable_oob_load_report: true
+                  oob_reporting_period:
+                      seconds: 1
+                  blackout_period:
+                      seconds: 1
+                  weight_expiration_period:
+                      seconds: 180
+                  weight_update_period:
+                      seconds: 1
+          )EOF";
+      TestUtility::loadFromYaml(policy_yaml, *policy);
+    });
+    HttpIntegrationTest::initialize();
+  }
+
+  // Accept one OOB stream per upstream and reply with one server-streamed
+  // OrcaLoadReport per stream. The streams remain open (no trailers).
+  void respondToOobStreams(double host0_qps, double host1_qps) {
+    for (size_t i = 0; i < 2; ++i) {
+      FakeHttpConnectionPtr conn;
+      ASSERT_TRUE(fake_upstreams_[i]->waitForHttpConnection(*dispatcher_, conn));
+
+      FakeStreamPtr stream;
+      ASSERT_TRUE(conn->waitForNewStream(*dispatcher_, stream));
+      // Envoy ends the request half-stream after sending the single
+      // OrcaLoadReportRequest message.
+      ASSERT_TRUE(stream->waitForEndStream(*dispatcher_));
+
+      // Send gRPC response headers; do NOT send trailers (server-streaming).
+      Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                                   {"content-type", "application/grpc"}};
+      stream->encodeHeaders(resp_headers, false);
+
+      xds::data::orca::v3::OrcaLoadReport report;
+      report.set_application_utilization(0.5);
+      report.set_rps_fractional(i == 0 ? host0_qps : host1_qps);
+      auto frame = Grpc::Common::serializeToGrpcFrame(report);
+      stream->encodeData(*frame, false);
+
+      // Keep the connection and stream alive for the lifetime of the test so
+      // Envoy continues to see an active OOB session.
+      stream_holder_.push_back(std::move(stream));
+      conn_holder_.push_back(std::move(conn));
+    }
+  }
+
+  std::vector<FakeHttpConnectionPtr> conn_holder_;
+  std::vector<FakeStreamPtr> stream_holder_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClientSideWeightedRoundRobinOobIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+TEST_P(ClientSideWeightedRoundRobinOobIntegrationTest, OobReportsApplyWeights) {
+  initializeConfig();
+  // Envoy should open one OOB stream per upstream host. Drive each stream
+  // through to a single OrcaLoadReport.
+  respondToOobStreams(/*host0_qps=*/100.0, /*host1_qps=*/1000.0);
+
+  // Verify the OOB plumbing is alive and reporting.
+  test_server_->waitForCounterGe("cluster.cluster_0.lb_orca_oob.reports_received", 2);
+  test_server_->waitForGaugeEq("cluster.cluster_0.lb_orca_oob.active_sessions", 2);
 }
 
 // Tests to verify the behavior of load balancing policy when cluster is added,

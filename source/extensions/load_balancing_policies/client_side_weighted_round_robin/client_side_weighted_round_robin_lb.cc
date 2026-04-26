@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/exception.h"
+
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
@@ -40,6 +42,10 @@ ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
       PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_expiration_period, 180000));
   weight_update_period =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_update_period, 1000));
+
+  enable_oob_load_report = lb_proto.enable_oob_load_report().value();
+  oob_reporting_period =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, oob_reporting_period, 10000));
 
   if (lb_proto.has_slow_start_config()) {
     *round_robin_overrides_.mutable_slow_start_config() = lb_proto.slow_start_config();
@@ -113,10 +119,33 @@ ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalanc
       std::make_unique<Extensions::LoadBalancingPolicies::Common::OrcaWeightManager>(
           orca_config, priority_set, time_source, typed_lb_config->main_thread_dispatcher_,
           [factory = factory_]() { factory->applyWeightsToAllWorkers(); });
+
+  // Init order: OrcaWeightManager (registered via addPriorityUpdateCb) and OrcaOobManager
+  // (below, via addMemberUpdateCb) live in separate callback registries on
+  // MainPrioritySetImpl. The relevant ordering is enforced by
+  // PrioritySetImpl::updateHosts(): for each host-set update it invokes
+  // HostSetImpl::updateHosts() (firing priority callbacks) BEFORE runUpdateCallbacks()
+  // (firing member callbacks). So when a new host arrives at runtime, OrcaWeightManager's
+  // priority callback attaches OrcaHostLbPolicyData first; OrcaOobManager's member callback
+  // then opens the session. The first OOB report can't arrive before the next dispatcher
+  // tick (backoff timer), so policy-data attachment always wins the race.
+  if (typed_lb_config->enable_oob_load_report) {
+    orca_oob_manager_ =
+        std::make_unique<Extensions::LoadBalancingPolicies::Common::ProdOrcaOobManager>(
+            typed_lb_config->oob_reporting_period, priority_set,
+            typed_lb_config->main_thread_dispatcher_, random, cluster_info.statsScope(),
+            orca_weight_manager_->reportHandler());
+  }
 }
 
 absl::Status ClientSideWeightedRoundRobinLoadBalancer::initialize() {
-  return orca_weight_manager_->initialize();
+  // Init order: weight manager attaches OrcaHostLbPolicyData to existing hosts and registers its
+  // priority callback FIRST, so OOB sessions decoding their first report find the policy data.
+  RETURN_IF_NOT_OK(orca_weight_manager_->initialize());
+  if (orca_oob_manager_ != nullptr) {
+    RETURN_IF_NOT_OK(orca_oob_manager_->initialize());
+  }
+  return absl::OkStatus();
 }
 
 } // namespace Upstream

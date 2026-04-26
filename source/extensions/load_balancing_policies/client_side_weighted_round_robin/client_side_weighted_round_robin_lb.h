@@ -8,6 +8,7 @@
 
 #include "source/common/common/callback_impl.h"
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
+#include "source/extensions/load_balancing_policies/common/orca_oob_manager.h"
 #include "source/extensions/load_balancing_policies/common/orca_weight_manager.h"
 #include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
@@ -37,6 +38,9 @@ public:
   std::chrono::milliseconds blackout_period;
   std::chrono::milliseconds weight_expiration_period;
   std::chrono::milliseconds weight_update_period;
+
+  bool enable_oob_load_report{false};
+  std::chrono::milliseconds oob_reporting_period{};
 
   // Round robin proto overrides that we want to propagate to the worker RR LB (e.g., slow start).
   RoundRobinConfig round_robin_overrides_;
@@ -126,6 +130,11 @@ private:
   // ORCA weight manager handles all weight computation and host data management.
   std::unique_ptr<Extensions::LoadBalancingPolicies::Common::OrcaWeightManager>
       orca_weight_manager_;
+
+  // ORCA out-of-band manager. Constructed only when enable_oob_load_report is true; null
+  // otherwise. Shares the OrcaWeightManager's report handler so OOB reports feed the same
+  // per-host atomics as in-band reports.
+  std::unique_ptr<Extensions::LoadBalancingPolicies::Common::OrcaOobManager> orca_oob_manager_;
 };
 
 } // namespace Upstream
