@@ -209,6 +209,8 @@ public:
     setUpstreamCount(2);
   }
 
+  void TearDown() override { cleanupOobStreams(); }
+
   void initializeConfig() {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
@@ -283,6 +285,19 @@ public:
       stream_holder_.push_back(std::move(stream));
       conn_holder_.push_back(std::move(conn));
     }
+  }
+
+  void cleanupOobStreams() {
+    for (auto& conn : conn_holder_) {
+      if (conn != nullptr) {
+        AssertionResult result = conn->close();
+        RELEASE_ASSERT(result, result.message());
+        result = conn->waitForDisconnect();
+        RELEASE_ASSERT(result, result.message());
+      }
+    }
+    stream_holder_.clear();
+    conn_holder_.clear();
   }
 
   std::vector<FakeHttpConnectionPtr> conn_holder_;

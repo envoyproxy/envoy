@@ -119,6 +119,8 @@ private:
     void onConnectionEvent(Network::ConnectionEvent event);
     void handleTransientFailure(absl::string_view reason);
     void handleTerminal(Grpc::Status::GrpcStatus status, absl::string_view reason);
+    // Order matters: close(Abort) raises LocalClose synchronously, which re-enters
+    // onConnectionEvent. Nulling codec_client_ first makes that re-entry a no-op.
     void tearDownCodec();
     void onRpcComplete(Grpc::Status::GrpcStatus status, absl::string_view message, bool end_stream);
     void onReport(const xds::data::orca::v3::OrcaLoadReport& report);
