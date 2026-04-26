@@ -54,6 +54,7 @@ Features:
 - build: Add a build feature ``exclude_certificates`` to disable inclusion of the Envoy Mobile certificate list, for use when using platform certificate validation.
 - build: Add a build feature ``envoy_http_datagrams`` to allow disabling HTTP Datagram support. (:issue:`#23564 <23564>`)
 - android: log cleared JNI exceptions to platform layer as `jni_cleared_pending_exception` events (:issue:`#26133 <26133>`).
+- api: Add support for SCONE (Standardized Communication with Network Elements) via ``enableScone()`` in ``EngineBuilder``. SCONE data is propagated via new fields in ``envoy_stream_intel``. (#44543)
 
 0.5.0 (September 2, 2022)
 ===========================

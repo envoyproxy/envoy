@@ -40,6 +40,7 @@ envoy_cc_test(
         "@envoy//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_build_config//:test_extensions",
+        "@quiche//:quic_test_tools_test_utils_lib",
     ],
 )
 
