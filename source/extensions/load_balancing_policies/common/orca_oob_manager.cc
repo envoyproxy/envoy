@@ -38,10 +38,6 @@ OrcaOobManager::OrcaOobManager(std::chrono::milliseconds reporting_period,
       oob_stats_(generateOrcaOobStats(stats_scope)) {}
 
 OrcaOobManager::~OrcaOobManager() {
-  // ThreadAwareLoadBalancer destroys this manager on the cluster's main-thread dispatcher
-  // during cluster-manager teardown. disarm() deferred-deletes each session's codec_client_,
-  // and we then deferred-delete the session itself onto the same dispatcher; the queue
-  // purges between event-loop ticks, before the dispatcher is destroyed.
   for (auto& [host, session] : oob_sessions_) {
     session->disarm();
     dispatcher_.deferredDelete(std::move(session));
@@ -51,9 +47,6 @@ OrcaOobManager::~OrcaOobManager() {
 }
 
 absl::Status OrcaOobManager::initialize() {
-  // Caller must invoke OrcaWeightManager::initialize() before this method so newly-added
-  // hosts get OrcaHostLbPolicyData attached before this manager opens their OOB session.
-  // See client_side_weighted_round_robin_lb.cc for the runtime callback-ordering rationale.
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     onHostsAdded(host_set->hosts());
   }
@@ -241,9 +234,8 @@ void OrcaOobManager::OobSession::connectAndStream() {
   auto headers_message =
       Grpc::Common::prepareHeaders(authority(), std::string(kOrcaOobServiceFullName),
                                    std::string(kStreamCoreMetricsMethod), absl::nullopt);
-  const absl::string_view scheme =
-      host_->transportSocketFactory().implementsSecureTransport() ? "https" : "http";
-  headers_message->headers().setScheme(scheme);
+  headers_message->headers().setScheme(
+      host_->transportSocketFactory().implementsSecureTransport() ? "https" : "http");
 
   const auto status =
       request_encoder_->encodeHeaders(headers_message->headers(), /*end_stream=*/false);

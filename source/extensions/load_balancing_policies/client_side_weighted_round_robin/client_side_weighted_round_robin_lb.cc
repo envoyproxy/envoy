@@ -120,15 +120,9 @@ ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalanc
           orca_config, priority_set, time_source, typed_lb_config->main_thread_dispatcher_,
           [factory = factory_]() { factory->applyWeightsToAllWorkers(); });
 
-  // Init order: OrcaWeightManager (registered via addPriorityUpdateCb) and OrcaOobManager
-  // (below, via addMemberUpdateCb) live in separate callback registries on
-  // MainPrioritySetImpl. The relevant ordering is enforced by
-  // PrioritySetImpl::updateHosts(): for each host-set update it invokes
-  // HostSetImpl::updateHosts() (firing priority callbacks) BEFORE runUpdateCallbacks()
-  // (firing member callbacks). So when a new host arrives at runtime, OrcaWeightManager's
-  // priority callback attaches OrcaHostLbPolicyData first; OrcaOobManager's member callback
-  // then opens the session. The first OOB report can't arrive before the next dispatcher
-  // tick (backoff timer), so policy-data attachment always wins the race.
+  // Init order relies on PrioritySetImpl::updateHosts() firing priority callbacks
+  // (OrcaWeightManager attaches OrcaHostLbPolicyData) before member callbacks (OrcaOobManager
+  // opens the session), so the data is in place before the first OOB report.
   if (typed_lb_config->enable_oob_load_report) {
     orca_oob_manager_ =
         std::make_unique<Extensions::LoadBalancingPolicies::Common::ProdOrcaOobManager>(
@@ -139,8 +133,6 @@ ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalanc
 }
 
 absl::Status ClientSideWeightedRoundRobinLoadBalancer::initialize() {
-  // Init order: weight manager attaches OrcaHostLbPolicyData to existing hosts and registers its
-  // priority callback FIRST, so OOB sessions decoding their first report find the policy data.
   RETURN_IF_NOT_OK(orca_weight_manager_->initialize());
   if (orca_oob_manager_ != nullptr) {
     RETURN_IF_NOT_OK(orca_oob_manager_->initialize());

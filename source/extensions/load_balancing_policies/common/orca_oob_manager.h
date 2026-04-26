@@ -42,11 +42,12 @@ struct OrcaOobStats {
 };
 
 /**
- * Cluster-level manager owning per-host ORCA OOB streams. Modeled on GrpcHealthCheckerImpl:
- * per-host nested OobSession holds a CodecClient and Http stream callbacks; the manager reacts
- * to PrioritySet::addMemberUpdateCb to add/remove sessions. All activity runs on the supplied
- * dispatcher's thread; the only cross-thread surface is OrcaHostLbPolicyData atomics (workers
- * read; this manager writes via the shared OrcaLoadReportHandler).
+ * Cluster-level manager owning per-host ORCA OOB streams. Modeled on
+ * source/extensions/health_checkers/grpc/health_checker_impl.h: per-host nested OobSession holds
+ * a CodecClient and Http stream callbacks; the manager reacts to PrioritySet::addMemberUpdateCb
+ * to add/remove sessions. All activity runs on the supplied dispatcher's thread; the only
+ * cross-thread surface is OrcaHostLbPolicyData atomics (workers read; this manager writes via the
+ * shared OrcaLoadReportHandler).
  */
 class OrcaOobManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
@@ -62,17 +63,13 @@ public:
   absl::Status initialize();
 
 protected:
-  // Test seam: subclass overrides to inject a CodecClientForTest. ProdOrcaOobManager builds a
-  // CodecClientProd over the supplied connection. Mirrors the gRPC health checker pattern at
-  // health_checker_impl.h.
+  // Test seam: subclass overrides to inject a CodecClientForTest.
   virtual Http::CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
 
   Event::Dispatcher& dispatcher_;
   Random::RandomGenerator& random_;
 
 private:
-  // Per-host gRPC OOB session driver. Mirrors GrpcActiveHealthCheckSession at
-  // source/extensions/health_checkers/grpc/health_checker_impl.h.
   class OobSession : public Event::DeferredDeletable,
                      public Http::ResponseDecoderImplBase,
                      public Http::StreamCallbacks,
@@ -122,10 +119,8 @@ private:
     void onConnectionEvent(Network::ConnectionEvent event);
     void handleTransientFailure(absl::string_view reason);
     void handleTerminal(Grpc::Status::GrpcStatus status, absl::string_view reason);
-    // Move codec_client_ to a local, then close + deferred-delete. Order matters:
-    // Network::ConnectionImpl::close(Abort) raises LocalClose synchronously, which re-enters
-    // onConnectionEvent. Nulling codec_client_ first makes that re-entry a no-op (mirrors
-    // GrpcActiveHealthCheckSession::onEvent at health_checker_impl.cc).
+    // Order matters: close(Abort) raises LocalClose synchronously, which re-enters
+    // onConnectionEvent. Nulling codec_client_ first makes that re-entry a no-op.
     void tearDownCodec();
     void onRpcComplete(Grpc::Status::GrpcStatus status, absl::string_view message, bool end_stream);
     void onReport(const xds::data::orca::v3::OrcaLoadReport& report);
@@ -141,11 +136,11 @@ private:
     Http::RequestEncoder* request_encoder_{nullptr};
     Grpc::Decoder decoder_;
     BackOffStrategyPtr backoff_;
-    // expect_reset_: we initiated a stream reset; suppress the resulting onResetStream callback.
-    // received_no_error_goaway_: server sent GOAWAY(NoError); we defer teardown until the next
-    //   decoded message so any in-flight reports are still delivered. If the server is silent
-    //   after GOAWAY, the inactivity_timer_ catches the stalled session.
+    // We initiated a stream reset; suppress the resulting onResetStream callback.
     bool expect_reset_{false};
+    // Server sent GOAWAY(NoError); defer teardown until the next decoded message so any in-flight
+    // reports are still delivered. If the server is silent after GOAWAY, the inactivity_timer_
+    // catches the stalled session.
     bool received_no_error_goaway_{false};
   };
 
@@ -161,8 +156,7 @@ private:
   const Upstream::PrioritySet& priority_set_;
   OrcaLoadReportHandlerSharedPtr report_handler_;
   Envoy::Common::CallbackHandlePtr member_update_cb_;
-  // node_hash_map for pointer/reference stability across rehash, mirroring
-  // HealthCheckerImplBase::active_sessions_.
+  // node_hash_map for pointer/reference stability across rehash.
   absl::node_hash_map<Upstream::HostConstSharedPtr, OobSessionPtr> oob_sessions_;
   OrcaOobStats oob_stats_;
 };
