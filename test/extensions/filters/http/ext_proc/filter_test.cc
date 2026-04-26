@@ -107,6 +107,8 @@ protected:
         {{"envoy.reloadable_features.ext_proc_stream_close_optimization", "true"}});
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.ext_proc_return_stop_iteration", "true"}});
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
@@ -570,8 +572,10 @@ protected:
   void sendChunkRequestData(const uint32_t chunk_number, const bool send_grpc) {
     for (uint32_t i = 0; i < chunk_number; i++) {
       Buffer::OwnedImpl req_data("foo");
-      EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
-      if (send_grpc) {
+      if (!send_grpc) {
+        EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+      } else {
+        EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
         processRequestBody(absl::nullopt, false);
       }
     }
@@ -580,8 +584,10 @@ protected:
   void sendChunkResponseData(const uint32_t chunk_number, const bool send_grpc) {
     for (uint32_t i = 0; i < chunk_number; i++) {
       Buffer::OwnedImpl resp_data("bar");
-      EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
-      if (send_grpc) {
+      if (!send_grpc) {
+        EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
+      } else {
+        EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, false));
         processResponseBody(absl::nullopt, false);
       }
     }
@@ -620,7 +626,7 @@ protected:
     uint32_t chunk_number = 3;
     for (uint32_t i = 0; i < chunk_number; i++) {
       Buffer::OwnedImpl resp_data(std::to_string(i));
-      EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
+      EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, false));
       processResponseBody(
           [i, &want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
             auto* body_mut = resp.mutable_response()->mutable_body_mutation();
@@ -1788,7 +1794,7 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
   const uint32_t chunk_number = 20;
   sendChunkRequestData(chunk_number, true);
   // When sends one more chunk of data, gRPC call fails.
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   // Oh no! The remote server had a failure!
   TestResponseHeaderMapImpl immediate_response_headers;
@@ -1847,7 +1853,7 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
   sendChunkResponseData(chunk_number / 2, true);
   // When sends one more chunk of data, gRPC call fails.
   Buffer::OwnedImpl resp_data("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, false));
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
@@ -1950,27 +1956,27 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatency) {
   const uint32_t chunk_number = 5;
   Buffer::OwnedImpl req_data("foo");
   // Latency 50 80 60 30 100.
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
   EXPECT_TRUE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(50));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(80));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(60));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(30));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
   EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(100));
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
@@ -2077,7 +2083,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     want_response_body.add(resp_chunk.toString());
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
     got_response_body.move(resp_chunk);
     EXPECT_FALSE(last_request_.has_protocol_config());
     processResponseBody(absl::nullopt, false);
@@ -2188,7 +2194,7 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     want_response_body.add(resp_chunk.toString());
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
     got_response_body.move(resp_chunk);
   }
 
@@ -2264,7 +2270,7 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeMode) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     want_response_body.add(resp_chunk.toString());
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
     got_response_body.move(resp_chunk);
   }
 
@@ -2275,16 +2281,12 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeMode) {
       },
       false);
 
-  // A new body chunk should not be sent to the server, but should be queued
-  // because we didn't get all the responses yet
   Buffer::OwnedImpl resp_chunk;
   TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
   want_response_body.add(resp_chunk.toString());
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   got_response_body.move(resp_chunk);
 
-  // There should be two more messages outstanding, but not three, so respond
-  // just to them.
   for (int i = 0; i < 3; i++) {
     processResponseBody(absl::nullopt, false);
   }
@@ -2356,7 +2358,7 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeModeDifferentOrder) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     want_response_body.add(resp_chunk.toString());
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
     got_response_body.move(resp_chunk);
   }
 
@@ -2367,8 +2369,6 @@ TEST_F(HttpFilterTest, GetStreamingBodyAndChangeModeDifferentOrder) {
       },
       false);
 
-  // A new body chunk should not be sent to the server, but should be queued
-  // because we didn't get all the responses yet
   Buffer::OwnedImpl resp_chunk;
   TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
   want_response_body.add(resp_chunk.toString());
@@ -4439,7 +4439,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedBeforeBody) {
   for (int i = 0; i < 5; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
 
   // Send body responses
@@ -4538,7 +4538,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
   for (int i = 5; i < 10; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
 
   // Send body responses
@@ -5746,7 +5746,7 @@ TEST_F(HttpFilterTest, CloseStreamOnRequestBodyWithTrailers) {
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   Buffer::OwnedImpl req_data("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
   auto response = std::make_unique<ProcessingResponse>();
   auto* body_response = response->mutable_request_body();
@@ -5776,7 +5776,7 @@ TEST_F(HttpFilterTest, CloseStreamOnResponseBodyWithTrailers) {
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
   Buffer::OwnedImpl response_data("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(response_data, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
   auto response = std::make_unique<ProcessingResponse>();
   auto* body_response = response->mutable_response_body();
@@ -6027,7 +6027,7 @@ TEST_F(HttpFilterTest, HttpEventTrafficStatsTest) {
 
   // Request Body
   Buffer::OwnedImpl chunk1("chunk1");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(chunk1, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(chunk1, false));
 
   processRequestBody(
       [&](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
@@ -6040,9 +6040,9 @@ TEST_F(HttpFilterTest, HttpEventTrafficStatsTest) {
 
   // Response Body
   Buffer::OwnedImpl resp_chunk1("resp_chunk1");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk1, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk1, false));
   Buffer::OwnedImpl resp_chunk2("resp_chunk2");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk2, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk2, false));
 
   processResponseBody(
       [&](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
@@ -6056,6 +6056,85 @@ TEST_F(HttpFilterTest, HttpEventTrafficStatsTest) {
   EXPECT_EQ(grpc_body.body_stats_->call_count_, 1);
 
   filter_->onDestroy();
+}
+
+// Streaming data test with runtime guard
+// envoy.reloadable_features.ext_proc_return_stop_iteration sets to false.
+// This test can be removed when the runtime guard is removed.
+TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatencyReturnContinue) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SKIP"
+    request_body_mode: "STREAMED"
+  )EOF");
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_return_stop_iteration", "false"}});
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  const uint32_t chunk_number = 5;
+  Buffer::OwnedImpl req_data("foo");
+  // Latency 50 80 60 30 100.
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_TRUE(last_request_.has_protocol_config());
+  processRequestBody(absl::nullopt, false, std::chrono::microseconds(50));
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
+  processRequestBody(absl::nullopt, false, std::chrono::microseconds(80));
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
+  processRequestBody(absl::nullopt, false, std::chrono::microseconds(60));
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
+  processRequestBody(absl::nullopt, false, std::chrono::microseconds(30));
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
+  processRequestBody(absl::nullopt, false, std::chrono::microseconds(100));
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  uint32_t total_msg = chunk_number;
+  EXPECT_EQ(total_msg, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(total_msg, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(0, config_->stats().streams_failed_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+
+  auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
+  EXPECT_TRUE(grpc_calls_in.header_stats_ == nullptr);
+  EXPECT_TRUE(grpc_calls_in.trailer_stats_ == nullptr);
+  EXPECT_TRUE(grpc_calls_in.body_stats_ != nullptr);
+  checkGrpcCallBody(*grpc_calls_in.body_stats_, chunk_number, Grpc::Status::Ok,
+                    std::chrono::microseconds(320), std::chrono::microseconds(100),
+                    std::chrono::microseconds(30));
+
+  expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 }
 
 } // namespace
