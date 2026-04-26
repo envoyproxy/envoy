@@ -5,6 +5,15 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: golang
+  change: |
+    Removed the per-cgo-call mutex on the Golang HTTP filter's destroy check by making the
+    ``has_destroyed_`` flag a ``std::atomic<bool>``. The lock-free destroy check eliminates an
+    atomic compare-and-swap on every CAPI call from Go (``getHeader``, ``copyHeaders``,
+    ``setHeader``, ``addData``, ``continueStatus``, etc.), reducing per-call overhead and removing
+    a source of contention between off-thread Go callers. The mutex is retained only on the few
+    CAPI methods that write to the per-request ``strValue`` scratch buffer (``getStringValue``,
+    ``getDynamicMetadata``, ``getStringFilterState``, ``getStringProperty``, ``getSecret``).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

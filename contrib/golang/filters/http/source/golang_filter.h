@@ -350,10 +350,10 @@ public:
 private:
   friend class TestFilter;
 
-  bool hasDestroyed() {
-    Thread::LockGuard lock(mutex_);
-    return has_destroyed_;
-  };
+  // Lock-free destroy check. The flag is set once, with release ordering, by onDestroy() on the
+  // worker thread; concurrent off-thread cgo callers do an acquire load to detect destruction
+  // without taking mutex_. See header note on has_destroyed_ below.
+  bool hasDestroyed() { return has_destroyed_.load(std::memory_order_acquire); };
   const StreamInfo::StreamInfo& streamInfo() const { return decoding_state_.streamInfo(); }
   StreamInfo::StreamInfo& streamInfo() { return decoding_state_.streamInfo(); }
   bool isThreadSafe() { return decoding_state_.isThreadSafe(); };
@@ -410,10 +410,16 @@ private:
 
   Event::Dispatcher* dispatcher_;
 
-  // lock for has_destroyed_/etc, to avoid race between envoy c thread and go thread (when calling
-  // back from go).
+  // Serializes off-thread Go callers that write to req_->strValue (e.g. getStringValue,
+  // getDynamicMetadata, getStringFilterState, getStringProperty, getSecret). The destroy flag
+  // itself no longer requires this mutex; see has_destroyed_.
   Thread::MutexBasicLockable mutex_{};
-  bool has_destroyed_ ABSL_GUARDED_BY(mutex_){false};
+  // Set exactly once by onDestroy() (write with release), read lock-free by hasDestroyed()
+  // (acquire load) from any thread. Concurrent cgo callers from Go bail out with
+  // CAPIFilterIsDestroy as soon as they observe the store. The Filter itself is kept alive across
+  // any cgo call by the shared_ptr taken at the cgo wrapper layer (see cgo.cc), so observing a
+  // false-then-true transition during a call is benign.
+  std::atomic<bool> has_destroyed_{false};
 };
 
 struct httpConfigInternal : httpConfig {
