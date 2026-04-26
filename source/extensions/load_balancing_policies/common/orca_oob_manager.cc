@@ -6,6 +6,7 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/codec_client.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -123,8 +124,6 @@ void OrcaOobManager::OobSession::disarm() {
 void OrcaOobManager::OobSession::tearDownCodec() {
   ASSERT(codec_client_ != nullptr);
   expect_reset_ = true;
-  // Null codec_client_ BEFORE close() so the synchronous LocalClose re-entry into
-  // onConnectionEvent sees a null codec_client_ and short-circuits.
   auto client = std::move(codec_client_);
   client->close(Network::ConnectionCloseType::Abort);
   parent_.dispatcher_.deferredDelete(std::move(client));
@@ -136,14 +135,12 @@ void OrcaOobManager::OobSession::decodeHeaders(Http::ResponseHeaderMapPtr&& head
   if (!Grpc::Common::isGrpcResponseHeaders(*headers, end_stream)) {
     const uint64_t http_status = Http::Utility::getResponseStatusOrNullopt(*headers).value_or(
         static_cast<uint64_t>(Http::Code::InternalServerError));
-    if (end_stream) {
-      const auto grpc_status = Grpc::Common::getGrpcStatus(*headers, /*allow_user_status=*/true);
-      onRpcComplete(grpc_status.value_or(Grpc::Utility::httpToGrpcStatus(http_status)),
-                    "non-grpc response", /*end_stream=*/true);
-    } else {
-      onRpcComplete(Grpc::Utility::httpToGrpcStatus(http_status), "non-grpc response",
-                    /*end_stream=*/false);
-    }
+    const auto http_grpc_status = Grpc::Utility::httpToGrpcStatus(http_status);
+    const auto status = end_stream
+                            ? Grpc::Common::getGrpcStatus(*headers, /*allow_user_status=*/true)
+                                  .value_or(http_grpc_status)
+                            : http_grpc_status;
+    onRpcComplete(status, "non-grpc response", end_stream);
     return;
   }
   if (end_stream) {
@@ -234,8 +231,10 @@ void OrcaOobManager::OobSession::connectAndStream() {
   auto headers_message =
       Grpc::Common::prepareHeaders(authority(), std::string(kOrcaOobServiceFullName),
                                    std::string(kStreamCoreMetricsMethod), absl::nullopt);
-  headers_message->headers().setScheme(
-      host_->transportSocketFactory().implementsSecureTransport() ? "https" : "http");
+  headers_message->headers().setReferenceScheme(
+      host_->transportSocketFactory().implementsSecureTransport()
+          ? Http::Headers::get().SchemeValues.Https
+          : Http::Headers::get().SchemeValues.Http);
 
   const auto status =
       request_encoder_->encodeHeaders(headers_message->headers(), /*end_stream=*/false);
