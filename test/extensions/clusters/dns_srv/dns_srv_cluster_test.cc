@@ -41,7 +41,8 @@ protected:
   )EOF";
 
   // Creates and initializes the cluster from yaml. Caller must set up DNS mock expectations first.
-  void createCluster(const std::string& yaml = default_yaml) {
+  void createCluster(const std::string& yaml = default_yaml,
+                     std::function<absl::Status()> init_cb = nullptr) {
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
 
     envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig dns_srv_config{};
@@ -60,7 +61,7 @@ protected:
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
 
     cluster_ = status_or_cluster.value().first;
-    cluster_->initialize([&]() { return absl::OkStatus(); });
+    cluster_->initialize(init_cb ? init_cb : []() { return absl::OkStatus(); });
   }
 
   // Registers an expectation that the resolve timer will be armed (any interval).
@@ -367,6 +368,53 @@ TEST_F(DnsSrvClusterTest, TwoIps) {
   EXPECT_EQ(hosts[1]->weight(), srv_weight);
   EXPECT_EQ(hosts[1]->address()->ip()->addressAsString(), "5.6.7.8");
   EXPECT_EQ(hosts[1]->address()->ip()->port(), srv_port);
+}
+
+TEST_F(DnsSrvClusterTest, DontWaitForDNSOnInit) {
+  static constexpr char yaml[] = R"EOF(
+    name: test_cluster
+    connect_timeout: 1s
+    dns_lookup_family: ALL
+    wait_for_warm_on_init: false
+    cluster_type:
+      name: envoy.clusters.dns_srv
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns_srv.v3.DnsSrvClusterConfig
+        srv_name: "_local_service._tcp.service.consul."
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.cares
+  )EOF";
+
+  expectResolveTimer();
+
+  Network::DnsResolver::ResolveCb srv_callback;
+  expectResolveSrv("_local_service._tcp.service.consul.", srv_callback);
+
+  // With wait_for_warm_on_init=false the init callback must fire during createCluster(),
+  // before any DNS response arrives.
+  bool initialized = false;
+  createCluster(yaml, [&]() {
+    initialized = true;
+    return absl::OkStatus();
+  });
+  EXPECT_TRUE(initialized);
+
+  // DNS resolution completes after init — cluster still processes it normally.
+  Network::DnsResolver::ResolveCb a_callback;
+  expectResolve("svc.example.com", Network::DnsLookupFamily::All, a_callback);
+
+  ASSERT_TRUE(srv_callback != nullptr);
+  srv_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+               {{0, 1, 9000, "svc.example.com", std::chrono::seconds(42)}});
+
+  ASSERT_TRUE(a_callback != nullptr);
+  a_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
+             TestUtility::makeDnsResponse({"1.2.3.4"}, std::chrono::seconds(42)));
+
+  const auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->address()->ip()->addressAsString(), "1.2.3.4");
+  EXPECT_EQ(hosts[0]->address()->ip()->port(), 9000);
 }
 
 } // namespace Clusters

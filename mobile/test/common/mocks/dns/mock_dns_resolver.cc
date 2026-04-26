@@ -68,8 +68,9 @@ Network::ActiveDnsQuery* MockDnsResolver::resolve(const std::string& dns_name,
   return nullptr;
 }
 
-Network::ActiveDnsQuery* resolveSrv(const std::string& dns_name ABSL_ATTRIBUTE_UNUSED,
-                                      ResolveCb callback ABSL_ATTRIBUTE_UNUSED) {
+Network::ActiveDnsQuery*
+MockDnsResolver::resolveSrv(const std::string& dns_name ABSL_ATTRIBUTE_UNUSED,
+                            ResolveCb callback ABSL_ATTRIBUTE_UNUSED) {
   callback(Network::DnsResolver::ResolutionStatus::Failure, "mock dns: SRV not supported",
            std::list<Network::DnsResponse>{});
   return nullptr;
