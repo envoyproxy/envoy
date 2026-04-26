@@ -457,7 +457,6 @@ TEST_F(OrcaOobManagerWireTest, MalformedGrpcFrameTriggersTransientFailure) {
   attempt_timer->invokeCallback();
 
   respondHeadersOk(*attempt);
-  // Frame flag byte > GRPC_FH_COMPRESSED makes Grpc::Decoder return NOT_OK.
   Buffer::OwnedImpl bad(std::string("\x02\x00\x00\x00\x00", 5));
   attempt->response_decoder->decodeData(bad, false);
   EXPECT_EQ(oobCounter("stream_failures"), 1);
@@ -478,7 +477,7 @@ TEST_F(OrcaOobManagerWireTest, CompressedFrameRejectedAsTransient) {
   attempt_timer->invokeCallback();
 
   respondHeadersOk(*attempt);
-  // Frame decodes cleanly with flags_=GRPC_FH_COMPRESSED; OobSession rejects compressed frames.
+  // Frame decodes cleanly; OobSession rejects compressed frames.
   Buffer::OwnedImpl bad(std::string("\x01\x00\x00\x00\x00", 5));
   attempt->response_decoder->decodeData(bad, false);
   EXPECT_EQ(oobCounter("stream_failures"), 1);
