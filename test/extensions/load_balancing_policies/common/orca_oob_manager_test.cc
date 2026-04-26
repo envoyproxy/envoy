@@ -1,5 +1,6 @@
 #include <chrono>
 #include <memory>
+#include <sstream>
 
 #include "envoy/upstream/upstream.h"
 
@@ -257,6 +258,11 @@ TEST_F(OrcaOobManagerWireTest, ReportReceivedUpdatesHostWeight) {
   attempt_timer->invokeCallback();
 
   respondHeadersOk(*attempt);
+  xds::data::orca::v3::OrcaLoadReport empty_report;
+  respondReport(*attempt, empty_report);
+  EXPECT_EQ(oobCounter("reports_received"), 0);
+  EXPECT_EQ(oobCounter("stream_failures"), 0);
+
   xds::data::orca::v3::OrcaLoadReport report;
   report.set_application_utilization(0.5);
   report.set_rps_fractional(1000);
@@ -267,8 +273,62 @@ TEST_F(OrcaOobManagerWireTest, ReportReceivedUpdatesHostWeight) {
   // Proves report flowed through; exact formula tested in OrcaWeightManager tests.
   EXPECT_GT(data_opt->weight_.load(), 1u);
 
+  xds::data::orca::v3::OrcaLoadReport invalid_report;
+  invalid_report.set_application_utilization(0.5);
+  respondReport(*attempt, invalid_report);
+  EXPECT_EQ(oobCounter("reports_received"), 2);
+  EXPECT_EQ(oobCounter("report_errors"), 1);
+
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   manager.reset();
+}
+
+TEST_F(OrcaOobManagerWireTest, CodecNoopCallbacksAreSafe) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  attempt_timer->invokeCallback();
+
+  attempt->response_decoder->decodeMetadata(std::make_unique<Http::MetadataMap>());
+  attempt->response_decoder->decode1xxHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>());
+  std::ostringstream dump;
+  attempt->response_decoder->dumpState(dump, 0);
+
+  attempt->request_encoder->stream_.runHighWatermarkCallbacks();
+  attempt->request_encoder->stream_.runLowWatermarkCallbacks();
+  attempt->network_connection->runHighWatermarkCallbacks();
+  attempt->network_connection->runLowWatermarkCallbacks();
+
+  EXPECT_EQ(oobCounter("stream_failures"), 0);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  manager.reset();
+}
+
+TEST_F(OrcaOobManagerWireTest, EndStreamDataWithoutTrailersIsTransientFailure) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  attempt_timer->invokeCallback();
+
+  respondHeadersOk(*attempt);
+  Buffer::OwnedImpl empty_data;
+  attempt->response_decoder->decodeData(empty_data, true);
+  EXPECT_EQ(oobCounter("stream_failures"), 1);
 }
 
 TEST_F(OrcaOobManagerWireTest, UnimplementedTrailerIsTerminal) {
@@ -335,7 +395,9 @@ TEST_F(OrcaOobManagerWireTest, GoAwayOtherIsImmediateTransient) {
 
   respondHeadersOk(*attempt);
   attempt->codec_client->raiseGoAway(Http::GoAwayErrorCode::Other);
+  respondTrailers(*attempt, Grpc::Status::WellKnownGrpcStatus::Unimplemented);
   EXPECT_EQ(oobCounter("stream_failures"), 1);
+  EXPECT_EQ(oobCounter("stream_terminated"), 0);
 }
 
 TEST_F(OrcaOobManagerWireTest, ReportWithoutLbPolicyDataIncrementsReportErrors) {
@@ -549,8 +611,12 @@ TEST_F(OrcaOobManagerWireTest, RemoteCloseTriggersTransientFailure) {
   attempt_timer->invokeCallback();
 
   respondHeadersOk(*attempt);
-  // RemoteClose flows through ConnectionCallbackImpl::onEvent into onConnectionEvent
-  // while codec_client_ is still live, exercising the handleTransientFailure branch.
+  // Run OobSession's connection callback before CodecClient's callback so onConnectionEvent sees
+  // codec_client_ live; CodecClient then resets the stream after OobSession has torn it down.
+  ASSERT_GE(attempt->network_connection->callbacks_.size(), 2);
+  auto* oob_callback = attempt->network_connection->callbacks_.back();
+  attempt->network_connection->callbacks_.pop_back();
+  attempt->network_connection->callbacks_.push_front(oob_callback);
   attempt->network_connection->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(oobCounter("stream_failures"), 1);
 }
