@@ -66,6 +66,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/formatter:substitution_format_string_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/http:hash_policy_lib",
         "//source/common/http:header_mutation_lib",
         "//source/common/http:header_utility_lib",

@@ -360,6 +360,85 @@ class RouteMatcherTest : public testing::Test,
                          public ConfigImplTestBase,
                          public TestScopedRuntime {};
 
+TEST(RouteMatchContextTest, BasicPathAndQuery) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo?a=1&b=2"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.path(), "/foo?a=1&b=2");
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo?a=1&b=2");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
+  EXPECT_EQ(ctx.queryParams().getFirstValue("a").value(), "1");
+  EXPECT_EQ(ctx.queryParams().getFirstValue("b").value(), "2");
+}
+
+TEST(RouteMatchContextTest, PathWithFragment) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo?x=1#section"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
+}
+
+TEST(RouteMatchContextTest, NoQueryString) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo/bar"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.path(), "/foo/bar");
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo/bar");
+  EXPECT_FALSE(ctx.queryParams().getFirstValue("any").has_value());
+}
+
+TEST(RouteMatchContextTest, SanitizedPathStripsPathParams) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo;env=prod;ver=2?a=1"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/true);
+
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo");
+  // Raw accessors are unaffected.
+  EXPECT_EQ(ctx.path(), "/foo;env=prod;ver=2?a=1");
+  EXPECT_EQ(ctx.pathWithoutQuery(), "/foo;env=prod;ver=2");
+}
+
+TEST(RouteMatchContextTest, SanitizedPathNoOpWhenNotConfigured) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo;env=prod?a=1"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_EQ(ctx.sanitizedPath(), "/foo;env=prod?a=1");
+  EXPECT_EQ(ctx.sanitizedPathWithoutQuery(), "/foo;env=prod");
+}
+
+TEST(RouteMatchContextTest, IsGrpc) {
+  {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/pkg.Svc/Method"},
+                                           {"content-type", "application/grpc"}};
+    RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+    EXPECT_TRUE(ctx.isGrpc());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}, {"content-type", "application/json"}};
+    RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+    EXPECT_FALSE(ctx.isGrpc());
+  }
+}
+
+TEST(RouteMatchContextTest, Cookies) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}, {"cookie", "session=abc; user=xyz"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  const auto& cookies = ctx.cookies();
+  EXPECT_EQ(cookies.at("session"), "abc");
+  EXPECT_EQ(cookies.at("user"), "xyz");
+  EXPECT_EQ(cookies.size(), 2);
+}
+
+TEST(RouteMatchContextTest, NoCookies) {
+  Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}};
+  RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
+
+  EXPECT_TRUE(ctx.cookies().empty());
+}
+
 TEST_F(RouteMatcherTest, TestConnectRoutes) {
   const std::string yaml = R"EOF(
 virtual_hosts:
