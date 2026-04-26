@@ -681,10 +681,6 @@ new_features:
     Added dynamic metadata emission on successful authentication under the
     ``envoy.filters.http.basic_auth`` namespace with key ``username``, allowing downstream
     filters (e.g. RBAC) to act on BasicAuth success.
-- area: attributes
-  change: |
-    Added ``connection.peer_certificate`` and ``upstream.peer_certificate`` attributes that provide the
-    PEM-encoded peer certificate for downstream and upstream TLS connections respectively.
 - area: mysql_proxy
   change: |
     Added SSL termination support to the MySQL proxy filter with RSA-mediated ``caching_sha2_password``
