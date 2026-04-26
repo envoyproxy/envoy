@@ -154,11 +154,10 @@ protected:
     CodecClientForTest* codec_client{nullptr};
   };
 
-  // Build the per-attempt mocks. OobSession takes ownership of network_connection (via
-  // CodecClientForTest) and codec (via codec_->reset). request_encoder lifetime is owned by
-  // the fixture; MockClientConnection::newStream returns a ref into it. close() is stubbed
-  // to a no-op so wire tests can assert stream_failures from explicit raise* hooks; see
-  // SyncLocalCloseDuringTearDownDoesNotDoubleCount for the synchronous-close variant.
+  // OobSession takes ownership of network_connection (via CodecClientForTest) and codec
+  // (via codec_->reset). request_encoder lifetime is owned by the fixture;
+  // MockClientConnection::newStream returns a ref into it. close() is stubbed to a no-op
+  // so wire tests assert stream_failures from explicit raise* hooks.
   std::unique_ptr<OobAttempt> makeAttempt() {
     auto attempt = std::make_unique<OobAttempt>();
     attempt->network_connection = new NiceMock<Network::MockClientConnection>();
@@ -435,7 +434,8 @@ TEST_F(OrcaOobManagerWireTest, TrailersOnlyResponseTreatedAsTerminal) {
   Http::TestResponseHeaderMapImpl headers{
       {":status", "200"},
       {"content-type", "application/grpc"},
-      {"grpc-status", absl::StrCat(static_cast<int>(Grpc::Status::WellKnownGrpcStatus::Unimplemented))}};
+      {"grpc-status",
+       absl::StrCat(static_cast<int>(Grpc::Status::WellKnownGrpcStatus::Unimplemented))}};
   attempt->response_decoder->decodeHeaders(
       std::make_unique<Http::TestResponseHeaderMapImpl>(headers), true);
   EXPECT_EQ(oobCounter("stream_terminated"), 1);
@@ -632,37 +632,6 @@ TEST_F(OrcaOobManagerWireTest, PipeHostFallsBackToAddressString) {
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   manager.reset();
-}
-
-TEST_F(OrcaOobManagerWireTest, SyncLocalCloseDuringTearDownDoesNotDoubleCount) {
-  auto manager = makeManager();
-  ASSERT_OK(manager->initialize());
-
-  auto* attempt_timer = installAttemptTimer();
-  auto host = makeWiredHost();
-  priority_set_.runUpdateCallbacks(0, {host}, {});
-
-  auto attempt = makeAttempt();
-  // Override the fixture's no-op close() stubs so close() raises sync LocalClose, matching
-  // production ConnectionImpl::close(Abort) semantics.
-  auto* raw_conn = attempt->network_connection;
-  ON_CALL(*raw_conn, close(_, _)).WillByDefault(testing::InvokeWithoutArgs([raw_conn]() {
-    raw_conn->raiseEvent(Network::ConnectionEvent::LocalClose);
-  }));
-  ON_CALL(*raw_conn, close(_)).WillByDefault(testing::InvokeWithoutArgs([raw_conn]() {
-    raw_conn->raiseEvent(Network::ConnectionEvent::LocalClose);
-  }));
-  wireConnectionFor(host, *attempt);
-  expectCreateCodecClient(*manager, *attempt);
-  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
-  attempt_timer->invokeCallback();
-
-  respondHeadersOk(*attempt);
-  // GoAway(Other) -> handleTransientFailure -> tearDownCodec -> sync close -> sync
-  // onConnectionEvent(LocalClose) re-entry. With the fix, the re-entry sees a null
-  // codec_client_ and returns; stream_failures stays at 1.
-  attempt->codec_client->raiseGoAway(Http::GoAwayErrorCode::Other);
-  EXPECT_EQ(oobCounter("stream_failures"), 1);
 }
 
 } // namespace

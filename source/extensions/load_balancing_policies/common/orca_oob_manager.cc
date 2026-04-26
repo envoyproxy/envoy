@@ -131,9 +131,7 @@ void OrcaOobManager::OobSession::disarm() {
 void OrcaOobManager::OobSession::tearDownCodec() {
   ASSERT(codec_client_ != nullptr);
   expect_reset_ = true;
-  auto client = std::move(codec_client_);
-  client->close(Network::ConnectionCloseType::Abort);
-  parent_.dispatcher_.deferredDelete(std::move(client));
+  parent_.dispatcher_.deferredDelete(std::move(codec_client_));
   request_encoder_ = nullptr;
 }
 
