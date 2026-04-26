@@ -28,7 +28,7 @@ message LoadAwareLocality {
       [(validate.rules).message = {required: true}];
 
   // How frequently ORCA weights and locality utilization are recomputed on the
-  // main thread. Defaults to 1s.
+  // main thread. Values less than 100ms are capped at 100ms. Defaults to 1s.
   google.protobuf.Duration weight_update_period = 2;
 
   // Named metrics from ORCA reports to use for computing utilization.
@@ -48,7 +48,8 @@ message LoadAwareLocality {
   // When the local locality's utilization is at most this threshold above the
   // remote average, route 100% of traffic to the local locality. This avoids
   // unnecessary cross-zone routing when utilization is roughly balanced.
-  // Must be in [0, 1]. Defaults to 0.1.
+  // One-sided: if the local zone is less loaded than remote, all-local routing
+  // always applies. Must be in [0, 1]. Defaults to 0.1.
   google.protobuf.DoubleValue utilization_variance_threshold = 4
       [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 
@@ -59,13 +60,16 @@ message LoadAwareLocality {
 
   // Minimum fraction of traffic sent to non-local localities to keep ORCA
   // data fresh. Applied even when the local-preference check would otherwise
-  // route 100% of traffic to the local locality. Must be in [0, 1).
-  // Set to 0 to disable. Defaults to 0.03 (3%).
+  // route 100% of traffic to the local locality. The deficit is redistributed
+  // proportionally to remote host count. Must be in [0, 1). Set to 0 to
+  // disable. Defaults to 0.03 (3%).
   google.protobuf.DoubleValue remote_probe_fraction = 6
       [(validate.rules).double = {lt: 1.0 gte: 0.0}];
 
-  // If a given endpoint has not reported load metrics in this long, then we
-  // stop using the reported weight. This ensures that we do not continue to
-  // use very stale weights. Set to 0s to disable expiration. Defaults to 3 minutes.
+  // If a given endpoint has not reported load metrics in this long, the
+  // sample is discarded and the locality's EWMA state is reset (smoothed
+  // utilization returns to 0.0, the locality appears at full headroom until
+  // fresh data arrives). This may cause a transient traffic surge toward the
+  // affected locality. Set to 0s to disable expiration. Defaults to 3 minutes.
   google.protobuf.Duration weight_expiration_period = 7 [(validate.rules).duration = {gte {}}];
 }
