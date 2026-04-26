@@ -36,11 +36,8 @@ using ::testing::AtLeast;
 using ::testing::NiceMock;
 using ::testing::Return;
 
-// Test seam: subclass overrides createCodecClient via a MOCK_METHOD that returns a raw
-// Http::CodecClient*; the base override wraps in unique_ptr. Mirrors the gRPC HC pattern
-// (TestGrpcHealthCheckerImpl in source/extensions/health_checkers/grpc/health_checker_impl.h).
-// Returning a raw pointer is safe because tests construct CodecClientForTest on the heap and
-// hand ownership to OobSession via the wrapping unique_ptr.
+// MOCK_METHOD returns a raw Http::CodecClient*; createCodecClient wraps in unique_ptr to
+// transfer ownership to OobSession.
 class TestOrcaOobManager : public OrcaOobManager {
 public:
   using OrcaOobManager::OrcaOobManager;
@@ -97,7 +94,12 @@ TEST_F(OrcaOobManagerLifecycleTest, HostAddedSchedulesSession) {
   ASSERT_OK(manager->initialize());
 
   auto* attempt_timer = installAttemptTimer();
-  priority_set_.runUpdateCallbacks(0, {makeHost()}, {});
+  auto host = makeHost();
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+  EXPECT_EQ(activeOobSessions(), 1);
+
+  // Re-adding the same host pointer hits try_emplace's already-present branch.
+  priority_set_.runUpdateCallbacks(0, {host}, {});
   EXPECT_EQ(activeOobSessions(), 1);
 
   EXPECT_CALL(*manager, createCodecClient_(_)).WillOnce(Return(nullptr));
@@ -116,6 +118,10 @@ TEST_F(OrcaOobManagerLifecycleTest, HostRemovedDisarmsAndDecrementsGauge) {
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   priority_set_.runUpdateCallbacks(0, {}, {host});
+  EXPECT_EQ(activeOobSessions(), 0);
+
+  // Removing a host the manager never tracked exercises the find()==end() branch.
+  priority_set_.runUpdateCallbacks(0, {}, {makeHost()});
   EXPECT_EQ(activeOobSessions(), 0);
 }
 
@@ -389,6 +395,245 @@ TEST_F(OrcaOobManagerWireTest, NonGrpcResponseTransientFailure) {
 // BEFORE calling close() so the re-entry into onConnectionEvent short-circuits. Without
 // the move-before-close ordering, this test would record stream_failures==2 (one from
 // the GoAway path, one from the sync onConnectionEvent re-entry into handleTransientFailure).
+TEST_F(OrcaOobManagerWireTest, NonGrpcResponseEndStreamFalseTransient) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  attempt_timer->invokeCallback();
+
+  // Non-grpc 503 with end_stream=false drives onRpcComplete's resetStream branch.
+  Http::TestResponseHeaderMapImpl headers{{":status", "503"}, {"content-type", "text/plain"}};
+  attempt->response_decoder->decodeHeaders(
+      std::make_unique<Http::TestResponseHeaderMapImpl>(headers), false);
+  EXPECT_EQ(oobCounter("stream_failures"), 1);
+}
+
+TEST_F(OrcaOobManagerWireTest, TrailersOnlyResponseTreatedAsTerminal) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  attempt_timer->invokeCallback();
+
+  // 200 OK + grpc-status + end_stream=true is the trailers-only frame; covers the
+  // end_stream branch in decodeHeaders that bypasses decodeTrailers entirely.
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"},
+      {"content-type", "application/grpc"},
+      {"grpc-status", absl::StrCat(static_cast<int>(Grpc::Status::WellKnownGrpcStatus::Unimplemented))}};
+  attempt->response_decoder->decodeHeaders(
+      std::make_unique<Http::TestResponseHeaderMapImpl>(headers), true);
+  EXPECT_EQ(oobCounter("stream_terminated"), 1);
+  EXPECT_EQ(activeOobSessions(), 0);
+}
+
+TEST_F(OrcaOobManagerWireTest, MalformedGrpcFrameTriggersTransientFailure) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  attempt_timer->invokeCallback();
+
+  respondHeadersOk(*attempt);
+  // Frame flag byte > GRPC_FH_COMPRESSED makes Grpc::Decoder return NOT_OK.
+  Buffer::OwnedImpl bad(std::string("\x02\x00\x00\x00\x00", 5));
+  attempt->response_decoder->decodeData(bad, false);
+  EXPECT_EQ(oobCounter("stream_failures"), 1);
+}
+
+TEST_F(OrcaOobManagerWireTest, CompressedFrameRejectedAsTransient) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  attempt_timer->invokeCallback();
+
+  respondHeadersOk(*attempt);
+  // Frame decodes cleanly with flags_=GRPC_FH_COMPRESSED; OobSession rejects compressed frames.
+  Buffer::OwnedImpl bad(std::string("\x01\x00\x00\x00\x00", 5));
+  attempt->response_decoder->decodeData(bad, false);
+  EXPECT_EQ(oobCounter("stream_failures"), 1);
+}
+
+TEST_F(OrcaOobManagerWireTest, InvalidProtoPayloadTriggersTransientFailure) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  attempt_timer->invokeCallback();
+
+  respondHeadersOk(*attempt);
+  // Valid frame envelope (flag=0, length=1) wrapping a single-byte payload that is an
+  // unterminated varint, so OrcaLoadReport::ParseFromZeroCopyStream returns false.
+  Buffer::OwnedImpl bad(std::string("\x00\x00\x00\x00\x01\x80", 6));
+  attempt->response_decoder->decodeData(bad, false);
+  EXPECT_EQ(oobCounter("stream_failures"), 1);
+}
+
+TEST_F(OrcaOobManagerWireTest, EncodeHeadersFailureTriggersTransientFailure) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  // Custom attempt: encodeHeaders returns NOT_OK so encodeData is never called.
+  auto attempt = std::make_unique<OobAttempt>();
+  attempt->network_connection = new NiceMock<Network::MockClientConnection>();
+  attempt->codec = new NiceMock<Http::MockClientConnection>();
+  attempt->request_encoder = std::make_unique<NiceMock<Http::MockRequestEncoder>>();
+  EXPECT_CALL(*attempt->codec, newStream(_))
+      .WillOnce(testing::DoAll(SaveArgAddress(&attempt->response_decoder),
+                               testing::ReturnRef(*attempt->request_encoder)));
+  EXPECT_CALL(*attempt->request_encoder, encodeHeaders(_, false))
+      .WillOnce(testing::Return(absl::InternalError("encode bust")));
+  ON_CALL(*attempt->network_connection, close(_, _)).WillByDefault(testing::Return());
+  ON_CALL(*attempt->network_connection, close(_)).WillByDefault(testing::Return());
+
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  attempt_timer->invokeCallback();
+  EXPECT_EQ(oobCounter("stream_failures"), 1);
+}
+
+TEST_F(OrcaOobManagerWireTest, RemoteCloseTriggersTransientFailure) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = makeWiredHost();
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = makeAttempt();
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  attempt_timer->invokeCallback();
+
+  respondHeadersOk(*attempt);
+  // RemoteClose flows through ConnectionCallbackImpl::onEvent into onConnectionEvent
+  // while codec_client_ is still live, exercising the handleTransientFailure branch.
+  attempt->network_connection->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(oobCounter("stream_failures"), 1);
+}
+
+TEST_F(OrcaOobManagerWireTest, HostnameUsedAsAuthority) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  auto address = *Network::Utility::resolveUrl("tcp://10.0.0.1:80");
+  addresses_.push_back(address);
+  ON_CALL(*host, address()).WillByDefault(testing::Return(address));
+  std::string hostname = "myorca.example";
+  ON_CALL(*host, hostname()).WillByDefault(testing::ReturnRef(hostname));
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  // Build the attempt manually so encodeHeaders captures the :authority header.
+  auto attempt = std::make_unique<OobAttempt>();
+  attempt->network_connection = new NiceMock<Network::MockClientConnection>();
+  attempt->codec = new NiceMock<Http::MockClientConnection>();
+  attempt->request_encoder = std::make_unique<NiceMock<Http::MockRequestEncoder>>();
+  EXPECT_CALL(*attempt->codec, newStream(_))
+      .WillOnce(testing::DoAll(SaveArgAddress(&attempt->response_decoder),
+                               testing::ReturnRef(*attempt->request_encoder)));
+  std::string captured_authority;
+  EXPECT_CALL(*attempt->request_encoder, encodeHeaders(_, false))
+      .WillOnce(testing::Invoke([&](const Http::RequestHeaderMap& h, bool) -> absl::Status {
+        captured_authority = std::string(h.getHostValue());
+        return absl::OkStatus();
+      }));
+  EXPECT_CALL(*attempt->request_encoder, encodeData(_, true));
+  ON_CALL(*attempt->network_connection, close(_, _)).WillByDefault(testing::Return());
+  ON_CALL(*attempt->network_connection, close(_)).WillByDefault(testing::Return());
+
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  attempt_timer->invokeCallback();
+  EXPECT_EQ(captured_authority, "myorca.example");
+
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  manager.reset();
+}
+
+TEST_F(OrcaOobManagerWireTest, PipeHostFallsBackToAddressString) {
+  auto manager = makeManager();
+  ASSERT_OK(manager->initialize());
+
+  auto* attempt_timer = installAttemptTimer();
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  auto address = *Network::Utility::resolveUrl("unix:///tmp/orca.sock");
+  addresses_.push_back(address);
+  ON_CALL(*host, address()).WillByDefault(testing::Return(address));
+  ON_CALL(*host, hostname()).WillByDefault(testing::ReturnRef(empty_hostname_));
+  priority_set_.runUpdateCallbacks(0, {host}, {});
+
+  auto attempt = std::make_unique<OobAttempt>();
+  attempt->network_connection = new NiceMock<Network::MockClientConnection>();
+  attempt->codec = new NiceMock<Http::MockClientConnection>();
+  attempt->request_encoder = std::make_unique<NiceMock<Http::MockRequestEncoder>>();
+  EXPECT_CALL(*attempt->codec, newStream(_))
+      .WillOnce(testing::DoAll(SaveArgAddress(&attempt->response_decoder),
+                               testing::ReturnRef(*attempt->request_encoder)));
+  std::string captured_authority;
+  EXPECT_CALL(*attempt->request_encoder, encodeHeaders(_, false))
+      .WillOnce(testing::Invoke([&](const Http::RequestHeaderMap& h, bool) -> absl::Status {
+        captured_authority = std::string(h.getHostValue());
+        return absl::OkStatus();
+      }));
+  EXPECT_CALL(*attempt->request_encoder, encodeData(_, true));
+  ON_CALL(*attempt->network_connection, close(_, _)).WillByDefault(testing::Return());
+  ON_CALL(*attempt->network_connection, close(_)).WillByDefault(testing::Return());
+
+  wireConnectionFor(host, *attempt);
+  expectCreateCodecClient(*manager, *attempt);
+  attempt_timer->invokeCallback();
+  // Pipe addresses have no ip(); authority falls through to address->asString().
+  EXPECT_THAT(captured_authority, testing::HasSubstr("/tmp/orca.sock"));
+
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  manager.reset();
+}
+
 TEST_F(OrcaOobManagerWireTest, SyncLocalCloseDuringTearDownDoesNotDoubleCount) {
   auto manager = makeManager();
   ASSERT_OK(manager->initialize());

@@ -67,19 +67,24 @@ OrcaOobStats OrcaOobManager::generateOrcaOobStats(Stats::Scope& scope) {
 }
 
 void OrcaOobManager::onHostsAdded(const Upstream::HostVector& hosts) {
+  const size_t prior_size = oob_sessions_.size();
   for (const Upstream::HostSharedPtr& host : hosts) {
-    if (oob_sessions_.find(host) != oob_sessions_.end()) {
+    auto [it, inserted] = oob_sessions_.try_emplace(host, nullptr);
+    if (!inserted) {
       continue;
     }
     const uint64_t period_ms = reporting_period_.count();
     const std::chrono::milliseconds initial_delay(period_ms == 0 ? 0
                                                                  : random_.random() % period_ms);
-    oob_sessions_.emplace(host, std::make_unique<OobSession>(*this, host, initial_delay));
+    it->second = std::make_unique<OobSession>(*this, host, initial_delay);
   }
-  oob_stats_.active_sessions_.set(oob_sessions_.size());
+  if (oob_sessions_.size() != prior_size) {
+    oob_stats_.active_sessions_.set(oob_sessions_.size());
+  }
 }
 
 void OrcaOobManager::onHostsRemoved(const Upstream::HostVector& hosts) {
+  const size_t prior_size = oob_sessions_.size();
   for (const Upstream::HostSharedPtr& host : hosts) {
     auto it = oob_sessions_.find(host);
     if (it == oob_sessions_.end()) {
@@ -89,7 +94,9 @@ void OrcaOobManager::onHostsRemoved(const Upstream::HostVector& hosts) {
     dispatcher_.deferredDelete(std::move(it->second));
     oob_sessions_.erase(it);
   }
-  oob_stats_.active_sessions_.set(oob_sessions_.size());
+  if (oob_sessions_.size() != prior_size) {
+    oob_stats_.active_sessions_.set(oob_sessions_.size());
+  }
 }
 
 void OrcaOobManager::onSessionTerminated(OobSession* session) {
@@ -189,7 +196,8 @@ void OrcaOobManager::OobSession::decodeData(Buffer::Instance& data, bool end_str
 
 void OrcaOobManager::OobSession::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   const auto status = Grpc::Common::getGrpcStatus(*trailers, /*allow_user_status=*/true);
-  onRpcComplete(status.value_or(Grpc::Status::WellKnownGrpcStatus::Unknown), "rpc trailers",
+  onRpcComplete(status.value_or(Grpc::Status::WellKnownGrpcStatus::Unknown),
+                Grpc::Common::getGrpcMessage(*trailers),
                 /*end_stream=*/true);
 }
 void OrcaOobManager::OobSession::onResetStream(Http::StreamResetReason reason, absl::string_view) {
@@ -251,8 +259,6 @@ void OrcaOobManager::OobSession::connectAndStream() {
 
   request_encoder_->encodeData(*Grpc::Common::serializeToGrpcFrame(request), /*end_stream=*/true);
 
-  // Arm the inactivity watchdog so a server that accepts the stream then goes
-  // silent before sending any reports is caught at 3x reporting_period.
   if (parent_.reporting_period_.count() > 0) {
     inactivity_timer_->enableTimer(parent_.reporting_period_ * kInactivityWatchdogMultiplier);
   }
@@ -346,7 +352,6 @@ std::string OrcaOobManager::OobSession::authority() const {
 
 Http::CodecClientPtr
 ProdOrcaOobManager::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  // ORCA OOB requires HTTP/2 (gRPC). Mirrors ProdGrpcHealthCheckerImpl::createCodecClient.
   return std::make_unique<Http::CodecClientProd>(
       Http::CodecType::HTTP2, std::move(data.connection_), data.host_description_, dispatcher_,
       random_, /*transport_socket_options=*/nullptr);
