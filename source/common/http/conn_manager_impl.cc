@@ -147,9 +147,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(
       allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
       close_connection_on_zombie_stream_complete_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")),
-      skip_finalize_non_recording_span_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.skip_finalize_non_recording_span")) {
+          "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -1007,8 +1005,7 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
     connection_manager_.config_->tracingStats().health_check_.inc();
   }
 
-  if (active_span_ &&
-      (!connection_manager_.skip_finalize_non_recording_span_ || active_span_->isRecording())) {
+  if (active_span_) {
     Tracing::HttpTracerUtility::finalizeDownstreamSpan(
         *active_span_, request_headers_.get(), response_headers_.get(), response_trailers_.get(),
         filter_manager_.streamInfo(), *this);

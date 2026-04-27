@@ -114,22 +114,14 @@ public:
   virtual void setSampled(bool sampled) PURE;
 
   /**
-   * @return whether this span is currently recording information set on it
-   *   (tags, logs, etc.) for eventual export. Mirrors the OpenTelemetry
-   *   IsRecording concept. May change over the span's lifetime if a sampling
-   *   decision is flipped via setSampled() or by a driver-internal sampler.
+   * @return whether finalizeDownstreamSpan's tags add value for this span.
+   *   The HCM uses this to skip building tags that the driver would discard.
    *
-   *   The HTTP connection manager consults this at end-of-request to decide
-   *   whether to run finalizeDownstreamSpan. Default true: drivers that do not
-   *   override are treated as always recording, matching legacy behavior.
-   *
-   *   Distinct from the propagation "sampled" flag carried in trace headers
-   *   (e.g. x-b3-sampled, traceparent trace-flags), which some drivers expose
-   *   under different names. Drivers should override this only when their
-   *   own export pipeline drops non-recording spans, so skipping finalize
-   *   tags will not lose user-visible data.
+   *   Return false only when the span will not be exported at all, or when
+   *   the export pipeline ignores Envoy-set tags. Drivers that ship the span
+   *   regardless of sampling state (Fluentd, SkyWalking) must return true.
    */
-  virtual bool isRecording() const { return true; }
+  virtual bool wantsFinalizeTags() const PURE;
 
   /**
    * When the startSpan() of tracer is called, the Envoy tracing decision is passed to the

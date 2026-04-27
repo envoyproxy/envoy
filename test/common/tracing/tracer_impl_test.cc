@@ -366,8 +366,8 @@ TEST(NullTracerTest, BasicFunctionality) {
   span_ptr->log(SystemTime(), "fake_event");
   span_ptr->useLocalDecision();
 
-  // NullSpan is never recording — lets the HCM skip finalizeDownstreamSpan entirely.
-  EXPECT_FALSE(span_ptr->isRecording());
+  // NullSpan is never recording
+  EXPECT_FALSE(span_ptr->wantsFinalizeTags());
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }

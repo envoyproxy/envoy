@@ -157,6 +157,11 @@ public:
   bool useLocalDecision() const override { return false; }
 
   /**
+   * Returns whether this sample needs a finalize call.
+   */
+  bool wantsFinalizeTags() const override { return sampled_; };
+
+  /**
    * Sets the server error as true for the traced operation/request.
    */
   void setServerError() { server_error_ = true; };

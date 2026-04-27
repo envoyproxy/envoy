@@ -109,6 +109,11 @@ public:
   bool useLocalDecision() const override { return use_local_decision_; }
 
   /**
+   * @return whether or not the span needs finalize tags
+   */
+  bool wantsFinalizeTags() const override { return sampled_; }
+
+  /**
    * @return whether or not the sampled attribute is set
    */
   bool sampled() const { return sampled_; }

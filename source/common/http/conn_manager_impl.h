@@ -704,10 +704,6 @@ private:
   // This fixes a potential FD leak where connections with zombie streams in draining state
   // would not be properly closed.
   const bool close_connection_on_zombie_stream_complete_{};
-  // Cached at construction. When true, the HCM skips HttpTracerUtility::finalizeDownstreamSpan
-  // for spans that report isRecording()==false — saves per-request string building and tag work
-  // on non-recording traffic without affecting propagation headers or late-flip recovery.
-  const bool skip_finalize_non_recording_span_{};
 
   // Whether the connection manager is drained due to premature resets.
   bool drained_due_to_premature_resets_{false};

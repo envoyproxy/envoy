@@ -31,7 +31,7 @@ public:
     return SpanPtr{new NullSpan()};
   }
   void setSampled(bool) override {}
-  bool isRecording() const override { return false; }
+  bool wantsFinalizeTags() const override { return false; }
   bool useLocalDecision() const override { return false; }
 };
 

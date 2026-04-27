@@ -585,10 +585,10 @@ TEST_F(ZipkinTracerTest, FinishNotSampledSpan) {
   SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
   span->setSampled(false);
 
-  // isRecording() must track sampled state — HCM consults this to skip finalizeDownstreamSpan.
-  EXPECT_FALSE(span->isRecording());
+  // wantsFinalizeTags() must track sampled state
+  EXPECT_FALSE(span->wantsFinalizeTags());
   span->setSampled(true);
-  EXPECT_TRUE(span->isRecording());
+  EXPECT_TRUE(span->wantsFinalizeTags());
   span->setSampled(false);
 
   span->finishSpan();
