@@ -645,9 +645,7 @@ private:
   absl::Status
   handleLocalResponseHeadersContinue(const ::envoy::service::ext_proc::v3::HttpHeaders& response);
 
-  Http::StreamDecoderFilterCallbacks* decoderCallbacks() const {
-    return decoder_callbacks_;
-  }
+  Http::StreamDecoderFilterCallbacks* decoderCallbacks() const { return decoder_callbacks_; }
 
   bool local_response_started_{false};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
@@ -750,9 +748,7 @@ private:
   void setProcessingModeInternal(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
 
-  Http::StreamEncoderFilterCallbacks* encoderCallbacks() const {
-    return encoder_callbacks_;
-  }
+  Http::StreamEncoderFilterCallbacks* encoderCallbacks() const { return encoder_callbacks_; }
 
   bool local_response_streaming_{false};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;

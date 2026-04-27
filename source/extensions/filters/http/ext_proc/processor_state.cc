@@ -519,8 +519,8 @@ absl::Status ProcessorState::validateContentLength(const CommonResponse& common_
 
 void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_response,
                                                Effect& effect) {
-  ENVOY_STREAM_LOG(debug, "Applying body response to buffered data. State = {}", *filter_callbacks(),
-                   static_cast<int>(callback_state_));
+  ENVOY_STREAM_LOG(debug, "Applying body response to buffered data. State = {}",
+                   *filter_callbacks(), static_cast<int>(callback_state_));
   modifyBufferedData([&common_response, &effect](Buffer::Instance& data) {
     effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
   });
