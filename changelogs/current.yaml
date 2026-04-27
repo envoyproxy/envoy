@@ -8,6 +8,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: build
+  change: |
+    Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=aws-lc-fips``
+    on aarch64 by restricting the ``using_aws_lc`` branch of ``SELECTED_CONTRIB_EXTENSIONS`` to
+    ``linux_x86_64``. Mirrors the approach taken by #32382 for ``boringssl_fips``.
 - area: dynamic_modules
   change: |
     Fixed a crashing bug in the HTTP filter when a stream was already above the downstream write-buffer
@@ -674,7 +679,6 @@ new_features:
     Added a new overload action :ref:`envoy.overload_actions.close_idle_http_connections <config_overload_manager_overload_actions>`
     that closes idle downstream HTTP connections when the overload action is active. Currently only HTTP/3 idle connections
     trimming is supported, and HTTP/1 and HTTP/2 support are to be implemented.
-
 - area: contrib
   change: |
     Added a new :ref:`Kafka stats sink <config_stat_sinks_kafka>` contrib extension
@@ -686,6 +690,18 @@ new_features:
     tag-as-label emission, and full librdkafka producer tuning (including TLS and SASL
     authentication) are supported via
     :ref:`KafkaStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig>`.
+- area: stat_sinks
+  change: |
+    Added a new :ref:`WASM stats filter <config_stat_sinks_wasm_filter>` contrib extension
+    (``envoy.stat_sinks.wasm_filter``) that acts as programmable middleware between
+    the metrics snapshot and any inner stats sink. A user-supplied WASM plugin can:
+    filter metrics by index, inject global tags from node metadata
+    (``stats_filter_set_global_tags``), rename metrics (``stats_filter_set_name_overrides``),
+    inject synthetic counters/gauges (``stats_filter_inject_metrics``), and filter
+    histograms (``stats_filter_get_histograms``). This enables moving centralized
+    metric processing logic (tag enrichment, name rewriting, custom metric injection)
+    into the proxy itself. Configured via
+    :ref:`WasmFilterStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig>`.
 - area: tls
   change: |
     Added support for building Envoy with OpenSSL as an alternative to the default BoringSSL.
@@ -702,5 +718,14 @@ new_features:
   change: |
     Added ``connection.peer_certificate`` and ``upstream.peer_certificate`` attributes that provide the
     PEM-encoded peer certificate for downstream and upstream TLS connections respectively.
+- area: mysql_proxy
+  change: |
+    Added SSL termination support to the MySQL proxy filter with RSA-mediated ``caching_sha2_password``
+    authentication. The filter can now terminate downstream TLS connections using the
+    :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`
+    and transparently mediate MySQL 8.0+ ``caching_sha2_password`` full authentication by performing
+    RSA public key exchange on behalf of the client. Added a new
+    :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.mysql_proxy.v3.MySQLProxy.downstream_ssl>`
+    config option with ``DISABLE``, ``REQUIRE``, and ``ALLOW`` modes.
 
 deprecated:
