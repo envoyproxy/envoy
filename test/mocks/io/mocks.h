@@ -28,6 +28,11 @@ public:
   MOCK_METHOD(IoUringResult, prepareClose, (os_fd_t fd, Request* user_data));
   MOCK_METHOD(IoUringResult, prepareCancel, (Request * cancelling_user_data, Request* user_data));
   MOCK_METHOD(IoUringResult, prepareShutdown, (os_fd_t fd, int how, Request* user_data));
+  MOCK_METHOD(IoUringResult, setupBufRing, (uint16_t group_id, uint32_t count, uint32_t buf_size));
+  MOCK_METHOD(IoUringResult, prepareRecvMultishot,
+              (os_fd_t fd, uint16_t group_id, Request* user_data));
+  MOCK_METHOD(uint8_t*, getBufferForBid, (uint16_t group_id, uint16_t bid));
+  MOCK_METHOD(void, recycleBuffer, (uint16_t group_id, uint16_t bid));
   MOCK_METHOD(IoUringResult, submit, ());
   MOCK_METHOD(void, injectCompletion, (os_fd_t fd, Request* user_data, int32_t result));
   MOCK_METHOD(void, removeInjectedCompletion, (os_fd_t fd));

@@ -30,7 +30,14 @@ IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polli
   RELEASE_ASSERT(ret == 0, fmt::format("unable to initialize io_uring: {}", errorDetails(-ret)));
 }
 
-IoUringImpl::~IoUringImpl() { io_uring_queue_exit(&ring_); }
+IoUringImpl::~IoUringImpl() {
+  if (buf_ring_ != nullptr) {
+    // Ignore the return value; we are tearing down regardless.
+    io_uring_free_buf_ring(&ring_, buf_ring_, buf_count_, buf_group_id_);
+    buf_ring_ = nullptr;
+  }
+  io_uring_queue_exit(&ring_);
+}
 
 os_fd_t IoUringImpl::registerEventfd() {
   ASSERT(!isEventfdRegistered());
@@ -195,6 +202,83 @@ IoUringResult IoUringImpl::prepareShutdown(os_fd_t fd, int how, Request* user_da
   io_uring_prep_shutdown(sqe, fd, how);
   io_uring_sqe_set_data(sqe, user_data);
   return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::setupBufRing(uint16_t group_id, uint32_t count, uint32_t buf_size) {
+  if (buf_ring_ != nullptr) {
+    ENVOY_LOG(warn, "buf ring already set up for group {}, refusing to set up group {}",
+              buf_group_id_, group_id);
+    return IoUringResult::Failed;
+  }
+  if (count == 0 || (count & (count - 1)) != 0) {
+    ENVOY_LOG(warn, "buf ring count must be a non-zero power of two, got {}", count);
+    return IoUringResult::Failed;
+  }
+  if (buf_size == 0) {
+    ENVOY_LOG(warn, "buf ring buf_size must be > 0");
+    return IoUringResult::Failed;
+  }
+
+  int ret = 0;
+  struct io_uring_buf_ring* br =
+      io_uring_setup_buf_ring(&ring_, count, group_id, /*flags=*/0, &ret);
+  if (br == nullptr) {
+    ENVOY_LOG(warn, "io_uring_setup_buf_ring failed: {}", errorDetails(-ret));
+    return IoUringResult::Failed;
+  }
+
+  buf_storage_ = std::make_unique<uint8_t[]>(static_cast<size_t>(count) * buf_size);
+  const int mask = io_uring_buf_ring_mask(count);
+  for (uint32_t i = 0; i < count; i++) {
+    io_uring_buf_ring_add(br, buf_storage_.get() + static_cast<size_t>(i) * buf_size, buf_size,
+                          /*bid=*/static_cast<uint16_t>(i), mask, /*buf_offset=*/static_cast<int>(i));
+  }
+  io_uring_buf_ring_advance(br, count);
+
+  buf_ring_ = br;
+  buf_group_id_ = group_id;
+  buf_count_ = count;
+  buf_size_ = buf_size;
+  ENVOY_LOG(debug, "set up buf ring: group_id = {}, count = {}, buf_size = {}", group_id, count,
+            buf_size);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareRecvMultishot(os_fd_t fd, uint16_t group_id,
+                                                Request* user_data) {
+  ENVOY_LOG(trace, "prepare recv multishot for fd = {}, group_id = {}", fd, group_id);
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
+  if (buf_ring_ == nullptr || group_id != buf_group_id_) {
+    ENVOY_LOG(warn, "prepareRecvMultishot called for unknown buf ring group {}", group_id);
+    return IoUringResult::Failed;
+  }
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_recv_multishot(sqe, fd, /*buf=*/nullptr, /*len=*/0, /*flags=*/0);
+  sqe->buf_group = group_id;
+  sqe->flags |= IOSQE_BUFFER_SELECT;
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+uint8_t* IoUringImpl::getBufferForBid(uint16_t group_id, uint16_t bid) {
+  ASSERT(buf_ring_ != nullptr);
+  ASSERT(group_id == buf_group_id_);
+  ASSERT(bid < buf_count_);
+  return buf_storage_.get() + static_cast<size_t>(bid) * buf_size_;
+}
+
+void IoUringImpl::recycleBuffer(uint16_t group_id, uint16_t bid) {
+  ASSERT(buf_ring_ != nullptr);
+  ASSERT(group_id == buf_group_id_);
+  ASSERT(bid < buf_count_);
+  const int mask = io_uring_buf_ring_mask(buf_count_);
+  io_uring_buf_ring_add(buf_ring_, buf_storage_.get() + static_cast<size_t>(bid) * buf_size_,
+                        buf_size_, bid, mask, /*buf_offset=*/0);
+  io_uring_buf_ring_advance(buf_ring_, 1);
 }
 
 IoUringResult IoUringImpl::submit() {

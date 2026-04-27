@@ -153,6 +153,48 @@ public:
   virtual IoUringResult prepareShutdown(os_fd_t fd, int how, Request* user_data) PURE;
 
   /**
+   * Set up a kernel-managed buffer ring of ``count`` buffers each of ``buf_size`` bytes. The
+   * kernel selects a buffer from this ring on each multishot recv completion, eliminating the
+   * per-read allocation that ``prepareReadv`` requires. Only one buf-ring may be set up per
+   * ``IoUring`` instance for now; subsequent calls return ``IoUringResult::Failed``.
+   *
+   * @param group_id buffer group identifier; subsequent ``prepareRecvMultishot`` and
+   *                 ``recycleBuffer`` calls reference this id.
+   * @param count    number of buffers; must be a power of two.
+   * @param buf_size size of each buffer in bytes.
+   * @return ``Ok`` on success; ``Failed`` if buf-rings are unsupported by the kernel or if a
+   *         buf-ring has already been set up on this instance.
+   */
+  virtual IoUringResult setupBufRing(uint16_t group_id, uint32_t count, uint32_t buf_size) PURE;
+
+  /**
+   * Prepare a multishot recv. The same SQE may produce multiple completions, each carrying
+   * ``IORING_CQE_F_BUFFER`` (the buffer ID is in the upper bits of ``flags``) and
+   * ``IORING_CQE_F_MORE`` (set while the SQE remains armed). When ``F_MORE`` is clear the
+   * caller must re-arm by issuing another ``prepareRecvMultishot``.
+   *
+   * @param fd        the socket fd.
+   * @param group_id  the buffer group set up via ``setupBufRing``.
+   * @param user_data attached to the SQE; surfaced on every completion of this SQE.
+   */
+  virtual IoUringResult prepareRecvMultishot(os_fd_t fd, uint16_t group_id,
+                                             Request* user_data) PURE;
+
+  /**
+   * Return the storage backing buffer ID ``bid`` in group ``group_id``. The caller is expected
+   * to consume up to ``cqe->res`` bytes (the value passed as ``result`` to the completion
+   * callback) and then recycle the buffer via ``recycleBuffer``.
+   */
+  virtual uint8_t* getBufferForBid(uint16_t group_id, uint16_t bid) PURE;
+
+  /**
+   * Return a buffer to the buf-ring after the user has finished consuming it. Until the buffer
+   * is recycled the kernel cannot reuse it for new completions; failing to recycle promptly
+   * may cause the kernel to terminate the multishot recv with ``-ENOBUFS``.
+   */
+  virtual void recycleBuffer(uint16_t group_id, uint16_t bid) PURE;
+
+  /**
    * Submits the entries in the submission queue to the kernel using the
    * `io_uring_enter()` system call.
    * Returns IoUringResult::Ok in case of success and may return
