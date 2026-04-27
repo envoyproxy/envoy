@@ -39,7 +39,9 @@ Prefer another policy when:
   with EDS locality weights when locality weighting should be computed
   centrally.
 - **Routing must be deterministic.** Use ring hash or Maglev for session
-  affinity or consistent hashing.
+  affinity or consistent hashing. They may also be configured as the
+  endpoint-picking child policy of this policy, but see
+  :ref:`Caveats <load_aware_locality_caveats>` for the resulting behavior.
 
 Example configuration
 ^^^^^^^^^^^^^^^^^^^^^
@@ -76,41 +78,54 @@ Configuration parameters
    * - ``endpoint_picking_policy``
      - (required)
      - Child LB policy for selecting an endpoint within the chosen locality.
-       Must be an endpoint-picking policy (e.g. round robin, least request),
-       not another locality-picking policy.
+       Any LB policy may be configured here, including ring hash and Maglev,
+       though policies that build cluster-wide structures will operate over
+       only the chosen locality's host slice. See
+       :ref:`Caveats <load_aware_locality_caveats>`.
    * - ``weight_update_period``
      - 1 s
-     - How often locality weights are recomputed from ORCA data. Values below
-       100 ms are capped at 100 ms.
+     - How often locality weights are recomputed from ORCA data. Must be at
+       least 100 ms.
    * - ``metric_names_for_computing_utilization``
      - (unset)
-     - Named ORCA metrics used to compute utilization. The max of matching
+     - Named ORCA metrics used to compute utilization when
+       ``application_utilization`` is not reported. The max of matching
        values is taken. Map entries use ``<map_field_name>.<map_key>`` (e.g.
        ``named_metrics.foo``). See
        :ref:`Weight computation <load_aware_locality_weight_computation>` for
-       the full precedence order.
+       precedence.
    * - ``utilization_variance_threshold``
      - 0.1
      - When the local locality's utilization is at most this far above the
        host-count-weighted remote average, all traffic is routed locally.
        One-sided check: if local is less loaded than remote, all-local
        routing always applies. Range: [0, 1].
-   * - ``ewma_alpha``
-     - 0.3
-     - EWMA smoothing factor. Higher = react faster, lower = more stable.
-       Range: (0, 1].
+   * - ``smoothing_time_constant``
+     - 5 s
+     - EWMA time constant for per-locality utilization smoothing. The
+       per-tick smoothing factor is derived as
+       ``alpha = 1 - exp(-weight_update_period / smoothing_time_constant)``,
+       so settling time is independent of the configured tick rate. Larger
+       values produce more stable weights; smaller values react faster.
+       Must be greater than 0 s.
    * - ``remote_probe_fraction``
      - 0.03
      - Minimum fraction of traffic sent to non-local localities to keep ORCA
-       data fresh. The deficit is redistributed proportionally to host count.
-       Set to 0 to disable (safe only with out-of-band ORCA reporting or when
-       cross-zone traffic must be strictly avoided). Range: [0, 1).
+       data fresh in all-local mode. The deficit is redistributed
+       proportionally to host count. Set to 0 to disable (safe only with
+       out-of-band ORCA reporting or when cross-zone traffic must be strictly
+       avoided). Range: [0, 1). Note: at very high remote-locality counts
+       combined with low aggregate request rates, per-host sample intervals
+       can exceed ``weight_expiration_period``; see
+       :ref:`Caveats <load_aware_locality_caveats>`.
    * - ``weight_expiration_period``
      - 180 s
-     - ORCA samples older than this are discarded and the locality's EWMA
-       state is reset. Set to 0 s to disable expiration. See
-       :ref:`Weight expiration <load_aware_locality_weight_expiration>` for
-       reset behavior.
+     - Per-host sample validity window. Hosts that have not reported within
+       this duration are excluded from their locality's utilization
+       aggregation. The locality's EWMA continues over the remaining
+       reporting hosts; if every host in a locality is stale, the locality
+       falls back to host-count-proportional weighting. Set to 0 s to
+       disable expiration.
 
 Architecture
 ^^^^^^^^^^^^
@@ -142,30 +157,36 @@ The policy is implemented as a ``ThreadAwareLoadBalancer``:
 
 - A main-thread timer recomputes per-locality weights from ORCA data and
   publishes an immutable snapshot to worker threads via a thread-local slot.
-- Worker threads read the latest snapshot lock-free on the request path, pick
-  a locality, and delegate endpoint selection to the child LB for that
+  The snapshot carries a generation counter; workers rebuild per-locality
+  child LB instances when membership changes bump the generation.
+- Worker threads read the latest snapshot lock-free on the request path,
+  pick a locality, and delegate endpoint selection to the child LB for that
   locality.
-- ORCA reports are stored in per-host LB policy data slots. This policy and
+- ORCA reports are stored in per-host ``HostLbPolicyData`` slots. This
+  policy and
   :ref:`CSWRR <arch_overview_load_balancing_types_client_side_weighted_round_robin>`
-  use independent slots, so they can consume the same reports without
+  attach independent entries, so they can consume the same reports without
   interfering with each other.
 
 ORCA data flow
 """"""""""""""
 
 Upstream endpoints must report ORCA utilization. The policy currently
-consumes per-request ORCA reports piggybacked on response trailers.
-Out-of-band (OOB) gRPC reporting is not yet integrated; once it is,
-``remote_probe_fraction`` could be set to 0 since utilization would arrive
-independently of traffic.
+consumes in-band ORCA reports (returned on response headers or trailers
+of upstream responses). Out-of-band (OOB) gRPC reporting is not yet
+integrated; once it is, ``remote_probe_fraction`` may be set to 0 since
+utilization will arrive independently of traffic.
 
-Endpoints should report at least one of:
+Utilization is derived from each host's ORCA report using the same
+extraction as CSWRR (precedence may be flipped by the
+``envoy.reloadable_features.orca_weight_manager_use_named_metrics_first``
+runtime feature). By default:
 
-- Named metrics via ``metric_names_for_computing_utilization`` -- highest
-  precedence when configured.
-- ``application_utilization`` -- value in [0, 1], used when no named metrics
-  are configured or present.
-- ``cpu_utilization`` -- final fallback.
+1. ``application_utilization`` -- value in [0, 1], used when reported and
+   greater than 0.
+2. Named metrics via ``metric_names_for_computing_utilization`` -- max of
+   present values, used when ``application_utilization`` is not reported.
+3. ``cpu_utilization`` -- final fallback.
 
 Combining with Client-Side Weighted Round Robin
 """""""""""""""""""""""""""""""""""""""""""""""
@@ -185,17 +206,32 @@ locality routing weights:
 
 ::
 
-  # Per-locality utilization (EWMA smoothed; first sample used raw)
-  raw_util(L)      = avg over endpoints in L of:
-                       max(named_metrics matching configured names) if any present
-                       else application_utilization if reported and > 0
-                       else cpu_utilization
-  smoothed_util(L) = ewma_alpha * raw_util(L)
-                     + (1 - ewma_alpha) * prev_smoothed_util(L)
+  # Per-tick smoothing factor (consistent settling regardless of tick rate)
+  alpha = 1 - exp(-weight_update_period / smoothing_time_constant)
 
-  # Base headroom weight
-  headroom(L)        = max(0, 1 - smoothed_util(L))
-  base_weight(L)     = host_count(L) * headroom(L)
+  # Per-host sample validity filter (excludes hosts whose last ORCA report
+  # is older than weight_expiration_period; if disabled, all hosts qualify)
+  valid(h)         = (now - last_report_time(h)) <= weight_expiration_period
+  valid_hosts(L)   = { h in hosts(L) : valid(h) }
+
+  # Per-locality utilization (EWMA smoothed; first sample applied raw)
+  if valid_hosts(L) is empty:
+      smoothed_util(L) = unchanged    # carry prior smoothed value (or
+                                      # treat L as stale -- see below)
+      stale(L) = true
+  else:
+      raw_util(L)      = avg over h in valid_hosts(L) of util(h)
+      smoothed_util(L) = alpha * raw_util(L)
+                         + (1 - alpha) * prev_smoothed_util(L)
+      stale(L) = false
+
+  # Base headroom weight; stale localities use host_count baseline
+  if stale(L):
+      base_weight(L) = host_count(L)
+  else:
+      headroom(L)    = max(0, 1 - smoothed_util(L))
+      base_weight(L) = host_count(L) * headroom(L)
+
   total_base_weight  = sum(base_weight(L_i) for all L_i)
   remote_host_count  = sum(host_count(R_i) for all remote R_i)
 
@@ -276,14 +312,21 @@ fresh.
 Weight expiration
 """""""""""""""""
 
-If an endpoint has not reported ORCA metrics within
-``weight_expiration_period`` (default 3 min), its sample is discarded and
-the per-locality EWMA state is **reset**: smoothed utilization returns to
-0.0 and the locality appears at full headroom until fresh data arrives.
+``weight_expiration_period`` (default 3 minutes) controls per-host sample
+validity. Hosts that have not produced an ORCA report within this window
+are excluded from their locality's utilization aggregation for the
+current tick. The locality's EWMA state continues normally over the
+remaining reporting hosts -- there is no synthetic reset and no transient
+traffic surge.
 
-This can cause a transient traffic surge toward a locality whose data has
-just expired. Tune higher to reduce spurious resets, lower to prevent
-stale data from persisting after backends are drained.
+If every host in a locality is stale, the locality falls back to
+host-count-proportional weighting (the same path used by the
+all-overloaded fallback). This keeps traffic flowing to localities that
+have stopped reporting without artificially boosting them: they receive
+their fair share of host-count weight, no more.
+
+Tune higher to tolerate longer reporting gaps; tune lower to prune
+draining backends faster. Set to 0 s to disable expiration entirely.
 
 Cold-start behavior
 """""""""""""""""""
@@ -312,25 +355,84 @@ Three independent weight sets are maintained per priority:
 - **All-host** -- when the priority is in
   :ref:`panic mode <arch_overview_load_balancing_panic_threshold>`.
 
-Each set tracks its own per-locality utilization averages, EWMA state,
-and headroom weights.
+Each set tracks its own per-locality utilization average and headroom
+weight, computed from the same per-host ORCA data in a single tick pass.
 
-Compatibility notes
-"""""""""""""""""""
+.. _load_aware_locality_caveats:
 
-This policy is **not** currently compatible with
-:ref:`load balancer subsetting <arch_overview_load_balancer_subsets>`.
-Subsetting partitions hosts in ways that cut across locality boundaries,
-which does not reconcile cleanly with locality-level headroom weights.
+Caveats and known limitations
+"""""""""""""""""""""""""""""
+
+- **Hash-based child policies.** Ring hash and Maglev build their hash
+  structures from the host set they are given. With this policy, that set
+  is the chosen locality's hosts, not the full cluster. The same request
+  hash will not necessarily map to the same endpoint cluster-wide, so
+  consistency guarantees apply only within a locality.
+- **Probe-fraction scaling.** ``remote_probe_fraction`` is a global value
+  divided across all remote localities. With many remote localities and
+  low aggregate request rates, the per-host sample interval can exceed
+  ``weight_expiration_period``. Approximate sample intervals at the
+  default 0.03 probe fraction:
+
+  +-----------+-----------+----------------+--------------+
+  | Total RPS | N remotes | Hosts/locality | Sample/host  |
+  +===========+===========+================+==============+
+  | 1000      | 3         | 10             | ~1 s         |
+  +-----------+-----------+----------------+--------------+
+  | 1000      | 100       | 10             | ~33 s        |
+  +-----------+-----------+----------------+--------------+
+  | 100       | 100       | 10             | ~5.5 min     |
+  +-----------+-----------+----------------+--------------+
+
+  In the bottom row, samples expire before the next probe arrives. Either
+  reduce locality count, increase probe fraction, raise
+  ``weight_expiration_period``, or wait for OOB ORCA reporting.
+- **Variance-threshold oscillation.** Workloads sitting near the
+  ``utilization_variance_threshold`` boundary can theoretically oscillate
+  between snap-to-local and spillover modes across consecutive ticks.
+  EWMA smoothing dampens this in practice; tune
+  ``smoothing_time_constant`` higher if oscillation is observed.
+- **Subsetting.** Load balancer
+  :ref:`subsetting <arch_overview_load_balancer_subsets>` partitions
+  hosts orthogonally to locality boundaries. The policy will operate
+  over the post-subset host slice; per-locality weights are computed
+  over whatever hosts remain after subsetting filters them. This is
+  rarely the behavior subset users expect.
 
 Statistics
 """"""""""
 
-The policy emits the same zone-routing counters
-(``cluster.<cluster_name>.lb_zone_routing_*``) and recalculation counter
-(``lb_recalculate_zone_structures``) as
-:ref:`zone-aware routing <arch_overview_load_balancing_zone_aware_routing>`,
-making behavior easy to compare when migrating between the two.
+The policy emits stats under ``cluster.<cluster_name>.load_aware_locality.*``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Counter
+     - Increments when
+   * - ``recompute_total``
+     - Per main-thread tick that recomputes weights.
+   * - ``all_overloaded_total``
+     - Per tick where every locality's headroom was 0 (fallback to
+       host-count weighting).
+   * - ``local_preferred_total``
+     - Per tick where the variance-threshold check snapped routing to
+       100% local.
+   * - ``probe_active_total``
+     - Per tick where ``remote_probe_fraction`` redistribution kicked in.
+   * - ``stale_locality_total``
+     - Per tick per locality whose hosts were all stale (fell back to
+       host-count baseline for that tick).
+
+Migrating from zone-aware routing? The closest counter mappings:
+
++--------------------------------------+----------------------------------------------+
+| Zone-aware counter                   | Load-aware-locality equivalent               |
++======================================+==============================================+
+| ``lb_zone_routing_all_directly``     | ``load_aware_locality.local_preferred_total``|
++--------------------------------------+----------------------------------------------+
+| ``lb_recalculate_zone_structures``   | ``load_aware_locality.recompute_total``      |
++--------------------------------------+----------------------------------------------+
 
 .. _load_aware_locality_comparison:
 
@@ -357,7 +459,7 @@ to runtime load imbalance.
 +----------------------------------------+-------------------------------+-------------------------------+--------------------------------------+
 | Cold-start behavior                    | Routes by host count ratio    | Routes by EDS weights         | Routes proportionally to host count  |
 +----------------------------------------+-------------------------------+-------------------------------+--------------------------------------+
-| Oscillation dampening                  | N/A                           | N/A                           | EWMA smoothing                       |
+| Oscillation dampening                  | N/A                           | N/A                           | EWMA (time-constant smoothing)       |
 +----------------------------------------+-------------------------------+-------------------------------+--------------------------------------+
 | Control plane dependency               | None                          | Requires EDS weights          | None (data-plane only)               |
 +----------------------------------------+-------------------------------+-------------------------------+--------------------------------------+
@@ -365,5 +467,5 @@ to runtime load imbalance.
 +----------------------------------------+-------------------------------+-------------------------------+--------------------------------------+
 | Degraded / panic mode support          | No                            | Yes                           | Yes (separate weight sets)           |
 +----------------------------------------+-------------------------------+-------------------------------+--------------------------------------+
-| Load balancer subsetting               | Yes                           | No                            | No                                   |
+| Load balancer subsetting               | Yes                           | No                            | Documented limitation                |
 +----------------------------------------+-------------------------------+-------------------------------+--------------------------------------+
