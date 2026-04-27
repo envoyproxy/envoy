@@ -18,6 +18,14 @@ bug_fixes:
     Fixed a crashing bug in the HTTP filter when a stream was already above the downstream write-buffer
     high watermark at filter-chain construction time. Downstream watermark callback registration is
     now deferred until the in-module filter has been constructed.
+- area: oauth2
+  change: |
+    Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously
+    succeed (~1/256) when the configured HMAC secret did not match the secret used to encrypt the
+    cookie (for example after secret rotation, or when receiving legacy unencrypted tokens). The
+    resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
+    ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
+    is preserved, matching the behavior already documented for the explicit decryption-failure case.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
