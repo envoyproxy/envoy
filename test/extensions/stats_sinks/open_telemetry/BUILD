@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_package",
 )
 load(
@@ -64,4 +66,23 @@ envoy_extension_cc_test(
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "open_telemetry_benchmark",
+    srcs = [
+        "open_telemetry_benchmark.cc",
+    ],
+    deps = [
+        "//envoy/stats:tag_interface",
+        "//source/extensions/stat_sinks/open_telemetry:open_telemetry_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "open_telemetry_benchmark_test",
+    benchmark_binary = "open_telemetry_benchmark",
 )
