@@ -51,7 +51,7 @@ public:
   MOCK_METHOD(uint64_t, write, (const Buffer::RawSlice* slices, uint64_t num_slice));
   MOCK_METHOD(void, onAccept, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onConnect, (Request * req, int32_t result, bool injected));
-  MOCK_METHOD(void, onRead, (Request * req, int32_t result, bool injected));
+  MOCK_METHOD(void, onRead, (Request * req, int32_t result, bool injected, uint32_t flags));
   MOCK_METHOD(void, onWrite, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onClose, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onCancel, (Request * req, int32_t result, bool injected));

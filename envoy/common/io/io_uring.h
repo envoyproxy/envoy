@@ -27,6 +27,10 @@ public:
     Close = 0x10,
     Cancel = 0x20,
     Shutdown = 0x40,
+    // A multishot recv SQE. Distinguished from ``Read`` because the kernel reuses the same
+    // ``Request*`` across multiple completions (until ``IORING_CQE_F_MORE`` is clear), so the
+    // worker must not free the request after each completion.
+    RecvMultishot = 0x80,
   };
 
   Request(RequestType type, IoUringSocket& socket) : type_(type), socket_(socket) {}
@@ -354,8 +358,12 @@ public:
    * @param req the ReadRequest object which is as request user data.
    * @param result the result of operation in the request.
    * @param injected indicates the completion is injected or not.
+   * @param flags the raw ``cqe->flags`` value. For a multishot recv completion, the buffer ID
+   *              is encoded in the upper bits (``flags >> IORING_CQE_BUFFER_SHIFT``), and
+   *              ``IORING_CQE_F_MORE`` indicates the SQE remains armed for further completions.
+   *              For all other (non-multishot) completions the value is ``0``.
    */
-  virtual void onRead(Request* req, int32_t result, bool injected) PURE;
+  virtual void onRead(Request* req, int32_t result, bool injected, uint32_t flags) PURE;
 
   /**
    * On write request completed.

@@ -32,8 +32,8 @@ public:
     is_connect_injected_completion_ = injected;
     nr_completion_++;
   }
-  void onRead(Request* req, int32_t result, bool injected) override {
-    IoUringSocketEntry::onRead(req, result, injected);
+  void onRead(Request* req, int32_t result, bool injected, uint32_t flags) override {
+    IoUringSocketEntry::onRead(req, result, injected, flags);
     read_result_ = result;
     is_read_injected_completion_ = injected;
     nr_completion_++;
