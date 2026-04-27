@@ -34,7 +34,7 @@ public:
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
-      : IoUringWorkerImpl(std::move(io_uring_instance), 8192, 1000, dispatcher) {}
+      : IoUringWorkerImpl(std::move(io_uring_instance), 8192, 1000, 0, dispatcher) {}
 
   IoUringSocket& addTestSocket(os_fd_t fd) {
     return addSocket(std::make_unique<IoUringSocketTestImpl>(fd, *this));
@@ -691,6 +691,112 @@ TEST(IoUringWorkerImplTest, NoEnableReadOnConnectError) {
 
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   delete static_cast<Request*>(connect_req);
+}
+
+// When ``write_buffer_high_watermark`` is set, ``IoUringServerSocket::write`` must refuse to stage
+// more bytes than the cap so that the upper layer's connection-level back-pressure can engage.
+// Once the in-flight write completes and the buffer drops below the watermark, an injected Write
+// completion is delivered so the upper layer retries.
+TEST(IoUringWorkerImplTest, WriteBufferHighWatermark) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(ReturnNew<NiceMock<Event::MockFileEvent>>());
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  // Watermark = 100 bytes.
+  IoUringServerSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false, 100);
+
+  // First write of 80 bytes fits under the watermark and is fully accepted.
+  Request* write_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareWritev(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  Buffer::OwnedImpl buf1;
+  buf1.add(std::string(80, 'a'));
+  socket.write(buf1);
+  EXPECT_EQ(0, buf1.length());
+
+  // Second write of 50 bytes can only stage 20 (100 - 80). The remaining 30 bytes stay in
+  // ``buf2``. No new ``prepareWritev`` is expected since a write request is already in flight.
+  Buffer::OwnedImpl buf2;
+  buf2.add(std::string(50, 'b'));
+  socket.write(buf2);
+  EXPECT_EQ(30, buf2.length());
+
+  // Third write while at the high watermark is rejected entirely.
+  Buffer::OwnedImpl buf3;
+  buf3.add(std::string(10, 'c'));
+  socket.write(buf3);
+  EXPECT_EQ(10, buf3.length());
+
+  // Complete the in-flight write (the kernel saw 80 bytes worth of iovecs). The drain leaves
+  // 20 bytes in ``write_buf_``, which is below the watermark, so an injected Write completion is
+  // queued for the upper layer to retry. The remaining 20 bytes are then submitted as a new
+  // ``prepareWritev``.
+  Request* write_req2 = nullptr;
+  EXPECT_CALL(mock_io_uring, injectCompletion(_, _, -EAGAIN))
+      .WillOnce(Invoke([](os_fd_t, Request* req, int32_t) { delete req; }));
+  EXPECT_CALL(mock_io_uring, prepareWritev(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req2), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  socket.onWrite(write_req, 80, false);
+  delete write_req;
+  delete write_req2;
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
+
+// The slice-based ``write`` overload also caps at the high watermark and reports the actual
+// number of bytes accepted.
+TEST(IoUringWorkerImplTest, WriteSliceBufferHighWatermark) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(ReturnNew<NiceMock<Event::MockFileEvent>>());
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+  IoUringServerSocket socket(0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, false, 50);
+
+  Request* write_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareWritev(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+
+  std::string a(40, 'a');
+  std::string b(20, 'b');
+  Buffer::RawSlice slices[2];
+  slices[0].mem_ = a.data();
+  slices[0].len_ = a.size();
+  slices[1].mem_ = b.data();
+  slices[1].len_ = b.size();
+  EXPECT_EQ(50, socket.write(slices, 2));
+
+  // Subsequent writes return 0 until the buffer drains.
+  std::string c(10, 'c');
+  Buffer::RawSlice slice2;
+  slice2.mem_ = c.data();
+  slice2.len_ = c.size();
+  EXPECT_EQ(0, socket.write(&slice2, 1));
+
+  // Drain the in-flight write fully (50 bytes accepted by the kernel). The buffer drops to 0,
+  // back-pressure clears, and a Write completion is injected for the upper layer.
+  EXPECT_CALL(mock_io_uring, injectCompletion(_, _, -EAGAIN))
+      .WillOnce(Invoke([](os_fd_t, Request* req, int32_t) { delete req; }));
+  socket.onWrite(write_req, 50, false);
+  delete write_req;
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
 }
 
 } // namespace

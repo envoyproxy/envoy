@@ -45,7 +45,7 @@ public:
     }
 
     io_uring_worker_factory_ =
-        std::make_unique<Io::IoUringWorkerFactoryImpl>(10, false, 8192, 1000, instance_);
+        std::make_unique<Io::IoUringWorkerFactoryImpl>(10, false, 8192, 1000, 0, instance_);
     io_uring_worker_factory_->onWorkerThreadInitialized();
 
     // Create the thread after the io_uring worker has been initialized, otherwise the dispatcher

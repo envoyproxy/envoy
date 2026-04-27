@@ -32,9 +32,9 @@ class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger:
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                     uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                    Event::Dispatcher& dispatcher);
+                    uint32_t write_buffer_high_watermark, Event::Dispatcher& dispatcher);
   IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                    Event::Dispatcher& dispatcher);
+                    uint32_t write_buffer_high_watermark, Event::Dispatcher& dispatcher);
   ~IoUringWorkerImpl() override;
 
   // IoUringWorker
@@ -74,6 +74,8 @@ protected:
   IoUringPtr io_uring_;
   const uint32_t read_buffer_size_;
   const uint32_t write_timeout_ms_;
+  // High watermark in bytes for ``IoUringServerSocket::write_buf_``. 0 disables the cap.
+  const uint32_t write_buffer_high_watermark_;
   // The dispatcher of this worker is running on.
   Event::Dispatcher& dispatcher_;
   // The file event of iouring's eventfd.
@@ -183,9 +185,11 @@ protected:
 class IoUringServerSocket : public IoUringSocketEntry {
 public:
   IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                      uint32_t write_timeout_ms, bool enable_close_event);
+                      uint32_t write_timeout_ms, bool enable_close_event,
+                      uint32_t write_buffer_high_watermark = 0);
   IoUringServerSocket(os_fd_t fd, Buffer::Instance& read_buf, IoUringWorkerImpl& parent,
-                      Event::FileReadyCb cb, uint32_t write_timeout_ms, bool enable_close_event);
+                      Event::FileReadyCb cb, uint32_t write_timeout_ms, bool enable_close_event,
+                      uint32_t write_buffer_high_watermark = 0);
   ~IoUringServerSocket() override;
 
   // IoUringSocket
@@ -216,13 +220,18 @@ protected:
   Buffer::OwnedImpl read_buf_;
   absl::optional<int32_t> read_error_;
 
-  // TODO (soulxu): We need water mark for write buffer.
-  // The upper layer will think the buffer released when the data copy into this write buffer.
-  // This leads to the `IntegrationTest.TestFloodUpstreamErrors` timeout, since the http layer
-  // always think the response is write successful, so flood protection is never kicked.
-  //
   // For write. iouring socket will write sequentially in the order of write_buf_ and shutdown_
   // Unless the write_buf_ is empty, the shutdown operation will not be performed.
+  //
+  // When ``write_buffer_high_watermark_`` is non-zero, ``write()`` returns a short write once
+  // ``write_buf_`` reaches the configured size, so connection-level back-pressure (and overload
+  // protections that depend on it, like HTTP flood protection) engages. With the default of 0 the
+  // cap is disabled and the upper layer always sees its writes as fully accepted.
+  const uint32_t write_buffer_high_watermark_;
+  // True when a previous ``write()`` was unable to fully accept the offered bytes because the
+  // internal write buffer hit the high watermark. When set, an injected Write completion is
+  // delivered to the upper layer after the buffer drains, so the upper layer retries.
+  bool back_pressure_pending_{false};
   Buffer::OwnedImpl write_buf_;
   // shutdown_ has 3 states. A absl::nullopt indicates the socket has not been shutdown, a false
   // value represents the socket wants to be shutdown but the shutdown has not been performed or
@@ -254,7 +263,8 @@ protected:
 class IoUringClientSocket : public IoUringServerSocket {
 public:
   IoUringClientSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
-                      uint32_t write_timeout_ms, bool enable_close_event);
+                      uint32_t write_timeout_ms, bool enable_close_event,
+                      uint32_t write_buffer_high_watermark = 0);
 
   void connect(const Network::Address::InstanceConstSharedPtr& address) override;
   void onConnect(Request* req, int32_t result, bool injected) override;

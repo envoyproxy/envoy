@@ -18,6 +18,14 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: io_uring
+  change: |
+    Added :ref:`write_buffer_high_watermark
+    <envoy_v3_api_field_extensions.network.socket_interface.v3.IoUringOptions.write_buffer_high_watermark>`
+    to bound the io_uring socket's internal write buffer. When set, the socket returns a short
+    write to the upper layer once the configured size is reached, which lets connection-level
+    back-pressure (and overload protections like HTTP flood protection that depend on it) engage.
+    The default of 0 disables the cap and preserves the previous (uncapped) behavior.
 - area: dynamic_modules
   change: |
     Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic

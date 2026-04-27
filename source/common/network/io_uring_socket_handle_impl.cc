@@ -122,9 +122,10 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
     return std::move(*write_result);
   }
 
-  uint64_t buffer_size = buffer.length();
+  const uint64_t before = buffer.length();
   io_uring_socket_->write(buffer);
-  return {buffer_size, IoSocketError::none()};
+  const uint64_t after = buffer.length();
+  return {before - after, IoSocketError::none()};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
