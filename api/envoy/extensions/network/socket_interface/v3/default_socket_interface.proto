@@ -43,4 +43,22 @@ message IoUringOptions {
   // asynchronously. If the remote stops reading, the io_uring write operation may never complete.
   // The operation is canceled and the socket is closed after the timeout. The default is 1000.
   google.protobuf.UInt32Value write_timeout_ms = 4;
+
+  // Enable multishot recv with kernel-managed provided buffers. When set, each io_uring server
+  // socket arms a single ``IORING_OP_RECV`` multishot SQE that pulls buffers from a per-worker
+  // buf-ring on every kernel-side recv, instead of submitting a fresh ``readv`` SQE plus
+  // allocating a new read buffer for each read. This eliminates the per-read SQE submission and
+  // the per-read user-space buffer allocation on the hot path.
+  //
+  // Requires kernel 5.19+ for ``IORING_REGISTER_PBUF_RING`` and 6.0+ for multishot recv. On
+  // older kernels Envoy logs a warning and falls back to the existing ``readv`` path, so this
+  // option is safe to enable on a heterogeneous fleet. The default is false.
+  google.protobuf.BoolValue enable_multishot_recv = 5;
+
+  // Number of buffers in the per-worker multishot recv buf-ring. Must be a power of two. Each
+  // buffer is sized to ``read_buffer_size``. The total memory dedicated per worker is therefore
+  // ``multishot_recv_buffer_count * read_buffer_size`` bytes. The default is 256.
+  //
+  // Only consulted when ``enable_multishot_recv`` is true.
+  google.protobuf.UInt32Value multishot_recv_buffer_count = 6;
 }

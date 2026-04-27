@@ -18,6 +18,15 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: io_uring
+  change: |
+    Added :ref:`enable_multishot_recv
+    <envoy_v3_api_field_extensions.network.socket_interface.v3.IoUringOptions.enable_multishot_recv>`
+    option that switches io_uring server sockets to ``IORING_OP_RECV`` multishot with
+    kernel-managed provided buffers. Each socket arms a single SQE that the kernel reuses across
+    many completions, eliminating the per-read SQE submission and the per-read user-space buffer
+    allocation. Requires kernel 5.19+ (buf-ring) / 6.0+ (multishot recv); on older kernels Envoy
+    silently falls back to the existing ``readv`` path.
 - area: dynamic_modules
   change: |
     Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic

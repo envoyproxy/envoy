@@ -179,6 +179,8 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
             options.enable_submission_queue_polling(),
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, read_buffer_size, 8192),
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_timeout_ms, 1000),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, enable_multishot_recv, false),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, multishot_recv_buffer_count, 256),
             context.threadLocal());
     io_uring_worker_factory_ = io_uring_worker_factory;
 

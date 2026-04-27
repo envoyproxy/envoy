@@ -9,9 +9,13 @@ IoUringWorkerFactoryImpl::IoUringWorkerFactoryImpl(uint32_t io_uring_size,
                                                    bool use_submission_queue_polling,
                                                    uint32_t read_buffer_size,
                                                    uint32_t write_timeout_ms,
+                                                   bool enable_multishot_recv,
+                                                   uint32_t multishot_recv_buffer_count,
                                                    ThreadLocal::SlotAllocator& tls)
     : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling),
-      read_buffer_size_(read_buffer_size), write_timeout_ms_(write_timeout_ms), tls_(tls) {}
+      read_buffer_size_(read_buffer_size), write_timeout_ms_(write_timeout_ms),
+      enable_multishot_recv_(enable_multishot_recv),
+      multishot_recv_buffer_count_(multishot_recv_buffer_count), tls_(tls) {}
 
 OptRef<IoUringWorker> IoUringWorkerFactoryImpl::getIoUringWorker() {
   auto ret = tls_.get();
@@ -24,10 +28,14 @@ OptRef<IoUringWorker> IoUringWorkerFactoryImpl::getIoUringWorker() {
 void IoUringWorkerFactoryImpl::onWorkerThreadInitialized() {
   tls_.set([io_uring_size = io_uring_size_,
             use_submission_queue_polling = use_submission_queue_polling_,
-            read_buffer_size = read_buffer_size_,
-            write_timeout_ms = write_timeout_ms_](Event::Dispatcher& dispatcher) {
+            read_buffer_size = read_buffer_size_, write_timeout_ms = write_timeout_ms_,
+            enable_multishot_recv = enable_multishot_recv_,
+            multishot_recv_buffer_count =
+                multishot_recv_buffer_count_](Event::Dispatcher& dispatcher) {
     return std::make_shared<IoUringWorkerImpl>(io_uring_size, use_submission_queue_polling,
-                                               read_buffer_size, write_timeout_ms, dispatcher);
+                                               read_buffer_size, write_timeout_ms, dispatcher,
+                                               enable_multishot_recv,
+                                               multishot_recv_buffer_count);
   });
 }
 
