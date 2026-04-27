@@ -5476,7 +5476,12 @@ TEST_F(OAuth2Test, DecryptTokenSpuriousSuccessReturnsOriginalInput) {
   // key, so EVP_DecryptFinal_ex succeeds, but the resulting plaintext fails headerValueIsValid.
   const std::string binary_plaintext("\x00\x01\x02\xff", 4);
   const std::string ciphertext = filter_->encryptToken(binary_plaintext);
-  EXPECT_LOG_CONTAINS("error", "failed to decrypt token",
+  // Tighter assertion: match on the message that is unique to the new headerValueIsValid branch
+  // ("plaintext is not a valid header value"), rather than the generic "failed to decrypt token"
+  // prefix that is shared with the pre-existing EVP_DecryptFinal_ex failure path. A regression
+  // that re-introduced the crash via the old error path would emit a different message and fail
+  // this test.
+  EXPECT_LOG_CONTAINS("error", "plaintext is not a valid header value",
                       { EXPECT_EQ(filter_->decryptToken(ciphertext), ciphertext); });
 }
 
@@ -5508,10 +5513,24 @@ TEST_F(OAuth2Test, GarbagePlaintextCookieDoesNotCrash) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
 
+  // Assert the redirect actually happened: filter took the redirect path (302 with Location)
+  // rather than crashing or returning a 401. We only check Status=="302" and Location is set
+  // to avoid brittleness from Set-Cookie values, nonce, and CSRF in the full header map.
+  // redirectToOAuthServer calls decoder_callbacks_->encodeHeaders with end_stream=true.
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(testing::Truly([](const Http::ResponseHeaderMap& headers) {
+                               return headers.getStatusValue() == "302" &&
+                                      !headers.getLocationValue().empty();
+                             }),
+                             true));
+
+  // Tighter assertion: match on the message that is unique to the new headerValueIsValid branch.
+  // A regression that re-introduced the crash via the old EVP_DecryptFinal_ex-failure path would
+  // emit a different message and cause this test to fail.
   // Before the fix this line would trigger a crash (ENVOY_BUG assertion in HeaderStringValidator).
   // After the fix it should complete without crashing and redirect to the OAuth server.
   EXPECT_LOG_CONTAINS(
-      "error", "failed to decrypt token",
+      "error", "plaintext is not a valid header value",
       {
         EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
                   filter_->decodeHeaders(request_headers, false));
@@ -5520,6 +5539,9 @@ TEST_F(OAuth2Test, GarbagePlaintextCookieDoesNotCrash) {
   // After the fix, the Cookie header should contain the original (valid ASCII) ciphertext,
   // not the binary garbage that decryption produced.
   auto cookies = Http::Utility::parseCookies(request_headers);
+  // Use ASSERT_TRUE first so the test fails clearly (not with out_of_range) if the cookie were
+  // dropped instead of preserved.
+  ASSERT_TRUE(cookies.contains("RefreshToken"));
   EXPECT_EQ(cookies.at("RefreshToken"), garbage_ciphertext);
 }
 
