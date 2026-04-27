@@ -5430,7 +5430,9 @@ TEST_F(OAuth2Test, OAuthCallbackGetAccessTokenSyncContinue) {
  * Scenario: decryptToken is called with an empty string.
  * Expected behavior: returns empty string.
  */
-TEST_F(OAuth2Test, DecryptTokenEmpty) { EXPECT_EQ(filter_->decryptToken(""), ""); }
+TEST_F(OAuth2Test, DecryptTokenEmpty) {
+  EXPECT_EQ(filter_->decryptToken(""), "");
+}
 
 /**
  * Scenario: decryptToken is called with a ciphertext that was encrypted with the same HMAC secret.
