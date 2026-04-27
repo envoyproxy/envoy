@@ -76,6 +76,7 @@ directories:
   source/extensions/tracers/zipkin: 96.2
   source/extensions/transport_sockets/proxy_protocol: 96.6
   source/extensions/transport_sockets/tls/cert_mappers/filter_state_override: 96.4
+  source/extensions/transport_sockets/tls/cert_selectors/dynamic_modules: 85.0
   source/extensions/transport_sockets/tls/cert_validator/spiffe: 96.7
   source/extensions/wasm_runtime/wamr: 0.0  # Not enabled in coverage build
   source/extensions/wasm_runtime/wasmtime: 0.0  # Not enabled in coverage build

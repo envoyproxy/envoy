@@ -14,6 +14,7 @@ package(default_visibility = [
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/tls/cert_selectors/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
@@ -189,6 +190,12 @@ test_program(name = "cert_validator_not_validated")
 test_program(name = "cert_validator_empty_digest")
 
 test_program(name = "cert_validator_filter_state")
+
+test_program(name = "cert_selector_no_op")
+
+test_program(name = "cert_selector_context_index")
+
+test_program(name = "cert_selector_config_new_fail")
 
 test_program(name = "upstream_bridge_no_op")
 

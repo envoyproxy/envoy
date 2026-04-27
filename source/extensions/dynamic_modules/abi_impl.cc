@@ -330,6 +330,57 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_cert_validator_get_filt
   return false;
 }
 
+// ---------------------- Cert Selector callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the cert selector config.cc when the cert selector extension is used.
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cert_selector_get_sni(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_selector_get_sni: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cert_selector_get_client_hello_raw(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_selector_get_client_hello_raw: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cert_selector_get_client_hello_extension(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr, uint16_t,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_selector_get_client_hello_extension: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cert_selector_is_client_ocsp_capable(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_selector_is_client_ocsp_capable: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cert_selector_set_filter_state(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_selector_set_filter_state: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_cert_selector_get_filter_state(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_selector_get_filter_state: "
+               "not implemented in this context");
+  return false;
+}
+
 // ---------------------- Bootstrap extension admin handler callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the bootstrap extension abi_impl.cc when the bootstrap extension is used.

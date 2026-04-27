@@ -60,6 +60,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @botengyao @tyxia
 # On demand secret provider
 /*/extensions/transport_sockets/tls/cert_selectors/on_demand @kyessenov @tonya11en
+# Dynamic-module-backed certificate selector
+/*/extensions/transport_sockets/tls/cert_selectors/dynamic_modules @mathetake @wbpcode @kanurag94
 /*/extensions/transport_sockets/tls/cert_mappers/filter_state_override @kyessenov @tonya11en
 /*/extensions/transport_sockets/tls/cert_mappers/sni @kyessenov @tonya11en
 /*/extensions/transport_sockets/tls/cert_mappers/static_name @kyessenov @tonya11en

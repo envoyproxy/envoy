@@ -10631,6 +10631,256 @@ bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
 
 // =============================================================================
+// ============================ Cert Selector ==================================
+// =============================================================================
+//
+// This extension enables custom TLS certificate selection via dynamic modules.
+// It integrates with Envoy's custom_tls_certificate_selector in
+// CommonTlsContext, registered under the envoy.tls.certificate_selectors
+// category.
+//
+// During the downstream TLS handshake, the module is invoked with the
+// ClientHello and returns either an index into the pre-provisioned TLS
+// contexts owned by the parent TLS config, or a PEM-encoded certificate chain
+// plus private key that Envoy compiles into an SSL_CTX on the fly and caches
+// per-worker.
+//
+// Asynchronous (Pending) selection is reserved for a follow-up revision; v1
+// supports synchronous selection only.
+
+// =============================================================================
+// Cert Selector Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_cert_selector_config_envoy_ptr is a pointer to the
+ * DynamicModuleCertSelectorConfig object in Envoy. This is passed to the
+ * module during config creation.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_cert_selector_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cert_selector_config_module_ptr is a pointer to
+ * the in-module cert selector configuration created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cert_selector_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cert_selector_envoy_ptr is a pointer to the
+ * DynamicModuleCertSelector instance in Envoy. This is passed to the module
+ * for each per-worker cert selector and is used as the context for all cert
+ * selector callbacks.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_cert_selector_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cert_selector_module_ptr is a pointer to the
+ * in-module per-selector instance created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cert_selector_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cert_selector_result_status represents the
+ * outcome of a certificate selection.
+ *
+ * Note: asynchronous (Pending) selection is not yet supported in the ABI.
+ */
+typedef enum envoy_dynamic_module_type_cert_selector_result_status {
+  // The module selected one of the pre-provisioned TLS contexts by index.
+  envoy_dynamic_module_type_cert_selector_result_SuccessWithContextIndex = 0,
+  // The module returned PEM cert chain and private key bytes; Envoy compiles
+  // and caches the resulting SSL_CTX.
+  envoy_dynamic_module_type_cert_selector_result_SuccessWithPem = 1,
+  // The module could not select a certificate.
+  envoy_dynamic_module_type_cert_selector_result_Failed = 2,
+} envoy_dynamic_module_type_cert_selector_result_status;
+
+/**
+ * envoy_dynamic_module_type_cert_selector_result is the result of a
+ * certificate selection, returned by envoy_dynamic_module_on_cert_selector_select.
+ *
+ * The buffer fields (cert_chain_pem, private_key_pem, cache_key) are owned by
+ * the module and must remain valid for the duration of the select event hook;
+ * Envoy copies their contents before the call returns.
+ */
+typedef struct envoy_dynamic_module_type_cert_selector_result {
+  // Selection status.
+  envoy_dynamic_module_type_cert_selector_result_status status;
+  // Index into the parent's pre-provisioned TLS contexts. Used only when
+  // status == SuccessWithContextIndex.
+  size_t context_index;
+  // PEM-encoded certificate chain. Used only when status == SuccessWithPem.
+  envoy_dynamic_module_type_module_buffer cert_chain_pem;
+  // PEM-encoded private key. Used only when status == SuccessWithPem.
+  envoy_dynamic_module_type_module_buffer private_key_pem;
+  // Optional cache key for the compiled SSL_CTX. Zero-length means do not
+  // cache (the context will be built fresh each call). Used only when
+  // status == SuccessWithPem.
+  envoy_dynamic_module_type_module_buffer cache_key;
+  // Whether OCSP stapling should be enabled for this selection.
+  bool staple_ocsp;
+} envoy_dynamic_module_type_cert_selector_result;
+
+// =============================================================================
+// Cert Selector Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_cert_selector_config_new is called by the main
+ * thread when the cert selector configuration is loaded. The module returns
+ * an in-module configuration pointer. Returning nullptr fails configuration.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertSelectorConfig.
+ * @param name is the selector implementation name owned by Envoy.
+ * @param config is the selector-specific configuration bytes owned by Envoy.
+ * @return envoy_dynamic_module_type_cert_selector_config_module_ptr or null
+ *         on failure.
+ */
+envoy_dynamic_module_type_cert_selector_config_module_ptr
+envoy_dynamic_module_on_cert_selector_config_new(
+    envoy_dynamic_module_type_cert_selector_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_cert_selector_config_destroy is called when the
+ * cert selector configuration is being destroyed in Envoy.
+ */
+void envoy_dynamic_module_on_cert_selector_config_destroy(
+    envoy_dynamic_module_type_cert_selector_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cert_selector_new is called once per per-worker
+ * TlsCertificateSelector instance. The returned module pointer is passed back
+ * on every subsequent select/destroy event.
+ *
+ * @param config_module_ptr is the in-module config pointer.
+ * @param selector_envoy_ptr is the pointer to the DynamicModuleCertSelector
+ *        instance owned by Envoy.
+ * @param num_pre_provisioned_contexts is the number of TLS contexts the parent
+ *        TLS context exposes for selection by index via
+ *        SuccessWithContextIndex. Modules returning a context_index outside
+ *        this range fail selection.
+ * @return envoy_dynamic_module_type_cert_selector_module_ptr owned by the
+ *         module. May be null if the module has no per-selector state.
+ */
+envoy_dynamic_module_type_cert_selector_module_ptr envoy_dynamic_module_on_cert_selector_new(
+    envoy_dynamic_module_type_cert_selector_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_cert_selector_envoy_ptr selector_envoy_ptr,
+    size_t num_pre_provisioned_contexts);
+
+/**
+ * envoy_dynamic_module_on_cert_selector_destroy is called when the per-worker
+ * cert selector instance is destroyed.
+ */
+void envoy_dynamic_module_on_cert_selector_destroy(
+    envoy_dynamic_module_type_cert_selector_module_ptr selector_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cert_selector_select is called synchronously on the
+ * worker thread during the downstream TLS handshake. The module inspects the
+ * ClientHello via cert_selector_get_* callbacks and returns a result.
+ *
+ * The ClientHello accessor callbacks (get_sni, get_client_hello_raw, etc.)
+ * are valid only for the duration of this event hook.
+ *
+ * NOTE: this revision of the ABI supports synchronous selection only. The
+ * asynchronous (Pending) selection path used by Envoy's on-demand selector
+ * is not yet exposed; the result enum reserves
+ * ``envoy_dynamic_module_type_cert_selector_result_status`` values for future
+ * extension.
+ */
+envoy_dynamic_module_type_cert_selector_result envoy_dynamic_module_on_cert_selector_select(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr selector_envoy_ptr,
+    envoy_dynamic_module_type_cert_selector_module_ptr selector_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cert_selector_config_updated is called by the main
+ * thread when the parent TLS config has updated (e.g. an SDS refresh on the
+ * pre-provisioned contexts). Implementation is optional; if the symbol is
+ * absent the bridge skips this notification.
+ */
+void envoy_dynamic_module_on_cert_selector_config_updated(
+    envoy_dynamic_module_type_cert_selector_config_module_ptr config_module_ptr);
+
+// =============================================================================
+// Cert Selector Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cert_selector_get_sni writes the ClientHello
+ * SNI value into *out. The buffer is owned by Envoy and valid only for the
+ * duration of the select event hook.
+ *
+ * @return true if an SNI was present, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cert_selector_get_sni(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr selector_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* out);
+
+/**
+ * envoy_dynamic_module_callback_cert_selector_get_client_hello_raw writes the
+ * raw ClientHello message bytes (as exposed by BoringSSL's SSL_CLIENT_HELLO
+ * struct) into *out. Valid only for the duration of the select event hook.
+ *
+ * @return true if the ClientHello is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cert_selector_get_client_hello_raw(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr selector_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* out);
+
+/**
+ * envoy_dynamic_module_callback_cert_selector_get_client_hello_extension
+ * writes the payload of a ClientHello extension identified by extension_type
+ * into *out. Valid only for the duration of the select event hook.
+ *
+ * @return true if the extension was present, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cert_selector_get_client_hello_extension(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr selector_envoy_ptr,
+    uint16_t extension_type, envoy_dynamic_module_type_envoy_buffer* out);
+
+/**
+ * envoy_dynamic_module_callback_cert_selector_is_client_ocsp_capable returns
+ * true when the client advertised the status_request extension in the
+ * ClientHello. Valid only for the duration of the select event hook.
+ */
+bool envoy_dynamic_module_callback_cert_selector_is_client_ocsp_capable(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr selector_envoy_ptr);
+
+// ------------------------- Filter State Operations ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_cert_selector_set_filter_state sets a string
+ * value on the connection-level filter state. Must only be called from within
+ * the select event hook.
+ *
+ * @return true on success, false if the connection context was unavailable.
+ */
+bool envoy_dynamic_module_callback_cert_selector_set_filter_state(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr selector_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cert_selector_get_filter_state reads a string
+ * value from the connection-level filter state. The returned buffer is owned
+ * by Envoy and valid only for the duration of the select event hook. Must
+ * only be called from within the select event hook.
+ *
+ * @return true if the value was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cert_selector_get_filter_state(
+    envoy_dynamic_module_type_cert_selector_envoy_ptr selector_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+// =============================================================================
 // ========================= Upstream HTTP TCP Bridge ===========================
 // =============================================================================
 //

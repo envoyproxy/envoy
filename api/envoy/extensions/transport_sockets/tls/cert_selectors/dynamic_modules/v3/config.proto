@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/cert_selectors/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic module TLS certificate selector]
+// [#extension: envoy.tls.certificate_selectors.dynamic_modules]
+
+// Configuration for a TLS certificate selector backed by a dynamic module.
+//
+// The selected module is invoked during the TLS handshake with the ClientHello
+// information (SNI, ALPN, raw ClientHello bytes) and returns either:
+//
+// * an index into the parent TLS context's pre-provisioned certificate list, or
+// * a PEM-encoded certificate chain and private key that the selector compiles
+//   into an ``SSL_CTX`` on the fly and caches per-worker by a module-supplied
+//   cache key.
+//
+// When the module returns PEM material, this selector behaves as if
+// ``providesCertificates()`` is true and session resumption on the parent
+// context must be disabled.
+//
+// Selection is synchronous in this revision; modules must return a result
+// from ``envoy_dynamic_module_on_cert_selector_select`` and cannot defer to
+// an asynchronous callback. The asynchronous (Pending) selection path used
+// by the on-demand selector is not yet exposed through this ABI.
+//
+// QUIC listeners are not supported; configuring this selector on a QUIC
+// listener is rejected at config time.
+message Config {
+  // Dynamic module configuration. See :ref:`dynamic module configuration
+  // <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>` for
+  // details.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // Name of the in-module selector implementation. Passed to the module's
+  // ``envoy_dynamic_module_on_cert_selector_config_new`` function so that a
+  // single dynamic module can expose multiple selectors.
+  string selector_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Optional module-specific configuration passed as bytes to the dynamic
+  // module.
+  google.protobuf.Any selector_config = 3;
+
+  // If true, the selector advertises ``providesCertificates() = true``, meaning
+  // the module may return its own PEM material that the selector compiles.
+  // When false, the module is restricted to returning an index into the
+  // parent's pre-provisioned ``TlsContexts`` and session resumption is
+  // permitted.
+  bool provides_certificates = 4;
+
+  // Maximum number of compiled ``SSL_CTX`` cache entries per worker. A value
+  // of ``0`` (the default) means a built-in safe default is applied;
+  // operators must opt in to a larger cache by setting this explicitly.
+  // Entries are evicted in least-recently-used order. Ignored when
+  // ``provides_certificates`` is false.
+  uint32 max_cache_size = 5;
+}
