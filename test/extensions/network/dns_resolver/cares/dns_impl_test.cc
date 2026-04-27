@@ -1999,6 +1999,27 @@ TEST_P(DnsImplTest, DnsSrvError) {
              1 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 }
 
+// A DNS name with a label > 63 characters is invalid and should be rejected by
+// c-ares immediately
+TEST_P(DnsImplTest, DnsSrvSyncResolutionFailure) {
+  const std::string invalid_name = std::string(64, 'a') + ".example.com";
+  bool callback_called = false;
+  DnsResolver::ResolutionStatus result_status = static_cast<DnsResolver::ResolutionStatus>(-1);
+
+  ActiveDnsQuery* query = resolver_->resolveSrv(
+      invalid_name,
+      [&](DnsResolver::ResolutionStatus status, absl::string_view, std::list<DnsResponse>&&) {
+        result_status = status;
+        callback_called = true;
+      });
+  // Synchronous completion: callback already fired, no async query was queued.
+  EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, result_status);
+  EXPECT_EQ(nullptr, query);
+  EXPECT_TRUE(callback_called);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             1 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
+}
+
 class DnsImplFilterUnroutableFamiliesTest : public DnsImplTest {
 protected:
   bool filterUnroutableFamilies() const override { return true; }

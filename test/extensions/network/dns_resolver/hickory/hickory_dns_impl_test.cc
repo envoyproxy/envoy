@@ -657,6 +657,24 @@ TEST_F(HickoryDnsImplTest, ResolveIpAddressV6) {
   EXPECT_TRUE(callback_called);
 }
 
+TEST_F(HickoryDnsImplTest, ResolveSrvNotImplemented) {
+  initialize();
+
+  bool callback_called = false;
+  auto* query = resolver_->resolveSrv(
+      "localhost", DnsLookupFamily::All,
+      [this, &callback_called](DnsResolver::ResolutionStatus status ABSL_ATTRIBUTE_UNUSED,
+                              absl::string_view ABSL_ATTRIBUTE_UNUSED,
+                               std::list<DnsResponse>&& response ABSL_ATTRIBUTE_UNUSED) {
+        callback_called = true;
+        dispatcher_->exit();
+      });
+
+  EXPECT_NE(query, nullptr);
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  EXPECT_FALSE(callback_called);
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

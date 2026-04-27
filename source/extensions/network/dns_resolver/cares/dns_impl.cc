@@ -514,8 +514,7 @@ ActiveDnsQuery* DnsResolverImpl::resolveSrv(const std::string& dns_name, Resolve
 
   pending_srv_res->startResolution();
   if (pending_srv_res->completed_) {
-    // Resolution does not need asynchronous behavior or network events. For
-    // example, localhost lookup.
+    // Resolution completed synchronously (e.g. ares_query_dnsrec rejected the query immediately).
     return nullptr;
   } else {
     // Enable timer to wake us up if the request times out.
