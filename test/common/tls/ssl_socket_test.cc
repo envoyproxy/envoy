@@ -8447,7 +8447,7 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
       .WillOnce(InvokeWithoutArgs([&]() -> void {
         // With the runtime feature disabled, reset detection should not be reported.
         EXPECT_NE(client_connection->detectedCloseType(),
-                   StreamInfo::DetectedCloseType::RemoteReset);
+                  StreamInfo::DetectedCloseType::RemoteReset);
         dispatcher_->exit();
       }));
 
