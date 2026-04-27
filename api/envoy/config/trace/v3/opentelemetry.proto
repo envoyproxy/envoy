@@ -65,9 +65,11 @@ message OpenTelemetryConfig {
 
   // Specifies whether to set the telemetry SDK resource attributes.
   // The following attributes will be set:
-  //  - telemetry.sdk.language
-  //  - telemetry.sdk.name
-  //  - telemetry.sdk.version
+  //
+  // - telemetry.sdk.language
+  // - telemetry.sdk.name
+  // - telemetry.sdk.version
+  //
   // If not specified, the default is to set these attributes.
   google.protobuf.BoolValue set_telemetry_sdk_resource_attributes = 7;
 }
