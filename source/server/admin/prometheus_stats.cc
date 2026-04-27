@@ -146,7 +146,7 @@ private:
                          std::is_same_v<Stats::PrimitiveGaugeSnapshot, StatType>) {
       type = "gauge";
     } else {
-      static_assert(false, "Unexpected StatsType");
+      static_assert(sizeof(StatType) == 0, "Unexpected StatsType");
     }
 
     generateTypeOutput(output, type, prefixed_tag_extracted_name);
