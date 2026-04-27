@@ -728,9 +728,9 @@ TEST_P(LoadStatsIntegrationTest, InProgressThenSuccess) {
   waitForUpstreamResponse(0, 200);
 
   // Second window:
-  // rq_issued=0, rq_active=0. Stats NOT sent for the locality.
-  // We expect cluster stats to be present but with empty locality stats.
-  ASSERT_TRUE(waitForLoadStatsRequest({}, 0, false, true));
+  // rq_success=1. Stats are sent for the locality.
+  ASSERT_TRUE(
+      waitForLoadStatsRequest({localityStats("winter", /*success*/ 1, 0, 0, 0)}, 0, false, true));
 
   cleanupUpstreamAndDownstream();
   cleanupLoadStatsConnection();
@@ -749,19 +749,15 @@ TEST_P(LoadStatsIntegrationTest, RequestActiveForMultipleWindows) {
   // First window: stats should be sent because rq_issued=1, rq_active=1.
   ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 1, 1)}));
 
-  // Second window: request is still active.
-  // Stats ARE sent because rq_active=1 and the runtime feature
-  // "envoy.reloadable_features.report_load_when_rq_active_is_non_zero" is
-  // enabled by default.
-  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 1, 0)}));
-
   // Finish the request now
   waitForUpstreamResponse(0, 200);
 
-  // Third window: Stats are NOT sent because rq_issued=0 and rq_active=0.
-  // Even though rq_success=1, it is not checked by the current logic.
-  // This demonstrates that success/error stats are lost if no new requests are
-  // issued in the window.
+  // Second window: rq_active=0 and rq_success=1. Stats ARE sent for the locality because of the
+  // rq_success=1.
+  ASSERT_TRUE(
+      waitForLoadStatsRequest({localityStats("winter", /*success*/ 1, 0, 0, 0)}, 0, false, true));
+
+  // Third window: rq_success=0. Stats are NOT sent for the locality.
   ASSERT_TRUE(waitForLoadStatsRequest({}, 0, false, true));
 
   cleanupUpstreamAndDownstream();

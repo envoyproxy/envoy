@@ -183,15 +183,8 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
         // Upstream locality stats
 
         bool should_send_locality_stats = rq_issued != 0;
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
-                                           "report_load_when_rq_active_is_non_zero")) {
-          // If rq_active is non-zero, we should send the locality stats even if
-          // rq_issued is zero (no new requests have been issued in this poll
-          // window). This is needed to report long-lived connections/requests (e.g., when
-          // web-sockets are used).
-          should_send_locality_stats = (rq_issued != 0) || (rq_active != 0);
-        } else if (Runtime::runtimeFeatureEnabled(
-                       "envoy.reloadable_features.report_load_for_non_zero_stats")) {
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.report_load_for_non_zero_stats")) {
           bool has_host_custom_metrics = false;
           for (const auto& metric : aggregated_host_custom_metrics) {
             if (metric.second.num_requests_with_metric != 0 ||
@@ -202,6 +195,13 @@ void LoadStatsReporterImpl::sendLoadStatsRequest() {
           }
           should_send_locality_stats = rq_success != 0 || rq_error != 0 || rq_active != 0 ||
                                        rq_issued != 0 || has_host_custom_metrics;
+        } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
+                                                  "report_load_when_rq_active_is_non_zero")) {
+          // If rq_active is non-zero, we should send the locality stats even if
+          // rq_issued is zero (no new requests have been issued in this poll
+          // window). This is needed to report long-lived connections/requests (e.g., when
+          // web-sockets are used).
+          should_send_locality_stats = (rq_issued != 0) || (rq_active != 0);
         }
 
         if (should_send_locality_stats) {
