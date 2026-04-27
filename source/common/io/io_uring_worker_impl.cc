@@ -251,7 +251,11 @@ void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, Request::Request
 void IoUringWorkerImpl::onFileEvent() {
   ENVOY_LOG(trace, "io uring worker, on file event");
   delay_submit_ = true;
-  io_uring_->forEveryCompletion([](Request* req, int32_t result, bool injected) {
+  // ``flags`` carries the raw ``cqe->flags`` value. The worker does not yet branch on it; this
+  // is wired through so a follow-up change can observe ``IORING_CQE_F_BUFFER`` and
+  // ``IORING_CQE_F_MORE`` for multishot recv.
+  io_uring_->forEveryCompletion([](Request* req, int32_t result, bool injected,
+                                   uint32_t /*flags*/) {
     ENVOY_LOG(trace, "receive request completion, type = {}, req = {}",
               static_cast<uint8_t>(req->type()), fmt::ptr(req));
     ASSERT(req != nullptr);

@@ -53,8 +53,13 @@ private:
  * queue.
  * @param result is a return code of submitted system call.
  * @param injected indicates whether the completion is injected or not.
+ * @param flags is the raw ``cqe->flags`` value from the io_uring completion. For multishot
+ * completions, callers inspect ``IORING_CQE_F_BUFFER`` (the buffer ID is encoded in the upper
+ * bits) and ``IORING_CQE_F_MORE`` (whether the SQE will produce further completions). For
+ * injected completions the value is always ``0``.
  */
-using CompletionCb = std::function<void(Request* user_data, int32_t result, bool injected)>;
+using CompletionCb =
+    std::function<void(Request* user_data, int32_t result, bool injected, uint32_t flags)>;
 
 /**
  * Callback for releasing the user data.

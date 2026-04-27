@@ -69,7 +69,7 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
 
   for (unsigned i = 0; i < count; ++i) {
     struct io_uring_cqe* cqe = cqes_[i];
-    completion_cb(reinterpret_cast<Request*>(cqe->user_data), cqe->res, false);
+    completion_cb(reinterpret_cast<Request*>(cqe->user_data), cqe->res, false, cqe->flags);
   }
 
   io_uring_cq_advance(&ring_, count);
@@ -80,7 +80,9 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
   // Iterate the injected completion.
   while (!injected_completions_.empty()) {
     auto& completion = injected_completions_.front();
-    completion_cb(completion.user_data_, completion.result_, true);
+    // Injected completions always carry ``flags == 0``; they do not originate from the kernel
+    // and have no associated CQE.
+    completion_cb(completion.user_data_, completion.result_, true, 0);
     // The socket may closed in the completion_cb and all the related completions are
     // removed.
     if (injected_completions_.empty()) {
