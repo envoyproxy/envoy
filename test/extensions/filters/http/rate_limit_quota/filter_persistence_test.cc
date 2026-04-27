@@ -13,6 +13,7 @@
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/integration_stream_decoder.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -124,6 +125,11 @@ protected:
     HttpIntegrationTest::initialize();
   }
 
+  void resetTlsStoreEmptiedCb() {
+    tls_store_emptied_ = std::make_unique<absl::Notification>();
+    GlobalTlsStores::registerEmptiedCb([&]() { tls_store_emptied_->Notify(); });
+  }
+
   // The RLQS upstream shouldn't be autonomous as it will handle the long-lived
   // RLQS stream.
   void createUpstreams() override {
@@ -156,12 +162,7 @@ protected:
         rlqs_upstream_refs.rlqs_cluster_->set_name(absl::StrCat("rlqs_upstream_", i));
       }
     });
-    tls_store_emptied_ = std::make_unique<absl::Notification>();
-    GlobalTlsStores::registerEmptiedCb([&]() {
-      if (tls_store_emptied_ != nullptr && !tls_store_emptied_->HasBeenNotified()) {
-        tls_store_emptied_->Notify();
-      }
-    });
+    resetTlsStoreEmptiedCb();
   }
 
   void updateConfigInPlace(std::function<void(envoy::config::bootstrap::v3::Bootstrap&)> modifier) {
@@ -199,12 +200,14 @@ protected:
       hcm_config.clear_http_filters();
       hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
     });
-    // Wait for all TLS stores to be deleted now that the filter factories are gone.
-    ASSERT_TRUE(waitForAllTlsStoreDeletions());
   }
 
   void cleanUp() {
-    wipeFilters();
+    // Cleanup leftover filters and their TLS stores.
+    if (tls_store_emptied_ != nullptr && !tls_store_emptied_->HasBeenNotified()) {
+      wipeFilters();
+      ASSERT_TRUE(waitForAllTlsStoreDeletions());
+    }
     for (auto& rlqs_upstream : rlqs_upstreams_) {
       if (rlqs_upstream.rlqs_connection_ != nullptr) {
         ASSERT_TRUE(rlqs_upstream.rlqs_connection_->close());
@@ -214,10 +217,7 @@ protected:
     cleanupUpstreamAndDownstream();
   }
 
-  void TearDown() override {
-    cleanUp();
-    GlobalTlsStores::registerEmptiedCb(nullptr);
-  }
+  void TearDown() override { cleanUp(); }
 
   // Send a request through the envoy & possibly to traffic_upstream_. Returns
   // the response's status code.
@@ -545,15 +545,6 @@ bucket_action:
 // Verify that the callback registered via registerEmptiedCb fires every time
 // the stores map becomes empty.
 TEST_P(FilterPersistenceTest, TestEmptiedCallbackFiresMultipleTimes) {
-  uint32_t emptied_count = 0;
-  auto n1 = std::make_shared<absl::Notification>();
-  GlobalTlsStores::registerEmptiedCb([&emptied_count, &n1]() {
-    emptied_count++;
-    if (!n1->HasBeenNotified()) {
-      n1->Notify();
-    }
-  });
-
   auto remove_rlqs = [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* hcm_filter = listener->mutable_filter_chains(0)->mutable_filters(0);
@@ -572,8 +563,7 @@ TEST_P(FilterPersistenceTest, TestEmptiedCallbackFiresMultipleTimes) {
 
   // 1. Initial removal of the RLQS filter to trigger the first call of the callback.
   updateConfigInPlace(remove_rlqs);
-  ASSERT_TRUE(n1->WaitForNotificationWithTimeout(absl::Seconds(3)));
-  EXPECT_EQ(emptied_count, 1);
+  ASSERT_TRUE(waitForAllTlsStoreDeletions());
 
   // 2. Add the filter back and verify it works.
   updateConfigInPlace([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -591,35 +581,49 @@ TEST_P(FilterPersistenceTest, TestEmptiedCallbackFiresMultipleTimes) {
   });
   absl::flat_hash_map<std::string, std::string> headers = {{"environment", "staging"}};
   ASSERT_EQ(sendRequest(&headers), "200");
+  // Reset the notification as we now expect another future call to the emptiedCb
+  resetTlsStoreEmptiedCb();
 
   // 3. Remove the filter again. The callback should be called a second time.
-  n1 = std::make_shared<absl::Notification>();
   updateConfigInPlace(remove_rlqs);
-  ASSERT_TRUE(n1->WaitForNotificationWithTimeout(absl::Seconds(3)));
-  EXPECT_EQ(emptied_count, 2);
+  ASSERT_TRUE(waitForAllTlsStoreDeletions());
+  // No need to reset the notification as we're leaving the config empty of RLQS filters.
+}
 
-  // Restore the callback for TearDown/subsequent tests.
-  GlobalTlsStores::registerEmptiedCb([&]() {
-    if (tls_store_emptied_ != nullptr && !tls_store_emptied_->HasBeenNotified()) {
-      tls_store_emptied_->Notify();
-    }
-  });
+TEST_P(FilterPersistenceTest, TestDeletingTlsStoreFromWorkerThread) {
+  RateLimitQuotaUsageReports expected_reports;
+  TestUtility::loadFromYaml(R"EOF(
+domain: "test_domain"
+bucket_quota_usages:
+  bucket_id:
+    bucket:
+      "test_key_1":
+        "test_value_1"
+      "test_key_2":
+        "test_value_2"
+  num_requests_allowed: 1
+)EOF",
+                            expected_reports);
+  // The first request should trigger an immediate usage report. The
+  // no-assignment behavior is ALLOW_ALL so the first request should be allowed.
+  absl::flat_hash_map<std::string, std::string> headers = {{"environment", "staging"}};
+  ASSERT_EQ(sendRequest(&headers), "200");
+  expectRlqsUsageReports(0, expected_reports, true);
 
-  // Add it back one last time so TearDown has something to wipe and the
-  // notification is triggered.
-  tls_store_emptied_ = std::make_unique<absl::Notification>();
-  updateConfigInPlace([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    auto* hcm_filter = listener->mutable_filter_chains(0)->mutable_filters(0);
-    HttpConnectionManager hcm_config;
-    hcm_filter->mutable_typed_config()->UnpackTo(&hcm_config);
-    (void)hcm_config.add_http_filters();
-    for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
-      hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
-    }
-    TestUtility::loadFromYaml(kDefaultRateLimitQuotaFilter, *hcm_config.mutable_http_filters(0));
-    hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
-  });
+  auto ctx = testing::NiceMock<Envoy::Server::Configuration::MockFactoryContext>();
+  // The TlsStore should already exist, so parameters needed for initialization aren't important.
+  // Capture a shared_ptr<TlsStore> to mimic deletion while a filter instance's shared_ptr outliving
+  // the filter factory's.
+  std::shared_ptr<GlobalTlsStores::TlsStore> tls_store = GlobalTlsStores::getTlsStore(
+      Envoy::Grpc::GrpcServiceConfigWithHashKey(), ctx,
+      rlqs_upstreams_[0].rlqs_upstream_->localAddress()->asStringView(), "test_domain");
+
+  // Push a config update to remove all RLQS filters and wait for confirmation that the config
+  // loaded via stat tracking.
+  wipeFilters();
+  EXPECT_EQ(tls_store.use_count(), 1);
+  tls_store = nullptr;
+  EXPECT_TRUE(waitForAllTlsStoreDeletions());
 }
 
 } // namespace
