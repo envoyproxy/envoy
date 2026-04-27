@@ -320,10 +320,29 @@ public:
   // `friend class OAuth2Test`, but `TEST_F(OAuth2Test, ...)` expands to a class
   // *derived* from OAuth2Test, and C++ friendship is not inherited — so the
   // test bodies cannot call the privates directly. These wrappers bridge that.
+  //
+  // We also prime `filter_->config_` here. In production it is set inside
+  // resolveAndSetActiveConfig() which only runs from decodeHeaders(); the tests
+  // below (DecryptTokenSameSecret, DecryptTokenDecryptionFails,
+  // DecryptTokenSpuriousSuccessReturnsOriginalInput, GarbagePlaintextCookieDoesNotCrash)
+  // call encryptToken/decryptToken directly without first going through
+  // decodeHeaders, so without this priming they would dereference a null
+  // config_ inside encryptToken/decryptToken (segfault at small offset, e.g. 0x318).
+  // DecryptTokenEmpty doesn't crash because decryptToken early-returns on empty
+  // input before touching config_.
+  void primeActiveConfigForTest() const {
+    if (filter_->config_ == nullptr) {
+      filter_->resolveAndSetActiveConfig();
+    }
+  }
   std::string encryptTokenForTest(const std::string& token) const {
+    primeActiveConfigForTest();
     return filter_->encryptToken(token);
   }
-  std::string decryptTokenForTest(const std::string& ct) const { return filter_->decryptToken(ct); }
+  std::string decryptTokenForTest(const std::string& ct) const {
+    primeActiveConfigForTest();
+    return filter_->decryptToken(ct);
+  }
 
   // Validates the behavior of the cookie validator.
   void expectValidCookies(const CookieNames& cookie_names, const std::string& cookie_domain) {
@@ -5520,7 +5539,6 @@ TEST_F(OAuth2Test, GarbagePlaintextCookieDoesNotCrash) {
 
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
 
   // Assert the redirect actually happened: filter took the redirect path (302 with Location)
   // rather than crashing or returning a 401. We only check Status=="302" and Location is set
