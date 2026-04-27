@@ -18,8 +18,7 @@ public:
   // is not in either set, then the request is expected to be rejected.
   using PathFormatter = std::function<std::string(char)>;
   void
-  validateCharacterSetInUrl(PathFormatter path_formatter,
-                            const std::array<uint32_t, 8>& uhv_allowed_characters,
+  validateCharacterSetInUrl(PathFormatter path_formatter, Http::CharTable& uhv_allowed_characters,
                             absl::string_view additionally_allowed_characters,
                             const std::function<std::string(uint32_t)>& expected_path_builder) {
     std::vector<FakeStreamPtr> upstream_requests;
@@ -47,7 +46,7 @@ public:
       headers.addViaMove(Http::HeaderString(absl::string_view(":path")), std::move(invalid_value));
       auto response = client->makeHeaderOnlyRequest(headers);
 
-      if (Http::testCharInTable(uhv_allowed_characters, static_cast<char>(ascii)) ||
+      if (uhv_allowed_characters.hasChar(ascii) ||
           absl::StrContains(additionally_allowed_characters, static_cast<char>(ascii))) {
         waitForNextUpstreamRequest();
         std::string expected_path = expected_path_builder(ascii);

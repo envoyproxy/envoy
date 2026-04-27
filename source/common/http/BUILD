@@ -82,6 +82,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "character_set_validation_lib",
     hdrs = ["character_set_validation.h"],
+    deps = [
+        "@abseil-cpp//absl/strings:string_view",
+    ],
 )
 
 envoy_cc_library(

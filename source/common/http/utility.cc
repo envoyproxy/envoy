@@ -1324,41 +1324,17 @@ namespace {
 // %-encode all ASCII character codepoints, EXCEPT:
 // ALPHA | DIGIT | * | - | . | _
 // SPACE is encoded as %20, NOT as the + character
-constexpr std::array<uint32_t, 8> kUrlEncodedCharTable = {
-    // control characters
-    0b11111111111111111111111111111111,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b11111111110110010000000000111111,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b10000000000000000000000000011110,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b10000000000000000000000000011111,
-    // extended ascii
-    0b11111111111111111111111111111111,
-    0b11111111111111111111111111111111,
-    0b11111111111111111111111111111111,
-    0b11111111111111111111111111111111,
-};
+constexpr CharTable kUrlEncodedCharTable =
+    ~(CharTable::alphanumeric() | CharTable::fromChars("*-._"));
 
-constexpr std::array<uint32_t, 8> kUrlDecodedCharTable = {
-    // control characters
-    0b00000000000000000000000000000000,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b01011111111111111111111111110101,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b11111111111111111111111111110101,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b11111111111111111111111111100010,
-    // extended ascii
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-};
+// The set of characters which, if they are percent-encoded, should be
+// decoded.
+constexpr CharTable kUrlDecodedCharTable =
+    CharTable::alphanumeric() | CharTable::fromChars("!#$%&'()*+,-./:;=?@[]_`~");
 
-bool shouldPercentEncodeChar(char c) { return testCharInTable(kUrlEncodedCharTable, c); }
+constexpr bool shouldPercentEncodeChar(char c) { return kUrlEncodedCharTable.hasChar(c); }
 
-bool shouldPercentDecodeChar(char c) { return testCharInTable(kUrlDecodedCharTable, c); }
+constexpr bool shouldPercentDecodeChar(char c) { return kUrlDecodedCharTable.hasChar(c); }
 } // namespace
 
 std::string Utility::PercentEncoding::urlEncode(absl::string_view value) {
@@ -1671,7 +1647,7 @@ bool Utility::isValidRefererValue(absl::string_view value) {
       seen_slash = true;
       continue;
     default:
-      if (!testCharInTable(kUriQueryAndFragmentCharTable, c)) {
+      if (!kUriQueryAndFragmentCharTable.hasChar(c)) {
         return false;
       }
     }
