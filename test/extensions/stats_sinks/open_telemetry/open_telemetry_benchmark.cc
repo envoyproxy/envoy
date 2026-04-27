@@ -166,9 +166,10 @@ void addCounterToAggregator(MetricAggregatorHashMap& aggregator,
 void addCounterToAggregator(
     Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator& aggregator,
     Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::AttributesVector&& attrs) {
-  using namespace Envoy::Extensions::StatSinks::OpenTelemetry;
-  aggregator.addCounter("metric_name", 1, 1,
-                        MetricAggregator::SortedAttributesVector(std::move(attrs)));
+  aggregator.addCounter(
+      "metric_name", 1,
+      Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::SortedAttributesVector(
+          std::move(attrs)));
 }
 
 void flushToStreamer(MetricAggregatorHashMap::AggregationResult&& result,
@@ -195,8 +196,7 @@ absl::flat_hash_map<std::string, std::string> createBaseAttrs(HashMapTag) {
 
 Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::AttributesVector
 createBaseAttrs(RealAggregatorTag) {
-  using namespace Envoy::Extensions::StatSinks::OpenTelemetry;
-  MetricAggregator::AttributesVector attrs;
+  Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::AttributesVector attrs;
   for (const auto& tag : test_tags) {
     attrs.emplace_back(tag.name_, tag.value_);
   }
@@ -210,7 +210,6 @@ void updateUniqueTag(absl::flat_hash_map<std::string, std::string>& attrs, int i
 
 void updateUniqueTag(
     Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::AttributesVector& attrs, int i) {
-  using namespace Envoy::Extensions::StatSinks::OpenTelemetry;
   for (auto& pair : attrs) {
     if (pair.first == test_tags.back().name_) {
       pair.second = std::to_string(i);
@@ -219,16 +218,21 @@ void updateUniqueTag(
   }
 }
 
-void BM_aggregationWithHashMap(benchmark::State& state) {
-  auto base_attrs = createBaseAttrs(HashMapTag{});
-  std::vector<absl::flat_hash_map<std::string, std::string>> precomputed_attrs;
+template <typename Tag> auto precomputeAttributes(Tag tag) {
+  auto base_attrs = createBaseAttrs(tag);
+  using Attrs = decltype(base_attrs);
+  std::vector<Attrs> precomputed_attrs;
   precomputed_attrs.reserve(10000);
   for (int i = 0; i < 10000; ++i) {
     auto attrs = base_attrs;
     updateUniqueTag(attrs, i);
     precomputed_attrs.push_back(std::move(attrs));
   }
+  return precomputed_attrs;
+}
 
+void BM_aggregationWithHashMap(benchmark::State& state) {
+  auto precomputed_attrs = precomputeAttributes(HashMapTag{});
   RequestStreamerHashMap streamer(opentelemetry::proto::metrics::v1::AggregationTemporality::
                                       AGGREGATION_TEMPORALITY_CUMULATIVE);
   for (auto _ : state) {
@@ -247,30 +251,25 @@ void BM_aggregationWithHashMap(benchmark::State& state) {
 BENCHMARK(BM_aggregationWithHashMap);
 
 void BM_aggregationWithSortedInlineVector(benchmark::State& state) {
-  using namespace Envoy::Extensions::StatSinks::OpenTelemetry;
-  auto base_attrs = createBaseAttrs(RealAggregatorTag{});
-  std::vector<MetricAggregator::AttributesVector> precomputed_attrs;
-  precomputed_attrs.reserve(10000);
-  for (int i = 0; i < 10000; ++i) {
-    auto attrs = base_attrs;
-    updateUniqueTag(attrs, i);
-    precomputed_attrs.push_back(std::move(attrs));
-  }
-
+  auto precomputed_attrs = precomputeAttributes(RealAggregatorTag{});
   static const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
       empty_resource_attributes;
 
-  RequestStreamer streamer(
+  Envoy::Extensions::StatSinks::OpenTelemetry::RequestStreamer streamer(
       20000, // max_dp
-      empty_resource_attributes, AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      [](MetricsExportRequestPtr) {}, // dummy callback
-      1000, 1000, 1000                // dummy times
+      empty_resource_attributes,
+      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+      [](Envoy::Extensions::StatSinks::OpenTelemetry::MetricsExportRequestPtr) {}, // dummy callback
+      1000, 1000, 1000                                                             // dummy times
   );
 
   for (auto _ : state) {
-    MetricAggregator aggregator(AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-                                AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+    Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator aggregator(
+        opentelemetry::proto::metrics::v1::AggregationTemporality::
+            AGGREGATION_TEMPORALITY_CUMULATIVE,
+        opentelemetry::proto::metrics::v1::AggregationTemporality::
+            AGGREGATION_TEMPORALITY_CUMULATIVE);
     for (int i = 0; i < 10000; ++i) {
       auto attrs = precomputed_attrs[i];
       addCounterToAggregator(aggregator, std::move(attrs));
