@@ -1863,7 +1863,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AnyNumber());
   EXPECT_CALL(response_decoder_, decodeData(_, true));
-  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteRstNoError, _));
   driveToCompletion();
   EXPECT_TRUE(client_wrapper_->status_.ok());
 }

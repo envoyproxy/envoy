@@ -5957,4 +5957,110 @@ TEST_P(DownstreamProtocolIntegrationTest, OptionsWithNoBodyNotChunked) {
   EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
 }
 
+// RFC 9113 Section 8.1: When the upstream sends a complete response followed by
+// RST_STREAM(NO_ERROR) while the request body hasn't been fully sent, the response
+// must be preserved and forwarded to the downstream client.
+// This test verifies behavior for all downstream protocols.
+TEST_P(ProtocolIntegrationTest, UpstreamRstStreamNoErrorAfterCompleteResponse) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    // HTTP/1.1 upstream has no RST_STREAM concept.
+    return;
+  }
+  // Without this, onUpstreamComplete() preemptively sends a local RST_STREAM to the upstream
+  // when the complete response is received, closing the stream before the upstream's
+  // RST_STREAM(NO_ERROR) arrives. With this enabled, the upstream stream stays open (half-closed
+  // remote), allowing the RST_STREAM(NO_ERROR) to reach the router through RemoteRstNoError.
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send request headers without end_stream (simulating a POST with pending body).
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Wait for the upstream to receive headers, but not end_stream (request body is still pending).
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Upstream sends a complete response (headers + body with END_STREAM), then RST_STREAM(NO_ERROR).
+  // Send both before waiting so they are in the pipeline together.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData("hello", true);
+  // Since response_end_stream was sent, LocalReset maps to NO_ERROR on the wire.
+  upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
+
+  // The complete response must be forwarded regardless of the RST_STREAM.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("hello", response->body());
+
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    // For HTTP/1.1: the connection is closed (the only way to signal "stop sending request body").
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    // For HTTP/2 and HTTP/3: the RST_STREAM(NO_ERROR) arrives after the response. RST_STREAM reason
+    // is verified by the
+    // Http2FrameIntegrationTest.UpstreamCompleteResponseFollowedByRstStreamNoError test which uses
+    // raw frames for precise control.
+    codec_client_->close();
+  }
+}
+
+// RFC 9113 Section 8.1: When the upstream sends a complete response (HEADERS + large DATA +
+// trailers with END_STREAM) followed by RST_STREAM(NO_ERROR), and the response body exceeds
+// the connection buffer limit, trailers get buffered. The RST_STREAM(NO_ERROR) arrives before
+// the buffered trailers are delivered. The deferred close mechanism must ensure the complete
+// response (including trailers) is forwarded before handling the RST_STREAM.
+// Unlike UpstreamRstStreamNoErrorAfterCompleteResponse,
+// this does NOT need `allow_multiplexed_upstream_half_close` because the RST_STREAM arrives
+// while trailers are still buffered (before onUpstreamComplete), so no preemptive local
+// RST_STREAM has been sent yet.
+TEST_P(ProtocolIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailers) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.setBufferLimits(1024, 1024);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Wait for the upstream to receive headers, but not end_stream (request body is still pending).
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Upstream sends headers, a body larger than the buffer limit (triggers trailer buffering),
+  // trailers with END_STREAM, then RST_STREAM(NO_ERROR).
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(std::string(2000, 'a'), false);
+  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
+  upstream_request_->encodeTrailers(response_trailers);
+  upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(2000U, response->body().size());
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->trailers());
+    EXPECT_EQ("0", response->trailers()->getGrpcStatusValue());
+  }
+
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteRstNoError, response->resetReason());
+    codec_client_->close();
+  }
+}
+
 } // namespace Envoy

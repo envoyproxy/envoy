@@ -1586,6 +1586,18 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                    *callbacks_, Http::Utility::resetReasonToString(reset_reason),
                    transport_failure_reason);
 
+  if (reset_reason == Http::StreamResetReason::RemoteRstNoError) {
+    auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+    callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+    if (numRequestsAwaitingHeaders() == 0 && pending_retries_ == 0 &&
+        downstream_response_started_) {
+      // If the entire response, including `end_stream`, has already been sent, this will
+      // be translated into `NO_ERROR` by the codec.
+      callbacks_->resetStream(reset_reason, "");
+    }
+    return;
+  }
+
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
 
   // Ignore upstream reset caused by a resource overflow.
@@ -1687,6 +1699,9 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::CoreResponseFlag::UpstreamRemoteReset;
   case Http::StreamResetReason::ProtocolError:
     return StreamInfo::CoreResponseFlag::UpstreamProtocolError;
+  case Http::StreamResetReason::RemoteRstNoError:
+    IS_ENVOY_BUG("unexpected RemoteRstNoError in streamResetReasonToResponseFlag");
+    return StreamInfo::CoreResponseFlag::UpstreamRemoteReset;
   case Http::StreamResetReason::OverloadManager:
     return StreamInfo::CoreResponseFlag::OverloadManager;
   }

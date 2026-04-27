@@ -479,15 +479,18 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                     absl::string_view transport_failure_reason) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  if (span_ != nullptr) {
-    // Add tags about reset.
-    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+  if (reason != Http::StreamResetReason::RemoteRstNoError) {
+    if (span_ != nullptr) {
+      // Add tags about reset.
+      span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+      span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
+    }
+
+    stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
   }
   clearRequestEncoder();
   awaiting_headers_ = false;
 
-  stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
   parent_.onUpstreamReset(reason, transport_failure_reason, *this);
 }
 
