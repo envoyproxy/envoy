@@ -39,3 +39,17 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "filter_integration_test",
+    srcs = ["filter_integration_test.cc"],
+    extension_names = ["envoy.filters.http.bandwidth_share"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/http/bandwidth_share:config",
+        # For matchers
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)

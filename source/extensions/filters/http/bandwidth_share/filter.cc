@@ -47,29 +47,36 @@ void BandwidthShare::StatsInProgress::update(uint64_t length_sent, uint64_t byte
 }
 
 Http::FilterHeadersStatus BandwidthShare::decodeHeaders(Http::RequestHeaderMap& request_headers,
-                                                        bool) {
+                                                        bool end_stream) {
   const auto& config = getConfig();
   request_state_.start_time_ = config.timeSource().monotonicTime();
   if (config.enabled()) {
     tenant_ = config.getTenantName(decoder_callbacks_->streamInfo(), request_headers);
-    request_bucket_ = config.getRequestBucket(tenant_);
+    if (!end_stream) {
+      request_bucket_ = config.getRequestBucket(tenant_);
+    }
   }
   if (request_bucket_) {
     request_state_.stats_ = config.requestStatsForTenant(tenant_);
     request_limiter_ = std::make_unique<StreamRateLimiter>(
         decoder_callbacks_->bufferLimit(),
+        // pause_data_cb
         [this] { decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark(); },
+        // resume_data_cb
         [this] { decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark(); },
+        // write_data_cb
         [this](Buffer::Instance& data, bool end_stream) {
           if (end_stream) {
             updateStatsOnDecodeFinish();
           }
           decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
         },
+        // continue_cb
         [this] {
           updateStatsOnDecodeFinish();
           decoder_callbacks_->continueDecoding();
         },
+        // write_stats_cb
         [this](uint64_t len, uint64_t buffered, std::chrono::milliseconds delay) {
           request_state_.update(len, buffered, delay);
         },
@@ -99,10 +106,12 @@ Http::FilterTrailersStatus BandwidthShare::decodeTrailers(Http::RequestTrailerMa
   return Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterHeadersStatus BandwidthShare::encodeHeaders(Http::ResponseHeaderMap&, bool) {
+Http::FilterHeadersStatus BandwidthShare::encodeHeaders(Http::ResponseHeaderMap&, bool end_stream) {
   auto& config = getConfig();
   response_state_.start_time_ = config.timeSource().monotonicTime();
-  response_bucket_ = config.getResponseBucket(tenant_);
+  if (!end_stream) {
+    response_bucket_ = config.getResponseBucket(tenant_);
+  }
   if (response_bucket_) {
     response_state_.stats_ = config.responseStatsForTenant(tenant_);
     response_limiter_ = std::make_unique<StreamRateLimiter>(
