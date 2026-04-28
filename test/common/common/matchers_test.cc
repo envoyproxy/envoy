@@ -454,11 +454,6 @@ TEST_F(StringMatcher, NoMatcherRejected) {
       fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
 }
 
-// Self-documenting matcher used by SizeIsBounded below. On failure, gtest will
-// print a message like:
-//   "does not use more than 32: think carefully before increasing this, and if
-//    you're sure, update the corresponding expectation"
-// which tells the next person touching StringMatcherImpl exactly what to do.
 MATCHER_P(MemNotMoreThan, sz,
           "does not use more than " + std::to_string(sz) +
               ": think carefully before increasing this, and if you're sure, "
@@ -466,26 +461,13 @@ MATCHER_P(MemNotMoreThan, sz,
   return arg <= sz;
 }
 
-// Bounds the per-alternative and overall size of StringMatcherImpl. This
-// enforces the structural property from PR #37782: each variant alternative
-// carries only the data it needs; no alternative holds redundant fields from
-// another; and StringMatcherImpl does not retain a copy of the proto used to
-// construct it.
+// Validates the per-matcher memory footprint of the different string matchers.
+// Requested as part of https://github.com/envoyproxy/envoy/pull/37782: each
+// variant alternative should carry only the data it needs, and
+// StringMatcherImpl should not retain the proto used to construct it.
 //
 // Bounds are expressed in terms of sizeof(std::string) and sizeof(void*) so
-// they are portable across libc++ (sizeof(std::string)==24) and libstdc++
-// (sizeof(std::string)==32), and across 32- and 64-bit builds.
-//
-// Why the old EXPECT_MEMORY_LE test was removed (PR #37782 / #43467):
-//   It measured tcmalloc *page-level* heap consumption, which is sensitive to
-//   size-class bucketing, span layout, page-heap fragmentation, and prior heap
-//   state — none of which are properties of StringMatcherImpl. The ±N*8192
-//   slack was an acknowledgement of page-sized noise, yet it still produced
-//   ~5/1000 flakes on gcc CI (most recently: actual 15710496 vs ceiling
-//   15685696, only ~24 KiB over a ~16 MiB bound). The magic constants also
-//   required manual hand-tuning on every tcmalloc/abseil/protobuf bump. The
-//   structural invariant that PR #37782 actually wanted to protect is
-//   captured deterministically by the sizeof checks below.
+// they are portable across libc++, libstdc++, and 32/64-bit builds.
 TEST_F(StringMatcher, SizeIsBounded) {
   // String-holding alternatives: one std::string + one bool rounded up to
   // pointer alignment.
