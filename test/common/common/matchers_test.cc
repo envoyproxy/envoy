@@ -12,6 +12,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -453,76 +454,61 @@ TEST_F(StringMatcher, NoMatcherRejected) {
       fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
 }
 
-// Compile-time size bounds for the variant alternatives inside StringMatcherImpl.
-// These enforce the structural property from PR #37782: each alternative carries only
-// the data it needs; no alternative holds redundant fields from another; and
-// StringMatcherImpl does not retain a copy of the proto used to construct it.
+// Self-documenting matcher used by SizeIsBounded below. On failure, gtest will
+// print a message like:
+//   "does not use more than 32: think carefully before increasing this, and if
+//    you're sure, update the corresponding expectation"
+// which tells the next person touching StringMatcherImpl exactly what to do.
+MATCHER_P(MemNotMoreThan, sz,
+          "does not use more than " + std::to_string(sz) +
+              ": think carefully before increasing this, and if you're sure, "
+              "update the corresponding expectation") {
+  return arg <= sz;
+}
+
+// Bounds the per-alternative and overall size of StringMatcherImpl. This
+// enforces the structural property from PR #37782: each variant alternative
+// carries only the data it needs; no alternative holds redundant fields from
+// another; and StringMatcherImpl does not retain a copy of the proto used to
+// construct it.
 //
-// Bounds are expressed in terms of sizeof(std::string) and sizeof(void*) so they
-// are portable across libc++ (sizeof(std::string)==24) and libstdc++
+// Bounds are expressed in terms of sizeof(std::string) and sizeof(void*) so
+// they are portable across libc++ (sizeof(std::string)==24) and libstdc++
 // (sizeof(std::string)==32), and across 32- and 64-bit builds.
 //
 // Why the old EXPECT_MEMORY_LE test was removed (PR #37782 / #43467):
 //   It measured tcmalloc *page-level* heap consumption, which is sensitive to
 //   size-class bucketing, span layout, page-heap fragmentation, and prior heap
-//   state — none of which are properties of StringMatcherImpl. The ±N*8192 slack
-//   was an acknowledgement of page-sized noise, yet it still produced ~5/1000
-//   flakes on gcc CI (most recently: actual 15710496 vs ceiling 15685696, only
-//   ~24 KiB over a ~16 MiB bound). The magic constants also required manual
-//   hand-tuning on every tcmalloc/abseil/protobuf bump. The structural invariant
-//   that PR #37782 actually wanted to protect is captured deterministically by
-//   the sizeof assertions below.
-
-// String-holding alternatives: one std::string + one bool rounded up to pointer
-// alignment. sizeof(ExactStringMatcher) must not grow beyond this.
-static_assert(sizeof(Matchers::ExactStringMatcher) <= sizeof(std::string) + sizeof(void*),
-              "ExactStringMatcher unexpectedly grew; verify any new field is necessary "
-              "and does not duplicate state already held in StringMatcherImpl.");
-static_assert(sizeof(Matchers::PrefixStringMatcher) <= sizeof(std::string) + sizeof(void*),
-              "PrefixStringMatcher unexpectedly grew; verify any new field is necessary "
-              "and does not duplicate state already held in StringMatcherImpl.");
-static_assert(sizeof(Matchers::SuffixStringMatcher) <= sizeof(std::string) + sizeof(void*),
-              "SuffixStringMatcher unexpectedly grew; verify any new field is necessary "
-              "and does not duplicate state already held in StringMatcherImpl.");
-static_assert(sizeof(Matchers::ContainsStringMatcher) <= sizeof(std::string) + sizeof(void*),
-              "ContainsStringMatcher unexpectedly grew; verify any new field is necessary "
-              "and does not duplicate state already held in StringMatcherImpl.");
-
-// Pointer-holding alternatives: a single unique_ptr (one pointer-sized member).
-static_assert(sizeof(Matchers::RegexStringMatcher) <= 2 * sizeof(void*),
-              "RegexStringMatcher unexpectedly grew; verify the new field is necessary.");
-static_assert(sizeof(Matchers::CustomStringMatcher) <= 2 * sizeof(void*),
-              "CustomStringMatcher unexpectedly grew; verify the new field is necessary.");
-
-// StringMatcherImpl layout — accounting for all four pointer-sized contributions:
-//   [1] vtable pointer for ValueMatcher base  (+1 * sizeof(void*))
-//   [2] vtable pointer for StringMatcher base (+1 * sizeof(void*))
-//   [3] absl::variant payload = max(sizeof(alternatives))
-//         = sizeof(std::string) [the string itself]
-//           + sizeof(void*) [bool member rounded up to pointer alignment]
-//   [4] absl::variant discriminant            (+1 * sizeof(void*))
-// Total upper bound: sizeof(std::string) + 4 * sizeof(void*).
-static_assert(sizeof(Matchers::StringMatcherImpl) <= sizeof(std::string) + 4 * sizeof(void*),
-              "StringMatcherImpl unexpectedly grew; if you added a data member or a new variant "
-              "alternative larger than the existing string-holding ones, ensure the per-matcher "
-              "footprint regression is intentional. See PR #37782 for the design context.");
-
-// Verifies the size bounds above at runtime so failures appear in the test-runner
-// output. The primary check is the compile-time static_assert above; this test
-// provides discoverability via the gtest output and documents the expected sizes.
+//   state — none of which are properties of StringMatcherImpl. The ±N*8192
+//   slack was an acknowledgement of page-sized noise, yet it still produced
+//   ~5/1000 flakes on gcc CI (most recently: actual 15710496 vs ceiling
+//   15685696, only ~24 KiB over a ~16 MiB bound). The magic constants also
+//   required manual hand-tuning on every tcmalloc/abseil/protobuf bump. The
+//   structural invariant that PR #37782 actually wanted to protect is
+//   captured deterministically by the sizeof checks below.
 TEST_F(StringMatcher, SizeIsBounded) {
-  // String-holding alternatives: std::string + bool padded to pointer alignment.
-  EXPECT_LE(sizeof(Matchers::ExactStringMatcher), sizeof(std::string) + sizeof(void*));
-  EXPECT_LE(sizeof(Matchers::PrefixStringMatcher), sizeof(std::string) + sizeof(void*));
-  EXPECT_LE(sizeof(Matchers::SuffixStringMatcher), sizeof(std::string) + sizeof(void*));
-  EXPECT_LE(sizeof(Matchers::ContainsStringMatcher), sizeof(std::string) + sizeof(void*));
+  // String-holding alternatives: one std::string + one bool rounded up to
+  // pointer alignment.
+  const size_t string_alt_bound = sizeof(std::string) + sizeof(void*);
+  EXPECT_THAT(sizeof(Matchers::ExactStringMatcher), MemNotMoreThan(string_alt_bound));
+  EXPECT_THAT(sizeof(Matchers::PrefixStringMatcher), MemNotMoreThan(string_alt_bound));
+  EXPECT_THAT(sizeof(Matchers::SuffixStringMatcher), MemNotMoreThan(string_alt_bound));
+  EXPECT_THAT(sizeof(Matchers::ContainsStringMatcher), MemNotMoreThan(string_alt_bound));
 
-  // Pointer-holding alternatives: one unique_ptr.
-  EXPECT_LE(sizeof(Matchers::RegexStringMatcher), 2 * sizeof(void*));
-  EXPECT_LE(sizeof(Matchers::CustomStringMatcher), 2 * sizeof(void*));
+  // Pointer-holding alternatives: a single unique_ptr.
+  const size_t ptr_alt_bound = 2 * sizeof(void*);
+  EXPECT_THAT(sizeof(Matchers::RegexStringMatcher), MemNotMoreThan(ptr_alt_bound));
+  EXPECT_THAT(sizeof(Matchers::CustomStringMatcher), MemNotMoreThan(ptr_alt_bound));
 
-  // StringMatcherImpl: two vtable ptrs + variant (largest alternative + discriminant).
-  EXPECT_LE(sizeof(Matchers::StringMatcherImpl), sizeof(std::string) + 4 * sizeof(void*));
+  // StringMatcherImpl layout — accounting for all four pointer-sized
+  // contributions:
+  //   [1] vtable pointer for ValueMatcher base       (+1 * sizeof(void*))
+  //   [2] vtable pointer for StringMatcher base      (+1 * sizeof(void*))
+  //   [3] absl::variant payload = max(sizeof(alternatives))
+  //         = sizeof(std::string) + sizeof(void*) (string + padded bool)
+  //   [4] absl::variant discriminant                 (+1 * sizeof(void*))
+  EXPECT_THAT(sizeof(Matchers::StringMatcherImpl),
+              MemNotMoreThan(sizeof(std::string) + 4 * sizeof(void*)));
 }
 
 class PathMatcher : public BaseTest {};
