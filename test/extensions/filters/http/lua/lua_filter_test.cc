@@ -956,6 +956,38 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponse) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
+// downstreamRequestHeaders() called twice returns the same cached wrapper without re-invoking the
+// underlying C++ requestHeaders() accessor. The Times(1) constraint is the load-bearing assertion:
+// if caching breaks, a second call to requestHeaders() triggers a gmock over-call failure.
+TEST_F(LuaHttpFilterTest, RequestHeadersInResponseCached) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      local h1 = response_handle:downstreamRequestHeaders()
+      local h2 = response_handle:downstreamRequestHeaders()
+      response_handle:logTrace(h1:get(":path"))
+      response_handle:logTrace(h2:get(":method"))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/cached"}, {":method", "GET"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  // requestHeaders() must be called exactly once; the second Lua call hits the cached wrapper.
+  EXPECT_CALL(encoder_callbacks_, requestHeaders())
+      .Times(1)
+      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"trace", "/cached"}, {"trace", "GET"}}), {
+        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                  filter_->encodeHeaders(response_headers, true));
+      });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
 // downstreamRequestHeaders() returns nil when no request headers are available.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponseNil) {
   const std::string SCRIPT{R"EOF(
@@ -1006,7 +1038,8 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseReadOnly) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }
 
-// downstreamRequestHeaders() from envoy_on_request raises a Lua error.
+// downstreamRequestHeaders() is not in the request handle API at all, so Lua raises a nil-method
+// error rather than a custom error message.
 TEST_F(LuaHttpFilterTest, DownstreamRequestHeadersNotAvailableInRequest) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -1018,11 +1051,9 @@ TEST_F(LuaHttpFilterTest, DownstreamRequestHeadersNotAvailableInRequest) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/test"}};
-  EXPECT_LOG_CONTAINS("error", "downstreamRequestHeaders() is only available in envoy_on_response",
-                      {
-                        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-                                  filter_->decodeHeaders(request_headers, true));
-                      });
+  EXPECT_LOG_CONTAINS("error", "attempt to call method 'downstreamRequestHeaders' (a nil value)", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }
 
@@ -2220,11 +2251,10 @@ TEST_F(LuaHttpFilterTest, RespondInResponsePath) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_LOG_CONTAINS("error",
-                      "[string \"...\"]:3: respond not currently supported in the response path", {
-                        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-                                  filter_->encodeHeaders(response_headers, true));
-                      });
+  // respond() is not in the response handle API, so Lua raises a nil-method error.
+  EXPECT_LOG_CONTAINS("error", "attempt to call method 'respond' (a nil value)", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
