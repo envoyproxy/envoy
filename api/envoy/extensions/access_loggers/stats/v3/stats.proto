@@ -3,11 +3,13 @@ syntax = "proto3";
 package envoy.extensions.access_loggers.stats.v3;
 
 import "envoy/data/accesslog/v3/accesslog.proto";
+import "envoy/type/v3/scope.proto";
 
 import "google/protobuf/wrappers.proto";
 
 import "xds/type/matcher/v3/matcher.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -29,7 +31,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   leading to a denial of service in Envoy, or can overwhelm any configured
 //   stat sinks by sending too many unique metrics.
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Config {
   // Defines a tag on a stat.
   message Tag {
@@ -153,7 +155,13 @@ message Config {
   }
 
   // The stat prefix for the generated stats.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  // Deprecated: please use ``stats_scope.prefix`` instead.
+  // It will override ``stats_scope.prefix`` if non-empty.
+  string stat_prefix = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Configuration for stats scope limits and sharing.
+  type.v3.Scope stats_scope = 6;
 
   // The histograms this logger will emit.
   repeated Histogram histograms = 3;

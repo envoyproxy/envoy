@@ -15,7 +15,7 @@ MetricHelper::~MetricHelper() {
 }
 
 MetricHelper::MetricHelper(StatName name, StatName tag_extracted_name,
-                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table) {
+                           StatNameTagSpan stat_name_tags, SymbolTable& symbol_table) {
   // Encode all the names and tags into transient storage so we can count the
   // required bytes. 2 is added to account for the name and tag_extracted_name,
   // and we multiply the number of tags by 2 to account for the name and value
