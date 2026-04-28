@@ -420,22 +420,31 @@ private:
   //    Envoy-owned objects whose lifetime is tied to the parent stream rather than to the
   //    Filter (getHeader, copyHeaders, copyTrailers, getIntegerValue). The Filter itself is
   //    kept alive across any cgo call by the shared_ptr taken at the cgo wrapper layer
-  //    (see cgo.cc), but the stream's HeaderMap / TrailerMap / StreamInfo are not. By
-  //    holding mutex_ across the off-thread dereference, onDestroy() blocks on the same
-  //    mutex and cannot return; this prevents the worker thread from progressing into
-  //    deferredDelete(stream) until every in-flight off-thread reader has unwound.
+  //    (see cgo.cc), but the stream's HeaderMap / TrailerMap / StreamInfo are not. The
+  //    fence is two-sided: those off-thread CAPI methods hold mutex_ across their
+  //    dereference, and onDestroy() re-acquires mutex_ once before letting the worker
+  //    thread return. The worker therefore blocks on mutex_ until every in-flight
+  //    off-thread reader has unwound, which prevents it from progressing into
+  //    deferredDelete(stream) (and the eventual stream / header-map free) while a Go
+  //    goroutine is still mid-deref. The atomic flag alone is not sufficient for this:
+  //    once onDestroy has set it the off-thread caller can already be past its own check
+  //    and committed to the deref, so the lock acquisition in onDestroy is what actually
+  //    serialises the two sides.
   //
   // The bare destroy-flag check (`if (hasDestroyed()) return CAPIFilterIsDestroy;`) does
   // NOT require this mutex; see has_destroyed_ below. CAPI methods whose only Envoy-side
   // work is either Filter-owned (e.g. doDataList buffers) or runs on the worker thread
   // (via dispatcher.post or under isThreadSafe()) do not need to take mutex_ at all.
   Thread::MutexBasicLockable mutex_{};
-  // Set exactly once by onDestroy() (write with release), read lock-free by hasDestroyed()
-  // (acquire load) from any thread. Concurrent cgo callers from Go bail out with
-  // CAPIFilterIsDestroy as soon as they observe the store. The Filter itself is kept alive
-  // across any cgo call by the shared_ptr taken at the cgo wrapper layer (see cgo.cc), so
-  // observing a false-then-true transition during a call is benign for Filter-owned state.
-  // For Envoy-stream-owned state see the role-2 explanation on mutex_ above.
+  // Set exactly once by onDestroy() while holding mutex_ (acq_rel exchange), read lock-free
+  // by hasDestroyed() (acquire load) from any thread. Concurrent cgo callers from Go bail
+  // out with CAPIFilterIsDestroy as soon as they observe the store. The Filter itself is
+  // kept alive across any cgo call by the shared_ptr taken at the cgo wrapper layer (see
+  // cgo.cc), so observing a false-then-true transition during a call is benign for
+  // Filter-owned state. For Envoy-stream-owned state, the lock-free observation is not
+  // sufficient on its own: see the role-2 explanation on mutex_ above for how the
+  // worker-stall fence (mutex_ acquired in onDestroy() and across the off-thread deref)
+  // closes the lifetime gap.
   std::atomic<bool> has_destroyed_{false};
 };
 

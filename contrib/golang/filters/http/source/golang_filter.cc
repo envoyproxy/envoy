@@ -151,7 +151,17 @@ void Filter::onDestroy() {
     return;
   }
 
-  bool already_destroyed = has_destroyed_.exchange(true, std::memory_order_acq_rel);
+  // Acquire mutex_ so any off-thread CAPI caller currently dereferencing an Envoy-stream-owned
+  // object (HeaderMap / TrailerMap / StreamInfo via getHeader, copyHeaders, copyTrailers,
+  // getIntegerValue) finishes before this worker thread can return into destroyFilters() and let
+  // the event loop process the deferred-delete that frees the underlying stream. The flag itself
+  // is std::atomic so unrelated CAPI methods can observe destruction lock-free; this lock only
+  // exists to provide the worker-stall fence. See has_destroyed_ comment in golang_filter.h.
+  bool already_destroyed;
+  {
+    Thread::LockGuard lock(mutex_);
+    already_destroyed = has_destroyed_.exchange(true, std::memory_order_acq_rel);
+  }
   if (already_destroyed) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return;
