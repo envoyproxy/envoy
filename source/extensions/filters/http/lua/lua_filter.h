@@ -144,9 +144,9 @@ public:
 
   /**
    * @return Http::RequestHeaderMapOptRef the downstream request headers for this stream, if
-   * present.
+   * present. Only meaningful on the response path.
    */
-  virtual Http::RequestHeaderMapOptRef requestHeaders() PURE;
+  virtual Http::RequestHeaderMapOptRef downstreamRequestHeaders() PURE;
 };
 
 class Filter;
@@ -188,7 +188,7 @@ public:
 
   StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                       Http::RequestOrResponseHeaderMap& headers, bool end_stream, Filter& filter,
-                      FilterCallbacks& callbacks, TimeSource& time_source);
+                      FilterCallbacks& callbacks, TimeSource& time_source, bool is_response);
 
   Http::FilterHeadersStatus start(int function_ref);
   Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
@@ -204,7 +204,7 @@ public:
 
   static ExportedFunctions exportedFunctions() {
     return {{"headers", static_luaHeaders},
-            {"requestHeaders", static_luaRequestHeaders},
+            {"downstreamRequestHeaders", static_luaDownstreamRequestHeaders},
             {"body", static_luaBody},
             {"bodyChunks", static_luaBodyChunks},
             {"trailers", static_luaTrailers},
@@ -255,11 +255,11 @@ private:
 
   /**
    * @return a read-only handle to the downstream request headers, or nil if not available.
-   * This is useful in envoy_on_response to access the original request headers.
+   * Only callable from envoy_on_response. Raises a Lua error if called from envoy_on_request.
    * Note: the underlying C++ type is non-const, but mutation is blocked at the Lua wrapper level
    * because modifying request headers after they have been forwarded upstream has no effect.
    */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRequestHeaders);
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaDownstreamRequestHeaders);
 
   /**
    * @return a handle to the full body or nil if there is no body. This call will cause the script
@@ -400,7 +400,7 @@ private:
     // Headers/body/trailers wrappers do not survive any yields. The user can request them
     // again across yields if needed.
     headers_wrapper_.reset();
-    request_headers_wrapper_.reset();
+    downstream_request_headers_wrapper_.reset();
     body_wrapper_.reset();
     trailers_wrapper_.reset();
     metadata_wrapper_.reset();
@@ -423,6 +423,7 @@ private:
   Filters::Common::Lua::Coroutine& coroutine_;
   Http::RequestOrResponseHeaderMap& headers_;
   bool end_stream_;
+  bool is_response_;
   bool headers_continued_{};
   bool buffered_body_{};
   bool saw_body_{};
@@ -432,7 +433,7 @@ private:
   FilterCallbacks& callbacks_;
   Http::HeaderMap* trailers_{};
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> request_headers_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> downstream_request_headers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
@@ -549,7 +550,7 @@ public:
     PerLuaCodeSetup* setup = getPerLuaCodeSetup();
     const int function_ref = setup ? setup->requestFunctionRef() : LUA_REFNIL;
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_, function_ref,
-                     setup, headers, end_stream);
+                     setup, headers, end_stream, false);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
@@ -570,7 +571,7 @@ public:
     PerLuaCodeSetup* setup = getPerLuaCodeSetup();
     const int function_ref = setup ? setup->responseFunctionRef() : LUA_REFNIL;
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
-                     function_ref, setup, headers, end_stream);
+                     function_ref, setup, headers, end_stream, true);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
@@ -626,7 +627,9 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
-    Http::RequestHeaderMapOptRef requestHeaders() override { return callbacks_->requestHeaders(); }
+    Http::RequestHeaderMapOptRef downstreamRequestHeaders() override {
+      return callbacks_->requestHeaders();
+    }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -661,7 +664,9 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
-    Http::RequestHeaderMapOptRef requestHeaders() override { return callbacks_->requestHeaders(); }
+    Http::RequestHeaderMapOptRef downstreamRequestHeaders() override {
+      return callbacks_->requestHeaders();
+    }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
@@ -698,11 +703,10 @@ private:
                                         : per_route_config_->filterContext();
   }
 
-  Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
-                                      Filters::Common::Lua::CoroutinePtr& coroutine,
-                                      FilterCallbacks& callbacks, int function_ref,
-                                      PerLuaCodeSetup* setup,
-                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
+  Http::FilterHeadersStatus
+  doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& coroutine,
+            FilterCallbacks& callbacks, int function_ref, PerLuaCodeSetup* setup,
+            Http::RequestOrResponseHeaderMap& headers, bool end_stream, bool is_response);
   Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 

@@ -274,9 +274,10 @@ script:
   end
 
 A script can define either or both of these functions. During the request path, Envoy will
-run *envoy_on_request* as a coroutine, passing a handle to the request API. During the
-response path, Envoy will run *envoy_on_response* as a coroutine, passing handle to the
-response API.
+run *envoy_on_request* as a coroutine, passing a handle to the
+:ref:`request handle API <config_http_filters_lua_request_handle_api>`. During the response path,
+Envoy will run *envoy_on_response* as a coroutine, passing a handle to the
+:ref:`response handle API <config_http_filters_lua_response_handle_api>`.
 
 .. attention::
 
@@ -284,7 +285,12 @@ response API.
   handle should not be assigned to any global variable and should not be used outside of the
   coroutine. Envoy will fail your script if the handle is used incorrectly.
 
-The following methods on the stream handle are supported:
+.. _config_http_filters_lua_request_handle_api:
+
+Request handle API
+~~~~~~~~~~~~~~~~~~
+
+The following methods are available on the request handle passed to ``envoy_on_request``.
 
 ``headers()``
 ^^^^^^^^^^^^^
@@ -297,22 +303,6 @@ Returns the stream's headers. The headers can be modified as long as they have n
 the next filter in the filter chain. For example, they can be modified after an ``httpCall()`` or
 after a ``body()`` call returns. The script will fail if the headers are modified in any other
 situation.
-
-Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
-
-``requestHeaders()``
-^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: lua
-
-  local request_headers = handle:requestHeaders()
-
-Returns the downstream request headers. This is primarily useful in ``envoy_on_response`` to
-inspect the original request headers alongside the response. The returned handle is **read-only**;
-any attempt to modify it will result in a script error.
-
-Returns ``nil`` if request headers are not available (e.g., in certain edge cases where the
-request has not been fully initialized).
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
@@ -745,6 +735,32 @@ Returns a :ref:`route object <config_http_filters_lua_route_wrapper>`.
 Returns a stats scope object that can be used to create and modify stats (counters, gauges, and
 histograms). See :ref:`Stats scope object API <config_http_filters_lua_stats_scope_wrapper>` for
 available methods.
+
+.. _config_http_filters_lua_response_handle_api:
+
+Response handle API
+~~~~~~~~~~~~~~~~~~~
+
+The response handle passed to ``envoy_on_response`` supports all of the same methods as the
+:ref:`request handle <config_http_filters_lua_request_handle_api>`, with the following
+differences:
+
+- ``respond()`` is **not** available on the response handle.
+- ``downstreamRequestHeaders()`` is available exclusively on the response handle.
+
+``downstreamRequestHeaders()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local request_headers = handle:downstreamRequestHeaders()
+
+Returns the original downstream request headers. The returned handle is **read-only**; any attempt
+to modify it will result in a script error.
+
+Returns ``nil`` if request headers are not available.
+
+Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
 .. _config_http_filters_lua_header_wrapper:
 

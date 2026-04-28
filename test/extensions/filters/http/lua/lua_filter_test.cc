@@ -930,11 +930,12 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   EXPECT_EQ(2, stats_store_.counter("test.lua.executions").value());
 }
 
-// Access request headers from envoy_on_response.
+// downstreamRequestHeaders() returns the original request headers when called from
+// envoy_on_response.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponse) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
-      local req_headers = response_handle:requestHeaders()
+      local req_headers = response_handle:downstreamRequestHeaders()
       response_handle:logTrace(req_headers:get(":path"))
       response_handle:logTrace(req_headers:get("x-custom"))
     end
@@ -955,11 +956,11 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponse) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// requestHeaders() returns nil when no request headers are available.
+// downstreamRequestHeaders() returns nil when no request headers are available.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponseNil) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
-      local req_headers = response_handle:requestHeaders()
+      local req_headers = response_handle:downstreamRequestHeaders()
       if req_headers == nil then
         response_handle:logTrace("no request headers")
       end
@@ -981,11 +982,11 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseNil) {
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
-// requestHeaders() is read-only: mutations should raise a Lua error.
+// downstreamRequestHeaders() is read-only: mutations should raise a Lua error.
 TEST_F(LuaHttpFilterTest, RequestHeadersInResponseReadOnly) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
-      local req_headers = response_handle:requestHeaders()
+      local req_headers = response_handle:downstreamRequestHeaders()
       req_headers:add("x-should-fail", "value")
     end
   )EOF"};
@@ -1005,12 +1006,11 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInResponseReadOnly) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }
 
-// requestHeaders() from envoy_on_request returns the current request headers (non-nil).
-TEST_F(LuaHttpFilterTest, RequestHeadersInRequest) {
+// downstreamRequestHeaders() from envoy_on_request raises a Lua error.
+TEST_F(LuaHttpFilterTest, DownstreamRequestHeadersNotAvailableInRequest) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      local req_headers = request_handle:requestHeaders()
-      request_handle:logTrace(req_headers:get(":path"))
+      local req_headers = request_handle:downstreamRequestHeaders()
     end
   )EOF"};
 
@@ -1018,12 +1018,12 @@ TEST_F(LuaHttpFilterTest, RequestHeadersInRequest) {
   setup(SCRIPT);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/test"}};
-  EXPECT_CALL(decoder_callbacks_, requestHeaders())
-      .WillOnce(Return(Http::RequestHeaderMapOptRef{request_headers}));
-  EXPECT_LOG_CONTAINS("trace", "/test", {
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  });
-  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  EXPECT_LOG_CONTAINS("error", "downstreamRequestHeaders() is only available in envoy_on_response",
+                      {
+                        EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                  filter_->decodeHeaders(request_headers, true));
+                      });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }
 
 // Response synchronous body.

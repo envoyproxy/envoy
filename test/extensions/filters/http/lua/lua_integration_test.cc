@@ -725,7 +725,7 @@ typed_config:
   cleanup();
 }
 
-// requestHeaders() in envoy_on_response returns the original downstream request headers.
+// downstreamRequestHeaders() in envoy_on_response returns the original downstream request headers.
 TEST_P(LuaIntegrationTest, RequestHeadersAccessibleInResponse) {
   const std::string FILTER_AND_CODE =
       R"EOF(
@@ -735,7 +735,7 @@ typed_config:
   default_source_code:
     inline_string: |
       function envoy_on_response(response_handle)
-        local req_headers = response_handle:requestHeaders()
+        local req_headers = response_handle:downstreamRequestHeaders()
         response_handle:headers():add("x-echoed-path", req_headers:get(":path"))
         response_handle:headers():add("x-echoed-authority", req_headers:get(":authority"))
       end

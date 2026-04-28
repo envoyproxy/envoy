@@ -247,9 +247,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                                          Http::RequestOrResponseHeaderMap& headers, bool end_stream,
                                          Filter& filter, FilterCallbacks& callbacks,
-                                         TimeSource& time_source)
-    : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), filter_(filter),
-      callbacks_(callbacks), yield_callback_([this]() {
+                                         TimeSource& time_source, bool is_response)
+    : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), is_response_(is_response),
+      filter_(filter), callbacks_(callbacks), yield_callback_([this]() {
         if (state_ == State::Running) {
           throw Filters::Common::Lua::LuaException("script performed an unexpected yield");
         }
@@ -540,22 +540,24 @@ int StreamHandleWrapper::luaHeaders(lua_State* state) {
   return 1;
 }
 
-int StreamHandleWrapper::luaRequestHeaders(lua_State* state) {
+int StreamHandleWrapper::luaDownstreamRequestHeaders(lua_State* state) {
   ASSERT(state_ == State::Running);
 
-  Http::RequestHeaderMapOptRef request_headers = callbacks_.requestHeaders();
+  if (!is_response_) {
+    return luaL_error(state, "downstreamRequestHeaders() is only available in envoy_on_response");
+  }
+
+  Http::RequestHeaderMapOptRef request_headers = callbacks_.downstreamRequestHeaders();
   if (!request_headers.has_value()) {
     return 0;
   }
 
-  if (request_headers_wrapper_.get() != nullptr) {
-    request_headers_wrapper_.pushStack();
+  if (downstream_request_headers_wrapper_.get() != nullptr) {
+    downstream_request_headers_wrapper_.pushStack();
   } else {
     // The "can modify" callback returns false to make this wrapper read-only at the Lua level.
-    // This is intentional: callers should not mutate headers through this accessor regardless
-    // of which filter phase they are in (e.g. mutating request headers from envoy_on_response
-    // would have no effect after headers have been forwarded upstream).
-    request_headers_wrapper_.reset(
+    // Mutating request headers after they have been forwarded upstream has no effect.
+    downstream_request_headers_wrapper_.reset(
         HeaderMapWrapper::create(state, request_headers.value().get(), [] { return false; }), true);
   }
   return 1;
@@ -915,7 +917,7 @@ void Filter::onDestroy() {
 Http::FilterHeadersStatus
 Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& coroutine,
                   FilterCallbacks& callbacks, int function_ref, PerLuaCodeSetup* setup,
-                  Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
+                  Http::RequestOrResponseHeaderMap& headers, bool end_stream, bool is_response) {
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -923,7 +925,7 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
   coroutine = setup->createCoroutine();
 
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
-                                           *this, callbacks, time_source_),
+                                           *this, callbacks, time_source_, is_response),
                true);
 
   Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
