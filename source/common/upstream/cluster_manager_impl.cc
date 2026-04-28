@@ -1973,26 +1973,29 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   auto upstream_protocols = host->cluster().upstreamHttpProtocol(downstream_protocol);
 
   // For auto_config (ALPN) clusters: if this is a WebSocket upgrade, filter out
-  // protocols where extended CONNECT is disabled, to avoid the
-  // upgrade-to-CONNECT transformation in the HTTP/2 or HTTP/3 codec.
+  // protocols where extended CONNECT is disabled, to avoid the upgrade-to-CONNECT
+  // transformation in the HTTP/2 or HTTP/3 codec.
+  //
+  // H3 is dropped whenever H2 must be dropped, even when H3 itself allows extended
+  // CONNECT: ProdClusterManagerFactory::allocateConnPool does not support a
+  // {H3, H1} protocol vector, and ConnectivityGrid only learns about H3 via Alt-Svc
+  // headers received over H2/H1, so dropping H2 effectively prevents H3 discovery.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.alpn_filter_websocket_protocols") &&
       (host->cluster().features() & Upstream::ClusterInfo::Features::USE_ALPN) && context &&
       context->downstreamHeaders() &&
       Http::Utility::isWebSocketUpgradeRequest(*context->downstreamHeaders())) {
     const auto& http_opts = host->cluster().httpProtocolOptions();
-    upstream_protocols.erase(
-        std::remove_if(upstream_protocols.begin(), upstream_protocols.end(),
-                       [&http_opts](Http::Protocol p) {
-                         switch (p) {
-                         case Http::Protocol::Http2:
-                           return !http_opts.http2Options().allow_connect();
-                         case Http::Protocol::Http3:
-                           return !http_opts.http3Options().allow_extended_connect();
-                         default:
-                           return false;
-                         }
-                       }),
-        upstream_protocols.end());
+    const bool drop_h2 = !http_opts.http2Options().allow_connect();
+    const bool drop_h3 = drop_h2 || !http_opts.http3Options().allow_extended_connect();
+    if (drop_h2 || drop_h3) {
+      upstream_protocols.erase(
+          std::remove_if(upstream_protocols.begin(), upstream_protocols.end(),
+                         [drop_h2, drop_h3](Http::Protocol p) {
+                           return (drop_h2 && p == Http::Protocol::Http2) ||
+                                  (drop_h3 && p == Http::Protocol::Http3);
+                         }),
+          upstream_protocols.end());
+    }
   }
 
   std::vector<uint8_t> hash_key;
