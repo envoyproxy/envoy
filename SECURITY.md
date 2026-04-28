@@ -1,8 +1,15 @@
 # Security Reporting Process
 
-Please report any security issue or Envoy crash report to
-envoy-security@googlegroups.com where the issue will be triaged appropriately.
-Thank you in advance for helping to keep Envoy secure.
+If you have found a security issue or an Envoy crash, please
+[open a GitHub Security Advisory](https://github.com/envoyproxy/envoy/security/advisories/new).
+This is the preferred reporting channel: reports can be triaged directly on GitHub, fix
+development can begin in a private fork right away, and all relevant details are kept in one
+place. Thank you in advance for helping to keep Envoy secure.
+
+If you cannot use GitHub Security Advisories (for example, you do not have a GitHub account),
+you may email [envoy-security@googlegroups.com](mailto:envoy-security@googlegroups.com) as a
+fallback. If you do have a GitHub account, please include your GitHub username in the email so
+we can add you to a corresponding Security Advisory later.
 
 # Security Release Process
 
