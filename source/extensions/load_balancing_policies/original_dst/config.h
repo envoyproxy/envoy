@@ -20,13 +20,12 @@ using ClusterProto = envoy::config::cluster::v3::Cluster;
 class OriginalDstLbConfig : public Upstream::LoadBalancerConfig {
 public:
   OriginalDstLbConfig(const OriginalDstLbProto& config)
-      : use_http_header_(config.use_http_header()),
-        http_header_name_(config.http_header_name()),
-        upstream_port_override_(config.has_upstream_port_override()
-                                    ? absl::optional<uint32_t>(config.upstream_port_override().value())
-                                    : absl::nullopt),
-        has_metadata_key_(config.has_metadata_key()),
-        metadata_key_(config.metadata_key()) {}
+      : use_http_header_(config.use_http_header()), http_header_name_(config.http_header_name()),
+        upstream_port_override_(
+            config.has_upstream_port_override()
+                ? absl::optional<uint32_t>(config.upstream_port_override().value())
+                : absl::nullopt),
+        has_metadata_key_(config.has_metadata_key()), metadata_key_(config.metadata_key()) {}
 
   OriginalDstLbConfig(const ClusterProto& cluster)
       : use_http_header_(cluster.original_dst_lb_config().use_http_header()),
@@ -73,8 +72,7 @@ public:
   }
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
-  loadLegacy(Server::Configuration::ServerFactoryContext&,
-             const ClusterProto& cluster) override {
+  loadLegacy(Server::Configuration::ServerFactoryContext&, const ClusterProto& cluster) override {
     return std::make_unique<OriginalDstLbConfig>(cluster);
   }
 };

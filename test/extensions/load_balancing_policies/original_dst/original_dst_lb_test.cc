@@ -454,7 +454,7 @@ TEST_F(OriginalDstLbTest, UseCustomHttpHeader) {
   // Custom header override by :authority.
   TestLoadBalancerContext lb_context(nullptr, Http::Headers::get().Host.get(), "127.0.0.1:6666");
   lb_context.downstream_headers_->setCopy(Http::Headers::get().EnvoyOriginalDstHost,
-                                           "127.0.0.1:5555");
+                                          "127.0.0.1:5555");
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {

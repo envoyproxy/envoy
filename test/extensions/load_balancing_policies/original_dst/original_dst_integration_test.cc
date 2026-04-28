@@ -31,33 +31,35 @@ public:
           auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
           ASSERT(cluster_0->name() == "cluster_0");
 
-          std::string cluster_yaml = R"EOF(
-            name: cluster_0
-            connect_timeout: 1.250s
-            type: ORIGINAL_DST
-            lb_policy: CLUSTER_PROVIDED
-            original_dst_lb_config:
-              use_http_header: true
-          )EOF";
-
-          TestUtility::loadFromYaml(cluster_yaml, *cluster_0);
-
-          if (!use_load_balancing_policy) {
-            // Legacy API: just use lb_policy: CLUSTER_PROVIDED with original_dst_lb_config.
-            return;
-          }
-
-          auto* policy = cluster_0->mutable_load_balancing_policy();
-          const std::string policy_yaml = R"EOF(
-          policies:
-          - typed_extension_config:
-              name: envoy.load_balancing_policies.original_dst
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.original_dst.v3.OriginalDst
+          if (use_load_balancing_policy) {
+            // New API: use load_balancing_policy with typed original_dst config.
+            // Do NOT set original_dst_lb_config to verify the typed config path works.
+            std::string cluster_yaml = R"EOF(
+              name: cluster_0
+              connect_timeout: 1.250s
+              type: ORIGINAL_DST
+              lb_policy: CLUSTER_PROVIDED
+              load_balancing_policy:
+                policies:
+                - typed_extension_config:
+                    name: envoy.load_balancing_policies.original_dst
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.original_dst.v3.OriginalDst
+                      use_http_header: true
+            )EOF";
+            TestUtility::loadFromYaml(cluster_yaml, *cluster_0);
+          } else {
+            // Legacy API: use lb_policy: CLUSTER_PROVIDED with original_dst_lb_config.
+            std::string cluster_yaml = R"EOF(
+              name: cluster_0
+              connect_timeout: 1.250s
+              type: ORIGINAL_DST
+              lb_policy: CLUSTER_PROVIDED
+              original_dst_lb_config:
                 use_http_header: true
-          )EOF";
-
-          TestUtility::loadFromYaml(policy_yaml, *policy);
+            )EOF";
+            TestUtility::loadFromYaml(cluster_yaml, *cluster_0);
+          }
         });
 
     HttpIntegrationTest::initialize();

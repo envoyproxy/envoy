@@ -45,8 +45,7 @@ public:
 
 class OriginalDstTester : public BaseTester {
 public:
-  OriginalDstTester(uint64_t num_hosts)
-      : BaseTester(0 /* original_dst manages its own hosts */) {
+  OriginalDstTester(uint64_t num_hosts) : BaseTester(0 /* original_dst manages its own hosts */) {
     const std::string yaml = R"EOF(
       name: name
       connect_timeout: 1.250s
@@ -146,8 +145,7 @@ void benchmarkOriginalDstChooseHostCacheMiss(::benchmark::State& state) {
     NiceMock<Network::MockConnection> connection;
     connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(addr);
 
-    Http::TestRequestHeaderMapImpl headers{
-        {"x-envoy-original-dst-host", addr->asString()}};
+    Http::TestRequestHeaderMapImpl headers{{"x-envoy-original-dst-host", addr->asString()}};
     OriginalDstLbContext lb_context(&connection, headers);
 
     Event::PostCb post_cb;

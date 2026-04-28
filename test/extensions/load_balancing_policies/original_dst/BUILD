@@ -57,9 +57,9 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "integration_test",
+    name = "original_dst_integration_test",
     size = "large",
-    srcs = ["integration_test.cc"],
+    srcs = ["original_dst_integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.original_dst"],
     rbe_pool = "6gig",
     deps = [

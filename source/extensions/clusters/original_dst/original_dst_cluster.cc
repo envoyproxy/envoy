@@ -18,6 +18,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/load_balancing_policies/original_dst/config.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -199,7 +200,26 @@ OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })),
       host_map_(std::make_shared<HostMultiMap>()) {
-  if (config.has_original_dst_lb_config()) {
+  // First try the typed load_balancing_policy config, then fall back to legacy
+  // original_dst_lb_config.
+  if (auto typed_lb_config = info()->loadBalancerConfig(); typed_lb_config.has_value()) {
+    const auto* original_dst_config =
+        dynamic_cast<const Extensions::LoadBalancingPolicies::OriginalDst::OriginalDstLbConfig*>(
+            &typed_lb_config.ref());
+    if (original_dst_config != nullptr) {
+      if (original_dst_config->useHttpHeader()) {
+        http_header_name_ = original_dst_config->httpHeaderName().empty()
+                                ? Http::Headers::get().EnvoyOriginalDstHost
+                                : Http::LowerCaseString(original_dst_config->httpHeaderName());
+      }
+      if (original_dst_config->hasMetadataKey()) {
+        metadata_key_ = Config::MetadataKey(original_dst_config->metadataKey());
+      }
+      if (original_dst_config->upstreamPortOverride().has_value()) {
+        port_override_ = original_dst_config->upstreamPortOverride().value();
+      }
+    }
+  } else if (config.has_original_dst_lb_config()) {
     const auto& lb_config = config.original_dst_lb_config();
     if (lb_config.use_http_header()) {
       http_header_name_ = lb_config.http_header_name().empty()
