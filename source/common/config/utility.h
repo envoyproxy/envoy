@@ -524,6 +524,18 @@ public:
                                                    default_max_interval_ms);
   }
 
+  /**
+   * Prepares BackOff Strategy for LRS from config containing the Retry Policy.
+   * Falls back to fixed interval of the given default_base_interval_ms if not specified.
+   * @param config config containing RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>
+   * @param random random generator
+   * @param default_base_interval_ms Default base interval, must be > 0
+   */
+  static absl::StatusOr<BackOffStrategyPtr>
+  prepareLrsBackOffStrategy(const envoy::config::core::v3::ApiConfigSource& api_config_source,
+                            Random::RandomGenerator& random,
+                            const uint32_t default_base_interval_ms);
+
 private:
   /**
    * Returns Jittered Exponential BackOff Strategy from BackoffStrategy config or default

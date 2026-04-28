@@ -1,5 +1,6 @@
 #include "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.h"
 
+#include "source/common/common/backoff_strategy.h"
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/upstream/load_stats_reporter_impl.h"
@@ -38,8 +39,13 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
 
   std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
       [&, data, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    auto backoff_or_error =
+        Utility::prepareLrsBackOffStrategy(api_config_source, data.api_.randomGenerator(),
+                                           Upstream::LoadStatsReporterImpl::RETRY_DELAY_MS);
+    THROW_IF_NOT_OK(backoff_or_error.status());
     auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
-        data.local_info_, data.cm_, data.scope_, primary_client, data.dispatcher_);
+        data.local_info_, data.cm_, data.scope_, primary_client, data.dispatcher_,
+        std::move(backoff_or_error.value()));
     return reporter;
   };
 

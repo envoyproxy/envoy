@@ -386,6 +386,22 @@ Utility::buildJitteredExponentialBackOffStrategy(
       default_base_interval_ms, default_base_interval_ms * 10, random);
 }
 
+absl::StatusOr<BackOffStrategyPtr> Utility::prepareLrsBackOffStrategy(
+    const envoy::config::core::v3::ApiConfigSource& api_config_source,
+    Random::RandomGenerator& random, const uint32_t default_base_interval_ms) {
+  const auto& grpc_services = api_config_source.grpc_services();
+  if (!grpc_services.empty()) {
+    const auto& grpc_service = grpc_services[0];
+    if (grpc_service.has_retry_policy() && grpc_service.retry_policy().has_retry_back_off()) {
+      auto backoff_or_error = prepareJitteredExponentialBackOffStrategy(
+          grpc_service, random, default_base_interval_ms, absl::nullopt);
+      RETURN_IF_NOT_OK(backoff_or_error.status());
+      return BackOffStrategyPtr(std::move(backoff_or_error.value()));
+    }
+  }
+  return std::make_unique<FixedBackOffStrategy>(default_base_interval_ms);
+}
+
 absl::Status Utility::validateTerminalFilters(const std::string& name,
                                               const std::string& filter_type,
                                               const std::string& filter_chain_type,

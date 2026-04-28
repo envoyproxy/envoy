@@ -22,6 +22,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/backoff_strategy.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
@@ -528,8 +529,15 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
       client_or_error = factory_or_error.value()->createUncachedRawAsyncClient();
     }
     RETURN_IF_NOT_OK_REF(client_or_error.status());
+
+    auto backoff_or_error = Config::Utility::prepareLrsBackOffStrategy(
+        load_stats_config, random_, LoadStatsReporterImpl::RETRY_DELAY_MS);
+    RETURN_IF_NOT_OK(backoff_or_error.status());
+    BackOffStrategyPtr retry_backoff = std::move(backoff_or_error.value());
+
     load_stats_reporter_ = std::make_unique<LoadStatsReporterImpl>(
-        local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_);
+        local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_,
+        std::move(retry_backoff));
   }
   return absl::OkStatus();
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/backoff_strategy.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
@@ -21,7 +22,7 @@ class LoadStatsReporterImpl
 public:
   LoadStatsReporterImpl(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
                         Stats::Scope& scope, Grpc::RawAsyncClientSharedPtr async_client,
-                        Event::Dispatcher& dispatcher);
+                        Event::Dispatcher& dispatcher, BackOffStrategyPtr retry_backoff);
   ~LoadStatsReporterImpl() override;
 
   // Grpc::AsyncStreamCallbacks
@@ -36,7 +37,7 @@ public:
   const LoadReporterStats& getStats() const override { return stats_; };
 
   // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_DELAY_MS = 5000;
+  static constexpr uint32_t RETRY_DELAY_MS = 5000;
 
 private:
   void setRetryTimer();
@@ -59,6 +60,7 @@ private:
   // Map from cluster name to start of measurement interval.
   absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
   TimeSource& time_source_;
+  BackOffStrategyPtr retry_backoff_;
 };
 
 } // namespace Upstream

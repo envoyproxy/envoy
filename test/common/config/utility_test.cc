@@ -581,6 +581,48 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyNoConfig) {
   }
 }
 
+// Validate that default values are used correctly when no retry configuration is provided for LRS.
+TEST(UtilityTest, PrepareLrsBackOffStrategyDefault) {
+  NiceMock<Random::MockRandomGenerator> random;
+  envoy::config::core::v3::ApiConfigSource api_config_source;
+  const std::string config_yaml = R"EOF(
+    api_type: GRPC
+  )EOF";
+
+  TestUtility::loadFromYaml(config_yaml, api_config_source);
+
+  auto strategy_or_error = Utility::prepareLrsBackOffStrategy(api_config_source, random, 5000);
+  EXPECT_TRUE(strategy_or_error.ok());
+  auto strategy = std::move(strategy_or_error.value());
+
+  EXPECT_NE(nullptr, dynamic_cast<FixedBackOffStrategy*>(strategy.get()));
+  EXPECT_EQ(5000, strategy->nextBackOffMs());
+}
+
+// Validate that configured values are used correctly for LRS.
+TEST(UtilityTest, PrepareLrsBackOffStrategyConfigured) {
+  NiceMock<Random::MockRandomGenerator> random;
+  envoy::config::core::v3::ApiConfigSource api_config_source;
+  const std::string config_yaml = R"EOF(
+    api_type: GRPC
+    grpc_services:
+      retry_policy:
+        retry_back_off:
+          base_interval: 1s
+          max_interval: 10s
+  )EOF";
+
+  TestUtility::loadFromYaml(config_yaml, api_config_source);
+
+  auto strategy_or_error = Utility::prepareLrsBackOffStrategy(api_config_source, random, 5000);
+  EXPECT_TRUE(strategy_or_error.ok());
+  auto strategy = std::move(strategy_or_error.value());
+
+  EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+  EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                      ->isOverTimeLimit(10000 + 1));
+}
+
 // confirm that user provided values in the retry configuration are correctly used to prepare the
 // backoff strategy
 TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyConfigFileValues) {

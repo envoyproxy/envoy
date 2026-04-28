@@ -24,13 +24,15 @@ MakeRequestTemplate(const LocalInfo::LocalInfo& local_info) {
 LoadStatsReporterImpl::LoadStatsReporterImpl(const LocalInfo::LocalInfo& local_info,
                                              ClusterManager& cluster_manager, Stats::Scope& scope,
                                              Grpc::RawAsyncClientSharedPtr async_client,
-                                             Event::Dispatcher& dispatcher)
+                                             Event::Dispatcher& dispatcher,
+                                             BackOffStrategyPtr retry_backoff)
     : cm_(cluster_manager),
       stats_{ALL_LOAD_REPORTER_STATS(POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
-      request_template_(MakeRequestTemplate(local_info)), time_source_(dispatcher.timeSource()) {
+      request_template_(MakeRequestTemplate(local_info)), time_source_(dispatcher.timeSource()),
+      retry_backoff_(std::move(retry_backoff)) {
   retry_timer_ = dispatcher.createTimer([this]() -> void {
     stats_.retries_.inc();
     establishNewStream();
@@ -51,8 +53,9 @@ LoadStatsReporterImpl::~LoadStatsReporterImpl() {
 }
 
 void LoadStatsReporterImpl::setRetryTimer() {
-  ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.", RETRY_DELAY_MS);
-  retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
+  const uint64_t retry_ms = retry_backoff_->nextBackOffMs();
+  ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.", retry_ms);
+  retry_timer_->enableTimer(std::chrono::milliseconds(retry_ms));
 }
 
 void LoadStatsReporterImpl::establishNewStream() {
@@ -238,6 +241,7 @@ void LoadStatsReporterImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&
 void LoadStatsReporterImpl::onReceiveMessage(
     std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
+  retry_backoff_->reset();
   message_ = std::move(message);
   startLoadReportPeriod();
   stats_.requests_.inc();

@@ -232,8 +232,12 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
 
       std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
           [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+        auto backoff_or_error = Utility::prepareLrsBackOffStrategy(
+            dyn_resources.ads_config(), random_, Upstream::LoadStatsReporterImpl::RETRY_DELAY_MS);
+        THROW_IF_NOT_OK(backoff_or_error.status());
         auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
-            local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
+            local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_,
+            std::move(backoff_or_error.value()));
         return reporter;
       };
 
@@ -265,8 +269,12 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
 
       std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
           [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+        auto backoff_or_error = Utility::prepareLrsBackOffStrategy(
+            dyn_resources.ads_config(), random_, Upstream::LoadStatsReporterImpl::RETRY_DELAY_MS);
+        THROW_IF_NOT_OK(backoff_or_error.status());
         auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
-            local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
+            local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_,
+            std::move(backoff_or_error.value()));
         return reporter;
       };
 
@@ -468,8 +476,12 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
                                        failover_client));
     std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
         [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+      auto backoff_or_error = Utility::prepareLrsBackOffStrategy(
+          api_config_source, random_, Upstream::LoadStatsReporterImpl::RETRY_DELAY_MS);
+      THROW_IF_NOT_OK(backoff_or_error.status());
       auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
-          local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
+          local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_,
+          std::move(backoff_or_error.value()));
       return reporter;
     };
 
@@ -504,8 +516,12 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
 
     std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
         [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+      auto backoff_or_error = Utility::prepareLrsBackOffStrategy(
+          api_config_source, random_, Upstream::LoadStatsReporterImpl::RETRY_DELAY_MS);
+      THROW_IF_NOT_OK(backoff_or_error.status());
       auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
-          local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
+          local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_,
+          std::move(backoff_or_error.value()));
       return reporter;
     };
 

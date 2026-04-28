@@ -3,10 +3,12 @@
 #include "envoy/config/endpoint/v3/load_report.pb.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 
+#include "source/common/common/backoff_strategy.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/upstream/load_stats_reporter_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -49,7 +51,10 @@ public:
     }
   }
 
-  void createLoadStatsReporter() {
+  void createLoadStatsReporter(BackOffStrategyPtr backoff_strategy = nullptr) {
+    if (backoff_strategy == nullptr) {
+      backoff_strategy = std::make_unique<FixedBackOffStrategy>(5000);
+    }
     InSequence s;
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       retry_timer_cb_ = timer_cb;
@@ -61,7 +66,7 @@ public:
     }));
     load_stats_reporter_ = std::make_unique<LoadStatsReporterImpl>(
         local_info_, cm_, *stats_store_.rootScope(), Grpc::RawAsyncClientPtr(async_client_),
-        dispatcher_);
+        dispatcher_, std::move(backoff_strategy));
   }
 
   void expectSendMessage(
@@ -538,6 +543,30 @@ TEST_F(LoadStatsReporterImplTest, RemoteStreamClose) {
   retry_timer_cb_();
   EXPECT_EQ(load_stats_reporter_->getStats().errors_.value(), 1);
   EXPECT_EQ(load_stats_reporter_->getStats().retries_.value(), 1);
+}
+
+// Validate that the client uses the configured retry policy.
+TEST_F(LoadStatsReporterImplTest, ConfigurableRetryPolicy) {
+  auto mock_backoff = std::make_unique<MockBackOffStrategy>();
+  auto* mock_backoff_ptr = mock_backoff.get();
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter(std::move(mock_backoff));
+
+  EXPECT_CALL(*response_timer_, disableTimer());
+  EXPECT_CALL(*mock_backoff_ptr, nextBackOffMs()).WillOnce(Return(1234));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1234), _));
+
+  load_stats_reporter_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+
+  // Verify reset is called on message receive.
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  retry_timer_cb_();
+
+  EXPECT_CALL(*mock_backoff_ptr, reset());
+  deliverLoadStatsResponse({"foo"});
 }
 
 // Validate that errors stat is not incremented for a graceful stream termination.
