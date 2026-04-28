@@ -931,9 +931,8 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
   // ~1/256, leaving us with arbitrary binary bytes that would later fail HeaderString validation
   // when written back into the Cookie header. Treat any plaintext that is not a valid header value
   // as a decrypt failure and fall through to the legacy/wrong-secret behavior below.
-  const bool decrypt_failed =
-      decrypt_result.error.has_value() ||
-      !Http::HeaderUtility::headerValueIsValid(decrypt_result.plaintext);
+  const bool decrypt_failed = decrypt_result.error.has_value() ||
+                              !Http::HeaderUtility::headerValueIsValid(decrypt_result.plaintext);
 
   if (decrypt_failed) {
     ENVOY_STREAM_LOG(error, "failed to decrypt token: {}, error: {}", *decoder_callbacks_,
@@ -944,7 +943,8 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
     // In this case, we return the token as-is to allow the request to proceed.
     // 2. The token is encrypted, but the decryption failed (or produced invalid plaintext) due to
     // the HMAC secret being changed. In this case, we return the original encrypted token; the HMAC
-    // validation will fail and the user will be redirected to the OAuth server for re-authentication.
+    // validation will fail and the user will be redirected to the OAuth server for
+    // re-authentication.
     return encrypted_token;
   }
   return decrypt_result.plaintext;

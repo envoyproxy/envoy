@@ -5458,9 +5458,7 @@ TEST_F(OAuth2Test, OAuthCallbackGetAccessTokenSyncContinue) {
  * Scenario: decryptToken is called with an empty string.
  * Expected behavior: returns empty string.
  */
-TEST_F(OAuth2Test, DecryptTokenEmpty) {
-  EXPECT_EQ(decryptTokenForTest(""), "");
-}
+TEST_F(OAuth2Test, DecryptTokenEmpty) { EXPECT_EQ(decryptTokenForTest(""), ""); }
 
 /**
  * Scenario: decryptToken is called with a ciphertext that was encrypted with the same HMAC secret.
@@ -5556,12 +5554,10 @@ TEST_F(OAuth2Test, GarbagePlaintextCookieDoesNotCrash) {
   // emit a different message and cause this test to fail.
   // Before the fix this line would trigger a crash (ENVOY_BUG assertion in HeaderStringValidator).
   // After the fix it should complete without crashing and redirect to the OAuth server.
-  EXPECT_LOG_CONTAINS(
-      "error", "plaintext is not a valid header value",
-      {
-        EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-                  filter_->decodeHeaders(request_headers, false));
-      });
+  EXPECT_LOG_CONTAINS("error", "plaintext is not a valid header value", {
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, false));
+  });
 
   // After the fix, the Cookie header should contain the original (valid ASCII) ciphertext,
   // not the binary garbage that decryption produced.
