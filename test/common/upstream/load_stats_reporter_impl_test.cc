@@ -560,7 +560,8 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
   // Keep this test when deprecating the runtime flag.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "true"}});
+      {{"envoy.reloadable_features.report_load_for_non_zero_stats", "false"},
+       {"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "true"}});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
@@ -600,6 +601,218 @@ TEST_F(LoadStatsReporterImplTest, ReportLoadWhenRqActiveIsNonZero) {
     // Load report send when there is 0 QPS in this poll cycle.
     expected_locality_stats->set_total_issued_requests(0);
     expected_locality_stats->set_total_requests_in_progress(5);
+
+    std::vector<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats_vector = {
+        expected_cluster_stats};
+
+    expectSendMessage(expected_cluster_stats_vector);
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
+// report is sent if only rq_success is non-zero.
+TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqSuccess) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "false"},
+       {"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+
+  NiceMock<MockClusterMockPrioritySet> cluster;
+  MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
+  ::envoy::config::core::v3::Locality locality;
+  locality.set_region("test_region");
+
+  HostSharedPtr host1 = makeTestHost("host1", locality);
+  host_set.hosts_per_locality_ = makeHostsPerLocality({{host1}});
+
+  // Set rq_success to non-zero, all others to zero.
+  host1->stats().rq_success_.inc();
+
+  cluster.info_->eds_service_name_ = "eds_service_for_foo";
+
+  ON_CALL(cm_, getActiveCluster("foo"))
+      .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
+  deliverLoadStatsResponse({"foo"});
+  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  {
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_cluster_service_name("eds_service_for_foo");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
+
+    auto* expected_locality_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality_stats->mutable_locality()->MergeFrom(locality);
+    expected_locality_stats->set_priority(0);
+    expected_locality_stats->set_total_successful_requests(1);
+    expected_locality_stats->set_total_error_requests(0);
+    expected_locality_stats->set_total_requests_in_progress(0);
+    expected_locality_stats->set_total_issued_requests(0);
+
+    std::vector<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats_vector = {
+        expected_cluster_stats};
+
+    expectSendMessage(expected_cluster_stats_vector);
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
+// report is sent if only rq_error is non-zero.
+TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsRqError) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "false"},
+       {"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+
+  NiceMock<MockClusterMockPrioritySet> cluster;
+  MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
+  ::envoy::config::core::v3::Locality locality;
+  locality.set_region("test_region");
+
+  HostSharedPtr host1 = makeTestHost("host1", locality);
+  host_set.hosts_per_locality_ = makeHostsPerLocality({{host1}});
+
+  // Set rq_error to non-zero, all others to zero.
+  host1->stats().rq_error_.inc();
+
+  cluster.info_->eds_service_name_ = "eds_service_for_foo";
+
+  ON_CALL(cm_, getActiveCluster("foo"))
+      .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
+  deliverLoadStatsResponse({"foo"});
+  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  {
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_cluster_service_name("eds_service_for_foo");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
+
+    auto* expected_locality_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality_stats->mutable_locality()->MergeFrom(locality);
+    expected_locality_stats->set_priority(0);
+    expected_locality_stats->set_total_successful_requests(0);
+    expected_locality_stats->set_total_error_requests(1);
+    expected_locality_stats->set_total_requests_in_progress(0);
+    expected_locality_stats->set_total_issued_requests(0);
+
+    std::vector<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats_vector = {
+        expected_cluster_stats};
+
+    expectSendMessage(expected_cluster_stats_vector);
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is true, a load
+// report is sent if only custom metrics are present.
+TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsCustomMetric) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.report_load_when_rq_active_is_non_zero", "false"},
+       {"envoy.reloadable_features.report_load_for_non_zero_stats", "true"}});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+
+  NiceMock<MockClusterMockPrioritySet> cluster;
+  MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
+  ::envoy::config::core::v3::Locality locality;
+  locality.set_region("test_region");
+
+  HostSharedPtr host1 = makeTestHost("host1", locality);
+  host_set.hosts_per_locality_ = makeHostsPerLocality({{host1}});
+
+  // Add a custom metric, all other counters zero.
+  host1->loadMetricStats().add("metric_a", 1.0);
+
+  cluster.info_->eds_service_name_ = "eds_service_for_foo";
+
+  ON_CALL(cm_, getActiveCluster("foo"))
+      .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
+  deliverLoadStatsResponse({"foo"});
+  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  {
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_cluster_service_name("eds_service_for_foo");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
+
+    auto* expected_locality_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality_stats->mutable_locality()->MergeFrom(locality);
+    expected_locality_stats->set_priority(0);
+    expected_locality_stats->set_total_successful_requests(0);
+    expected_locality_stats->set_total_error_requests(0);
+    expected_locality_stats->set_total_requests_in_progress(0);
+    expected_locality_stats->set_total_issued_requests(0);
+    addStatExpectation(expected_locality_stats, "metric_a", 1, 1.0);
+
+    std::vector<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats_vector = {
+        expected_cluster_stats};
+
+    expectSendMessage(expected_cluster_stats_vector);
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+// Validate that when envoy.reloadable_features.report_load_for_non_zero_stats is false, a load
+// report is NOT sent if only rq_success is non-zero.
+TEST_F(LoadStatsReporterImplTest, ReportLoadForNonZeroStatsDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.report_load_for_non_zero_stats", "false"}});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  time_system_.setMonotonicTime(std::chrono::microseconds(100));
+
+  NiceMock<MockClusterMockPrioritySet> cluster;
+  MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
+  ::envoy::config::core::v3::Locality locality;
+  locality.set_region("test_region");
+
+  HostSharedPtr host1 = makeTestHost("host1", locality);
+  host_set.hosts_per_locality_ = makeHostsPerLocality({{host1}});
+
+  // Set rq_success to non-zero, all others to zero.
+  host1->stats().rq_success_.inc();
+
+  cluster.info_->eds_service_name_ = "eds_service_for_foo";
+
+  ON_CALL(cm_, getActiveCluster("foo"))
+      .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
+  deliverLoadStatsResponse({"foo"});
+  time_system_.setMonotonicTime(std::chrono::microseconds(101));
+  {
+    // Expect no UpstreamLocalityStats
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_cluster_service_name("eds_service_for_foo");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
 
     std::vector<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats_vector = {
         expected_cluster_stats};

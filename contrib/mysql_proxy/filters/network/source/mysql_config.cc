@@ -28,8 +28,8 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
 
   const std::string stat_prefix = fmt::format("mysql.{}", proto_config.stat_prefix());
 
-  MySQLFilterConfigSharedPtr filter_config(
-      std::make_shared<MySQLFilterConfig>(stat_prefix, context.scope()));
+  MySQLFilterConfigSharedPtr filter_config(std::make_shared<MySQLFilterConfig>(
+      stat_prefix, context.scope(), proto_config.downstream_ssl()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<MySQLFilter>(filter_config));
   };

@@ -980,12 +980,6 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
 
 // Test buffer limit callbacks for non-terminal filters.
 TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
-  // TODO(wbpcode): Enable this test for other SDKs when supported.
-  if (GetParam() != "rust") {
-    // Buffer limit callbacks are only supported in the Rust SDK currently.
-    return;
-  }
-
   initializeFilter("buffer_limit_filter");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
