@@ -629,6 +629,11 @@ CAPIStatus Filter::injectData(ProcessorState& state, absl::string_view data) {
 
 CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
                              int* value_len) {
+  // mutex_ is held across the inline read of the Envoy-owned header map below: it serialises
+  // against onDestroy() so the worker thread cannot tear down the parent stream (and free the
+  // header map) while this off-thread Go caller is mid-dereference. See has_destroyed_ comment
+  // in the header for the full lifetime invariant.
+  Thread::LockGuard lock(mutex_);
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -684,6 +689,11 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
 }
 
 CAPIStatus Filter::copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf) {
+  // mutex_ is held across the inline iteration of the Envoy-owned header map below: it
+  // serialises against onDestroy() so the worker thread cannot tear down the parent stream
+  // (and free the header map) while this off-thread Go caller is mid-iteration. See
+  // has_destroyed_ comment in the header for the full lifetime invariant.
+  Thread::LockGuard lock(mutex_);
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -869,6 +879,11 @@ CAPIStatus Filter::setBufferHelper(ProcessorState& state, Buffer::Instance* buff
 }
 
 CAPIStatus Filter::copyTrailers(ProcessorState& state, GoString* go_strs, char* go_buf) {
+  // mutex_ is held across the inline iteration of the Envoy-owned trailer map below: it
+  // serialises against onDestroy() so the worker thread cannot tear down the parent stream
+  // (and free the trailer map) while this off-thread Go caller is mid-iteration. See
+  // has_destroyed_ comment in the header for the full lifetime invariant.
+  Thread::LockGuard lock(mutex_);
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
@@ -1062,6 +1077,11 @@ void Filter::clearRouteCacheInternal(bool refresh) {
 }
 
 CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
+  // mutex_ is held across the inline reads of streamInfo() and its SSL/upstream sub-objects
+  // below: it serialises against onDestroy() so the worker thread cannot tear down the parent
+  // stream (and free StreamInfo) while this off-thread Go caller is mid-dereference. See
+  // has_destroyed_ comment in the header for the full lifetime invariant.
+  Thread::LockGuard lock(mutex_);
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
