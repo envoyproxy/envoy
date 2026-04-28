@@ -119,14 +119,14 @@ Http2HeaderValidator::validatePathHeaderWithAdditionalCharactersHttp2(
   // runtime value is set to "true".
   static constexpr ::Envoy::Http::CharTable kPathHeaderCharTableWithAdditionalCharacters =
       kPathHeaderCharTable | ::Envoy::Http::CharTable::fromChars("\"<>[]^`{}\\|") |
-      ::Envoy::Http::CharTable::extendedAscii();
+      ::Envoy::Http::CharTables::kExtendedAscii;
 
-  // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
+  // Same table as  CharTables::kUriQueryAndFragment but with the following additional character
   // allowed " < > [ ] ^ ` { } \ | # and all extended ASCII.
   // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
   // runtime value is set to "true".
   static constexpr ::Envoy::Http::CharTable kQueryAndFragmentCharTableWithAdditionalCharacters =
-      ::Envoy::Http::kUriQueryAndFragmentCharTable | ::Envoy::Http::CharTable::extendedAscii() |
+      ::Envoy::Http::CharTables::kUriQueryAndFragment | ::Envoy::Http::CharTables::kExtendedAscii |
       ::Envoy::Http::CharTable::fromChars("\"<>[]^`{}\\|#");
 
   return HeaderValidator::validatePathHeaderCharacterSet(
@@ -144,15 +144,15 @@ Http2HeaderValidator::validatePathHeaderWithAdditionalCharactersHttp3(
   // runtime value is set to "true".
   // This is the same as all printable characters except # and ?.
   static constexpr ::Envoy::Http::CharTable kPathHeaderCharTableWithAdditionalCharacters =
-      ::Envoy::Http::CharTable::printable() & ~::Envoy::Http::CharTable::fromChars("?#");
+      ::Envoy::Http::CharTables::kPrintable & ~::Envoy::Http::CharTable::fromChars("?#");
 
-  // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
+  // Same table as CharTables::kUriQueryAndFragment but with the following additional character
   // allowed " < > [ ] ^ ` { } \ | #
   // This table is used when the "envoy.uhv.allow_non_compliant_characters_in_path"
   // runtime value is set to "true".
   // This is the same as all printable chars.
   static constexpr ::Envoy::Http::CharTable kQueryAndFragmentCharTableWithAdditionalCharacters =
-      ::Envoy::Http::CharTable::printable();
+      ::Envoy::Http::CharTables::kPrintable;
   return HeaderValidator::validatePathHeaderCharacterSet(
       path_header_value, kPathHeaderCharTableWithAdditionalCharacters,
       kQueryAndFragmentCharTableWithAdditionalCharacters);
@@ -440,7 +440,7 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
        iter != key_string_view.end() && is_valid && !reject_due_to_underscore; ++iter) {
     c = *iter;
     if (c != '_') {
-      is_valid &= ::Envoy::Http::kGenericHeaderNameCharTable.hasChar(c) && (c < 'A' || c > 'Z');
+      is_valid &= ::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c) && (c < 'A' || c > 'Z');
     } else {
       reject_due_to_underscore = reject_header_names_with_underscores;
     }

@@ -199,7 +199,7 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
        iter != key_string_view.end() && is_valid && !reject_due_to_underscore; ++iter) {
     c = *iter;
     if (c != '_') {
-      is_valid &= ::Envoy::Http::kGenericHeaderNameCharTable.hasChar(c);
+      is_valid &= ::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c);
     } else {
       reject_due_to_underscore = reject_header_names_with_underscores;
     }
@@ -421,7 +421,7 @@ HeaderValidator::validateHostHeaderRegName(absl::string_view host) {
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
   return validatePathHeaderCharacterSet(value, kPathHeaderCharTable,
-                                        ::Envoy::Http::kUriQueryAndFragmentCharTable);
+                                        ::Envoy::Http::CharTables::kUriQueryAndFragment);
 }
 
 HeaderValidator::HeaderValueValidationResult HeaderValidator::validatePathHeaderCharacterSet(
@@ -487,7 +487,7 @@ void HeaderValidator::encodeAdditionalCharactersInPath(
 
     ::Envoy::Http::RequestHeaderMap& header_map) {
   static constexpr ::Envoy::Http::CharTable kCharactersToEncode =
-      ::Envoy::Http::CharTable::extendedAscii() |
+      ::Envoy::Http::CharTables::kExtendedAscii |
       ::Envoy::Http::CharTable::fromChars("\"<>^`{}|\t ");
 
   absl::string_view path = header_map.getPathValue();

@@ -110,7 +110,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
     setHeaderStringUnvalidated(header_string, name);
 
     auto result = uhv->validateGenericHeaderName(header_string);
-    if (::Envoy::Http::kGenericHeaderNameCharTable.hasChar(c)) {
+    if (::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c)) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);

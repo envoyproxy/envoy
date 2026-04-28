@@ -1,5 +1,8 @@
+#include <type_traits>
+
 #include "source/common/http/character_set_validation.h"
 
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -34,7 +37,7 @@ TEST(CharacterSetValidationTest, RawInitializationWorksCorrectly) {
 }
 
 TEST(CharacterSetValidationTest, AlphanumericsAndCharsInitializesCorrectly) {
-  constexpr CharTable kCharTable = CharTable::alphanumeric() | CharTable::fromChars("!");
+  constexpr CharTable kCharTable = CharTables::kAlphanumeric | CharTable::fromChars("!");
 
   for (unsigned c = 0; c < 256; ++c) {
     bool result = kCharTable.hasChar(c);
@@ -45,7 +48,7 @@ TEST(CharacterSetValidationTest, AlphanumericsAndCharsInitializesCorrectly) {
 }
 
 TEST(CharacterSetValidationTest, NotOperatorInitializesCorrectly) {
-  constexpr CharTable kCharTable = ~(CharTable::alphanumeric() | CharTable::fromChars("!"));
+  constexpr CharTable kCharTable = ~(CharTables::kAlphanumeric | CharTable::fromChars("!"));
 
   for (unsigned c = 0; c < 256; ++c) {
     bool result = kCharTable.hasChar(c);
@@ -56,7 +59,7 @@ TEST(CharacterSetValidationTest, NotOperatorInitializesCorrectly) {
 }
 
 TEST(CharacterSetValidationTest, AndNotOperatorInitializesCorrectly) {
-  constexpr CharTable kCharTable = CharTable::alphanumeric() & ~CharTable::uppercase();
+  constexpr CharTable kCharTable = CharTables::kAlphanumeric & ~CharTables::kUppercase;
 
   for (unsigned c = 0; c < 256; ++c) {
     bool result = kCharTable.hasChar(c);
@@ -71,6 +74,35 @@ TEST(CharacterSetValidationTest, FromCharsInitializesCorrectly) {
   for (unsigned c = 0; c < 256; ++c) {
     bool result = kCharTable.hasChar(c);
     bool expected = (c == '!');
+    EXPECT_EQ(result, expected) << c;
+  }
+}
+
+// Primary template - selected if expression CAN be constexpr
+template <typename Lambda>
+constexpr auto is_constexpr_impl(Lambda lambda,
+                                 int) -> decltype(std::integral_constant<int, (lambda(), 0)>{},
+                                                  bool{}) {
+  return true;
+}
+
+// Fallback - selected if expression CANNOT be constexpr
+template <typename Lambda> constexpr bool is_constexpr_impl(Lambda, long) { return false; }
+
+TEST(CharacterSetValidationTest, WorksFromDynamicData) {
+  // Code coverage says none of the functions are covered if we don't test using them
+  // with dynamic data, since all constexpr usage is compiled-out!
+  // absl::StrCat doesn't have a constexpr variant so this forces non-constexpr usage.
+  static_assert(
+      !is_constexpr_impl([]() { return absl::StrCat("!"); }, 0),
+      "Oh no, StrCat can be constexpr-evaluated - replace StrCat with something that can't!");
+  const CharTable kCharTable =
+      CharTable::fromChars(absl::StrCat("!")) |
+      CharTable::fromChars(absl::StrCat("@$")) & ~CharTable::fromChars(absl::StrCat("$"));
+
+  for (unsigned c = 0; c < 256; ++c) {
+    bool result = kCharTable.hasChar(c);
+    bool expected = (c == '!' || c == '@');
     EXPECT_EQ(result, expected) << c;
   }
 }

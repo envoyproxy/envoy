@@ -65,14 +65,14 @@ Http1HeaderValidator::validatePathHeaderWithAdditionalCharacters(
   // runtime value is set to "true".
   // This is the same as all printable characters except ? and #
   static constexpr ::Envoy::Http::CharTable kPathHeaderCharTableWithAdditionalCharacters =
-      ::Envoy::Http::CharTable::printable() & ~::Envoy::Http::CharTable::fromChars("?#");
+      ::Envoy::Http::CharTables::kPrintable & ~::Envoy::Http::CharTable::fromChars("?#");
 
-  // Same table as the kUriQueryAndFragmentCharTable but with the following additional character
+  // Same table as CharTables::kUriQueryAndFragment but with the following additional character
   // allowed " < > [ ] ^ ` { } \ | # This table is used when the
   // "envoy.uhv.allow_non_compliant_characters_in_path" runtime value is set to "true".
   // This ends up being the same thing as all printable characters.
   static constexpr ::Envoy::Http::CharTable kQueryAndFragmentCharTableWithAdditionalCharacters =
-      ::Envoy::Http::CharTable::printable();
+      ::Envoy::Http::CharTables::kPrintable;
 
   return HeaderValidator::validatePathHeaderCharacterSet(
       path_header_value, kPathHeaderCharTableWithAdditionalCharacters,

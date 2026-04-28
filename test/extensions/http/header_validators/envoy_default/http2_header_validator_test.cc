@@ -620,7 +620,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestGenericHeaderName) {
                                HeaderString(absl::string_view("some value")));
 
     auto result = uhv->validateRequestHeaders(request_headers);
-    if (::Envoy::Http::kGenericHeaderNameCharTable.hasChar(c) && (c < 'A' || c > 'Z')) {
+    if (::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -643,7 +643,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseGenericHeaderName) {
     headers.addViaMove(std::move(header_string), HeaderString(absl::string_view("some value")));
 
     auto result = uhv->validateResponseHeaders(headers);
-    if (::Envoy::Http::kGenericHeaderNameCharTable.hasChar(c) && (c < 'A' || c > 'Z')) {
+    if (::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);

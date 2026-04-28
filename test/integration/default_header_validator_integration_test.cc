@@ -286,7 +286,7 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithPathNormalizat
     return fmt::format("/path/with/ad{:c}itional/characters", c);
   };
   validateCharacterSetInUrl(
-      path_formatter, Http::kUriQueryAndFragmentCharTable, additionally_allowed_characters,
+      path_formatter, Http::CharTables::kUriQueryAndFragment, additionally_allowed_characters,
       [&encoded_characters](uint32_t ascii) -> std::string {
         if (ascii == '#') {
           return "/path/with/ad";
@@ -322,7 +322,7 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInQuery) {
   PathFormatter path_formatter = [](char c) {
     return fmt::format("/query?with=a{:c}ditional&characters", c);
   };
-  validateCharacterSetInUrl(path_formatter, Http::kUriQueryAndFragmentCharTable,
+  validateCharacterSetInUrl(path_formatter, Http::CharTables::kUriQueryAndFragment,
                             additionally_allowed_characters, [](uint32_t ascii) -> std::string {
                               return ascii == '#'
                                          ? "/query?with=a"
@@ -348,7 +348,7 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInFragment) {
   PathFormatter path_formatter = [](char c) {
     return fmt::format("/query?with=a#frag{:c}ment", c);
   };
-  validateCharacterSetInUrl(path_formatter, Http::kUriQueryAndFragmentCharTable,
+  validateCharacterSetInUrl(path_formatter, Http::CharTables::kUriQueryAndFragment,
                             additionally_allowed_characters,
                             [](uint32_t) -> std::string { return "/query?with=a"; });
 }

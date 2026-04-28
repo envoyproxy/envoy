@@ -25,7 +25,7 @@ namespace EnvoyDefault {
 //                   ; visible (printing) characters
 // SPELLCHECKER(on)
 inline constexpr ::Envoy::Http::CharTable kGenericHeaderValueCharTable =
-    ::Envoy::Http::CharTable::printable() | ::Envoy::Http::CharTable::extendedAscii() |
+    ::Envoy::Http::CharTables::kPrintable | ::Envoy::Http::CharTables::kExtendedAscii |
     ::Envoy::Http::CharTable::fromChars("\t ");
 
 // :method header character table.
@@ -38,7 +38,7 @@ inline constexpr ::Envoy::Http::CharTable kGenericHeaderValueCharTable =
 //        /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 // SPELLCHECKER(on)
 inline constexpr ::Envoy::Http::CharTable kMethodHeaderCharTable =
-    ::Envoy::Http::CharTable::alphanumeric() |
+    ::Envoy::Http::CharTables::kAlphanumeric |
     ::Envoy::Http::CharTable::fromChars("!#$%&'*+-.^_`|~");
 
 // :path header character table.
@@ -65,7 +65,7 @@ inline constexpr ::Envoy::Http::CharTable kMethodHeaderCharTable =
 // pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
 // SPELLCHECKER(on)
 inline constexpr ::Envoy::Http::CharTable kPathHeaderCharTable =
-    ::Envoy::Http::CharTable::alphanumeric() |
+    ::Envoy::Http::CharTables::kAlphanumeric |
     ::Envoy::Http::CharTable::fromChars("!$%&'()*+,-./:;=@_~");
 
 // Unreserved characters.
@@ -73,7 +73,7 @@ inline constexpr ::Envoy::Http::CharTable kPathHeaderCharTable =
 //
 // unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
 inline constexpr ::Envoy::Http::CharTable kUnreservedCharTable =
-    ::Envoy::Http::CharTable::alphanumeric() | ::Envoy::Http::CharTable::fromChars("-._~");
+    ::Envoy::Http::CharTables::kAlphanumeric | ::Envoy::Http::CharTable::fromChars("-._~");
 
 // Transfer-Encoding HTTP/1.1 header character table.
 // From RFC 9110: https://www.rfc-editor.org/rfc/rfc9110.html#section-10.1.4
@@ -84,7 +84,7 @@ inline constexpr ::Envoy::Http::CharTable kUnreservedCharTable =
 // transfer-parameter  = token BWS "=" BWS ( token / quoted-string )
 // SPELLCHECKER(on)
 inline constexpr ::Envoy::Http::CharTable kTransferEncodingHeaderCharTable =
-    ::Envoy::Http::CharTable::alphanumeric() |
+    ::Envoy::Http::CharTables::kAlphanumeric |
     ::Envoy::Http::CharTable::fromChars("\t !\"#$%&'*+,-.;=^_`|~");
 
 // An IPv6 address, excluding the surrounding "[" and "]" characters. This is based on RFC 3986,
@@ -100,7 +100,7 @@ inline constexpr ::Envoy::Http::CharTable kHostIPv6AddressCharTable =
 // reg-name    = *( unreserved / pct-encoded / sub-delims )
 // SPELLCHECKER(on)
 inline constexpr ::Envoy::Http::CharTable kHostRegNameCharTable =
-    ::Envoy::Http::CharTable::alphanumeric() |
+    ::Envoy::Http::CharTables::kAlphanumeric |
     ::Envoy::Http::CharTable::fromChars("!$%&'()*+,-.;=_~");
 
 } // namespace EnvoyDefault

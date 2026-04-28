@@ -1325,12 +1325,12 @@ namespace {
 // ALPHA | DIGIT | * | - | . | _
 // SPACE is encoded as %20, NOT as the + character
 constexpr CharTable kUrlEncodedCharTable =
-    ~(CharTable::alphanumeric() | CharTable::fromChars("*-._"));
+    ~(CharTables::kAlphanumeric | CharTable::fromChars("*-._"));
 
 // The set of characters which, if they are percent-encoded, should be
 // decoded.
 constexpr CharTable kUrlDecodedCharTable =
-    CharTable::alphanumeric() | CharTable::fromChars("!#$%&'()*+,-./:;=?@[]_`~");
+    CharTables::kAlphanumeric | CharTable::fromChars("!#$%&'()*+,-./:;=?@[]_`~");
 
 constexpr bool shouldPercentEncodeChar(char c) { return kUrlEncodedCharTable.hasChar(c); }
 
@@ -1647,7 +1647,7 @@ bool Utility::isValidRefererValue(absl::string_view value) {
       seen_slash = true;
       continue;
     default:
-      if (!kUriQueryAndFragmentCharTable.hasChar(c)) {
+      if (!CharTables::kUriQueryAndFragment.hasChar(c)) {
         return false;
       }
     }
