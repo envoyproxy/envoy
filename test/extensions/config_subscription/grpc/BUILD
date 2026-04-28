@@ -297,3 +297,37 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "grpc_subscription_factory_test",
+    srcs = ["grpc_subscription_factory_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "grpc_collection_subscription_factory_test",
+    srcs = ["grpc_collection_subscription_factory_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/config_subscription/grpc:grpc_collection_subscription_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
