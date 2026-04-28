@@ -494,10 +494,13 @@ static_assert(sizeof(Matchers::RegexStringMatcher) <= 2 * sizeof(void*),
 static_assert(sizeof(Matchers::CustomStringMatcher) <= 2 * sizeof(void*),
               "CustomStringMatcher unexpectedly grew; verify the new field is necessary.");
 
-// StringMatcherImpl layout:
-//   - 2 vtable pointers: one for ValueMatcher, one for StringMatcher (multiple inheritance)
-//   - absl::variant payload: max(sizeof(alternatives)) = sizeof(std::string) + sizeof(void*)
-//   - absl::variant discriminant: at most sizeof(void*) bytes
+// StringMatcherImpl layout — accounting for all four pointer-sized contributions:
+//   [1] vtable pointer for ValueMatcher base  (+1 * sizeof(void*))
+//   [2] vtable pointer for StringMatcher base (+1 * sizeof(void*))
+//   [3] absl::variant payload = max(sizeof(alternatives))
+//         = sizeof(std::string) [the string itself]
+//           + sizeof(void*) [bool member rounded up to pointer alignment]
+//   [4] absl::variant discriminant            (+1 * sizeof(void*))
 // Total upper bound: sizeof(std::string) + 4 * sizeof(void*).
 static_assert(sizeof(Matchers::StringMatcherImpl) <= sizeof(std::string) + 4 * sizeof(void*),
               "StringMatcherImpl unexpectedly grew; if you added a data member or a new variant "
