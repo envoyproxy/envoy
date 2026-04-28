@@ -33,8 +33,13 @@ configure and code each application independently. Envoy supports various types 
   :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster will
   increment. For HTTP/3 the equivalent to HTTP/2's :ref:`max concurrent streams <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>` is :ref:`max concurrent streams <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.max_concurrent_streams>`
 * **Cluster maximum requests**: The maximum number of requests that can be outstanding to all hosts
-  in a cluster at any given time. If this circuit breaker overflows the :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>`
-  counter for the cluster will increment.
+  in a cluster at any given time. If this circuit breaker overflows the
+  :ref:`upstream_rq_active_overflow <config_cluster_manager_cluster_stats>` counter for the cluster
+  will increment. By default, the legacy :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>`
+  counter is no longer incremented for this path; set the runtime flag
+  ``envoy.reloadable_features.skip_pending_overflow_count_on_active_rq`` to ``false`` to also
+  increment ``upstream_rq_pending_overflow`` on this path, preserving backwards compatibility
+  with existing dashboards and alerts.
 * **Cluster maximum active retries**: The maximum number of retries that can be outstanding to all
   hosts in a cluster at any given time. In general we recommend using :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`; however, if static circuit breaking is preferred it should aggressively circuit break
   retries. This is so that retries for sporadic failures are allowed, but the overall retry volume cannot

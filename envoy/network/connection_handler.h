@@ -128,6 +128,11 @@ public:
   virtual const std::string& statPrefix() const PURE;
 
   /**
+   * Close idle HTTP connections.
+   */
+  virtual void closeIdleHttpConnections(bool is_saturated) PURE;
+
+  /**
    * Used by ConnectionHandler to manage listeners.
    */
   class ActiveListener {
@@ -172,6 +177,12 @@ public:
      */
     virtual void onFilterChainDraining(
         const std::list<const Network::FilterChain*>& draining_filter_chains) PURE;
+
+    // New method for handling idle connection closing
+    virtual void onCloseIdleHttpConnections(bool /*is_saturated*/) {
+      // Default implementation does nothing.
+      // Specific listener types (TCP, QUIC) will override this.
+    }
   };
 
   using ActiveListenerPtr = std::unique_ptr<ActiveListener>;

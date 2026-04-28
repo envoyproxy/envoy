@@ -2842,7 +2842,10 @@ envoy_cc_library(
 envoy_quic_cc_library(
     name = "quic_core_framer_lib",
     srcs = ["quiche/quic/core/quic_framer.cc"],
-    hdrs = ["quiche/quic/core/quic_framer.h"],
+    hdrs = [
+        "quiche/quic/core/quic_framer.h",
+        "quiche/quic/core/scone.h",
+    ],
     deps = [
         ":quic_core_connection_id_generator_interface_lib",
         ":quic_core_constants_lib",
@@ -3983,9 +3986,7 @@ envoy_quic_cc_library(
         ":quic_core_server_id_lib",
         ":quic_core_session_notifier_interface_lib",
         ":quic_core_stream_frame_data_producer_lib",
-        ":quic_core_stream_send_buffer_base_lib",
         ":quic_core_stream_send_buffer_inlining_lib",
-        ":quic_core_stream_send_buffer_lib",
         ":quic_core_stream_sequencer_buffer_lib",
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
@@ -4063,22 +4064,6 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
-    name = "quic_core_stream_send_buffer_base_lib",
-    srcs = ["quiche/quic/core/quic_stream_send_buffer_base.cc"],
-    hdrs = ["quiche/quic/core/quic_stream_send_buffer_base.h"],
-    deps = [
-        ":quic_core_interval_lib",
-        ":quic_core_interval_set_lib",
-        ":quic_core_types_lib",
-        ":quic_platform_base",
-        ":quic_platform_bug_tracker",
-        ":quiche_common_mem_slice",
-        "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:span",
-    ],
-)
-
-envoy_quic_cc_library(
     name = "quic_core_inlined_string_view_lib",
     hdrs = ["quiche/quic/core/quic_inlined_string_view.h"],
     deps = [
@@ -4098,31 +4083,12 @@ envoy_quic_cc_library(
         ":quic_core_interval_deque_lib",
         ":quic_core_interval_lib",
         ":quic_core_interval_set_lib",
-        ":quic_core_stream_send_buffer_base_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
         ":quic_platform_bug_tracker",
         ":quiche_common_mem_slice",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
-    ],
-)
-
-envoy_quic_cc_library(
-    name = "quic_core_stream_send_buffer_lib",
-    srcs = ["quiche/quic/core/quic_stream_send_buffer.cc"],
-    hdrs = ["quiche/quic/core/quic_stream_send_buffer.h"],
-    deps = [
-        ":quic_core_data_lib",
-        ":quic_core_frames_frames_lib",
-        ":quic_core_interval_deque_lib",
-        ":quic_core_interval_lib",
-        ":quic_core_interval_set_lib",
-        ":quic_core_stream_send_buffer_base_lib",
-        ":quic_core_types_lib",
-        ":quic_core_utils_lib",
-        ":quic_platform_base",
-        ":quiche_common_circular_deque_lib",
     ],
 )
 
@@ -4521,7 +4487,6 @@ envoy_quic_cc_test_library(
     deps = [
         ":quic_core_packets_lib",
         ":quic_core_session_lib",
-        ":quic_core_stream_send_buffer_lib",
         ":quic_platform_base",
         ":quic_test_tools_flow_controller_peer_lib",
     ],

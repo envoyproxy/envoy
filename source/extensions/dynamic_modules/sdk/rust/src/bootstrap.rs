@@ -1,18 +1,9 @@
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi,
-  drop_wrapped_c_void_ptr,
-  str_to_module_buffer,
-  wrap_into_c_void_ptr,
-  EnvoyCounterId,
-  EnvoyCounterVecId,
-  EnvoyGaugeId,
-  EnvoyGaugeVecId,
-  EnvoyHistogramId,
-  EnvoyHistogramVecId,
-  NewBootstrapExtensionConfigFunction,
-  NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
+  abi, drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr, EnvoyCounterId,
+  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  NewBootstrapExtensionConfigFunction, NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
 };
 use mockall::*;
 
@@ -190,6 +181,19 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// This must be called on the main thread.
   fn new_timer(&self) -> Box<dyn EnvoyBootstrapExtensionTimer>;
 
+  /// Watch a file or directory for changes. Each call creates a new watcher for the given path.
+  /// The watcher lifetime is managed by Envoy and tied to the config — all watchers are
+  /// automatically destroyed when the config is destroyed.
+  ///
+  /// When a change is detected, [`BootstrapExtensionConfig::on_file_changed`] is called on the
+  /// main thread.
+  ///
+  /// Returns `true` if the watch was successfully added, `false` otherwise (e.g. file does not
+  /// exist).
+  ///
+  /// This must be called on the main thread.
+  fn add_file_watch(&self, path: &str, events: u32) -> bool;
+
   /// Register a custom admin HTTP endpoint.
   ///
   /// When the endpoint is requested, [`BootstrapExtensionConfig::on_admin_request`] is called.
@@ -333,6 +337,21 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _timer: &dyn EnvoyBootstrapExtensionTimer,
+  ) {
+  }
+
+  /// This is called when a file watched via
+  /// [`EnvoyBootstrapExtensionConfig::add_file_watch`] changes.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `path` is the path that was registered via `add_file_watch` that triggered the change.
+  /// * `events` is the bitmask of events that occurred ([`FILE_WATCHER_EVENT_MOVED_TO`],
+  ///   [`FILE_WATCHER_EVENT_MODIFIED`]).
+  fn on_file_changed(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _path: &str,
+    _events: u32,
   ) {
   }
 
@@ -547,10 +566,15 @@ impl EnvoyBootstrapExtensionConfigScheduler for Box<dyn EnvoyBootstrapExtensionC
 /// A timer handle for bootstrap extensions on the main thread event loop.
 ///
 /// The timer is created via [`EnvoyBootstrapExtensionConfig::new_timer`] and fires by calling
-/// [`BootstrapExtensionConfig::on_timer_fired`]. All methods must be called on the main thread.
+/// [`BootstrapExtensionConfig::on_timer_fired`]. All methods must be called on the main thread,
+/// including dropping the owning handle, since the underlying Envoy timer deregisters from the
+/// main thread dispatcher when destroyed.
 ///
 /// The owning handle (returned by `new_timer`) will automatically destroy the underlying Envoy
-/// timer when dropped.
+/// timer when dropped. If the handle is stored in a context that may be dropped off the main
+/// thread (for example, a future spawned onto a worker pool), the module is responsible for
+/// ensuring the drop happens on the main thread, typically by posting the drop through an
+/// [`EnvoyBootstrapExtensionConfigScheduler`].
 ///
 /// Each timer has a unique [`id`](EnvoyBootstrapExtensionTimer::id) that is stable for its
 /// lifetime. This allows modules with multiple timers to identify which timer fired in the
@@ -666,6 +690,11 @@ impl EnvoyBootstrapExtensionTimer for Box<dyn EnvoyBootstrapExtensionTimer> {
     (**self).enabled()
   }
 }
+
+/// File watcher event: file was moved to the watched path (e.g. atomic rename).
+pub const FILE_WATCHER_EVENT_MOVED_TO: u32 = 0x1;
+/// File watcher event: file content was modified.
+pub const FILE_WATCHER_EVENT_MODIFIED: u32 = 0x2;
 
 // Implementation of EnvoyBootstrapExtensionConfig
 
@@ -1082,6 +1111,16 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     }
   }
 
+  fn add_file_watch(&self, path: &str, events: u32) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+        self.raw,
+        str_to_module_buffer(path),
+        events,
+      )
+    }
+  }
+
   fn register_admin_handler(
     &self,
     path_prefix: &str,
@@ -1466,6 +1505,31 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
   extension_config.on_timer_fired(
     &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
     &timer_ref,
+  );
+}
+
+/// Event hook called by Envoy when a watched file changes for a bootstrap extension.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_file_changed(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  path: abi::envoy_dynamic_module_type_envoy_buffer,
+  events: u32,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let path_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      path.ptr as *const u8,
+      path.length,
+    ))
+  };
+
+  extension_config.on_file_changed(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    path_str,
+    events,
   );
 }
 

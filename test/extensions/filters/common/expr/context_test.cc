@@ -584,6 +584,7 @@ TEST(Context, ConnectionAttributes) {
   info.setAttemptCount(upstream_request_attempt_count);
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*upstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
   EXPECT_CALL(*upstream_host, locality()).WillRepeatedly(ReturnRef(upstream_locality));
 
@@ -618,6 +619,38 @@ TEST(Context, ConnectionAttributes) {
       .WillRepeatedly(ReturnRef(peer_certificate_digest));
   EXPECT_CALL(*upstream_ssl_info, sha256PeerCertificateDigest())
       .WillRepeatedly(ReturnRef(peer_certificate_digest));
+  const std::string peer_cert_pem =
+      "-----BEGIN CERTIFICATE-----\n"
+      "MIIEoTCCA4mgAwIBAgIUQRkh3sY/JN5+tu5NX3Tbyx0Y8mIwDQYJKoZIhvcNAQEL\n"
+      "BQAwdjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcM\n"
+      "DVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsMEEx5ZnQgRW5n\n"
+      "aW5lZXJpbmcxEDAOBgNVBAMMB1Rlc3QgQ0EwHhcNMjQwNDA4MTA0MjUzWhcNMjYw\n"
+      "NDA4MTA0MjUzWjCBqDELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWEx\n"
+      "FjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsM\n"
+      "EEx5ZnQgRW5naW5lZXJpbmcxGzAZBgNVBAMMElRlc3QgRnJvbnRlbmQgVGVhbTEl\n"
+      "MCMGCSqGSIb3DQEJARYWZnJvbnRlbmQtdGVhbUBseWZ0LmNvbTCCASIwDQYJKoZI\n"
+      "hvcNAQEBBQADggEPADCCAQoCggEBAKfEnhbPuNbkPue6HWQS6TJK48my/JEh+3vb\n"
+      "HVjiaMKe9ERxXW19xfFXHBCaB4dRrVTxrKlS3XivQkTck1P99s2YkCvDYUns9B4o\n"
+      "mUnjj/mdVL0OPgdu5mfAmgKB5BqD2psSt117FzIT9AnXQ80pSpQHmDrC5ZSEYkqb\n"
+      "FAOU5QTp7AA5NJMB7ZKbgjeohehLwG92G8tk4ARgB1M/615sVdz3vlbOsa4VLDKS\n"
+      "UbgnGRNiQoVFzSUHQhb6cl+/hDtW2q5nBGiHW3zeYIdCM718XUPlOnOj45Y+2E0d\n"
+      "XVM3txLXJ0huWylitiCtK0jBpy7kSI7Ubcaw1LhWuYrwO6S8bdECAwEAAaOB8zCB\n"
+      "8DAMBgNVHRMBAf8EAjAAMAsGA1UdDwQEAwIF4DAdBgNVHSUEFjAUBggrBgEFBQcD\n"
+      "AgYIKwYBBQUHAwEwdAYDVR0RBG0wa4Yfc3BpZmZlOi8vbHlmdC5jb20vZnJvbnRl\n"
+      "bmQtdGVhbYYYaHR0cDovL2Zyb250ZW5kLmx5ZnQuY29tgghseWZ0LmNvbYIMd3d3\n"
+      "Lmx5ZnQuY29thwQBAgMEhxAAAAABAAIAAwAAAAAAAAAEMB0GA1UdDgQWBBSS/zHJ\n"
+      "9Mtc3XtVgk7+VxF6kS1YDDAfBgNVHSMEGDAWgBQZ/nNEIOqmw8nxkUzZNY87irkj\n"
+      "AgDANBgkqhkiG9w0BAQsFAAOCAQEAnYBoTWYkhMMsr10lagEJOPMHK9EIz/h/W8Rc\n"
+      "r9DhREZA1+uEQrsFpzsqHhDqDEhjjmakU14VeNmTpZ+HUvDFY3YaAoZnXFYmg/6+\n"
+      "jtxLkzRjjtCIaEHRiiIS7xMw8wyhMcmoQY9mQNbyWonIVpykvYFf0h5fVo11BAv7\n"
+      "ELUKZeCqFJBifLdfME0cIub/PhoJfk/hM6X2lRUUe2wvtOP8Vd9wHfrzktJysSLI\n"
+      "TwHES7ftFo9+vYn5qM27PGW9TWPvCF2EFiUziqAoaZkP5YwiFEIY2N9uRFliXm1/\n"
+      "Jg3xZwtsjs+9jsVHQqKSUHivUR3s7NenUF8s3bOMtqkccaVcww==\n"
+      "-----END CERTIFICATE-----";
+  EXPECT_CALL(*downstream_ssl_info, pemEncodedPeerCertificate())
+      .WillRepeatedly(ReturnRef(peer_cert_pem));
+  EXPECT_CALL(*upstream_ssl_info, pemEncodedPeerCertificate())
+      .WillRepeatedly(ReturnRef(peer_cert_pem));
 
   {
     auto value = connection[CelValue::CreateStringView(Undefined)];
@@ -752,6 +785,13 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
+    auto value = connection[CelValue::CreateStringView(PeerCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(peer_cert_pem, value.value().StringOrDie().value());
+  }
+
+  {
     auto value = connection[CelValue::CreateStringView(ID)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsUint64());
@@ -833,6 +873,13 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(peer_certificate_digest, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(PeerCertificate)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(peer_cert_pem, value.value().StringOrDie().value());
   }
 
   {
@@ -1255,18 +1302,36 @@ TEST(Context, ExtractSslInfoEmptyValues) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  auto upstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   const std::string sni_name = "kittens.com";
   info.downstream_connection_info_provider_->setRequestedServerName(sni_name);
   info.downstream_connection_info_provider_->setSslConnection(downstream_ssl_info);
+  info.upstreamInfo()->setUpstreamSslConnection(upstream_ssl_info);
 
   Protobuf::Arena arena;
   ConnectionWrapper connection(arena, info);
+  UpstreamWrapper upstream(arena, info);
   const std::string empty_str;
   EXPECT_CALL(*downstream_ssl_info, sha256PeerCertificateDigest())
       .WillRepeatedly(ReturnRef(empty_str));
 
   {
     auto value = connection[CelValue::CreateStringView(SHA256PeerCertificateDigest)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  // Test connection.peer_certificate when certificate is not presented
+  EXPECT_CALL(*downstream_ssl_info, pemEncodedPeerCertificate())
+      .WillRepeatedly(ReturnRef(empty_str));
+  {
+    auto value = connection[CelValue::CreateStringView(PeerCertificate)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  // Test upstream.peer_certificate when certificate is not presented
+  EXPECT_CALL(*upstream_ssl_info, pemEncodedPeerCertificate()).WillRepeatedly(ReturnRef(empty_str));
+  {
+    auto value = upstream[CelValue::CreateStringView(PeerCertificate)];
     EXPECT_FALSE(value.has_value());
   }
 }

@@ -79,6 +79,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_total, Counter, Total requests
   upstream_rq_active, Gauge, Total active requests
   upstream_rq_pending_total, Counter, Total requests pending a connection pool connection
+  upstream_rq_active_overflow, Counter, Total requests rejected because the ``max_requests`` circuit breaker was exhausted while attaching to a ready upstream connection (see ``envoy.reloadable_features.skip_pending_overflow_count_on_active_rq``)
   upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool or requests (mainly for HTTP/2 and above) circuit breaking and were failed
   upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure or remote connection termination
   upstream_rq_pending_active, Gauge, Total active requests pending a connection pool connection
@@ -112,7 +113,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   update_attempt, Counter, Total attempted cluster membership updates by service discovery
   update_success, Counter, Total successful cluster membership updates by service discovery
   update_failure, Counter, Total failed cluster membership updates by service discovery
-  update_duration, Histogram, Amount of time spent updating configs
+  update_duration, Histogram, Amount of time in milliseconds spent updating configs
   update_empty, Counter, Total cluster membership updates ending with empty cluster load assignment and continuing with previous config
   update_no_rebuild, Counter, Total successful cluster membership updates that didn't result in any cluster load balancing structure rebuilds
   version, Gauge, Hash of the contents from the last successful API fetch

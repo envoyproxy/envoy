@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package envoy.extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client;
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client";
+option java_outer_classname = "GrpcClientProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/clients/grpc_client";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// Configuration for gRPC push-based connection event client.
+// Actively pushes connection events to a cluster using grpc using some internal timing.
+// [#next-free-field: 7]
+message GrpcClientConfig {
+  // Stat prefix for this client's metrics.
+  string stat_prefix = 1;
+
+  // Name of the cluster to send gRPC requests to.
+  // It must be present in the config otherwise the setup will throw error in the onServerInitialized.
+  string cluster = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Default interval between sending batched connection events.
+  // Default is 5s.
+  google.protobuf.Duration default_send_interval = 3 [(validate.rules).duration = {
+    lte {seconds: 3600}
+    gte {nanos: 25000000}
+  }];
+
+  // Interval between connection retry attempts to the gRPC service.
+  // Connect timeouts are provided at the cluster level and will be handled by the http/2 client.
+  // How much time to wait after a failed connect before retrying. Default is 5s.
+  google.protobuf.Duration connect_retry_interval = 4 [(validate.rules).duration = {
+    lte {seconds: 3600}
+    gte {nanos: 25000000}
+  }];
+
+  // Maximum number of retry attempts for failed gRPC sends.
+  // Basically the cluster will have default_send_interval * max_retries time to respond.
+  // Default is 5. After this we will disconnect and try to connect again.
+  uint32 max_retries = 5;
+
+  // Maximum events to buffer at any given time
+  // Default is 1,000,000.
+  uint32 max_buffer_count = 6;
+}

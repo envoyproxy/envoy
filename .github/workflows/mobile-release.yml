@@ -5,6 +5,16 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      job_to_run:
+        description: 'Select the job to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - android
+        - python
   schedule:
   # Mondays at 1pm UTC (8am EST)
   - cron: "0 13 * * 1"
@@ -18,16 +28,18 @@ jobs:
       contents: read
     uses: ./.github/workflows/_load_env.yml
 
-  release:
+  android-release:
     permissions:
+      actions: read
       contents: read
       packages: read
     if: >-
-      ${{
-          github.repository == 'envoyproxy/envoy'
-          && (github.event.schedule
-              || !contains(github.actor, '[bot]'))
-      }}
+      github.repository == 'envoyproxy/envoy'
+      && (github.event.schedule
+             || !contains(github.actor, '[bot]'))
+      && (github.event.inputs.job_to_run == 'all'
+             || github.event.inputs.job_to_run == 'android'
+             || github.event_name == 'schedule')
     needs: env
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
@@ -76,8 +88,14 @@ jobs:
             //:android_dist
           output: envoy
 
-  deploy:
-    needs: release
+  android-deploy:
+    needs: android-release
+    if: >-
+      always()
+      && (github.event.inputs.job_to_run == 'all'
+             || github.event.inputs.job_to_run == 'android'
+             || github.event_name == 'schedule')
+      && (needs.android-release.result == 'success')
     permissions:
       contents: read
       packages: read
@@ -89,12 +107,12 @@ jobs:
         include:
         - output: envoy
     steps:
-    - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       with:
         fetch-depth: 0
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
-    - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
       with:
         name: ${{ matrix.output }}_android_aar_sources
         path: .
@@ -141,3 +159,81 @@ jobs:
             ${{ matrix.output }}-pom.xml.asc \
             ${{ matrix.output }}-sources.jar.asc \
             ${{ matrix.output }}-javadoc.jar.asc
+
+  python-release:
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    if: >-
+      github.repository == 'envoyproxy/envoy'
+      && (github.event_name == 'workflow_dispatch')
+      && (github.event.inputs.job_to_run == 'all'
+             || github.event.inputs.job_to_run == 'python')
+    needs: env
+    name: Build and Publish Python Wheel
+    uses: ./.github/workflows/_mobile_container_ci.yml
+    with:
+      args: ${{ matrix.args }}
+      container: ${{ fromJSON(needs.env.outputs.build-image).default }}
+      container-output: |
+        "bazel-bin/library/python/": build/
+      request: ${{ needs.env.outputs.request }}
+      steps-post: |
+        - name: Repair wheel
+          run: |
+            mkdir -p /tmp/dist
+            WHEEL_PATH=$(find /tmp/container-output/build -name "*.whl" | head -n 1)
+
+            if [[ -z "$WHEEL_PATH" ]]; then
+                echo "Error: No wheel file found in /tmp/container-output/build"
+                ls -R /tmp/container-output/
+                exit 1
+            fi
+            python3 -m venv envoy_wheel
+            source envoy_wheel/bin/activate
+            pip install patchelf auditwheel
+
+            auditwheel repair "$WHEEL_PATH" --wheel-dir /tmp/dist
+          shell: bash
+      target: ${{ matrix.target }}
+      upload-name: python-wheel
+      upload-path: /tmp/dist/*.whl
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: envoy_mobile_wheel
+          args: >-
+            build
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-release
+            -c opt --strip=always
+            //library/python:envoy_mobile_wheel
+            --//library/python:python_platform="manylinux2014_x86_64"
+
+  python-publish:
+    needs: python-release
+    if: >-
+      always()
+        && (github.event.inputs.job_to_run == 'all'
+               || github.event.inputs.job_to_run == 'python')
+        && (needs.python-release.result == 'success')
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+    environment:
+      name: pypi
+      url: https://pypi.org/p/envoy-mobile-client
+    steps:
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+      with:
+        name: python-wheel
+        path: dist/
+    - name: Publish to PyPi
+      uses: pypa/gh-action-pypi-publish@release/v1

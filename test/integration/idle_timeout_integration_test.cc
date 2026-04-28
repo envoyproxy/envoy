@@ -125,7 +125,7 @@ public:
   }
 
   static constexpr uint64_t IdleTimeoutMs = 300 * TIMEOUT_FACTOR;
-  static constexpr uint64_t RequestTimeoutMs = 200;
+  static constexpr uint64_t RequestTimeoutMs = 200 * TIMEOUT_FACTOR;
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};

@@ -719,6 +719,17 @@ an empty metadata object.
 
 Returns a :ref:`route object <config_http_filters_lua_route_wrapper>`.
 
+``stats()``
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local stats = handle:stats()
+
+Returns a stats scope object that can be used to create and modify stats (counters, gauges, and
+histograms). See :ref:`Stats scope object API <config_http_filters_lua_stats_scope_wrapper>` for
+available methods.
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API
@@ -1509,6 +1520,35 @@ certificate, or no serial number.
 Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
 peer certificate, or no issuer.
 
+``sha256PeerCertificateIssuerDigest()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sha256PeerCertificateIssuerDigest()
+
+Returns the hex-encoded SHA-256 fingerprint of the direct issuer certificate from the
+validated peer certificate chain. The issuer is the second certificate in the validated chain
+(i.e., the certificate that directly signed the peer leaf certificate), as determined by
+BoringSSL during the TLS handshake. Requires the peer certificate chain to have been
+successfully validated (e.g., mTLS with ``require_client_certificate: true`` and a
+``validation_context``). Returns ``""`` if there is no validated peer certificate chain or
+the validated chain contains fewer than two certificates.
+
+``serialNumberPeerCertificateIssuer()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:serialNumberPeerCertificateIssuer()
+
+Returns the serial number of the direct issuer certificate from the validated peer certificate
+chain. The issuer is the second certificate in the validated chain (i.e., the certificate that
+directly signed the peer leaf certificate), as determined by BoringSSL during the TLS handshake.
+Requires the peer certificate chain to have been successfully validated (e.g., mTLS with
+``require_client_certificate: true`` and a ``validation_context``). Returns ``""`` if there is
+no validated peer certificate chain or the validated chain contains fewer than two certificates.
+
 ``subjectPeerCertificate()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1767,3 +1807,156 @@ Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_c
     :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
+
+.. _config_http_filters_lua_stats_scope_wrapper:
+
+Stats scope object API
+----------------------
+
+.. code-block:: lua
+
+  local stats = handle:stats()
+
+``handle:stats()`` returns a stats scope object that can be used to create and
+modify stats (counters, gauges, and histograms). Stats created through this API
+are prefixed with ``lua.`` followed by the optional ``stat_prefix`` from the Lua
+filter configuration.
+
+counter()
+^^^^^^^^^
+
+.. code-block:: lua
+
+  local counter = stats:counter("my_counter")
+
+Returns a :ref:`counter object <config_http_filters_lua_counter_wrapper>` with
+the given name. The counter is created if it doesn't exist.
+
+gauge()
+^^^^^^^
+
+.. code-block:: lua
+
+  local gauge = stats:gauge("my_gauge")
+
+Returns a :ref:`gauge object <config_http_filters_lua_gauge_wrapper>` with
+the given name. The gauge is created if it doesn't exist. Gauges created through
+Lua use ``NeverImport`` mode, meaning they track local process state and are not
+aggregated across the cluster during hot restart.
+
+histogram()
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local histogram = stats:histogram("my_histogram", "ms")
+
+Returns a :ref:`histogram object <config_http_filters_lua_histogram_wrapper>`
+with the given name and unit. The second argument specifies the unit and must be
+one of: ``"unspecified"``, ``"bytes"``, ``"microseconds"``, ``"milliseconds"``, or ``"ms"``
+(shorthand for milliseconds).
+
+.. _config_http_filters_lua_counter_wrapper:
+
+Counter object API
+------------------
+
+inc()
+^^^^^
+
+.. code-block:: lua
+
+  counter:inc()
+
+Increments the counter by 1.
+
+add()
+^^^^^
+
+.. code-block:: lua
+
+  counter:add(5)
+
+Adds the specified value to the counter. The value must be a non-negative integer.
+
+value()
+^^^^^^^
+
+.. code-block:: lua
+
+  local val = counter:value()
+
+Returns the current value of the counter.
+
+.. _config_http_filters_lua_gauge_wrapper:
+
+Gauge object API
+----------------
+
+inc()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:inc()
+
+Increments the gauge by 1.
+
+dec()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:dec()
+
+Decrements the gauge by 1.
+
+add()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:add(5)
+
+Adds the specified value to the gauge. The value must be a non-negative integer.
+
+sub()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:sub(3)
+
+Subtracts the specified value from the gauge. The value must be a non-negative integer.
+
+set()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:set(10)
+
+Sets the gauge to the specified value. The value must be a non-negative integer (zero is valid).
+
+value()
+^^^^^^^
+
+.. code-block:: lua
+
+  local val = gauge:value()
+
+Returns the current value of the gauge.
+
+.. _config_http_filters_lua_histogram_wrapper:
+
+Histogram object API
+--------------------
+
+recordValue()
+^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  histogram:recordValue(42)
+
+Records a value in the histogram. The value must be a non-negative integer.

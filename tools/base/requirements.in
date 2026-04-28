@@ -5,13 +5,10 @@ aio.core>=0.10.2
 aiodocker>=0.22.2
 aiohttp>=3.13.3
 aioquic>=0.9.21
-black
 cffi>=1.15.0
 colorama
 coloredlogs
-# NB: When updating this dep you _must_ strip out all the unused wheel hashes
-#  ie - only keep python3.9+ glibc2.28 for arm/x86 and macos
-cryptography>=44.0.1
+cryptography
 dependatool>=0.2.2
 envoy.base.utils>=0.5.10
 envoy.ci.report>=0.0.3

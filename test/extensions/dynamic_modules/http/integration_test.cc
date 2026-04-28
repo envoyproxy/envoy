@@ -51,7 +51,7 @@ typed_config:
       constexpr auto filter_per_route_config = R"EOF(
 dynamic_module_config:
   name: {}
-per_route_config_name: {}
+filter_name: {}
 filter_config:
   "@type": {}
   value: {}
@@ -980,12 +980,6 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
 
 // Test buffer limit callbacks for non-terminal filters.
 TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
-  // TODO(wbpcode): Enable this test for other SDKs when supported.
-  if (GetParam() != "rust") {
-    // Buffer limit callbacks are only supported in the Rust SDK currently.
-    return;
-  }
-
   initializeFilter("buffer_limit_filter");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
