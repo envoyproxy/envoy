@@ -3,7 +3,6 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
-acknowledgement
 Allshard
 FLUSHALL
 NUMPAT
@@ -71,7 +70,6 @@ consume
 cstr
 deadcode
 DFP
-discoverability
 Dynatrace
 DOM
 DONTFRAG
