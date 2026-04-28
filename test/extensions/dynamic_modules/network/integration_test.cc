@@ -135,9 +135,8 @@ TEST_P(DynamicModulesNetworkIntegrationTest, HalfClose) {
   tcp_client->close();
 }
 
-class DynamicModulesNetworkSdkIntegrationTest
-    : public testing::TestWithParam<std::string>,
-      public DynamicModulesNetworkIntegrationTestBase {
+class DynamicModulesNetworkSdkIntegrationTest : public testing::TestWithParam<std::string>,
+                                                public DynamicModulesNetworkIntegrationTestBase {
 public:
   DynamicModulesNetworkSdkIntegrationTest()
       : DynamicModulesNetworkIntegrationTestBase(GetParam() == "rust"
@@ -148,9 +147,9 @@ public:
     if (GetParam() == "go") {
       TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
     }
-    initializeFilter(
-        filter_name, "network_integration_test",
-        "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" + GetParam(), config);
+    initializeFilter(filter_name, "network_integration_test",
+                     "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" + GetParam(),
+                     config);
   }
 };
 
@@ -160,12 +159,11 @@ auto DynamicModulesNetworkSdkIntegrationTestValues = testing::Values("rust", "go
 auto DynamicModulesNetworkSdkIntegrationTestValues = testing::Values("rust", "go");
 #endif
 
-INSTANTIATE_TEST_SUITE_P(
-    SdkLanguages, DynamicModulesNetworkSdkIntegrationTest,
-    DynamicModulesNetworkSdkIntegrationTestValues,
-    [](const testing::TestParamInfo<std::string>& info) {
-      return info.param;
-    });
+INSTANTIATE_TEST_SUITE_P(SdkLanguages, DynamicModulesNetworkSdkIntegrationTest,
+                         DynamicModulesNetworkSdkIntegrationTestValues,
+                         [](const testing::TestParamInfo<std::string>& info) {
+                           return info.param;
+                         });
 
 TEST_P(DynamicModulesNetworkSdkIntegrationTest, FlowControl) {
   initializeSdkFilter("flow_control");

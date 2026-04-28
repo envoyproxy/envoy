@@ -36,12 +36,12 @@ std::optional<std::string_view> bufferViewToOptionalStringView(const BufferView&
 
 using NetworkSchedulerImpl =
     SchedulerImplBase<envoy_dynamic_module_callback_network_filter_scheduler_new,
-                          envoy_dynamic_module_callback_network_filter_scheduler_commit,
-                          envoy_dynamic_module_callback_network_filter_scheduler_delete>;
+                      envoy_dynamic_module_callback_network_filter_scheduler_commit,
+                      envoy_dynamic_module_callback_network_filter_scheduler_delete>;
 using NetworkConfigSchedulerImpl =
     SchedulerImplBase<envoy_dynamic_module_callback_network_filter_config_scheduler_new,
-                          envoy_dynamic_module_callback_network_filter_config_scheduler_commit,
-                          envoy_dynamic_module_callback_network_filter_config_scheduler_delete>;
+                      envoy_dynamic_module_callback_network_filter_config_scheduler_commit,
+                      envoy_dynamic_module_callback_network_filter_config_scheduler_delete>;
 
 template <bool IsReadBuffer> class NetworkBufferImpl : public NetworkBuffer {
 public:

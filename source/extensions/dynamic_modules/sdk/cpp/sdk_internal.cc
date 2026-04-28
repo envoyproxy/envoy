@@ -147,14 +147,13 @@ using ResponseHeaders = HeaderMapImpl<envoy_dynamic_module_type_http_header_type
 using ResponseTrailers = HeaderMapImpl<envoy_dynamic_module_type_http_header_type_ResponseTrailer>;
 
 // Scheduler implementation
-using SchedulerImpl =
-    SchedulerImplBase<envoy_dynamic_module_callback_http_filter_scheduler_new,
-                          envoy_dynamic_module_callback_http_filter_scheduler_commit,
-                          envoy_dynamic_module_callback_http_filter_scheduler_delete>;
+using SchedulerImpl = SchedulerImplBase<envoy_dynamic_module_callback_http_filter_scheduler_new,
+                                        envoy_dynamic_module_callback_http_filter_scheduler_commit,
+                                        envoy_dynamic_module_callback_http_filter_scheduler_delete>;
 using ConfigSchedulerImpl =
     SchedulerImplBase<envoy_dynamic_module_callback_http_filter_config_scheduler_new,
-                          envoy_dynamic_module_callback_http_filter_config_scheduler_commit,
-                          envoy_dynamic_module_callback_http_filter_config_scheduler_delete>;
+                      envoy_dynamic_module_callback_http_filter_config_scheduler_commit,
+                      envoy_dynamic_module_callback_http_filter_config_scheduler_delete>;
 
 std::optional<std::string_view> bufferViewToOptionalStringView(const BufferView& value,
                                                                bool found) {
