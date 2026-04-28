@@ -1,6 +1,6 @@
 """Utilities for mapping httpx requests and responses to Envoy Mobile."""
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 from urllib.parse import urlparse
 import httpx
 from .async_client.utils import (

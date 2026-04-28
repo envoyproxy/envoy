@@ -1,12 +1,11 @@
 """Async httpx transport for Envoy Mobile."""
 
 import asyncio
-from typing import Any, AsyncIterable, Dict, List, Optional, Union
+from typing import AsyncIterable, Dict, List, Optional, Union
 
 import httpx
 from . import envoy_engine
 from .async_client.executor import AsyncioExecutor
-from .async_client.utils import normalize_timeout_to_ms
 from .httpx_utils import get_envoy_headers, map_envoy_error
 
 
