@@ -260,7 +260,7 @@ public:
   virtual envoy::service::ext_proc::v3::HttpTrailers*
   mutableTrailers(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
 
-  virtual Http::StreamFilterCallbacks* filter_callbacks() const PURE;
+  virtual Http::StreamFilterCallbacks* filterCallbacks() const PURE;
 
   virtual bool sendAttributes(const ExpressionManager& mgr) const PURE;
 
@@ -532,21 +532,21 @@ public:
   }
 
   void addBufferedData(Buffer::Instance& data) const override {
-    decoderCallbacks()->addDecodedData(data, false);
+    decoder_callbacks_->addDecodedData(data, false);
   }
 
   void modifyBufferedData(std::function<void(Buffer::Instance&)> cb) const override {
-    decoderCallbacks()->modifyDecodingBuffer(cb);
+    decoder_callbacks_->modifyDecodingBuffer(cb);
   }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
-    decoderCallbacks()->injectDecodedDataToFilterChain(data, end_stream);
+    decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
   }
 
-  uint32_t bufferLimit() const override { return decoderCallbacks()->bufferLimit(); }
+  uint32_t bufferLimit() const override { return decoder_callbacks_->bufferLimit(); }
 
   Http::HeaderMap* addTrailers() override {
-    trailers_ = &decoderCallbacks()->addDecodedTrailers();
+    trailers_ = &decoder_callbacks_->addDecodedTrailers();
     return trailers_;
   }
 
@@ -575,7 +575,7 @@ public:
   void requestWatermark() override;
   void clearWatermark() override;
 
-  Http::StreamFilterCallbacks* filter_callbacks() const override { return decoder_callbacks_; }
+  Http::StreamFilterCallbacks* filterCallbacks() const override { return decoder_callbacks_; }
 
   bool sendAttributes(const ExpressionManager& mgr) const override {
     return !attributes_sent_ && mgr.hasRequestExpr();
@@ -645,8 +645,6 @@ private:
   absl::Status
   handleLocalResponseHeadersContinue(const ::envoy::service::ext_proc::v3::HttpHeaders& response);
 
-  Http::StreamDecoderFilterCallbacks* decoderCallbacks() const { return decoder_callbacks_; }
-
   bool local_response_started_{false};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
 };
@@ -679,25 +677,25 @@ public:
   }
 
   void addBufferedData(Buffer::Instance& data) const override {
-    encoderCallbacks()->addEncodedData(data, false);
+    encoder_callbacks_->addEncodedData(data, false);
   }
 
   void modifyBufferedData(std::function<void(Buffer::Instance&)> cb) const override {
-    encoderCallbacks()->modifyEncodingBuffer(cb);
+    encoder_callbacks_->modifyEncodingBuffer(cb);
   }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
-    encoderCallbacks()->injectEncodedDataToFilterChain(data, end_stream);
+    encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
   }
 
-  uint32_t bufferLimit() const override { return encoderCallbacks()->bufferLimit(); }
+  uint32_t bufferLimit() const override { return encoder_callbacks_->bufferLimit(); }
 
   Http::HeaderMap* addTrailers() override {
-    trailers_ = &encoderCallbacks()->addEncodedTrailers();
+    trailers_ = &encoder_callbacks_->addEncodedTrailers();
     return trailers_;
   }
 
-  void continueProcessing() const override { encoderCallbacks()->continueEncoding(); }
+  void continueProcessing() const override { encoder_callbacks_->continueEncoding(); }
 
   envoy::service::ext_proc::v3::HttpHeaders*
   mutableHeaders(envoy::service::ext_proc::v3::ProcessingRequest& request) const override {
@@ -722,7 +720,7 @@ public:
   void requestWatermark() override;
   void clearWatermark() override;
 
-  Http::StreamFilterCallbacks* filter_callbacks() const override { return encoder_callbacks_; }
+  Http::StreamFilterCallbacks* filterCallbacks() const override { return encoder_callbacks_; }
 
   bool sendAttributes(const ExpressionManager& mgr) const override {
     return !attributes_sent_ && mgr.hasResponseExpr();
@@ -747,8 +745,6 @@ public:
 private:
   void setProcessingModeInternal(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
-
-  Http::StreamEncoderFilterCallbacks* encoderCallbacks() const { return encoder_callbacks_; }
 
   bool local_response_streaming_{false};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
