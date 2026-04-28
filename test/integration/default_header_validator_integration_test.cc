@@ -18,7 +18,8 @@ public:
   // is not in either set, then the request is expected to be rejected.
   using PathFormatter = std::function<std::string(char)>;
   void
-  validateCharacterSetInUrl(PathFormatter path_formatter, Http::CharTable& uhv_allowed_characters,
+  validateCharacterSetInUrl(PathFormatter path_formatter,
+                            const Http::CharTable& uhv_allowed_characters,
                             absl::string_view additionally_allowed_characters,
                             const std::function<std::string(uint32_t)>& expected_path_builder) {
     std::vector<FakeStreamPtr> upstream_requests;
