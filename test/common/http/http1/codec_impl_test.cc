@@ -53,7 +53,8 @@ void setupRequestDecoderMock(Http::MockRequestDecoder& request_decoder) {
   EXPECT_CALL(request_decoder, getRequestDecoderHandle())
       .WillRepeatedly(Invoke([&request_decoder]() {
         auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
-        ON_CALL(*handle, get()).WillByDefault(Return(OptRef<Http::RequestDecoder>(request_decoder)));
+        ON_CALL(*handle, get())
+            .WillByDefault(Return(OptRef<Http::RequestDecoder>(request_decoder)));
         return handle;
       }));
 }
@@ -308,6 +309,7 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
 
   MockRequestDecoder decoder;
   setupRequestDecoderMock(decoder);
+
   InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
@@ -505,9 +507,10 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
 TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -571,9 +574,10 @@ TEST_F(Http1ServerConnectionImplTest, UnsupportedEncoding) {
 TEST_F(Http1ServerConnectionImplTest, LargeBodyOptimization) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   std::string post = "POST / HTTP/1.1\r\ncontent-length: 1000000\r\n\r\n";
@@ -601,9 +605,10 @@ TEST_F(Http1ServerConnectionImplTest, LargeBodyOptimization) {
 TEST_F(Http1ServerConnectionImplTest, ContentLengthAllBitsSet) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -624,9 +629,10 @@ TEST_F(Http1ServerConnectionImplTest, ContentLengthAllBitsSet) {
 TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -655,9 +661,10 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
 TEST_F(Http1ServerConnectionImplTest, ChunkedBodySplitOverTwoDispatches) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -693,9 +700,10 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodySplitOverTwoDispatches) {
 TEST_F(Http1ServerConnectionImplTest, ChunkedBodyFragmentedBuffer) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -722,9 +730,10 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyFragmentedBuffer) {
 TEST_F(Http1ServerConnectionImplTest, ChunkedBodyCase) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -749,9 +758,10 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyCase) {
 TEST_F(Http1ServerConnectionImplTest, InvalidChunkHeader) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -781,9 +791,10 @@ TEST_F(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
 
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
@@ -920,9 +931,10 @@ TEST_F(Http1ServerConnectionImplTest, Http10) {
   codec_settings_.accept_http_10_ = true;
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
@@ -940,9 +952,10 @@ TEST_F(Http1ServerConnectionImplTest, Http10HostAdded) {
   codec_settings_.default_host_for_http_10_ = "example.com";
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -982,6 +995,7 @@ TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
   initialize();
 
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   // Send a full HTTP/1.0 request and proxy a response.
   {
     Buffer::OwnedImpl buffer(
@@ -1041,9 +1055,10 @@ TEST_F(Http1ServerConnectionImplTest, HttpVersion) {
     const absl::optional<absl::string_view>& expected_error = test_case.expected_error_;
     initialize();
 
-    InSequence sequence;
-
     MockRequestDecoder decoder;
+    setupRequestDecoderMock(decoder);
+
+    InSequence sequence;
     EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
     if (expected_error.has_value()) {
       EXPECT_CALL(decoder,
@@ -1132,6 +1147,7 @@ TEST_F(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
   initialize();
 
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
@@ -1205,9 +1221,10 @@ TEST_F(Http1ServerConnectionImplTest, Http11Options) {
 TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
@@ -1223,9 +1240,10 @@ TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
 TEST_F(Http1ServerConnectionImplTest, ProtocolStreamId) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
@@ -1247,6 +1265,7 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestNoStream) {
   initialize();
 
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
   // Check that before any headers are parsed, requests do not look like HEAD or gRPC requests.
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
@@ -1260,6 +1279,7 @@ TEST_F(Http1ServerConnectionImplTest, RejectCustomMethod) {
   initialize();
 
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
 
@@ -1275,6 +1295,7 @@ TEST_F(Http1ServerConnectionImplTest, RejectInvalidCharacterInMethod) {
   initialize();
 
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
 
@@ -1291,6 +1312,7 @@ TEST_F(Http1ServerConnectionImplTest, AllowCustomMethod) {
   initialize();
 
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\n");
@@ -1310,6 +1332,7 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   initialize();
 
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("G");
@@ -1371,9 +1394,10 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
 TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -1392,6 +1416,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   initialize();
 
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
@@ -1488,6 +1513,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
   initialize();
 
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
@@ -1511,9 +1537,10 @@ TEST_F(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
   for (size_t n = 0; n < example_input.size(); ++n) {
     initialize();
 
-    InSequence sequence;
-
     MockRequestDecoder decoder;
+    setupRequestDecoderMock(decoder);
+
+    InSequence sequence;
     EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
     Buffer::OwnedImpl buffer(
@@ -1540,9 +1567,10 @@ TEST_F(Http1ServerConnectionImplTest, TrailerMutateEmbeddedNul) {
   for (size_t n = 0; n < trailers.size(); ++n) {
     initialize();
 
-    InSequence sequence;
-
     MockRequestDecoder decoder;
+    setupRequestDecoderMock(decoder);
+
+    InSequence sequence;
     EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
     Buffer::OwnedImpl buffer(absl::StrCat(headers_and_body, trailers.substr(0, n), kNullCharacter,
@@ -1582,9 +1610,10 @@ TEST_F(Http1ServerConnectionImplTest, HeaderMutateEmbeddedCRLF) {
 TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -1604,9 +1633,10 @@ TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
 TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -1630,9 +1660,10 @@ TEST_F(Http1ServerConnectionImplTest, PostWithContentLength) {
 TEST_F(Http1ServerConnectionImplTest, PostWithContentLengthFragmentedBuffer) {
   initialize();
 
-  InSequence sequence;
-
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -1914,6 +1945,9 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
 
 TEST_F(Http1ServerConnectionImplTest, VerifyRequestHeaderTrailerMapMaxLimits) {
   initialize();
+  MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
   InSequence sequence;
 
   codec_settings_.allow_absolute_url_ = true;
@@ -1923,7 +1957,6 @@ TEST_F(Http1ServerConnectionImplTest, VerifyRequestHeaderTrailerMapMaxLimits) {
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
       overload_manager_);
 
-  MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
   TestRequestHeaderMapImpl expected_headers{
       {{":path", "/"}, {":method", "POST"}, {"transfer-encoding", "chunked"}},
@@ -2483,6 +2516,7 @@ TEST_F(Http1ServerConnectionImplTest, LoadShedPointCanCloseConnectionOnDispatchO
 
   EXPECT_CALL(mock_abort_dispatch, shouldShedLoad()).WillOnce(Return(true));
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
 
@@ -2534,6 +2568,7 @@ TEST_F(Http1ServerConnectionImplTest, LoadShedPointCanCloseConnectionOnDispatchO
 
   EXPECT_CALL(mock_abort_dispatch, shouldShedLoad()).WillOnce(Return(false));
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl request_line_buffer("GET / HTTP/1.1\r\n");
@@ -3631,6 +3666,7 @@ TEST_F(Http1ServerConnectionImplTest, Utf8Path) {
   initialize();
 
   MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
   Buffer::OwnedImpl buffer("GET /δ¶/δt/pope?q=1#narf HXXP/1.1\r\n\r\n");
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
@@ -4488,12 +4524,12 @@ TEST_F(Http1ClientConnectionImplTest, DecoderDestroyedBeforeMessageComplete) {
 
   // Send final chunk. This triggers onMessageCompleteBase.
   Buffer::OwnedImpl final_chunk("0\r\n\r\n");
-  EXPECT_ENVOY_BUG(status = codec_->dispatch(final_chunk), "ResponseDecoder is null in onMessageCompleteBase");
+  EXPECT_ENVOY_BUG(status = codec_->dispatch(final_chunk),
+                   "ResponseDecoder is null in onMessageCompleteBase");
   EXPECT_TRUE(status.ok());
 }
 
-TEST_F(Http1ServerConnectionImplTest,
-       RequestDecoderDestroyedBeforeMessageComplete) {
+TEST_F(Http1ServerConnectionImplTest, RequestDecoderDestroyedBeforeMessageComplete) {
   initialize();
 
   StrictMock<MockRequestDecoder> decoder;
@@ -4504,8 +4540,7 @@ TEST_F(Http1ServerConnectionImplTest,
   EXPECT_CALL(decoder, getRequestDecoderHandle())
       .WillOnce(Return(testing::ByMove(std::move(handle_ptr))));
 
-  EXPECT_CALL(*handle, get())
-      .WillRepeatedly(Return(OptRef<Http::RequestDecoder>(decoder)));
+  EXPECT_CALL(*handle, get()).WillRepeatedly(Return(OptRef<Http::RequestDecoder>(decoder)));
 
   Buffer::OwnedImpl headers_buffer(
       "GET / HTTP/1.1\r\nHost: host\r\nTransfer-Encoding: chunked\r\n\r\n");
@@ -4515,8 +4550,7 @@ TEST_F(Http1ServerConnectionImplTest,
   auto status = codec_->dispatch(headers_buffer);
   EXPECT_TRUE(status.ok());
 
-  EXPECT_CALL(*handle, get())
-      .WillRepeatedly(Return(OptRef<Http::RequestDecoder>{}));
+  EXPECT_CALL(*handle, get()).WillRepeatedly(Return(OptRef<Http::RequestDecoder>{}));
 
   Buffer::OwnedImpl final_chunk("0\r\n\r\n");
 
@@ -5269,6 +5303,7 @@ TEST_F(Http1ServerConnectionImplTest, RequestAfterConnectionClose) {
 
   {
     MockRequestDecoder decoder;
+    setupRequestDecoderMock(decoder);
     EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
     EXPECT_CALL(decoder, decodeHeaders_(_, true));
 

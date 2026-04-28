@@ -589,7 +589,8 @@ private:
   struct PendingResponse {
     PendingResponse(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter,
                     ResponseDecoderHandlePtr&& decoder_handle)
-        : encoder_(connection, std::move(bytes_meter)), decoder_handle_(std::move(decoder_handle)) {}
+        : encoder_(connection, std::move(bytes_meter)), decoder_handle_(std::move(decoder_handle)) {
+    }
     RequestEncoderImpl encoder_;
     ResponseDecoderHandlePtr decoder_handle_;
   };

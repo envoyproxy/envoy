@@ -438,7 +438,8 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderInterfaceCoverageViaNewStream)
   auto logs = decoder.accessLogHandlers();
   EXPECT_TRUE(logs.empty());
   auto handle = decoder.getRequestDecoderHandle();
-  EXPECT_EQ(nullptr, handle.get());
+  EXPECT_NE(nullptr, handle.get());
+  EXPECT_EQ(&decoder, handle->get().ptr());
 }
 
 // Test configuration with custom ping interval.
