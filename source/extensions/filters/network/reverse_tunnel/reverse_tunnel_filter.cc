@@ -51,6 +51,7 @@ class RequestDecoderHandleImpl : public Http::RequestDecoderHandle {
 public:
   explicit RequestDecoderHandleImpl(Http::RequestDecoder& decoder) : decoder_(decoder) {}
   OptRef<Http::RequestDecoder> get() override { return decoder_; }
+
 private:
   Http::RequestDecoder& decoder_;
 };
