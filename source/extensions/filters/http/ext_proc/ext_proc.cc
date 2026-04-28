@@ -2007,6 +2007,14 @@ void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   processing_complete_ = true;
   stats_.streams_closed_.inc();
   stats_.server_half_closed_.inc();
+
+  // In observability mode, capture logging info before closing the stream.
+  // encodeComplete() also calls logStreamInfo(), but the ordering is
+  // nondeterministic: if closeStream() nullifies stream_ first, that
+  // call becomes a no-op.
+  if (config_->observabilityMode()) {
+    logStreamInfo();
+  }
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();

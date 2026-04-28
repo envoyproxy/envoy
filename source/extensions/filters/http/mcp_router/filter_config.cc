@@ -56,8 +56,7 @@ McpRouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   return McpRouterStats{MCP_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-std::vector<McpBackendConfig>
-parseBackends(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& config) {
+template <typename Config> std::vector<McpBackendConfig> parseBackends(const Config& config) {
   std::vector<McpBackendConfig> result;
   for (const auto& server : config.servers()) {
     McpBackendConfig backend;
@@ -91,6 +90,21 @@ const McpBackendConfig* McpRouterConfigImpl::findBackend(const std::string& name
     }
   }
   return nullptr;
+}
+
+McpRouterClusterConfigImpl::McpRouterClusterConfigImpl(
+    const envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig& proto_config,
+    McpRouterConfigSharedPtr base_config)
+    : base_config_(std::move(base_config)), backends_(parseBackends(proto_config)),
+      default_backend_name_(backends_.size() == 1 ? backends_[0].name : "") {}
+
+const McpBackendConfig* McpRouterClusterConfigImpl::findBackend(const std::string& name) const {
+  for (const auto& backend : backends_) {
+    if (backend.name == name) {
+      return &backend;
+    }
+  }
+  return base_config_->findBackend(name);
 }
 
 } // namespace McpRouter

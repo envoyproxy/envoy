@@ -227,6 +227,27 @@ public:
               upstream_locality_stats->total_issued_requests() +
               local_upstream_locality_stats.total_issued_requests());
           // Unlike most stats, current requests in progress replaces old requests in progress.
+
+          // Merge load_metric_stats.
+          for (int k = 0; k < local_upstream_locality_stats.load_metric_stats_size(); ++k) {
+            const auto& local_metric = local_upstream_locality_stats.load_metric_stats(k);
+            bool found_metric = false;
+            for (int l = 0; l < upstream_locality_stats->load_metric_stats_size(); ++l) {
+              auto* metric = upstream_locality_stats->mutable_load_metric_stats(l);
+              if (metric->metric_name() == local_metric.metric_name()) {
+                found_metric = true;
+                metric->set_num_requests_finished_with_metric(
+                    metric->num_requests_finished_with_metric() +
+                    local_metric.num_requests_finished_with_metric());
+                metric->set_total_metric_value(metric->total_metric_value() +
+                                               local_metric.total_metric_value());
+                break;
+              }
+            }
+            if (!found_metric) {
+              upstream_locality_stats->add_load_metric_stats()->CopyFrom(local_metric);
+            }
+          }
           break;
         }
       }
@@ -427,6 +448,7 @@ public:
     initiateClientConnection();
     waitForUpstreamResponse(endpoint_index, response_code, send_orca_load_report);
     cleanupUpstreamAndDownstream();
+    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
   }
 
   void updateDropOverloadConfig() {
@@ -456,7 +478,7 @@ public:
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
-  const uint32_t load_report_interval_ms_ = 500;
+  const uint32_t load_report_interval_ms_ = 1000;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LoadStatsIntegrationTest,

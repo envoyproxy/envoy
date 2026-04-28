@@ -139,8 +139,9 @@ bool McpFilter::isValidMcpSseRequest(const Http::RequestHeaderMap& headers) cons
   }
 
   for (size_t i = 0; i < accepts.size(); ++i) {
-    if (absl::StrContains(accepts[i]->value().getStringView(),
-                          Http::Headers::get().ContentTypeValues.TextEventStream)) {
+    const absl::string_view value = accepts[i]->value().getStringView();
+    if (absl::StrContains(value, Http::Headers::get().ContentTypeValues.TextEventStream) ||
+        absl::StrContains(value, "*/*")) {
       return true;
     }
   }
@@ -177,6 +178,10 @@ bool McpFilter::isValidMcpPostRequest(const Http::RequestHeaderMap& headers) con
 
   for (size_t i = 0; i < accepts.size(); ++i) {
     const absl::string_view value = accepts[i]->value().getStringView();
+    if (absl::StrContains(value, "*/*")) {
+      has_sse = true;
+      has_json = true;
+    }
     if (!has_sse &&
         absl::StrContains(value, Http::Headers::get().ContentTypeValues.TextEventStream)) {
       has_sse = true;

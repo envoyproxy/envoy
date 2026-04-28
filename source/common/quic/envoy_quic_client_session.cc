@@ -11,6 +11,9 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_network_connectivity_observer_impl.h"
+#include "source/common/quic/scone_state.h"
+
+#include "quiche/quic/core/quic_bandwidth.h"
 
 namespace Envoy {
 namespace Quic {
@@ -116,6 +119,10 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif
+
+  streamInfo().filterState()->setData(SconeStateKey, std::make_shared<SconeState>(),
+                                      StreamInfo::FilterState::StateType::Mutable,
+                                      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
@@ -350,6 +357,20 @@ void EnvoyQuicClientSession::StartDraining() {
   if (http_connection_callbacks_ != nullptr) {
     // HTTP/3 GOAWAY doesn't have an error code field.
     http_connection_callbacks_->onGoAway(Http::GoAwayErrorCode::NoError);
+  }
+}
+
+void EnvoyQuicClientSession::OnSconePacket(quic::QuicBandwidth bandwidth) {
+  auto* state = streamInfo().filterState()->getDataMutable<SconeState>(SconeStateKey);
+  if (state) {
+    state->scone_max_kbps = bandwidth.ToKBitsPerSecond();
+    auto now = dispatcher_.timeSource().systemTime();
+    state->timestamp_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    ENVOY_CONN_LOG(debug, "SCONE update: {} kbps at {} ms", *this, bandwidth.ToKBitsPerSecond(),
+                   state->timestamp_ms.value());
+  } else {
+    IS_ENVOY_BUG("SconeState not found in FilterState");
   }
 }
 

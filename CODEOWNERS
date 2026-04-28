@@ -477,6 +477,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
 /contrib/kafka/ @mattklein123 @adamkotwasinski
+/contrib/stat_sinks/wasm_filter/ @prashanthjos @UNOWNED
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui
 /contrib/mysql_proxy/ @rshriram @venilnoronha
 /contrib/postgres/protocol/ @agrawroh @cpakulski @jarupatj

@@ -1,5 +1,5 @@
 {
-  "checksum": "5b28fd0dce18a76ab2908a4493989dbf92fe211266706e299c5a49874f95892d",
+  "checksum": "6c229299d001117048a532a667e66e1943ca53f008d36013a5fd3f15ebd71189",
   "crates": {
     "aho-corasick 1.1.4": {
       "name": "aho-corasick",
@@ -2696,7 +2696,7 @@
               "target": "once_cell"
             },
             {
-              "id": "rand 0.9.2",
+              "id": "rand 0.9.4",
               "target": "rand"
             },
             {
@@ -2840,7 +2840,7 @@
               "target": "parking_lot"
             },
             {
-              "id": "rand 0.9.2",
+              "id": "rand 0.9.4",
               "target": "rand"
             },
             {
@@ -5857,14 +5857,14 @@
       ],
       "license_file": null
     },
-    "rand 0.9.2": {
+    "rand 0.9.4": {
       "name": "rand",
-      "version": "0.9.2",
+      "version": "0.9.4",
       "package_url": "https://github.com/rust-random/rand",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/rand/0.9.2/download",
-          "sha256": "6db2770f06117d490610c7488547d543617b21bfa07796d7a12f6f1bd53850d1"
+          "url": "https://static.crates.io/crates/rand/0.9.4/download",
+          "sha256": "44c5af06bb1b7d3216d91932aed5265164bf384dc89cd6ba05cf59a35f5f76ea"
         }
       },
       "targets": [
@@ -5910,7 +5910,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.9.2"
+        "version": "0.9.4"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -6532,7 +6532,7 @@
               "alias": "pki_types"
             },
             {
-              "id": "rustls-webpki 0.103.10",
+              "id": "rustls-webpki 0.103.12",
               "target": "webpki"
             },
             {
@@ -6633,14 +6633,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "rustls-webpki 0.103.10": {
+    "rustls-webpki 0.103.12": {
       "name": "rustls-webpki",
-      "version": "0.103.10",
+      "version": "0.103.12",
       "package_url": "https://github.com/rustls/webpki",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/rustls-webpki/0.103.10/download",
-          "sha256": "df33b2b81ac578cabaf06b89b0631153a3f416b0a886e8a7a1707fb51abbd1ef"
+          "url": "https://static.crates.io/crates/rustls-webpki/0.103.12/download",
+          "sha256": "8279bb85272c9f10811ae6a6c547ff594d6a7f3c6c6b02ee9726d1d0dcfcdd06"
         }
       },
       "targets": [
@@ -6689,7 +6689,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.103.10"
+        "version": "0.103.12"
       },
       "license": "ISC",
       "license_ids": [

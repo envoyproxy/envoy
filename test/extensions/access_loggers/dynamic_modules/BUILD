@@ -18,6 +18,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:access_log_missing_logger_log",
         "//test/extensions/dynamic_modules/test_data/c:access_log_missing_logger_new",
         "//test/extensions/dynamic_modules/test_data/c:access_log_no_op",
+        "//test/extensions/dynamic_modules/test_data/rust:access_log_integration_test",
     ],
     deps = [
         "//envoy/registry",
