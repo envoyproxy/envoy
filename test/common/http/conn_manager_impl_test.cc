@@ -3320,7 +3320,7 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   conn_manager_->onData(fake_input, false);
 }
 
-// When the active span reports wantsFinalizeTags()==false, the HCM calls
+// When the active span reports exportedSpan()==false, the HCM calls
 // HttpTracerUtility::finalizeDownstreamSpan but skips tag string building and storage
 // work on spans whose driver-level export pipeline will drop them. Propagation and
 // per-request span creation are unaffected (exercised elsewhere). The span should
@@ -3330,7 +3330,7 @@ TEST_F(HttpConnectionManagerImplTest, SkipFinalizeDownstreamSpanWhenNotRecording
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
-  EXPECT_CALL(*span, wantsFinalizeTags()).WillRepeatedly(Return(false));
+  EXPECT_CALL(*span, exportedSpan()).WillRepeatedly(Return(false));
 
   // finalizeDownstreamSpan-owned methods must not fire when not wanted
   EXPECT_CALL(*span, setTag(_, _)).Times(0);

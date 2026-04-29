@@ -174,7 +174,7 @@ public:
   bool useLocalDecision() const override { return use_local_decision_; }
   // Fluentd's finishSpan exports unconditionally; the `sampled` flag is only
   // propagated in the W3C traceparent header, not consulted locally.
-  bool wantsFinalizeTags() const override { return true; }
+  bool exportedSpan() const override { return true; }
 
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;

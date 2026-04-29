@@ -9,7 +9,7 @@ using testing::ReturnPointee;
 namespace Envoy {
 namespace Tracing {
 
-MockSpan::MockSpan() { ON_CALL(*this, wantsFinalizeTags()).WillByDefault(Return(true)); }
+MockSpan::MockSpan() { ON_CALL(*this, exportedSpan()).WillByDefault(Return(true)); }
 MockSpan::~MockSpan() = default;
 
 MockConfig::MockConfig() {

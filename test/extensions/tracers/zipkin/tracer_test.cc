@@ -585,10 +585,10 @@ TEST_F(ZipkinTracerTest, FinishNotSampledSpan) {
   SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
   span->setSampled(false);
 
-  // wantsFinalizeTags() must track sampled state
-  EXPECT_FALSE(span->wantsFinalizeTags());
+  // exportedSpan() must track sampled state
+  EXPECT_FALSE(span->exportedSpan());
   span->setSampled(true);
-  EXPECT_TRUE(span->wantsFinalizeTags());
+  EXPECT_TRUE(span->exportedSpan());
   span->setSampled(false);
 
   span->finishSpan();

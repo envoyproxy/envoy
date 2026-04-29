@@ -92,7 +92,7 @@ public:
   bool useLocalDecision() const override { return false; }
   // SkyWalking ships every finished span to OAP. setSampled(false) only sets a skip flag, it does
   // not drop the span.
-  bool wantsFinalizeTags() const override { return true; }
+  bool exportedSpan() const override { return true; }
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getTraceId() const override { return tracing_context_->traceId(); }

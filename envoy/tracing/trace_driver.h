@@ -114,14 +114,14 @@ public:
   virtual void setSampled(bool sampled) PURE;
 
   /**
-   * @return whether finalizeDownstreamSpan's tags add value for this span.
-   *   The HCM uses this to skip building tags that the driver would discard.
+   * @return whether this span will be exported to the tracing backend. The HTTP connection
+   * manager may skip finalize-time tag work for spans that return false, since those tags
+   * would be discarded by the driver anyway.
    *
-   *   Return false only when the span will not be exported at all, or when
-   *   the export pipeline ignores Envoy-set tags. Drivers that ship the span
-   *   regardless of sampling state (Fluentd, SkyWalking) must return true.
+   * If the driver cannot conclusively determine that the span will be dropped, it MUST
+   * return true so that the span is fully populated and suitable for export.
    */
-  virtual bool wantsFinalizeTags() const PURE;
+  virtual bool exportedSpan() const PURE;
 
   /**
    * When the startSpan() of tracer is called, the Envoy tracing decision is passed to the

@@ -152,7 +152,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                                                const StreamInfo::StreamInfo& stream_info,
                                                const Config& tracing_config) {
   // Early exit if tags are not needed
-  if (!span.wantsFinalizeTags()) {
+  if (!span.exportedSpan()) {
     span.finishSpan();
     return;
   }

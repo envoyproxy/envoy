@@ -142,7 +142,7 @@ void DynamicModuleSpan::log(SystemTime timestamp, const std::string& event) {
   config_->on_span_log_(in_module_span_, timestamp_ns, event_buf);
 }
 
-bool DynamicModuleSpan::wantsFinalizeTags() const {
+bool DynamicModuleSpan::exportedSpan() const {
   // TODO(jkoch): extend module ABI with hook as an optimization
   return true;
 }

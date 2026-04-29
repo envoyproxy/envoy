@@ -127,7 +127,7 @@ void Span::setSampled(bool sampled) {
   span_->trace_segment().override_sampling_priority(priority);
 }
 
-bool Span::wantsFinalizeTags() const {
+bool Span::exportedSpan() const {
   // DD does expose sampling_decision()->priority, but the span sampling
   // (eg, DD_SPAN_SAMPLING_RULES and similar) might be configured to resurrect
   // the span later.

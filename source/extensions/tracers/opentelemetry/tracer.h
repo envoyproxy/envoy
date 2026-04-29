@@ -109,9 +109,9 @@ public:
   bool useLocalDecision() const override { return use_local_decision_; }
 
   /**
-   * @return whether or not the span needs finalize tags
+   * @return whether the span will be exported to the OTLP backend.
    */
-  bool wantsFinalizeTags() const override { return sampled_; }
+  bool exportedSpan() const override { return sampled_; }
 
   /**
    * @return whether or not the sampled attribute is set
