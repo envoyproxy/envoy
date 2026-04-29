@@ -111,7 +111,7 @@ void DnsSrvCluster::allTargetsResolved() {
   priority_state_manager.initializePriorityFor(locality_lb_endpoints);
 
   // Only update the list of targets if at least one of them was resolved successfully
-  // this has a down-side: we can loose some of targets for some while but hopefully they'll get
+  // this has a down-side: we can lose some of targets for some while but hopefully they'll get
   // back next time
   bool some_targets_resolved = false;
 
