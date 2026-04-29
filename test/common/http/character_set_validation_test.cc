@@ -79,9 +79,7 @@ TEST(CharacterSetValidationTest, FromCharsInitializesCorrectly) {
 }
 
 // Primary template - selected if expression CAN be constexpr
-template <typename Lambda>
-constexpr auto is_constexpr_impl(Lambda lambda, int)
-    -> decltype((void)std::integral_constant<bool, (lambda(), true)>::value, bool{}) {
+template <typename Lambda, int = (Lambda{}(), 0)> constexpr bool is_constexpr_impl(Lambda, int) {
   return true;
 }
 
