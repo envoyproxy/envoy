@@ -21,6 +21,10 @@ import (
 type tracerConfigWrapper struct {
 	tracer       shared.Tracer
 	configHandle *dymTracerConfigHandle
+
+	// destroyed is set during config_destroy so any late StartSpan / span callbacks
+	// become no-ops instead of re-entering user code.
+	destroyed bool
 }
 
 type tracerSpanWrapper struct {
@@ -29,6 +33,10 @@ type tracerSpanWrapper struct {
 	traceIDCache []byte
 	spanIDCache  []byte
 	baggageCache []byte
+
+	// destroyed is set during span destroy so any late span operations (set_tag,
+	// set_baggage, etc. that arrive concurrent with destroy) become no-ops.
+	destroyed bool
 }
 
 var tracerConfigManager = newManager[tracerConfigWrapper]()
@@ -196,12 +204,16 @@ func envoy_dynamic_module_on_tracer_config_new(
 	configHandle := &dymTracerConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetTracerConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load tracer configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load tracer configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	t, err := configFactory.Create(configHandle, configBytes)
-	if err != nil || t == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load tracer configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load tracer configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if t == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load tracer configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper := &tracerConfigWrapper{tracer: t, configHandle: configHandle}
@@ -214,9 +226,10 @@ func envoy_dynamic_module_on_tracer_config_destroy(
 	configPtr C.envoy_dynamic_module_type_tracer_config_module_ptr,
 ) {
 	w := tracerConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	if w.tracer != nil {
 		w.tracer.OnDestroy()
 	}
@@ -232,7 +245,7 @@ func envoy_dynamic_module_on_tracer_start_span(
 	reason C.envoy_dynamic_module_type_trace_reason,
 ) C.envoy_dynamic_module_type_tracer_span_module_ptr {
 	cfg := tracerConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if cfg == nil || cfg.tracer == nil {
+	if cfg == nil || cfg.tracer == nil || cfg.destroyed {
 		return nil
 	}
 	ctx := &dymTracerSpanContext{hostSpanPtr: hostSpanPtr}
@@ -255,7 +268,7 @@ func envoy_dynamic_module_on_tracer_span_set_operation(
 	operation C.envoy_dynamic_module_type_envoy_buffer,
 ) {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return
 	}
 	w.span.SetOperation(envoyBufferToStringUnsafe(operation))
@@ -268,7 +281,7 @@ func envoy_dynamic_module_on_tracer_span_set_tag(
 	value C.envoy_dynamic_module_type_envoy_buffer,
 ) {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return
 	}
 	w.span.SetTag(envoyBufferToStringUnsafe(key), envoyBufferToStringUnsafe(value))
@@ -281,7 +294,7 @@ func envoy_dynamic_module_on_tracer_span_log(
 	event C.envoy_dynamic_module_type_envoy_buffer,
 ) {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return
 	}
 	w.span.Log(int64(timestampNs), envoyBufferToStringUnsafe(event))
@@ -292,7 +305,7 @@ func envoy_dynamic_module_on_tracer_span_finish(
 	spanPtr C.envoy_dynamic_module_type_tracer_span_module_ptr,
 ) {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return
 	}
 	w.span.Finish()
@@ -304,7 +317,7 @@ func envoy_dynamic_module_on_tracer_span_inject_context(
 	hostSpanPtr C.envoy_dynamic_module_type_tracer_span_envoy_ptr,
 ) {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return
 	}
 	ctx := &dymTracerSpanContext{hostSpanPtr: hostSpanPtr}
@@ -318,7 +331,7 @@ func envoy_dynamic_module_on_tracer_span_spawn_child(
 	startTimeNs C.int64_t,
 ) C.envoy_dynamic_module_type_tracer_span_module_ptr {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return nil
 	}
 	child := w.span.SpawnChild(envoyBufferToStringUnsafe(name), int64(startTimeNs))
@@ -336,7 +349,7 @@ func envoy_dynamic_module_on_tracer_span_set_sampled(
 	sampled C.bool,
 ) {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return
 	}
 	w.span.SetSampled(bool(sampled))
@@ -347,7 +360,7 @@ func envoy_dynamic_module_on_tracer_span_use_local_decision(
 	spanPtr C.envoy_dynamic_module_type_tracer_span_module_ptr,
 ) C.bool {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return true
 	}
 	return C.bool(w.span.UseLocalDecision())
@@ -360,7 +373,7 @@ func envoy_dynamic_module_on_tracer_span_get_baggage(
 	valueOut *C.envoy_dynamic_module_type_module_buffer,
 ) C.bool {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return false
 	}
 	value, ok := w.span.GetBaggage(envoyBufferToStringUnsafe(key))
@@ -387,7 +400,7 @@ func envoy_dynamic_module_on_tracer_span_set_baggage(
 	value C.envoy_dynamic_module_type_envoy_buffer,
 ) {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return
 	}
 	w.span.SetBaggage(envoyBufferToStringUnsafe(key), envoyBufferToStringUnsafe(value))
@@ -399,7 +412,7 @@ func envoy_dynamic_module_on_tracer_span_get_trace_id(
 	valueOut *C.envoy_dynamic_module_type_module_buffer,
 ) C.bool {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return false
 	}
 	value, ok := w.span.GetTraceID()
@@ -425,7 +438,7 @@ func envoy_dynamic_module_on_tracer_span_get_span_id(
 	valueOut *C.envoy_dynamic_module_type_module_buffer,
 ) C.bool {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil || w.span == nil {
+	if w == nil || w.span == nil || w.destroyed {
 		return false
 	}
 	value, ok := w.span.GetSpanID()
@@ -450,9 +463,10 @@ func envoy_dynamic_module_on_tracer_span_destroy(
 	spanPtr C.envoy_dynamic_module_type_tracer_span_module_ptr,
 ) {
 	w := tracerSpanManager.unwrap(unsafe.Pointer(spanPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	if w.span != nil {
 		w.span.OnDestroy()
 	}

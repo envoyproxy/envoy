@@ -330,7 +330,7 @@ type ClusterHostCounts struct {
 type Scheduler interface {
 	// Schedule schedules a function to be executed asynchronously in the thread where the stream
 	// plugin is being processed.
-	// @Param func the function to be executed.
-	// NOTE: This function may be ignored if the related plugin processing is completed.
+	//
+	// NOTE: The function may be ignored if the related plugin processing is completed.
 	Schedule(func())
 }

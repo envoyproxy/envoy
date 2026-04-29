@@ -51,6 +51,11 @@ type bootstrapConfigWrapper struct {
 	extension     shared.BootstrapExtension
 	configHandle  *dymBootstrapConfigHandle
 
+	// destroyed is set during the config_destroy hook so late callbacks (timer fires,
+	// file watch events, lifecycle listener notifications, callout completions, admin
+	// requests, scheduled tasks) become no-ops instead of re-entering user code.
+	destroyed bool
+
 	// timers indexed by their host pointer address.
 	timersMu sync.Mutex
 	timers   map[unsafe.Pointer]*dymBootstrapTimer
@@ -81,6 +86,10 @@ type bootstrapExtensionWrapper struct {
 	hostExtensionPtr C.envoy_dynamic_module_type_bootstrap_extension_envoy_ptr
 	extension        shared.BootstrapExtension
 	configRef        *bootstrapConfigWrapper
+
+	// destroyed is set during the destroy hook so late callbacks (scheduled tasks,
+	// shutdown event, file watcher events) become no-ops instead of re-entering user code.
+	destroyed bool
 }
 
 type bootstrapShutdownCompletion struct {
@@ -497,14 +506,18 @@ func envoy_dynamic_module_on_bootstrap_extension_config_new(
 
 	configFactory := sdk.GetBootstrapExtensionConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load bootstrap extension configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load bootstrap extension configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	wrapper := &bootstrapConfigWrapper{hostConfigPtr: hostConfigPtr}
 	wrapper.configHandle = &dymBootstrapConfigHandle{wrapper: wrapper}
 	ext, err := configFactory.Create(wrapper.configHandle, configBytes)
-	if err != nil || ext == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load bootstrap extension configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load bootstrap extension configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if ext == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load bootstrap extension configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper.extension = ext
@@ -517,9 +530,10 @@ func envoy_dynamic_module_on_bootstrap_extension_config_destroy(
 	configPtr C.envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
 ) {
 	w := bootstrapConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	if w.extension != nil {
 		w.extension.OnDestroy()
 	}
@@ -553,7 +567,7 @@ func envoy_dynamic_module_on_bootstrap_extension_server_initialized(
 	extPtr C.envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
 	w := bootstrapExtensionManager.unwrap(unsafe.Pointer(extPtr))
-	if w == nil || w.extension == nil {
+	if w == nil || w.extension == nil || w.destroyed {
 		return
 	}
 	w.hostExtensionPtr = hostExtensionPtr
@@ -567,7 +581,7 @@ func envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
 	extPtr C.envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
 	w := bootstrapExtensionManager.unwrap(unsafe.Pointer(extPtr))
-	if w == nil || w.extension == nil {
+	if w == nil || w.extension == nil || w.destroyed {
 		return
 	}
 	handle := &dymBootstrapExtensionHandle{hostExtensionPtr: hostExtensionPtr}
@@ -580,7 +594,7 @@ func envoy_dynamic_module_on_bootstrap_extension_drain_started(
 	extPtr C.envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
 	w := bootstrapExtensionManager.unwrap(unsafe.Pointer(extPtr))
-	if w == nil || w.extension == nil {
+	if w == nil || w.extension == nil || w.destroyed {
 		return
 	}
 	handle := &dymBootstrapExtensionHandle{hostExtensionPtr: hostExtensionPtr}
@@ -618,9 +632,10 @@ func envoy_dynamic_module_on_bootstrap_extension_destroy(
 	extPtr C.envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
 	w := bootstrapExtensionManager.unwrap(unsafe.Pointer(extPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	bootstrapExtensionManager.remove(unsafe.Pointer(extPtr))
 }
 
@@ -631,7 +646,7 @@ func envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
 	eventID C.uint64_t,
 ) {
 	w := bootstrapConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil || w.scheduler == nil {
+	if w == nil || w.scheduler == nil || w.destroyed {
 		return
 	}
 	w.scheduler.onScheduled(uint64(eventID))
@@ -644,7 +659,7 @@ func envoy_dynamic_module_on_bootstrap_extension_timer_fired(
 	timerPtr C.envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr,
 ) {
 	w := bootstrapConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
 	w.timersMu.Lock()
@@ -663,7 +678,7 @@ func envoy_dynamic_module_on_bootstrap_extension_file_changed(
 	events C.uint32_t,
 ) {
 	w := bootstrapConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
 	pathStr := envoyBufferToStringUnsafe(path)
@@ -682,7 +697,7 @@ func envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
 	clusterName C.envoy_dynamic_module_type_envoy_buffer,
 ) {
 	w := bootstrapConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil || w.extension == nil {
+	if w == nil || w.extension == nil || w.destroyed {
 		return
 	}
 	if l, ok := w.extension.(shared.BootstrapClusterLifecycleListener); ok {
@@ -697,7 +712,7 @@ func envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
 	clusterName C.envoy_dynamic_module_type_envoy_buffer,
 ) {
 	w := bootstrapConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil || w.extension == nil {
+	if w == nil || w.extension == nil || w.destroyed {
 		return
 	}
 	if l, ok := w.extension.(shared.BootstrapClusterLifecycleListener); ok {
@@ -712,7 +727,7 @@ func envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
 	listenerName C.envoy_dynamic_module_type_envoy_buffer,
 ) {
 	w := bootstrapConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil || w.extension == nil {
+	if w == nil || w.extension == nil || w.destroyed {
 		return
 	}
 	if l, ok := w.extension.(shared.BootstrapListenerLifecycleListener); ok {
@@ -727,7 +742,7 @@ func envoy_dynamic_module_on_bootstrap_extension_listener_removal(
 	listenerName C.envoy_dynamic_module_type_envoy_buffer,
 ) {
 	w := bootstrapConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil || w.extension == nil {
+	if w == nil || w.extension == nil || w.destroyed {
 		return
 	}
 	if l, ok := w.extension.(shared.BootstrapListenerLifecycleListener); ok {
@@ -747,7 +762,7 @@ func envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
 	chunksSize C.size_t,
 ) {
 	w := bootstrapConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
 	resultHeaders := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(headers, int(headersSize)))
@@ -770,7 +785,7 @@ func envoy_dynamic_module_on_bootstrap_extension_admin_request(
 	body C.envoy_dynamic_module_type_envoy_buffer,
 ) C.uint32_t {
 	w := bootstrapConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return 500
 	}
 	// path is used both for handler lookup and is passed through to the user; the lookup is

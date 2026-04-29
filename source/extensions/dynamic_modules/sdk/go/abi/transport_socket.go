@@ -20,6 +20,10 @@ import (
 
 type tsFactoryConfigWrapper struct {
 	factory shared.TransportSocketFactory
+
+	// destroyed is set during factory_config_destroy so any late TransportSocket creation
+	// becomes a no-op instead of re-entering user code.
+	destroyed bool
 }
 
 type tsSocketWrapper struct {
@@ -29,6 +33,10 @@ type tsSocketWrapper struct {
 	// duration of GetProtocol / GetFailureReason callbacks.
 	protocolCache []byte
 	failureCache  []byte
+
+	// destroyed is set during transport_socket_destroy so any late socket callbacks
+	// (do_handshake, do_read, etc.) become no-ops.
+	destroyed bool
 }
 
 var tsFactoryConfigManager = newManager[tsFactoryConfigWrapper]()
@@ -157,16 +165,20 @@ func envoy_dynamic_module_on_transport_socket_factory_config_new(
 	isUpstream C.bool,
 ) C.envoy_dynamic_module_type_transport_socket_factory_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(socketName)
-	configBytes := envoyBufferToBytesUnsafe(socketConfig)
+	configBytes := envoyBufferToBytesCopy(socketConfig)
 
 	configFactory := sdk.GetTransportSocketFactoryConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load transport socket configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load transport socket configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	factory, err := configFactory.Create(nameStr, configBytes, bool(isUpstream))
-	if err != nil || factory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load transport socket configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load transport socket configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if factory == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load transport socket configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper := &tsFactoryConfigWrapper{factory: factory}
@@ -179,9 +191,10 @@ func envoy_dynamic_module_on_transport_socket_factory_config_destroy(
 	configPtr C.envoy_dynamic_module_type_transport_socket_factory_config_module_ptr,
 ) {
 	w := tsFactoryConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	w.factory.OnDestroy()
 	tsFactoryConfigManager.remove(unsafe.Pointer(configPtr))
 }
@@ -192,7 +205,7 @@ func envoy_dynamic_module_on_transport_socket_new(
 	hostSocketPtr C.envoy_dynamic_module_type_transport_socket_envoy_ptr,
 ) C.envoy_dynamic_module_type_transport_socket_module_ptr {
 	cfg := tsFactoryConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if cfg == nil {
+	if cfg == nil || cfg.destroyed {
 		return nil
 	}
 	handle := &dymTransportSocketHandle{hostSocketPtr: hostSocketPtr}
@@ -210,9 +223,10 @@ func envoy_dynamic_module_on_transport_socket_destroy(
 	socketPtr C.envoy_dynamic_module_type_transport_socket_module_ptr,
 ) {
 	w := tsSocketManager.unwrap(unsafe.Pointer(socketPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	if w.socket != nil {
 		w.socket.OnDestroy()
 	}
@@ -225,7 +239,7 @@ func envoy_dynamic_module_on_transport_socket_set_callbacks(
 	socketPtr C.envoy_dynamic_module_type_transport_socket_module_ptr,
 ) {
 	w := tsSocketManager.unwrap(unsafe.Pointer(socketPtr))
-	if w == nil || w.socket == nil {
+	if w == nil || w.socket == nil || w.destroyed {
 		return
 	}
 	handle := &dymTransportSocketHandle{hostSocketPtr: hostSocketPtr}
@@ -238,7 +252,7 @@ func envoy_dynamic_module_on_transport_socket_on_connected(
 	socketPtr C.envoy_dynamic_module_type_transport_socket_module_ptr,
 ) {
 	w := tsSocketManager.unwrap(unsafe.Pointer(socketPtr))
-	if w == nil || w.socket == nil {
+	if w == nil || w.socket == nil || w.destroyed {
 		return
 	}
 	handle := &dymTransportSocketHandle{hostSocketPtr: hostSocketPtr}
@@ -251,7 +265,7 @@ func envoy_dynamic_module_on_transport_socket_do_read(
 	socketPtr C.envoy_dynamic_module_type_transport_socket_module_ptr,
 ) C.envoy_dynamic_module_type_transport_socket_io_result {
 	w := tsSocketManager.unwrap(unsafe.Pointer(socketPtr))
-	if w == nil || w.socket == nil {
+	if w == nil || w.socket == nil || w.destroyed {
 		return C.envoy_dynamic_module_type_transport_socket_io_result{
 			action: C.envoy_dynamic_module_type_transport_socket_post_io_action_Close,
 		}
@@ -273,7 +287,7 @@ func envoy_dynamic_module_on_transport_socket_do_write(
 	endStream C.bool,
 ) C.envoy_dynamic_module_type_transport_socket_io_result {
 	w := tsSocketManager.unwrap(unsafe.Pointer(socketPtr))
-	if w == nil || w.socket == nil {
+	if w == nil || w.socket == nil || w.destroyed {
 		return C.envoy_dynamic_module_type_transport_socket_io_result{
 			action: C.envoy_dynamic_module_type_transport_socket_post_io_action_Close,
 		}
@@ -294,7 +308,7 @@ func envoy_dynamic_module_on_transport_socket_close(
 	event C.envoy_dynamic_module_type_network_connection_event,
 ) {
 	w := tsSocketManager.unwrap(unsafe.Pointer(socketPtr))
-	if w == nil || w.socket == nil {
+	if w == nil || w.socket == nil || w.destroyed {
 		return
 	}
 	handle := &dymTransportSocketHandle{hostSocketPtr: hostSocketPtr}
@@ -308,7 +322,7 @@ func envoy_dynamic_module_on_transport_socket_get_protocol(
 	result *C.envoy_dynamic_module_type_module_buffer,
 ) {
 	w := tsSocketManager.unwrap(unsafe.Pointer(socketPtr))
-	if w == nil || w.socket == nil {
+	if w == nil || w.socket == nil || w.destroyed {
 		result.ptr = nil
 		result.length = 0
 		return
@@ -330,7 +344,7 @@ func envoy_dynamic_module_on_transport_socket_get_failure_reason(
 	result *C.envoy_dynamic_module_type_module_buffer,
 ) {
 	w := tsSocketManager.unwrap(unsafe.Pointer(socketPtr))
-	if w == nil || w.socket == nil {
+	if w == nil || w.socket == nil || w.destroyed {
 		result.ptr = nil
 		result.length = 0
 		return
@@ -351,7 +365,7 @@ func envoy_dynamic_module_on_transport_socket_can_flush_close(
 	socketPtr C.envoy_dynamic_module_type_transport_socket_module_ptr,
 ) C.bool {
 	w := tsSocketManager.unwrap(unsafe.Pointer(socketPtr))
-	if w == nil || w.socket == nil {
+	if w == nil || w.socket == nil || w.destroyed {
 		return true
 	}
 	return C.bool(w.socket.CanFlushClose())

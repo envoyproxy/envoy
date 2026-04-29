@@ -565,12 +565,16 @@ func envoy_dynamic_module_on_listener_filter_config_new(
 	configHandle := &dymListenerConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetListenerFilterConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load listener filter configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load listener filter configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	factory, err := configFactory.Create(configHandle, configBytes)
-	if err != nil || factory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load listener filter configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load listener filter configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if factory == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load listener filter configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper := &listenerFilterConfigWrapper{factory: factory, configHandle: configHandle}

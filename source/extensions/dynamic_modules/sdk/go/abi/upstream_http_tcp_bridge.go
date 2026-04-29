@@ -179,12 +179,16 @@ func envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
 
 	configFactory := sdk.GetUpstreamHttpTcpBridgeConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load upstream HTTP/TCP bridge configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load upstream HTTP/TCP bridge configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	factory, err := configFactory.Create(nameStr, configBytes)
-	if err != nil || factory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load upstream HTTP/TCP bridge configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load upstream HTTP/TCP bridge configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if factory == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load upstream HTTP/TCP bridge configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper := &uhtbConfigWrapper{factory: factory}

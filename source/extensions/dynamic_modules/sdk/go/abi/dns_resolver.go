@@ -21,11 +21,19 @@ import (
 type dnsResolverConfigWrapper struct {
 	factory      shared.DnsResolverFactory
 	configHandle *dymDnsResolverConfigHandle
+
+	// destroyed is set during config_destroy so any late resolver creation becomes a
+	// no-op instead of re-entering user code.
+	destroyed bool
 }
 
 type dnsResolverWrapper struct {
 	resolver  shared.DnsResolver
 	configRef *dnsResolverConfigWrapper // for ResolveComplete via the config handle
+
+	// destroyed is set during resolver_destroy so any late resolve / cancel /
+	// reset_networking callbacks become no-ops.
+	destroyed bool
 }
 
 // dnsQueryWrapper is a stable Go-allocated cell that backs the opaque query pointer handed to
@@ -216,12 +224,16 @@ func envoy_dynamic_module_on_dns_resolver_config_new(
 	configHandle := &dymDnsResolverConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetDnsResolverConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load DNS resolver configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load DNS resolver configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	factory, err := configFactory.Create(configHandle, configBytes)
-	if err != nil || factory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load DNS resolver configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load DNS resolver configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if factory == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load DNS resolver configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper := &dnsResolverConfigWrapper{factory: factory, configHandle: configHandle}
@@ -234,9 +246,10 @@ func envoy_dynamic_module_on_dns_resolver_config_destroy(
 	configPtr C.envoy_dynamic_module_type_dns_resolver_config_module_ptr,
 ) {
 	w := dnsResolverConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	w.factory.OnDestroy()
 	dnsResolverConfigManager.remove(unsafe.Pointer(configPtr))
 }
@@ -247,7 +260,7 @@ func envoy_dynamic_module_on_dns_resolver_new(
 	hostResolverPtr C.envoy_dynamic_module_type_dns_resolver_envoy_ptr,
 ) C.envoy_dynamic_module_type_dns_resolver_module_ptr {
 	cfg := dnsResolverConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if cfg == nil {
+	if cfg == nil || cfg.destroyed {
 		return nil
 	}
 	// Bind the resolver pointer for ResolveComplete callbacks.
@@ -270,9 +283,10 @@ func envoy_dynamic_module_on_dns_resolver_destroy(
 	resolverPtr C.envoy_dynamic_module_type_dns_resolver_module_ptr,
 ) {
 	w := dnsResolverManager.unwrap(unsafe.Pointer(resolverPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	if w.resolver != nil {
 		w.resolver.OnDestroy()
 	}
@@ -287,7 +301,7 @@ func envoy_dynamic_module_on_dns_resolve(
 	queryID C.uint64_t,
 ) C.envoy_dynamic_module_type_dns_query_module_ptr {
 	w := dnsResolverManager.unwrap(unsafe.Pointer(resolverPtr))
-	if w == nil || w.resolver == nil {
+	if w == nil || w.resolver == nil || w.destroyed {
 		return nil
 	}
 	dnsNameStr := envoyBufferToStringUnsafe(dnsName)
@@ -308,7 +322,7 @@ func envoy_dynamic_module_on_dns_resolve_cancel(
 	queryPtr C.envoy_dynamic_module_type_dns_query_module_ptr,
 ) {
 	w := dnsResolverManager.unwrap(unsafe.Pointer(resolverPtr))
-	if w == nil || w.resolver == nil {
+	if w == nil || w.resolver == nil || w.destroyed {
 		return
 	}
 	q := dnsQueryManager.unwrap(unsafe.Pointer(queryPtr))
@@ -324,7 +338,7 @@ func envoy_dynamic_module_on_dns_resolver_reset_networking(
 	resolverPtr C.envoy_dynamic_module_type_dns_resolver_module_ptr,
 ) {
 	w := dnsResolverManager.unwrap(unsafe.Pointer(resolverPtr))
-	if w == nil || w.resolver == nil {
+	if w == nil || w.resolver == nil || w.destroyed {
 		return
 	}
 	w.resolver.ResetNetworking()

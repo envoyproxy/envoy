@@ -20,6 +20,10 @@ import (
 
 type matcherConfigWrapper struct {
 	matcher shared.Matcher
+
+	// destroyed is set during config_destroy so a late on_match becomes a no-op
+	// returning false instead of re-entering user code.
+	destroyed bool
 }
 
 var matcherConfigManager = newManager[matcherConfigWrapper]()
@@ -87,12 +91,16 @@ func envoy_dynamic_module_on_matcher_config_new(
 
 	configFactory := sdk.GetMatcherConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load matcher configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load matcher configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	matcher, err := configFactory.Create(nameStr, configBytes)
-	if err != nil || matcher == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load matcher configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load matcher configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if matcher == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load matcher configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper := &matcherConfigWrapper{matcher: matcher}
@@ -105,9 +113,10 @@ func envoy_dynamic_module_on_matcher_config_destroy(
 	configPtr C.envoy_dynamic_module_type_matcher_config_module_ptr,
 ) {
 	w := matcherConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	if w.matcher != nil {
 		w.matcher.OnDestroy()
 	}
@@ -120,7 +129,7 @@ func envoy_dynamic_module_on_matcher_match(
 	inputPtr C.envoy_dynamic_module_type_matcher_input_envoy_ptr,
 ) C.bool {
 	w := matcherConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil || w.matcher == nil {
+	if w == nil || w.matcher == nil || w.destroyed {
 		return false
 	}
 	ctx := &dymMatchInputContext{hostInputPtr: inputPtr}

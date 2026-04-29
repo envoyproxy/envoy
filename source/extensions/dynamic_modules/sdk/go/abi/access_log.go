@@ -21,10 +21,18 @@ import (
 type accessLoggerConfigWrapper struct {
 	factory      shared.AccessLoggerFactory
 	configHandle *dymAccessLoggerConfigHandle
+
+	// destroyed is set during config_destroy so any late logger creation becomes a
+	// no-op instead of re-entering user code.
+	destroyed bool
 }
 
 type accessLoggerWrapper struct {
 	logger shared.AccessLogger
+
+	// destroyed is set during logger_destroy so any late log / flush callbacks become
+	// no-ops.
+	destroyed bool
 }
 
 var accessLoggerConfigManager = newManager[accessLoggerConfigWrapper]()
@@ -555,12 +563,16 @@ func envoy_dynamic_module_on_access_logger_config_new(
 	configHandle := &dymAccessLoggerConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetAccessLoggerConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load access logger configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load access logger configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	factory, err := configFactory.Create(configHandle, configBytes)
-	if err != nil || factory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load access logger configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load access logger configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if factory == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load access logger configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper := &accessLoggerConfigWrapper{factory: factory, configHandle: configHandle}
@@ -573,9 +585,10 @@ func envoy_dynamic_module_on_access_logger_config_destroy(
 	configPtr C.envoy_dynamic_module_type_access_logger_config_module_ptr,
 ) {
 	wrapper := accessLoggerConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if wrapper == nil {
+	if wrapper == nil || wrapper.destroyed {
 		return
 	}
+	wrapper.destroyed = true
 	wrapper.factory.OnDestroy()
 	accessLoggerConfigManager.remove(unsafe.Pointer(configPtr))
 }
@@ -586,7 +599,7 @@ func envoy_dynamic_module_on_access_logger_new(
 	_ C.envoy_dynamic_module_type_access_logger_envoy_ptr,
 ) C.envoy_dynamic_module_type_access_logger_module_ptr {
 	cfg := accessLoggerConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if cfg == nil {
+	if cfg == nil || cfg.destroyed {
 		return nil
 	}
 	logger := cfg.factory.Create()
@@ -605,7 +618,7 @@ func envoy_dynamic_module_on_access_logger_log(
 	logType C.envoy_dynamic_module_type_access_log_type,
 ) {
 	w := accessLoggerManager.unwrap(unsafe.Pointer(loggerPtr))
-	if w == nil || w.logger == nil {
+	if w == nil || w.logger == nil || w.destroyed {
 		return
 	}
 	ctx := &dymAccessLogContext{hostLoggerPtr: hostLoggerPtr}
@@ -617,9 +630,10 @@ func envoy_dynamic_module_on_access_logger_destroy(
 	loggerPtr C.envoy_dynamic_module_type_access_logger_module_ptr,
 ) {
 	w := accessLoggerManager.unwrap(unsafe.Pointer(loggerPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	if w.logger != nil {
 		w.logger.OnDestroy()
 	}
@@ -631,7 +645,7 @@ func envoy_dynamic_module_on_access_logger_flush(
 	loggerPtr C.envoy_dynamic_module_type_access_logger_module_ptr,
 ) {
 	w := accessLoggerManager.unwrap(unsafe.Pointer(loggerPtr))
-	if w == nil || w.logger == nil {
+	if w == nil || w.logger == nil || w.destroyed {
 		return
 	}
 	w.logger.Flush()

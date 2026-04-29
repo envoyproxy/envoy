@@ -1989,12 +1989,16 @@ func envoy_dynamic_module_on_http_filter_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_http_filter_config_module_ptr {
 	nameString := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configHandle := &dymConfigHandle{hostConfigPtr: hostConfigPtr}
 	factory, err := sdk.NewHttpFilterFactory(configHandle, nameString, configBytes)
-	if err != nil || factory == nil {
-		configHandle.Log(shared.LogLevelWarn, "Failed to load configuration: %v", err)
+	if err != nil {
+		configHandle.Log(shared.LogLevelWarn, "Failed to load HTTP filter configuration for %q: %v", nameString, err)
+		return nil
+	}
+	if factory == nil {
+		configHandle.Log(shared.LogLevelWarn, "Failed to load HTTP filter configuration for %q: factory returned nil", nameString)
 		return nil
 	}
 	configPtr := configManager.record(&httpFilterConfigWrapper{pluginFactory: factory, configHandle: configHandle})
@@ -2020,7 +2024,7 @@ func envoy_dynamic_module_on_http_filter_per_route_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_http_filter_per_route_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	// The route config handle only make logging available.
 	configHandle := &dymRouteConfigHandle{}
@@ -2028,13 +2032,18 @@ func envoy_dynamic_module_on_http_filter_per_route_config_new(
 	configFactory := sdk.GetHttpFilterConfigFactory(nameStr)
 	if configFactory == nil {
 		configHandle.Log(shared.LogLevelWarn,
-			"Failed to load configuration: no factory for %s", nameStr)
+			"Failed to load HTTP per-route configuration for %q: no factory registered", nameStr)
 		return nil
 	}
 	parsedConfig, err := configFactory.CreatePerRoute(configBytes)
-	if err != nil || parsedConfig == nil {
+	if err != nil {
 		configHandle.Log(shared.LogLevelWarn,
-			"Failed to load per-route configuration: %v", err)
+			"Failed to load HTTP per-route configuration for %q: %v", nameStr, err)
+		return nil
+	}
+	if parsedConfig == nil {
+		configHandle.Log(shared.LogLevelWarn,
+			"Failed to load HTTP per-route configuration for %q: factory returned nil", nameStr)
 		return nil
 	}
 

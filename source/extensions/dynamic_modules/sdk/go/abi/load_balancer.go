@@ -406,12 +406,16 @@ func envoy_dynamic_module_on_lb_config_new(
 	configHandle := &dymLbConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetLoadBalancerConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load LB configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load load balancer configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	factory, err := configFactory.Create(configHandle, configBytes)
-	if err != nil || factory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load LB configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load load balancer configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if factory == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load load balancer configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper := &lbConfigWrapper{factory: factory, configHandle: configHandle}

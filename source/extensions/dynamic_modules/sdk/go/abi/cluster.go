@@ -47,6 +47,11 @@ type clusterWrapper struct {
 
 	shutdownMu         sync.Mutex
 	shutdownCompletion *clusterShutdownCompletion
+
+	// destroyed is set during the destroy hook so late callbacks (scheduled tasks,
+	// callouts that fire as the cluster is being torn down) become no-ops instead of
+	// re-entering user code.
+	destroyed bool
 }
 
 type clusterShutdownCompletion struct {
@@ -62,6 +67,10 @@ type clusterLbWrapper struct {
 
 	asyncMu      sync.Mutex
 	asyncHandles map[*dymClusterAsyncCompletion]struct{}
+
+	// destroyed is set during the destroy hook to prevent late callbacks (cancel,
+	// host-membership updates) from re-entering user code after OnDestroy.
+	destroyed bool
 }
 
 var clusterConfigManager = newManager[clusterConfigWrapper]()
@@ -666,12 +675,16 @@ func envoy_dynamic_module_on_cluster_config_new(
 	configHandle := &dymClusterConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetClusterConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load cluster configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load cluster configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	factory, err := configFactory.Create(configHandle, configBytes)
-	if err != nil || factory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load cluster configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load cluster configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if factory == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load cluster configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper := &clusterConfigWrapper{
@@ -718,6 +731,11 @@ func envoy_dynamic_module_on_cluster_new(
 }
 
 //export envoy_dynamic_module_on_cluster_init
+//
+// Init is the first lifecycle callback after _new; it must not see a destroyed wrapper
+// (Envoy serializes _new -> _init -> _destroy on the main thread). The destroyed-flag
+// guards on subsequent hooks below cover the case where a late callback races with the
+// destroy hook running concurrently on the same thread.
 func envoy_dynamic_module_on_cluster_init(
 	hostClusterPtr C.envoy_dynamic_module_type_cluster_envoy_ptr,
 	clusterPtr C.envoy_dynamic_module_type_cluster_module_ptr,
@@ -735,9 +753,10 @@ func envoy_dynamic_module_on_cluster_destroy(
 	clusterPtr C.envoy_dynamic_module_type_cluster_module_ptr,
 ) {
 	w := clusterManager.unwrap(unsafe.Pointer(clusterPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	if w.cluster != nil {
 		w.cluster.OnDestroy()
 	}
@@ -774,9 +793,10 @@ func envoy_dynamic_module_on_cluster_lb_destroy(
 	lbPtr C.envoy_dynamic_module_type_cluster_lb_module_ptr,
 ) {
 	w := clusterLbManager.unwrap(unsafe.Pointer(lbPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	if w.lb != nil {
 		w.lb.OnDestroy()
 	}
@@ -791,7 +811,7 @@ func envoy_dynamic_module_on_cluster_lb_choose_host(
 	asyncOut *C.envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr,
 ) {
 	w := clusterLbManager.unwrap(unsafe.Pointer(lbPtr))
-	if w == nil || w.lb == nil {
+	if w == nil || w.lb == nil || w.destroyed {
 		*hostOut = nil
 		*asyncOut = nil
 		return
@@ -830,7 +850,7 @@ func envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
 	asyncPtr C.envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr,
 ) {
 	w := clusterLbManager.unwrap(unsafe.Pointer(lbPtr))
-	if w == nil || w.lb == nil {
+	if w == nil || w.lb == nil || w.destroyed {
 		return
 	}
 	a := clusterAsyncCompletionManager.unwrap(unsafe.Pointer(asyncPtr))
@@ -858,7 +878,7 @@ func envoy_dynamic_module_on_cluster_scheduled(
 	eventID C.uint64_t,
 ) {
 	w := clusterManager.unwrap(unsafe.Pointer(clusterPtr))
-	if w == nil || w.scheduler == nil {
+	if w == nil || w.scheduler == nil || w.destroyed {
 		return
 	}
 	w.hostClusterPtr = hostClusterPtr
@@ -871,7 +891,7 @@ func envoy_dynamic_module_on_cluster_server_initialized(
 	clusterPtr C.envoy_dynamic_module_type_cluster_module_ptr,
 ) {
 	w := clusterManager.unwrap(unsafe.Pointer(clusterPtr))
-	if w == nil || w.cluster == nil {
+	if w == nil || w.cluster == nil || w.destroyed {
 		return
 	}
 	w.hostClusterPtr = hostClusterPtr
@@ -884,7 +904,7 @@ func envoy_dynamic_module_on_cluster_drain_started(
 	clusterPtr C.envoy_dynamic_module_type_cluster_module_ptr,
 ) {
 	w := clusterManager.unwrap(unsafe.Pointer(clusterPtr))
-	if w == nil || w.cluster == nil {
+	if w == nil || w.cluster == nil || w.destroyed {
 		return
 	}
 	w.hostClusterPtr = hostClusterPtr
@@ -899,7 +919,7 @@ func envoy_dynamic_module_on_cluster_shutdown(
 	completionContext unsafe.Pointer,
 ) {
 	w := clusterManager.unwrap(unsafe.Pointer(clusterPtr))
-	if w == nil || w.cluster == nil {
+	if w == nil || w.cluster == nil || w.destroyed {
 		C.cgoClusterInvokeEventCb(completionCallback, completionContext)
 		return
 	}
@@ -928,7 +948,7 @@ func envoy_dynamic_module_on_cluster_http_callout_done(
 	chunksSize C.size_t,
 ) {
 	w := clusterManager.unwrap(unsafe.Pointer(clusterPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
 	resultHeaders := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(headers, int(headersSize)))
@@ -950,7 +970,7 @@ func envoy_dynamic_module_on_cluster_lb_on_host_membership_update(
 	numHostsRemoved C.size_t,
 ) {
 	w := clusterLbManager.unwrap(unsafe.Pointer(lbPtr))
-	if w == nil || w.lb == nil {
+	if w == nil || w.lb == nil || w.destroyed {
 		return
 	}
 	w.hostLbPtr = hostLbPtr

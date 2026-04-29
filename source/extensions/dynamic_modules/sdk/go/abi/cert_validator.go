@@ -23,6 +23,10 @@ type certValidatorWrapper struct {
 	// digestCache holds the most-recent digest bytes returned from UpdateDigest, keeping the
 	// memory alive for the duration of the on_update_digest call.
 	digestCache []byte
+
+	// destroyed is set during config_destroy so any late callbacks (verify_cert_chain,
+	// get_ssl_verify_mode, update_digest) become no-ops.
+	destroyed bool
 }
 
 var certValidatorManager = newManager[certValidatorWrapper]()
@@ -73,12 +77,16 @@ func envoy_dynamic_module_on_cert_validator_config_new(
 
 	configFactory := sdk.GetCertValidatorConfigFactory(nameStr)
 	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load cert validator configuration: no factory for %s", []any{nameStr})
+		hostLog(shared.LogLevelWarn, "Failed to load cert validator configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
 	v, err := configFactory.Create(nameStr, configBytes)
-	if err != nil || v == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load cert validator configuration: %v", []any{err})
+	if err != nil {
+		hostLog(shared.LogLevelWarn, "Failed to load cert validator configuration for %q: %v", []any{nameStr, err})
+		return nil
+	}
+	if v == nil {
+		hostLog(shared.LogLevelWarn, "Failed to load cert validator configuration for %q: factory returned nil", []any{nameStr})
 		return nil
 	}
 	wrapper := &certValidatorWrapper{validator: v}
@@ -91,9 +99,10 @@ func envoy_dynamic_module_on_cert_validator_config_destroy(
 	configPtr C.envoy_dynamic_module_type_cert_validator_config_module_ptr,
 ) {
 	w := certValidatorManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil {
+	if w == nil || w.destroyed {
 		return
 	}
+	w.destroyed = true
 	if w.validator != nil {
 		w.validator.OnDestroy()
 	}
@@ -110,7 +119,7 @@ func envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
 	isServer C.bool,
 ) C.envoy_dynamic_module_type_cert_validator_validation_result {
 	w := certValidatorManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil || w.validator == nil {
+	if w == nil || w.validator == nil || w.destroyed {
 		return C.envoy_dynamic_module_type_cert_validator_validation_result{
 			status:          C.envoy_dynamic_module_type_cert_validator_validation_status_Failed,
 			detailed_status: C.envoy_dynamic_module_type_cert_validator_client_validation_status_Failed,
@@ -138,7 +147,7 @@ func envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
 	handshakerProvidesCertificates C.bool,
 ) C.int {
 	w := certValidatorManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil || w.validator == nil {
+	if w == nil || w.validator == nil || w.destroyed {
 		return 0
 	}
 	return C.int(w.validator.GetSSLVerifyMode(bool(handshakerProvidesCertificates)))
@@ -150,7 +159,7 @@ func envoy_dynamic_module_on_cert_validator_update_digest(
 	outData *C.envoy_dynamic_module_type_module_buffer,
 ) {
 	w := certValidatorManager.unwrap(unsafe.Pointer(configPtr))
-	if w == nil || w.validator == nil {
+	if w == nil || w.validator == nil || w.destroyed {
 		return
 	}
 	digest := w.validator.UpdateDigest()

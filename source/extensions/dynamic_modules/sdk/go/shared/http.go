@@ -90,38 +90,28 @@ const (
 // not implement flexible stream control. But it should be enough for most of the use cases.
 type HttpFilter interface {
 	// OnRequestHeaders will be called when the request headers are received.
-	// @Param headers the request headers.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Return HeadersStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnRequestHeaders(headers HeaderMap, endOfStream bool) HeadersStatus
 
 	// OnRequestBody will be called when the request body are received. This may be called multiple times.
-	// @Param body the request body.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Return BodyStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnRequestBody(body BodyBuffer, endOfStream bool) BodyStatus
 
 	// OnRequestTrailers will be called when the request trailers are received.
-	// @Param trailers the request trailers.
-	// @Return TrailersStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnRequestTrailers(trailers HeaderMap) TrailersStatus
 
 	// OnResponseHeaders will be called when the response headers are received.
-	// @Param headers the response headers.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Return HeadersStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnResponseHeaders(headers HeaderMap, endOfStream bool) HeadersStatus
 
 	// OnResponseBody will be called when the response body is received. This may be called multiple
 	// times.
-	// @Param body the response body.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Return BodyStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnResponseBody(body BodyBuffer, endOfStream bool) BodyStatus
 
 	// OnResponseTrailers will be called when the response trailers are received.
-	// @Param trailers the response trailers.
-	// @Return TrailersStatus the status to control the plugin chain processing.
+	// Returns the status to control the plugin chain processing.
 	OnResponseTrailers(trailers HeaderMap) TrailersStatus
 
 	// OnStreamComplete is called when the stream processing is complete and before access logs
@@ -139,11 +129,11 @@ type HttpFilter interface {
 	// reply proceed (LocalReplyStatusContinue) or ask Envoy to reset the stream instead
 	// (LocalReplyStatusContinueAndResetStream). This is invoked before the reply leaves
 	// Envoy and before any stream reset.
-	// @Param responseCode the HTTP status code of the local reply.
-	// @Param details a short description of why the local reply is being sent (e.g.,
+	//
+	// details is a short description of why the local reply is being sent (e.g.
 	// "buffer overflow", "rate limit exceeded"). The buffer aliases Envoy memory; copy
-	// before retaining past this call.
-	// @Param resetImminent true if Envoy is going to reset the stream after this call.
+	// before retaining past this call. resetImminent is true if Envoy is going to reset
+	// the stream after this call.
 	OnLocalReply(responseCode uint32, details UnsafeEnvoyBuffer, resetImminent bool) LocalReplyStatus
 }
 
@@ -244,11 +234,9 @@ type BodyBuffer interface {
 	GetSize() uint64
 
 	// Drain removes the specified number of bytes from the beginning of the body buffer.
-	// @Param numBytes the number of bytes to drain.
 	Drain(numBytes uint64)
 
 	// Append adds the specified bytes to the end of the body buffer.
-	// @Param data the bytes to append.
 	Append(data []byte)
 }
 
@@ -393,43 +381,28 @@ type DownstreamWatermarkCallbacks interface {
 // This should be implemented by the SDK or runtime.
 type HttpFilterHandle interface {
 	// GetMetadataString retrieves the dynamic metadata string value of the stream.
-	// @Param source the metadata source type.
-	// @Param metadataNamespace the metadata namespace.
-	// @Param key the metadata key.
-	// @Return the metadata value if found, otherwise an empty UnsafeEnvoyBuffer.
+	// Returns metadata value if found, otherwise an empty UnsafeEnvoyBuffer.
 	GetMetadataString(source MetadataSourceType, metadataNamespace, key string) (UnsafeEnvoyBuffer, bool)
 
 	// GetMetadataNumber retrieves the dynamic metadata number value of the stream.
-	// @Param source the metadata source type.
-	// @Param metadataNamespace the metadata namespace.
-	// @Param key the metadata key.
-	// @Return the metadata value if found, otherwise nil.
+	// Returns metadata value if found, otherwise nil.
 	GetMetadataNumber(source MetadataSourceType, metadataNamespace, key string) (float64, bool)
 
 	// GetMetadataBool retrieves the dynamic metadata bool value of the stream.
-	// @Param source the metadata source type.
-	// @Param metadataNamespace the metadata namespace.
-	// @Param key the metadata key.
-	// @Return the metadata value and true if found, otherwise false.
+	// Returns metadata value and true if found, otherwise false.
 	GetMetadataBool(source MetadataSourceType, metadataNamespace, key string) (bool, bool)
 
 	// SetMetadata sets the dynamic metadata value of the stream.
-	// @Param metadataNamespace the metadata namespace.
-	// @Param key the metadata key.
-	// @Param value the metadata value. Only string/int/float/bool are supported.
 	SetMetadata(metadataNamespace, key string, value any)
 
 	// GetMetadataKeys retrieves all keys in the given metadata namespace.
-	// @Param source the metadata source type.
-	// @Param metadataNamespace the metadata namespace.
-	// @Return the list of keys in the namespace, or nil if the namespace does not exist.
+	// Returns list of keys in the namespace, or nil if the namespace does not exist.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
 	GetMetadataKeys(source MetadataSourceType, metadataNamespace string) []UnsafeEnvoyBuffer
 
 	// GetMetadataNamespaces retrieves all namespace names in the metadata.
-	// @Param source the metadata source type.
-	// @Return the list of namespace names, or nil if no namespaces exist.
+	// Returns list of namespace names, or nil if no namespaces exist.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
 	GetMetadataNamespaces(source MetadataSourceType) []UnsafeEnvoyBuffer
@@ -475,76 +448,57 @@ type HttpFilterHandle interface {
 	GetMetadataListBool(source MetadataSourceType, metadataNamespace, key string, index int) (bool, bool)
 
 	// GetFilterState retrieves the serialized filter state value of the stream.
-	// @Param key the filter state key.
-	// @Return the filter state value if found, otherwise an empty UnsafeEnvoyBuffer.
+	// Returns filter state value if found, otherwise an empty UnsafeEnvoyBuffer.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
 	GetFilterState(key string) (UnsafeEnvoyBuffer, bool)
 
 	// SetFilterState sets the serialized filter state value of the stream.
-	// @Param key the filter state key.
-	// @Param value the filter state value.
 	SetFilterState(key string, value []byte)
 
 	// GetAttributeString retrieves the string attribute value of the stream.
-	// @Param attributeID the attribute ID.
-	// @Return the attribute value if found, otherwise an empty UnsafeEnvoyBuffer.
+	// Returns attribute value if found, otherwise an empty UnsafeEnvoyBuffer.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
 	// copy the data if you need to keep it and use it later.
 	GetAttributeString(attributeID AttributeID) (UnsafeEnvoyBuffer, bool)
 
 	// GetAttributeNumber retrieves the integer attribute value of the stream.
-	// @Param attributeID the attribute ID.
-	// @Return the attribute value if found, otherwise (0, false).
+	// Returns attribute value if found, otherwise (0, false).
 	GetAttributeNumber(attributeID AttributeID) (uint64, bool)
 
 	// GetAttributeBool retrieves the bool attribute value of the stream.
-	// @Param attributeID the attribute ID.
-	// @Return the attribute value and true if found, otherwise false.
+	// Returns attribute value and true if found, otherwise false.
 	GetAttributeBool(attributeID AttributeID) (bool, bool)
 
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
-	// @Param key the data key.
-	// @Return the data value if found, otherwise nil.
+	// Returns data value if found, otherwise nil.
 	GetData(key string) any
 
 	// SetData sets internal data for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
-	// @Param key the data key.
-	// @Param value the data value.
 	SetData(key string, value any)
 
 	// SendLocalResponse sends a local reply to the client and terminates the stream.
-	// @Param status the HTTP status code.
-	// @Param headers the response headers.
-	// @Param body the response body.
-	// @Param detail a short description to the response for debugging purposes.
 	SendLocalResponse(status uint32, headers [][2]string, body []byte, detail string)
 
 	// SendResponseHeaders sends response headers to the client. This is used for
 	// streaming local replies.
 	//
-	// @Param headers the response headers.
-	// @Param endOfStream whether this is the end of the stream.
 	SendResponseHeaders(headers [][2]string, endOfStream bool)
 
 	// SendResponseData sends response body data to the client. This is used for
 	// streaming local replies.
 	//
-	// @Param body the response body data.
-	// @Param endOfStream whether this is the end of the stream.
 	SendResponseData(body []byte, endOfStream bool)
 
 	// SendResponseTrailers sends response trailers to the client. This is used for
 	// streaming local replies.
 	//
-	// @Param trailers the response trailers.
 	SendResponseTrailers(trailers [][2]string)
 
 	// AddCustomFlag adds a custom flag to the stream. This flag should be very short
 	// string to indicate some custom state or information of the stream.
-	// @Param flag the custom flag to add.
 	AddCustomFlag(flag string)
 
 	// ContinueRequest continues the request stream processing.
@@ -567,7 +521,7 @@ type HttpFilterHandle interface {
 	RefreshRouteCluster()
 
 	// RequestHeaders retrieves the request headers.
-	// @Return the request headers.
+	// Returns request headers.
 	RequestHeaders() HeaderMap
 
 	// BufferedRequestBody retrieves the buffered request body in the chain.
@@ -576,7 +530,7 @@ type HttpFilterHandle interface {
 	// currently buffered body in the chain. And the latest newly received body chunk is passed
 	// as the parameter to OnRequestBody. Only when endOfStream is true or OnRequestTrailers is
 	// called, the full request body is received.
-	// @Return the buffered request body.
+	// Returns buffered request body.
 	BufferedRequestBody() BodyBuffer
 
 	// ReceivedRequestBody retrieves the latest received request body chunk in the OnRequestBody callback.
@@ -586,11 +540,11 @@ type HttpFilterHandle interface {
 	ReceivedRequestBody() BodyBuffer
 
 	// RequestTrailers retrieves the request trailers.
-	// @Return the request trailers.
+	// Returns request trailers.
 	RequestTrailers() HeaderMap
 
 	// ResponseHeaders retrieves the response headers.
-	// @Return the response headers.
+	// Returns response headers.
 	ResponseHeaders() HeaderMap
 
 	// BufferedResponseBody retrieves the buffered response body in the chain.
@@ -599,7 +553,7 @@ type HttpFilterHandle interface {
 	// currently buffered body in the chain. And the latest newly received body chunk is passed
 	// as the parameter to OnResponseBody. Only when endOfStream is true or OnResponseTrailers is
 	// called, the full request body is received.
-	// @Return the buffered response body.
+	// Returns buffered response body.
 	BufferedResponseBody() BodyBuffer
 
 	// ReceivedResponseBody retrieves the latest received response body chunk in the OnResponseBody callback.
@@ -623,7 +577,7 @@ type HttpFilterHandle interface {
 	ReceivedBufferedResponseBody() bool
 
 	// ResponseTrailers retrieves the response trailers.
-	// @Return the response trailers.
+	// Returns response trailers.
 	ResponseTrailers() HeaderMap
 
 	// GetMostSpecificConfig retrieves the most specific route configuration for the stream.
@@ -642,15 +596,10 @@ type HttpFilterHandle interface {
 
 	// HttpCallout performs an HTTP call to an external service. The call is asynchronous, and the
 	// response will be delivered via the provided callback.
-	// @Param cluster the cluster (target) name to which the HTTP call will be made.
-	// @Param headers the HTTP headers to be sent with the request.
-	// @Param body the HTTP body to be sent with the request.
-	// @Param timeoutMs the timeout in milliseconds for the HTTP call.
-	// @Param callback the callback function to be invoked when the response is received or an
 	// error occurs.
 	// The callback function receives the response headers, body, and an error if any occurred.
 	//
-	// @Return the result of the HTTP callout initialization and the callout ID. Non-success results
+	// Returns result of the HTTP callout initialization and the callout ID. Non-success results
 	// indicate that the callout failed to start.
 	//
 	// NOTE: This method should only be called during OnRequest* or OnResponse* callbacks or
@@ -661,14 +610,8 @@ type HttpFilterHandle interface {
 
 	// StartHttpStream starts a new HTTP stream to an external service. The stream is asynchronous,
 	// and the response will be delivered via the provided callback.
-	// @Param cluster the cluster (target) name to which the HTTP stream will be made.
-	// @Param headers the initial HTTP headers to be sent with the request.
-	// @Param body the initial HTTP body to be sent with the request.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Param timeoutMs the timeout in milliseconds for the HTTP stream.
-	// @Param callback the callback interface to handle the stream events.
 	//
-	// @Return the result of the HTTP stream initialization and the stream ID. Non-success results
+	// Returns result of the HTTP stream initialization and the stream ID. Non-success results
 	// indicate that the stream failed to start.
 	//
 	// NOTE: This method should only be called during OnRequest* or OnResponse* callbacks or
@@ -678,11 +621,8 @@ type HttpFilterHandle interface {
 		cb HttpStreamCallback) (HttpCalloutInitResult, uint64)
 
 	// SendHttpStreamData sends data on an existing HTTP stream.
-	// @Param streamID the ID of the HTTP stream.
-	// @Param body the HTTP body to be sent with the request.
-	// @Param endOfStream whether this is the end of the stream.
 	//
-	// @Return whether the data was successfully sent.
+	// Returns the data was successfully sent.
 	//
 	// NOTE: This method should only be called during OnRequest* or OnResponse* callbacks or
 	// scheduled functions via the Scheduler. By this way we can ensure this is only be called
@@ -690,10 +630,8 @@ type HttpFilterHandle interface {
 	SendHttpStreamData(streamID uint64, body []byte, endOfStream bool) bool
 
 	// SendHttpStreamTrailers sends trailers on an existing HTTP stream.
-	// @Param streamID the ID of the HTTP stream.
-	// @Param trailers the HTTP trailers to be sent with the request.
 	//
-	// @Return whether the trailers were successfully sent.
+	// Returns the trailers were successfully sent.
 	//
 	// NOTE: This method should only be called during OnRequest* or OnResponse* callbacks or
 	// scheduled functions via the Scheduler. By this way we can ensure this is only be called
@@ -701,7 +639,6 @@ type HttpFilterHandle interface {
 	SendHttpStreamTrailers(streamID uint64, trailers [][2]string) bool
 
 	// ResetHttpStream resets an existing HTTP stream.
-	// @Param streamID the ID of the HTTP stream.
 	//
 	// NOTE: This method should only be called during OnRequest* or OnResponse* callbacks or
 	// scheduled functions via the Scheduler. By this way we can ensure this is only be called
@@ -709,44 +646,28 @@ type HttpFilterHandle interface {
 	ResetHttpStream(streamID uint64)
 
 	// SetDownstreamWatermarkCallbacks sets the downstream watermark callbacks for the stream.
-	// @Param callbacks the downstream watermark callbacks.
 	SetDownstreamWatermarkCallbacks(callbacks DownstreamWatermarkCallbacks)
 
 	// ClearDownstreamWatermarkCallbacks unsets the downstream watermark callbacks for the stream.
 	ClearDownstreamWatermarkCallbacks()
 
 	// RecordValue records the given value to the histogram metric.
-	// @Param id the histogram metric id.
-	// @Param value the value to be recorded.
-	// @Param tagsValues the optional tag values associated with the metric. The order and size
 	// of the tag values must match the tag keys defined when the metric was created.
 	RecordHistogramValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
 
 	// SetValue sets the given value to the gauge metric.
-	// @Param id the gauge metric id.
-	// @Param value the value to be set.
-	// @Param tagsValues the optional tag values associated with the metric. The order and size
 	// of the tag values must match the tag keys defined when the metric was created.
 	SetGaugeValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
 
 	// IncrementGaugeValue adds the given value to the gauge metric.
-	// @Param id the gauge metric id.
-	// @Param value the value to be added.
-	// @Param tagsValues the optional tag values associated with the metric. The order and size
 	// of the tag values must match the tag keys defined when the metric was created.
 	IncrementGaugeValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
 
 	// DecrementGaugeValue subtracts the given value from the gauge metric.
-	// @Param id the gauge metric id.
-	// @Param value the value to be subtracted.
-	// @Param tagsValues the optional tag values associated with the metric. The order and size
 	// of the tag values must match the tag keys defined when the metric was created.
 	DecrementGaugeValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
 
 	// IncrementCounterValue adds the given value to the counter metric.
-	// @Param id the counter metric id.
-	// @Param value the value to be added.
-	// @Param tagsValues the optional tag values associated with the metric. The order and size
 	// of the tag values must match the tag keys defined when the metric was created.
 	IncrementCounterValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
 
@@ -757,7 +678,7 @@ type HttpFilterHandle interface {
 	// GetFilterStateTyped retrieves the serialized bytes of a typed filter state object stored
 	// under the given key. Unlike GetFilterState, this calls serializeAsString on the registered
 	// typed object, so it works for any filter state object type (not just StringAccessor).
-	// @Return the serialized value if found, otherwise an empty UnsafeEnvoyBuffer and false.
+	// Returns serialized value if found, otherwise an empty UnsafeEnvoyBuffer and false.
 	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
 	// need to keep it past the current callback.
 	GetFilterStateTyped(key string) (UnsafeEnvoyBuffer, bool)
@@ -766,33 +687,28 @@ type HttpFilterHandle interface {
 	// MUST match a registered ObjectFactory; the bytes are passed to createFromBytes on that
 	// factory. This is the form required for interop with built-in Envoy filters that read filter
 	// state as typed objects (e.g., tcp_proxy reading PerConnectionCluster).
-	// @Return true if the operation was successful, false otherwise (e.g., no factory registered
+	// Returns if the operation was successful, false otherwise (e.g., no factory registered
 	// for the key, factory failed to create the object, or the key is read-only).
 	SetFilterStateTyped(key string, value []byte) bool
 
 	// SetSocketOptionInt sets an integer-valued socket option on the upstream or downstream
 	// connection associated with the stream.
-	// @Param level the socket option level (e.g., SOL_SOCKET).
-	// @Param name the socket option name (e.g., SO_KEEPALIVE).
-	// @Param state the socket state at which to apply the option. Ignored for already-connected
 	// downstream sockets.
-	// @Param direction whether to apply to the upstream or downstream connection.
-	// @Param value the integer value for the option.
-	// @Return true if the operation was successful, false otherwise.
+	// Returns if the operation was successful, false otherwise.
 	SetSocketOptionInt(level, name int64, state SocketOptionState, direction SocketDirection, value int64) bool
 
 	// SetSocketOptionBytes sets a bytes-valued socket option on the upstream or downstream
 	// connection associated with the stream.
-	// @Return true if the operation was successful, false otherwise.
+	// Returns if the operation was successful, false otherwise.
 	SetSocketOptionBytes(level, name int64, state SocketOptionState, direction SocketDirection, value []byte) bool
 
 	// GetSocketOptionInt retrieves the integer value of a socket option.
-	// @Return the value and true if found, otherwise 0 and false.
+	// Returns value and true if found, otherwise 0 and false.
 	GetSocketOptionInt(level, name int64, state SocketOptionState, direction SocketDirection) (int64, bool)
 
 	// GetSocketOptionBytes retrieves the bytes value of a socket option. The buffer is owned by
 	// Envoy and remains valid until the filter is destroyed.
-	// @Return the value and true if found, otherwise an empty UnsafeEnvoyBuffer and false.
+	// Returns value and true if found, otherwise an empty UnsafeEnvoyBuffer and false.
 	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
 	// need to keep it past the current callback.
 	GetSocketOptionBytes(level, name int64, state SocketOptionState, direction SocketDirection) (UnsafeEnvoyBuffer, bool)
@@ -812,22 +728,19 @@ type HttpFilterHandle interface {
 	GetActiveSpan() Span
 
 	// GetClusterName returns the name of the cluster the current request is routed to.
-	// @Return the cluster name and true if found, otherwise an empty UnsafeEnvoyBuffer and false.
+	// Returns cluster name and true if found, otherwise an empty UnsafeEnvoyBuffer and false.
 	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
 	// need to keep it past the current callback.
 	GetClusterName() (UnsafeEnvoyBuffer, bool)
 
 	// GetClusterHostCounts returns the host counts for the routed cluster at the given priority.
-	// @Param priority the priority level to query (0 for default priority).
-	// @Return the host counts and true if successful, otherwise a zero-valued struct and false.
+	// Returns host counts and true if successful, otherwise a zero-valued struct and false.
 	GetClusterHostCounts(priority uint32) (ClusterHostCounts, bool)
 
 	// SetUpstreamOverrideHost sets a host that the upstream load balancer should select first if
 	// it exists in the routed cluster. This is useful for sticky sessions or host affinity.
-	// @Param host the host address to override (e.g., "10.0.0.1:8080"). Must be a valid IP address.
-	// @Param strict if true, the request will fail when the override host is not available; if
 	// false, normal load balancing is used as a fallback.
-	// @Return true if the override was set successfully, false if the host address was invalid.
+	// Returns if the override was set successfully, false if the host address was invalid.
 	SetUpstreamOverrideHost(host string, strict bool) bool
 
 	// ResetStream resets the HTTP stream with the given reason and optional details. After this
@@ -842,7 +755,7 @@ type HttpFilterHandle interface {
 	// headers if headers is nil). Useful for internal redirects or request retries. After a
 	// successful call, the current filter chain is destroyed and the filter SHOULD return Stop
 	// from the current callback.
-	// @Return true if recreation was initiated, false otherwise (e.g., the request body has not
+	// Returns if recreation was initiated, false otherwise (e.g., the request body has not
 	// been fully received yet).
 	RecreateStream(headers [][2]string) bool
 }
@@ -855,23 +768,17 @@ type HttpFilterConfigHandle interface {
 	Log(level LogLevel, format string, args ...any)
 
 	// DefineHistogram creates a histogram metric with the given name, and tag keys.
-	// @Param name the name of the metric.
-	// @Param tagKeys the optional tag keys for the metric.
-	// @Return the histogram metric id. This metric can never be used after the plugin
+	// Returns histogram metric id. This metric can never be used after the plugin
 	// config is unloaded.
 	DefineHistogram(name string, tagKeys ...string) (MetricID, MetricsResult)
 
 	// DefineGauge creates a gauge metric with the given name, description, and tag keys.
-	// @Param name the name of the metric.
-	// @Param tagKeys the optional tag keys for the metric.
-	// @Return the gauge metric id. This metric can never be used after the plugin
+	// Returns gauge metric id. This metric can never be used after the plugin
 	// config is unloaded.
 	DefineGauge(name string, tagKeys ...string) (MetricID, MetricsResult)
 
 	// DefineCounter creates a counter metric with the given name, description, and tag keys.
-	// @Param name the name of the metric.
-	// @Param tagKeys the optional tag keys for the metric.
-	// @Return the counter metric id. This metric can never be used after the plugin
+	// Returns counter metric id. This metric can never be used after the plugin
 	// config is unloaded.
 	DefineCounter(name string, tagKeys ...string) (MetricID, MetricsResult)
 
@@ -879,43 +786,26 @@ type HttpFilterConfigHandle interface {
 	// The call is asynchronous, and the response will be delivered via the provided callback.
 	// This is similar to HttpFilterHandle.HttpCallout but runs on the main thread rather than
 	// the worker thread.
-	// @Param cluster the cluster (target) name to which the HTTP call will be made.
-	// @Param headers the HTTP headers to be sent with the request.
-	// @Param body the HTTP body to be sent with the request.
-	// @Param timeoutMs the timeout in milliseconds for the HTTP call.
-	// @Param callback the callback function to be invoked when the response is received.
-	// @Return the result of the HTTP callout initialization and the callout ID.
+	// Returns result of the HTTP callout initialization and the callout ID.
 	HttpCallout(cluster string, headers [][2]string, body []byte, timeoutMs uint64,
 		cb HttpCalloutCallback) (HttpCalloutInitResult, uint64)
 
 	// StartHttpStream starts a new HTTP stream to an external service from the config context.
 	// The stream is asynchronous, and the response will be delivered via the provided callback.
 	// This is similar to HttpFilterHandle.StartHttpStream but runs on the main thread.
-	// @Param cluster the cluster (target) name.
-	// @Param headers the initial HTTP headers.
-	// @Param body the initial HTTP body.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Param timeoutMs the timeout in milliseconds.
-	// @Param callback the callback interface to handle the stream events.
-	// @Return the result of the HTTP stream initialization and the stream ID.
+	// Returns result of the HTTP stream initialization and the stream ID.
 	StartHttpStream(cluster string, headers [][2]string, body []byte, endOfStream bool,
 		timeoutMs uint64, cb HttpStreamCallback) (HttpCalloutInitResult, uint64)
 
 	// SendHttpStreamData sends data on an existing HTTP stream started via StartHttpStream.
-	// @Param streamID the ID of the HTTP stream.
-	// @Param body the HTTP body to be sent.
-	// @Param endOfStream whether this is the end of the stream.
-	// @Return whether the data was successfully sent.
+	// Returns the data was successfully sent.
 	SendHttpStreamData(streamID uint64, body []byte, endOfStream bool) bool
 
 	// SendHttpStreamTrailers sends trailers on an existing HTTP stream started via StartHttpStream.
-	// @Param streamID the ID of the HTTP stream.
-	// @Param trailers the HTTP trailers to be sent.
-	// @Return whether the trailers were successfully sent.
+	// Returns the trailers were successfully sent.
 	SendHttpStreamTrailers(streamID uint64, trailers [][2]string) bool
 
 	// ResetHttpStream resets an existing HTTP stream started via StartHttpStream.
-	// @Param streamID the ID of the HTTP stream.
 	ResetHttpStream(streamID uint64)
 
 	// GetScheduler retrieves a scheduler for deferred task execution in the config context.
