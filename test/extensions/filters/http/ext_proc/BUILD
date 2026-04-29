@@ -224,6 +224,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":filter_test_common_lib",
@@ -471,7 +472,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.set_metadata",
     ],
     rbe_pool = "4core",
-    shard_count = 8,
+    shard_count = 4,
     tags = [
         "cpu:3",
         "skip_on_windows",
@@ -582,7 +583,6 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
-        "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",

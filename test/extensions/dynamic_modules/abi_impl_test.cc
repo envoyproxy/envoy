@@ -1,13 +1,48 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace {
+
+// =============================================================================
+// Validation Mode Tests
+// =============================================================================
+
+TEST(CommonAbiImplTest, IsValidationModeReturnsTrueInValidateMode) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::Validate));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_TRUE(envoy_dynamic_module_callback_is_validation_mode());
+}
+
+TEST(CommonAbiImplTest, IsValidationModeReturnsFalseInServeMode) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::Serve));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode());
+}
+
+TEST(CommonAbiImplTest, IsValidationModeReturnsFalseInInitOnlyMode) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, mode()).WillByDefault(Return(Server::Mode::InitOnly));
+
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_FALSE(envoy_dynamic_module_callback_is_validation_mode());
+}
+
+// =============================================================================
+// Function Registry Tests
+// =============================================================================
 
 // Test registering and retrieving a function.
 TEST(CommonAbiImplTest, FunctionRegistryRegisterAndGet) {

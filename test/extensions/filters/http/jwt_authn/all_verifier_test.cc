@@ -662,9 +662,9 @@ TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, TwoGoodJwts) {
   EXPECT_THAT(headers, JwtOutputSuccess(kOtherHeader));
 }
 
-
 // Test: Verification status header is NOT set when JWT is valid.
-TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderNotSetOnGoodJwt) {
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest,
+       VerificationStatusHeaderNotSetOnGoodJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -684,7 +684,8 @@ TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHe
 }
 
 // Test: Verification status header is NOT set when no JWT is present.
-TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest, VerificationStatusHeaderNotSetOnMissingJwt) {
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest,
+       VerificationStatusHeaderNotSetOnMissingJwt) {
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);

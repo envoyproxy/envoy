@@ -381,12 +381,11 @@ public:
       const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation&
           extract_config,
       const BaseVerifierImpl* parent)
-      : BaseVerifierImpl(parent), auth_factory_(factory),
-        extractor_(Extractor::create(providers)) {
-    // Resolve verification status header name from config or use default.
-    const auto& configured = extract_config.verification_status_header();
-    verification_status_header_ = Http::LowerCaseString(
-        configured.empty() ? std::string(kDefaultVerificationStatusHeader) : configured);
+      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)),
+        verification_status_header_(
+            Http::LowerCaseString(extract_config.verification_status_header().empty()
+                                      ? std::string(kDefaultVerificationStatusHeader)
+                                      : extract_config.verification_status_header())) {
     ENVOY_LOG(info,
               "JWT filter configured for claim extraction only. "
               "Header '{}' will be set to 'false' when JWT verification fails.",
@@ -468,8 +467,8 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
                                                       parent);
   case JwtRequirement::RequiresTypeCase::kExtractOnlyWithoutValidation:
     return std::make_unique<ExtractOnlyWithoutValidationVerifierImpl>(
-        factory, getAllProvidersAsList(providers),
-        requirement.extract_only_without_validation(), parent);
+        factory, getAllProvidersAsList(providers), requirement.extract_only_without_validation(),
+        parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);
   }

@@ -79,6 +79,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_total, Counter, Total requests
   upstream_rq_active, Gauge, Total active requests
   upstream_rq_pending_total, Counter, Total requests pending a connection pool connection
+  upstream_rq_active_overflow, Counter, Total requests rejected because the ``max_requests`` circuit breaker was exhausted while attaching to a ready upstream connection (see ``envoy.reloadable_features.skip_pending_overflow_count_on_active_rq``)
   upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool or requests (mainly for HTTP/2 and above) circuit breaking and were failed
   upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure or remote connection termination
   upstream_rq_pending_active, Gauge, Total active requests pending a connection pool connection

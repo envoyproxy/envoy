@@ -78,6 +78,7 @@ message JwtProvider {
   // otherwise the JWT ``iss`` field is not checked.
   //
   // .. note::
+  //
   //     ``JwtRequirement`` :ref:`allow_missing <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.allow_missing>`
   //     and :ref:`allow_missing_or_failed <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.allow_missing_or_failed>`
   //     are implemented differently than other ``JwtRequirements``. Hence the usage of this field
@@ -324,10 +325,11 @@ message JwtProvider {
   //       alg: PS256
   //
   // .. warning::
-  //   Using the same key name for :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
-  //   and :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
-  //   is not suggested due to potential override of existing entry, while it is not enforced during
-  //   config validation.
+  //
+  //    Using the same key name for :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  //    and :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  //    is not suggested due to potential override of existing entry, while it is not enforced during
+  //    config validation.
   //
   string header_in_metadata = 14;
 

@@ -7,6 +7,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/filters/common/lua/protobuf_converter.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
@@ -527,6 +528,122 @@ int RouteWrapper::luaMetadata(lua_State* state) {
     metadata_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata()),
                             true);
   }
+  return 1;
+}
+
+int CounterWrapper::luaInc(lua_State*) {
+  counter_.inc();
+  return 0;
+}
+
+int CounterWrapper::luaAdd(lua_State* state) {
+  const lua_Integer amount = luaL_checkinteger(state, 2);
+  if (amount < 0) {
+    luaL_error(state, "counter add amount must be non-negative");
+  }
+  counter_.add(static_cast<uint64_t>(amount));
+  return 0;
+}
+
+int CounterWrapper::luaValue(lua_State* state) {
+  lua_pushnumber(state, static_cast<lua_Number>(counter_.value()));
+  return 1;
+}
+
+int GaugeWrapper::luaInc(lua_State*) {
+  gauge_.inc();
+  return 0;
+}
+
+int GaugeWrapper::luaDec(lua_State*) {
+  gauge_.dec();
+  return 0;
+}
+
+int GaugeWrapper::luaAdd(lua_State* state) {
+  const lua_Integer amount = luaL_checkinteger(state, 2);
+  if (amount < 0) {
+    luaL_error(state, "gauge add amount must be non-negative");
+  }
+  gauge_.add(static_cast<uint64_t>(amount));
+  return 0;
+}
+
+int GaugeWrapper::luaSub(lua_State* state) {
+  const lua_Integer amount = luaL_checkinteger(state, 2);
+  if (amount < 0) {
+    luaL_error(state, "gauge sub amount must be non-negative");
+  }
+  gauge_.sub(static_cast<uint64_t>(amount));
+  return 0;
+}
+
+int GaugeWrapper::luaSet(lua_State* state) {
+  const lua_Integer value = luaL_checkinteger(state, 2);
+  if (value < 0) {
+    luaL_error(state, "gauge set value must be non-negative");
+  }
+  gauge_.set(static_cast<uint64_t>(value));
+  return 0;
+}
+
+int GaugeWrapper::luaValue(lua_State* state) {
+  lua_pushnumber(state, static_cast<lua_Number>(gauge_.value()));
+  return 1;
+}
+
+int HistogramWrapper::luaRecordValue(lua_State* state) {
+  const lua_Integer value = luaL_checkinteger(state, 2);
+  if (value < 0) {
+    luaL_error(state, "histogram value must be non-negative");
+  }
+  histogram_.recordValue(static_cast<uint64_t>(value));
+  return 0;
+}
+
+int StatsScopeWrapper::luaCounter(lua_State* state) {
+  const char* name = luaL_checkstring(state, 2);
+  Stats::Counter& counter = Stats::Utility::counterFromElements(scope_, {Stats::DynamicName(name)});
+  CounterWrapper::create(state, counter);
+  return 1;
+}
+
+int StatsScopeWrapper::luaGauge(lua_State* state) {
+  const char* name = luaL_checkstring(state, 2);
+  // Use NeverImport mode - Lua gauges track local state and should not be
+  // accumulated across hot restarts.
+  Stats::Gauge& gauge = Stats::Utility::gaugeFromElements(scope_, {Stats::DynamicName(name)},
+                                                          Stats::Gauge::ImportMode::NeverImport);
+  GaugeWrapper::create(state, gauge);
+  return 1;
+}
+
+int StatsScopeWrapper::luaHistogram(lua_State* state) {
+  const char* name = luaL_checkstring(state, 2);
+
+  // Parse optional unit parameter (default: Unspecified).
+  Stats::Histogram::Unit unit = Stats::Histogram::Unit::Unspecified;
+  if (lua_gettop(state) >= 3 && !lua_isnil(state, 3)) {
+    const absl::string_view unit_str = luaL_checkstring(state, 3);
+    if (unit_str == "ms" || unit_str == "milliseconds") {
+      unit = Stats::Histogram::Unit::Milliseconds;
+    } else if (unit_str == "bytes") {
+      unit = Stats::Histogram::Unit::Bytes;
+    } else if (unit_str == "microseconds") {
+      unit = Stats::Histogram::Unit::Microseconds;
+    } else if (unit_str == "unspecified") {
+      unit = Stats::Histogram::Unit::Unspecified;
+    } else {
+      luaL_error(state,
+                 "invalid histogram unit '%s', expected 'ms', 'milliseconds', 'microseconds', "
+                 "'bytes', or 'unspecified'",
+                 std::string(unit_str).c_str());
+    }
+  }
+
+  Stats::Histogram& histogram =
+      Stats::Utility::histogramFromElements(scope_, {Stats::DynamicName(name)}, unit);
+  HistogramWrapper::create(state, histogram);
   return 1;
 }
 
