@@ -579,12 +579,12 @@ type NetworkFilterHandle interface {
 
 	// ---- upstream/cluster info ----
 
-	// GetClusterHostCount returns host counts for the named cluster at the given priority
+	// GetClusterHostCounts returns host counts for the named cluster at the given priority
 	// level. priority of 0 selects the default priority. Returns false if the cluster is not
 	// found or the priority level does not exist.
 	//
 	// Useful for implementing scale-to-zero logic or custom load-balancing decisions.
-	GetClusterHostCount(clusterName string, priority uint32) (ClusterHostCount, bool)
+	GetClusterHostCounts(clusterName string, priority uint32) (ClusterHostCounts, bool)
 
 	// GetUpstreamHostAddress returns the address and port of the currently selected upstream
 	// host. Returns false if no upstream host has been selected or the address is not an IP.

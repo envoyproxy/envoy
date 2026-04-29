@@ -615,7 +615,7 @@ func (h *dymNetworkFilterHandle) RecordHistogramValue(id shared.MetricID, value 
 
 // ---- upstream/cluster info ----
 
-func (h *dymNetworkFilterHandle) GetClusterHostCount(clusterName string, priority uint32) (shared.ClusterHostCount, bool) {
+func (h *dymNetworkFilterHandle) GetClusterHostCounts(clusterName string, priority uint32) (shared.ClusterHostCounts, bool) {
 	var total, healthy, degraded C.size_t
 	ret := C.envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
 		h.hostFilterPtr,
@@ -625,9 +625,9 @@ func (h *dymNetworkFilterHandle) GetClusterHostCount(clusterName string, priorit
 	)
 	runtime.KeepAlive(clusterName)
 	if !bool(ret) {
-		return shared.ClusterHostCount{}, false
+		return shared.ClusterHostCounts{}, false
 	}
-	return shared.ClusterHostCount{
+	return shared.ClusterHostCounts{
 		Total: uint64(total), Healthy: uint64(healthy), Degraded: uint64(degraded),
 	}, true
 }

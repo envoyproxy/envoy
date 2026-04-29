@@ -221,6 +221,8 @@ const (
 	AttributeIDXdsUpstreamHostMetadata
 	// xds.filter_chain_name
 	AttributeIDXdsFilterChainName
+	// health_check
+	AttributeIDHealthCheck
 )
 
 // HttpHeaderType identifies which HTTP header map to access. It corresponds to
@@ -312,8 +314,8 @@ const (
 	SocketDirectionDownstream
 )
 
-// ClusterHostCount carries the host counts returned by HttpFilterHandle.GetClusterHostCount.
-type ClusterHostCount struct {
+// ClusterHostCounts carries the host counts returned by HttpFilterHandle.GetClusterHostCounts.
+type ClusterHostCounts struct {
 	// Total is the total number of hosts in the priority set.
 	Total uint64
 	// Healthy is the number of hosts in the HEALTHY state.

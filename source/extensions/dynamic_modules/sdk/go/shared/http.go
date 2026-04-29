@@ -5,7 +5,7 @@ package shared
 //
 // Cross-surface primitives (UnsafeEnvoyBuffer, LogLevel, MetricID, AttributeID, Scheduler,
 // HttpCalloutInitResult/Result/Callback, HttpStreamCallback/ResetReason, SocketOption*,
-// ClusterHostCount, HttpHeaderType) live in types.go.
+// ClusterHostCounts, HttpHeaderType) live in types.go.
 
 type HeadersStatus int32
 
@@ -71,6 +71,21 @@ const (
 	TrailersStatusDefault TrailersStatus = TrailersStatusContinue
 )
 
+// LocalReplyStatus is returned from HttpFilter.OnLocalReply to control whether Envoy should
+// send the local reply to the client or reset the stream instead.
+type LocalReplyStatus int32
+
+const (
+	// LocalReplyStatusContinue indicates that the local reply should continue to be sent
+	// after all filters are informed.
+	LocalReplyStatusContinue LocalReplyStatus = 0
+	// LocalReplyStatusContinueAndResetStream indicates that the local reply notification
+	// should continue to all filters, but the stream should be reset instead of sending
+	// the local reply.
+	LocalReplyStatusContinueAndResetStream LocalReplyStatus = 1
+	LocalReplyStatusDefault                LocalReplyStatus = LocalReplyStatusContinue
+)
+
 // HttpFilter is the interface to implement your own plugin logic. This is a simplified version and could
 // not implement flexible stream control. But it should be enough for most of the use cases.
 type HttpFilter interface {
@@ -119,6 +134,17 @@ type HttpFilter interface {
 	// after OnStreamComplete and access logs are flushed. This is a good place to release
 	// any per-stream resources.
 	OnDestroy()
+
+	// OnLocalReply is called when a local reply is being sent. The filter can either let the
+	// reply proceed (LocalReplyStatusContinue) or ask Envoy to reset the stream instead
+	// (LocalReplyStatusContinueAndResetStream). This is invoked before the reply leaves
+	// Envoy and before any stream reset.
+	// @Param responseCode the HTTP status code of the local reply.
+	// @Param details a short description of why the local reply is being sent (e.g.,
+	// "buffer overflow", "rate limit exceeded"). The buffer aliases Envoy memory; copy
+	// before retaining past this call.
+	// @Param resetImminent true if Envoy is going to reset the stream after this call.
+	OnLocalReply(responseCode uint32, details UnsafeEnvoyBuffer, resetImminent bool) LocalReplyStatus
 }
 
 type EmptyHttpFilter struct {
@@ -149,6 +175,10 @@ func (p *EmptyHttpFilter) OnResponseTrailers(trailers HeaderMap) TrailersStatus 
 }
 
 func (p *EmptyHttpFilter) OnStreamComplete() {
+}
+
+func (p *EmptyHttpFilter) OnLocalReply(_ uint32, _ UnsafeEnvoyBuffer, _ bool) LocalReplyStatus {
+	return LocalReplyStatusDefault
 }
 
 func (p *EmptyHttpFilter) OnDestroy() {
@@ -787,10 +817,10 @@ type HttpFilterHandle interface {
 	// need to keep it past the current callback.
 	GetClusterName() (UnsafeEnvoyBuffer, bool)
 
-	// GetClusterHostCount returns the host counts for the routed cluster at the given priority.
+	// GetClusterHostCounts returns the host counts for the routed cluster at the given priority.
 	// @Param priority the priority level to query (0 for default priority).
 	// @Return the host counts and true if successful, otherwise a zero-valued struct and false.
-	GetClusterHostCount(priority uint32) (ClusterHostCount, bool)
+	GetClusterHostCounts(priority uint32) (ClusterHostCounts, bool)
 
 	// SetUpstreamOverrideHost sets a host that the upstream load balancer should select first if
 	// it exists in the routed cluster. This is useful for sticky sessions or host affinity.

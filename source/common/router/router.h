@@ -37,6 +37,7 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/match.h"
 #include "absl/types/optional.h"
 
@@ -638,6 +639,7 @@ private:
   void maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
                                   UpstreamRequest& upstream_request);
   bool isEarlyConnectData();
+  void removeShadowStream(Http::AsyncClient::OngoingRequest* shadow_stream);
 
   RetryStatePtr retry_state_;
   const FilterConfigSharedPtr config_;
@@ -664,9 +666,6 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_from_upstream_lb_;
-  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_;
-  std::unique_ptr<Http::RequestHeaderMap> shadow_headers_;
-  std::unique_ptr<Http::RequestTrailerMap> shadow_trailers_;
   // The stream lifetime configured by request header.
   absl::optional<std::chrono::milliseconds> dynamic_max_stream_duration_;
   // list of cookies to add to upstream headers
@@ -674,8 +673,10 @@ private:
 
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
-  // Set of ongoing shadow streams which have not yet received end stream.
-  absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
+  // Ongoing shadow streams which have not yet received end stream.
+  // Inlined vector is used here under the assumption that most cases will have only single or
+  // double stream, and this avoids heap allocation in that case.
+  absl::InlinedVector<Http::AsyncClient::OngoingRequest*, 2> shadow_streams_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};

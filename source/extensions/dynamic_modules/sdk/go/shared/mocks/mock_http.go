@@ -52,6 +52,20 @@ func (mr *MockHttpFilterMockRecorder) OnDestroy() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnDestroy", reflect.TypeOf((*MockHttpFilter)(nil).OnDestroy))
 }
 
+// OnLocalReply mocks base method.
+func (m *MockHttpFilter) OnLocalReply(responseCode uint32, details shared.UnsafeEnvoyBuffer, resetImminent bool) shared.LocalReplyStatus {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OnLocalReply", responseCode, details, resetImminent)
+	ret0, _ := ret[0].(shared.LocalReplyStatus)
+	return ret0
+}
+
+// OnLocalReply indicates an expected call of OnLocalReply.
+func (mr *MockHttpFilterMockRecorder) OnLocalReply(responseCode, details, resetImminent any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnLocalReply", reflect.TypeOf((*MockHttpFilter)(nil).OnLocalReply), responseCode, details, resetImminent)
+}
+
 // OnRequestBody mocks base method.
 func (m *MockHttpFilter) OnRequestBody(body shared.BodyBuffer, endOfStream bool) shared.BodyStatus {
 	m.ctrl.T.Helper()
@@ -977,19 +991,19 @@ func (mr *MockHttpFilterHandleMockRecorder) GetBufferLimit() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBufferLimit", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetBufferLimit))
 }
 
-// GetClusterHostCount mocks base method.
-func (m *MockHttpFilterHandle) GetClusterHostCount(priority uint32) (shared.ClusterHostCount, bool) {
+// GetClusterHostCounts mocks base method.
+func (m *MockHttpFilterHandle) GetClusterHostCounts(priority uint32) (shared.ClusterHostCounts, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetClusterHostCount", priority)
-	ret0, _ := ret[0].(shared.ClusterHostCount)
+	ret := m.ctrl.Call(m, "GetClusterHostCounts", priority)
+	ret0, _ := ret[0].(shared.ClusterHostCounts)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
-// GetClusterHostCount indicates an expected call of GetClusterHostCount.
-func (mr *MockHttpFilterHandleMockRecorder) GetClusterHostCount(priority any) *gomock.Call {
+// GetClusterHostCounts indicates an expected call of GetClusterHostCounts.
+func (mr *MockHttpFilterHandleMockRecorder) GetClusterHostCounts(priority any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterHostCount", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetClusterHostCount), priority)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterHostCounts", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetClusterHostCounts), priority)
 }
 
 // GetClusterName mocks base method.

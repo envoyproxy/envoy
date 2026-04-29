@@ -28,7 +28,7 @@ jobs:
       id: vars
       run: |
         echo "cve-data-path=${{ inputs.cve-data-path }}" > $GITHUB_OUTPUT
-    - uses: envoyproxy/toolshed/actions/gcp/setup@0f75902a4f8ed63a5b5f9e4336ef22048f6f5670  # v0.4.6
+    - uses: envoyproxy/toolshed/actions/gcp/setup@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cve-key }}

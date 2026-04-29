@@ -1411,7 +1411,7 @@ func (h *dymHttpFilterHandle) GetClusterName() (shared.UnsafeEnvoyBuffer, bool) 
 	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
-func (h *dymHttpFilterHandle) GetClusterHostCount(priority uint32) (shared.ClusterHostCount, bool) {
+func (h *dymHttpFilterHandle) GetClusterHostCounts(priority uint32) (shared.ClusterHostCounts, bool) {
 	var total, healthy, degraded C.size_t
 	ret := C.envoy_dynamic_module_callback_http_get_cluster_host_count(
 		h.hostPluginPtr,
@@ -1421,9 +1421,9 @@ func (h *dymHttpFilterHandle) GetClusterHostCount(priority uint32) (shared.Clust
 		&degraded,
 	)
 	if !bool(ret) {
-		return shared.ClusterHostCount{}, false
+		return shared.ClusterHostCounts{}, false
 	}
-	return shared.ClusterHostCount{
+	return shared.ClusterHostCounts{
 		Total:    uint64(total),
 		Healthy:  uint64(healthy),
 		Degraded: uint64(degraded),
@@ -2386,13 +2386,25 @@ func envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_water
 
 //export envoy_dynamic_module_on_http_filter_local_reply
 func envoy_dynamic_module_on_http_filter_local_reply(
-	filter_envoy_ptr C.envoy_dynamic_module_type_http_filter_envoy_ptr,
+	_ C.envoy_dynamic_module_type_http_filter_envoy_ptr,
 	filter_module_ptr C.envoy_dynamic_module_type_http_filter_module_ptr,
 	response_code C.uint32_t,
 	details C.envoy_dynamic_module_type_envoy_buffer,
 	reset_imminent C.bool,
 ) C.envoy_dynamic_module_type_on_http_filter_local_reply_status {
-	return C.envoy_dynamic_module_type_on_http_filter_local_reply_status(0)
+	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(filter_module_ptr))
+	if pluginWrapper == nil || pluginWrapper.plugin == nil {
+		return C.envoy_dynamic_module_type_on_http_filter_local_reply_status(
+			shared.LocalReplyStatusContinue,
+		)
+	}
+	return C.envoy_dynamic_module_type_on_http_filter_local_reply_status(
+		pluginWrapper.plugin.OnLocalReply(
+			uint32(response_code),
+			envoyBufferToUnsafeEnvoyBuffer(details),
+			bool(reset_imminent),
+		),
+	)
 }
 
 //export envoy_dynamic_module_on_http_filter_config_http_callout_done
