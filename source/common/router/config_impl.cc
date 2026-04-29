@@ -883,7 +883,8 @@ bool RouteEntryImplBase::matchRoute(const RouteMatchContext& route_match_context
   }
 
   if (!config_cookies_.empty()) {
-    if (!ConfigUtility::matchCookies(route_match_context.cookies(), config_cookies_)) {
+    if (!ConfigUtility::matchCookies(route_match_context.cookies(config_cookie_names_),
+                                     config_cookies_)) {
       return false;
     }
   }
@@ -1504,7 +1505,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const RouteMatchContext& route_
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(route_match_context, stream_info, random_value)) {
-    if (path_matcher_->match(route_match_context.sanitizedPathWithoutQuery())) {
+    if (path_matcher_->match(route_match_context.sanitizedPath())) {
       return clusterEntry(route_match_context.headers(), stream_info, random_value);
     }
   }

@@ -426,7 +426,8 @@ TEST(RouteMatchContextTest, Cookies) {
   Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}, {"cookie", "session=abc; user=xyz"}};
   RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
 
-  const auto& cookies = ctx.cookies();
+  const absl::flat_hash_set<absl::string_view> names = {"session", "user"};
+  const auto& cookies = ctx.cookies(names);
   EXPECT_EQ(cookies.at("session"), "abc");
   EXPECT_EQ(cookies.at("user"), "xyz");
   EXPECT_EQ(cookies.size(), 2);
@@ -436,7 +437,8 @@ TEST(RouteMatchContextTest, NoCookies) {
   Http::TestRequestHeaderMapImpl headers{{":path", "/foo"}};
   RouteMatchContext ctx(headers, /*ignore_path_params=*/false);
 
-  EXPECT_TRUE(ctx.cookies().empty());
+  const absl::flat_hash_set<absl::string_view> names;
+  EXPECT_TRUE(ctx.cookies(names).empty());
 }
 
 TEST_F(RouteMatcherTest, TestConnectRoutes) {
