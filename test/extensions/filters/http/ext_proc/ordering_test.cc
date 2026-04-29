@@ -209,8 +209,6 @@ protected:
   MockStream stream_delegate_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  FilterConfigSharedPtr config_;
-  std::unique_ptr<Filter> filter_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Router::RouteConstSharedPtr route_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -222,6 +220,8 @@ protected:
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  FilterConfigSharedPtr config_;
+  std::unique_ptr<Filter> filter_;
 };
 
 // A base class for tests that will check that gRPC streams fail while being created
