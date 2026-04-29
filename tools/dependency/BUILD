@@ -87,6 +87,12 @@ py_binary(
     deps = [":validate"],
 )
 
+py_binary(
+    name = "verify_mirror_coverage",
+    srcs = ["verify_mirror_coverage.py"],
+    visibility = ["//visibility:public"],
+)
+
 json_merge(
     name = "build-images",
     filter = """
