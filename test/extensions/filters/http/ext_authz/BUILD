@@ -35,7 +35,6 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
-        "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_runtime_lib",

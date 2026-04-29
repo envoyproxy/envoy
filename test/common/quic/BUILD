@@ -93,7 +93,6 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/stats:stats_lib",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
     ]),
 )

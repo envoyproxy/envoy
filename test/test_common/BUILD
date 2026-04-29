@@ -348,7 +348,6 @@ envoy_cc_test_library(
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/common/wasm:wasm_lib",
-        "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",

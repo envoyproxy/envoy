@@ -9,7 +9,6 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/server/config_validation/cluster_manager.h"
 
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"

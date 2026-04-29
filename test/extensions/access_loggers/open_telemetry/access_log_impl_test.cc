@@ -15,7 +15,6 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/common.h"
-#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"

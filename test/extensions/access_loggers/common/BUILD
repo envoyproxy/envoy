@@ -26,7 +26,6 @@ envoy_cc_test(
     deps = [
         "//source/common/protobuf",
         "//source/extensions/access_loggers/common:grpc_access_logger",
-        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

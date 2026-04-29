@@ -9,7 +9,6 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"

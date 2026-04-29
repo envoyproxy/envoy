@@ -11,7 +11,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"

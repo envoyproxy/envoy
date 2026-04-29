@@ -7,7 +7,6 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"

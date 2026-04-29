@@ -26,7 +26,6 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/integration/clusters/custom_static_cluster.h"
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"

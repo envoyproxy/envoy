@@ -13,7 +13,6 @@
 
 #include "test/common/http/common.h"
 #include "test/mocks/access_log/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"

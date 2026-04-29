@@ -8,7 +8,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

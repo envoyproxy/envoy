@@ -13,7 +13,6 @@
 #include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/network/mocks.h"

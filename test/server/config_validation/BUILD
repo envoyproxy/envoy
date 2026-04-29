@@ -18,7 +18,6 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/common/tls:context_lib",
         "//source/server/config_validation:cluster_manager_lib",
-        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:admin_mocks",
