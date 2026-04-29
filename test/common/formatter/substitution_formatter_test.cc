@@ -7,7 +7,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/formatter/http_specific_formatter.h"
 #include "source/common/formatter/stream_info_formatter.h"

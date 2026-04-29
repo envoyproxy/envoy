@@ -7,7 +7,6 @@
 #include <bit>
 
 #include "source/common/common/hash.h"
-#include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/symbol_table.h"
