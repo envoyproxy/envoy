@@ -25,10 +25,8 @@ type listenerFilterConfigWrapper struct {
 	configHandle *dymListenerConfigHandle
 }
 
-type listenerFilterWrapper = dymListenerFilterHandle
-
 var listenerConfigManager = newManager[listenerFilterConfigWrapper]()
-var listenerFilterManager = newManager[listenerFilterWrapper]()
+var listenerFilterManager = newManager[dymListenerFilterHandle]()
 
 // dymListenerConfigHandle implements shared.ListenerFilterConfigHandle.
 type dymListenerConfigHandle struct {
@@ -146,13 +144,13 @@ func (h *dymListenerFilterHandle) SetRequestedApplicationProtocols(protocols []s
 	runtime.KeepAlive(views)
 }
 
-func (h *dymListenerFilterHandle) SetJa3Hash(hash string) {
+func (h *dymListenerFilterHandle) SetJA3Hash(hash string) {
 	C.envoy_dynamic_module_callback_listener_filter_set_ja3_hash(
 		h.hostFilterPtr, stringToModuleBuffer(hash))
 	runtime.KeepAlive(hash)
 }
 
-func (h *dymListenerFilterHandle) SetJa4Hash(hash string) {
+func (h *dymListenerFilterHandle) SetJA4Hash(hash string) {
 	C.envoy_dynamic_module_callback_listener_filter_set_ja4_hash(
 		h.hostFilterPtr, stringToModuleBuffer(hash))
 	runtime.KeepAlive(hash)
@@ -191,7 +189,7 @@ func (h *dymListenerFilterHandle) GetRequestedApplicationProtocols() []shared.Un
 	return out
 }
 
-func (h *dymListenerFilterHandle) GetJa3Hash() (shared.UnsafeEnvoyBuffer, bool) {
+func (h *dymListenerFilterHandle) GetJA3Hash() (shared.UnsafeEnvoyBuffer, bool) {
 	var buf C.envoy_dynamic_module_type_envoy_buffer
 	if !bool(C.envoy_dynamic_module_callback_listener_filter_get_ja3_hash(h.hostFilterPtr, &buf)) {
 		return shared.UnsafeEnvoyBuffer{}, false
@@ -199,7 +197,7 @@ func (h *dymListenerFilterHandle) GetJa3Hash() (shared.UnsafeEnvoyBuffer, bool) 
 	return envoyBufferToUnsafeEnvoyBuffer(buf), true
 }
 
-func (h *dymListenerFilterHandle) GetJa4Hash() (shared.UnsafeEnvoyBuffer, bool) {
+func (h *dymListenerFilterHandle) GetJA4Hash() (shared.UnsafeEnvoyBuffer, bool) {
 	var buf C.envoy_dynamic_module_type_envoy_buffer
 	if !bool(C.envoy_dynamic_module_callback_listener_filter_get_ja4_hash(h.hostFilterPtr, &buf)) {
 		return shared.UnsafeEnvoyBuffer{}, false
@@ -562,7 +560,7 @@ func envoy_dynamic_module_on_listener_filter_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_listener_filter_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configHandle := &dymListenerConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetListenerFilterConfigFactory(nameStr)

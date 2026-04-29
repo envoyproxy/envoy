@@ -463,10 +463,10 @@ type HttpFilterHandle interface {
 	// copy the data if you need to keep it and use it later.
 	GetAttributeString(attributeID AttributeID) (UnsafeEnvoyBuffer, bool)
 
-	// GetAttributeNumber retrieves the float attribute value of the stream.
-	// @Param key the attribute key.
-	// @Return the attribute value if found, otherwise nil.
-	GetAttributeNumber(attributeID AttributeID) (float64, bool)
+	// GetAttributeNumber retrieves the integer attribute value of the stream.
+	// @Param attributeID the attribute ID.
+	// @Return the attribute value if found, otherwise (0, false).
+	GetAttributeNumber(attributeID AttributeID) (uint64, bool)
 
 	// GetAttributeBool retrieves the bool attribute value of the stream.
 	// @Param attributeID the attribute ID.

@@ -9,13 +9,13 @@ package abi
 #include <string.h>
 #include "../../../abi/abi.h"
 
-extern void cgoBootstrapEventCb(void* context);
-
-// Local trampoline so the cluster shutdown path can invoke the same Go-exported event
-// callback as bootstrap. Each cgo file has its own preamble; this duplicates the trampoline
-// from internal_bootstrap.go to keep the two files independently compilable.
-static inline void cgoClusterInvokeEventCb(void* context) {
-    cgoBootstrapEventCb(context);
+// cgoClusterInvokeEventCb invokes Envoy's cluster-shutdown completion callback. Each cgo
+// file has its own preamble, so we duplicate the wrapper from bootstrap.go's preamble here
+// to keep the two files independently compilable.
+static inline void cgoClusterInvokeEventCb(envoy_dynamic_module_type_event_cb cb, void* context) {
+    if (cb != NULL) {
+        cb(context);
+    }
 }
 */
 import "C"
@@ -56,18 +56,18 @@ type clusterShutdownCompletion struct {
 }
 
 type clusterLbWrapper struct {
-	hostLbPtr C.envoy_dynamic_module_type_cluster_lb_envoy_ptr
-	lb        shared.ClusterLoadBalancer
+	hostLbPtr  C.envoy_dynamic_module_type_cluster_lb_envoy_ptr
+	lb         shared.ClusterLoadBalancer
 	clusterRef *clusterWrapper
 
 	asyncMu      sync.Mutex
-	asyncHandles map[*dymClusterAsyncSelection]struct{}
+	asyncHandles map[*dymClusterAsyncCompletion]struct{}
 }
 
 var clusterConfigManager = newManager[clusterConfigWrapper]()
 var clusterManager = newManager[clusterWrapper]()
 var clusterLbManager = newManager[clusterLbWrapper]()
-var clusterAsyncSelectionManager = newManager[dymClusterAsyncSelection]()
+var clusterAsyncCompletionManager = newManager[dymClusterAsyncCompletion]()
 
 // dymClusterConfigHandle implements shared.ClusterConfigHandle (labeled metrics).
 type dymClusterConfigHandle struct {
@@ -529,23 +529,6 @@ func (h *dymClusterLoadBalancerHandle) GetMemberUpdateHostAddress(index uint64, 
 type dymClusterLbContext struct {
 	hostCtxPtr C.envoy_dynamic_module_type_cluster_lb_context_envoy_ptr
 	lbWrapper  *clusterLbWrapper
-
-	// asyncSelection, when set, points to the async-selection record allocated for this
-	// ChooseHost call. Used only when the module returns async; cleared otherwise.
-	asyncSelection *dymClusterAsyncSelection
-}
-
-func (c *dymClusterLbContext) Complete(host shared.ClusterHost, details string) {
-	if c.lbWrapper == nil {
-		return
-	}
-	C.envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
-		c.lbWrapper.hostLbPtr,
-		c.hostCtxPtr,
-		C.envoy_dynamic_module_type_cluster_host_envoy_ptr(shared.UnsafeClusterHostPtr(host)),
-		stringToModuleBuffer(details),
-	)
-	runtime.KeepAlive(details)
 }
 
 func (c *dymClusterLbContext) ComputeHashKey() (uint64, bool) {
@@ -621,16 +604,31 @@ func (c *dymClusterLbContext) GetDownstreamConnectionSNI() (shared.UnsafeEnvoyBu
 	return envoyBufferToUnsafeEnvoyBuffer(buf), true
 }
 
-// dymClusterAsyncSelection implements shared.ClusterAsyncHostSelection. The Complete method
-// dispatches to the LB's async-completion callback with the originating context pointer.
-type dymClusterAsyncSelection struct {
+// dymClusterAsyncCompletion is the SDK-provided shared.ClusterAsyncCompletion handed to
+// ClusterLoadBalancer.ChooseHost. The module calls Complete (possibly from another goroutine)
+// when async host selection finishes; the SDK then dispatches to Envoy's async-completion
+// callback.
+//
+// The wrapper carries enough state to (a) deliver the result to Envoy, (b) cancel itself
+// from both the per-LB tracking map and the global async manager, and (c) coordinate with
+// the cancel path so completion-after-cancel and double-completion are safe no-ops.
+type dymClusterAsyncCompletion struct {
 	lbWrapper  *clusterLbWrapper
 	hostCtxPtr C.envoy_dynamic_module_type_cluster_lb_context_envoy_ptr
-	completed  atomic.Bool
+	// userSelection is the module's optional ClusterAsyncHostSelection; Cancel is dispatched
+	// to it when the SDK observes a cancellation from Envoy. nil if the module returned
+	// nil for the async handle.
+	userSelection shared.ClusterAsyncHostSelection
+	// managerPtr is this completion's key in clusterAsyncCompletionManager. Stored so
+	// Complete (called from arbitrary goroutines) can remove itself.
+	managerPtr unsafe.Pointer
+	// done is set on first Complete OR Cancel; further calls in either direction are
+	// no-ops. This makes Complete↔Cancel safe regardless of order.
+	done atomic.Bool
 }
 
-func (a *dymClusterAsyncSelection) Complete(host shared.ClusterHost, details string) {
-	if a.completed.Swap(true) {
+func (a *dymClusterAsyncCompletion) Complete(host shared.ClusterHost, details string) {
+	if a.done.Swap(true) {
 		return
 	}
 	if a.lbWrapper == nil {
@@ -643,10 +641,13 @@ func (a *dymClusterAsyncSelection) Complete(host shared.ClusterHost, details str
 		stringToModuleBuffer(details),
 	)
 	runtime.KeepAlive(details)
-	// Remove from async tracking so the wrapper can be GC'd.
+	// Drop from per-LB tracking and from the global async manager so the wrapper can be GC'd.
 	a.lbWrapper.asyncMu.Lock()
 	delete(a.lbWrapper.asyncHandles, a)
 	a.lbWrapper.asyncMu.Unlock()
+	if a.managerPtr != nil {
+		clusterAsyncCompletionManager.remove(a.managerPtr)
+	}
 }
 
 // =============================================================================
@@ -660,7 +661,7 @@ func envoy_dynamic_module_on_cluster_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_cluster_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configHandle := &dymClusterConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetClusterConfigFactory(nameStr)
@@ -756,7 +757,7 @@ func envoy_dynamic_module_on_cluster_lb_new(
 	lbWrapper := &clusterLbWrapper{
 		hostLbPtr:    hostLbPtr,
 		clusterRef:   w,
-		asyncHandles: make(map[*dymClusterAsyncSelection]struct{}),
+		asyncHandles: make(map[*dymClusterAsyncCompletion]struct{}),
 	}
 	handle := &dymClusterLoadBalancerHandle{wrapper: lbWrapper}
 	lb := w.cluster.NewLoadBalancer(handle)
@@ -796,25 +797,25 @@ func envoy_dynamic_module_on_cluster_lb_choose_host(
 		return
 	}
 	ctx := &dymClusterLbContext{hostCtxPtr: hostCtxPtr, lbWrapper: w}
-	host, async, ok := w.lb.ChooseHost(&dymClusterLoadBalancerHandle{wrapper: w}, ctx)
+	// Pre-allocate the SDK completion handle so the module always has a real callable
+	// object to store; if the module returns sync, we discard it without registering.
+	completion := &dymClusterAsyncCompletion{lbWrapper: w, hostCtxPtr: hostCtxPtr}
+	host, userAsync, ok := w.lb.ChooseHost(&dymClusterLoadBalancerHandle{wrapper: w}, ctx, completion)
 	if !ok {
 		*hostOut = nil
 		*asyncOut = nil
 		return
 	}
-	if async != nil {
-		// Async path: stash the selection record and return its pointer as the async handle.
-		impl, isImpl := async.(*dymClusterAsyncSelection)
-		if !isImpl {
-			impl = &dymClusterAsyncSelection{lbWrapper: w, hostCtxPtr: hostCtxPtr}
-		} else {
-			impl.lbWrapper = w
-			impl.hostCtxPtr = hostCtxPtr
-		}
+	if userAsync != nil {
+		// Async path. Bind the completion to the user's selection (used for cancel
+		// dispatch), then register so Envoy can address it via the returned async-handle
+		// pointer.
+		completion.userSelection = userAsync
 		w.asyncMu.Lock()
-		w.asyncHandles[impl] = struct{}{}
+		w.asyncHandles[completion] = struct{}{}
 		w.asyncMu.Unlock()
-		ptr := clusterAsyncSelectionManager.record(impl)
+		ptr := clusterAsyncCompletionManager.record(completion)
+		completion.managerPtr = ptr
 		*hostOut = nil
 		*asyncOut = C.envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr(ptr)
 		return
@@ -832,16 +833,22 @@ func envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
 	if w == nil || w.lb == nil {
 		return
 	}
-	a := clusterAsyncSelectionManager.unwrap(unsafe.Pointer(asyncPtr))
+	a := clusterAsyncCompletionManager.unwrap(unsafe.Pointer(asyncPtr))
 	if a == nil {
 		return
 	}
-	w.lb.OnCancelHostSelection(&dymClusterLoadBalancerHandle{wrapper: w}, a)
-	a.completed.Store(true)
+	// Mark done first to prevent a racing Complete from also dispatching to Envoy.
+	if a.done.Swap(true) {
+		// Already completed; Complete already removed itself, nothing to do.
+		return
+	}
+	if a.userSelection != nil {
+		a.userSelection.Cancel()
+	}
 	w.asyncMu.Lock()
 	delete(w.asyncHandles, a)
 	w.asyncMu.Unlock()
-	clusterAsyncSelectionManager.remove(unsafe.Pointer(asyncPtr))
+	clusterAsyncCompletionManager.remove(unsafe.Pointer(asyncPtr))
 }
 
 //export envoy_dynamic_module_on_cluster_scheduled
@@ -893,9 +900,7 @@ func envoy_dynamic_module_on_cluster_shutdown(
 ) {
 	w := clusterManager.unwrap(unsafe.Pointer(clusterPtr))
 	if w == nil || w.cluster == nil {
-		if completionCallback != nil {
-			C.cgoClusterInvokeEventCb(completionContext)
-		}
+		C.cgoClusterInvokeEventCb(completionCallback, completionContext)
 		return
 	}
 	completion := &clusterShutdownCompletion{cb: completionCallback, context: completionContext}
@@ -907,9 +912,7 @@ func envoy_dynamic_module_on_cluster_shutdown(
 		if completion.done.Swap(true) {
 			return
 		}
-		if completion.cb != nil {
-			C.cgoClusterInvokeEventCb(completion.context)
-		}
+		C.cgoClusterInvokeEventCb(completion.cb, completion.context)
 	})
 }
 

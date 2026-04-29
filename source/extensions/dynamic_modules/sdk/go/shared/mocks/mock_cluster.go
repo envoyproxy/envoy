@@ -16,6 +16,42 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
+// MockClusterAsyncCompletion is a mock of ClusterAsyncCompletion interface.
+type MockClusterAsyncCompletion struct {
+	ctrl     *gomock.Controller
+	recorder *MockClusterAsyncCompletionMockRecorder
+	isgomock struct{}
+}
+
+// MockClusterAsyncCompletionMockRecorder is the mock recorder for MockClusterAsyncCompletion.
+type MockClusterAsyncCompletionMockRecorder struct {
+	mock *MockClusterAsyncCompletion
+}
+
+// NewMockClusterAsyncCompletion creates a new mock instance.
+func NewMockClusterAsyncCompletion(ctrl *gomock.Controller) *MockClusterAsyncCompletion {
+	mock := &MockClusterAsyncCompletion{ctrl: ctrl}
+	mock.recorder = &MockClusterAsyncCompletionMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockClusterAsyncCompletion) EXPECT() *MockClusterAsyncCompletionMockRecorder {
+	return m.recorder
+}
+
+// Complete mocks base method.
+func (m *MockClusterAsyncCompletion) Complete(host shared.ClusterHost, details string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Complete", host, details)
+}
+
+// Complete indicates an expected call of Complete.
+func (mr *MockClusterAsyncCompletionMockRecorder) Complete(host, details any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Complete", reflect.TypeOf((*MockClusterAsyncCompletion)(nil).Complete), host, details)
+}
+
 // MockClusterAsyncHostSelection is a mock of ClusterAsyncHostSelection interface.
 type MockClusterAsyncHostSelection struct {
 	ctrl     *gomock.Controller
@@ -40,16 +76,16 @@ func (m *MockClusterAsyncHostSelection) EXPECT() *MockClusterAsyncHostSelectionM
 	return m.recorder
 }
 
-// Complete mocks base method.
-func (m *MockClusterAsyncHostSelection) Complete(host shared.ClusterHost, details string) {
+// Cancel mocks base method.
+func (m *MockClusterAsyncHostSelection) Cancel() {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Complete", host, details)
+	m.ctrl.Call(m, "Cancel")
 }
 
-// Complete indicates an expected call of Complete.
-func (mr *MockClusterAsyncHostSelectionMockRecorder) Complete(host, details any) *gomock.Call {
+// Cancel indicates an expected call of Cancel.
+func (mr *MockClusterAsyncHostSelectionMockRecorder) Cancel() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Complete", reflect.TypeOf((*MockClusterAsyncHostSelection)(nil).Complete), host, details)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cancel", reflect.TypeOf((*MockClusterAsyncHostSelection)(nil).Cancel))
 }
 
 // MockCluster is a mock of Cluster interface.
@@ -525,9 +561,9 @@ func (m *MockClusterLoadBalancer) EXPECT() *MockClusterLoadBalancerMockRecorder 
 }
 
 // ChooseHost mocks base method.
-func (m *MockClusterLoadBalancer) ChooseHost(handle shared.ClusterLoadBalancerHandle, ctx shared.ClusterLoadBalancerContext) (shared.ClusterHost, shared.ClusterAsyncHostSelection, bool) {
+func (m *MockClusterLoadBalancer) ChooseHost(handle shared.ClusterLoadBalancerHandle, ctx shared.ClusterLoadBalancerContext, completion shared.ClusterAsyncCompletion) (shared.ClusterHost, shared.ClusterAsyncHostSelection, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ChooseHost", handle, ctx)
+	ret := m.ctrl.Call(m, "ChooseHost", handle, ctx, completion)
 	ret0, _ := ret[0].(shared.ClusterHost)
 	ret1, _ := ret[1].(shared.ClusterAsyncHostSelection)
 	ret2, _ := ret[2].(bool)
@@ -535,21 +571,9 @@ func (m *MockClusterLoadBalancer) ChooseHost(handle shared.ClusterLoadBalancerHa
 }
 
 // ChooseHost indicates an expected call of ChooseHost.
-func (mr *MockClusterLoadBalancerMockRecorder) ChooseHost(handle, ctx any) *gomock.Call {
+func (mr *MockClusterLoadBalancerMockRecorder) ChooseHost(handle, ctx, completion any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChooseHost", reflect.TypeOf((*MockClusterLoadBalancer)(nil).ChooseHost), handle, ctx)
-}
-
-// OnCancelHostSelection mocks base method.
-func (m *MockClusterLoadBalancer) OnCancelHostSelection(handle shared.ClusterLoadBalancerHandle, async shared.ClusterAsyncHostSelection) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnCancelHostSelection", handle, async)
-}
-
-// OnCancelHostSelection indicates an expected call of OnCancelHostSelection.
-func (mr *MockClusterLoadBalancerMockRecorder) OnCancelHostSelection(handle, async any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnCancelHostSelection", reflect.TypeOf((*MockClusterLoadBalancer)(nil).OnCancelHostSelection), handle, async)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChooseHost", reflect.TypeOf((*MockClusterLoadBalancer)(nil).ChooseHost), handle, ctx, completion)
 }
 
 // OnDestroy mocks base method.
@@ -998,18 +1022,6 @@ func NewMockClusterLoadBalancerContext(ctrl *gomock.Controller) *MockClusterLoad
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockClusterLoadBalancerContext) EXPECT() *MockClusterLoadBalancerContextMockRecorder {
 	return m.recorder
-}
-
-// Complete mocks base method.
-func (m *MockClusterLoadBalancerContext) Complete(host shared.ClusterHost, details string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Complete", host, details)
-}
-
-// Complete indicates an expected call of Complete.
-func (mr *MockClusterLoadBalancerContextMockRecorder) Complete(host, details any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Complete", reflect.TypeOf((*MockClusterLoadBalancerContext)(nil).Complete), host, details)
 }
 
 // ComputeHashKey mocks base method.

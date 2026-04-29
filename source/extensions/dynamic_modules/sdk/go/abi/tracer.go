@@ -191,7 +191,7 @@ func envoy_dynamic_module_on_tracer_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_tracer_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configHandle := &dymTracerConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetTracerConfigFactory(nameStr)

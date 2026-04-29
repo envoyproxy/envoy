@@ -501,13 +501,13 @@ func (c *dymAccessLogContext) IsTraceSampled() bool {
 
 // ---- additional stream info ----
 
-func (c *dymAccessLogContext) GetJa3Hash() (shared.UnsafeEnvoyBuffer, bool) {
+func (c *dymAccessLogContext) GetJA3Hash() (shared.UnsafeEnvoyBuffer, bool) {
 	var buf C.envoy_dynamic_module_type_envoy_buffer
 	ok := C.envoy_dynamic_module_callback_access_logger_get_ja3_hash(c.hostLoggerPtr, &buf)
 	return accessLogStrResult(buf, ok)
 }
 
-func (c *dymAccessLogContext) GetJa4Hash() (shared.UnsafeEnvoyBuffer, bool) {
+func (c *dymAccessLogContext) GetJA4Hash() (shared.UnsafeEnvoyBuffer, bool) {
 	var buf C.envoy_dynamic_module_type_envoy_buffer
 	ok := C.envoy_dynamic_module_callback_access_logger_get_ja4_hash(c.hostLoggerPtr, &buf)
 	return accessLogStrResult(buf, ok)
@@ -550,7 +550,7 @@ func envoy_dynamic_module_on_access_logger_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_access_logger_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configHandle := &dymAccessLoggerConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetAccessLoggerConfigFactory(nameStr)

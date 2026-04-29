@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"fmt"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
@@ -343,47 +344,55 @@ func RegisterClusterConfigFactories(factories map[string]shared.ClusterConfigFac
 
 // programHandle is the live shared.ProgramHandle wired up by the abi package via
 // SetProgramHandle. It defaults to a no-op so module test code that doesn't link the abi
-// package still gets sensible zero values.
-var programHandle shared.ProgramHandle = &noopProgramHandle{}
+// package still gets sensible zero values. atomic.Pointer is used so SetProgramHandle from
+// a test goroutine doesn't race with module code reading the handle.
+var programHandle atomic.Pointer[shared.ProgramHandle]
+
+func init() {
+	var noop shared.ProgramHandle = &noopProgramHandle{}
+	programHandle.Store(&noop)
+}
+
+func loadProgramHandle() shared.ProgramHandle { return *programHandle.Load() }
 
 // SetProgramHandle replaces the program-wide handle used by GetConcurrency / IsValidationMode
 // / Register*/Get* below. The abi package calls this once during init to wire in the live
 // Envoy callbacks; tests may override it to inject a fake.
-func SetProgramHandle(h shared.ProgramHandle) { programHandle = h }
+func SetProgramHandle(h shared.ProgramHandle) { programHandle.Store(&h) }
 
 // GetConcurrency returns the number of worker threads the server is configured to use. MUST
 // be called on the main thread (typically inside an on-program-init or on-server-initialized
 // hook).
-func GetConcurrency() uint32 { return programHandle.GetConcurrency() }
+func GetConcurrency() uint32 { return loadProgramHandle().GetConcurrency() }
 
 // IsValidationMode reports whether the server is running in config-validation mode
 // (`--mode validate`). Modules can use this to skip expensive operations during validation.
 // MUST be called on the main thread.
-func IsValidationMode() bool { return programHandle.IsValidationMode() }
+func IsValidationMode() bool { return loadProgramHandle().IsValidationMode() }
 
 // RegisterFunction registers a function pointer in Envoy's process-wide function registry —
 // used for zero-copy cross-module calls. See shared.ProgramHandle.RegisterFunction for full
 // semantics. Thread-safe.
 func RegisterFunction(key string, fnPtr unsafe.Pointer) bool {
-	return programHandle.RegisterFunction(key, fnPtr)
+	return loadProgramHandle().RegisterFunction(key, fnPtr)
 }
 
 // GetFunction retrieves a previously registered function pointer by key. See
 // shared.ProgramHandle.GetFunction. Thread-safe.
 func GetFunction(key string) (unsafe.Pointer, bool) {
-	return programHandle.GetFunction(key)
+	return loadProgramHandle().GetFunction(key)
 }
 
 // RegisterSharedData registers an opaque data pointer in Envoy's process-wide shared-data
 // registry. See shared.ProgramHandle.RegisterSharedData. Thread-safe.
 func RegisterSharedData(key string, dataPtr unsafe.Pointer) bool {
-	return programHandle.RegisterSharedData(key, dataPtr)
+	return loadProgramHandle().RegisterSharedData(key, dataPtr)
 }
 
 // GetSharedData retrieves a previously registered data pointer by key. See
 // shared.ProgramHandle.GetSharedData. Thread-safe.
 func GetSharedData(key string) (unsafe.Pointer, bool) {
-	return programHandle.GetSharedData(key)
+	return loadProgramHandle().GetSharedData(key)
 }
 
 // noopProgramHandle is the default until abi.init() replaces it with the live one.

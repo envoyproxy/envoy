@@ -23,10 +23,8 @@ type udpListenerFilterConfigWrapper struct {
 	configHandle *dymUdpListenerConfigHandle
 }
 
-type udpListenerFilterWrapper = dymUdpListenerFilterHandle
-
 var udpListenerConfigManager = newManager[udpListenerFilterConfigWrapper]()
-var udpListenerFilterManager = newManager[udpListenerFilterWrapper]()
+var udpListenerFilterManager = newManager[dymUdpListenerFilterHandle]()
 
 // dymUdpListenerConfigHandle implements shared.UdpListenerFilterConfigHandle.
 type dymUdpListenerConfigHandle struct {
@@ -163,7 +161,7 @@ func envoy_dynamic_module_on_udp_listener_filter_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_udp_listener_filter_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configHandle := &dymUdpListenerConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetUdpListenerFilterConfigFactory(nameStr)

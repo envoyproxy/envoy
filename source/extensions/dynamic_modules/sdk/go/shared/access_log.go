@@ -308,8 +308,8 @@ type AccessLogContext interface {
 
 	// ---- additional stream info ----
 
-	GetJa3Hash() (UnsafeEnvoyBuffer, bool)
-	GetJa4Hash() (UnsafeEnvoyBuffer, bool)
+	GetJA3Hash() (UnsafeEnvoyBuffer, bool)
+	GetJA4Hash() (UnsafeEnvoyBuffer, bool)
 
 	GetRequestHeadersBytes() uint64
 	GetResponseHeadersBytes() uint64

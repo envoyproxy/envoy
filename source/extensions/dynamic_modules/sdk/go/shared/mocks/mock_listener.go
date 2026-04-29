@@ -489,34 +489,34 @@ func (mr *MockListenerFilterHandleMockRecorder) GetFilterState(key any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFilterState", reflect.TypeOf((*MockListenerFilterHandle)(nil).GetFilterState), key)
 }
 
-// GetJa3Hash mocks base method.
-func (m *MockListenerFilterHandle) GetJa3Hash() (shared.UnsafeEnvoyBuffer, bool) {
+// GetJA3Hash mocks base method.
+func (m *MockListenerFilterHandle) GetJA3Hash() (shared.UnsafeEnvoyBuffer, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetJa3Hash")
+	ret := m.ctrl.Call(m, "GetJA3Hash")
 	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
-// GetJa3Hash indicates an expected call of GetJa3Hash.
-func (mr *MockListenerFilterHandleMockRecorder) GetJa3Hash() *gomock.Call {
+// GetJA3Hash indicates an expected call of GetJA3Hash.
+func (mr *MockListenerFilterHandleMockRecorder) GetJA3Hash() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJa3Hash", reflect.TypeOf((*MockListenerFilterHandle)(nil).GetJa3Hash))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJA3Hash", reflect.TypeOf((*MockListenerFilterHandle)(nil).GetJA3Hash))
 }
 
-// GetJa4Hash mocks base method.
-func (m *MockListenerFilterHandle) GetJa4Hash() (shared.UnsafeEnvoyBuffer, bool) {
+// GetJA4Hash mocks base method.
+func (m *MockListenerFilterHandle) GetJA4Hash() (shared.UnsafeEnvoyBuffer, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetJa4Hash")
+	ret := m.ctrl.Call(m, "GetJA4Hash")
 	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
-// GetJa4Hash indicates an expected call of GetJa4Hash.
-func (mr *MockListenerFilterHandleMockRecorder) GetJa4Hash() *gomock.Call {
+// GetJA4Hash indicates an expected call of GetJA4Hash.
+func (mr *MockListenerFilterHandleMockRecorder) GetJA4Hash() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJa4Hash", reflect.TypeOf((*MockListenerFilterHandle)(nil).GetJa4Hash))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJA4Hash", reflect.TypeOf((*MockListenerFilterHandle)(nil).GetJA4Hash))
 }
 
 // GetLocalAddress mocks base method.
@@ -900,28 +900,28 @@ func (mr *MockListenerFilterHandleMockRecorder) SetGauge(id, value any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetGauge", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetGauge), id, value)
 }
 
-// SetJa3Hash mocks base method.
-func (m *MockListenerFilterHandle) SetJa3Hash(hash string) {
+// SetJA3Hash mocks base method.
+func (m *MockListenerFilterHandle) SetJA3Hash(hash string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetJa3Hash", hash)
+	m.ctrl.Call(m, "SetJA3Hash", hash)
 }
 
-// SetJa3Hash indicates an expected call of SetJa3Hash.
-func (mr *MockListenerFilterHandleMockRecorder) SetJa3Hash(hash any) *gomock.Call {
+// SetJA3Hash indicates an expected call of SetJA3Hash.
+func (mr *MockListenerFilterHandleMockRecorder) SetJA3Hash(hash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetJa3Hash", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetJa3Hash), hash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetJA3Hash", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetJA3Hash), hash)
 }
 
-// SetJa4Hash mocks base method.
-func (m *MockListenerFilterHandle) SetJa4Hash(hash string) {
+// SetJA4Hash mocks base method.
+func (m *MockListenerFilterHandle) SetJA4Hash(hash string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetJa4Hash", hash)
+	m.ctrl.Call(m, "SetJA4Hash", hash)
 }
 
-// SetJa4Hash indicates an expected call of SetJa4Hash.
-func (mr *MockListenerFilterHandleMockRecorder) SetJa4Hash(hash any) *gomock.Call {
+// SetJA4Hash indicates an expected call of SetJA4Hash.
+func (mr *MockListenerFilterHandleMockRecorder) SetJA4Hash(hash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetJa4Hash", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetJa4Hash), hash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetJA4Hash", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetJA4Hash), hash)
 }
 
 // SetRemoteAddress mocks base method.

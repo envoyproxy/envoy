@@ -401,7 +401,7 @@ func envoy_dynamic_module_on_lb_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_lb_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configHandle := &dymLbConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetLoadBalancerConfigFactory(nameStr)

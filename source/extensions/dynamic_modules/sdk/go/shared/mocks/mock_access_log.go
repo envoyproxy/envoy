@@ -712,34 +712,34 @@ func (mr *MockAccessLogContextMockRecorder) GetHeadersSize(headerType any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHeadersSize", reflect.TypeOf((*MockAccessLogContext)(nil).GetHeadersSize), headerType)
 }
 
-// GetJa3Hash mocks base method.
-func (m *MockAccessLogContext) GetJa3Hash() (shared.UnsafeEnvoyBuffer, bool) {
+// GetJA3Hash mocks base method.
+func (m *MockAccessLogContext) GetJA3Hash() (shared.UnsafeEnvoyBuffer, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetJa3Hash")
+	ret := m.ctrl.Call(m, "GetJA3Hash")
 	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
-// GetJa3Hash indicates an expected call of GetJa3Hash.
-func (mr *MockAccessLogContextMockRecorder) GetJa3Hash() *gomock.Call {
+// GetJA3Hash indicates an expected call of GetJA3Hash.
+func (mr *MockAccessLogContextMockRecorder) GetJA3Hash() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJa3Hash", reflect.TypeOf((*MockAccessLogContext)(nil).GetJa3Hash))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJA3Hash", reflect.TypeOf((*MockAccessLogContext)(nil).GetJA3Hash))
 }
 
-// GetJa4Hash mocks base method.
-func (m *MockAccessLogContext) GetJa4Hash() (shared.UnsafeEnvoyBuffer, bool) {
+// GetJA4Hash mocks base method.
+func (m *MockAccessLogContext) GetJA4Hash() (shared.UnsafeEnvoyBuffer, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetJa4Hash")
+	ret := m.ctrl.Call(m, "GetJA4Hash")
 	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
-// GetJa4Hash indicates an expected call of GetJa4Hash.
-func (mr *MockAccessLogContextMockRecorder) GetJa4Hash() *gomock.Call {
+// GetJA4Hash indicates an expected call of GetJA4Hash.
+func (mr *MockAccessLogContextMockRecorder) GetJA4Hash() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJa4Hash", reflect.TypeOf((*MockAccessLogContext)(nil).GetJa4Hash))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJA4Hash", reflect.TypeOf((*MockAccessLogContext)(nil).GetJA4Hash))
 }
 
 // GetLocalReplyBody mocks base method.

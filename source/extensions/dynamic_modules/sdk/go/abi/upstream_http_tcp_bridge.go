@@ -175,7 +175,7 @@ func envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configFactory := sdk.GetUpstreamHttpTcpBridgeConfigFactory(nameStr)
 	if configFactory == nil {

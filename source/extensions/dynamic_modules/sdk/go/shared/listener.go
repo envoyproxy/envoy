@@ -192,11 +192,11 @@ type ListenerFilterHandle interface {
 	// socket.
 	SetRequestedApplicationProtocols(protocols []string)
 
-	// SetJa3Hash sets the JA3 fingerprint hash on the socket.
-	SetJa3Hash(hash string)
+	// SetJA3Hash sets the JA3 fingerprint hash on the socket.
+	SetJA3Hash(hash string)
 
-	// SetJa4Hash sets the JA4 fingerprint hash on the socket.
-	SetJa4Hash(hash string)
+	// SetJA4Hash sets the JA4 fingerprint hash on the socket.
+	SetJA4Hash(hash string)
 
 	// ---- protocol detection getters & SSL info ----
 
@@ -214,13 +214,13 @@ type ListenerFilterHandle interface {
 	// GetRequestedApplicationProtocols returns the ALPN protocols set on the socket.
 	GetRequestedApplicationProtocols() []UnsafeEnvoyBuffer
 
-	// GetJa3Hash returns the JA3 fingerprint hash from the socket. Returns false if not
+	// GetJA3Hash returns the JA3 fingerprint hash from the socket. Returns false if not
 	// available.
-	GetJa3Hash() (UnsafeEnvoyBuffer, bool)
+	GetJA3Hash() (UnsafeEnvoyBuffer, bool)
 
-	// GetJa4Hash returns the JA4 fingerprint hash from the socket. Returns false if not
+	// GetJA4Hash returns the JA4 fingerprint hash from the socket. Returns false if not
 	// available.
-	GetJa4Hash() (UnsafeEnvoyBuffer, bool)
+	GetJA4Hash() (UnsafeEnvoyBuffer, bool)
 
 	// IsSSL reports whether SSL/TLS connection information is available on the socket.
 	IsSSL() bool

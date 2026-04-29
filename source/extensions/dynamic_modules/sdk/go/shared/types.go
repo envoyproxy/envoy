@@ -146,23 +146,23 @@ const (
 	// connection.id
 	AttributeIDConnectionId
 	// connection.mtls
-	AttributeIDConnectionMtls
+	AttributeIDConnectionMTLS
 	// connection.requested_server_name
 	AttributeIDConnectionRequestedServerName
 	// connection.tls_version
-	AttributeIDConnectionTlsVersion
+	AttributeIDConnectionTLSVersion
 	// connection.subject_local_certificate
 	AttributeIDConnectionSubjectLocalCertificate
 	// connection.subject_peer_certificate
 	AttributeIDConnectionSubjectPeerCertificate
 	// connection.dns_san_local_certificate
-	AttributeIDConnectionDnsSanLocalCertificate
+	AttributeIDConnectionDNSSanLocalCertificate
 	// connection.dns_san_peer_certificate
-	AttributeIDConnectionDnsSanPeerCertificate
+	AttributeIDConnectionDNSSanPeerCertificate
 	// connection.uri_san_local_certificate
-	AttributeIDConnectionUriSanLocalCertificate
+	AttributeIDConnectionURISanLocalCertificate
 	// connection.uri_san_peer_certificate
-	AttributeIDConnectionUriSanPeerCertificate
+	AttributeIDConnectionURISanPeerCertificate
 	// connection.sha256_peer_certificate_digest
 	AttributeIDConnectionSha256PeerCertificateDigest
 	// connection.transport_failure_reason
@@ -174,19 +174,19 @@ const (
 	// upstream.port
 	AttributeIDUpstreamPort
 	// upstream.tls_version
-	AttributeIDUpstreamTlsVersion
+	AttributeIDUpstreamTLSVersion
 	// upstream.subject_local_certificate
 	AttributeIDUpstreamSubjectLocalCertificate
 	// upstream.subject_peer_certificate
 	AttributeIDUpstreamSubjectPeerCertificate
 	// upstream.dns_san_local_certificate
-	AttributeIDUpstreamDnsSanLocalCertificate
+	AttributeIDUpstreamDNSSanLocalCertificate
 	// upstream.dns_san_peer_certificate
-	AttributeIDUpstreamDnsSanPeerCertificate
+	AttributeIDUpstreamDNSSanPeerCertificate
 	// upstream.uri_san_local_certificate
-	AttributeIDUpstreamUriSanLocalCertificate
+	AttributeIDUpstreamURISanLocalCertificate
 	// upstream.uri_san_peer_certificate
-	AttributeIDUpstreamUriSanPeerCertificate
+	AttributeIDUpstreamURISanPeerCertificate
 	// upstream.sha256_peer_certificate_digest
 	AttributeIDUpstreamSha256PeerCertificateDigest
 	// upstream.local_address
@@ -267,7 +267,7 @@ type HttpCalloutCallback interface {
 type HttpStreamResetReason uint32
 
 const (
-	HttpStreamResetReasonConnectionFailure = iota
+	HttpStreamResetReasonConnectionFailure HttpStreamResetReason = iota
 	HttpStreamResetReasonConnectionTermination
 	HttpStreamResetReasonLocalReset
 	HttpStreamResetReasonLocalRefusedStreamReset

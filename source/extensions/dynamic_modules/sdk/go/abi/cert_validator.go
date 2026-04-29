@@ -69,7 +69,7 @@ func envoy_dynamic_module_on_cert_validator_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_cert_validator_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configFactory := sdk.GetCertValidatorConfigFactory(nameStr)
 	if configFactory == nil {

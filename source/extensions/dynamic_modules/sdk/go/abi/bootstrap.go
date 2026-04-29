@@ -10,16 +10,19 @@ package abi
 #include "../../../abi/abi.h"
 
 // Forward declarations for Go-exported callbacks so we can reference them from C trampolines.
-extern void cgoBootstrapEventCb(void* context);
 extern envoy_dynamic_module_type_stats_iteration_action cgoBootstrapCounterIteratorGo(
     envoy_dynamic_module_type_envoy_buffer name, uint64_t value, void* user_data);
 extern envoy_dynamic_module_type_stats_iteration_action cgoBootstrapGaugeIteratorGo(
     envoy_dynamic_module_type_envoy_buffer name, uint64_t value, void* user_data);
 
-// cgoBootstrapInvokeEventCb is a tiny C trampoline so we can store a Go-exported function
-// address in a C function-pointer field without violating cgo pointer rules.
-static inline void cgoBootstrapInvokeEventCb(void* context) {
-    cgoBootstrapEventCb(context);
+// cgoInvokeEventCb invokes Envoy's completion callback. The completion callback is a
+// plain C function pointer Envoy hands us via the *_shutdown export hooks; calling it
+// from Go via cgo would require turning the function-pointer field into a Go-callable
+// value, so we route through this tiny C wrapper instead.
+static inline void cgoInvokeEventCb(envoy_dynamic_module_type_event_cb cb, void* context) {
+    if (cb != NULL) {
+        cb(context);
+    }
 }
 
 // C-side function pointers we can pass to Envoy. They forward to the Go-exported callbacks.
@@ -448,19 +451,8 @@ func (h *dymBootstrapExtensionHandle) IterateGauges(visit func(name shared.Unsaf
 }
 
 // =============================================================================
-// CGo trampolines for stats iteration & shutdown completion
+// CGo trampolines for stats iteration
 // =============================================================================
-
-//export cgoBootstrapEventCb
-func cgoBootstrapEventCb(context unsafe.Pointer) {
-	// Forward to the pending shutdown's Go callback. context holds a pointer to a
-	// bootstrapShutdownCompletion record allocated and managed by Envoy — but since we hand
-	// Envoy's own context back, we just forward the call.
-	//
-	// In practice, this is reached when the Go-level completion func passed to OnShutdown is
-	// called, which in turn invokes this trampoline via cgoBootstrapInvokeEventCb.
-	_ = context
-}
 
 //export cgoBootstrapCounterIteratorGo
 func cgoBootstrapCounterIteratorGo(
@@ -501,7 +493,7 @@ func envoy_dynamic_module_on_bootstrap_extension_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_bootstrap_extension_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configFactory := sdk.GetBootstrapExtensionConfigFactory(nameStr)
 	if configFactory == nil {
@@ -605,9 +597,7 @@ func envoy_dynamic_module_on_bootstrap_extension_shutdown(
 	w := bootstrapExtensionManager.unwrap(unsafe.Pointer(extPtr))
 	if w == nil || w.extension == nil {
 		// We still have to call completion to unblock Envoy.
-		if completionCallback != nil {
-			C.cgoBootstrapInvokeEventCb(completionContext)
-		}
+		C.cgoInvokeEventCb(completionCallback, completionContext)
 		return
 	}
 	completion := &bootstrapShutdownCompletion{cb: completionCallback, context: completionContext}
@@ -619,9 +609,7 @@ func envoy_dynamic_module_on_bootstrap_extension_shutdown(
 		if completion.done.Swap(true) {
 			return
 		}
-		if completion.cb != nil {
-			C.cgoBootstrapInvokeEventCb(completion.context)
-		}
+		C.cgoInvokeEventCb(completion.cb, completion.context)
 	})
 }
 
@@ -785,16 +773,18 @@ func envoy_dynamic_module_on_bootstrap_extension_admin_request(
 	if w == nil {
 		return 500
 	}
-	pathStr := envoyBufferToStringUnsafe(path)
+	// path is used both for handler lookup and is passed through to the user; the lookup is
+	// safe with the unsafe alias, but the user may retain pathStr, so copy before dispatch.
+	pathView := envoyBufferToStringUnsafe(path)
 	w.adminMu.Lock()
 	// Match by exact prefix first; if no exact match, fall back to longest matching prefix.
 	var handler shared.BootstrapAdminHandler
-	if h, ok := w.adminHandlers[pathStr]; ok {
+	if h, ok := w.adminHandlers[pathView]; ok {
 		handler = h
 	} else {
 		var bestPrefix string
 		for prefix, h := range w.adminHandlers {
-			if len(prefix) > len(bestPrefix) && hasPrefixGo(pathStr, prefix) {
+			if len(prefix) > len(bestPrefix) && hasPrefixGo(pathView, prefix) {
 				bestPrefix = prefix
 				handler = h
 			}
@@ -804,8 +794,11 @@ func envoy_dynamic_module_on_bootstrap_extension_admin_request(
 	if handler == nil {
 		return 404
 	}
-	methodStr := envoyBufferToStringUnsafe(method)
-	bodyBytes := envoyBufferToBytesUnsafe(body)
+	// Admin handlers may retain method/path/body strings (e.g., persisting them in module
+	// state); copy out of the Envoy-owned buffers before user code runs.
+	pathStr := string(pathView)
+	methodStr := envoyBufferToStringCopy(method)
+	bodyBytes := envoyBufferToBytesCopy(body)
 	return C.uint32_t(handler.HandleAdminRequest(w.configHandle, methodStr, pathStr, bodyBytes))
 }
 

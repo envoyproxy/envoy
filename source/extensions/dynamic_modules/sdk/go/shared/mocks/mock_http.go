@@ -934,10 +934,10 @@ func (mr *MockHttpFilterHandleMockRecorder) GetAttributeBool(attributeID any) *g
 }
 
 // GetAttributeNumber mocks base method.
-func (m *MockHttpFilterHandle) GetAttributeNumber(attributeID shared.AttributeID) (float64, bool) {
+func (m *MockHttpFilterHandle) GetAttributeNumber(attributeID shared.AttributeID) (uint64, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAttributeNumber", attributeID)
-	ret0, _ := ret[0].(float64)
+	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }

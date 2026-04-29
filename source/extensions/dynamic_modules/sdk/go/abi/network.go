@@ -27,10 +27,8 @@ type networkFilterConfigWrapper struct {
 	configHandle *dymNetworkConfigHandle
 }
 
-type networkFilterWrapper = dymNetworkFilterHandle
-
 var networkConfigManager = newManager[networkFilterConfigWrapper]()
-var networkFilterManager = newManager[networkFilterWrapper]()
+var networkFilterManager = newManager[dymNetworkFilterHandle]()
 
 // dymNetworkConfigHandle implements shared.NetworkFilterConfigHandle.
 type dymNetworkConfigHandle struct {
@@ -703,7 +701,7 @@ func envoy_dynamic_module_on_network_filter_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_network_filter_config_module_ptr {
 	nameStr := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configHandle := &dymNetworkConfigHandle{hostConfigPtr: hostConfigPtr}
 	configFactory := sdk.GetNetworkFilterConfigFactory(nameStr)

@@ -22,8 +22,9 @@ import "unsafe"
 //   4. Cluster.NewLoadBalancer is called once per worker thread, returning a per-worker
 //      ClusterLoadBalancer.
 //   5. ClusterLoadBalancer.ChooseHost is called for each upstream selection on that worker.
-//      It can resolve synchronously (returning host or nil) or asynchronously (returning an
-//      AsyncHostSelection that the module completes later via context.Complete).
+//      It can resolve synchronously (returning a host) or asynchronously (returning a
+//      ClusterAsyncHostSelection; the module signals completion via the SDK-provided
+//      ClusterAsyncCompletion handed to ChooseHost).
 //   6. ClusterLoadBalancer.OnHostMembershipUpdate notifies the worker's LB of host-set changes.
 //   7. Cluster.OnServerInitialized / OnDrainStarted / OnShutdown fire on the main thread at
 //      their respective lifecycle stages. OnShutdown MUST call completion exactly once.
@@ -70,13 +71,27 @@ type ClusterHostSpec struct {
 	MetadataPairs []string
 }
 
-// ClusterAsyncHostSelection is a module-owned handle returned from ClusterLoadBalancer.ChooseHost
-// when the selection is performed asynchronously. The module MUST eventually call its Complete
-// method exactly once per handle, unless OnCancelHostSelection is invoked first.
-type ClusterAsyncHostSelection interface {
-	// Complete delivers the final host (or nil for failure), with a free-form details string
-	// recorded as the resolution outcome.
+// ClusterAsyncCompletion is the SDK-provided completion handle passed to
+// ClusterLoadBalancer.ChooseHost. When ChooseHost returns asynchronously, the module stores
+// this handle and calls Complete exactly once when the selection finishes (unless
+// OnCancelHostSelection has already fired). Complete is safe to call from any goroutine.
+type ClusterAsyncCompletion interface {
+	// Complete delivers the final host (or the zero ClusterHost for failure), with a
+	// free-form details string recorded as the resolution outcome. Calling Complete more
+	// than once is a no-op; calling Complete after OnCancelHostSelection is a no-op.
 	Complete(host ClusterHost, details string)
+}
+
+// ClusterAsyncHostSelection is a module-owned handle returned from ClusterLoadBalancer.ChooseHost
+// when the selection is performed asynchronously. The module typically stores the
+// ClusterAsyncCompletion it was handed and signals completion via that handle; this interface
+// exists so the SDK can notify the module of cancellation.
+type ClusterAsyncHostSelection interface {
+	// Cancel is called by the SDK when Envoy cancels async host selection (e.g., the stream
+	// was destroyed before the module produced a result). After this returns, the module MUST
+	// NOT call Complete on the associated ClusterAsyncCompletion. The module should release
+	// any resources tied to the selection.
+	Cancel()
 }
 
 // Cluster is the module-side cluster object — one instance per cluster configuration. All
@@ -191,17 +206,14 @@ type ClusterHandle interface {
 // ClusterLoadBalancer is the per-worker LB associated with a Cluster. ChooseHost is called for
 // every upstream selection on this worker.
 type ClusterLoadBalancer interface {
-	// ChooseHost picks a host for the request. Returns:
-	//   - (host, nil, true) for synchronous success
-	//   - (0, async, true) when async resolution is in flight; the module MUST eventually
-	//     call async.Complete or accept OnCancelHostSelection
-	//   - (0, nil, false) for synchronous failure (no host selected; request fails)
-	ChooseHost(handle ClusterLoadBalancerHandle, ctx ClusterLoadBalancerContext) (ClusterHost, ClusterAsyncHostSelection, bool)
-
-	// OnCancelHostSelection is called when a stream is destroyed before async selection
-	// completes (e.g., timeout). After this, the module MUST NOT call async.Complete for the
-	// given handle. Optional — only modules using async selection need this.
-	OnCancelHostSelection(handle ClusterLoadBalancerHandle, async ClusterAsyncHostSelection)
+	// ChooseHost picks a host for the request. completion is the SDK-provided completion
+	// handle the module uses to signal an asynchronous result. Returns:
+	//   - (host, nil, true) for synchronous success (completion can be ignored)
+	//   - (zero, async, true) when async resolution is in flight; the module MUST eventually
+	//     call completion.Complete (unless async.Cancel fires first)
+	//   - (zero, nil, false) for synchronous failure (no host selected; request fails)
+	ChooseHost(handle ClusterLoadBalancerHandle, ctx ClusterLoadBalancerContext,
+		completion ClusterAsyncCompletion) (ClusterHost, ClusterAsyncHostSelection, bool)
 
 	// OnHostMembershipUpdate notifies the per-worker LB of host-set changes. During the
 	// callback the module can enumerate added/removed hosts via
@@ -215,12 +227,11 @@ type ClusterLoadBalancer interface {
 // EmptyClusterLoadBalancer is a no-op ClusterLoadBalancer that always returns sync failure.
 type EmptyClusterLoadBalancer struct{}
 
-func (*EmptyClusterLoadBalancer) ChooseHost(_ ClusterLoadBalancerHandle, _ ClusterLoadBalancerContext) (ClusterHost, ClusterAsyncHostSelection, bool) {
+func (*EmptyClusterLoadBalancer) ChooseHost(_ ClusterLoadBalancerHandle, _ ClusterLoadBalancerContext, _ ClusterAsyncCompletion) (ClusterHost, ClusterAsyncHostSelection, bool) {
 	return ClusterHost{}, nil, false
 }
-func (*EmptyClusterLoadBalancer) OnCancelHostSelection(_ ClusterLoadBalancerHandle, _ ClusterAsyncHostSelection) {}
-func (*EmptyClusterLoadBalancer) OnHostMembershipUpdate(_ ClusterLoadBalancerHandle, _, _ uint64)                  {}
-func (*EmptyClusterLoadBalancer) OnDestroy()                                                                       {}
+func (*EmptyClusterLoadBalancer) OnHostMembershipUpdate(_ ClusterLoadBalancerHandle, _, _ uint64) {}
+func (*EmptyClusterLoadBalancer) OnDestroy()                                                      {}
 
 // ClusterLoadBalancerHandle is the per-worker LB handle. All methods MUST be called on the
 // owning worker thread (i.e., from inside a ClusterLoadBalancer callback).
@@ -285,13 +296,6 @@ type ClusterLoadBalancerHandle interface {
 // through this handle is only valid for the duration of the ChooseHost callback (synchronous
 // case) or until the async-handle is completed/cancelled (async case).
 type ClusterLoadBalancerContext interface {
-	// Complete delivers the result of an asynchronous host selection. host=0 means failure.
-	// details is recorded as the resolution outcome.
-	//
-	// MUST be called exactly once per AsyncHostSelection returned from ChooseHost, unless
-	// OnCancelHostSelection has been invoked first.
-	Complete(host ClusterHost, details string)
-
 	ComputeHashKey() (uint64, bool)
 	GetDownstreamHeadersSize() uint64
 	GetDownstreamHeaders() [][2]UnsafeEnvoyBuffer
