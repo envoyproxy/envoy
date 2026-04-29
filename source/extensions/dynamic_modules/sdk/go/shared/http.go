@@ -1,54 +1,205 @@
-//go:generate mockgen -source=base.go -destination=mocks/mock_base.go -package=mocks
+//go:generate mockgen -source=http.go -destination=mocks/mock_http.go -package=mocks
 package shared
 
-import (
-	"strings"
-	"unsafe"
+// HTTP filter SDK surface for dynamic modules.
+//
+// Cross-surface primitives (UnsafeEnvoyBuffer, LogLevel, MetricID, AttributeID, Scheduler,
+// HttpCalloutInitResult/Result/Callback, HttpStreamCallback/ResetReason, SocketOption*,
+// ClusterHostCount, HttpHeaderType) live in types.go.
+
+type HeadersStatus int32
+
+const (
+	// '2' is preserved for ContinueAndDontEndStream and is not exposed here.
+
+	// HeadersStatusContinue indicates that the headers can continue to be processed by
+	// next plugin in the chain and nothing will be stopped.
+	HeadersStatusContinue HeadersStatus = 0
+	// HeadersStatusStop indicates that the headers processing should stop at this plugin.
+	// And when the body or trailers are received, the onRequestBody or onRequestTrailers
+	// of this plugin will be called. And the filter chain will continue or still hang
+	// based on the returned status of onRequestBody or onRequestTrailers.
+	// Of course the continueRequestStream or continueResponseStream can be called to continue
+	// the processing manually.
+	HeadersStatusStop HeadersStatus = 1
+	// HeadersStatusStopAndBuffer indicates that the headers processing should stop at this plugin.
+	// And even if the body or trailers are received, the onRequestBody or onRequestTrailers
+	// of this plugin will NOT be called and the body will be buffered. The only way to continue
+	// the processing is to call continueRequestStream or continueResponseStream manually.
+	// This is useful when you want to wait a certain condition to be met before continuing
+	// the processing (For example, waiting for the result of an asynchronous operation).
+	HeadersStatusStopAllAndBuffer HeadersStatus = 3
+	// Similar to HeadersStatusStopAllAndBuffer. But when there are too big body data buffered,
+	// the HeadersStatusStopAllAndBuffer will result in 413 (Payload Too Large) response to the
+	// client. But with this status, the watermarking will be used to disable reading from client
+	// or server.
+	HeadersStatusStopAllAndWatermark HeadersStatus = 4
+	HeadersStatusDefault             HeadersStatus = HeadersStatusContinue
 )
 
-// UnsafeEnvoyBuffer is a struct that represents a buffer of data from Envoy.
-// It contains a pointer to the data and its length. The memory of the data is managed by Envoy.
-type UnsafeEnvoyBuffer struct {
-	// Pointer to the start of the buffer data.
-	Ptr *byte
-	// Length of the buffer data in bytes.
-	Len uint64
+type BodyStatus int32
+
+const (
+	// BodyStatusContinue indicates that the body can continue to be processed by next plugin
+	// in the chain. And if the onRequestHeaders or onResponseHeaders of this plugin returned
+	// HeadersStatusStop before, the headers processing will continue.
+	BodyStatusContinue BodyStatus = 0
+	// BodyStatusStopAndBuffer indicates that the body processing should stop at this plugin.
+	// And the body will be buffered.
+	BodyStatusStopAndBuffer BodyStatus = 1
+	// BodyStatusStopAndWatermark indicates that the body processing should stop at this plugin.
+	// And watermarking will be used to disable reading from client or server if there are too
+	// big body data buffered.
+	BodyStatusStopAndWatermark BodyStatus = 2
+	// BodyStatusStopNoBuffer indicates that the body processing should stop at this plugin.
+	// No body data will be buffered.
+	BodyStatusStopNoBuffer BodyStatus = 3
+	BodyStatusDefault      BodyStatus = BodyStatusContinue
+)
+
+type TrailersStatus int32
+
+const (
+	// TrailersStatusContinue indicates that the trailers can continue to be processed by next plugin
+	// in the chain. And if the onRequestHeaders, onResponseHeaders, onRequestBody or onResponseBody
+	// of this plugin have returned stop status before, the processing will continue after this.
+	TrailersStatusContinue TrailersStatus = 0
+	// TrailersStatusStop indicates that the trailers processing should stop at this plugin. The
+	// only way to continue the processing is to call continueRequestStream or continueResponseStream
+	// manually.
+	TrailersStatusStop    TrailersStatus = 1
+	TrailersStatusDefault TrailersStatus = TrailersStatusContinue
+)
+
+// HttpFilter is the interface to implement your own plugin logic. This is a simplified version and could
+// not implement flexible stream control. But it should be enough for most of the use cases.
+type HttpFilter interface {
+	// OnRequestHeaders will be called when the request headers are received.
+	// @Param headers the request headers.
+	// @Param endOfStream whether this is the end of the stream.
+	// @Return HeadersStatus the status to control the plugin chain processing.
+	OnRequestHeaders(headers HeaderMap, endOfStream bool) HeadersStatus
+
+	// OnRequestBody will be called when the request body are received. This may be called multiple times.
+	// @Param body the request body.
+	// @Param endOfStream whether this is the end of the stream.
+	// @Return BodyStatus the status to control the plugin chain processing.
+	OnRequestBody(body BodyBuffer, endOfStream bool) BodyStatus
+
+	// OnRequestTrailers will be called when the request trailers are received.
+	// @Param trailers the request trailers.
+	// @Return TrailersStatus the status to control the plugin chain processing.
+	OnRequestTrailers(trailers HeaderMap) TrailersStatus
+
+	// OnResponseHeaders will be called when the response headers are received.
+	// @Param headers the response headers.
+	// @Param endOfStream whether this is the end of the stream.
+	// @Return HeadersStatus the status to control the plugin chain processing.
+	OnResponseHeaders(headers HeaderMap, endOfStream bool) HeadersStatus
+
+	// OnResponseBody will be called when the response body is received. This may be called multiple
+	// times.
+	// @Param body the response body.
+	// @Param endOfStream whether this is the end of the stream.
+	// @Return BodyStatus the status to control the plugin chain processing.
+	OnResponseBody(body BodyBuffer, endOfStream bool) BodyStatus
+
+	// OnResponseTrailers will be called when the response trailers are received.
+	// @Param trailers the response trailers.
+	// @Return TrailersStatus the status to control the plugin chain processing.
+	OnResponseTrailers(trailers HeaderMap) TrailersStatus
+
+	// OnStreamComplete is called when the stream processing is complete and before access logs
+	// are flushed.
+	// This is a good place to do any final processing or cleanup before the request is fully
+	// completed.
+	OnStreamComplete()
+
+	// OnDestroy is called when the HTTP filter instance is being destroyed. This is called
+	// after OnStreamComplete and access logs are flushed. This is a good place to release
+	// any per-stream resources.
+	OnDestroy()
 }
 
-func (b UnsafeEnvoyBuffer) ToUnsafeBytes() []byte {
-	if b.Ptr == nil || b.Len == 0 {
-		return nil
-	}
-	// Use unsafe to create a byte slice that points to the buffer data without copying.
-	return unsafe.Slice(b.Ptr, b.Len)
+type EmptyHttpFilter struct {
 }
 
-// ToBytes converts the UnsafeEnvoyBuffer to a byte slice. It creates a copy of the data in Go memory.
-func (b UnsafeEnvoyBuffer) ToBytes() []byte {
-	if b.Ptr == nil || b.Len == 0 {
-		return nil
-	}
-	// Create a byte slice that copys the data from the buffer.
-	owned := make([]byte, b.Len)
-	// Use unsafe to copy the data from the buffer to the byte slice.
-	src := unsafe.Slice(b.Ptr, b.Len)
-	copy(owned, src)
-	return owned
+func (p *EmptyHttpFilter) OnRequestHeaders(headers HeaderMap, endOfStream bool) HeadersStatus {
+	return HeadersStatusDefault
 }
 
-func (b UnsafeEnvoyBuffer) ToUnsafeString() string {
-	if b.Ptr == nil || b.Len == 0 {
-		return ""
-	}
-	// Use unsafe to create a string that points to the buffer data without copying.
-	return unsafe.String(b.Ptr, b.Len)
+func (p *EmptyHttpFilter) OnRequestBody(body BodyBuffer, endOfStream bool) BodyStatus {
+	return BodyStatusDefault
 }
 
-func (b UnsafeEnvoyBuffer) ToString() string {
-	if b.Ptr == nil || b.Len == 0 {
-		return ""
-	}
-	return strings.Clone(b.ToUnsafeString())
+func (p *EmptyHttpFilter) OnRequestTrailers(trailers HeaderMap) TrailersStatus {
+	return TrailersStatusDefault
+}
+
+func (p *EmptyHttpFilter) OnResponseHeaders(headers HeaderMap, endOfStream bool) HeadersStatus {
+	return HeadersStatusDefault
+}
+
+func (p *EmptyHttpFilter) OnResponseBody(body BodyBuffer, endOfStream bool) BodyStatus {
+	return BodyStatusDefault
+}
+
+func (p *EmptyHttpFilter) OnResponseTrailers(trailers HeaderMap) TrailersStatus {
+	return TrailersStatusDefault
+}
+
+func (p *EmptyHttpFilter) OnStreamComplete() {
+}
+
+func (p *EmptyHttpFilter) OnDestroy() {
+}
+
+// HttpFilterFactory is the factory interface for creating stream plugins.
+// This is used to create instances of the stream plugin at runtime when a new request is received.
+// The implementation of this interface should be thread-safe and hold the parsed configuration.
+type HttpFilterFactory interface {
+	// Create creates a HttpFilter instance.
+	Create(handle HttpFilterHandle) HttpFilter
+
+	// OnDestroy is called when the factory is being destroyed. This is a good place to clean up any
+	// resources. This usually happens when the configuration is updated and all existing streams
+	// using this factory are closed.
+	OnDestroy()
+}
+
+type EmptyHttpFilterFactory struct {
+}
+
+func (f *EmptyHttpFilterFactory) Create(handle HttpFilterHandle) HttpFilter {
+	return &EmptyHttpFilter{}
+}
+
+func (f *EmptyHttpFilterFactory) OnDestroy() {
+}
+
+// HttpFilterConfigFactory is the factory interface for creating stream plugin configurations.
+// This is used to create
+// PluginConfig based on the unparsed configuration. The HttpFilterConfigFactory should parse the unparsedConfig
+// and create a PluginFactory instance.
+// The implementation of this interface should be thread-safe and be stateless in most cases.
+type HttpFilterConfigFactory interface {
+	// Create creates a HttpFilterFactory based on the unparsed configuration.
+	Create(handle HttpFilterConfigHandle, unparsedConfig []byte) (HttpFilterFactory, error)
+
+	// CreatePerRoute creates a per-route configuration based on the unparsed configuration.
+	CreatePerRoute(unparsedConfig []byte) (any, error)
+}
+
+type EmptyHttpFilterConfigFactory struct {
+}
+
+func (f *EmptyHttpFilterConfigFactory) Create(handle HttpFilterConfigHandle,
+	unparsedConfig []byte) (HttpFilterFactory, error) {
+	return &EmptyHttpFilterFactory{}, nil
+}
+
+func (f *EmptyHttpFilterConfigFactory) CreatePerRoute(unparsedConfig []byte) (any, error) {
+	return nil, nil
 }
 
 // BodyBuffer is an interface that provides access to the request and response body.
@@ -103,175 +254,8 @@ type HeaderMap interface {
 	Remove(key string)
 }
 
-type AttributeID uint32
-
-const (
-	// request.path
-	AttributeIDRequestPath AttributeID = iota
-	// request.url_path
-	AttributeIDRequestUrlPath
-	// request.host
-	AttributeIDRequestHost
-	// request.scheme
-	AttributeIDRequestScheme
-	// request.method
-	AttributeIDRequestMethod
-	// request.headers
-	AttributeIDRequestHeaders
-	// request.referer
-	AttributeIDRequestReferer
-	// request.useragent
-	AttributeIDRequestUserAgent
-	// request.time
-	AttributeIDRequestTime
-	// request.id
-	AttributeIDRequestId
-	// request.protocol
-	AttributeIDRequestProtocol
-	// request.query
-	AttributeIDRequestQuery
-	// request.duration
-	AttributeIDRequestDuration
-	// request.size
-	AttributeIDRequestSize
-	// request.total_size
-	AttributeIDRequestTotalSize
-	// response.code
-	AttributeIDResponseCode
-	// response.code_details
-	AttributeIDResponseCodeDetails
-	// response.flags
-	AttributeIDResponseFlags
-	// response.grpc_status
-	AttributeIDResponseGrpcStatus
-	// response.headers
-	AttributeIDResponseHeaders
-	// response.trailers
-	AttributeIDResponseTrailers
-	// response.size
-	AttributeIDResponseSize
-	// response.total_size
-	AttributeIDResponseTotalSize
-	// response.backend_latency
-	AttributeIDResponseBackendLatency
-	// source.address
-	AttributeIDSourceAddress
-	// source.port
-	AttributeIDSourcePort
-	// destination.address
-	AttributeIDDestinationAddress
-	// destination.port
-	AttributeIDDestinationPort
-	// connection.id
-	AttributeIDConnectionId
-	// connection.mtls
-	AttributeIDConnectionMtls
-	// connection.requested_server_name
-	AttributeIDConnectionRequestedServerName
-	// connection.tls_version
-	AttributeIDConnectionTlsVersion
-	// connection.subject_local_certificate
-	AttributeIDConnectionSubjectLocalCertificate
-	// connection.subject_peer_certificate
-	AttributeIDConnectionSubjectPeerCertificate
-	// connection.dns_san_local_certificate
-	AttributeIDConnectionDnsSanLocalCertificate
-	// connection.dns_san_peer_certificate
-	AttributeIDConnectionDnsSanPeerCertificate
-	// connection.uri_san_local_certificate
-	AttributeIDConnectionUriSanLocalCertificate
-	// connection.uri_san_peer_certificate
-	AttributeIDConnectionUriSanPeerCertificate
-	// connection.sha256_peer_certificate_digest
-	AttributeIDConnectionSha256PeerCertificateDigest
-	// connection.transport_failure_reason
-	AttributeIDConnectionTransportFailureReason
-	// connection.termination_details
-	AttributeIDConnectionTerminationDetails
-	// upstream.address
-	AttributeIDUpstreamAddress
-	// upstream.port
-	AttributeIDUpstreamPort
-	// upstream.tls_version
-	AttributeIDUpstreamTlsVersion
-	// upstream.subject_local_certificate
-	AttributeIDUpstreamSubjectLocalCertificate
-	// upstream.subject_peer_certificate
-	AttributeIDUpstreamSubjectPeerCertificate
-	// upstream.dns_san_local_certificate
-	AttributeIDUpstreamDnsSanLocalCertificate
-	// upstream.dns_san_peer_certificate
-	AttributeIDUpstreamDnsSanPeerCertificate
-	// upstream.uri_san_local_certificate
-	AttributeIDUpstreamUriSanLocalCertificate
-	// upstream.uri_san_peer_certificate
-	AttributeIDUpstreamUriSanPeerCertificate
-	// upstream.sha256_peer_certificate_digest
-	AttributeIDUpstreamSha256PeerCertificateDigest
-	// upstream.local_address
-	AttributeIDUpstreamLocalAddress
-	// upstream.transport_failure_reason
-	AttributeIDUpstreamTransportFailureReason
-	// upstream.request_attempt_count
-	AttributeIDUpstreamRequestAttemptCount
-	// upstream.cx_pool_ready_duration
-	AttributeIDUpstreamCxPoolReadyDuration
-	// upstream.locality
-	AttributeIDUpstreamLocality
-	// xds.node
-	AttributeIDXdsNode
-	// xds.cluster_name
-	AttributeIDXdsClusterName
-	// xds.cluster_metadata
-	AttributeIDXdsClusterMetadata
-	// xds.listener_direction
-	AttributeIDXdsListenerDirection
-	// xds.listener_metadata
-	AttributeIDXdsListenerMetadata
-	// xds.route_name
-	AttributeIDXdsRouteName
-	// xds.route_metadata
-	AttributeIDXdsRouteMetadata
-	// xds.virtual_host_name
-	AttributeIDXdsVirtualHostName
-	// xds.virtual_host_metadata
-	AttributeIDXdsVirtualHostMetadata
-	// xds.upstream_host_metadata
-	AttributeIDXdsUpstreamHostMetadata
-	// xds.filter_chain_name
-	AttributeIDXdsFilterChainName
-)
-
-type LogLevel uint32
-
-const (
-	LogLevelTrace LogLevel = iota
-	LogLevelDebug
-	LogLevelInfo
-	LogLevelWarn
-	LogLevelError
-	LogLevelCritical
-	LogLevelOff
-)
-
-type HttpCalloutInitResult uint32
-
-const (
-	HttpCalloutInitSuccess HttpCalloutInitResult = iota
-	HttpCalloutInitMissingRequiredHeaders
-	HttpCalloutInitClusterNotFound
-	HttpCalloutInitDuplicateCalloutId
-	HttpCalloutInitCannotCreateRequest
-)
-
-type HttpCalloutResult uint32
-
-const (
-	HttpCalloutSuccess HttpCalloutResult = iota
-	HttpCalloutReset
-	HttpCalloutExceedResponseBufferLimit
-)
-
+// MetadataSourceType identifies which metadata source to read from. Corresponds to
+// envoy_dynamic_module_type_metadata_source.
 type MetadataSourceType uint32
 
 const (
@@ -282,43 +266,94 @@ const (
 	MetadataSourceTypeHostLocality
 )
 
-type HttpCalloutCallback interface {
-	OnHttpCalloutDone(calloutID uint64, result HttpCalloutResult,
-		headers [][2]UnsafeEnvoyBuffer, body []UnsafeEnvoyBuffer)
-}
-
-type HttpStreamResetReason uint32
+// HttpFilterStreamResetReason is the reason for resetting the main HTTP stream via
+// HttpFilterHandle.ResetStream. This corresponds to envoy_dynamic_module_type_http_filter_stream_reset_reason
+// in the dynamic module ABI.
+type HttpFilterStreamResetReason uint32
 
 const (
-	HttpStreamResetReasonConnectionFailure = iota
-	HttpStreamResetReasonConnectionTermination
-	HttpStreamResetReasonLocalReset
-	HttpStreamResetReasonLocalRefusedStreamReset
-	HttpStreamResetReasonOverflow
-	HttpStreamResetReasonRemoteReset
-	HttpStreamResetReasonRemoteRefusedStreamReset
-	HttpStreamResetReasonProtocolError
+	// HttpFilterStreamResetReasonLocalReset indicates a local codec level reset was sent on the stream.
+	HttpFilterStreamResetReasonLocalReset HttpFilterStreamResetReason = iota
+	// HttpFilterStreamResetReasonLocalRefusedStreamReset indicates a local codec level refused stream
+	// reset was sent on the stream (allowing for retry).
+	HttpFilterStreamResetReasonLocalRefusedStreamReset
 )
 
-type HttpStreamCallback interface {
-	OnHttpStreamHeaders(streamID uint64, headers [][2]UnsafeEnvoyBuffer, endStream bool)
-	OnHttpStreamData(streamID uint64, body []UnsafeEnvoyBuffer, endStream bool)
-	OnHttpStreamTrailers(streamID uint64, trailers [][2]UnsafeEnvoyBuffer)
-	OnHttpStreamComplete(streamID uint64)
-	OnHttpStreamReset(streamID uint64, reason HttpStreamResetReason)
+// Span is a tracing span associated with the current HTTP stream. It is owned by Envoy and is
+// valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span -
+// it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module owns.
+type Span interface {
+	// SetTag sets a key/value tag on the span.
+	SetTag(key, value string)
+
+	// SetOperation sets the operation name on the span.
+	SetOperation(operation string)
+
+	// Log records an event on the span with the current timestamp.
+	Log(event string)
+
+	// SetSampled overrides the sampling decision for the span. If sampled is false, this span and
+	// any subsequent child spans will not be reported to the tracing system.
+	SetSampled(sampled bool)
+
+	// GetBaggage retrieves a baggage value from the span. Returns the value and true if the key
+	// was found, otherwise an empty buffer and false.
+	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
+	// need to keep it past the current callback.
+	GetBaggage(key string) (UnsafeEnvoyBuffer, bool)
+
+	// SetBaggage sets a baggage value on the span. All subsequent child spans will have access to
+	// this baggage.
+	SetBaggage(key, value string)
+
+	// GetTraceID retrieves the trace ID from the span. Returns the value and true if available,
+	// otherwise an empty buffer and false.
+	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
+	// need to keep it past the current callback.
+	GetTraceID() (UnsafeEnvoyBuffer, bool)
+
+	// GetSpanID retrieves the span ID from the span. Returns the value and true if available,
+	// otherwise an empty buffer and false.
+	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
+	// need to keep it past the current callback.
+	GetSpanID() (UnsafeEnvoyBuffer, bool)
+
+	// SpawnChild creates a child span with the given operation name. The returned ChildSpan must
+	// be finished by calling its Finish method when the module is done with it. Returns nil if
+	// the child span could not be created.
+	SpawnChild(operationName string) ChildSpan
 }
 
-// Scheduler is the interface that provides scheduling capabilities for asynchronous operations.
-// This allow the plugins run tasks in another thread and continue the processing later at the
-// thread where the stream plugin is being processed.
-type Scheduler interface {
-	// Schedule schedules a function to be executed asynchronously in the thread where the stream
-	// plugin is being processed.
-	// @Param func the function to be executed.
-	// NOTE: This function may be ignored if the related plugin processing is completed.
-	Schedule(func())
+// ChildSpan is a tracing span owned by the module. It must be finished by calling Finish when
+// the module is done with it.
+type ChildSpan interface {
+	// SetTag sets a key/value tag on the span.
+	SetTag(key, value string)
+
+	// SetOperation sets the operation name on the span.
+	SetOperation(operation string)
+
+	// Log records an event on the span with the current timestamp.
+	Log(event string)
+
+	// SetSampled overrides the sampling decision for the span.
+	SetSampled(sampled bool)
+
+	// SetBaggage sets a baggage value on the span. All subsequent child spans will have access to
+	// this baggage.
+	SetBaggage(key, value string)
+
+	// SpawnChild creates a child span from this span with the given operation name. Returns nil
+	// if the child span could not be created.
+	SpawnChild(operationName string) ChildSpan
+
+	// Finish finishes and releases this span. After calling this method, the span is no longer
+	// valid and must not be used. Calling Finish more than once is a no-op.
+	Finish()
 }
 
+// DownstreamWatermarkCallbacks is the callback interface invoked when the downstream connection
+// crosses the configured write-buffer high/low watermark.
 type DownstreamWatermarkCallbacks interface {
 	OnAboveWriteBufferHighWatermark()
 	OnBelowWriteBufferLowWatermark()
@@ -684,18 +719,107 @@ type HttpFilterHandle interface {
 	// @Param tagsValues the optional tag values associated with the metric. The order and size
 	// of the tag values must match the tag keys defined when the metric was created.
 	IncrementCounterValue(id MetricID, value uint64, tagsValues ...string) MetricsResult
+
+	// GetWorkerIndex returns the worker thread index assigned to the current HTTP filter.
+	// This can be used by the module to manage worker-specific resources.
+	GetWorkerIndex() uint32
+
+	// GetFilterStateTyped retrieves the serialized bytes of a typed filter state object stored
+	// under the given key. Unlike GetFilterState, this calls serializeAsString on the registered
+	// typed object, so it works for any filter state object type (not just StringAccessor).
+	// @Return the serialized value if found, otherwise an empty UnsafeEnvoyBuffer and false.
+	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
+	// need to keep it past the current callback.
+	GetFilterStateTyped(key string) (UnsafeEnvoyBuffer, bool)
+
+	// SetFilterStateTyped sets the typed filter state value stored under the given key. The key
+	// MUST match a registered ObjectFactory; the bytes are passed to createFromBytes on that
+	// factory. This is the form required for interop with built-in Envoy filters that read filter
+	// state as typed objects (e.g., tcp_proxy reading PerConnectionCluster).
+	// @Return true if the operation was successful, false otherwise (e.g., no factory registered
+	// for the key, factory failed to create the object, or the key is read-only).
+	SetFilterStateTyped(key string, value []byte) bool
+
+	// SetSocketOptionInt sets an integer-valued socket option on the upstream or downstream
+	// connection associated with the stream.
+	// @Param level the socket option level (e.g., SOL_SOCKET).
+	// @Param name the socket option name (e.g., SO_KEEPALIVE).
+	// @Param state the socket state at which to apply the option. Ignored for already-connected
+	// downstream sockets.
+	// @Param direction whether to apply to the upstream or downstream connection.
+	// @Param value the integer value for the option.
+	// @Return true if the operation was successful, false otherwise.
+	SetSocketOptionInt(level, name int64, state SocketOptionState, direction SocketDirection, value int64) bool
+
+	// SetSocketOptionBytes sets a bytes-valued socket option on the upstream or downstream
+	// connection associated with the stream.
+	// @Return true if the operation was successful, false otherwise.
+	SetSocketOptionBytes(level, name int64, state SocketOptionState, direction SocketDirection, value []byte) bool
+
+	// GetSocketOptionInt retrieves the integer value of a socket option.
+	// @Return the value and true if found, otherwise 0 and false.
+	GetSocketOptionInt(level, name int64, state SocketOptionState, direction SocketDirection) (int64, bool)
+
+	// GetSocketOptionBytes retrieves the bytes value of a socket option. The buffer is owned by
+	// Envoy and remains valid until the filter is destroyed.
+	// @Return the value and true if found, otherwise an empty UnsafeEnvoyBuffer and false.
+	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
+	// need to keep it past the current callback.
+	GetSocketOptionBytes(level, name int64, state SocketOptionState, direction SocketDirection) (UnsafeEnvoyBuffer, bool)
+
+	// GetBufferLimit returns the current per-stream body buffer limit in bytes. A limit of 0
+	// indicates no limit is applied.
+	GetBufferLimit() uint64
+
+	// SetBufferLimit sets the per-stream body buffer limit. It is recommended (but not required)
+	// that filters only INCREASE the limit, to avoid conflicting with the buffer requirements of
+	// other filters in the chain.
+	SetBufferLimit(limit uint64)
+
+	// GetActiveSpan returns the active tracing span for the stream, or nil if tracing is disabled
+	// or no span is available. The returned Span is owned by Envoy; do not Finish it. Use
+	// Span.SpawnChild to create module-owned child spans.
+	GetActiveSpan() Span
+
+	// GetClusterName returns the name of the cluster the current request is routed to.
+	// @Return the cluster name and true if found, otherwise an empty UnsafeEnvoyBuffer and false.
+	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
+	// need to keep it past the current callback.
+	GetClusterName() (UnsafeEnvoyBuffer, bool)
+
+	// GetClusterHostCount returns the host counts for the routed cluster at the given priority.
+	// @Param priority the priority level to query (0 for default priority).
+	// @Return the host counts and true if successful, otherwise a zero-valued struct and false.
+	GetClusterHostCount(priority uint32) (ClusterHostCount, bool)
+
+	// SetUpstreamOverrideHost sets a host that the upstream load balancer should select first if
+	// it exists in the routed cluster. This is useful for sticky sessions or host affinity.
+	// @Param host the host address to override (e.g., "10.0.0.1:8080"). Must be a valid IP address.
+	// @Param strict if true, the request will fail when the override host is not available; if
+	// false, normal load balancing is used as a fallback.
+	// @Return true if the override was set successfully, false if the host address was invalid.
+	SetUpstreamOverrideHost(host string, strict bool) bool
+
+	// ResetStream resets the HTTP stream with the given reason and optional details. After this
+	// call, no further filter callbacks will be invoked except OnDestroy.
+	ResetStream(reason HttpFilterStreamResetReason, details string)
+
+	// SendGoAwayAndClose sends a GOAWAY frame to the downstream and closes the connection. If
+	// graceful is true, a graceful drain is initiated before closing.
+	SendGoAwayAndClose(graceful bool)
+
+	// RecreateStream recreates the HTTP stream, optionally with new headers (or with the original
+	// headers if headers is nil). Useful for internal redirects or request retries. After a
+	// successful call, the current filter chain is destroyed and the filter SHOULD return Stop
+	// from the current callback.
+	// @Return true if recreation was initiated, false otherwise (e.g., the request body has not
+	// been fully received yet).
+	RecreateStream(headers [][2]string) bool
 }
 
-type MetricID uint64
-type MetricsResult uint32
-
-const (
-	MetricsSuccess MetricsResult = iota
-	MetricsNotFound
-	MetricsInvalidTags
-	MetricsFrozen
-)
-
+// HttpFilterConfigHandle is the per-filter-config handle exposed to HttpFilterConfig
+// implementations. It supports config-scoped logging, metric definition, and async I/O via
+// HttpCallout / StartHttpStream from the main thread.
 type HttpFilterConfigHandle interface {
 	// Log will log the given message via the host environment's logging mechanism.
 	Log(level LogLevel, format string, args ...any)
