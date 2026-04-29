@@ -12,7 +12,6 @@
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "source/extensions/filters/network/redis_proxy/router_impl.h"
 
-
 #include "absl/types/variant.h"
 #include "benchmark/benchmark.h"
 

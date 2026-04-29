@@ -1,6 +1,5 @@
 #include "test/mocks/config/eds_resources_cache.h"
 
-
 namespace Envoy {
 namespace Config {
 using testing::_;

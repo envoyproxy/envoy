@@ -1,6 +1,5 @@
 #include "test/fuzz/utility.h"
 
-
 #include "absl/strings/str_format.h"
 
 namespace Envoy {
