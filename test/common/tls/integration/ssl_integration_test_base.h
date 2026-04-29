@@ -6,7 +6,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
-#include "test/mocks/secret/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

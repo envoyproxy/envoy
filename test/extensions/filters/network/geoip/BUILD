@@ -20,7 +20,6 @@ envoy_cc_test(
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/filters/network/geoip:geoip_filter_lib",
         "//test/extensions/filters/http/geoip:geoip_mocks",
-        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",

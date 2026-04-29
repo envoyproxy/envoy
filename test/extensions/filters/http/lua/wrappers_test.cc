@@ -11,7 +11,6 @@
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
