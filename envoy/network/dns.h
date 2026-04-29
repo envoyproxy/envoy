@@ -71,7 +71,7 @@ struct AddrInfoResponse {
  * DNS SRV record response.
  */
 struct SrvResponse {
-  // keepping in order as RFC defines
+  // Keeping in order as RFC defines.
   // https://www.ietf.org/rfc/rfc2782.txt
   uint16_t priority_;
   uint16_t weight_;
