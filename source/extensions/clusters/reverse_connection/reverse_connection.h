@@ -202,8 +202,10 @@ private:
   // Periodically cleans the stale hosts from host_map_.
   void cleanup();
 
-  // Checks if a host exists for a given host identifier and if not creates and caches it.
-  Upstream::HostSelectionResponse checkAndCreateHost(absl::string_view host_id);
+  Upstream::HostSelectionResponse checkAndCreateHost(absl::string_view host_id,
+                                                     Upstream::HostSharedPtr& created_host);
+
+  void addHostToHostSet(Upstream::HostSharedPtr host);
 
   // Get the upstream socket manager from the thread-local registry.
   BootstrapReverseConnection::UpstreamSocketManager* getUpstreamSocketManager() const;
