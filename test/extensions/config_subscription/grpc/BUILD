@@ -312,6 +312,7 @@ envoy_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
