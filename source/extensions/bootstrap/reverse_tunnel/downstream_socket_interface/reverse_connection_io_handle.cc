@@ -4,12 +4,12 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/event/real_time_system.h"
@@ -57,6 +57,7 @@ void ReverseConnectionIOHandle::cleanup() {
                  "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
                  trigger_pipe_write_fd_, trigger_pipe_read_fd_);
   resetFileEvents();
+  SET_SOCKET_INVALID(trigger_pipe_read_fd_);
 
   // Clean up pipe trigger mechanism first to prevent use-after-free.
   ENVOY_LOG_MISC(trace,
@@ -64,47 +65,8 @@ void ReverseConnectionIOHandle::cleanup() {
                  "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
                  trigger_pipe_write_fd_, trigger_pipe_read_fd_);
   if (trigger_pipe_write_fd_ >= 0) {
-    ::close(trigger_pipe_write_fd_);
+    Api::OsSysCallsSingleton::get().close(trigger_pipe_write_fd_);
     trigger_pipe_write_fd_ = -1;
-  }
-  if (trigger_pipe_read_fd_ >= 0) {
-    ::close(trigger_pipe_read_fd_);
-    trigger_pipe_read_fd_ = -1;
-  }
-
-  // Reset the retry timer. Don't call enabled() here — it asserts
-  // dispatcher_.isThreadSafe(), which fails when the destructor runs on the main
-  // thread during shutdown (the timer was created on a worker thread).
-  if (rev_conn_retry_timer_) {
-    ENVOY_LOG_MISC(trace, "reverse_tunnel: resetting retry timer.");
-    rev_conn_retry_timer_.reset();
-  }
-
-  // Graceful shutdown of connection wrappers with exception safety.
-  ENVOY_LOG_MISC(debug, "Gracefully shutting down {} connection wrappers.",
-                 connection_wrappers_.size());
-
-  // Move wrappers for deferred cleanup.
-  std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers_to_delete;
-  for (auto& wrapper : connection_wrappers_) {
-    if (wrapper) {
-      ENVOY_LOG(debug, "Moving connection wrapper for deferred cleanup.");
-      wrappers_to_delete.push_back(std::move(wrapper));
-    }
-  }
-
-  // Clear containers safely.
-  connection_wrappers_.clear();
-  conn_wrapper_to_host_map_.clear();
-
-  // Clean up wrappers with safe deletion.
-  for (auto& wrapper : wrappers_to_delete) {
-    if (wrapper && isThreadLocalDispatcherAvailable()) {
-      getThreadLocalDispatcher().deferredDelete(std::move(wrapper));
-    } else {
-      // Direct cleanup when dispatcher not available.
-      wrapper.reset();
-    }
   }
 
   // Clear cluster to hosts mapping.
@@ -343,9 +305,9 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
   ENVOY_LOG(error, "reverse_tunnel: performing graceful shutdown.");
 
   // Clean up original socket FD
-  if (original_socket_fd_ != -1) {
+  if (original_socket_fd_ != fd_ && original_socket_fd_ >= 0) {
     ENVOY_LOG(error, "Closing original socket FD: {}.", original_socket_fd_);
-    ::close(original_socket_fd_);
+    Api::OsSysCallsSingleton::get().close(original_socket_fd_);
     original_socket_fd_ = -1;
   }
 
@@ -1214,12 +1176,7 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
   if (wrapper_vector_it != connection_wrappers_.end()) {
     auto wrapper_to_delete = std::move(*wrapper_vector_it);
     connection_wrappers_.erase(wrapper_vector_it);
-
-    // Use deferred deletion to prevent crash during cleanup.
-    std::unique_ptr<Event::DeferredDeletable> deletable_wrapper(
-        static_cast<Event::DeferredDeletable*>(wrapper_to_delete.release()));
-    getThreadLocalDispatcher().deferredDelete(std::move(deletable_wrapper));
-    ENVOY_LOG(debug, "reverse_tunnel: Deferred delete of connection wrapper");
+    getThreadLocalDispatcher().deferredDelete(std::move(wrapper_to_delete));
   }
 }
 
