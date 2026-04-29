@@ -42,7 +42,6 @@ envoy_cc_mock(
     hdrs = ["eds_resources_cache.h"],
     deps = [
         "//envoy/config:eds_resources_cache_interface",
-        "//source/common/common:logger_lib",
     ],
 )
 

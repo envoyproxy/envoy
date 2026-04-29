@@ -4,7 +4,6 @@
 #include "envoy/config/listener/v3/quic_config.pb.validate.h"
 #include "envoy/network/exception.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
 #include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/listen_socket_impl.h"

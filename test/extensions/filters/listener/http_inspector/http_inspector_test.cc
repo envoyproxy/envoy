@@ -1,5 +1,4 @@
 #include "source/common/common/hex.h"
-#include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"

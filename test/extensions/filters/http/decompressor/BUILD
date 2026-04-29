@@ -45,7 +45,6 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )

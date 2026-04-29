@@ -1188,7 +1188,6 @@ envoy_cc_test_library(
         "//test/common/http/http2:http2_frame",
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:cluster_info_mocks",
-        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/early_data/v3:pkg_cc_proto",
@@ -2122,7 +2121,6 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
-        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )
