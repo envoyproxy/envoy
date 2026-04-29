@@ -761,28 +761,20 @@ uint64_t outputStatType(Buffer::Instance& response, const StatsParams& params,
   // Collection of metrics by their tagExtractedName.
   // Sorting will be done on the names separately.
   absl::flat_hash_map<Stats::StatName, StatTypeUnsortedCollection> groups;
-  absl::flat_hash_set<Stats::StatName> unique_stat_names;
 
   for (const auto& metric : metrics) {
     ASSERT(&global_symbol_table == &metric->constSymbolTable());
     if (!params.shouldShowMetric(*metric)) {
       continue;
     }
-    Stats::StatName tag_extracted_stat_name = metric->tagExtractedStatName();
-    unique_stat_names.insert(tag_extracted_stat_name);
-    groups[tag_extracted_stat_name].push_back(metric.get());
+    groups[metric->tagExtractedStatName()].push_back(metric.get());
   }
 
   std::vector<Stats::StatName> sorted_stat_names;
-  sorted_stat_names.reserve(unique_stat_names.size());
-  for (auto it = unique_stat_names.begin(); it != unique_stat_names.end();) {
-    auto extract_it = it;
-    it++;
-    absl::flat_hash_set<Stats::StatName>::node_type nh = unique_stat_names.extract(extract_it);
-    ASSERT(nh);
-    sorted_stat_names.push_back(std::move(nh.value()));
+  sorted_stat_names.reserve(groups.size());
+  for (const auto& [group, _] : groups) {
+    sorted_stat_names.push_back(group);
   }
-
   Stats::StatNameLessThan comp(global_symbol_table);
   std::sort(sorted_stat_names.begin(), sorted_stat_names.end(), comp);
 
@@ -834,28 +826,21 @@ uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& 
     return 0;
   }
 
-  // Sorted collection of metrics sorted by their tagExtractedName, to satisfy the requirements
-  // of the exposition format.
+  // Collection of metrics sorted by their tagExtractedName.
+  // We satisfy the requirements of the exposition format by iterating over the sorted keys.
   absl::flat_hash_map<std::string, StatTypeUnsortedCollection> groups;
-  absl::flat_hash_set<std::string> unique_group_names;
 
   for (auto& metric : metrics) {
     if (!params.shouldShowMetric(metric)) {
       continue;
     }
-    std::string tag_extracted_name = metric.tagExtractedName();
-    unique_group_names.insert(tag_extracted_name);
-    groups[std::move(tag_extracted_name)].push_back(&metric);
+    groups[metric.tagExtractedName()].push_back(&metric);
   }
 
   std::vector<std::string> sorted_group_names;
-  sorted_group_names.reserve(unique_group_names.size());
-  for (auto it = unique_group_names.begin(); it != unique_group_names.end();) {
-    auto extract_it = it;
-    it++;
-    absl::flat_hash_set<std::string>::node_type nh = unique_group_names.extract(extract_it);
-    ASSERT(nh);
-    sorted_group_names.push_back(std::move(nh.value()));
+  sorted_group_names.reserve(groups.size());
+  for (const auto& [group, _] : groups) {
+    sorted_group_names.push_back(group);
   }
   std::sort(sorted_group_names.begin(), sorted_group_names.end());
 
