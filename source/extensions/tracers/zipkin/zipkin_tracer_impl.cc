@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
+#include "envoy/http/header_map.h"
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/config/utility.h"
@@ -20,6 +21,22 @@ namespace Tracers {
 namespace Zipkin {
 
 namespace {
+
+// W3C traceparent / tracestate are registered by the OpenTelemetry tracer,
+// which this extension depends on for W3C fallback.
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    register_x_b3_traceid(Http::LowerCaseString("x-b3-traceid"));
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    register_x_b3_spanid(Http::LowerCaseString("x-b3-spanid"));
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    register_x_b3_parentspanid(Http::LowerCaseString("x-b3-parentspanid"));
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    register_x_b3_sampled(Http::LowerCaseString("x-b3-sampled"));
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    register_x_b3_flags(Http::LowerCaseString("x-b3-flags"));
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    register_b3(Http::LowerCaseString("b3"));
+
 // Helper function to parse URI and extract hostname and path
 std::pair<std::string, std::string> parseUri(absl::string_view uri) {
   // Find the scheme separator

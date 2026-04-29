@@ -26,6 +26,13 @@ using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
 namespace {
 
+// Also covers the Zipkin tracer's W3C fallback (it depends on this library).
+// If removed from here, the Zipkin tracer must register them itself.
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    register_traceparent(Http::LowerCaseString("traceparent"));
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    register_tracestate(Http::LowerCaseString("tracestate"));
+
 const Tracing::TraceContextHandler& traceParentHeader() {
   CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "traceparent");
 }
