@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/file_system_buffer/filter.h"
 
 #include "test/extensions/common/async_files/mocks.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 

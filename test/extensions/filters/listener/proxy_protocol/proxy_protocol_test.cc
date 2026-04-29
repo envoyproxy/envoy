@@ -24,7 +24,6 @@
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/listener_factory_context.h"

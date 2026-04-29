@@ -10,7 +10,6 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/common/ratelimit/mocks.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/server/factory_context.h"

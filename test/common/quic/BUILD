@@ -396,7 +396,6 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
         "//source/common/quic:http_datagram_handler",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:utility_lib",
         "@quiche//:quic_test_tools_test_utils_lib",
     ]),

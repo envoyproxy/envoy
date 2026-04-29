@@ -4,7 +4,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/csrf/csrf_filter.h"
 
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/printers.h"

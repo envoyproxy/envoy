@@ -5,7 +5,6 @@
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"

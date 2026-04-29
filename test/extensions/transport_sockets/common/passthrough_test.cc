@@ -1,7 +1,6 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/extensions/transport_sockets/common/passthrough.h"
 
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 

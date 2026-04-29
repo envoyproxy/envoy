@@ -2,7 +2,6 @@
 
 #include "source/common/quic/http_datagram_handler.h"
 
-#include "test/mocks/buffer/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

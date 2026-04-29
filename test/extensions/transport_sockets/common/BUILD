@@ -14,7 +14,6 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/transport_sockets/common:passthrough_lib",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/network:transport_socket_mocks",
     ],

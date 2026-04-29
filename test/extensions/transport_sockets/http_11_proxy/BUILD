@@ -20,7 +20,6 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/http_11_proxy:connect",
         "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/network:transport_socket_mocks",

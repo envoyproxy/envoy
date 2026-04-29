@@ -19,7 +19,6 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/stat_sinks/common/statsd:statsd_lib",
         "//test/common/upstream:utility_lib",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",

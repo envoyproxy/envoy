@@ -25,7 +25,6 @@
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/common/tls/cert_validator/timed_cert_validator.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"

@@ -9,7 +9,6 @@
 #include "source/extensions/transport_sockets/http_11_proxy/connect.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"

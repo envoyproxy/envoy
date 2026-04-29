@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/file_system_buffer/fragment.h"
 
 #include "test/extensions/common/async_files/mocks.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"

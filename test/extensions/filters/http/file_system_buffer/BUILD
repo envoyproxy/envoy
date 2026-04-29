@@ -20,7 +20,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/file_system_buffer:fragment",
         "//test/extensions/common/async_files:mocks",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:status_utility_lib",
     ],
 )

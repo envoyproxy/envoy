@@ -20,7 +20,6 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/csrf:config",
         "//source/extensions/filters/http/csrf:csrf_filter_lib",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",

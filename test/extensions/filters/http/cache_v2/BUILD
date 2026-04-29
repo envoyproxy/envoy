@@ -100,7 +100,6 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         "//source/extensions/filters/http/cache_v2:cache_filter_lib",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",

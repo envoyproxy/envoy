@@ -9,7 +9,6 @@
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"

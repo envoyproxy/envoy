@@ -33,7 +33,6 @@ envoy_cc_test(
         "//source/common/network:listener_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",

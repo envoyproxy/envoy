@@ -56,7 +56,6 @@ envoy_cc_test(
         "//source/common/tls/private_key:private_key_manager_lib",
         "//test/common/tls/cert_validator:timed_cert_validator",
         "//test/common/tls/test_data:cert_infos",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:io_handle_mocks",

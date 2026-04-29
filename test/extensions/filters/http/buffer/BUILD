@@ -21,7 +21,6 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/http/buffer:buffer_filter_lib",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",

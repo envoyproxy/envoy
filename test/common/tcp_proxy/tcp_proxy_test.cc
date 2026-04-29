@@ -30,7 +30,6 @@
 
 #include "test/common/tcp_proxy/tcp_proxy_test_base.h"
 #include "test/common/upstream/utility.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"

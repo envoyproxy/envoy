@@ -7,7 +7,6 @@
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"

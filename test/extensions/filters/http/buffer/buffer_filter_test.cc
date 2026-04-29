@@ -8,7 +8,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/filters/http/buffer/buffer_filter.h"
 
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
 
