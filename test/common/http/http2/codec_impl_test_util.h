@@ -95,7 +95,7 @@ public:
       : TestCodecStatsProvider(scope),
         ServerConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
                              max_request_headers_kb, max_request_headers_count,
-                             headers_with_underscores_action, overload_manager_) {}
+                             headers_with_underscores_action) {}
 
   http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
   using ServerConnectionImpl::getStream;

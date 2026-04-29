@@ -1219,13 +1219,17 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
   first_request_encoder.encodeData(first_request_body, true);
   ASSERT_TRUE(first_request_decoder->waitForEndStream());
 
+  // This is the initial GOAWAY, with max stream ID.
   EXPECT_TRUE(codec_client_->sawGoAway());
+
+  // This waits for the final GOAWAY, with a real stream ID.
   test_server_->waitForCounterEq("http2.goaway_sent", 1);
 
-  // The GOAWAY gets submitted with the first created stream as the last stream
-  // that will be processed on this connection, so the second stream's frames
-  // are ignored.
-  EXPECT_FALSE(second_request_decoder->complete());
+  // Because the load shed operation uses a two-phase GOAWAY, a request initiated before the drain
+  // timer fires will be processed as usual.
+  EXPECT_TRUE(second_request_decoder->complete());
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   updateResource(0.80);
   test_server_->waitForGaugeEq(
@@ -1265,9 +1269,9 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayAndClosesConn
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(codec_client_->sawGoAway());
   test_server_->waitForCounterEq("http2.goaway_sent", 1);
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
 
-  // The second request will not complete.
+  // The second request is ignored and will not complete, since the connection manager stops network
+  // filter iteration.
   EXPECT_FALSE(second_request_decoder->complete());
 }
 
