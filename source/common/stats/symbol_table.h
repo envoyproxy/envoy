@@ -192,8 +192,31 @@ public:
      *
      * @param The encoded byte array, written previously by appendEncoding.
      * @return A pair containing the decoded number, and the number of bytes consumed from encoding.
+     *
+     * Defined inline in the header to allow the compiler to inline on hot paths.
      */
-    static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding);
+    static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding) {
+      // fast-path for the case 127 or less
+      if (encoding[0] < SpilloverMask) {
+        return {encoding[0], 1};
+      }
+
+      uint64_t number = 0;
+      uint64_t uc = SpilloverMask;
+      const uint8_t* start = encoding;
+      for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
+        uc = static_cast<uint32_t>(*encoding);
+        number |= (uc & Low7Bits) << shift;
+      }
+      return std::make_pair(number, encoding - start);
+    }
+
+    // Masks used for variable-length encoding of arbitrary-sized integers into a
+    // uint8-array. The integers are typically small, so we try to store them in as
+    // few bytes as possible. The bottom 7 bits hold values, and the top bit is used
+    // to determine whether another byte is needed for more data.
+    static constexpr uint32_t SpilloverMask = 0x80;
+    static constexpr uint32_t Low7Bits = 0x7f;
 
   private:
     friend class StatName;
@@ -587,6 +610,14 @@ public:
   uint64_t hash() const { return absl::Hash<StatName>()(*this); }
 
   bool operator==(const StatName& rhs) const {
+    if (size_and_data_ == rhs.size_and_data_) {
+      return true;
+    }
+
+    if (size_and_data_ == nullptr || rhs.size_and_data_ == nullptr) {
+      return empty() && rhs.empty();
+    }
+
     return dataAsStringView() == rhs.dataAsStringView();
   }
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
@@ -595,7 +626,7 @@ public:
    * @return size_t the number of bytes in the symbol array, excluding the
    *                overhead for the size itself.
    */
-  size_t dataSize() const;
+  size_t dataSize() const { return dataAsStringView().size(); }
 
   /**
    * @return size_t the number of bytes in the symbol array, including the
@@ -624,7 +655,8 @@ public:
    * @param mem_block_builder the builder to receive the storage.
    */
   void appendDataToMemBlock(MemBlockBuilder<uint8_t>& storage) {
-    storage.appendData(absl::MakeSpan(data(), dataSize()));
+    auto sv = dataAsStringView();
+    storage.appendData(absl::MakeSpan(reinterpret_cast<const uint8_t*>(sv.data()), sv.size()));
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -635,10 +667,7 @@ public:
    * @return A pointer to the first byte of data (skipping over size bytes).
    */
   const uint8_t* data() const {
-    if (size_and_data_ == nullptr) {
-      return nullptr;
-    }
-    return size_and_data_ + SymbolTable::Encoding::encodingSizeBytes(dataSize());
+    return reinterpret_cast<const uint8_t*>(dataAsStringView().data());
   }
 
   const uint8_t* dataIncludingSize() const { return size_and_data_; }
@@ -646,7 +675,11 @@ public:
   /**
    * @return whether this is empty.
    */
-  bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
+  bool empty() const {
+    // Avoid a full varint decode: it is sufficient to know the first byte,
+    // since 0x00 uniquely encodes zero
+    return size_and_data_ == nullptr || size_and_data_[0] == 0;
+  }
 
   /**
    * Determines whether this starts with the prefix. Note: dynamic segments
@@ -660,13 +693,16 @@ public:
 
 private:
   /**
-   * Casts the raw data as a string_view. Note that this string_view will not
-   * be in human-readable form, but it will be compatible with a string-view
-   * hasher and comparator.
+   * Casts the raw data as a string_view, decoding the varint length prefix.
+   * All accessors that need the data pointer and/or size should delegate to
+   * this method so the decode happens in exactly one place.
    */
   absl::string_view dataAsStringView() const {
-    return {reinterpret_cast<const char*>(data()),
-            static_cast<absl::string_view::size_type>(dataSize())};
+    if (size_and_data_ == nullptr) {
+      return {};
+    }
+    const auto [data_size, prefix_size] = SymbolTable::Encoding::decodeNumber(size_and_data_);
+    return {reinterpret_cast<const char*>(size_and_data_ + prefix_size), data_size};
   }
 
   const uint8_t* size_and_data_{nullptr};
@@ -862,6 +898,27 @@ public:
    * @param symbol_table the symbol table.
    */
   void clear(SymbolTable& symbol_table);
+
+  /**
+   * @return the number of StatNames in the list, or 0 if not populated.
+   */
+  uint32_t size() const { return populated() ? storage_[0] : 0; }
+
+  /**
+   * @return the StatName at the given index. This is O(index): each element
+   *         has a variable-length encoding, so callers that need to visit
+   *         many elements should prefer iterate().
+   *
+   * Requires: populated() && index < size().
+   */
+  StatName at(uint32_t index) const {
+    ASSERT(populated() && index < storage_[0]);
+    const uint8_t* p = &storage_[1];
+    for (uint32_t i = 0; i < index; ++i) {
+      p += StatName(p).size();
+    }
+    return StatName(p);
+  }
 
 private:
   friend class SymbolTable;

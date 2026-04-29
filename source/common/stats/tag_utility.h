@@ -34,6 +34,17 @@ public:
    */
   StatName tagExtractedName() const { return tag_extracted_name_; }
 
+  /**
+   * @return the optional effective tags.
+   */
+  absl::optional<StatNameTagSpan> effectiveTags() const {
+    if (stat_name_tags_) {
+      return stat_name_tags_->get();
+    } else {
+      return {};
+    }
+  }
+
 private:
   // TODO(snowp): This isn't really "tag extracted", but we'll use this for the sake of consistency
   // until we can change the naming convention throughout.
@@ -41,6 +52,10 @@ private:
   SymbolTable::StoragePtr prefix_storage_;
   SymbolTable::StoragePtr full_name_storage_;
   StatName name_with_tags_;
+
+  // The tags are provided to the constructor. The TagStatNameJoiner must not outlive the
+  // tags; therefore, it is safe to keep a reference here.
+  StatNameTagVectorOptConstRef stat_name_tags_;
 
   SymbolTable::StoragePtr joinNameAndTags(StatName name, const StatNameTagVector& stat_name_tags,
                                           SymbolTable& symbol_table);
