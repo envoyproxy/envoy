@@ -14,7 +14,6 @@
 
 #include "source/common/tls/cert_validator/san_matcher.h"
 
-#include "test/mocks/secret/mocks.h"
 
 #include "gmock/gmock.h"
 

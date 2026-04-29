@@ -15,7 +15,6 @@
 
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/session_idle_list.h"
 #include "test/mocks/http/stream_decoder.h"

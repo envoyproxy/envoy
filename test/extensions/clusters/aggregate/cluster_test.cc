@@ -6,7 +6,6 @@
 #include "source/extensions/clusters/aggregate/cluster.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"

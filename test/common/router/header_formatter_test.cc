@@ -15,7 +15,6 @@
 #include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"

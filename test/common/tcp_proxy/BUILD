@@ -33,7 +33,6 @@ envoy_cc_test_library(
         "//test/common/upstream:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/ssl:ssl_mocks",

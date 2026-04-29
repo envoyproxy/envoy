@@ -212,7 +212,6 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/init:init_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:status_utility_lib",

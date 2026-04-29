@@ -47,7 +47,6 @@ envoy_cc_test(
         "//source/extensions/matching/input_matchers/cel_matcher:config",
         "//test/common/matcher:test_utility_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/test_common:environment_lib",

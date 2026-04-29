@@ -24,7 +24,6 @@ envoy_extension_cc_test(
         "@envoy//test/common/tls:ssl_test_utils",
         "@envoy//test/common/tls/cert_validator:test_common",
         "@envoy//test/common/tls/test_data:cert_infos",
-        "@envoy//test/mocks/event:event_mocks",
         "@envoy//test/mocks/ssl:ssl_mocks",
         "@envoy//test/mocks/thread:thread_mocks",
         "@envoy//test/test_common:environment_lib",

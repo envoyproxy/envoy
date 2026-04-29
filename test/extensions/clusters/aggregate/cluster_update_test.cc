@@ -11,7 +11,6 @@
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/config/xds_manager.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"

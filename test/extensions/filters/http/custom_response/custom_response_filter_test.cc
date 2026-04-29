@@ -5,9 +5,7 @@
 #include "source/extensions/filters/http/custom_response/factory.h"
 
 #include "test/common/http/common.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/init/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"

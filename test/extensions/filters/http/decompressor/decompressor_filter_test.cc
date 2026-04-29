@@ -7,7 +7,6 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/compression/decompressor/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
