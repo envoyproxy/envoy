@@ -25,7 +25,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:instance_mocks",
-        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

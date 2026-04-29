@@ -30,7 +30,6 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/registry.h"

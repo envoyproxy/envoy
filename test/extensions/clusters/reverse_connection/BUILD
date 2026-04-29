@@ -31,7 +31,6 @@ envoy_cc_test(
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
-        "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",

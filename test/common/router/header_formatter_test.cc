@@ -17,7 +17,6 @@
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/test_runtime.h"

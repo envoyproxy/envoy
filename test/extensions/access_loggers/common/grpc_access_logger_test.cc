@@ -12,7 +12,6 @@
 #include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
 #include "test/mocks/grpc/mocks.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 

@@ -13,7 +13,6 @@
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
