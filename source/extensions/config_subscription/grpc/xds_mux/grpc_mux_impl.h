@@ -114,9 +114,8 @@ public:
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
 
-  // TODO(adisuissa): finish implementation.
-  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
-  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
+  Upstream::LoadStatsReporter* loadStatsReporter() const override;
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override;
 
   GrpcStreamInterface<RQ, RS>& grpcStreamForTest() {
     // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
@@ -255,6 +254,12 @@ private:
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
   std::atomic<bool> shutdown_{false};
+
+  // A Load-Stats-Reporter factory method that allows to lazily create the
+  // reporter if needed.
+  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory_;
+  // The load stats reporter, lazily created.
+  std::unique_ptr<Upstream::LoadStatsReporter> lrs_server_;
 };
 
 class GrpcMuxDelta : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptionStateFactory,

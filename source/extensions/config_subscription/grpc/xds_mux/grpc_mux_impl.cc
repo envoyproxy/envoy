@@ -59,7 +59,8 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
-      target_xds_authority_(grpc_mux_context.target_xds_authority_) {
+      target_xds_authority_(grpc_mux_context.target_xds_authority_),
+      load_stats_reporter_factory_(grpc_mux_context.load_stats_reporter_factory_) {
   THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("ads", grpc_mux_context.local_info_));
   AllMuxes::get().insert(this);
 }
@@ -484,6 +485,31 @@ Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   OpaqueResourceDecoderSharedPtr,
                                                   const SubscriptionOptions&) {
   throwEnvoyExceptionOrPanic("ADS must be configured to support an ADS config source");
+}
+
+template <class S, class F, class RQ, class RS>
+Upstream::LoadStatsReporter* GrpcMuxImpl<S, F, RQ, RS>::maybeCreateLoadStatsReporter() {
+  if (!lrs_server_ && load_stats_reporter_factory_ &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_lrs_server_self_ads")) {
+    ENVOY_LOG(info, "Creating self-hosted LRS reporter for xDS-gRPC-Mux (target-authority: {})",
+              target_xds_authority_);
+    lrs_server_ = load_stats_reporter_factory_();
+    if (!lrs_server_) {
+      ENVOY_LOG(warn,
+                "Failed to create self-hosted LRS reporter, not using an xDS-based LRS server");
+      return nullptr;
+    }
+    ENVOY_LOG(
+        debug,
+        "Successfully created self-hosted LRS reporter for xDS-gRPC-Mux (target-authority: {})",
+        target_xds_authority_);
+  }
+  return lrs_server_.get();
+}
+
+template <class S, class F, class RQ, class RS>
+Upstream::LoadStatsReporter* GrpcMuxImpl<S, F, RQ, RS>::loadStatsReporter() const {
+  return lrs_server_.get();
 }
 
 class DeltaGrpcMuxFactory : public MuxFactory {

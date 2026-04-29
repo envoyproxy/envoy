@@ -25,6 +25,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/upstream/load_stats_reporter.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
@@ -1066,12 +1067,99 @@ TEST_P(NewGrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                      .async_stream = &async_stream_});
 }
 
-// A temp test to increase coverage. The test will be modified once the
-// implementation will be added.
-TEST_P(NewGrpcMuxImplTest, LrsCoverageIncrease) {
-  setup();
-  EXPECT_EQ(grpc_mux_->loadStatsReporter(), nullptr);
-  EXPECT_EQ(grpc_mux_->maybeCreateLoadStatsReporter(), nullptr);
+// Ensures that the load-stats-reporter is created if enabled.
+TEST_P(NewGrpcMuxImplTest, MaybeCreateLoadStatsReporter) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "true"}});
+
+  bool factory_called = false;
+  auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    factory_called = true;
+    return std::make_unique<Upstream::MockLoadStatsReporter>();
+  };
+
+  auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+      SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
+
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+      /*backoff_strategy_=*/std::move(backoff_strategy),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/skip_subsequent_node_,
+      /*load_stats_reporter_factory_=*/lrs_factory};
+
+  if (isUnifiedMuxTest()) {
+    grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context);
+  } else {
+    grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(grpc_mux_context);
+  }
+
+  // Initial state: not created.
+  EXPECT_EQ(nullptr, grpc_mux_->loadStatsReporter());
+  EXPECT_FALSE(factory_called);
+
+  // First call to maybeCreate: creates it.
+  Upstream::LoadStatsReporter* reporter = grpc_mux_->maybeCreateLoadStatsReporter();
+  EXPECT_NE(nullptr, reporter);
+  EXPECT_TRUE(factory_called);
+  EXPECT_EQ(reporter, grpc_mux_->loadStatsReporter());
+
+  // Second call: returns existing one, doesn't call factory again.
+  factory_called = false;
+  EXPECT_EQ(reporter, grpc_mux_->maybeCreateLoadStatsReporter());
+  EXPECT_FALSE(factory_called);
+}
+
+// Ensures that the load-stats-reporter is not created if disabled.
+TEST_P(NewGrpcMuxImplTest, MaybeCreateLoadStatsReporterRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "false"}});
+
+  auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    return nullptr; // Should not be called.
+  };
+
+  auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+      SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
+
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+      /*backoff_strategy_=*/std::move(backoff_strategy),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/skip_subsequent_node_,
+      /*load_stats_reporter_factory_=*/lrs_factory};
+
+  if (isUnifiedMuxTest()) {
+    grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context);
+  } else {
+    grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(grpc_mux_context);
+  }
+
+  EXPECT_EQ(nullptr, grpc_mux_->maybeCreateLoadStatsReporter());
 }
 
 TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {

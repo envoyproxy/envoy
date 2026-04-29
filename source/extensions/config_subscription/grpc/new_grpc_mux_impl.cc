@@ -54,7 +54,8 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
       skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_ &&
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node")),
-      eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)) {
+      eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
+      load_stats_reporter_factory_(grpc_mux_context.load_stats_reporter_factory_) {
   AllMuxes::get().insert(this);
 }
 
@@ -458,6 +459,23 @@ absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   }
   return absl::nullopt;
 }
+
+Upstream::LoadStatsReporter* NewGrpcMuxImpl::maybeCreateLoadStatsReporter() {
+  if (!lrs_server_ && load_stats_reporter_factory_ &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_lrs_server_self_ads")) {
+    ENVOY_LOG(info, "Creating self-hosted LRS reporter for xDS-gRPC-Mux");
+    lrs_server_ = load_stats_reporter_factory_();
+    if (!lrs_server_) {
+      ENVOY_LOG(warn,
+                "Failed to create self-hosted LRS reporter, not using an xDS-based LRS server");
+      return nullptr;
+    }
+    ENVOY_LOG(debug, "Successfully created self-hosted LRS reporter for xDS-gRPC-Mux");
+  }
+  return lrs_server_.get();
+}
+
+Upstream::LoadStatsReporter* NewGrpcMuxImpl::loadStatsReporter() const { return lrs_server_.get(); }
 
 // A factory class for creating NewGrpcMuxImpl so it does not have to be
 // hard-compiled into cluster_manager_impl.cc
