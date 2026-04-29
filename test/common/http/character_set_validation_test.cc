@@ -80,9 +80,8 @@ TEST(CharacterSetValidationTest, FromCharsInitializesCorrectly) {
 
 // Primary template - selected if expression CAN be constexpr
 template <typename Lambda>
-constexpr auto is_constexpr_impl(Lambda lambda,
-                                 int) -> decltype(std::integral_constant<int, (lambda(), 0)>{},
-                                                  bool{}) {
+constexpr auto is_constexpr_impl(Lambda lambda, int)
+    -> decltype((void)std::integral_constant<bool, (lambda(), true)>::value, bool{}) {
   return true;
 }
 
@@ -97,8 +96,8 @@ TEST(CharacterSetValidationTest, WorksFromDynamicData) {
       !is_constexpr_impl([]() { return absl::StrCat("!"); }, 0),
       "Oh no, StrCat can be constexpr-evaluated - replace StrCat with something that can't!");
   const CharTable kCharTable =
-      CharTable::fromChars(absl::StrCat("!")) |
-      CharTable::fromChars(absl::StrCat("@$")) & ~CharTable::fromChars(absl::StrCat("$"));
+      (CharTable::fromChars(absl::StrCat("!")) | CharTable::fromChars(absl::StrCat("@$"))) &
+      ~CharTable::fromChars(absl::StrCat("$"));
 
   for (unsigned c = 0; c < 256; ++c) {
     bool result = kCharTable.hasChar(c);
