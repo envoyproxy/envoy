@@ -11,6 +11,7 @@ import (
 // For built-in plugin factories in the host binary directly. DO NOT use this for independently
 // compiled module or plugins.
 var httpFilterConfigFactoryRegistry = make(map[string]shared.HttpFilterConfigFactory)
+var networkFilterConfigFactoryRegistry = make(map[string]shared.NetworkFilterConfigFactory)
 
 // NewHttpFilterFactory creates a new plugin factory for the given plugin name and unparsed config.
 func NewHttpFilterFactory(handle shared.HttpFilterConfigHandle, name string,
@@ -43,7 +44,16 @@ func RegisterHttpFilterConfigFactories(factories map[string]shared.HttpFilterCon
 // Network filter registry
 // ---------------------------------------------------------------------------
 
-var networkFilterConfigFactoryRegistry = make(map[string]shared.NetworkFilterConfigFactory)
+// NewNetworkFilterFactory creates a new network filter factory for the given plugin name and
+// unparsed config. Returns an error if no factory is registered for name.
+func NewNetworkFilterFactory(handle shared.NetworkFilterConfigHandle, name string,
+	unparsedConfig []byte) (shared.NetworkFilterFactory, error) {
+	configFactory := networkFilterConfigFactoryRegistry[name]
+	if configFactory == nil {
+		return nil, fmt.Errorf("failed to get network filter config factory for %s", name)
+	}
+	return configFactory.Create(handle, unparsedConfig)
+}
 
 // GetNetworkFilterConfigFactory returns the registered network filter config factory for name,
 // or nil if no factory is registered.

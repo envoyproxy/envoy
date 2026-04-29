@@ -1,15 +1,12 @@
 package abi
 
 /*
-#cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
-#cgo linux LDFLAGS: -Wl,--unresolved-symbols=ignore-all
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 #include "../../../abi/abi.h"
 */
 import "C"
+
 import (
 	"runtime"
 	"sync"
@@ -19,461 +16,544 @@ import (
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
 
-// networkFilterConfigWrapper is the module-side object that backs an Envoy
-// DynamicModuleNetworkFilterConfig. We keep the wrapper type so the manager pointer remains stable
-// across Go GC moves.
 type networkFilterConfigWrapper struct {
-	factory      shared.NetworkFilterFactory
-	configHandle *dymNetworkConfigHandle
+	pluginFactory shared.NetworkFilterFactory
+	configHandle  *dymNetworkConfigHandle
 }
 
 var networkConfigManager = newManager[networkFilterConfigWrapper]()
-var networkFilterManager = newManager[dymNetworkFilterHandle]()
+var networkPluginManager = newManager[dymNetworkFilterHandle]()
 
-// dymNetworkConfigHandle implements shared.NetworkFilterConfigHandle.
-type dymNetworkConfigHandle struct {
-	hostConfigPtr C.envoy_dynamic_module_type_network_filter_config_envoy_ptr
-	scheduler     *dymScheduler
+type dymNetworkBuffer struct {
+	hostPluginPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr
+	readSide      bool
 }
 
-func (h *dymNetworkConfigHandle) DefineCounter(name string) (shared.MetricID, shared.MetricsResult) {
-	var id C.size_t
-	ret := C.envoy_dynamic_module_callback_network_filter_config_define_counter(
-		h.hostConfigPtr,
-		stringToModuleBuffer(name),
-		&id,
-	)
-	runtime.KeepAlive(name)
-	return shared.MetricID(id), shared.MetricsResult(ret)
-}
-
-func (h *dymNetworkConfigHandle) DefineGauge(name string) (shared.MetricID, shared.MetricsResult) {
-	var id C.size_t
-	ret := C.envoy_dynamic_module_callback_network_filter_config_define_gauge(
-		h.hostConfigPtr,
-		stringToModuleBuffer(name),
-		&id,
-	)
-	runtime.KeepAlive(name)
-	return shared.MetricID(id), shared.MetricsResult(ret)
-}
-
-func (h *dymNetworkConfigHandle) DefineHistogram(name string) (shared.MetricID, shared.MetricsResult) {
-	var id C.size_t
-	ret := C.envoy_dynamic_module_callback_network_filter_config_define_histogram(
-		h.hostConfigPtr,
-		stringToModuleBuffer(name),
-		&id,
-	)
-	runtime.KeepAlive(name)
-	return shared.MetricID(id), shared.MetricsResult(ret)
-}
-
-func (h *dymNetworkConfigHandle) GetScheduler() shared.Scheduler {
-	if h.scheduler == nil {
-		schedulerPtr := C.envoy_dynamic_module_callback_network_filter_config_scheduler_new(
-			h.hostConfigPtr)
-		h.scheduler = newDymScheduler(
-			unsafe.Pointer(schedulerPtr),
-			func(p unsafe.Pointer, taskID C.uint64_t) {
-				C.envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
-					(C.envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr)(p),
-					taskID,
-				)
-			},
+func (b *dymNetworkBuffer) GetChunks() []shared.UnsafeEnvoyBuffer {
+	var chunksSize C.size_t
+	if b.readSide {
+		chunksSize = C.envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
+			b.hostPluginPtr,
 		)
-		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
-				(C.envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr)(s.schedulerPtr),
-			)
-		})
+	} else {
+		chunksSize = C.envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(
+			b.hostPluginPtr,
+		)
 	}
-	return h.scheduler
+
+	if chunksSize == 0 {
+		return nil
+	}
+
+	resultChunks := make([]C.envoy_dynamic_module_type_envoy_buffer, chunksSize)
+	var ok C.bool
+	if b.readSide {
+		ok = C.envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
+			b.hostPluginPtr,
+			unsafe.SliceData(resultChunks),
+		)
+	} else {
+		ok = C.envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
+			b.hostPluginPtr,
+			unsafe.SliceData(resultChunks),
+		)
+	}
+	if !bool(ok) {
+		return nil
+	}
+
+	finalResult := envoyBufferSliceToUnsafeEnvoyBufferSlice(resultChunks)
+	runtime.KeepAlive(resultChunks)
+	return finalResult
 }
 
-// dymNetworkFilterHandle implements shared.NetworkFilterHandle.
+func (b *dymNetworkBuffer) GetSize() uint64 {
+	if b.readSide {
+		return uint64(C.envoy_dynamic_module_callback_network_filter_get_read_buffer_size(
+			b.hostPluginPtr,
+		))
+	}
+	return uint64(C.envoy_dynamic_module_callback_network_filter_get_write_buffer_size(
+		b.hostPluginPtr,
+	))
+}
+
+func (b *dymNetworkBuffer) Drain(numBytes uint64) bool {
+	var ok C.bool
+	if b.readSide {
+		ok = C.envoy_dynamic_module_callback_network_filter_drain_read_buffer(
+			b.hostPluginPtr,
+			C.size_t(numBytes),
+		)
+	} else {
+		ok = C.envoy_dynamic_module_callback_network_filter_drain_write_buffer(
+			b.hostPluginPtr,
+			C.size_t(numBytes),
+		)
+	}
+	return bool(ok)
+}
+
+func (b *dymNetworkBuffer) Prepend(data []byte) bool {
+	var ok C.bool
+	if b.readSide {
+		ok = C.envoy_dynamic_module_callback_network_filter_prepend_read_buffer(
+			b.hostPluginPtr,
+			bytesToModuleBuffer(data),
+		)
+	} else {
+		ok = C.envoy_dynamic_module_callback_network_filter_prepend_write_buffer(
+			b.hostPluginPtr,
+			bytesToModuleBuffer(data),
+		)
+	}
+	runtime.KeepAlive(data)
+	return bool(ok)
+}
+
+func (b *dymNetworkBuffer) Append(data []byte) bool {
+	var ok C.bool
+	if b.readSide {
+		ok = C.envoy_dynamic_module_callback_network_filter_append_read_buffer(
+			b.hostPluginPtr,
+			bytesToModuleBuffer(data),
+		)
+	} else {
+		ok = C.envoy_dynamic_module_callback_network_filter_append_write_buffer(
+			b.hostPluginPtr,
+			bytesToModuleBuffer(data),
+		)
+	}
+	runtime.KeepAlive(data)
+	return bool(ok)
+}
+
 type dymNetworkFilterHandle struct {
-	hostFilterPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr
-
-	plugin    shared.NetworkFilter
-	scheduler *dymScheduler
-	destroyed bool
-
-	calloutCallbacks map[uint64]shared.HttpCalloutCallback
+	hostPluginPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr
+	plugin        shared.NetworkFilter
+	readBuffer    dymNetworkBuffer
+	writeBuffer   dymNetworkBuffer
+	// calloutMu guards calloutCallbacks. Per-connection network filter processing is
+	// single-threaded today, so this lock is uncontended in normal use; it's held for
+	// consistency with cluster/bootstrap callout maps and to keep the SDK safe if a future
+	// change introduces cross-thread callout dispatch.
 	calloutMu        sync.Mutex
+	calloutCallbacks map[uint64]shared.HttpCalloutCallback
+	scheduler        *dymScheduler
+	filterDestroyed  bool
 }
 
-// ---- read/write buffers ----
-
-func (h *dymNetworkFilterHandle) GetReadBufferChunks() []shared.UnsafeEnvoyBuffer {
-	size := C.envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(h.hostFilterPtr)
-	if size == 0 {
-		return nil
+func newDymNetworkFilterHandle(
+	hostPluginPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
+) *dymNetworkFilterHandle {
+	return &dymNetworkFilterHandle{
+		hostPluginPtr: hostPluginPtr,
+		readBuffer: dymNetworkBuffer{
+			hostPluginPtr: hostPluginPtr,
+			readSide:      true,
+		},
+		writeBuffer: dymNetworkBuffer{
+			hostPluginPtr: hostPluginPtr,
+			readSide:      false,
+		},
 	}
-	bufs := make([]C.envoy_dynamic_module_type_envoy_buffer, int(size))
-	if !bool(C.envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
-		h.hostFilterPtr, unsafe.SliceData(bufs))) {
-		return nil
-	}
-	out := envoyBufferSliceToUnsafeEnvoyBufferSlice(bufs)
-	runtime.KeepAlive(bufs)
-	return out
 }
 
-func (h *dymNetworkFilterHandle) GetReadBufferSize() uint64 {
-	return uint64(C.envoy_dynamic_module_callback_network_filter_get_read_buffer_size(h.hostFilterPtr))
+func (h *dymNetworkFilterHandle) ReadBuffer() shared.NetworkBuffer {
+	return &h.readBuffer
 }
 
-func (h *dymNetworkFilterHandle) GetWriteBufferChunks() []shared.UnsafeEnvoyBuffer {
-	size := C.envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(h.hostFilterPtr)
-	if size == 0 {
-		return nil
-	}
-	bufs := make([]C.envoy_dynamic_module_type_envoy_buffer, int(size))
-	if !bool(C.envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
-		h.hostFilterPtr, unsafe.SliceData(bufs))) {
-		return nil
-	}
-	out := envoyBufferSliceToUnsafeEnvoyBufferSlice(bufs)
-	runtime.KeepAlive(bufs)
-	return out
+func (h *dymNetworkFilterHandle) WriteBuffer() shared.NetworkBuffer {
+	return &h.writeBuffer
 }
 
-func (h *dymNetworkFilterHandle) GetWriteBufferSize() uint64 {
-	return uint64(C.envoy_dynamic_module_callback_network_filter_get_write_buffer_size(h.hostFilterPtr))
-}
-
-func (h *dymNetworkFilterHandle) DrainReadBuffer(length uint64) bool {
-	return bool(C.envoy_dynamic_module_callback_network_filter_drain_read_buffer(
-		h.hostFilterPtr, C.size_t(length)))
-}
-
-func (h *dymNetworkFilterHandle) DrainWriteBuffer(length uint64) bool {
-	return bool(C.envoy_dynamic_module_callback_network_filter_drain_write_buffer(
-		h.hostFilterPtr, C.size_t(length)))
-}
-
-func (h *dymNetworkFilterHandle) PrependReadBuffer(data []byte) bool {
-	ret := C.envoy_dynamic_module_callback_network_filter_prepend_read_buffer(
-		h.hostFilterPtr, bytesToModuleBuffer(data))
-	runtime.KeepAlive(data)
-	return bool(ret)
-}
-
-func (h *dymNetworkFilterHandle) AppendReadBuffer(data []byte) bool {
-	ret := C.envoy_dynamic_module_callback_network_filter_append_read_buffer(
-		h.hostFilterPtr, bytesToModuleBuffer(data))
-	runtime.KeepAlive(data)
-	return bool(ret)
-}
-
-func (h *dymNetworkFilterHandle) PrependWriteBuffer(data []byte) bool {
-	ret := C.envoy_dynamic_module_callback_network_filter_prepend_write_buffer(
-		h.hostFilterPtr, bytesToModuleBuffer(data))
-	runtime.KeepAlive(data)
-	return bool(ret)
-}
-
-func (h *dymNetworkFilterHandle) AppendWriteBuffer(data []byte) bool {
-	ret := C.envoy_dynamic_module_callback_network_filter_append_write_buffer(
-		h.hostFilterPtr, bytesToModuleBuffer(data))
-	runtime.KeepAlive(data)
-	return bool(ret)
-}
-
-func (h *dymNetworkFilterHandle) Write(data []byte, endOfStream bool) {
+func (h *dymNetworkFilterHandle) Write(data []byte, endStream bool) {
 	C.envoy_dynamic_module_callback_network_filter_write(
-		h.hostFilterPtr, bytesToModuleBuffer(data), C.bool(endOfStream))
+		h.hostPluginPtr,
+		bytesToModuleBuffer(data),
+		C.bool(endStream),
+	)
 	runtime.KeepAlive(data)
 }
 
-func (h *dymNetworkFilterHandle) InjectReadData(data []byte, endOfStream bool) {
+func (h *dymNetworkFilterHandle) InjectReadData(data []byte, endStream bool) {
 	C.envoy_dynamic_module_callback_network_filter_inject_read_data(
-		h.hostFilterPtr, bytesToModuleBuffer(data), C.bool(endOfStream))
+		h.hostPluginPtr,
+		bytesToModuleBuffer(data),
+		C.bool(endStream),
+	)
 	runtime.KeepAlive(data)
 }
 
-func (h *dymNetworkFilterHandle) InjectWriteData(data []byte, endOfStream bool) {
+func (h *dymNetworkFilterHandle) InjectWriteData(data []byte, endStream bool) {
 	C.envoy_dynamic_module_callback_network_filter_inject_write_data(
-		h.hostFilterPtr, bytesToModuleBuffer(data), C.bool(endOfStream))
+		h.hostPluginPtr,
+		bytesToModuleBuffer(data),
+		C.bool(endStream),
+	)
 	runtime.KeepAlive(data)
 }
 
 func (h *dymNetworkFilterHandle) ContinueReading() {
-	C.envoy_dynamic_module_callback_network_filter_continue_reading(h.hostFilterPtr)
+	C.envoy_dynamic_module_callback_network_filter_continue_reading(h.hostPluginPtr)
 }
-
-// ---- connection control ----
 
 func (h *dymNetworkFilterHandle) Close(closeType shared.NetworkConnectionCloseType) {
 	C.envoy_dynamic_module_callback_network_filter_close(
-		h.hostFilterPtr,
+		h.hostPluginPtr,
 		C.envoy_dynamic_module_type_network_connection_close_type(closeType),
 	)
 }
 
-func (h *dymNetworkFilterHandle) CloseWithDetails(closeType shared.NetworkConnectionCloseType, details string) {
+func (h *dymNetworkFilterHandle) GetConnectionID() uint64 {
+	return uint64(C.envoy_dynamic_module_callback_network_filter_get_connection_id(h.hostPluginPtr))
+}
+
+func (h *dymNetworkFilterHandle) getAddress(
+	kind int,
+) (shared.UnsafeEnvoyBuffer, uint32, bool) {
+	var address C.envoy_dynamic_module_type_envoy_buffer
+	var port C.uint32_t
+	var ret C.bool
+	switch kind {
+	case 0:
+		ret = C.envoy_dynamic_module_callback_network_filter_get_remote_address(
+			h.hostPluginPtr,
+			&address,
+			&port,
+		)
+	case 1:
+		ret = C.envoy_dynamic_module_callback_network_filter_get_local_address(
+			h.hostPluginPtr,
+			&address,
+			&port,
+		)
+	case 2:
+		ret = C.envoy_dynamic_module_callback_network_filter_get_direct_remote_address(
+			h.hostPluginPtr,
+			&address,
+			&port,
+		)
+	default:
+		return shared.UnsafeEnvoyBuffer{}, 0, false
+	}
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, 0, false
+	}
+	if address.ptr == nil || address.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, uint32(port), true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(address), uint32(port), true
+}
+
+func (h *dymNetworkFilterHandle) GetRemoteAddress() (shared.UnsafeEnvoyBuffer, uint32, bool) {
+	return h.getAddress(0)
+}
+
+func (h *dymNetworkFilterHandle) GetLocalAddress() (shared.UnsafeEnvoyBuffer, uint32, bool) {
+	return h.getAddress(1)
+}
+
+func (h *dymNetworkFilterHandle) IsSSL() bool {
+	return bool(C.envoy_dynamic_module_callback_network_filter_is_ssl(h.hostPluginPtr))
+}
+
+func (h *dymNetworkFilterHandle) DisableClose(disabled bool) {
+	C.envoy_dynamic_module_callback_network_filter_disable_close(
+		h.hostPluginPtr,
+		C.bool(disabled),
+	)
+}
+
+func (h *dymNetworkFilterHandle) CloseWithDetails(
+	closeType shared.NetworkConnectionCloseType,
+	details string,
+) {
 	C.envoy_dynamic_module_callback_network_filter_close_with_details(
-		h.hostFilterPtr,
+		h.hostPluginPtr,
 		C.envoy_dynamic_module_type_network_connection_close_type(closeType),
 		stringToModuleBuffer(details),
 	)
 	runtime.KeepAlive(details)
 }
 
-func (h *dymNetworkFilterHandle) DisableClose(disabled bool) {
-	C.envoy_dynamic_module_callback_network_filter_disable_close(
-		h.hostFilterPtr, C.bool(disabled))
-}
-
-func (h *dymNetworkFilterHandle) GetConnectionID() uint64 {
-	return uint64(C.envoy_dynamic_module_callback_network_filter_get_connection_id(h.hostFilterPtr))
-}
-
-func (h *dymNetworkFilterHandle) GetConnectionState() shared.NetworkConnectionState {
-	return shared.NetworkConnectionState(
-		C.envoy_dynamic_module_callback_network_filter_get_connection_state(h.hostFilterPtr))
-}
-
-func (h *dymNetworkFilterHandle) ReadDisable(disable bool) shared.NetworkReadDisableStatus {
-	return shared.NetworkReadDisableStatus(
-		C.envoy_dynamic_module_callback_network_filter_read_disable(
-			h.hostFilterPtr, C.bool(disable)))
-}
-
-func (h *dymNetworkFilterHandle) ReadEnabled() bool {
-	return bool(C.envoy_dynamic_module_callback_network_filter_read_enabled(h.hostFilterPtr))
-}
-
-func (h *dymNetworkFilterHandle) IsHalfCloseEnabled() bool {
-	return bool(C.envoy_dynamic_module_callback_network_filter_is_half_close_enabled(h.hostFilterPtr))
-}
-
-func (h *dymNetworkFilterHandle) EnableHalfClose(enabled bool) {
-	C.envoy_dynamic_module_callback_network_filter_enable_half_close(
-		h.hostFilterPtr, C.bool(enabled))
-}
-
-func (h *dymNetworkFilterHandle) GetBufferLimit() uint32 {
-	return uint32(C.envoy_dynamic_module_callback_network_filter_get_buffer_limit(h.hostFilterPtr))
-}
-
-func (h *dymNetworkFilterHandle) SetBufferLimits(limit uint32) {
-	C.envoy_dynamic_module_callback_network_filter_set_buffer_limits(
-		h.hostFilterPtr, C.uint32_t(limit))
-}
-
-func (h *dymNetworkFilterHandle) AboveHighWatermark() bool {
-	return bool(C.envoy_dynamic_module_callback_network_filter_above_high_watermark(h.hostFilterPtr))
-}
-
-// ---- connection metadata ----
-
-func addressOrEmpty(buf C.envoy_dynamic_module_type_envoy_buffer, port C.uint32_t, ok C.bool) (shared.UnsafeEnvoyBuffer, uint32, bool) {
-	if !bool(ok) {
-		return shared.UnsafeEnvoyBuffer{}, 0, false
+func (h *dymNetworkFilterHandle) GetRequestedServerName() (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_network_filter_get_requested_server_name(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
 	}
-	return envoyBufferToUnsafeEnvoyBuffer(buf), uint32(port), true
-}
-
-func (h *dymNetworkFilterHandle) GetRemoteAddress() (shared.UnsafeEnvoyBuffer, uint32, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
-	var port C.uint32_t
-	ok := C.envoy_dynamic_module_callback_network_filter_get_remote_address(h.hostFilterPtr, &buf, &port)
-	return addressOrEmpty(buf, port, ok)
-}
-
-func (h *dymNetworkFilterHandle) GetLocalAddress() (shared.UnsafeEnvoyBuffer, uint32, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
-	var port C.uint32_t
-	ok := C.envoy_dynamic_module_callback_network_filter_get_local_address(h.hostFilterPtr, &buf, &port)
-	return addressOrEmpty(buf, port, ok)
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (h *dymNetworkFilterHandle) GetDirectRemoteAddress() (shared.UnsafeEnvoyBuffer, uint32, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
-	var port C.uint32_t
-	ok := C.envoy_dynamic_module_callback_network_filter_get_direct_remote_address(h.hostFilterPtr, &buf, &port)
-	return addressOrEmpty(buf, port, ok)
+	return h.getAddress(2)
 }
 
-func (h *dymNetworkFilterHandle) GetRequestedServerName() (shared.UnsafeEnvoyBuffer, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
-	if !bool(C.envoy_dynamic_module_callback_network_filter_get_requested_server_name(h.hostFilterPtr, &buf)) {
-		return shared.UnsafeEnvoyBuffer{}, false
+func (h *dymNetworkFilterHandle) getSANs(
+	kind int,
+) []shared.UnsafeEnvoyBuffer {
+	var size C.size_t
+	switch kind {
+	case 0:
+		size = C.envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(h.hostPluginPtr)
+	case 1:
+		size = C.envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(h.hostPluginPtr)
+	default:
+		return nil
 	}
-	return envoyBufferToUnsafeEnvoyBuffer(buf), true
-}
-
-func (h *dymNetworkFilterHandle) IsSSL() bool {
-	return bool(C.envoy_dynamic_module_callback_network_filter_is_ssl(h.hostFilterPtr))
-}
-
-func (h *dymNetworkFilterHandle) GetSSLURISans() []shared.UnsafeEnvoyBuffer {
-	size := C.envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(h.hostFilterPtr)
 	if size == 0 {
 		return nil
 	}
-	bufs := make([]C.envoy_dynamic_module_type_envoy_buffer, int(size))
-	if !bool(C.envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(h.hostFilterPtr, unsafe.SliceData(bufs))) {
+
+	result := make([]C.envoy_dynamic_module_type_envoy_buffer, size)
+	var ret C.bool
+	switch kind {
+	case 0:
+		ret = C.envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
+			h.hostPluginPtr,
+			unsafe.SliceData(result),
+		)
+	case 1:
+		ret = C.envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
+			h.hostPluginPtr,
+			unsafe.SliceData(result),
+		)
+	default:
 		return nil
 	}
-	out := envoyBufferSliceToUnsafeEnvoyBufferSlice(bufs)
-	runtime.KeepAlive(bufs)
-	return out
+	if !bool(ret) {
+		return nil
+	}
+
+	finalResult := envoyBufferSliceToUnsafeEnvoyBufferSlice(result)
+	runtime.KeepAlive(result)
+	return finalResult
 }
 
-func (h *dymNetworkFilterHandle) GetSSLDNSSans() []shared.UnsafeEnvoyBuffer {
-	size := C.envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(h.hostFilterPtr)
-	if size == 0 {
-		return nil
-	}
-	bufs := make([]C.envoy_dynamic_module_type_envoy_buffer, int(size))
-	if !bool(C.envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(h.hostFilterPtr, unsafe.SliceData(bufs))) {
-		return nil
-	}
-	out := envoyBufferSliceToUnsafeEnvoyBufferSlice(bufs)
-	runtime.KeepAlive(bufs)
-	return out
+func (h *dymNetworkFilterHandle) GetSSLURISANs() []shared.UnsafeEnvoyBuffer {
+	return h.getSANs(0)
+}
+
+func (h *dymNetworkFilterHandle) GetSSLDNSSANs() []shared.UnsafeEnvoyBuffer {
+	return h.getSANs(1)
 }
 
 func (h *dymNetworkFilterHandle) GetSSLSubject() (shared.UnsafeEnvoyBuffer, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
-	if !bool(C.envoy_dynamic_module_callback_network_filter_get_ssl_subject(h.hostFilterPtr, &buf)) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_network_filter_get_ssl_subject(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
 		return shared.UnsafeEnvoyBuffer{}, false
 	}
-	return envoyBufferToUnsafeEnvoyBuffer(buf), true
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
-
-// ---- filter state ----
 
 func (h *dymNetworkFilterHandle) SetFilterState(key string, value []byte) bool {
 	ret := C.envoy_dynamic_module_callback_network_set_filter_state_bytes(
-		h.hostFilterPtr, stringToModuleBuffer(key), bytesToModuleBuffer(value))
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+		bytesToModuleBuffer(value),
+	)
 	runtime.KeepAlive(key)
 	runtime.KeepAlive(value)
 	return bool(ret)
 }
 
 func (h *dymNetworkFilterHandle) GetFilterState(key string) (shared.UnsafeEnvoyBuffer, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
 	ret := C.envoy_dynamic_module_callback_network_get_filter_state_bytes(
-		h.hostFilterPtr, stringToModuleBuffer(key), &buf)
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+		&valueView,
+	)
 	runtime.KeepAlive(key)
-	if !bool(ret) || buf.ptr == nil || buf.length == 0 {
-		return shared.UnsafeEnvoyBuffer{}, bool(ret)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
 	}
-	return envoyBufferToUnsafeEnvoyBuffer(buf), true
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (h *dymNetworkFilterHandle) SetFilterStateTyped(key string, value []byte) bool {
 	ret := C.envoy_dynamic_module_callback_network_set_filter_state_typed(
-		h.hostFilterPtr, stringToModuleBuffer(key), bytesToModuleBuffer(value))
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+		bytesToModuleBuffer(value),
+	)
 	runtime.KeepAlive(key)
 	runtime.KeepAlive(value)
 	return bool(ret)
 }
 
 func (h *dymNetworkFilterHandle) GetFilterStateTyped(key string) (shared.UnsafeEnvoyBuffer, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
 	ret := C.envoy_dynamic_module_callback_network_get_filter_state_typed(
-		h.hostFilterPtr, stringToModuleBuffer(key), &buf)
-	runtime.KeepAlive(key)
-	if !bool(ret) || buf.ptr == nil || buf.length == 0 {
-		return shared.UnsafeEnvoyBuffer{}, bool(ret)
-	}
-	return envoyBufferToUnsafeEnvoyBuffer(buf), true
-}
-
-// ---- dynamic metadata ----
-
-func (h *dymNetworkFilterHandle) SetDynamicMetadataString(metadataNamespace, key, value string) {
-	C.envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
-		h.hostFilterPtr,
-		stringToModuleBuffer(metadataNamespace),
+		h.hostPluginPtr,
 		stringToModuleBuffer(key),
-		stringToModuleBuffer(value),
+		&valueView,
 	)
-	runtime.KeepAlive(metadataNamespace)
 	runtime.KeepAlive(key)
-	runtime.KeepAlive(value)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
-func (h *dymNetworkFilterHandle) GetDynamicMetadataString(metadataNamespace, key string) (shared.UnsafeEnvoyBuffer, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
+func (h *dymNetworkFilterHandle) GetMetadataString(
+	metadataNamespace, key string,
+) (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
 	ret := C.envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
-		h.hostFilterPtr,
+		h.hostPluginPtr,
 		stringToModuleBuffer(metadataNamespace),
 		stringToModuleBuffer(key),
-		&buf,
+		&valueView,
 	)
 	runtime.KeepAlive(metadataNamespace)
 	runtime.KeepAlive(key)
-	if !bool(ret) || buf.ptr == nil || buf.length == 0 {
-		return shared.UnsafeEnvoyBuffer{}, bool(ret)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
 	}
-	return envoyBufferToUnsafeEnvoyBuffer(buf), true
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
-func (h *dymNetworkFilterHandle) SetDynamicMetadataNumber(metadataNamespace, key string, value float64) {
-	C.envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
-		h.hostFilterPtr,
-		stringToModuleBuffer(metadataNamespace),
-		stringToModuleBuffer(key),
-		C.double(value),
-	)
-	runtime.KeepAlive(metadataNamespace)
-	runtime.KeepAlive(key)
-}
-
-func (h *dymNetworkFilterHandle) GetDynamicMetadataNumber(metadataNamespace, key string) (float64, bool) {
-	var v C.double
+func (h *dymNetworkFilterHandle) GetMetadataNumber(metadataNamespace, key string) (float64, bool) {
+	var value C.double
 	ret := C.envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
-		h.hostFilterPtr,
+		h.hostPluginPtr,
 		stringToModuleBuffer(metadataNamespace),
 		stringToModuleBuffer(key),
-		&v,
+		&value,
 	)
 	runtime.KeepAlive(metadataNamespace)
 	runtime.KeepAlive(key)
 	if !bool(ret) {
 		return 0, false
 	}
-	return float64(v), true
+	return float64(value), true
 }
 
-func (h *dymNetworkFilterHandle) SetDynamicMetadataBool(metadataNamespace, key string, value bool) {
-	C.envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
-		h.hostFilterPtr,
-		stringToModuleBuffer(metadataNamespace),
-		stringToModuleBuffer(key),
-		C.bool(value),
-	)
-	runtime.KeepAlive(metadataNamespace)
-	runtime.KeepAlive(key)
-}
-
-func (h *dymNetworkFilterHandle) GetDynamicMetadataBool(metadataNamespace, key string) (bool, bool) {
-	var v C.bool
+func (h *dymNetworkFilterHandle) GetMetadataBool(metadataNamespace, key string) (bool, bool) {
+	var value C.bool
 	ret := C.envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
-		h.hostFilterPtr,
+		h.hostPluginPtr,
 		stringToModuleBuffer(metadataNamespace),
 		stringToModuleBuffer(key),
-		&v,
+		&value,
 	)
 	runtime.KeepAlive(metadataNamespace)
 	runtime.KeepAlive(key)
 	if !bool(ret) {
 		return false, false
 	}
-	return bool(v), true
+	return bool(value), true
 }
 
-// ---- socket options ----
+func (h *dymNetworkFilterHandle) SetMetadata(metadataNamespace, key string, value any) {
+	var numValue float64
+	var isNum bool
+	var strValue string
+	var isStr bool
 
-func (h *dymNetworkFilterHandle) SetSocketOptionInt(level, name int64, state shared.SocketOptionState, value int64) {
+	switch v := value.(type) {
+	case uint:
+		numValue = float64(v)
+		isNum = true
+	case uint8:
+		numValue = float64(v)
+		isNum = true
+	case uint16:
+		numValue = float64(v)
+		isNum = true
+	case uint32:
+		numValue = float64(v)
+		isNum = true
+	case uint64:
+		numValue = float64(v)
+		isNum = true
+	case int:
+		numValue = float64(v)
+		isNum = true
+	case int8:
+		numValue = float64(v)
+		isNum = true
+	case int16:
+		numValue = float64(v)
+		isNum = true
+	case int32:
+		numValue = float64(v)
+		isNum = true
+	case int64:
+		numValue = float64(v)
+		isNum = true
+	case float32:
+		numValue = float64(v)
+		isNum = true
+	case float64:
+		numValue = float64(v)
+		isNum = true
+	case bool:
+		C.envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+			h.hostPluginPtr,
+			stringToModuleBuffer(metadataNamespace),
+			stringToModuleBuffer(key),
+			C.bool(v),
+		)
+		runtime.KeepAlive(metadataNamespace)
+		runtime.KeepAlive(key)
+		return
+	case string:
+		strValue = v
+		isStr = true
+	}
+
+	if isNum {
+		C.envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+			h.hostPluginPtr,
+			stringToModuleBuffer(metadataNamespace),
+			stringToModuleBuffer(key),
+			C.double(numValue),
+		)
+	} else if isStr {
+		C.envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+			h.hostPluginPtr,
+			stringToModuleBuffer(metadataNamespace),
+			stringToModuleBuffer(key),
+			stringToModuleBuffer(strValue),
+		)
+	}
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(key)
+	runtime.KeepAlive(strValue)
+}
+
+func (h *dymNetworkFilterHandle) SetSocketOptionInt(
+	level, name int64,
+	state shared.SocketOptionState,
+	value int64,
+) {
 	C.envoy_dynamic_module_callback_network_set_socket_option_int(
-		h.hostFilterPtr,
+		h.hostPluginPtr,
 		C.int64_t(level),
 		C.int64_t(name),
 		C.envoy_dynamic_module_type_socket_option_state(state),
@@ -481,9 +561,13 @@ func (h *dymNetworkFilterHandle) SetSocketOptionInt(level, name int64, state sha
 	)
 }
 
-func (h *dymNetworkFilterHandle) SetSocketOptionBytes(level, name int64, state shared.SocketOptionState, value []byte) {
+func (h *dymNetworkFilterHandle) SetSocketOptionBytes(
+	level, name int64,
+	state shared.SocketOptionState,
+	value []byte,
+) {
 	C.envoy_dynamic_module_callback_network_set_socket_option_bytes(
-		h.hostFilterPtr,
+		h.hostPluginPtr,
 		C.int64_t(level),
 		C.int64_t(name),
 		C.envoy_dynamic_module_type_socket_option_state(state),
@@ -492,91 +576,103 @@ func (h *dymNetworkFilterHandle) SetSocketOptionBytes(level, name int64, state s
 	runtime.KeepAlive(value)
 }
 
-func (h *dymNetworkFilterHandle) GetSocketOptionInt(level, name int64, state shared.SocketOptionState) (int64, bool) {
-	var v C.int64_t
+func (h *dymNetworkFilterHandle) GetSocketOptionInt(
+	level, name int64,
+	state shared.SocketOptionState,
+) (int64, bool) {
+	var value C.int64_t
 	ret := C.envoy_dynamic_module_callback_network_get_socket_option_int(
-		h.hostFilterPtr,
+		h.hostPluginPtr,
 		C.int64_t(level),
 		C.int64_t(name),
 		C.envoy_dynamic_module_type_socket_option_state(state),
-		&v,
+		&value,
 	)
 	if !bool(ret) {
 		return 0, false
 	}
-	return int64(v), true
+	return int64(value), true
 }
 
-func (h *dymNetworkFilterHandle) GetSocketOptionBytes(level, name int64, state shared.SocketOptionState) (shared.UnsafeEnvoyBuffer, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
+func (h *dymNetworkFilterHandle) GetSocketOptionBytes(
+	level, name int64,
+	state shared.SocketOptionState,
+) (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
 	ret := C.envoy_dynamic_module_callback_network_get_socket_option_bytes(
-		h.hostFilterPtr,
+		h.hostPluginPtr,
 		C.int64_t(level),
 		C.int64_t(name),
 		C.envoy_dynamic_module_type_socket_option_state(state),
-		&buf,
+		&valueView,
 	)
-	if !bool(ret) || buf.ptr == nil || buf.length == 0 {
-		return shared.UnsafeEnvoyBuffer{}, bool(ret)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
 	}
-	return envoyBufferToUnsafeEnvoyBuffer(buf), true
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (h *dymNetworkFilterHandle) GetSocketOptions() []shared.SocketOption {
-	size := C.envoy_dynamic_module_callback_network_get_socket_options_size(h.hostFilterPtr)
+	size := C.envoy_dynamic_module_callback_network_get_socket_options_size(h.hostPluginPtr)
 	if size == 0 {
 		return nil
 	}
-	raw := make([]C.envoy_dynamic_module_type_socket_option, int(size))
-	C.envoy_dynamic_module_callback_network_get_socket_options(h.hostFilterPtr, unsafe.SliceData(raw))
-	out := make([]shared.SocketOption, int(size))
-	for i := range raw {
-		out[i] = shared.SocketOption{
-			Level: int64(raw[i].level),
-			Name:  int64(raw[i].name),
-			State: shared.SocketOptionState(raw[i].state),
-		}
-		switch raw[i].value_type {
-		case C.envoy_dynamic_module_type_socket_option_value_type_Int:
-			out[i].Value = shared.SocketOptionValue{Int: int64(raw[i].int_value)}
-		case C.envoy_dynamic_module_type_socket_option_value_type_Bytes:
-			out[i].Value = shared.SocketOptionValue{
-				IsBytes: true,
-				Bytes:   envoyBufferToUnsafeEnvoyBuffer(raw[i].byte_value),
-			}
-		}
+
+	result := make([]C.envoy_dynamic_module_type_socket_option, size)
+	C.envoy_dynamic_module_callback_network_get_socket_options(
+		h.hostPluginPtr,
+		unsafe.SliceData(result),
+	)
+
+	finalResult := make([]shared.SocketOption, 0, len(result))
+	for _, option := range result {
+		finalResult = append(finalResult, shared.SocketOption{
+			Level:      int64(option.level),
+			Name:       int64(option.name),
+			State:      shared.SocketOptionState(option.state),
+			ValueType:  shared.SocketOptionValueType(option.value_type),
+			IntValue:   int64(option.int_value),
+			BytesValue: envoyBufferToUnsafeEnvoyBuffer(option.byte_value),
+		})
 	}
-	runtime.KeepAlive(raw)
-	return out
+	runtime.KeepAlive(result)
+	return finalResult
 }
 
-// ---- HTTP callout ----
+func (h *dymNetworkFilterHandle) Log(level shared.LogLevel, format string, args ...any) {
+	hostLog(level, format, args)
+}
 
 func (h *dymNetworkFilterHandle) HttpCallout(
-	clusterName string, headers [][2]string, body []byte, timeoutMs uint64,
+	cluster string, headers [][2]string, body []byte, timeoutMs uint64,
 	cb shared.HttpCalloutCallback,
 ) (shared.HttpCalloutInitResult, uint64) {
 	headerViews := headersToModuleHttpHeaderSlice(headers)
 	var calloutID C.uint64_t
 
 	result := C.envoy_dynamic_module_callback_network_filter_http_callout(
-		h.hostFilterPtr,
+		h.hostPluginPtr,
 		&calloutID,
-		stringToModuleBuffer(clusterName),
+		stringToModuleBuffer(cluster),
 		unsafe.SliceData(headerViews),
 		C.size_t(len(headerViews)),
 		bytesToModuleBuffer(body),
 		C.uint64_t(timeoutMs),
 	)
-	runtime.KeepAlive(clusterName)
+
+	runtime.KeepAlive(cluster)
 	runtime.KeepAlive(headers)
-	runtime.KeepAlive(headerViews)
 	runtime.KeepAlive(body)
+	runtime.KeepAlive(headerViews)
 
 	goResult := shared.HttpCalloutInitResult(result)
 	if goResult != shared.HttpCalloutInitSuccess {
 		return goResult, 0
 	}
+
 	h.calloutMu.Lock()
 	if h.calloutCallbacks == nil {
 		h.calloutCallbacks = make(map[uint64]shared.HttpCalloutCallback)
@@ -586,100 +682,214 @@ func (h *dymNetworkFilterHandle) HttpCallout(
 	return goResult, uint64(calloutID)
 }
 
-// ---- metrics ----
-
-func (h *dymNetworkFilterHandle) IncrementCounter(id shared.MetricID, value uint64) shared.MetricsResult {
-	return shared.MetricsResult(C.envoy_dynamic_module_callback_network_filter_increment_counter(
-		h.hostFilterPtr, C.size_t(uint64(id)), C.uint64_t(value)))
-}
-
-func (h *dymNetworkFilterHandle) SetGauge(id shared.MetricID, value uint64) shared.MetricsResult {
-	return shared.MetricsResult(C.envoy_dynamic_module_callback_network_filter_set_gauge(
-		h.hostFilterPtr, C.size_t(uint64(id)), C.uint64_t(value)))
-}
-
-func (h *dymNetworkFilterHandle) IncrementGauge(id shared.MetricID, value uint64) shared.MetricsResult {
-	return shared.MetricsResult(C.envoy_dynamic_module_callback_network_filter_increment_gauge(
-		h.hostFilterPtr, C.size_t(uint64(id)), C.uint64_t(value)))
-}
-
-func (h *dymNetworkFilterHandle) DecrementGauge(id shared.MetricID, value uint64) shared.MetricsResult {
-	return shared.MetricsResult(C.envoy_dynamic_module_callback_network_filter_decrement_gauge(
-		h.hostFilterPtr, C.size_t(uint64(id)), C.uint64_t(value)))
-}
-
-func (h *dymNetworkFilterHandle) RecordHistogramValue(id shared.MetricID, value uint64) shared.MetricsResult {
-	return shared.MetricsResult(C.envoy_dynamic_module_callback_network_filter_record_histogram_value(
-		h.hostFilterPtr, C.size_t(uint64(id)), C.uint64_t(value)))
-}
-
-// ---- upstream/cluster info ----
-
-func (h *dymNetworkFilterHandle) GetClusterHostCounts(clusterName string, priority uint32) (shared.ClusterHostCounts, bool) {
-	var total, healthy, degraded C.size_t
-	ret := C.envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
-		h.hostFilterPtr,
-		stringToModuleBuffer(clusterName),
-		C.uint32_t(priority),
-		&total, &healthy, &degraded,
+func (h *dymNetworkFilterHandle) RecordHistogramValue(
+	id shared.MetricID,
+	value uint64,
+) shared.MetricsResult {
+	result := C.envoy_dynamic_module_callback_network_filter_record_histogram_value(
+		h.hostPluginPtr,
+		C.size_t(id),
+		C.uint64_t(value),
 	)
-	runtime.KeepAlive(clusterName)
+	return shared.MetricsResult(result)
+}
+
+func (h *dymNetworkFilterHandle) SetGaugeValue(
+	id shared.MetricID,
+	value uint64,
+) shared.MetricsResult {
+	result := C.envoy_dynamic_module_callback_network_filter_set_gauge(
+		h.hostPluginPtr,
+		C.size_t(id),
+		C.uint64_t(value),
+	)
+	return shared.MetricsResult(result)
+}
+
+func (h *dymNetworkFilterHandle) IncrementGaugeValue(
+	id shared.MetricID,
+	value uint64,
+) shared.MetricsResult {
+	result := C.envoy_dynamic_module_callback_network_filter_increment_gauge(
+		h.hostPluginPtr,
+		C.size_t(id),
+		C.uint64_t(value),
+	)
+	return shared.MetricsResult(result)
+}
+
+func (h *dymNetworkFilterHandle) DecrementGaugeValue(
+	id shared.MetricID,
+	value uint64,
+) shared.MetricsResult {
+	result := C.envoy_dynamic_module_callback_network_filter_decrement_gauge(
+		h.hostPluginPtr,
+		C.size_t(id),
+		C.uint64_t(value),
+	)
+	return shared.MetricsResult(result)
+}
+
+func (h *dymNetworkFilterHandle) IncrementCounterValue(
+	id shared.MetricID,
+	value uint64,
+) shared.MetricsResult {
+	result := C.envoy_dynamic_module_callback_network_filter_increment_counter(
+		h.hostPluginPtr,
+		C.size_t(id),
+		C.uint64_t(value),
+	)
+	return shared.MetricsResult(result)
+}
+
+func (h *dymNetworkFilterHandle) GetClusterHostCounts(
+	cluster string,
+	priority uint32,
+) (shared.ClusterHostCounts, bool) {
+	var total C.size_t
+	var healthy C.size_t
+	var degraded C.size_t
+	ret := C.envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+		h.hostPluginPtr,
+		stringToModuleBuffer(cluster),
+		C.uint32_t(priority),
+		&total,
+		&healthy,
+		&degraded,
+	)
+	runtime.KeepAlive(cluster)
 	if !bool(ret) {
 		return shared.ClusterHostCounts{}, false
 	}
 	return shared.ClusterHostCounts{
-		Total: uint64(total), Healthy: uint64(healthy), Degraded: uint64(degraded),
+		Total:    uint64(total),
+		Healthy:  uint64(healthy),
+		Degraded: uint64(degraded),
 	}, true
 }
 
 func (h *dymNetworkFilterHandle) GetUpstreamHostAddress() (shared.UnsafeEnvoyBuffer, uint32, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
+	var address C.envoy_dynamic_module_type_envoy_buffer
 	var port C.uint32_t
-	ok := C.envoy_dynamic_module_callback_network_filter_get_upstream_host_address(h.hostFilterPtr, &buf, &port)
-	return addressOrEmpty(buf, port, ok)
+	ret := C.envoy_dynamic_module_callback_network_filter_get_upstream_host_address(
+		h.hostPluginPtr,
+		&address,
+		&port,
+	)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, 0, false
+	}
+	if address.ptr == nil || address.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, uint32(port), true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(address), uint32(port), true
 }
 
 func (h *dymNetworkFilterHandle) GetUpstreamHostHostname() (shared.UnsafeEnvoyBuffer, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
-	if !bool(C.envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(h.hostFilterPtr, &buf)) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
 		return shared.UnsafeEnvoyBuffer{}, false
 	}
-	return envoyBufferToUnsafeEnvoyBuffer(buf), true
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (h *dymNetworkFilterHandle) GetUpstreamHostCluster() (shared.UnsafeEnvoyBuffer, bool) {
-	var buf C.envoy_dynamic_module_type_envoy_buffer
-	if !bool(C.envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(h.hostFilterPtr, &buf)) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
 		return shared.UnsafeEnvoyBuffer{}, false
 	}
-	return envoyBufferToUnsafeEnvoyBuffer(buf), true
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
 func (h *dymNetworkFilterHandle) HasUpstreamHost() bool {
-	return bool(C.envoy_dynamic_module_callback_network_filter_has_upstream_host(h.hostFilterPtr))
+	return bool(C.envoy_dynamic_module_callback_network_filter_has_upstream_host(h.hostPluginPtr))
 }
 
 func (h *dymNetworkFilterHandle) StartUpstreamSecureTransport() bool {
-	return bool(C.envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(h.hostFilterPtr))
+	return bool(C.envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
+		h.hostPluginPtr,
+	))
 }
 
-// ---- scheduler / misc ----
+func (h *dymNetworkFilterHandle) GetConnectionState() shared.NetworkConnectionState {
+	return shared.NetworkConnectionState(
+		C.envoy_dynamic_module_callback_network_filter_get_connection_state(h.hostPluginPtr),
+	)
+}
+
+func (h *dymNetworkFilterHandle) ReadDisable(disable bool) shared.NetworkReadDisableStatus {
+	return shared.NetworkReadDisableStatus(
+		C.envoy_dynamic_module_callback_network_filter_read_disable(
+			h.hostPluginPtr,
+			C.bool(disable),
+		),
+	)
+}
+
+func (h *dymNetworkFilterHandle) ReadEnabled() bool {
+	return bool(C.envoy_dynamic_module_callback_network_filter_read_enabled(h.hostPluginPtr))
+}
+
+func (h *dymNetworkFilterHandle) IsHalfCloseEnabled() bool {
+	return bool(C.envoy_dynamic_module_callback_network_filter_is_half_close_enabled(
+		h.hostPluginPtr,
+	))
+}
+
+func (h *dymNetworkFilterHandle) EnableHalfClose(enabled bool) {
+	C.envoy_dynamic_module_callback_network_filter_enable_half_close(
+		h.hostPluginPtr,
+		C.bool(enabled),
+	)
+}
+
+func (h *dymNetworkFilterHandle) GetBufferLimit() uint32 {
+	return uint32(C.envoy_dynamic_module_callback_network_filter_get_buffer_limit(h.hostPluginPtr))
+}
+
+func (h *dymNetworkFilterHandle) SetBufferLimits(limit uint32) {
+	C.envoy_dynamic_module_callback_network_filter_set_buffer_limits(
+		h.hostPluginPtr,
+		C.uint32_t(limit),
+	)
+}
+
+func (h *dymNetworkFilterHandle) AboveHighWatermark() bool {
+	return bool(C.envoy_dynamic_module_callback_network_filter_above_high_watermark(
+		h.hostPluginPtr,
+	))
+}
 
 func (h *dymNetworkFilterHandle) GetScheduler() shared.Scheduler {
 	if h.scheduler == nil {
-		schedulerPtr := C.envoy_dynamic_module_callback_network_filter_scheduler_new(h.hostFilterPtr)
+		schedulerPtr := C.envoy_dynamic_module_callback_network_filter_scheduler_new(h.hostPluginPtr)
 		h.scheduler = newDymScheduler(
 			unsafe.Pointer(schedulerPtr),
-			func(p unsafe.Pointer, taskID C.uint64_t) {
+			func(schedulerPtr unsafe.Pointer, taskID C.uint64_t) {
 				C.envoy_dynamic_module_callback_network_filter_scheduler_commit(
-					(C.envoy_dynamic_module_type_network_filter_scheduler_module_ptr)(p),
+					C.envoy_dynamic_module_type_network_filter_scheduler_module_ptr(schedulerPtr),
 					taskID,
 				)
 			},
 		)
+
 		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
 			C.envoy_dynamic_module_callback_network_filter_scheduler_delete(
-				(C.envoy_dynamic_module_type_network_filter_scheduler_module_ptr)(s.schedulerPtr),
+				C.envoy_dynamic_module_type_network_filter_scheduler_module_ptr(s.schedulerPtr),
 			)
 		})
 	}
@@ -687,12 +897,78 @@ func (h *dymNetworkFilterHandle) GetScheduler() shared.Scheduler {
 }
 
 func (h *dymNetworkFilterHandle) GetWorkerIndex() uint32 {
-	return uint32(C.envoy_dynamic_module_callback_network_filter_get_worker_index(h.hostFilterPtr))
+	return uint32(C.envoy_dynamic_module_callback_network_filter_get_worker_index(h.hostPluginPtr))
 }
 
-// =============================================================================
-// Event hooks (//export entry points called by Envoy through cgo)
-// =============================================================================
+type dymNetworkConfigHandle struct {
+	hostConfigPtr C.envoy_dynamic_module_type_network_filter_config_envoy_ptr
+	scheduler     *dymScheduler
+}
+
+func (h *dymNetworkConfigHandle) Log(level shared.LogLevel, format string, args ...any) {
+	hostLog(level, format, args)
+}
+
+func (h *dymNetworkConfigHandle) DefineHistogram(name string) (shared.MetricID, shared.MetricsResult) {
+	var metricID C.size_t
+	result := C.envoy_dynamic_module_callback_network_filter_config_define_histogram(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+		&metricID,
+	)
+	runtime.KeepAlive(name)
+	return shared.MetricID(metricID), shared.MetricsResult(result)
+}
+
+func (h *dymNetworkConfigHandle) DefineGauge(name string) (shared.MetricID, shared.MetricsResult) {
+	var metricID C.size_t
+	result := C.envoy_dynamic_module_callback_network_filter_config_define_gauge(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+		&metricID,
+	)
+	runtime.KeepAlive(name)
+	return shared.MetricID(metricID), shared.MetricsResult(result)
+}
+
+func (h *dymNetworkConfigHandle) DefineCounter(name string) (shared.MetricID, shared.MetricsResult) {
+	var metricID C.size_t
+	result := C.envoy_dynamic_module_callback_network_filter_config_define_counter(
+		h.hostConfigPtr,
+		stringToModuleBuffer(name),
+		&metricID,
+	)
+	runtime.KeepAlive(name)
+	return shared.MetricID(metricID), shared.MetricsResult(result)
+}
+
+func (h *dymNetworkConfigHandle) GetScheduler() shared.Scheduler {
+	if h.scheduler == nil {
+		schedulerPtr := C.envoy_dynamic_module_callback_network_filter_config_scheduler_new(
+			h.hostConfigPtr,
+		)
+		h.scheduler = newDymScheduler(
+			unsafe.Pointer(schedulerPtr),
+			func(schedulerPtr unsafe.Pointer, taskID C.uint64_t) {
+				C.envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
+					C.envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr(
+						schedulerPtr,
+					),
+					taskID,
+				)
+			},
+		)
+
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
+			C.envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
+				C.envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr(
+					s.schedulerPtr,
+				),
+			)
+		})
+	}
+	return h.scheduler
+}
 
 //export envoy_dynamic_module_on_network_filter_config_new
 func envoy_dynamic_module_on_network_filter_config_new(
@@ -700,22 +976,26 @@ func envoy_dynamic_module_on_network_filter_config_new(
 	name C.envoy_dynamic_module_type_envoy_buffer,
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_network_filter_config_module_ptr {
-	nameStr := envoyBufferToStringUnsafe(name)
+	nameString := envoyBufferToStringUnsafe(name)
 	configBytes := envoyBufferToBytesCopy(config)
 
 	configHandle := &dymNetworkConfigHandle{hostConfigPtr: hostConfigPtr}
-	configFactory := sdk.GetNetworkFilterConfigFactory(nameStr)
-	if configFactory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load network filter configuration: no factory for %s", []any{nameStr})
+	factory, err := sdk.NewNetworkFilterFactory(configHandle, nameString, configBytes)
+	if err != nil {
+		configHandle.Log(shared.LogLevelWarn,
+			"Failed to load network filter configuration for %q: %v", nameString, err)
 		return nil
 	}
-	factory, err := configFactory.Create(configHandle, configBytes)
-	if err != nil || factory == nil {
-		hostLog(shared.LogLevelWarn, "Failed to load network filter configuration: %v", []any{err})
+	if factory == nil {
+		configHandle.Log(shared.LogLevelWarn,
+			"Failed to load network filter configuration for %q: network filter factory is nil", nameString)
 		return nil
 	}
-	wrapper := &networkFilterConfigWrapper{factory: factory, configHandle: configHandle}
-	configPtr := networkConfigManager.record(wrapper)
+
+	configPtr := networkConfigManager.record(&networkFilterConfigWrapper{
+		pluginFactory: factory,
+		configHandle:  configHandle,
+	})
 	return C.envoy_dynamic_module_type_network_filter_config_module_ptr(configPtr)
 }
 
@@ -723,107 +1003,125 @@ func envoy_dynamic_module_on_network_filter_config_new(
 func envoy_dynamic_module_on_network_filter_config_destroy(
 	configPtr C.envoy_dynamic_module_type_network_filter_config_module_ptr,
 ) {
-	wrapper := networkConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if wrapper == nil {
+	configWrapper := networkConfigManager.unwrap(unsafe.Pointer(configPtr))
+	if configWrapper == nil {
 		return
 	}
-	wrapper.configHandle.scheduler = nil
-	wrapper.factory.OnDestroy()
+	configWrapper.configHandle.scheduler = nil
+	configWrapper.pluginFactory.OnDestroy()
 	networkConfigManager.remove(unsafe.Pointer(configPtr))
 }
 
 //export envoy_dynamic_module_on_network_filter_new
 func envoy_dynamic_module_on_network_filter_new(
 	configPtr C.envoy_dynamic_module_type_network_filter_config_module_ptr,
-	hostFilterPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
+	hostPluginPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
 ) C.envoy_dynamic_module_type_network_filter_module_ptr {
-	cfg := networkConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if cfg == nil {
+	configWrapper := networkConfigManager.unwrap(unsafe.Pointer(configPtr))
+	if configWrapper == nil {
 		return nil
 	}
-	handle := &dymNetworkFilterHandle{hostFilterPtr: hostFilterPtr}
-	handle.plugin = cfg.factory.Create(handle)
-	if handle.plugin == nil {
+
+	filterWrapper := newDymNetworkFilterHandle(hostPluginPtr)
+	filterWrapper.plugin = configWrapper.pluginFactory.Create(filterWrapper)
+	if filterWrapper.plugin == nil {
 		return nil
 	}
-	filterPtr := networkFilterManager.record(handle)
+
+	filterPtr := networkPluginManager.record(filterWrapper)
 	return C.envoy_dynamic_module_type_network_filter_module_ptr(filterPtr)
 }
 
 //export envoy_dynamic_module_on_network_filter_new_connection
 func envoy_dynamic_module_on_network_filter_new_connection(
-	_ C.envoy_dynamic_module_type_network_filter_envoy_ptr,
+	filterEnvoyPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
 	filterPtr C.envoy_dynamic_module_type_network_filter_module_ptr,
 ) C.envoy_dynamic_module_type_on_network_filter_data_status {
-	h := networkFilterManager.unwrap(unsafe.Pointer(filterPtr))
-	if h == nil || h.plugin == nil || h.destroyed {
-		return 0
+	_ = filterEnvoyPtr
+	filterWrapper := networkPluginManager.unwrap(unsafe.Pointer(filterPtr))
+	if filterWrapper == nil || filterWrapper.plugin == nil || filterWrapper.filterDestroyed {
+		return C.envoy_dynamic_module_type_on_network_filter_data_status(
+			shared.NetworkFilterStatusContinue,
+		)
 	}
-	return C.envoy_dynamic_module_type_on_network_filter_data_status(h.plugin.OnNewConnection(h))
+	return C.envoy_dynamic_module_type_on_network_filter_data_status(
+		filterWrapper.plugin.OnNewConnection(),
+	)
 }
 
 //export envoy_dynamic_module_on_network_filter_read
 func envoy_dynamic_module_on_network_filter_read(
-	_ C.envoy_dynamic_module_type_network_filter_envoy_ptr,
+	filterEnvoyPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
 	filterPtr C.envoy_dynamic_module_type_network_filter_module_ptr,
 	dataLength C.size_t,
 	endStream C.bool,
 ) C.envoy_dynamic_module_type_on_network_filter_data_status {
-	h := networkFilterManager.unwrap(unsafe.Pointer(filterPtr))
-	if h == nil || h.plugin == nil || h.destroyed {
-		return 0
+	_ = filterEnvoyPtr
+	_ = dataLength
+	filterWrapper := networkPluginManager.unwrap(unsafe.Pointer(filterPtr))
+	if filterWrapper == nil || filterWrapper.plugin == nil || filterWrapper.filterDestroyed {
+		return C.envoy_dynamic_module_type_on_network_filter_data_status(
+			shared.NetworkFilterStatusContinue,
+		)
 	}
 	return C.envoy_dynamic_module_type_on_network_filter_data_status(
-		h.plugin.OnRead(h, uint64(dataLength), bool(endStream)))
+		filterWrapper.plugin.OnRead(&filterWrapper.readBuffer, bool(endStream)),
+	)
 }
 
 //export envoy_dynamic_module_on_network_filter_write
 func envoy_dynamic_module_on_network_filter_write(
-	_ C.envoy_dynamic_module_type_network_filter_envoy_ptr,
+	filterEnvoyPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
 	filterPtr C.envoy_dynamic_module_type_network_filter_module_ptr,
 	dataLength C.size_t,
 	endStream C.bool,
 ) C.envoy_dynamic_module_type_on_network_filter_data_status {
-	h := networkFilterManager.unwrap(unsafe.Pointer(filterPtr))
-	if h == nil || h.plugin == nil || h.destroyed {
-		return 0
+	_ = filterEnvoyPtr
+	_ = dataLength
+	filterWrapper := networkPluginManager.unwrap(unsafe.Pointer(filterPtr))
+	if filterWrapper == nil || filterWrapper.plugin == nil || filterWrapper.filterDestroyed {
+		return C.envoy_dynamic_module_type_on_network_filter_data_status(
+			shared.NetworkFilterStatusContinue,
+		)
 	}
 	return C.envoy_dynamic_module_type_on_network_filter_data_status(
-		h.plugin.OnWrite(h, uint64(dataLength), bool(endStream)))
+		filterWrapper.plugin.OnWrite(&filterWrapper.writeBuffer, bool(endStream)),
+	)
 }
 
 //export envoy_dynamic_module_on_network_filter_event
 func envoy_dynamic_module_on_network_filter_event(
-	_ C.envoy_dynamic_module_type_network_filter_envoy_ptr,
+	filterEnvoyPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
 	filterPtr C.envoy_dynamic_module_type_network_filter_module_ptr,
 	event C.envoy_dynamic_module_type_network_connection_event,
 ) {
-	h := networkFilterManager.unwrap(unsafe.Pointer(filterPtr))
-	if h == nil || h.plugin == nil || h.destroyed {
+	_ = filterEnvoyPtr
+	filterWrapper := networkPluginManager.unwrap(unsafe.Pointer(filterPtr))
+	if filterWrapper == nil || filterWrapper.plugin == nil || filterWrapper.filterDestroyed {
 		return
 	}
-	h.plugin.OnEvent(h, shared.NetworkConnectionEvent(event))
+	filterWrapper.plugin.OnEvent(shared.NetworkConnectionEvent(event))
 }
 
 //export envoy_dynamic_module_on_network_filter_destroy
 func envoy_dynamic_module_on_network_filter_destroy(
 	filterPtr C.envoy_dynamic_module_type_network_filter_module_ptr,
 ) {
-	h := networkFilterManager.unwrap(unsafe.Pointer(filterPtr))
-	if h == nil || h.destroyed {
+	filterWrapper := networkPluginManager.unwrap(unsafe.Pointer(filterPtr))
+	if filterWrapper == nil || filterWrapper.filterDestroyed {
 		return
 	}
-	h.destroyed = true
-	if h.plugin != nil {
-		h.plugin.OnDestroy()
+	filterWrapper.filterDestroyed = true
+	filterWrapper.scheduler = nil
+	if filterWrapper.plugin != nil {
+		filterWrapper.plugin.OnDestroy()
 	}
-	h.scheduler = nil
-	networkFilterManager.remove(unsafe.Pointer(filterPtr))
+	networkPluginManager.remove(unsafe.Pointer(filterPtr))
 }
 
 //export envoy_dynamic_module_on_network_filter_http_callout_done
 func envoy_dynamic_module_on_network_filter_http_callout_done(
-	_ C.envoy_dynamic_module_type_network_filter_envoy_ptr,
+	filterEnvoyPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
 	filterPtr C.envoy_dynamic_module_type_network_filter_module_ptr,
 	calloutID C.uint64_t,
 	result C.envoy_dynamic_module_type_http_callout_result,
@@ -832,17 +1130,21 @@ func envoy_dynamic_module_on_network_filter_http_callout_done(
 	chunks *C.envoy_dynamic_module_type_envoy_buffer,
 	chunksSize C.size_t,
 ) {
-	h := networkFilterManager.unwrap(unsafe.Pointer(filterPtr))
-	if h == nil || h.destroyed {
+	_ = filterEnvoyPtr
+	filterWrapper := networkPluginManager.unwrap(unsafe.Pointer(filterPtr))
+	if filterWrapper == nil || filterWrapper.filterDestroyed {
 		return
 	}
+
 	resultHeaders := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(headers, int(headersSize)))
 	resultChunks := envoyBufferSliceToUnsafeEnvoyBufferSlice(unsafe.Slice(chunks, int(chunksSize)))
 
-	h.calloutMu.Lock()
-	cb := h.calloutCallbacks[uint64(calloutID)]
-	delete(h.calloutCallbacks, uint64(calloutID))
-	h.calloutMu.Unlock()
+	filterWrapper.calloutMu.Lock()
+	cb := filterWrapper.calloutCallbacks[uint64(calloutID)]
+	if cb != nil {
+		delete(filterWrapper.calloutCallbacks, uint64(calloutID))
+	}
+	filterWrapper.calloutMu.Unlock()
 	if cb != nil {
 		cb.OnHttpCalloutDone(uint64(calloutID), shared.HttpCalloutResult(result), resultHeaders, resultChunks)
 	}
@@ -850,49 +1152,52 @@ func envoy_dynamic_module_on_network_filter_http_callout_done(
 
 //export envoy_dynamic_module_on_network_filter_scheduled
 func envoy_dynamic_module_on_network_filter_scheduled(
-	_ C.envoy_dynamic_module_type_network_filter_envoy_ptr,
+	filterEnvoyPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
 	filterPtr C.envoy_dynamic_module_type_network_filter_module_ptr,
-	eventID C.uint64_t,
+	taskID C.uint64_t,
 ) {
-	h := networkFilterManager.unwrap(unsafe.Pointer(filterPtr))
-	if h == nil || h.destroyed || h.scheduler == nil {
+	_ = filterEnvoyPtr
+	filterWrapper := networkPluginManager.unwrap(unsafe.Pointer(filterPtr))
+	if filterWrapper == nil || filterWrapper.scheduler == nil || filterWrapper.filterDestroyed {
 		return
 	}
-	h.scheduler.onScheduled(uint64(eventID))
+	filterWrapper.scheduler.onScheduled(uint64(taskID))
 }
 
 //export envoy_dynamic_module_on_network_filter_config_scheduled
 func envoy_dynamic_module_on_network_filter_config_scheduled(
 	configPtr C.envoy_dynamic_module_type_network_filter_config_module_ptr,
-	eventID C.uint64_t,
+	taskID C.uint64_t,
 ) {
-	cfg := networkConfigManager.unwrap(unsafe.Pointer(configPtr))
-	if cfg == nil || cfg.configHandle == nil || cfg.configHandle.scheduler == nil {
+	configWrapper := networkConfigManager.unwrap(unsafe.Pointer(configPtr))
+	if configWrapper == nil || configWrapper.configHandle == nil || configWrapper.configHandle.scheduler == nil {
 		return
 	}
-	cfg.configHandle.scheduler.onScheduled(uint64(eventID))
+	configWrapper.configHandle.scheduler.onScheduled(uint64(taskID))
 }
 
 //export envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark
 func envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark(
-	_ C.envoy_dynamic_module_type_network_filter_envoy_ptr,
+	filterEnvoyPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
 	filterPtr C.envoy_dynamic_module_type_network_filter_module_ptr,
 ) {
-	h := networkFilterManager.unwrap(unsafe.Pointer(filterPtr))
-	if h == nil || h.plugin == nil || h.destroyed {
+	_ = filterEnvoyPtr
+	filterWrapper := networkPluginManager.unwrap(unsafe.Pointer(filterPtr))
+	if filterWrapper == nil || filterWrapper.plugin == nil || filterWrapper.filterDestroyed {
 		return
 	}
-	h.plugin.OnAboveWriteBufferHighWatermark(h)
+	filterWrapper.plugin.OnAboveWriteBufferHighWatermark()
 }
 
 //export envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark
 func envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark(
-	_ C.envoy_dynamic_module_type_network_filter_envoy_ptr,
+	filterEnvoyPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr,
 	filterPtr C.envoy_dynamic_module_type_network_filter_module_ptr,
 ) {
-	h := networkFilterManager.unwrap(unsafe.Pointer(filterPtr))
-	if h == nil || h.plugin == nil || h.destroyed {
+	_ = filterEnvoyPtr
+	filterWrapper := networkPluginManager.unwrap(unsafe.Pointer(filterPtr))
+	if filterWrapper == nil || filterWrapper.plugin == nil || filterWrapper.filterDestroyed {
 		return
 	}
-	h.plugin.OnBelowWriteBufferLowWatermark(h)
+	filterWrapper.plugin.OnBelowWriteBufferLowWatermark()
 }
