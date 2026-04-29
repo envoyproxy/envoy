@@ -5,7 +5,6 @@
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
-#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 

@@ -174,10 +174,8 @@ envoy_cc_test_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -350,7 +348,6 @@ envoy_cc_test_library(
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/common/wasm:wasm_lib",
-        "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",

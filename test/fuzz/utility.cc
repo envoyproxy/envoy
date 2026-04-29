@@ -1,7 +1,5 @@
 #include "test/fuzz/utility.h"
 
-#include "source/common/common/logger.h"
-
 #include "absl/strings/str_format.h"
 
 namespace Envoy {
