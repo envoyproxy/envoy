@@ -125,6 +125,13 @@ envoy.stat_sinks.kafka:
   status: alpha
   type_urls:
   - envoy.extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig
+envoy.stat_sinks.wasm_filter:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig
 envoy.tap_sinks.udp_sink:
   categories:
   - envoy.filters.http

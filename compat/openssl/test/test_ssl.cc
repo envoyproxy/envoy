@@ -642,6 +642,7 @@ TEST_P(SSLTestWithCurves, test_SSL_get_curve_id) {
     ASSERT_TRUE(SSL_connect(ssl.get()) > 0) << (ERR_print_errors_fp(stderr), "");
 
     ASSERT_EQ(curves.expected_curve, SSL_get_curve_id(ssl.get()));
+    ASSERT_EQ(curves.expected_curve, SSL_get_group_id(ssl.get()));
 
     char buf[sizeof(MESSAGE)];
     ASSERT_EQ(sizeof(MESSAGE), SSL_write(ssl.get(), MESSAGE, sizeof(MESSAGE)));
@@ -666,6 +667,15 @@ TEST(SSLTest, test_SSL_get_curve_name) {
   EXPECT_STREQ("X25519", SSL_get_curve_name(SSL_CURVE_X25519));
   EXPECT_STREQ("X25519MLKEM768", SSL_get_curve_name(SSL_GROUP_X25519_MLKEM768));
   EXPECT_STREQ("X25519Kyber768Draft00", SSL_get_curve_name(SSL_GROUP_X25519_KYBER768_DRAFT00));
+}
+
+TEST(SSLTest, test_SSL_get_group_name) {
+  EXPECT_STREQ("P-256", SSL_get_group_name(SSL_CURVE_SECP256R1));
+  EXPECT_STREQ("P-384", SSL_get_group_name(SSL_CURVE_SECP384R1));
+  EXPECT_STREQ("P-521", SSL_get_group_name(SSL_CURVE_SECP521R1));
+  EXPECT_STREQ("X25519", SSL_get_group_name(SSL_CURVE_X25519));
+  EXPECT_STREQ("X25519MLKEM768", SSL_get_group_name(SSL_GROUP_X25519_MLKEM768));
+  EXPECT_STREQ("X25519Kyber768Draft00", SSL_get_group_name(SSL_GROUP_X25519_KYBER768_DRAFT00));
 }
 
 struct Sigalgs {
@@ -2037,6 +2047,23 @@ TEST(SSLTest, test_SSL_get_all_curve_names) {
   for (size_t i = 0; i < (size2 - 1); i++) {
     ASSERT_NE(names2.get()[i], nullptr);
     ASSERT_GT(strlen(names2.get()[i]), 0);
+  }
+}
+
+TEST(SSLTest, test_SSL_get_all_group_names) {
+  size_t curve_size = SSL_get_all_curve_names(nullptr, 0);
+  size_t group_size = SSL_get_all_group_names(nullptr, 0);
+  ASSERT_EQ(group_size, curve_size);
+  ASSERT_GT(group_size, 0);
+
+  std::unique_ptr<const char*[]> curve_names(new const char*[curve_size]);
+  std::unique_ptr<const char*[]> group_names(new const char*[group_size]);
+
+  SSL_get_all_curve_names(curve_names.get(), curve_size);
+  SSL_get_all_group_names(group_names.get(), group_size);
+
+  for (size_t i = 0; i < group_size; i++) {
+    ASSERT_STREQ(curve_names.get()[i], group_names.get()[i]);
   }
 }
 

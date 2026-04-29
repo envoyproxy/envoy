@@ -28,6 +28,7 @@ func init() {
 		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
 		"stats_callbacks":              &StatsCallbacksConfigFactory{},
 		"streaming_terminal_filter":    &StreamingTerminalConfigFactory{},
+		"buffer_limit_filter":          &BufferLimitConfigFactory{},
 		"http_stream_basic":            &HttpStreamBasicConfigFactory{},
 		"http_stream_bidirectional":    &HttpStreamBidirectionalConfigFactory{},
 		"upstream_reset":               &UpstreamResetConfigFactory{},
@@ -963,6 +964,61 @@ func (p *StreamingTerminalFilter) OnBelowWriteBufferLowWatermark() {
 func (p *StreamingTerminalFilter) OnStreamComplete() {
 	// Force the GC to release the scheduler and related C resources.
 	runtime.GC()
+}
+
+// -----------------------------------------------------------------------------
+// BufferLimit
+// -----------------------------------------------------------------------------
+
+type BufferLimitConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *BufferLimitConfigFactory) Create(h shared.HttpFilterConfigHandle, c []byte) (shared.HttpFilterFactory, error) {
+	return &BufferLimitFilterFactory{}, nil
+}
+
+type BufferLimitFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *BufferLimitFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	p := &BufferLimitFilter{handle: h}
+	h.SetDownstreamWatermarkCallbacks(p)
+	return p
+}
+
+type BufferLimitFilter struct {
+	shared.EmptyHttpFilter
+	handle             shared.HttpFilterHandle
+	initialBufferLimit uint64
+	aboveW             int
+	belowW             int
+}
+
+func (p *BufferLimitFilter) OnRequestHeaders(headers shared.HeaderMap, endOfStream bool) shared.HeadersStatus {
+	p.initialBufferLimit = p.handle.GetBufferLimit()
+	const desiredLimit uint64 = 65536
+	if p.initialBufferLimit < desiredLimit {
+		p.handle.SetBufferLimit(desiredLimit)
+	}
+	return shared.HeadersStatusContinue
+}
+
+func (p *BufferLimitFilter) OnResponseHeaders(headers shared.HeaderMap, endOfStream bool) shared.HeadersStatus {
+	headers.Set("x-initial-buffer-limit", strconv.FormatUint(p.initialBufferLimit, 10))
+	headers.Set("x-current-buffer-limit", strconv.FormatUint(p.handle.GetBufferLimit(), 10))
+	headers.Set("x-above-watermark-count", strconv.Itoa(p.aboveW))
+	headers.Set("x-below-watermark-count", strconv.Itoa(p.belowW))
+	return shared.HeadersStatusContinue
+}
+
+func (p *BufferLimitFilter) OnAboveWriteBufferHighWatermark() {
+	p.aboveW++
+}
+
+func (p *BufferLimitFilter) OnBelowWriteBufferLowWatermark() {
+	p.belowW++
 }
 
 // -----------------------------------------------------------------------------
