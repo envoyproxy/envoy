@@ -335,12 +335,20 @@ absl::StatusOr<std::string> ExtractStringFieldValue(
                          CodedInputStream* input_stream) -> absl::StatusOr<std::string> {
     if (field->kind() != Field::TYPE_STRING) {
       return absl::InvalidArgumentError(
-          absl::Substitute("Field '$0' is not a singular string field.", field->name()));
+          absl::Substitute("Field '$0' is not a string field.", field->name()));
     } else if (field->cardinality() == Field::CARDINALITY_REPEATED) {
-      return absl::InvalidArgumentError(
-          absl::Substitute("Field '$0' is a repeated string field, only singular "
-                           "string field is accepted.",
-                           field->name()));
+      std::string result;
+      uint32_t tag = 0;
+      while ((tag = input_stream->ReadTag()) != 0) {
+        if (field->number() == WireFormatLite::GetTagFieldNumber(tag)) {
+          uint32_t length;
+          input_stream->ReadVarint32(&length);
+          input_stream->ReadString(&result, length);
+        } else {
+          WireFormatLite::SkipField(input_stream, tag);
+        }
+      }
+      return result;
     } else { // singular string field
       std::string result;
       if (FieldExtractor::SearchField(*field, input_stream)) {
