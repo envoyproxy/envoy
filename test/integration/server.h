@@ -169,6 +169,11 @@ public:
   Store& store() override { return store_; }
   const Store& constStore() const override { return store_; }
 
+  void setCleanupCallback(std::function<void()> callback) override {
+    Thread::LockGuard lock(lock_);
+    wrapped_scope_->setCleanupCallback(callback);
+  }
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopeSharedPtr wrapped_scope_;

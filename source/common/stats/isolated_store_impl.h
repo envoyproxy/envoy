@@ -316,7 +316,16 @@ public:
                     StatsMatcherSharedPtr matcher = nullptr)
       : prefix_(prefix, store.symbolTable()), store_(store), scope_matcher_(std::move(matcher)) {}
 
-  ~IsolatedScopeImpl() override { prefix_.free(store_.symbolTable()); }
+  ~IsolatedScopeImpl() override {
+    if (cleanup_callback_) {
+      cleanup_callback_();
+    }
+    prefix_.free(store_.symbolTable());
+  }
+
+  void setCleanupCallback(std::function<void()> callback) override {
+    cleanup_callback_ = std::move(callback);
+  }
 
   // Stats::Scope
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
@@ -431,6 +440,7 @@ protected:
   StatNameStorage prefix_;
   IsolatedStoreImpl& store_;
   StatsMatcherSharedPtr scope_matcher_;
+  std::function<void()> cleanup_callback_;
 };
 
 } // namespace Stats
