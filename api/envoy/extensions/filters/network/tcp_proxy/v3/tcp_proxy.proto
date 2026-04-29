@@ -83,17 +83,17 @@ enum ProxyProtocolTlvMergePolicy {
 // [#next-free-field: 25]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
-  "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
+      "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
 
   // Allows specification of multiple upstream clusters along with weights indicating the percentage of
   // traffic forwarded to each cluster. The cluster selection is based on these weights.
   message WeightedCluster {
     option (udpa.annotations.versioning).previous_message_type =
-    "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster";
+        "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster";
 
     message ClusterWeight {
       option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight";
+          "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight";
 
       // Name of the upstream cluster.
       string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -122,7 +122,7 @@ message TcpProxy {
   // [#next-free-field: 10]
   message TunnelingConfig {
     option (udpa.annotations.versioning).previous_message_type =
-    "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
+        "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
 
     // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
     // This field evaluates command operators if present; otherwise, the value is used as-is.
@@ -154,7 +154,7 @@ message TcpProxy {
     //
     // Neither ``:``-prefixed pseudo-headers like ``:path`` nor the ``host`` header can be overridden.
     repeated config.core.v3.HeaderValueOption headers_to_add = 3
-    [(validate.rules).repeated = {max_items: 1000}];
+        [(validate.rules).repeated = {max_items: 1000}];
 
     // Save response headers to the downstream connection's filter state for consumption
     // by network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_headers``.
@@ -225,7 +225,7 @@ message TcpProxy {
     // specified interval.
     // The interval must be at least 1ms.
     google.protobuf.Duration access_log_flush_interval = 1
-    [(validate.rules).duration = {gte {nanos: 1000000}}];
+        [(validate.rules).duration = {gte {nanos: 1000000}}];
 
     // If set to ``true``, the access log is flushed when the TCP proxy successfully establishes a
     // connection with the upstream. If the connection fails, the access log is not flushed.
@@ -312,7 +312,7 @@ message TcpProxy {
   // established. If not set, there is no maximum duration. When ``max_downstream_connection_duration`` is
   // reached, the connection is closed. The duration must be at least ``1ms``.
   google.protobuf.Duration max_downstream_connection_duration = 13
-  [(validate.rules).duration = {gte {nanos: 1000000}}];
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // Percentage-based jitter for ``max_downstream_connection_duration``. The jitter increases the
   // ``max_downstream_connection_duration`` by a random duration up to the provided percentage.
@@ -343,7 +343,7 @@ message TcpProxy {
   //   :ref:`flush_access_log_on_connected
   //   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
   bool flush_access_log_on_connected = 16
-  [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional access log options for the TCP proxy.
   TcpAccessLogOptions access_log_options = 17;
@@ -363,7 +363,7 @@ message TcpProxy {
   // :ref:`ProxyProtocolTlvMergePolicy
   // <envoy_v3_api_enum_extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy>`.
   ProxyProtocolTlvMergePolicy proxy_protocol_tlv_merge_policy = 23
-  [(validate.rules).enum = {defined_only: true}];
+      [(validate.rules).enum = {defined_only: true}];
 
   // Specifies when to establish the upstream connection.
   //
