@@ -307,6 +307,73 @@ TEST_F(XdstpOdCdsApiImplTest, MultipleSubscriptions) {
   callbacks2->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
 }
 
+// Tests that onDiscoveryTerminated(Timeout) evicts the singleton subscription
+// so that a subsequent updateOnDemand for the same resource creates a fresh
+// subscription. This is the regression test for the 1.38 OdCDS-over-ADS bug
+// where a timed-out discovery permanently poisoned future requests.
+TEST_F(XdstpOdCdsApiImplTest, OnDiscoveryTerminatedTimeoutEvictsAndAllowsResubscribe) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+
+  // While the subscription is registered, a second updateOnDemand for the same
+  // resource is short-circuited (no new subscription is created).
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _)).Times(0);
+  odcds_->updateOnDemand(cluster_name);
+
+  // Simulate the cluster manager telling ODCDS that the discovery timed out.
+  odcds_->onDiscoveryTerminated(cluster_name, ClusterDiscoveryStatus::Timeout);
+
+  // The subscription has been evicted, so a subsequent updateOnDemand for the
+  // same resource must create a fresh subscription.
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+}
+
+// Tests that onDiscoveryTerminated(Missing) evicts the singleton subscription.
+TEST_F(XdstpOdCdsApiImplTest, OnDiscoveryTerminatedMissingEvictsAndAllowsResubscribe) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+
+  odcds_->onDiscoveryTerminated(cluster_name, ClusterDiscoveryStatus::Missing);
+
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+}
+
+// Tests that onDiscoveryTerminated(Available) does NOT evict the singleton
+// subscription. The singleton-subscription design intentionally retains the
+// subscription so the control plane can subsequently signal removal of the
+// resource.
+TEST_F(XdstpOdCdsApiImplTest, OnDiscoveryTerminatedAvailableDoesNotEvict) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+
+  odcds_->onDiscoveryTerminated(cluster_name, ClusterDiscoveryStatus::Available);
+
+  // The subscription is retained, so a subsequent updateOnDemand for the
+  // same resource must NOT create a new subscription.
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _)).Times(0);
+  odcds_->updateOnDemand(cluster_name);
+}
+
+// Tests that onDiscoveryTerminated for an unknown resource is a harmless no-op.
+TEST_F(XdstpOdCdsApiImplTest, OnDiscoveryTerminatedUnknownResourceIsNoOp) {
+  // No subscriptions registered.
+  odcds_->onDiscoveryTerminated("unknown_cluster", ClusterDiscoveryStatus::Timeout);
+  // A subsequent subscribe still works normally.
+  expectSingletonSubscription("fake_cluster");
+  odcds_->updateOnDemand("fake_cluster");
+}
+
 // Tests cluster removal via a delta update.
 TEST_F(XdstpOdCdsApiImplTest, ClusterRemovalViaDeltaUpdate) {
   InSequence s;

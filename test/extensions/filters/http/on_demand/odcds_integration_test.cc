@@ -856,6 +856,72 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryTimesOut) {
 // tests a scenario when:
 //  - making a request to an unknown cluster
 //  - odcds initiates a connection with a request for the cluster
+//  - waiting for response times out (first request fails with 503)
+//  - making a second request to the same unknown cluster
+//  - odcds re-issues a discovery request for the cluster (the singleton
+//    subscription must have been evicted on timeout)
+//  - a response contains the cluster
+//  - the second request is resumed and succeeds with 200
+//
+// Regression test for the 1.38 OdCDS-over-ADS bug where
+// XdstpOdcdsSubscriptionsManager::subscriptions_ was never evicted on
+// terminal failures, so any cluster that timed out once would time out
+// forever (every subsequent attempt was short-circuited by the
+// "already subscribed to, skipping" early-return in addSubscription).
+TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryTimesOutThenRetrySucceeds) {
+  // The bug only exists in the new XdstpOdCdsApiImpl path.
+  if (!odcds_over_ads_fix_enabled()) {
+    GTEST_SKIP() << "This test only exercises the XdstpOdCdsApiImpl singleton-subscription path";
+  }
+
+  initialize();
+  doInitialCommunications();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+
+  // First request: discovery is requested, no response is sent, request times
+  // out and gets a 503.
+  IntegrationStreamDecoderPtr response1 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {}));
+  ASSERT_TRUE(response1->waitForEndStream());
+  verifyResponse(std::move(response1), "503", {}, {});
+
+  // On terminal Timeout, the cluster manager evicts the singleton subscription
+  // for "new_cluster" (regression fix for the 1.38 OdCDS-over-ADS bug). This
+  // causes the per-resource subscription to be torn down, which sends an
+  // unsubscribe for "new_cluster" on the ADS stream.
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {"new_cluster"}));
+
+  // Second request to the same unknown cluster: the cluster manager must
+  // forward the request to ODCDS again and a fresh delta-CDS subscribe must
+  // be issued for "new_cluster". Without the eviction fix, the subscription
+  // map still contains the entry from the first attempt, addSubscription
+  // short-circuits, no DiscoveryRequest is sent, and the test times out
+  // here.
+  IntegrationStreamDecoderPtr response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {}));
+
+  // Now the control plane responds with the cluster.
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "3");
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {}));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  verifyResponse(std::move(response2), "200", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when:
+//  - making a request to an unknown cluster
+//  - odcds initiates a connection with a request for the cluster
 //  - a response says that there is no such cluster
 //  - request is resumed
 TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentCluster) {
@@ -872,7 +938,17 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentCluste
   EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {}));
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {}, {"new_cluster"}, "3");
+  // ACK of the response from Envoy.
   EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {}));
+  if (odcds_over_ads_fix_enabled()) {
+    // The XdstpOdCdsApiImpl singleton-subscription is evicted (post-dispatched)
+    // on terminal Missing status, which destroys the per-resource subscription
+    // and emits an unsubscribe for "new_cluster" on the ADS stream. This
+    // eviction is required so a subsequent on-demand request for the same
+    // cluster can re-subscribe rather than being silently short-circuited by
+    // the "already subscribed to, skipping" early-return in addSubscription.
+    EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {"new_cluster"}));
+  }
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
@@ -1840,10 +1916,19 @@ TEST_P(OdCdsXdstpIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentClus
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
                                                              {}, {cluster_name}, "1", {},
                                                              authority1_xds_stream_.get());
-  // Expect a CDS ACK from authority1.
+  // ACK of the response from Envoy on the authority1 stream.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {cluster_name}, {},
                                       {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       authority1_xds_stream_.get()));
+  // The XdstpOdCdsApiImpl singleton-subscription is evicted (post-dispatched)
+  // on terminal Missing status, which destroys the per-resource subscription
+  // and emits a follow-up unsubscribe on the authority1 stream. This eviction
+  // is required so a subsequent on-demand request for the same resource can
+  // re-subscribe rather than being silently short-circuited by the
+  // "already subscribed to, skipping" early-return in addSubscription.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {},
+                                      {cluster_name}, false, Grpc::Status::WellKnownGrpcStatus::Ok,
+                                      "", authority1_xds_stream_.get()));
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});

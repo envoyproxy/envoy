@@ -24,6 +24,20 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: upstream
+  change: |
+    Fixed a regression introduced in 1.38.0 (#41174) where on-demand cluster discovery (OD-CDS)
+    over an ADS config source (``odcds.source: { ads: {} }``) would silently fail forever after
+    the first request to a not-yet-discovered cluster timed out. ``XdstpOdCdsApiImpl``'s
+    singleton subscription map was never evicted on terminal Timeout/Missing statuses, so every
+    subsequent on-demand request for the same cluster was short-circuited at ``addSubscription``
+    with "already subscribed to, skipping" and returned ``503 NC cluster_not_found`` after the
+    discovery timeout. The cluster manager now notifies the OD-CDS implementation on terminal
+    failures and ``XdstpOdCdsApiImpl`` evicts the per-resource subscription so the next request
+    re-issues a fresh discovery. The eviction is post-dispatched to avoid destroying the
+    subscription synchronously from inside its own callback. This behavior can be reverted by
+    setting the runtime guard
+    ``envoy.reloadable_features.odcds_evict_subscription_on_terminal_status`` to ``false``.
 - area: load_report
   change: |
     Fixed a bug in load stats reporting where reports were dropped if only custom metrics or completed

@@ -218,6 +218,16 @@ public:
   // Subscribe to a cluster with a given name. It's meant to eventually send a discovery request
   // with the cluster name to the management server.
   virtual void updateOnDemand(std::string cluster_name) PURE;
+
+  // Notifies the ODCDS implementation that an on-demand cluster discovery for the
+  // given resource has reached a terminal state. Implementations that maintain
+  // per-resource subscription state (e.g. XdstpOdCdsApiImpl's singleton-subscription
+  // map) can use this hook to evict that state on terminal failures (Timeout / Missing)
+  // so that subsequent on-demand requests for the same resource are not silently
+  // short-circuited. The default implementation is a no-op for backwards compatibility
+  // with implementations that do not need eviction (e.g. the legacy OdCdsApiImpl).
+  virtual void onDiscoveryTerminated(absl::string_view /*resource_name*/,
+                                     ClusterDiscoveryStatus /*status*/) {}
 };
 
 using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;

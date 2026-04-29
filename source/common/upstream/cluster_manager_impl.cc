@@ -1667,6 +1667,30 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
     // notifies the cluster manager about it.
     return;
   }
+  // Let the on-demand CDS implementation drop any per-resource singleton-subscription
+  // bookkeeping it may hold for terminal failures (Timeout / Missing). Without this,
+  // implementations like XdstpOdCdsApiImpl keep the entry in their subscriptions_
+  // map forever and every subsequent on-demand request for the same cluster is
+  // silently short-circuited with "already subscribed to, skipping" and times out
+  // again. The default OdCdsApi::onDiscoveryTerminated is a no-op, so the legacy
+  // OdCdsApiImpl path is unaffected. This behaviour can be reverted by setting the
+  // runtime guard envoy.reloadable_features.odcds_evict_subscription_on_terminal_status
+  // to false.
+  //
+  // The eviction is deferred to a dispatcher post to avoid destroying the subscription
+  // synchronously from inside one of its own callbacks (notifyMissingCluster is invoked
+  // synchronously from PerSubscriptionData::onConfigUpdate, which would otherwise lead
+  // to a use-after-free when the subscription tears down its own state).
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.odcds_evict_subscription_on_terminal_status")) {
+    if (auto& odcds = map_node_handle.mapped().odcds_; odcds != nullptr) {
+      // Capture odcds and the resource name by value into the posted closure so the
+      // ODCDS implementation outlives the callback that triggered this notification.
+      dispatcher_.post([odcds, name = std::string(name), status]() {
+        odcds->onDiscoveryTerminated(name, status);
+      });
+    }
+  }
   // Let all the worker threads know that the discovery timed out.
   tls_.runOnAllThreads(
       [name = std::string(name), status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {

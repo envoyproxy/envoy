@@ -169,6 +169,19 @@ public:
     notifier_.notifyMissingCluster(resource_name);
   }
 
+  // Evicts the singleton-subscription bookkeeping for a resource. Used on
+  // terminal failures (Timeout / Missing) so that subsequent on-demand
+  // discovery requests for the same resource are not silently short-circuited
+  // by addSubscription's "already subscribed" early-return. The control-plane
+  // side resources (the actual xDS subscription) are torn down via the
+  // PerSubscriptionData destructor when the entry is erased from the map.
+  void removeSubscription(absl::string_view resource_name) {
+    auto erased = subscriptions_.erase(resource_name);
+    if (erased > 0) {
+      ENVOY_LOG(debug, "ODCDS-manager: evicting subscription for resource {}", resource_name);
+    }
+  }
+
   void addSubscription(absl::string_view resource_name, bool old_ads) {
     if (subscriptions_.contains(resource_name)) {
       ENVOY_LOG(debug, "ODCDS-manager: resource {} is already subscribed to, skipping",
@@ -351,6 +364,18 @@ XdstpOdCdsApiImpl::subscriptionsManager(Server::Configuration::ServerFactoryCont
 
 void XdstpOdCdsApiImpl::updateOnDemand(std::string cluster_name) {
   subscriptions_manager_->addSubscription(cluster_name, old_ads_);
+}
+
+void XdstpOdCdsApiImpl::onDiscoveryTerminated(absl::string_view resource_name,
+                                              ClusterDiscoveryStatus status) {
+  // Only evict the singleton-subscription bookkeeping on terminal failures.
+  // For Available the singleton subscription is intentionally retained so
+  // that subsequent control-plane removals of the resource can still notify
+  // the cluster manager (the design introduced by the per-cluster-singleton
+  // OD-CDS rework).
+  if (status == ClusterDiscoveryStatus::Timeout || status == ClusterDiscoveryStatus::Missing) {
+    subscriptions_manager_->removeSubscription(resource_name);
+  }
 }
 } // namespace Upstream
 } // namespace Envoy

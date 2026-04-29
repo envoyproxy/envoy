@@ -85,6 +85,8 @@ public:
 
   // Upstream::OdCdsApi
   void updateOnDemand(std::string cluster_name) override;
+  void onDiscoveryTerminated(absl::string_view resource_name,
+                             ClusterDiscoveryStatus status) override;
 
 private:
   class XdstpOdcdsSubscriptionsManager;
