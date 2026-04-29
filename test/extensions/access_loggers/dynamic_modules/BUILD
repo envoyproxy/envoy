@@ -70,8 +70,10 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/go:access_log_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:access_log_integration_test",
     ],
+    env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//source/extensions/access_loggers/dynamic_modules:config",
         "//test/integration:http_integration_lib",

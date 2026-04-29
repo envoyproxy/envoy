@@ -77,3 +77,7 @@ func (dymProgramHandle) GetSharedData(key string) (unsafe.Pointer, bool) {
 	}
 	return p, true
 }
+
+func (dymProgramHandle) Log(level shared.LogLevel, format string, args ...any) {
+	hostLog(level, format, args)
+}

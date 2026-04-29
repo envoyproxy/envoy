@@ -47,8 +47,12 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/go:cluster_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
     ],
+    # cgo modules trigger the "unaligned 64-bit atomic operation" check on some platforms;
+    # disabling cgocheck matches the Go integration tests for HTTP and network filters.
+    env = {"GODEBUG": "cgocheck=0"},
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/clusters/dynamic_modules:cluster",

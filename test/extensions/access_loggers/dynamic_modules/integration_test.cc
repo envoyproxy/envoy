@@ -4,20 +4,28 @@
 
 namespace Envoy {
 
-class DynamicModulesAccessLogIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
-      public HttpIntegrationTest {
+// Parameterized over (language, IP version). language selects which test_data subdir
+// (rust, go) the access logger module is loaded from. Both languages ship a module named
+// "access_log_integration_test" exposing a "test_logger" access logger that exercises the
+// full AccessLogContext getter surface.
+struct AccessLogParam {
+  std::string language;
+  Network::Address::IpVersion ip_version;
+};
+
+class DynamicModulesAccessLogIntegrationTest : public testing::TestWithParam<AccessLogParam>,
+                                                public HttpIntegrationTest {
 public:
   DynamicModulesAccessLogIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam().ip_version) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
   };
 
   void initializeWithAccessLogger() {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-        TestEnvironment::substitute(
-            "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
+        TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
+                                    GetParam().language),
         1);
 
     config_helper_.addConfigModifier(
@@ -43,9 +51,25 @@ typed_config:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesAccessLogIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+namespace {
+std::vector<AccessLogParam> getAccessLogTestParams() {
+  std::vector<AccessLogParam> params;
+  for (const auto& language : {"rust", "go"}) {
+    for (const auto ip : TestEnvironment::getIpVersionsForTest()) {
+      params.push_back({language, ip});
+    }
+  }
+  return params;
+}
+
+std::string accessLogParamName(const testing::TestParamInfo<AccessLogParam>& info) {
+  return info.param.language + "_" +
+         (info.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6");
+}
+} // namespace
+
+INSTANTIATE_TEST_SUITE_P(SdkLanguagesAndIpVersions, DynamicModulesAccessLogIntegrationTest,
+                         testing::ValuesIn(getAccessLogTestParams()), accessLogParamName);
 
 TEST_P(DynamicModulesAccessLogIntegrationTest, BasicLogging) {
   initializeWithAccessLogger();

@@ -12,19 +12,33 @@ namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
 
+// Parameterized over (language, IP version). language selects which test_data subdir is
+// loaded as the dynamic module — currently rust or go. Each language ships a module named
+// "cluster_integration_test" that exposes the same set of named cluster types
+// (sync_host_selection, async_host_selection, scheduler_host_update, lifecycle_callbacks),
+// so the same test bodies exercise both SDKs.
+struct ClusterIntegrationParam {
+  std::string language;
+  Network::Address::IpVersion ip_version;
+};
+
 class DynamicModuleClusterIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
+    : public testing::TestWithParam<ClusterIntegrationParam>,
       public HttpIntegrationTest {
 public:
-  DynamicModuleClusterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  DynamicModuleClusterIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version) {}
 
   void initializeWithDecCluster(const std::string& cluster_name,
                                 const std::string& cluster_config = "") {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/" +
+                                      GetParam().language),
+        1);
 
-    // Replace the default cluster_0 with a DEC cluster that uses the Rust module.
+    // Replace the default cluster_0 with a DEC cluster that uses the language module
+    // selected by the test parameter.
     config_helper_.addConfigModifier([this, cluster_name, cluster_config](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -42,8 +56,8 @@ public:
       dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
       dec_config.set_cluster_name(cluster_name);
 
-      // Pass the upstream address via the cluster config so the Rust module knows
-      // where to add hosts.
+      // Pass the upstream address via the cluster config so the module knows where to add
+      // hosts.
       const std::string config_value = cluster_config.empty() ? upstream_address : cluster_config;
       Protobuf::StringValue config_proto;
       config_proto.set_value(config_value);
@@ -57,9 +71,27 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+namespace {
+std::vector<ClusterIntegrationParam> getClusterIntegrationTestParams() {
+  std::vector<ClusterIntegrationParam> params;
+  for (const auto& language : {"rust", "go"}) {
+    for (const auto ip : TestEnvironment::getIpVersionsForTest()) {
+      params.push_back({language, ip});
+    }
+  }
+  return params;
+}
+
+std::string clusterIntegrationParamName(
+    const testing::TestParamInfo<ClusterIntegrationParam>& info) {
+  return info.param.language + "_" +
+         (info.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6");
+}
+} // namespace
+
+INSTANTIATE_TEST_SUITE_P(SdkLanguagesAndIpVersions, DynamicModuleClusterIntegrationTest,
+                         testing::ValuesIn(getClusterIntegrationTestParams()),
+                         clusterIntegrationParamName);
 
 // Verifies that a cluster with synchronous host selection correctly routes requests
 // to the upstream added during on_init.
@@ -91,6 +123,10 @@ TEST_P(DynamicModuleClusterIntegrationTest, SyncHostSelectionMultipleRequests) {
 }
 
 // Verifies that a cluster with asynchronous host selection correctly routes requests.
+//
+// For Go specifically, this exercises the bug fix where ChooseHost was unable to honor a
+// user-supplied ClusterAsyncHostSelection — the SDK previously discarded the user's
+// returned handle and registered a fresh one, making Cancel dispatch unreachable.
 TEST_P(DynamicModuleClusterIntegrationTest, AsyncHostSelection) {
   initializeWithDecCluster("async_host_selection");
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -117,7 +153,10 @@ TEST_P(DynamicModuleClusterIntegrationTest, SchedulerHostUpdate) {
 }
 
 // Verifies that the cluster lifecycle callbacks fire correctly during cluster
-// initialization.
+// initialization, and — critically for Go — that the shutdown completion callback
+// reaches Envoy. A previous bug at the trampoline layer silently dropped the completion,
+// causing test_server_.reset() at the end of the test to hang waiting for an event_cb
+// that never arrived.
 TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
   EXPECT_LOG_CONTAINS_ALL_OF(
       Envoy::ExpectedLogMessages({{"info", "cluster lifecycle: on_init called"},
@@ -131,6 +170,12 @@ TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Tear the server down explicitly so the on_shutdown hook fires inside this test scope
+  // — that lets us assert the completion callback reaches Envoy. If the bug regresses on
+  // Go, the reset hangs and the test times out.
+  EXPECT_LOG_CONTAINS("info", "cluster lifecycle: on_shutdown called",
+                      { test_server_.reset(); });
 }
 
 } // namespace DynamicModules

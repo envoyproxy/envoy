@@ -405,12 +405,21 @@ func GetSharedData(key string) (unsafe.Pointer, bool) {
 	return loadProgramHandle().GetSharedData(key)
 }
 
+// Log writes a formatted message through Envoy's logging subsystem. This is the
+// process-global logging entry point — it works for any extension type, including
+// surfaces (bootstrap, cluster, tracer, etc.) whose handle does not expose its own Log
+// method. Thread-safe.
+func Log(level shared.LogLevel, format string, args ...any) {
+	loadProgramHandle().Log(level, format, args...)
+}
+
 // noopProgramHandle is the default until abi.init() replaces it with the live one.
 type noopProgramHandle struct{}
 
-func (noopProgramHandle) GetConcurrency() uint32                           { return 0 }
+func (noopProgramHandle) GetConcurrency() uint32                            { return 0 }
 func (noopProgramHandle) IsValidationMode() bool                            { return false }
 func (noopProgramHandle) RegisterFunction(_ string, _ unsafe.Pointer) bool  { return false }
 func (noopProgramHandle) GetFunction(_ string) (unsafe.Pointer, bool)       { return nil, false }
 func (noopProgramHandle) RegisterSharedData(_ string, _ unsafe.Pointer) bool { return false }
 func (noopProgramHandle) GetSharedData(_ string) (unsafe.Pointer, bool)     { return nil, false }
+func (noopProgramHandle) Log(_ shared.LogLevel, _ string, _ ...any)         {}

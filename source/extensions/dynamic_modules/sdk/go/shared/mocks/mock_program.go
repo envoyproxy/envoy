@@ -13,6 +13,7 @@ import (
 	reflect "reflect"
 	unsafe "unsafe"
 
+	shared "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -96,6 +97,23 @@ func (m *MockProgramHandle) IsValidationMode() bool {
 func (mr *MockProgramHandleMockRecorder) IsValidationMode() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsValidationMode", reflect.TypeOf((*MockProgramHandle)(nil).IsValidationMode))
+}
+
+// Log mocks base method.
+func (m *MockProgramHandle) Log(level shared.LogLevel, format string, args ...any) {
+	m.ctrl.T.Helper()
+	varargs := []any{level, format}
+	for _, a := range args {
+		varargs = append(varargs, a)
+	}
+	m.ctrl.Call(m, "Log", varargs...)
+}
+
+// Log indicates an expected call of Log.
+func (mr *MockProgramHandleMockRecorder) Log(level, format any, args ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{level, format}, args...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockProgramHandle)(nil).Log), varargs...)
 }
 
 // RegisterFunction mocks base method.

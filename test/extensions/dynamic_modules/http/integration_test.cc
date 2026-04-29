@@ -978,6 +978,85 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
   FAIL() << "Config was not updated in time";
 }
 
+// Verifies the config-time HttpCallout API: the filter config Create() initiates a
+// callout via HttpFilterConfigHandle.HttpCallout against cluster_0. Per-request filters
+// short-circuit with x-config-callout: success once the callout completes
+// (503 + "pending" until then).
+TEST_P(DynamicModulesIntegrationTest, ConfigCallout) {
+  // C++ SDK does not expose the config-time callout API; skip.
+  if (GetParam() == "cpp") {
+    return;
+  }
+  initializeFilter("http_config_callout", "cluster_0");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // First downstream request: the dispatcher run-loop drives the in-flight config-time
+  // callout out to cluster_0. Serve it so the callout completes; the factory's atomic
+  // flag flips on completion. The downstream request itself short-circuits with 503.
+  {
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    auto response = std::move(encoder_decoder.second);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+  }
+
+  // Subsequent requests should see "success" once the atomic flag has been observed.
+  for (int i = 0; i < 20; ++i) {
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    auto response = std::move(encoder_decoder.second);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+
+    auto hdr = response->headers().get(Http::LowerCaseString("x-config-callout"));
+    ASSERT_FALSE(hdr.empty());
+    if (hdr[0]->value().getStringView() == "success") {
+      return;
+    }
+    absl::SleepFor(absl::Milliseconds(50));
+  }
+  FAIL() << "Config callout did not complete in time";
+}
+
+// Verifies the config-time StartHttpStream API: the filter config Create() opens an HTTP
+// stream via HttpFilterConfigHandle.StartHttpStream against cluster_0. Per-request filters
+// short-circuit with x-config-stream: success once the stream completes
+// (503 + "pending" until then).
+TEST_P(DynamicModulesIntegrationTest, ConfigStream) {
+  // C++ SDK does not expose the config-time stream API; skip.
+  if (GetParam() == "cpp") {
+    return;
+  }
+  initializeFilter("http_config_stream", "cluster_0");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Serve the in-flight config-time stream against cluster_0 on the first request.
+  {
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    auto response = std::move(encoder_decoder.second);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+  }
+
+  for (int i = 0; i < 20; ++i) {
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    auto response = std::move(encoder_decoder.second);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+
+    auto hdr = response->headers().get(Http::LowerCaseString("x-config-stream"));
+    ASSERT_FALSE(hdr.empty());
+    if (hdr[0]->value().getStringView() == "success") {
+      return;
+    }
+    absl::SleepFor(absl::Milliseconds(50));
+  }
+  FAIL() << "Config stream did not complete in time";
+}
+
 // Test buffer limit callbacks for non-terminal filters.
 TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
   initializeFilter("buffer_limit_filter");

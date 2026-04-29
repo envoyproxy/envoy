@@ -7,9 +7,22 @@
 namespace Envoy {
 namespace {
 
-class DynamicModuleBridgeIntegrationTest : public HttpProtocolIntegrationTest {
+// Parameterized over (HttpProtocolTestParams, language). language selects which
+// test_data subdir (rust, go) the upstream_http_tcp_bridge module is loaded from. Both
+// languages ship a "test_bridge" config factory that supports the same two modes:
+// "streaming" (the default) and "local_reply".
+struct DynamicModuleBridgeParam {
+  HttpProtocolTestParams protocol;
+  std::string language;
+};
+
+class DynamicModuleBridgeIntegrationTest : public testing::TestWithParam<DynamicModuleBridgeParam>,
+                                            public HttpIntegrationTest {
 public:
-  DynamicModuleBridgeIntegrationTest() { enableHalfClose(true); }
+  DynamicModuleBridgeIntegrationTest()
+      : HttpIntegrationTest(GetParam().protocol.downstream_protocol, GetParam().protocol.version) {
+    enableHalfClose(true);
+  }
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -29,9 +42,12 @@ public:
   void initializeWithBridgeConfig(const std::string& bridge_mode) {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-        TestEnvironment::substitute(
-            "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
+        TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
+                                    GetParam().language),
         1);
+    // The Go module relies on the cgo runtime; cgocheck must be relaxed for the
+    // module's internal cgo calls.
+    TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
 
     config_helper_.addConfigModifier(
         [bridge_mode](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -74,10 +90,25 @@ public:
   IntegrationStreamDecoderPtr response_;
 };
 
-INSTANTIATE_TEST_SUITE_P(HttpAndIpVersions, DynamicModuleBridgeIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP1}, {Http::CodecType::HTTP1})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+std::vector<DynamicModuleBridgeParam> getBridgeTestParams() {
+  std::vector<DynamicModuleBridgeParam> params;
+  for (const auto& language : {"rust", "go"}) {
+    for (const auto& protocol : HttpProtocolIntegrationTest::getProtocolTestParams(
+             {Http::CodecType::HTTP1}, {Http::CodecType::HTTP1})) {
+      params.push_back({protocol, language});
+    }
+  }
+  return params;
+}
+
+std::string bridgeParamName(const testing::TestParamInfo<DynamicModuleBridgeParam>& info) {
+  return info.param.language + "_" +
+         HttpProtocolIntegrationTest::protocolTestParamsToString(
+             ::testing::TestParamInfo<HttpProtocolTestParams>(info.param.protocol, 0));
+}
+
+INSTANTIATE_TEST_SUITE_P(SdkLanguagesAndProtocols, DynamicModuleBridgeIntegrationTest,
+                         testing::ValuesIn(getBridgeTestParams()), bridgeParamName);
 
 TEST_P(DynamicModuleBridgeIntegrationTest, StreamingMode) {
   initializeWithBridgeConfig("streaming");

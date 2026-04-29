@@ -43,8 +43,10 @@ envoy_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/go:upstream_http_tcp_bridge",
         "//test/extensions/dynamic_modules/test_data/rust:upstream_http_tcp_bridge",
     ],
+    env = {"GODEBUG": "cgocheck=0"},
     rbe_pool = "2core",
     shard_count = 4,
     tags = [

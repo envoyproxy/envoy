@@ -29,6 +29,13 @@ type ProgramHandle interface {
 	// MUST be called on the main thread.
 	IsValidationMode() bool
 
+	// Log writes a formatted message through Envoy's logging subsystem, gated on the
+	// configured log level. Safe to call from any goroutine after program init. This is
+	// the equivalent of Rust's envoy_log_* macros and is the only logging entry point
+	// available to extensions whose handle does not carry a Log method (e.g. bootstrap,
+	// cluster, tracer).
+	Log(level LogLevel, format string, args ...any)
+
 	// RegisterFunction registers a function pointer under the given key in the process-wide
 	// function registry. This allows modules loaded in the same process to expose functions
 	// that other modules resolve by name and call directly (zero-copy cross-module
