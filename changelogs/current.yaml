@@ -39,6 +39,13 @@ bug_fixes:
     Fixed a crashing bug in the HTTP filter when a stream was already above the downstream write-buffer
     high watermark at filter-chain construction time. Downstream watermark callback registration is
     now deferred until the in-module filter has been constructed.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where the HTTP filter per-route configuration and the upstream HTTP TCP bridge
+    configuration did not handle the ``google.protobuf.Struct`` configuration message as the API
+    definition requires. Both factories now serialize the ``Struct`` to a JSON string and pass the
+    string to the dynamic module side as the configuration, matching the behavior already in place
+    for every other dynamic module extension factory.
 - area: oauth2
   change: |
     Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously
