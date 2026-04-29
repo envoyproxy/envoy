@@ -747,7 +747,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolListRewritePathForRequestAndTranslateRes
   // Assumes the request body is split into different parts.
   Buffer::OwnedImpl request_first_body(R"json({"jsonrpc":"2.0")json");
   EXPECT_EQ(filter_->decodeData(request_first_body, /*end_stream=*/false),
-            Http::FilterDataStatus::StopIterationNoBuffer);
+            Http::FilterDataStatus::StopIterationAndWatermark);
   Buffer::OwnedImpl request_second_body(R"json(,"id":12,"method":"tools/list"})json");
   EXPECT_EQ(filter_->decodeData(request_second_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
@@ -769,6 +769,38 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolListRewritePathForRequestAndTranslateRes
       nlohmann::json::parse(response_body.toString()),
       nlohmann::json::parse(
           R"json({"jsonrpc":"2.0","id":12,"result":{"tools":[{"name":"google.api.CreateApiKey"}]}})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, EncodeDataReturnsStopIterationAndWatermarkWhenNotEndOfStream) {
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}}}})json");
+  request_headers_.setContentLength(request_body.toString().size());
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  response_headers_ = {
+      {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "123456"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl first_chunk("part1");
+  EXPECT_EQ(filter_->encodeData(first_chunk, /*end_stream=*/false),
+            Http::FilterDataStatus::StopIterationAndWatermark);
+  EXPECT_TRUE(first_chunk.toString().empty());
+  Buffer::OwnedImpl second_chunk("part2");
+  EXPECT_EQ(filter_->encodeData(second_chunk, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(),
+              StrEq(std::to_string(second_chunk.length())));
+  EXPECT_EQ(
+      nlohmann::json::parse(second_chunk.toString()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":123,"result":{"content":[{"text":"part1part2","type":"text"}],"isError":false}})json"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolListWithNumericStringId) {
@@ -1129,6 +1161,74 @@ TEST_F(McpJsonRestBridgeFilterTest, InitializeRequestIgnoreProtocolVersionHeader
   Buffer::OwnedImpl response_body("initialize response");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, RequestBodyExceedsLimitReturnsError) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
+      ParseTextProtoOrDie(R"pb(
+    max_request_body_size { value: 10 }
+  )pb");
+  config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(10));
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::PayloadTooLarge), _, _, _,
+                             StrEq("mcp_json_rest_bridge_filter_request_too_large")));
+  Buffer::OwnedImpl body("12345678901"); // 11 bytes
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, ResponseBodyExceedsLimitReturnsError) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config =
+      ParseTextProtoOrDie(R"pb(
+    max_response_body_size { value: 10 }
+    tool_config {
+      tools {
+        name: "create_api_key"
+        http_rule: {
+          post: "/v1/{parent=projects/*}/apiKeys"
+          body: "key"
+        }
+      }
+    }
+  )pb");
+  config_ = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
+  Buffer::OwnedImpl request_body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}}}})json");
+  request_headers_.setContentLength(request_body.toString().size());
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+
+  EXPECT_CALL(encoder_callbacks_, setBufferLimit(10));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_CALL(
+      encoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::InternalServerError),
+          StrEq(
+              R"json({"error":{"code":-32000,"message":"Response body too large"},"id":123,"jsonrpc":"2.0"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_filter_response_too_large")));
+  Buffer::OwnedImpl body("12345678901"); // 11 bytes
+  EXPECT_EQ(filter_->encodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
 class McpHttpMethodFilterTest : public testing::TestWithParam<std::string> {
