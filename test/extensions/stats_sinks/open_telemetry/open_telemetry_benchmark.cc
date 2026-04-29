@@ -34,10 +34,74 @@ public:
   void send(MetricsExportRequestPtr&&) override {}
 };
 
-void BM_OpenTelemetrySinkFlush(benchmark::State& state) {
-  const int num_counters = 3000;
-  const int num_gauges = 3000;
-  const int num_histograms = 3000;
+struct BenchmarkSetup {
+  BenchmarkSetup() {
+    snapshot = std::make_unique<testing::NiceMock<Stats::MockMetricSnapshot>>();
+    hist = hist_alloc();
+    hist_insert(hist, 1.5, 10);
+    hist_insert(hist, 2.5, 20);
+    hist_stats = std::make_unique<Stats::HistogramStatisticsImpl>(hist);
+
+    const int num_counters = 3000;
+    const int num_gauges = 3000;
+    const int num_histograms = 3000;
+
+    counters.reserve(num_counters);
+    gauges.reserve(num_gauges);
+    histograms.reserve(num_histograms);
+
+    auto make_tags = [](int i) {
+      std::vector<Stats::Tag> tags = test_tags;
+      tags.back().value_ = std::to_string(i);
+      return tags;
+    };
+
+    for (int i = 0; i < num_counters; ++i) {
+      auto counter = std::make_unique<testing::NiceMock<Stats::MockCounter>>();
+      counter->name_ = "counter_metric";
+      counter->setTagExtractedName("counter_metric");
+      counter->value_ = 100;
+      counter->used_ = true;
+      counter->setTags(make_tags(i));
+      snapshot->counters_.push_back({1, *counter});
+      counters.push_back(std::move(counter));
+    }
+
+    for (int i = 0; i < num_gauges; ++i) {
+      auto gauge = std::make_unique<testing::NiceMock<Stats::MockGauge>>();
+      gauge->name_ = "gauge_metric";
+      gauge->setTagExtractedName("gauge_metric");
+      gauge->value_ = 100;
+      gauge->used_ = true;
+      gauge->setTags(make_tags(i));
+      snapshot->gauges_.push_back(*gauge);
+      gauges.push_back(std::move(gauge));
+    }
+
+    for (int i = 0; i < num_histograms; ++i) {
+      auto histogram = std::make_unique<testing::NiceMock<Stats::MockParentHistogram>>();
+      histogram->name_ = "hist_metric";
+      histogram->setTagExtractedName("hist_metric");
+      histogram->used_ = true;
+      histogram->setTags(make_tags(i));
+      ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(testing::ReturnRef(*hist_stats));
+      snapshot->histograms_.push_back(*histogram);
+      histograms.push_back(std::move(histogram));
+    }
+  }
+
+  ~BenchmarkSetup() { hist_free(hist); }
+
+  std::unique_ptr<testing::NiceMock<Stats::MockMetricSnapshot>> snapshot;
+  histogram_t* hist;
+  std::unique_ptr<Stats::HistogramStatisticsImpl> hist_stats;
+  std::vector<std::unique_ptr<testing::NiceMock<Stats::MockCounter>>> counters;
+  std::vector<std::unique_ptr<testing::NiceMock<Stats::MockGauge>>> gauges;
+  std::vector<std::unique_ptr<testing::NiceMock<Stats::MockParentHistogram>>> histograms;
+};
+
+void BM_OpenTelemetrySinkFlush_NoLimit(benchmark::State& state) {
+  BenchmarkSetup setup;
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
@@ -49,68 +113,31 @@ void BM_OpenTelemetrySinkFlush(benchmark::State& state) {
 
   OpenTelemetrySink sink(flusher, exporter, 0);
 
-  testing::NiceMock<Stats::MockMetricSnapshot> snapshot;
-
-  // Setup shared histogram statistics to avoid allocating 3000 instances
-  histogram_t* hist = hist_alloc();
-  hist_insert(hist, 1.5, 10);
-  hist_insert(hist, 2.5, 20);
-  Stats::HistogramStatisticsImpl hist_stats(hist);
-
-  std::vector<std::unique_ptr<testing::NiceMock<Stats::MockCounter>>> counters;
-  std::vector<std::unique_ptr<testing::NiceMock<Stats::MockGauge>>> gauges;
-  std::vector<std::unique_ptr<testing::NiceMock<Stats::MockParentHistogram>>> histograms;
-
-  counters.reserve(num_counters);
-  gauges.reserve(num_gauges);
-  histograms.reserve(num_histograms);
-
-  auto make_tags = [](int i) {
-    std::vector<Stats::Tag> tags = test_tags;
-    tags.back().value_ = std::to_string(i);
-    return tags;
-  };
-
-  for (int i = 0; i < num_counters; ++i) {
-    auto counter = std::make_unique<testing::NiceMock<Stats::MockCounter>>();
-    counter->name_ = "counter_metric";
-    counter->setTagExtractedName("counter_metric");
-    counter->value_ = 100;
-    counter->used_ = true;
-    counter->setTags(make_tags(i));
-    snapshot.counters_.push_back({1, *counter});
-    counters.push_back(std::move(counter));
+  for (auto _ : state) {
+    sink.flush(*setup.snapshot);
   }
+}
+BENCHMARK(BM_OpenTelemetrySinkFlush_NoLimit);
 
-  for (int i = 0; i < num_gauges; ++i) {
-    auto gauge = std::make_unique<testing::NiceMock<Stats::MockGauge>>();
-    gauge->name_ = "gauge_metric";
-    gauge->setTagExtractedName("gauge_metric");
-    gauge->value_ = 100;
-    gauge->used_ = true;
-    gauge->setTags(make_tags(i));
-    snapshot.gauges_.push_back(*gauge);
-    gauges.push_back(std::move(gauge));
-  }
+void BM_OpenTelemetrySinkFlush_TrafficSplit_200(benchmark::State& state) {
+  BenchmarkSetup setup;
 
-  for (int i = 0; i < num_histograms; ++i) {
-    auto histogram = std::make_unique<testing::NiceMock<Stats::MockParentHistogram>>();
-    histogram->name_ = "hist_metric";
-    histogram->setTagExtractedName("hist_metric");
-    histogram->used_ = true;
-    histogram->setTags(make_tags(i));
-    ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(testing::ReturnRef(hist_stats));
-    snapshot.histograms_.push_back(*histogram);
-    histograms.push_back(std::move(histogram));
-  }
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+  sink_config.set_max_data_points_per_request(200);
+  Tracers::OpenTelemetry::Resource resource;
+
+  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context);
+  auto flusher = std::make_shared<OtlpMetricsFlusherImpl>(options);
+  auto exporter = std::make_shared<DummyExporter>();
+
+  OpenTelemetrySink sink(flusher, exporter, 0);
 
   for (auto _ : state) {
-    sink.flush(snapshot);
+    sink.flush(*setup.snapshot);
   }
-
-  hist_free(hist);
 }
-BENCHMARK(BM_OpenTelemetrySinkFlush);
+BENCHMARK(BM_OpenTelemetrySinkFlush_TrafficSplit_200);
 
 } // namespace
 } // namespace OpenTelemetry
