@@ -1183,7 +1183,12 @@ CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
 }
 
 CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) {
-  // mutex_ serializes writes to req_->strValue across off-thread Go callers.
+  // mutex_ has two roles here:
+  //   1) it serialises writes to req_->strValue across off-thread Go callers, and
+  //   2) it is held across the inline streamInfo() / SSL / upstream-info dereferences below,
+  //      stalling onDestroy() so the worker thread cannot tear down the parent stream (and
+  //      free StreamInfo) while this off-thread Go caller is mid-read.
+  // See has_destroyed_ comment in the header for the full lifetime invariant.
   Thread::LockGuard lock(mutex_);
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
@@ -1763,6 +1768,11 @@ CAPIStatus Filter::getSecret(const absl::string_view name, uint64_t* value_data,
 }
 
 CAPIStatus Filter::setDrainConnectionUponCompletion() {
+  // mutex_ is held across the inline streamInfo() dereference below: it serialises against
+  // onDestroy() so the worker thread cannot tear down the parent stream (and free StreamInfo)
+  // while this off-thread Go caller is mid-write. See has_destroyed_ comment in the header for
+  // the full lifetime invariant.
+  Thread::LockGuard lock(mutex_);
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
