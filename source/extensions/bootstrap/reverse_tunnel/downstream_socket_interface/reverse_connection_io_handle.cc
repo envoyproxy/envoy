@@ -48,6 +48,19 @@ ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
   cleanup();
 }
 
+void ReverseConnectionIOHandle::emitAccessLog(const std::string& event,
+                                              const std::string& host_address,
+                                              const std::string& cluster_name,
+                                              const std::string& connection_key,
+                                              const std::string& error_message) {
+  if (!extension_) {
+    return;
+  }
+  extension_->emitAccessLog(getTimeSource(), event, config_.src_node_id, config_.src_cluster_id,
+                            config_.src_tenant_id, cluster_name, host_address, connection_key,
+                            error_message);
+}
+
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Starting cleanup of reverse connection resources.");
 
@@ -805,6 +818,8 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
   // Remove connection state tracking.
   removeConnectionState(host_address, cluster_name, connection_key);
 
+  emitAccessLog("connection_closed", host_address, cluster_name, connection_key, "");
+
   // The next call to maintainClusterConnections() will detect the missing connection
   // and re-initiate it automatically.
   ENVOY_LOG(debug,
@@ -1119,6 +1134,8 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
 
     trackConnectionFailure(host_address, cluster_name);
 
+    emitAccessLog("handshake_failure", host_address, cluster_name, connection_key, error);
+
   } else {
     // Handle connection success.
     ENVOY_LOG(debug, "reverse_tunnel: Connection succeeded for host {}", host_address);
@@ -1126,6 +1143,8 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
     resetHostBackoff(host_address);
     updateConnectionState(host_address, cluster_name, connection_key,
                           ReverseConnectionState::Connected);
+
+    emitAccessLog("handshake_success", host_address, cluster_name, connection_key, "");
 
     // Only proceed if connection is still valid.
     if (!connection) {

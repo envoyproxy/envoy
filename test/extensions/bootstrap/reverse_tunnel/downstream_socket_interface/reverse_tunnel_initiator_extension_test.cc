@@ -8,10 +8,12 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -83,6 +85,11 @@ protected:
 
     // Set the slot in the extension using the test-only method.
     extension_->setTestOnlyTLSRegistry(std::move(another_tls_slot_));
+  }
+
+  // Helper to inject a mock access log into the extension (friend access).
+  void addAccessLog(AccessLog::InstanceSharedPtr log) {
+    extension_->access_logs_.push_back(std::move(log));
   }
 
   void TearDown() override {
@@ -687,6 +694,163 @@ TEST_F(ConfigValidationTest, EmptyStatPrefix) {
 
   // Should not throw and should use default prefix.
   EXPECT_NO_THROW(initiator.createBootstrapExtension(config_, context_));
+}
+
+// Access log tests.
+TEST_F(ReverseTunnelInitiatorExtensionTest, AccessLogsEmptyByDefault) {
+  // Default config has no access_log entries.
+  EXPECT_TRUE(extension_->accessLogs().empty());
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogNoOpsWhenEmpty) {
+  // emitAccessLog should be a no-op when no access logs are configured.
+  Event::SimulatedTimeSystem time_system;
+  extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",
+                            "upstream_cluster", "10.0.0.1:443", "conn-key-1", "");
+  // No crash, no side effects — just verifying the early return.
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogCallsLoggers) {
+  // Inject a mock access log.
+  auto mock_log = std::make_shared<AccessLog::MockInstance>();
+  addAccessLog(mock_log);
+
+  Event::SimulatedTimeSystem time_system;
+
+  // Expect log() to be called once.
+  EXPECT_CALL(*mock_log, log(_, _))
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        // Verify metadata was populated correctly.
+        const auto& metadata =
+            stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "handshake_success");
+        EXPECT_EQ(metadata.fields().at("node_id").string_value(), "node1");
+        EXPECT_EQ(metadata.fields().at("cluster_id").string_value(), "cluster1");
+        EXPECT_EQ(metadata.fields().at("tenant_id").string_value(), "tenant1");
+        EXPECT_EQ(metadata.fields().at("upstream_cluster").string_value(), "my_upstream");
+        EXPECT_EQ(metadata.fields().at("host_address").string_value(), "10.0.0.1:443");
+        EXPECT_EQ(metadata.fields().at("connection_key").string_value(), "conn-123");
+        EXPECT_EQ(metadata.fields().at("error").string_value(), "");
+      }));
+
+  extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",
+                            "my_upstream", "10.0.0.1:443", "conn-123", "");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithError) {
+  // Inject a mock access log.
+  auto mock_log = std::make_shared<AccessLog::MockInstance>();
+  addAccessLog(mock_log);
+
+  Event::SimulatedTimeSystem time_system;
+
+  // Expect log() to be called with error metadata.
+  EXPECT_CALL(*mock_log, log(_, _))
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata =
+            stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "handshake_failure");
+        EXPECT_EQ(metadata.fields().at("error").string_value(), "connection refused");
+      }));
+
+  extension_->emitAccessLog(time_system, "handshake_failure", "node1", "cluster1", "tenant1",
+                            "my_upstream", "10.0.0.1:443", "conn-456", "connection refused");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogMultipleLoggers) {
+  // Inject two mock access logs.
+  auto mock_log1 = std::make_shared<AccessLog::MockInstance>();
+  auto mock_log2 = std::make_shared<AccessLog::MockInstance>();
+  addAccessLog(mock_log1);
+  addAccessLog(mock_log2);
+
+  Event::SimulatedTimeSystem time_system;
+
+  // Both loggers should be called.
+  EXPECT_CALL(*mock_log1, log(_, _));
+  EXPECT_CALL(*mock_log2, log(_, _));
+
+  extension_->emitAccessLog(time_system, "connection_closed", "node1", "cluster1", "tenant1",
+                            "my_upstream", "10.0.0.1:443", "conn-789", "");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogConnectionClosedFullMetadata) {
+  auto mock_log = std::make_shared<AccessLog::MockInstance>();
+  addAccessLog(mock_log);
+
+  Event::SimulatedTimeSystem time_system;
+
+  EXPECT_CALL(*mock_log, log(_, _))
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata =
+            stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "connection_closed");
+        EXPECT_EQ(metadata.fields().at("node_id").string_value(), "node-abc");
+        EXPECT_EQ(metadata.fields().at("cluster_id").string_value(), "cluster-xyz");
+        EXPECT_EQ(metadata.fields().at("tenant_id").string_value(), "tenant-123");
+        EXPECT_EQ(metadata.fields().at("upstream_cluster").string_value(), "us-west-cluster");
+        EXPECT_EQ(metadata.fields().at("host_address").string_value(), "192.168.1.100:8443");
+        EXPECT_EQ(metadata.fields().at("connection_key").string_value(), "conn-close-001");
+        EXPECT_EQ(metadata.fields().at("error").string_value(), "");
+      }));
+
+  extension_->emitAccessLog(time_system, "connection_closed", "node-abc", "cluster-xyz",
+                            "tenant-123", "us-west-cluster", "192.168.1.100:8443", "conn-close-001",
+                            "");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithEmptyOptionalFields) {
+  auto mock_log = std::make_shared<AccessLog::MockInstance>();
+  addAccessLog(mock_log);
+
+  Event::SimulatedTimeSystem time_system;
+
+  EXPECT_CALL(*mock_log, log(_, _))
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata =
+            stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "handshake_success");
+        EXPECT_EQ(metadata.fields().at("tenant_id").string_value(), "");
+        EXPECT_EQ(metadata.fields().at("error").string_value(), "");
+        EXPECT_EQ(metadata.fields().size(), 8);
+      }));
+
+  extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "",
+                            "my_upstream", "10.0.0.1:443", "conn-empty", "");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogVerifiesMetadataNamespace) {
+  auto mock_log = std::make_shared<AccessLog::MockInstance>();
+  addAccessLog(mock_log);
+
+  Event::SimulatedTimeSystem time_system;
+
+  EXPECT_CALL(*mock_log, log(_, _))
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& filter_metadata = stream_info.dynamicMetadata().filter_metadata();
+        EXPECT_EQ(filter_metadata.size(), 1);
+        EXPECT_TRUE(filter_metadata.contains("envoy.reverse_tunnel.initiator"));
+      }));
+
+  extension_->emitAccessLog(time_system, "handshake_success", "n", "c", "t", "u", "h", "k", "");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogErrorFieldAlwaysPresent) {
+  auto mock_log = std::make_shared<AccessLog::MockInstance>();
+  addAccessLog(mock_log);
+
+  Event::SimulatedTimeSystem time_system;
+
+  EXPECT_CALL(*mock_log, log(_, _))
+      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata =
+            stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_TRUE(metadata.fields().contains("error"));
+        EXPECT_EQ(metadata.fields().at("error").string_value(), "");
+      }));
+
+  extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",
+                            "upstream", "10.0.0.1:443", "conn-1", "");
 }
 
 } // namespace ReverseConnection
