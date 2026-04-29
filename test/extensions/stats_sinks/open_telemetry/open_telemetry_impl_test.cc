@@ -10,7 +10,6 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
 
-
 #include "gtest/gtest.h"
 
 using testing::_;
