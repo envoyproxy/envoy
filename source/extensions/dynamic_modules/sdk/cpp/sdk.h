@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <functional>
 #include <map>
@@ -244,7 +245,8 @@ enum class AttributeID : uint32_t {
   XdsVirtualHostName,
   XdsVirtualHostMetadata,
   XdsUpstreamHostMetadata,
-  XdsFilterChainName
+  XdsFilterChainName,
+  HealthCheck
 };
 
 enum class LogLevel : uint32_t { Trace, Debug, Info, Warn, Error, Critical, Off };
@@ -325,6 +327,47 @@ public:
    * @param reason The reason for the reset.
    */
   virtual void onHttpStreamReset(uint64_t stream_id, HttpStreamResetReason reason) = 0;
+};
+
+enum class HttpFilterStreamResetReason : uint32_t {
+  LocalReset,
+  LocalRefusedStreamReset,
+};
+
+enum class SocketOptionState : uint32_t {
+  Prebind,
+  Bound,
+  Listening,
+};
+
+enum class SocketDirection : uint32_t { Upstream, Downstream };
+
+struct ClusterHostCounts {
+  uint64_t total;
+  uint64_t healthy;
+  uint64_t degraded;
+};
+
+class ChildSpan;
+
+class Span {
+public:
+  virtual ~Span() = default;
+
+  virtual void setTag(std::string_view key, std::string_view value) = 0;
+  virtual void setOperation(std::string_view operation) = 0;
+  virtual void log(std::string_view event) = 0;
+  virtual void setSampled(bool sampled) = 0;
+  virtual std::optional<std::string_view> getBaggage(std::string_view key) = 0;
+  virtual void setBaggage(std::string_view key, std::string_view value) = 0;
+  virtual std::optional<std::string_view> getTraceID() = 0;
+  virtual std::optional<std::string_view> getSpanID() = 0;
+  virtual std::unique_ptr<ChildSpan> spawnChild(std::string_view operation) = 0;
+};
+
+class ChildSpan : public Span {
+public:
+  virtual void finish() = 0;
 };
 
 class RouteSpecificConfig {
@@ -606,6 +649,99 @@ public:
    * route cache.
    */
   virtual void refreshRouteCluster() = 0;
+
+  /**
+   * Returns the current body buffering limit in bytes.
+   * @return The buffer limit in bytes.
+   */
+  virtual uint64_t getBufferLimit() = 0;
+
+  /**
+   * Sets the current body buffering limit in bytes.
+   * @param limit The desired buffer limit in bytes.
+   */
+  virtual void setBufferLimit(uint64_t limit) = 0;
+
+  /**
+   * Retrieves the serialized typed filter state value of the stream.
+   * @param key The filter state key.
+   * @return The typed filter state value if found, otherwise empty.
+   */
+  virtual std::optional<std::string_view> getFilterStateTyped(std::string_view key) = 0;
+
+  /**
+   * Sets a typed filter state value of the stream.
+   * @param key The filter state key.
+   * @param value The serialized typed value.
+   * @return true if the value was stored successfully.
+   */
+  virtual bool setFilterStateTyped(std::string_view key, std::string_view value) = 0;
+
+  /**
+   * Returns the worker index assigned to the current filter instance.
+   */
+  virtual uint32_t getWorkerIndex() = 0;
+
+  /**
+   * Sets an integer socket option on the upstream or downstream connection.
+   */
+  virtual bool setSocketOptionInt(int64_t level, int64_t name, SocketOptionState state,
+                                  SocketDirection direction, int64_t value) = 0;
+
+  /**
+   * Sets a bytes socket option on the upstream or downstream connection.
+   */
+  virtual bool setSocketOptionBytes(int64_t level, int64_t name, SocketOptionState state,
+                                    SocketDirection direction, std::string_view value) = 0;
+
+  /**
+   * Retrieves an integer socket option from the upstream or downstream connection.
+   */
+  virtual std::optional<int64_t> getSocketOptionInt(int64_t level, int64_t name,
+                                                    SocketOptionState state,
+                                                    SocketDirection direction) = 0;
+
+  /**
+   * Retrieves a bytes socket option from the upstream or downstream connection.
+   */
+  virtual std::optional<std::string_view> getSocketOptionBytes(int64_t level, int64_t name,
+                                                               SocketOptionState state,
+                                                               SocketDirection direction) = 0;
+
+  /**
+   * Retrieves the active tracing span for the current stream.
+   */
+  virtual std::unique_ptr<Span> getActiveSpan() = 0;
+
+  /**
+   * Retrieves the selected upstream cluster name for the current stream.
+   */
+  virtual std::optional<std::string_view> getClusterName() = 0;
+
+  /**
+   * Retrieves host counts for the selected upstream cluster at the given priority.
+   */
+  virtual std::optional<ClusterHostCounts> getClusterHostCounts(uint32_t priority) = 0;
+
+  /**
+   * Sets an upstream override host for the selected cluster.
+   */
+  virtual bool setUpstreamOverrideHost(std::string_view host, bool strict) = 0;
+
+  /**
+   * Resets the current downstream stream with the given reason and details string.
+   */
+  virtual void resetStream(HttpFilterStreamResetReason reason, std::string_view details) = 0;
+
+  /**
+   * Sends GOAWAY and closes the downstream connection.
+   */
+  virtual void sendGoAwayAndClose(bool graceful) = 0;
+
+  /**
+   * Recreates the current stream, optionally with replacement headers.
+   */
+  virtual bool recreateStream(std::span<const HeaderView> headers = {}) = 0;
 
   /**
    * Returns reference to request headers.
@@ -950,6 +1086,11 @@ enum class TrailersStatus : uint32_t {
   Stop = 1,
 };
 
+enum class LocalReplyStatus : uint32_t {
+  Continue = 0,
+  ContinueAndResetStream = 1,
+};
+
 class HttpFilter {
 public:
   virtual ~HttpFilter();
@@ -1013,6 +1154,18 @@ public:
    * any per-stream resources.
    */
   virtual void onDestroy() = 0;
+
+  /**
+   * Called when a local reply is being sent on the stream.
+   * @param response_code The HTTP response code for the local reply.
+   * @param details The response code details string.
+   * @param reset_imminent Whether the stream will be reset instead of sending the local reply.
+   * @return LocalReplyStatus indicating how local reply processing should continue.
+   */
+  virtual LocalReplyStatus onLocalReply(uint32_t response_code, std::string_view details,
+                                        bool reset_imminent) {
+    return LocalReplyStatus::Continue;
+  }
 };
 
 class HttpFilterFactory {
