@@ -240,6 +240,8 @@ const (
 	AttributeIDXdsUpstreamHostMetadata
 	// xds.filter_chain_name
 	AttributeIDXdsFilterChainName
+	// health_check
+	AttributeIDHealthCheck
 )
 
 type LogLevel uint32
@@ -322,6 +324,51 @@ type Scheduler interface {
 type DownstreamWatermarkCallbacks interface {
 	OnAboveWriteBufferHighWatermark()
 	OnBelowWriteBufferLowWatermark()
+}
+
+type HttpFilterStreamResetReason uint32
+
+const (
+	HttpFilterStreamResetReasonLocalReset HttpFilterStreamResetReason = iota
+	HttpFilterStreamResetReasonLocalRefusedStreamReset
+)
+
+type SocketOptionState uint32
+
+const (
+	SocketOptionStatePrebind SocketOptionState = iota
+	SocketOptionStateBound
+	SocketOptionStateListening
+)
+
+type SocketDirection uint32
+
+const (
+	SocketDirectionUpstream SocketDirection = iota
+	SocketDirectionDownstream
+)
+
+type ClusterHostCounts struct {
+	Total    uint64
+	Healthy  uint64
+	Degraded uint64
+}
+
+type Span interface {
+	SetTag(key, value string)
+	SetOperation(operation string)
+	Log(event string)
+	SetSampled(sampled bool)
+	GetBaggage(key string) (UnsafeEnvoyBuffer, bool)
+	SetBaggage(key, value string)
+	GetTraceID() (UnsafeEnvoyBuffer, bool)
+	GetSpanID() (UnsafeEnvoyBuffer, bool)
+	SpawnChild(operation string) ChildSpan
+}
+
+type ChildSpan interface {
+	Span
+	Finish()
 }
 
 // HttpFilterHandle is the interface that provides access to the plugin's context and configuration.
@@ -421,6 +468,13 @@ type HttpFilterHandle interface {
 	// @Param value the filter state value.
 	SetFilterState(key string, value []byte)
 
+	// SetFilterStateTyped sets a typed filter state object from serialized bytes using the registered
+	// Envoy ObjectFactory for the given key.
+	// @Param key the filter state key.
+	// @Param value the serialized bytes used to construct the typed object.
+	// @Return true if the value was stored successfully, otherwise false.
+	SetFilterStateTyped(key string, value []byte) bool
+
 	// GetAttributeString retrieves the string attribute value of the stream.
 	// @Param attributeID the attribute ID.
 	// @Return the attribute value if found, otherwise an empty UnsafeEnvoyBuffer.
@@ -437,6 +491,11 @@ type HttpFilterHandle interface {
 	// @Param attributeID the attribute ID.
 	// @Return the attribute value and true if found, otherwise false.
 	GetAttributeBool(attributeID AttributeID) (bool, bool)
+
+	// GetFilterStateTyped retrieves the serialized value of a typed filter state object.
+	// @Param key the filter state key.
+	// @Return the serialized value if found, otherwise an empty UnsafeEnvoyBuffer.
+	GetFilterStateTyped(key string) (UnsafeEnvoyBuffer, bool)
 
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
@@ -500,6 +559,49 @@ type HttpFilterHandle interface {
 	// This is a subset of ClearRouteCache. Use this when a filter modifies headers that affect
 	// cluster selection but not the route itself.
 	RefreshRouteCluster()
+
+	// GetWorkerIndex returns the worker index assigned to the current filter instance.
+	GetWorkerIndex() uint32
+
+	// SetSocketOptionInt sets an integer socket option on the upstream or downstream connection.
+	SetSocketOptionInt(level, name int64, state SocketOptionState, direction SocketDirection, value int64) bool
+
+	// SetSocketOptionBytes sets a bytes socket option on the upstream or downstream connection.
+	SetSocketOptionBytes(level, name int64, state SocketOptionState, direction SocketDirection, value []byte) bool
+
+	// GetSocketOptionInt retrieves an integer socket option from the upstream or downstream connection.
+	GetSocketOptionInt(level, name int64, state SocketOptionState, direction SocketDirection) (int64, bool)
+
+	// GetSocketOptionBytes retrieves a bytes socket option from the upstream or downstream connection.
+	GetSocketOptionBytes(level, name int64, state SocketOptionState, direction SocketDirection) (UnsafeEnvoyBuffer, bool)
+
+	// GetBufferLimit returns the current body buffering limit in bytes.
+	GetBufferLimit() uint64
+
+	// SetBufferLimit sets the current body buffering limit in bytes.
+	SetBufferLimit(limit uint64)
+
+	// GetActiveSpan retrieves the active tracing span for the stream.
+	GetActiveSpan() Span
+
+	// GetClusterName retrieves the selected upstream cluster name for the stream.
+	GetClusterName() (UnsafeEnvoyBuffer, bool)
+
+	// GetClusterHostCounts retrieves the total, healthy, and degraded host counts for the selected
+	// cluster at the given priority.
+	GetClusterHostCounts(priority uint32) (ClusterHostCounts, bool)
+
+	// SetUpstreamOverrideHost sets an override host for the selected upstream cluster.
+	SetUpstreamOverrideHost(host string, strict bool) bool
+
+	// ResetStream resets the downstream HTTP stream with the given reason and details string.
+	ResetStream(reason HttpFilterStreamResetReason, details string)
+
+	// SendGoAwayAndClose sends a GOAWAY frame to the downstream and closes the connection.
+	SendGoAwayAndClose(graceful bool)
+
+	// RecreateStream recreates the HTTP stream, optionally with replacement headers.
+	RecreateStream(headers [][2]string) bool
 
 	// RequestHeaders retrieves the request headers.
 	// @Return the request headers.

@@ -208,8 +208,6 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherClusterMetadataMatched) {
   setUpstreamClusterMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                              std::string(kMetadataValue));
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
@@ -218,8 +216,6 @@ TEST_F(CelMatcherTest, CelMatcherClusterMetadataMatched) {
 TEST_F(CelMatcherTest, CelMatcherClusterMetadataNotMatched) {
   setUpstreamClusterMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                              "wrong_service");
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
@@ -229,8 +225,6 @@ TEST_F(CelMatcherTest, CelMatcherClusterMetadataNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherRouteMetadataMatched) {
   setUpstreamRouteMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                            std::string(kMetadataValue));
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamRouteMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
@@ -239,8 +233,6 @@ TEST_F(CelMatcherTest, CelMatcherRouteMetadataMatched) {
 TEST_F(CelMatcherTest, CelMatcherRouteMetadataNotMatched) {
   setUpstreamRouteMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                            "wrong_service");
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
@@ -250,8 +242,6 @@ TEST_F(CelMatcherTest, CelMatcherRouteMetadataNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherDynamicMetadataMatched) {
   setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                      std::string(kMetadataValue));
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(
       absl::StrFormat(DynamicMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
@@ -259,8 +249,6 @@ TEST_F(CelMatcherTest, CelMatcherDynamicMetadataMatched) {
 
 TEST_F(CelMatcherTest, CelMatcherDynamicMetadataNotMatched) {
   setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey), "wrong_service");
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(
       absl::StrFormat(DynamicMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
@@ -274,8 +262,6 @@ TEST_F(CelMatcherTest, CelMatcherTypedDynamicMetadataMatched) {
   typed_metadata.PackFrom(pipe);
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
       {std::string(kFilterNamespace), typed_metadata});
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       TypedDynamicMetadataCelString, kFilterNamespace, "path", "/foo/bar/baz.fads"));
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
