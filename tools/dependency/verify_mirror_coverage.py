@@ -37,11 +37,18 @@ REPO_LOCATIONS_FILES = [
 MAX_RETRIES = 3
 RETRY_DELAY = 1.0  # seconds
 
-# ANSI colour codes.
+# ANSI color codes.
 GREEN = "\033[32m"
 RED = "\033[31m"
 YELLOW = "\033[33m"
 RESET = "\033[0m"
+
+# Padding added to column width when color codes are used (ANSI escape sequences
+# are non-printing characters, so we compensate to keep columns aligned).
+COLOR_ANSI_PADDING = 10
+
+# Minimum width for the dependency name column.
+MIN_NAME_COLUMN_WIDTH = 10
 
 
 def _format_version(s, version):
@@ -257,7 +264,7 @@ def _colorize(text, color, use_color):
 
 def print_table(results, use_color):
     """Print a human-readable summary table."""
-    col_name = max((len(r['name']) for r in results), default=10)
+    col_name = max((len(r['name']) for r in results), default=MIN_NAME_COLUMN_WIDTH)
     col_status = 8
     header = (f"{'DEP':<{col_name}}  {'STATUS':<{col_status}}  "
               f"{'UPSTREAM URL'}")
@@ -275,7 +282,7 @@ def print_table(results, use_color):
             status_str = _colorize(f"ERR", YELLOW, use_color)
         else:
             status_str = _colorize(f"{r['status']}", RED, use_color)
-        print(f"{r['name']:<{col_name}}  {status_str:<{col_status + (10 if use_color else 0)}}  {r['upstream_url']}")
+        print(f"{r['name']:<{col_name}}  {status_str:<{col_status + (COLOR_ANSI_PADDING if use_color else 0)}}  {r['upstream_url']}")
 
     print()
     print(f"Summary: {len(mirrored)} mirrored, "
@@ -304,7 +311,7 @@ def load_all_entries(repo_root):
         text = path.read_text()
         entries, protobuf_version, protoc_versions = _parse_bzl_dict(text)
 
-        # Synthesise the _compiled_protoc_deps entries.
+        # Synthesize the _compiled_protoc_deps entries.
         if protobuf_version and protoc_versions:
             for platform, sha in protoc_versions.items():
                 dep_name = f"com_google_protobuf_protoc_{platform}"
