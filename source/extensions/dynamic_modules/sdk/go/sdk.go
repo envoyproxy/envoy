@@ -44,7 +44,7 @@ func NewNetworkFilterFactory(handle shared.NetworkFilterConfigHandle, name strin
 	unparsedConfig []byte) (shared.NetworkFilterFactory, error) {
 	configFactory := networkFilterConfigFactoryRegistry[name]
 	if configFactory == nil {
-		return nil, fmt.Errorf("failed to get network filter config factory")
+		return nil, fmt.Errorf("failed to get network filter config factory for %s", name)
 	}
 	return configFactory.Create(handle, unparsedConfig)
 }

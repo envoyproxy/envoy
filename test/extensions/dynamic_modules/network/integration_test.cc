@@ -144,9 +144,6 @@ public:
                                                      : Envoy::Network::Address::IpVersion::v6) {}
 
   void initializeSdkFilter(const std::string& filter_name, const std::string& config = "") {
-    if (GetParam() == "go") {
-      TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
-    }
     initializeFilter(filter_name, "network_integration_test",
                      "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" + GetParam(),
                      config);

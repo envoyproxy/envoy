@@ -975,8 +975,14 @@ func envoy_dynamic_module_on_network_filter_config_new(
 
 	configHandle := &dymNetworkConfigHandle{hostConfigPtr: hostConfigPtr}
 	factory, err := sdk.NewNetworkFilterFactory(configHandle, nameString, configBytes)
-	if err != nil || factory == nil {
-		configHandle.Log(shared.LogLevelWarn, "Failed to load network filter configuration: %v", err)
+	if err != nil {
+		configHandle.Log(shared.LogLevelWarn,
+			"Failed to load network filter configuration for %q: %v", nameString, err)
+		return nil
+	}
+	if factory == nil {
+		configHandle.Log(shared.LogLevelWarn,
+			"Failed to load network filter configuration for %q: network filter factory is nil", nameString)
 		return nil
 	}
 
