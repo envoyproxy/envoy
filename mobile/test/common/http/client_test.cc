@@ -11,7 +11,6 @@
 #include "test/common/http/common.h"
 #include "test/common/mocks/common/mocks.h"
 #include "test/common/mocks/event/mocks.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/api_listener.h"

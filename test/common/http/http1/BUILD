@@ -64,7 +64,6 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
         "//test/common/upstream:utility_lib",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
