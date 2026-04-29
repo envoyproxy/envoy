@@ -162,12 +162,11 @@ void DnsSrvCluster::allTargetsResolved() {
   }
 
   if (some_targets_resolved) {
-    HostVector all_hosts;
     HostVector hosts_added;
     HostVector hosts_removed;
-    HostVector hosts_;
+    HostVector hosts;
 
-    if (updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, all_hosts_,
+    if (updateDynamicHostList(new_hosts, hosts, hosts_added, hosts_removed, all_hosts_,
                               all_new_hosts)) {
       // Update host map for current resolve target.
       for (const auto& host : hosts_removed) {
