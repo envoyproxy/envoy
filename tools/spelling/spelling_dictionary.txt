@@ -12,7 +12,6 @@ SLOWLOG
 addend
 addrlen
 defragmentation
-dp
 evictable
 flushdb
 itr

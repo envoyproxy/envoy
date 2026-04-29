@@ -75,7 +75,10 @@ envoy_cc_benchmark_binary(
     ],
     deps = [
         "//envoy/stats:tag_interface",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stats:stats_mocks",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:inlined_vector",
         "@benchmark",

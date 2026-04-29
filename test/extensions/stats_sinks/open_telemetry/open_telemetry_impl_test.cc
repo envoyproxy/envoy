@@ -1802,14 +1802,14 @@ class RequestStreamerTests : public testing::Test {
 public:
   void SetUp() override { resource_attributes_.Add()->set_key("resource_key"); }
 
-  void setupStreamer(uint32_t max_dp) {
+  void setupStreamer(uint32_t max_data_point) {
     opentelemetry::proto::metrics::v1::AggregationTemporality counter_temp = opentelemetry::proto::
         metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
     opentelemetry::proto::metrics::v1::AggregationTemporality hist_temp = opentelemetry::proto::
         metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
 
     streamer_ = std::make_unique<RequestStreamer>(
-        max_dp, resource_attributes_, counter_temp, hist_temp,
+        max_data_point, resource_attributes_, counter_temp, hist_temp,
         [this](MetricsExportRequestPtr request) { requests_.push_back(std::move(request)); },
         0 /* snapshot_time_ns */, 0 /* delta_start_time_ns */, 0 /* cumulative_start_time_ns */);
   }
@@ -1820,13 +1820,13 @@ public:
 };
 
 TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestEmptyMetrics) {
-  setupStreamer(/*max_dp=*/1);
+  setupStreamer(/*max_data_point=*/1);
   streamer_->send();
   EXPECT_EQ(requests_.size(), 0);
 }
 
 TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoLimits) {
-  setupStreamer(/*max_dp=*/0);
+  setupStreamer(/*max_data_point=*/0);
 
   for (int i = 0; i < 1000; i++) {
     streamer_->addGauge("metric" + std::to_string(i), i, {});
@@ -1838,7 +1838,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoLimits) {
 }
 
 TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestWithLimits) {
-  setupStreamer(/*max_dp=*/2);
+  setupStreamer(/*max_data_point=*/2);
 
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   streamer_->addGauge("metric1", 1, {});
@@ -1861,7 +1861,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestWithLimits) {
 }
 
 TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestGauge) {
-  setupStreamer(/*max_dp=*/1);
+  setupStreamer(/*max_data_point=*/1);
 
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
@@ -1876,7 +1876,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestGauge) {
 }
 
 TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationCounter) {
-  setupStreamer(/*max_dp=*/2);
+  setupStreamer(/*max_data_point=*/2);
 
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
   MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
@@ -1912,7 +1912,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationCounter) {
 }
 
 TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoAggregationCounter) {
-  setupStreamer(/*max_dp=*/1);
+  setupStreamer(/*max_data_point=*/1);
 
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
 
@@ -1932,7 +1932,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoAggregationCounter) {
 }
 
 TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationHistogram) {
-  setupStreamer(/*max_dp=*/2);
+  setupStreamer(/*max_data_point=*/2);
 
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
 
@@ -1978,7 +1978,7 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationHistogram) {
 }
 
 TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoAggregationHistogram) {
-  setupStreamer(/*max_dp=*/1);
+  setupStreamer(/*max_data_point=*/1);
 
   MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
 

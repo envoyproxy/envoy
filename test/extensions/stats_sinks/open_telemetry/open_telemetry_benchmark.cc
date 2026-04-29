@@ -1,287 +1,119 @@
-// This file benchmarks different approaches for aggregating metrics with tags (attributes)
-// in the OpenTelemetry stats sink. It compares a custom hash-map based approach against
-// the real production implementation which uses a sorted vector of pairs as the key.
-// The benchmark runs at a scale of 10,000 stats with 10 tags each to test performance
+// This file benchmarks the OpenTelemetry stats sink using the `Stats::Sink::flush` API.
+// The benchmark runs at a scale of 9,000 stats (3,000 counters, 3,000 gauges, 3,000 histograms)
+// with 8 tags each to test end-to-end aggregation and RPC generation performance
 // under realistic load with high cardinality.
-//
-// Benchmark Results (Scale: 10,000 stats, 10 tags):
-// - BM_aggregationWithHashMap:            ~1230 ms
-// - BM_aggregationWithSortedInlineVector: ~770 ms (1.2x faster)
-//
-// Conclusion: The real implementation using a sorted vector of pairs is more
-// performant than the hash map approach both in pure aggregation and end-to-end.
+
 #include "envoy/stats/tag.h"
 
+#include "source/common/stats/histogram_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
-#include "absl/container/flat_hash_map.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/stats/mocks.h"
+
 #include "absl/container/inlined_vector.h"
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
-namespace Stats {
+namespace Extensions {
+namespace StatSinks {
+namespace OpenTelemetry {
 namespace {
 
-const std::vector<Tag> test_tags = {{"cluster_name", "bar_cluster"},
-                                    {"response_code", "200"},
-                                    {"uri", "/api/v1/resource"},
-                                    {"method", "GET"},
-                                    {"zone", "us-east1-a"},
-                                    {"tag6", "value6"},
-                                    {"tag7", "value7"},
-                                    {"tag8", "value8"},
-                                    {"tag9", "value9"},
-                                    {"tag10", "value10"}};
+const std::vector<Stats::Tag> test_tags = {{"cluster_name", "bar_cluster"},
+                                           {"response_code", "200"},
+                                           {"uri", "/api/v1/resource"},
+                                           {"method", "GET"},
+                                           {"zone", "us-east1-a"},
+                                           {"tag6", "value6"},
+                                           {"tag7", "value7"},
+                                           {"tag8", "value8"}};
 
-class MetricKeyHashMap {
+class DummyExporter : public OtlpMetricsExporter {
 public:
-  MetricKeyHashMap(std::string&& name, absl::flat_hash_map<std::string, std::string>&& attributes)
-      : name_(std::move(name)), attributes_(std::move(attributes)) {}
-
-  bool operator==(const MetricKeyHashMap& other) const {
-    return name_ == other.name_ && attributes_ == other.attributes_;
-  }
-
-  template <typename H> friend H AbslHashValue(H h, const MetricKeyHashMap& k) {
-    size_t attrs_hash = 0;
-    for (const auto& pair : k.attributes_) {
-      attrs_hash += absl::Hash<std::pair<std::string, std::string>>()(pair);
-    }
-    return H::combine(std::move(h), k.name_, attrs_hash);
-  }
-
-  absl::string_view name() const { return name_; }
-  const absl::flat_hash_map<std::string, std::string>& attributes() const { return attributes_; }
-
-  std::string releaseName() { return std::move(name_); }
-  absl::flat_hash_map<std::string, std::string> releaseAttributes() {
-    return std::move(attributes_);
-  }
-
-private:
-  std::string name_;
-  absl::flat_hash_map<std::string, std::string> attributes_;
+  void send(MetricsExportRequestPtr&&) override {}
 };
 
-class MetricAggregatorHashMap {
-public:
-  explicit MetricAggregatorHashMap(
-      opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality)
-      : counter_temporality_(counter_temporality) {}
+void BM_OpenTelemetrySinkFlush(benchmark::State& state) {
+  const int num_counters = 3000;
+  const int num_gauges = 3000;
+  const int num_histograms = 3000;
 
-  void addCounter(std::string&& metric_name, uint64_t value, uint64_t delta,
-                  absl::flat_hash_map<std::string, std::string>&& attributes) {
-    using namespace opentelemetry::proto::metrics::v1;
-    const uint64_t point_value =
-        (counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta
-                                                                                        : value;
-    MetricKeyHashMap key{std::move(metric_name), std::move(attributes)};
-    auto it = counter_data_.find(key);
-    if (it != counter_data_.end()) {
-      it->second += point_value;
-    } else {
-      counter_data_.emplace(std::move(key), point_value);
-    }
-  }
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+  Tracers::OpenTelemetry::Resource resource;
 
-  struct AggregationResult {
-    absl::flat_hash_map<MetricKeyHashMap, uint64_t> counter_data_;
+  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context);
+  auto flusher = std::make_shared<OtlpMetricsFlusherImpl>(options);
+  auto exporter = std::make_shared<DummyExporter>();
+
+  OpenTelemetrySink sink(flusher, exporter, 0);
+
+  testing::NiceMock<Stats::MockMetricSnapshot> snapshot;
+
+  // Setup shared histogram statistics to avoid allocating 3000 instances
+  histogram_t* hist = hist_alloc();
+  hist_insert(hist, 1.5, 10);
+  hist_insert(hist, 2.5, 20);
+  Stats::HistogramStatisticsImpl hist_stats(hist);
+
+  std::vector<std::unique_ptr<testing::NiceMock<Stats::MockCounter>>> counters;
+  std::vector<std::unique_ptr<testing::NiceMock<Stats::MockGauge>>> gauges;
+  std::vector<std::unique_ptr<testing::NiceMock<Stats::MockParentHistogram>>> histograms;
+
+  counters.reserve(num_counters);
+  gauges.reserve(num_gauges);
+  histograms.reserve(num_histograms);
+
+  auto make_tags = [](int i) {
+    std::vector<Stats::Tag> tags = test_tags;
+    tags.back().value_ = std::to_string(i);
+    return tags;
   };
 
-  AggregationResult releaseResult() { return {std::move(counter_data_)}; }
-
-private:
-  absl::flat_hash_map<MetricKeyHashMap, uint64_t> counter_data_;
-  const opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality_;
-};
-
-class RequestStreamerHashMap {
-public:
-  explicit RequestStreamerHashMap(
-      opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality)
-      : counter_temporality_(counter_temporality) {
-    initNewRequest();
+  for (int i = 0; i < num_counters; ++i) {
+    auto counter = std::make_unique<testing::NiceMock<Stats::MockCounter>>();
+    counter->name_ = "counter_metric";
+    counter->setTagExtractedName("counter_metric");
+    counter->value_ = 100;
+    counter->used_ = true;
+    counter->setTags(make_tags(i));
+    snapshot.counters_.push_back({1, *counter});
+    counters.push_back(std::move(counter));
   }
 
-  void addCounter(std::string&& name, uint64_t value, uint64_t delta,
-                  absl::flat_hash_map<std::string, std::string>&& attributes) {
-    using namespace opentelemetry::proto::metrics::v1;
-    const uint64_t point_value =
-        (counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta
-                                                                                        : value;
-    auto* metric = findOrCreateMetric(std::move(name));
-    auto* sum = metric->mutable_sum();
-    sum->set_aggregation_temporality(counter_temporality_);
-    sum->set_is_monotonic(true);
-    auto* point = sum->add_data_points();
-    point->set_time_unix_nano(1000); // Dummy timestamp
-    point->set_as_int(point_value);
-
-    for (auto& [k, v] : attributes) {
-      auto* attr = point->add_attributes();
-      attr->set_key(std::move(k));
-      attr->mutable_value()->set_string_value(std::move(v));
-    }
+  for (int i = 0; i < num_gauges; ++i) {
+    auto gauge = std::make_unique<testing::NiceMock<Stats::MockGauge>>();
+    gauge->name_ = "gauge_metric";
+    gauge->setTagExtractedName("gauge_metric");
+    gauge->value_ = 100;
+    gauge->used_ = true;
+    gauge->setTags(make_tags(i));
+    snapshot.gauges_.push_back(*gauge);
+    gauges.push_back(std::move(gauge));
   }
 
-  std::unique_ptr<opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest>
-  releaseRequest() {
-    return std::move(current_request_);
+  for (int i = 0; i < num_histograms; ++i) {
+    auto histogram = std::make_unique<testing::NiceMock<Stats::MockParentHistogram>>();
+    histogram->name_ = "hist_metric";
+    histogram->setTagExtractedName("hist_metric");
+    histogram->used_ = true;
+    histogram->setTags(make_tags(i));
+    ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(testing::ReturnRef(hist_stats));
+    snapshot.histograms_.push_back(*histogram);
+    histograms.push_back(std::move(histogram));
   }
-
-private:
-  void initNewRequest() {
-    current_request_ = std::make_unique<
-        opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest>();
-    auto* rm = current_request_->add_resource_metrics();
-    current_scope_metrics_ = rm->add_scope_metrics();
-  }
-
-  ::opentelemetry::proto::metrics::v1::Metric* findOrCreateMetric(std::string&& name) {
-    for (int i = 0; i < current_scope_metrics_->metrics_size(); ++i) {
-      auto* m = current_scope_metrics_->mutable_metrics(i);
-      if (m->name() == name) {
-        return m;
-      }
-    }
-    auto* m = current_scope_metrics_->add_metrics();
-    m->set_name(std::move(name));
-    return m;
-  }
-
-  std::unique_ptr<opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest>
-      current_request_;
-  ::opentelemetry::proto::metrics::v1::ScopeMetrics* current_scope_metrics_{nullptr};
-  const opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality_;
-};
-
-struct HashMapTag {};
-struct RealAggregatorTag {};
-
-void addCounterToAggregator(MetricAggregatorHashMap& aggregator,
-                            absl::flat_hash_map<std::string, std::string>&& attrs) {
-  aggregator.addCounter("metric_name", 1, 1, std::move(attrs));
-}
-
-void addCounterToAggregator(
-    Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator& aggregator,
-    Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::AttributesVector&& attrs) {
-  aggregator.addCounter(
-      "metric_name", 1,
-      Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::SortedAttributesVector(
-          std::move(attrs)));
-}
-
-void flushToStreamer(MetricAggregatorHashMap::AggregationResult&& result,
-                     RequestStreamerHashMap& streamer) {
-  for (auto it = result.counter_data_.begin(); it != result.counter_data_.end();) {
-    auto node = result.counter_data_.extract(it++);
-    streamer.addCounter(node.key().releaseName(), node.mapped(), 0, node.key().releaseAttributes());
-  }
-}
-
-void flushToStreamer(
-    Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::AggregationResult&& result,
-    Envoy::Extensions::StatSinks::OpenTelemetry::RequestStreamer& streamer) {
-  streamer.addAggregationResult(std::move(result));
-}
-
-absl::flat_hash_map<std::string, std::string> createBaseAttrs(HashMapTag) {
-  absl::flat_hash_map<std::string, std::string> attrs;
-  for (const auto& tag : test_tags) {
-    attrs.emplace(tag.name_, tag.value_);
-  }
-  return attrs;
-}
-
-Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::AttributesVector
-createBaseAttrs(RealAggregatorTag) {
-  Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::AttributesVector attrs;
-  for (const auto& tag : test_tags) {
-    attrs.emplace_back(tag.name_, tag.value_);
-  }
-  std::sort(attrs.begin(), attrs.end());
-  return attrs;
-}
-
-void updateUniqueTag(absl::flat_hash_map<std::string, std::string>& attrs, int i) {
-  attrs[test_tags.back().name_] = std::to_string(i);
-}
-
-void updateUniqueTag(
-    Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator::AttributesVector& attrs, int i) {
-  for (auto& pair : attrs) {
-    if (pair.first == test_tags.back().name_) {
-      pair.second = std::to_string(i);
-      break;
-    }
-  }
-}
-
-template <typename Tag> auto precomputeAttributes(Tag tag) {
-  auto base_attrs = createBaseAttrs(tag);
-  using Attrs = decltype(base_attrs);
-  std::vector<Attrs> precomputed_attrs;
-  precomputed_attrs.reserve(10000);
-  for (int i = 0; i < 10000; ++i) {
-    auto attrs = base_attrs;
-    updateUniqueTag(attrs, i);
-    precomputed_attrs.push_back(std::move(attrs));
-  }
-  return precomputed_attrs;
-}
-
-void BM_aggregationWithHashMap(benchmark::State& state) {
-  auto precomputed_attrs = precomputeAttributes(HashMapTag{});
-  RequestStreamerHashMap streamer(opentelemetry::proto::metrics::v1::AggregationTemporality::
-                                      AGGREGATION_TEMPORALITY_CUMULATIVE);
-  for (auto _ : state) {
-    MetricAggregatorHashMap aggregator(opentelemetry::proto::metrics::v1::AggregationTemporality::
-                                           AGGREGATION_TEMPORALITY_CUMULATIVE);
-    for (int i = 0; i < 10000; ++i) {
-      auto attrs = precomputed_attrs[i];
-      addCounterToAggregator(aggregator, std::move(attrs));
-    }
-
-    flushToStreamer(aggregator.releaseResult(), streamer);
-
-    benchmark::DoNotOptimize(&streamer);
-  }
-}
-BENCHMARK(BM_aggregationWithHashMap);
-
-void BM_aggregationWithSortedInlineVector(benchmark::State& state) {
-  auto precomputed_attrs = precomputeAttributes(RealAggregatorTag{});
-  static const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
-      empty_resource_attributes;
-
-  Envoy::Extensions::StatSinks::OpenTelemetry::RequestStreamer streamer(
-      20000, // max_dp
-      empty_resource_attributes,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-      [](Envoy::Extensions::StatSinks::OpenTelemetry::MetricsExportRequestPtr) {}, // dummy callback
-      1000, 1000, 1000                                                             // dummy times
-  );
 
   for (auto _ : state) {
-    Envoy::Extensions::StatSinks::OpenTelemetry::MetricAggregator aggregator(
-        opentelemetry::proto::metrics::v1::AggregationTemporality::
-            AGGREGATION_TEMPORALITY_CUMULATIVE,
-        opentelemetry::proto::metrics::v1::AggregationTemporality::
-            AGGREGATION_TEMPORALITY_CUMULATIVE);
-    for (int i = 0; i < 10000; ++i) {
-      auto attrs = precomputed_attrs[i];
-      addCounterToAggregator(aggregator, std::move(attrs));
-    }
-
-    flushToStreamer(aggregator.releaseResult(), streamer);
-
-    benchmark::DoNotOptimize(&streamer);
+    sink.flush(snapshot);
   }
+
+  hist_free(hist);
 }
-BENCHMARK(BM_aggregationWithSortedInlineVector);
+BENCHMARK(BM_OpenTelemetrySinkFlush);
 
 } // namespace
-} // namespace Stats
+} // namespace OpenTelemetry
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy
