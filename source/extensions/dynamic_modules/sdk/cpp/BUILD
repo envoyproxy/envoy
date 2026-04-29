@@ -27,8 +27,10 @@ cc_library(
     name = "sdk_abi",
     srcs = [
         "sdk_internal.cc",
-        "sdk_internal_common.h",
         "sdk_internal_network.cc",
+    ],
+    hdrs = [
+        "sdk_internal_common.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
