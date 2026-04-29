@@ -5,9 +5,30 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: golang
+  change: |
+    Reduced the per-cgo-call mutex acquisition on the Golang HTTP filter by making the
+    ``has_destroyed_`` flag a ``std::atomic<bool>``. CAPI methods whose only Envoy-side work is
+    Filter-owned or runs on the worker thread (``setHeader``, ``removeHeader``, ``setTrailer``,
+    ``removeTrailer``, ``addData``, ``injectData``, ``continueStatus``, ``sendLocalReply``,
+    ``setBufferHelper``, ``copyBuffer``, ``drainBuffer``, ``setUpstreamOverrideHost``,
+    ``clearRouteCache``, ``setDynamicMetadata``, ``setStringFilterState``) no longer take the
+    mutex, eliminating an uncontended atomic compare-and-swap pair on every such call. The
+    mutex is retained on the CAPI methods that inline-dereference Envoy-stream-owned objects
+    from off-thread (``getHeader``, ``copyHeaders``, ``copyTrailers``, ``getIntegerValue``,
+    ``setDrainConnectionUponCompletion``) where it serialises against ``onDestroy`` to prevent
+    the worker thread from freeing the underlying header map or ``StreamInfo`` mid-access, and
+    on the five methods that write to the per-request ``strValue`` scratch buffer
+    (``getStringValue``, ``getDynamicMetadata``, ``getStringFilterState``, ``getStringProperty``,
+    ``getSecret``).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: load_report
+  change: |
+    Fixed a bug in load stats reporting where reports were dropped if only custom metrics or completed
+    requests were present in a reporting interval. This behavioral change can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.report_load_for_non_zero_stats`` to ``false``.
 - area: build
   change: |
     Fixed ``Illegal ambiguous match`` error when building contrib targets with ``--config=aws-lc-fips``
@@ -18,6 +39,14 @@ bug_fixes:
     Fixed a crashing bug in the HTTP filter when a stream was already above the downstream write-buffer
     high watermark at filter-chain construction time. Downstream watermark callback registration is
     now deferred until the in-module filter has been constructed.
+- area: oauth2
+  change: |
+    Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously
+    succeed (~1/256) when the configured HMAC secret did not match the secret used to encrypt the
+    cookie (for example after secret rotation, or when receiving legacy unencrypted tokens). The
+    resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
+    ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
+    is preserved, matching the behavior already documented for the explicit decryption-failure case.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -690,6 +719,9 @@ new_features:
     tag-as-label emission, and full librdkafka producer tuning (including TLS and SASL
     authentication) are supported via
     :ref:`KafkaStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig>`.
+- area: access_log
+  change: |
+    Supported the singleton stats scope in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
 - area: stat_sinks
   change: |
     Added a new :ref:`WASM stats filter <config_stat_sinks_wasm_filter>` contrib extension
@@ -702,22 +734,6 @@ new_features:
     metric processing logic (tag enrichment, name rewriting, custom metric injection)
     into the proxy itself. Configured via
     :ref:`WasmFilterStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig>`.
-- area: tls
-  change: |
-    Added support for building Envoy with OpenSSL as an alternative to the default BoringSSL.
-    This is achieved through a BoringSSL compatibility layer (``bssl-compat``) that translates BoringSSL
-    API calls to OpenSSL, allowing Envoy's TLS code to remain unchanged. To build with OpenSSL, use
-    ``--config=openssl``. HTTP/3 (QUIC) is disabled for OpenSSL builds. Note that OpenSSL builds are
-    not currently covered by the `Envoy security policy <https://github.com/envoyproxy/envoy/blob/main/SECURITY.md>`_.
-    See :repo:`bazel/SSL.md <bazel/SSL.md>` for details.
-- area: dynamic_modules
-  change: |
-    Promoted the dynamic modules HTTP filter (``envoy.filters.http.dynamic_modules``) from alpha
-    to stable.
-- area: attributes
-  change: |
-    Added ``connection.peer_certificate`` and ``upstream.peer_certificate`` attributes that provide the
-    PEM-encoded peer certificate for downstream and upstream TLS connections respectively.
 - area: mysql_proxy
   change: |
     Added SSL termination support to the MySQL proxy filter with RSA-mediated ``caching_sha2_password``
@@ -727,5 +743,13 @@ new_features:
     RSA public key exchange on behalf of the client. Added a new
     :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.mysql_proxy.v3.MySQLProxy.downstream_ssl>`
     config option with ``DISABLE``, ``REQUIRE``, and ``ALLOW`` modes.
+- area: composite
+  change: |
+    Added support for the
+    :ref:`inline matcher <envoy_v3_api_field_extensions.filters.http.composite.v3.Composite.matcher>`
+    in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
+    instead of using the :ref:`ExtensionWithMatcher
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
+
 
 deprecated:

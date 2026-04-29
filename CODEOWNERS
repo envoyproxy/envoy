@@ -303,8 +303,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # health check
 /*/extensions/filters/http/health_check @mattklein123 @adisuissa
 # lua
-/*/extensions/filters/http/lua @mattklein123 @wbpcode
-/*/extensions/filters/common/lua @mattklein123 @wbpcode
+/*/extensions/filters/http/lua @mattklein123 @wbpcode @derekargueta
+/*/extensions/filters/common/lua @mattklein123 @wbpcode @derekargueta
 # rbac
 /*/extensions/filters/network/rbac @yangminzhu @yanavlasov
 /*/extensions/filters/http/rbac @yangminzhu @yanavlasov
