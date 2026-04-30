@@ -6,7 +6,15 @@
 
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 
-declare_listener_filter_init_functions!(init, new_filter_config);
+// Using declare_all_init_functions! with the `listener:` category instead of
+// declare_listener_filter_init_functions!. The dedicated single-surface macro takes a
+// server_factory_context_ptr argument that references a type not yet defined in the C
+// ABI (envoy_dynamic_module_type_server_factory_context_envoy_ptr); declare_all_init_functions!
+// avoids that signature mismatch.
+declare_all_init_functions!(
+  init,
+  listener: new_filter_config,
+);
 
 fn init() -> bool {
   true
