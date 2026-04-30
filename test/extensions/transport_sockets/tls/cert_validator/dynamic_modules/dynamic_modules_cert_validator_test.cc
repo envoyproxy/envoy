@@ -729,12 +729,10 @@ TEST_P(DynamicModuleCertValidatorLanguageTest, VerifyCertChainSuccess) {
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
   sk_X509_push(cert_chain.get(), cert.release());
 
-  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
-  Ssl::CertValidator::ExtraValidationContext validation_context;
-
-  auto result = validator.doVerifyCertChain(*cert_chain, nullptr, nullptr, *ssl_ctx,
-                                            validation_context, false, "example.com");
-  EXPECT_EQ(result.status, Ssl::ValidateStatus::Successful);
+  CSmartPtr<SSL_CTX, SSL_CTX_free> ssl_ctx(SSL_CTX_new(TLS_method()));
+  auto results = validator.doVerifyCertChain(*cert_chain, nullptr, nullptr, *ssl_ctx, {}, false,
+                                             "example.com");
+  EXPECT_EQ(ValidationResults::ValidationStatus::Successful, results.status);
 }
 
 } // namespace
