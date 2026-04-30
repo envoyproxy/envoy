@@ -161,26 +161,56 @@ convertGrpcStatusToTraceStatusCode(::opentelemetry::proto::trace::v1::Span_SpanK
   }
 }
 
-void Span::setTag(absl::string_view name, absl::string_view value) {
-  if (name == Tracing::Tags::get().GrpcStatusCode) {
-    span_.mutable_status()->set_code(convertGrpcStatusToTraceStatusCode(span_.kind(), value));
-  } else if (name == Tracing::Tags::get().HttpStatusCode) {
-    uint64_t status_code;
-    // For HTTP status codes in the 5xx range, as well as any other code the client failed to
-    // interpret, span status MUST be set to Error.
-    //
-    // For HTTP status codes in the 4xx range span status MUST be left unset in case of
-    // SpanKind.SERVER and MUST be set to Error in case of SpanKind.CLIENT.
-    if (absl::SimpleAtoi(value, &status_code)) {
-      if (status_code >= 500 ||
-          (status_code >= 400 &&
-           span_.kind() == ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT)) {
-        span_.mutable_status()->set_code(
-            ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_ERROR);
-      }
+void setSpanStatusFromHttp(::opentelemetry::proto::trace::v1::Span& span, absl::string_view value) {
+  uint64_t status_code;
+  // For HTTP status codes in the 5xx range, as well as any other code the client failed to
+  // interpret, span status MUST be set to Error.
+  //
+  // For HTTP status codes in the 4xx range span status MUST be left unset in case of
+  // SpanKind.SERVER and MUST be set to Error in case of SpanKind.CLIENT.
+  if (absl::SimpleAtoi(value, &status_code)) {
+    if (status_code >= 500 ||
+        (status_code >= 400 &&
+         span.kind() == ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT)) {
+      span.mutable_status()->set_code(::opentelemetry::proto::trace::v1::Status::STATUS_CODE_ERROR);
     }
   }
+}
+
+void setSpanStatusFromGrpc(::opentelemetry::proto::trace::v1::Span& span, absl::string_view value) {
+  span.mutable_status()->set_code(convertGrpcStatusToTraceStatusCode(span.kind(), value));
+}
+
+void Span::setTag(absl::string_view name, absl::string_view value) {
+  if (name == Tracing::Tags::get().GrpcStatusCode) {
+    setSpanStatusFromGrpc(span_, value);
+  } else if (name == Tracing::Tags::get().HttpStatusCode) {
+    setSpanStatusFromHttp(span_, value);
+  }
   setAttribute(name, value);
+}
+
+void Span::setTag(const Tracing::Tag& tag, absl::string_view value) {
+  // Handle potential status overrides using standard tags first
+  if (tag.id() == Tracing::TagName::GrpcStatusCode) {
+    setSpanStatusFromGrpc(span_, value);
+  } else if (tag.id() == Tracing::TagName::HttpStatusCode) {
+    setSpanStatusFromHttp(span_, value);
+  }
+
+  const auto stability_opt_in = parent_tracer_.otelSemconvStabilityOptIn();
+
+  if (stability_opt_in == envoy::config::trace::v3::OpenTelemetryConfig::UNKNOWN ||
+      stability_opt_in == envoy::config::trace::v3::OpenTelemetryConfig::LEGACY ||
+      stability_opt_in == envoy::config::trace::v3::OpenTelemetryConfig::LEGACY_AND_SEMCONV) {
+    setAttribute(tag.name(), value);
+  }
+
+  if ((stability_opt_in == envoy::config::trace::v3::OpenTelemetryConfig::SEMCONV ||
+       stability_opt_in == envoy::config::trace::v3::OpenTelemetryConfig::LEGACY_AND_SEMCONV) &&
+      tag.name() != tag.semConvName()) {
+    setAttribute(tag.semConvName(), value);
+  }
 }
 
 void Span::log(SystemTime timestamp, const std::string& event) {
@@ -200,10 +230,13 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
-               uint64_t max_cache_size)
+               uint64_t max_cache_size,
+               envoy::config::trace::v3::OpenTelemetryConfig::OtelSemconvStabilityOptIn
+                   otel_semconv_stability_opt_in)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
       tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
-      max_cache_size_(max_cache_size) {
+      max_cache_size_(max_cache_size),
+      otel_semconv_stability_opt_in_(otel_semconv_stability_opt_in) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();

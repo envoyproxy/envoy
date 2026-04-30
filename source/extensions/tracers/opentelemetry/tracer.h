@@ -40,7 +40,9 @@ public:
   Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
-         SamplerSharedPtr sampler, uint64_t max_cache_size);
+         SamplerSharedPtr sampler, uint64_t max_cache_size,
+         envoy::config::trace::v3::OpenTelemetryConfig::OtelSemconvStabilityOptIn
+             otel_semconv_stability_opt_in);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
@@ -55,6 +57,11 @@ public:
                              const SpanContext& previous_span_context,
                              OptRef<const Tracing::TraceContext> trace_context,
                              OTelSpanKind span_kind);
+
+  envoy::config::trace::v3::OpenTelemetryConfig::OtelSemconvStabilityOptIn
+  otelSemconvStabilityOptIn() const {
+    return otel_semconv_stability_opt_in_;
+  }
 
 private:
   /**
@@ -76,6 +83,8 @@ private:
   const ResourceConstSharedPtr resource_;
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
+  const envoy::config::trace::v3::OpenTelemetryConfig::OtelSemconvStabilityOptIn
+      otel_semconv_stability_opt_in_;
 };
 
 /**
@@ -91,6 +100,7 @@ public:
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
+  void setTag(const Tracing::Tag& /*tag*/, absl::string_view /*value*/) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override;
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/,
