@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <string>
 
 #include "envoy/extensions/http/injected_credentials/oauth2/v3/oauth2.pb.h"
@@ -80,6 +81,7 @@ private:
   }
 
   std::string token_;
+  std::chrono::steady_clock::time_point token_expiry_time_;
   const Common::SecretReaderConstSharedPtr secret_reader_;
   ThreadLocal::SlotPtr tls_;
   std::unique_ptr<OAuth2Client> oauth2_client_;
