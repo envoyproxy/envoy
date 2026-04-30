@@ -104,6 +104,9 @@ public:
 
   void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) override;
 
+  void setServerSentCertificateRequest() override { server_sent_certificate_request_ = true; }
+  bool serverSentCertificateRequest() const override { return server_sent_certificate_request_; }
+
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
       Envoy::Ssl::ClientValidationStatus::NotValidated};
@@ -127,6 +130,8 @@ private:
   std::string cert_validation_error_;
   // Stores additional per-connection data needed by the certificate selector.
   Ssl::SelectionHandleConstSharedPtr cert_selection_handle_;
+  // Set to true when the upstream server sends a CertificateRequest during handshake.
+  bool server_sent_certificate_request_{false};
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,

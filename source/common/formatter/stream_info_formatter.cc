@@ -1747,6 +1747,18 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return connection_info.subjectPeerCertificate();
                                      });
                                }}},
+                             {"UPSTREAM_CLIENT_CERT_REQUESTED",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& connection_info) {
+                                       return absl::optional<std::string>(
+                                           connection_info.serverSentCertificateRequest()
+                                               ? "true"
+                                               : "false");
+                                     });
+                               }}},
                              {"DOWNSTREAM_LOCAL_ADDRESS",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {

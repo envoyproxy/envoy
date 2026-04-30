@@ -59,6 +59,7 @@ public:
   const std::string& tlsVersion() const override;
   const std::string& alpn() const override;
   const std::string& sni() const override;
+  bool serverSentCertificateRequest() const override;
 
   virtual SSL* ssl() const PURE;
 

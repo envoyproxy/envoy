@@ -54,6 +54,8 @@ public:
 
   int selectTlsContext(SSL*);
 
+  absl::optional<PostHandshakeFailure> verifyPostHandshake(SSL* ssl) override;
+
 protected:
   ClientContextImpl(
       Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
@@ -67,7 +69,8 @@ private:
   const std::string server_name_indication_;
   const bool auto_host_sni_;
   const bool allow_renegotiation_;
-
+  const bool enforce_rsa_key_usage_;
+  const bool require_certificate_request_;
   const size_t max_session_keys_;
   absl::Mutex session_keys_mu_;
   std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);

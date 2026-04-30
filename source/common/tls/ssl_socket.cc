@@ -191,6 +191,13 @@ void SslSocket::resumeHandshake() {
 Network::Connection& SslSocket::connection() const { return callbacks_->connection(); }
 
 void SslSocket::onSuccess(SSL* ssl) {
+  if (auto failure = ctx_->verifyPostHandshake(ssl); failure.has_value()) {
+    failure_reason_ = failure->failure_reason;
+    ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
+    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, failure->close_reason);
+    return;
+  }
+
   ctx_->logHandshake(ssl);
   if (callbacks_->connection().streamInfo().upstreamInfo()) {
     callbacks_->connection()

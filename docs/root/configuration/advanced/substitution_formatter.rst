@@ -1556,6 +1556,12 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%UPSTREAM_CLIENT_CERT_REQUESTED%``
+  HTTP/TCP/THRIFT
+    Whether the upstream sent a TLS ``CertificateRequest`` during the handshake.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%HOSTNAME%``
   The system hostname.
 

@@ -139,6 +139,10 @@ public:
    * @param chain the validated chain where chain[0] = leaf, chain[1] = direct issuer, etc.
    */
   virtual void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) PURE;
+
+  /** Set/query whether the upstream sent a TLS CertificateRequest during the handshake. **/
+  virtual void setServerSentCertificateRequest() PURE;
+  virtual bool serverSentCertificateRequest() const PURE;
 };
 
 } // namespace Ssl

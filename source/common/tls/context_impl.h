@@ -92,6 +92,16 @@ public:
    */
   void logHandshake(SSL* ssl) const;
 
+  struct PostHandshakeFailure {
+    std::string failure_reason;
+    std::string close_reason;
+  };
+
+  // Called after a successful handshake; returns a failure to reject the connection, or nullopt.
+  virtual absl::optional<PostHandshakeFailure> verifyPostHandshake(SSL* /*ssl*/) {
+    return absl::nullopt;
+  }
+
   SslStats& stats() { return stats_; }
 
   /**

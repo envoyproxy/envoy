@@ -1711,6 +1711,16 @@ TEST_F(ClientContextConfigImplTest, TlsCertificatesAndSdsConfig) {
             "Multiple TLS certificates are not supported for client contexts");
 }
 
+// Validate that require_certificate_request without a client certificate configured is rejected.
+TEST_F(ClientContextConfigImplTest, RequireCertificateRequestWithoutClientCert) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  tls_context.set_require_certificate_request(true);
+  EXPECT_EQ(ClientContextConfigImpl::create(tls_context, factory_context_).status().message(),
+            "'require_certificate_request' requires a client certificate to be configured "
+            "via 'tls_certificates', 'tls_certificate_sds_secret_configs', or "
+            "'custom_tls_certificate_selector'");
+}
+
 // Validate context config supports SDS, and is marked as not ready if secrets are not yet
 // downloaded.
 TEST_F(ClientContextConfigImplTest, SecretNotReady) {
