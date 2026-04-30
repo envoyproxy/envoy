@@ -91,8 +91,16 @@ envoy_cc_test(
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/dynamic_modules:abi_impl",
+        # The Go SDK's `abi` Go package references all per-surface
+        # `envoy_dynamic_module_callback_*` symbols (listener, network, cluster, etc.) —
+        # so even an http-only test_data .so has unresolved listener-filter callback
+        # references. With RTLD_LAZY the dynamic linker accepts these as long as the
+        # symbols are provided by the test binary, so we depend on every per-surface
+        # `abi_impl`/`filter_lib` library here. Same reasoning applies to the other
+        # dynamic-modules tests below.
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
+        "//source/extensions/filters/listener/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_factory_context_mocks",

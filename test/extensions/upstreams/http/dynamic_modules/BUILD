@@ -53,6 +53,11 @@ envoy_cc_test(
         "cpu:3",
     ],
     deps = [
+        # The Go SDK's `abi` package references per-surface callback symbols. With
+        # RTLD_LAZY the loader accepts these as long as the test binary provides
+        # them — so we link the relevant abi libs explicitly.
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
+        "//source/extensions/filters/listener/dynamic_modules:filter_lib",
         "//source/extensions/upstreams/http/dynamic_modules:config",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",

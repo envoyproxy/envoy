@@ -141,7 +141,12 @@ envoy_cc_test(
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
+        # The Go SDK's `abi` package references per-surface callback symbols (listener,
+        # http filter, etc.). With RTLD_LAZY the loader accepts these as long as the
+        # test binary provides them, so we link the relevant abi libs explicitly.
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
+        "//source/extensions/filters/listener/dynamic_modules:filter_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
