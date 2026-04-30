@@ -129,6 +129,10 @@ build:mobile-rbe --verbose_failures
 build:mobile-rbe --spawn_strategy=remote,sandboxed,local
 build:mobile-rbe --experimental_ui_max_stdouterr_bytes=10485760
 build:mobile-rbe --extra_execution_platforms=//bazel/platforms/rbe:linux_x64
+# Recover from transient gRPC failures (e.g. UNAVAILABLE: io exception) talking to engflow.
+build:mobile-rbe --remote_retries=5
+build:mobile-rbe --remote_retry_max_delay=10s
+build:mobile-rbe --experimental_remote_cache_eviction_retries=5
 
 
 #############################################################################
