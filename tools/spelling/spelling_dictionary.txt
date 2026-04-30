@@ -113,6 +113,7 @@ ETX
 FS
 FIXME
 decrypted
+decrypts
 gperf
 HEXDIG
 HEXDIGIT
@@ -720,6 +721,7 @@ codebase
 codec
 codecs
 codepath
+codepoint
 codepoints
 codings
 combinatorial
@@ -1520,6 +1522,7 @@ timestamps
 timeval
 tmp
 tmpfile
+tmpfs
 token
 tokenize
 tokenized
