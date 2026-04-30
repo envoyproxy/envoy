@@ -415,7 +415,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       }));
 
   Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "146"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "98"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
@@ -448,7 +448,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
       }));
 
   Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "134"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "91"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
