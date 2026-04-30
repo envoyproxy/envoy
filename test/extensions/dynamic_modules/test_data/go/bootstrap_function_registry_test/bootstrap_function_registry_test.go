@@ -47,23 +47,36 @@ var (
 	doubleSentinel uint64 = 0xB2
 )
 
+// Keys are namespaced with a "go_" prefix so they don't collide with the Rust
+// FunctionRegistryRust test, which registers different pointer values under the
+// bare names "get_answer" and "double_it". The registry is process-wide and
+// holds whatever was first registered, so under the gtest parameterization the
+// Rust run executes first and the bare names already point at Rust functions
+// when the Go run starts.
+const (
+	answerKey = "go_get_answer"
+	doubleKey = "go_double_it"
+)
+
 func (*functionRegistryExtension) OnServerInitialized(_ shared.BootstrapExtensionHandle) {
 	answerPtr := unsafe.Pointer(&answerSentinel)
 	doublePtr := unsafe.Pointer(&doubleSentinel)
 
-	// Register sentinels. The registry is process-wide; under parameterized test runs the
-	// same key may already exist from a prior run, so we ignore the boolean return.
-	_ = sdk.RegisterFunction("get_answer", answerPtr)
-	_ = sdk.RegisterFunction("double_it", doublePtr)
+	// Under parameterized runs (IPv4 then IPv6) the keys may already exist from the
+	// prior parameterization; the registry retains the first value. We assert that
+	// either: (a) registration succeeded and the round-trip returns our pointer, or
+	// (b) registration was rejected because the same value is already present.
+	_ = sdk.RegisterFunction(answerKey, answerPtr)
+	_ = sdk.RegisterFunction(doubleKey, doublePtr)
 
-	if got, ok := sdk.GetFunction("get_answer"); !ok {
-		panic("registered function get_answer should be found")
+	if got, ok := sdk.GetFunction(answerKey); !ok {
+		panic("registered function should be found")
 	} else if got != answerPtr {
 		panic("get_answer round-trip returned wrong pointer")
 	}
 
-	if got, ok := sdk.GetFunction("double_it"); !ok {
-		panic("registered function double_it should be found")
+	if got, ok := sdk.GetFunction(doubleKey); !ok {
+		panic("registered function should be found")
 	} else if got != doublePtr {
 		panic("double_it round-trip returned wrong pointer")
 	}

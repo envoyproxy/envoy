@@ -77,7 +77,14 @@ var getRouteEndpoint = func(service string) (string, bool) {
 	return v.(string), true
 }
 
-const registryKey = "get_route_endpoint"
+// Namespaced with a "go_" prefix so it doesn't collide with the Rust mirror
+// (bootstrap_http_combined_test.rs) which registers a Rust extern "C" fn under
+// the bare name "get_route_endpoint". The function registry is process-wide and
+// the gtest parameterization runs FunctionRegistryCrossFilterRust before
+// FunctionRegistryCrossFilterGo within the same process, so the bare key would
+// already point at a Rust function pointer when this Go filter resolves it —
+// which would crash when re-cast to a Go closure pointer.
+const registryKey = "go_get_route_endpoint"
 
 // -------------------------------------------------------------------------------------
 // Bootstrap extension.
