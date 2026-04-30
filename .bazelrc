@@ -283,7 +283,6 @@ build:cache-local --remote_cache=grpc://localhost:9092
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:rbe-toolchain --incompatible_enable_cc_toolchain_resolution=false
-common:rbe-toolchain --experimental_remote_downloader=grpcs://mordenite.cluster.engflow.com
 
 build:rbe-toolchain-clang --config=rbe-toolchain
 build:rbe-toolchain-clang --config=clang
@@ -599,10 +598,12 @@ common:engflow-common --google_default_credentials=false
 common:engflow-common --grpc_keepalive_time=60s
 common:engflow-common --grpc_keepalive_timeout=30s
 common:engflow-common --remote_cache_compression
+common:engflow-common --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
 
 common:remote-cache --config=engflow-common
 common:remote-cache --remote_cache=grpcs://mordenite.cluster.engflow.com
 common:remote-cache --remote_timeout=3600s
+common:remote-cache --experimental_remote_downloader=grpcs://mordenite.cluster.engflow.com
 
 try-import %workspace%/repo.bazelrc
 try-import %workspace%/clang.bazelrc
