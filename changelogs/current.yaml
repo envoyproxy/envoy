@@ -39,6 +39,13 @@ bug_fixes:
     Fixed a crashing bug in the HTTP filter when a stream was already above the downstream write-buffer
     high watermark at filter-chain construction time. Downstream watermark callback registration is
     now deferred until the in-module filter has been constructed.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where the HTTP filter per-route configuration and the upstream HTTP TCP bridge
+    configuration did not handle the ``google.protobuf.Struct`` configuration message as the API
+    definition requires. Both factories now serialize the ``Struct`` to a JSON string and pass the
+    string to the dynamic module side as the configuration, matching the behavior already in place
+    for every other dynamic module extension factory.
 - area: oauth2
   change: |
     Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously
@@ -56,6 +63,11 @@ new_features:
   change: |
     Added :ref:`per-route configuration support <envoy_v3_api_msg_extensions.filters.http.set_metadata.v3.Config>`
     to the ``set_metadata`` HTTP filter.
+- area: logging
+  change: |
+    Added ``%N`` as a custom spdlog pattern flag that emits the Envoy version string. It can be
+    used in the ``--log-format`` CLI flag or the bootstrap ``application_log_config.log_format``
+    to include the running version in every log line, e.g. ``--log-format "[%N][%l] %v"``.
 - area: dynamic_modules
   change: |
     Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic

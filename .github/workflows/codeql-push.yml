@@ -89,6 +89,10 @@ jobs:
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2
+      env:
+        # NOTE: these env vars are undocumented/experimental - they are likely to require a future update
+        CODEQL_EXTRACTOR_CPP_OPTION_EXCLUDE_HEADER_PATTERNS: "bin/clang.*/.*"
+        CODEQL_EXTRACTOR_CPP_WIP_IGNORE_SYSTEM_HEADERS: "true"
       with:
         languages: cpp
         trap-caching: false

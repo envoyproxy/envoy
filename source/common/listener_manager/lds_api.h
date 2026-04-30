@@ -13,7 +13,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/init/target_impl.h"
 
 namespace Envoy {
@@ -23,7 +23,7 @@ namespace Server {
  * LDS API implementation that fetches via Subscription.
  */
 class LdsApiImpl : public LdsApi,
-                   Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>,
+                   public Config::SubscriptionCallbacks,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
@@ -49,6 +49,7 @@ private:
   std::string system_version_info_;
   ListenerManager& listener_manager_;
   Stats::ScopeSharedPtr scope_;
+  const Config::ResourceTypeHelper<envoy::config::listener::v3::Listener> resource_type_helper_;
   Config::XdsManager& xds_manager_;
   Init::TargetImpl init_target_;
 };

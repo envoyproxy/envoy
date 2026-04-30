@@ -30,7 +30,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/socket_interface_swap.h"
 #include "test/integration/ssl_utility.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"

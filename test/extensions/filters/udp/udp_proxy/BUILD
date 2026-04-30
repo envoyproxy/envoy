@@ -126,7 +126,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_config_lib",
         "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_proto_cc_proto",
         "//test/integration:integration_lib",
-        "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
