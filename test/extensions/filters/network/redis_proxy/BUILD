@@ -228,7 +228,6 @@ envoy_extension_cc_benchmark_binary(
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//source/extensions/filters/network/redis_proxy:router_lib",
         "//test/test_common:printers_lib",
-        "//test/test_common:simulated_time_system_lib",
         "@benchmark",
     ],
 )

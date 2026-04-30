@@ -12,7 +12,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/upstream/cds_api_helper.h"
 
@@ -32,7 +32,7 @@ enum class StartStatus {
  * ODCDS API implementation that fetches via Subscription.
  */
 class OdCdsApiImpl : public OdCdsApi,
-                     Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>,
+                     public Config::SubscriptionCallbacks,
                      Logger::Loggable<Logger::Id::upstream> {
 public:
   static absl::StatusOr<OdCdsApiSharedPtr>
@@ -68,6 +68,7 @@ private:
   Stats::ScopeSharedPtr scope_;
   StartStatus status_{StartStatus::NotStarted};
   absl::flat_hash_set<std::string> awaiting_names_;
+  const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
   Config::SubscriptionPtr subscription_;
 };
 

@@ -5,6 +5,7 @@
 #include "source/common/secret/secret_provider_impl.h"
 #include "source/extensions/filters/http/oauth2/config.h"
 
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/logging.h"
 
