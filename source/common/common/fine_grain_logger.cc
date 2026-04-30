@@ -238,10 +238,17 @@ level_enum FineGrainLogContext::getLogLevel(absl::string_view key) const {
 
   absl::string_view file = key;
   absl::string_view logger_name;
-  const size_t colon = file.rfind(':');
-  if (colon != file.npos) {
-    logger_name = file.substr(colon + 1);
-    file = file.substr(0, colon);
+  size_t colon = key.rfind(':');
+#ifdef _WIN32
+  // On Windows, a colon at index 1 is likely a drive letter (e.g., C:\path).
+  if (colon == 1 && key.size() > 1 &&
+      ((key[0] >= 'a' && key[0] <= 'z') || (key[0] >= 'A' && key[0] <= 'Z'))) {
+    colon = absl::string_view::npos;
+  }
+#endif
+  if (colon != absl::string_view::npos) {
+    logger_name = key.substr(colon + 1);
+    file = key.substr(0, colon);
   }
 
   // Get basename for file.

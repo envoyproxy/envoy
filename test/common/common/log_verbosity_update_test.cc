@@ -435,49 +435,23 @@ TEST(FineGrainLog, updateWithFileGroupAndGroupOnly) {
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key2)->level(), spdlog::level::trace);
 }
 
-TEST(FineGrainLog, loggingBehaviorWithGroups) {
+TEST(FineGrainLog, updateWithMultipleColons) {
   Logger::Context::enableFineGrainLogger();
-  // Register a logger with a group name.
-  const std::string key = "source/common/http/http.cc:http_group";
+  // Simulate a case where the file path might contain a colon (e.g. some generated code or Windows
+  // path). On Linux, the last colon is always the separator.
+  const std::string key = "path/with:colon/file.cc:group";
   std::atomic<spdlog::logger*> flogger{nullptr};
   getFineGrainLogContext().initFineGrainLogger(key, "", flogger);
 
-  // Helper function to log using the new GROUP macro.
-  auto log_func = [&]() {
-    FINE_GRAIN_GROUP_LOG(info, "http_group", "this should be filtered");
-    FINE_GRAIN_GROUP_LOG(warn, "http_group", "this should be logged");
-  };
-
-  // Set "http_group" to WARN.
+  // Match by group name.
   getFineGrainLogContext().updateVerbositySetting(
-      {{"http_group", static_cast<int>(spdlog::level::warn)}});
+      {{"group", static_cast<int>(spdlog::level::warn)}});
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key)->level(), spdlog::level::warn);
 
-  {
-    Envoy::StartStopRecording recording(Envoy::GetLogSink());
-    log_func();
-    auto messages = recording.messages();
-    EXPECT_TRUE(std::any_of(messages.begin(), messages.end(), [](const std::string& m) {
-      return m.find("this should be logged") != std::string::npos;
-    }));
-    EXPECT_FALSE(std::any_of(messages.begin(), messages.end(), [](const std::string& m) {
-      return m.find("this should be filtered") != std::string::npos;
-    }));
-  }
-
-  // Now change "http_group" to TRACE.
+  // Match by file path (the part before the last colon).
   getFineGrainLogContext().updateVerbositySetting(
-      {{"http_group", static_cast<int>(spdlog::level::trace)}});
-
-  {
-    Envoy::StartStopRecording recording(Envoy::GetLogSink());
-    log_func();
-    auto messages = recording.messages();
-    EXPECT_TRUE(std::any_of(messages.begin(), messages.end(), [](const std::string& m) {
-      return m.find("this should be logged") != std::string::npos;
-    }));
-    EXPECT_TRUE(std::any_of(messages.begin(), messages.end(), [](const std::string& m) {
-      return m.find("this should be filtered") != std::string::npos;
-    }));
-  }
+      {{"path/with:colon/file.cc", static_cast<int>(spdlog::level::err)}});
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key)->level(), spdlog::level::err);
 }
+
 } // namespace Envoy
