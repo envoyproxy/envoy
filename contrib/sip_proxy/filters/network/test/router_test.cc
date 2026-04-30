@@ -10,7 +10,6 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/test_time.h"
 
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
