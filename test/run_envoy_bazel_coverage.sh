@@ -38,8 +38,28 @@ if [[ -n "${BAZEL_GRPC_LOG}" ]]; then
 fi
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
+    # `bazel query` still triggers WORKSPACE/repository-rule loading, so
+    # rctx.download calls (e.g. for yq) need to go via the remote downloader
+    # when one is configured -- otherwise the query can fail when github.com
+    # returns transient errors. Detect which of our configs is in use in
+    # BAZEL_BUILD_OPTIONS and forward a matching, query-safe --config= to
+    # the query. We can't just pass BAZEL_BUILD_OPTIONS through -- query
+    # rejects/warns on executor/strategy/test flags.
+    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}")
+    for opt in "${BAZEL_BUILD_OPTIONS[@]}"; do
+        case "$opt" in
+            --config=rbe|--config=remote-cache)
+                BAZEL_QUERY_OPTIONS+=("--config=remote-cache")
+                break
+                ;;
+            --config=mobile-rbe)
+                BAZEL_QUERY_OPTIONS+=("--config=mobile-rbe")
+                break
+                ;;
+        esac
+    done
     # Filter targets to just fuzz tests.
-    _targets=$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" --noshow_loading_progress --noshow_progress "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
+    _targets=$(bazel query "${BAZEL_QUERY_OPTIONS[@]}" --noshow_loading_progress --noshow_progress "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
     COVERAGE_TARGETS=()
     while read -r line; do COVERAGE_TARGETS+=("$line"); done \
         <<< "$_targets"
