@@ -88,6 +88,13 @@ public:
   void updateOnDemand(std::string cluster_name) override;
 
 private:
+  // Forward declarations of singleton-manager helpers defined in the .cc file. The
+  // ``SharedKadsSubscription`` is a single long-lived ``Config::Subscription`` over the
+  // bootstrap-level ADS mux that the manager uses for non-xdstp resources when the runtime
+  // guard ``envoy.reloadable_features.odcds_singleton_shared_kads_subscription`` is enabled.
+  // It avoids the per-resource ``Watch`` lifecycle that, on the shared ``WatchMap[Cluster]``
+  // populated by a wildcard CDS watcher, can cause delta responses to be dispatched only to
+  // the wildcard watcher and never reach the singleton manager's per-resource callback.
   class XdstpOdcdsSubscriptionsManager;
   using XdstpOdcdsSubscriptionsManagerSharedPtr = std::shared_ptr<XdstpOdcdsSubscriptionsManager>;
 

@@ -54,6 +54,21 @@ bug_fixes:
     resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
     ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
     is preserved, matching the behavior already documented for the explicit decryption-failure case.
+- area: upstream
+  change: |
+    Fixed a regression in the on-demand cluster discovery (ODCDS) singleton subscription manager
+    introduced alongside ``envoy.reloadable_features.odcds_over_ads_fix`` where, on a deployment
+    whose bootstrap-level ADS mux also serves a wildcard CDS subscription, delta responses for
+    on-demand cluster names were dispatched only to the wildcard CDS watcher and never reached
+    the singleton manager's per-resource callback. As a result the manager never observed
+    ``Available``/``Missing`` updates, every on-demand request silently waited for the
+    on_demand filter's 5s timeout, and the cluster could not be retried until the next request
+    arrived. The singleton manager now uses a single long-lived ``Config::Subscription`` driven
+    by ``requestOnDemandUpdate`` for non-xDS-TP resources over ``kAds`` (mirroring the legacy
+    ``OdCdsApiImpl`` wire model that is known to work in 1.37), which avoids the per-resource
+    ``Watch`` lifecycle that is racy with the wildcard CDS watcher on the shared
+    ``WatchMap[Cluster]``. This behavioral change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.odcds_singleton_shared_kads_subscription`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

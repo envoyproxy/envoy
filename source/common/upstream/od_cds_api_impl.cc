@@ -3,11 +3,33 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Upstream {
+
+namespace {
+
+// When this guard is enabled (default), ``XdstpOdCdsApiImpl`` over the bootstrap-level ADS
+// mux uses a single long-lived ``Config::Subscription`` driven by ``requestOnDemandUpdate``
+// instead of one ``Subscription`` per requested resource. This restores the legacy
+// ``OdCdsApiImpl`` wire model and avoids a delta-xDS dispatch hazard with a wildcard CDS
+// watcher on the shared ``WatchMap`` for ``type.googleapis.com/envoy.config.cluster.v3.Cluster``.
+constexpr absl::string_view SharedKadsSubscriptionRuntimeGuard =
+    "envoy.reloadable_features.odcds_singleton_shared_kads_subscription";
+
+const envoy::config::core::v3::ConfigSource& staticAdsConfigSource() {
+  CONSTRUCT_ON_FIRST_USE(envoy::config::core::v3::ConfigSource,
+                         []() -> envoy::config::core::v3::ConfigSource {
+                           envoy::config::core::v3::ConfigSource ads;
+                           ads.mutable_ads();
+                           return ads;
+                         }());
+}
+
+} // namespace
 
 absl::StatusOr<OdCdsApiSharedPtr>
 OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
@@ -177,7 +199,17 @@ public:
       return;
     }
     ENVOY_LOG(trace, "ODCDS-manager: adding a subscription for resource {}", resource_name);
-    // Subscribe using the xds-manager.
+    // For non-xdstp resources over the bootstrap-level ADS mux (the ``kAds`` config-source
+    // case), prefer a single long-lived ``Config::Subscription`` driven by
+    // ``requestOnDemandUpdate``. This bypasses the per-resource ``Watch`` lifecycle that, on
+    // the shared ``WatchMap`` populated by a wildcard CDS watcher, can cause delta responses
+    // to be routed only to the wildcard watcher and never reach this manager's callback.
+    if (old_ads && Runtime::runtimeFeatureEnabled(SharedKadsSubscriptionRuntimeGuard)) {
+      addSharedKadsSubscription(resource_name);
+      return;
+    }
+    // Per-resource subscription path (xdstp resources, or the legacy fallback when the
+    // shared-kAds runtime guard is disabled).
     auto subscription =
         std::make_unique<PerSubscriptionData>(*this, resource_name, validation_visitor_);
     absl::Status status = subscription->initializeSubscription(old_ads);
@@ -196,8 +228,21 @@ public:
   }
 
 private:
-  // A singleton subscription handler.
-  class PerSubscriptionData : public Config::SubscriptionCallbacks {
+  class SharedKadsSubscription;
+  // A subscription handler. For non-xdstp resources over the bootstrap-level ADS mux this is
+  // shared across all on-demand resources (the manager owns a single ``Config::Subscription``
+  // and the per-resource ``subscriptions_`` entry is just a marker tag). For genuine xdstp
+  // resources this owns the per-resource ``PerSubscriptionData`` legacy object that holds its
+  // own ``Subscription``.
+  class SubscriptionHandle {
+  public:
+    virtual ~SubscriptionHandle() = default;
+  };
+  using SubscriptionHandlePtr = std::unique_ptr<SubscriptionHandle>;
+
+  // A per-resource subscription handler. Used for xdstp resources, where each resource maps
+  // to its own per-authority mux and watcher dispatch is unambiguous.
+  class PerSubscriptionData : public SubscriptionHandle, public Config::SubscriptionCallbacks {
   public:
     PerSubscriptionData(XdstpOdcdsSubscriptionsManager& parent, absl::string_view resource_name,
                         ProtobufMessage::ValidationVisitor& validation_visitor)
@@ -224,15 +269,6 @@ private:
     }
 
   private:
-    const envoy::config::core::v3::ConfigSource& staticAdsConfigSource() {
-      CONSTRUCT_ON_FIRST_USE(envoy::config::core::v3::ConfigSource,
-                             []() -> envoy::config::core::v3::ConfigSource {
-                               envoy::config::core::v3::ConfigSource ads;
-                               ads.mutable_ads();
-                               return ads;
-                             }());
-    }
-
     // Config::SubscriptionCallbacks
     absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                 const std::string& version_info) override {
@@ -288,7 +324,118 @@ private:
     Config::SubscriptionPtr subscription_;
     bool resource_was_updated_{false};
   };
-  using PerSubscriptionDataPtr = std::unique_ptr<PerSubscriptionData>;
+
+  // A bookkeeping marker for resources that are tracked by the shared kAds subscription
+  // (``shared_kads_subscription_``) rather than by their own ``PerSubscriptionData``.
+  class SharedKadsHandle : public SubscriptionHandle {};
+
+  void addSharedKadsSubscription(absl::string_view resource_name) {
+    if (shared_kads_subscription_ == nullptr) {
+      shared_kads_subscription_ =
+          std::make_unique<SharedKadsSubscription>(*this, validation_visitor_);
+      absl::Status status = shared_kads_subscription_->start(resource_name);
+      if (!status.ok()) {
+        ENVOY_LOG(info,
+                  "ODCDS-manager: shared kAds subscription for resource {} could not be "
+                  "registered: {}. Treating as missing cluster",
+                  resource_name, status.message());
+        shared_kads_subscription_.reset();
+        onFailure(resource_name);
+        return;
+      }
+    } else {
+      shared_kads_subscription_->requestOnDemandUpdate(resource_name);
+    }
+    subscriptions_.emplace(std::string(resource_name), std::make_unique<SharedKadsHandle>());
+  }
+
+  // A single, long-lived ``Config::Subscription`` shared across all on-demand resources whose
+  // config-source is the bootstrap-level ADS (``kAds``). Per-resource interest is added via
+  // ``requestOnDemandUpdate``, mirroring the legacy ``OdCdsApiImpl`` wire model.
+  class SharedKadsSubscription : public Config::SubscriptionCallbacks,
+                                 Logger::Loggable<Logger::Id::upstream> {
+  public:
+    SharedKadsSubscription(XdstpOdcdsSubscriptionsManager& parent,
+                           ProtobufMessage::ValidationVisitor& validation_visitor)
+        : parent_(parent), resource_type_helper_(validation_visitor, "name") {}
+
+    absl::Status start(absl::string_view first_resource_name) {
+      const auto resource_type = resource_type_helper_.getResourceName();
+      absl::StatusOr<Config::SubscriptionPtr> subscription_or_error =
+          parent_.xds_manager_.subscribeToSingletonResource(
+              first_resource_name,
+              makeOptRef<const envoy::config::core::v3::ConfigSource>(staticAdsConfigSource()),
+              Grpc::Common::typeUrl(resource_type), *parent_.scope_, *this,
+              resource_type_helper_.resourceDecoder(), {});
+      RETURN_IF_NOT_OK_REF(subscription_or_error.status());
+      subscription_ = std::move(subscription_or_error.value());
+      interested_names_.insert(std::string(first_resource_name));
+      ENVOY_LOG(debug, "ODCDS-manager: starting shared kAds subscription for resource {}",
+                first_resource_name);
+      subscription_->start({std::string(first_resource_name)});
+      return absl::OkStatus();
+    }
+
+    void requestOnDemandUpdate(absl::string_view resource_name) {
+      interested_names_.insert(std::string(resource_name));
+      ENVOY_LOG(debug,
+                "ODCDS-manager: requesting on-demand update on shared kAds subscription for "
+                "resource {}",
+                resource_name);
+      subscription_->requestOnDemandUpdate({std::string(resource_name)});
+    }
+
+  private:
+    // Config::SubscriptionCallbacks
+    absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                const std::string& version_info) override {
+      // On-demand cluster updates are only supported for delta, not sotw.
+      UNREFERENCED_PARAMETER(resources);
+      UNREFERENCED_PARAMETER(version_info);
+      PANIC("not supported");
+    }
+    absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                                const std::string& system_version_info) override {
+      for (const auto& resource : added_resources) {
+        ENVOY_LOG(trace, "ODCDS-manager: shared kAds: updating resource {}", resource.get().name());
+        absl::Status status =
+            parent_.onResourceUpdate(resource.get().name(), resource, system_version_info);
+        if (!status.ok()) {
+          return status;
+        }
+      }
+      for (const auto& resource_name : removed_resources) {
+        ENVOY_LOG(trace, "ODCDS-manager: shared kAds: removing resource {}", resource_name);
+        absl::Status status = parent_.onResourceRemoved(resource_name, system_version_info);
+        if (!status.ok()) {
+          return status;
+        }
+      }
+      return absl::OkStatus();
+    }
+    void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                              const EnvoyException* e) override {
+      // The shared subscription multiplexes all on-demand resources. A subscription-level
+      // failure (e.g. ``UpdateRejected``) is not associated with a specific resource, so we
+      // notify every interested resource as missing. Subsequent ``requestOnDemandUpdate``
+      // calls will retry through the same subscription.
+      ENVOY_LOG(debug,
+                "ODCDS-manager: shared kAds subscription failed (reason = {}): {}; treating all "
+                "{} interested resources as missing",
+                enumToInt(reason), e == nullptr ? "exception not provided" : e->what(),
+                interested_names_.size());
+      for (const auto& resource_name : interested_names_) {
+        parent_.onFailure(resource_name);
+      }
+    }
+
+    XdstpOdcdsSubscriptionsManager& parent_;
+    const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
+    Config::SubscriptionPtr subscription_;
+    absl::flat_hash_set<std::string> interested_names_;
+  };
+  using SharedKadsSubscriptionPtr = std::unique_ptr<SharedKadsSubscription>;
 
   Config::XdsManager& xds_manager_;
   CdsApiHelper helper_;
@@ -296,7 +443,10 @@ private:
   Stats::ScopeSharedPtr scope_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   // Maps a resource name to its subscription data.
-  absl::flat_hash_map<std::string, PerSubscriptionDataPtr> subscriptions_;
+  absl::flat_hash_map<std::string, SubscriptionHandlePtr> subscriptions_;
+  // Lazily constructed on the first kAds + non-xdstp on-demand request when the shared
+  // subscription runtime guard is enabled. ``nullptr`` otherwise.
+  SharedKadsSubscriptionPtr shared_kads_subscription_;
 };
 
 // Register the XdstpOdcdsSubscriptionsManager singleton.
