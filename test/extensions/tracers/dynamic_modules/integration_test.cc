@@ -41,7 +41,7 @@ public:
           auto* provider = tracing->mutable_provider();
           provider->set_name("envoy.tracers.dynamic_modules");
 
-          envoy::extensions::tracers::dynamic_modules::v3::DynamicModuleConfig tracer_proto;
+          envoy::extensions::tracers::dynamic_modules::v3::DynamicModuleTracer tracer_proto;
           tracer_proto.mutable_dynamic_module_config()->set_name("tracer_integration_test");
           tracer_proto.set_tracer_name("test_tracer");
           Protobuf::StringValue value;

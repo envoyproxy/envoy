@@ -25,12 +25,16 @@ static inline void cgoInvokeEventCb(envoy_dynamic_module_type_event_cb cb, void*
     }
 }
 
-// C-side function pointers we can pass to Envoy. They forward to the Go-exported callbacks.
-static envoy_dynamic_module_type_stats_iteration_action cgoBootstrapCounterIteratorC(
+// C-side function pointers we can pass to Envoy. They forward to the Go-exported
+// callbacks. `__attribute__((used))` ensures the linker keeps the symbol even though
+// the only references are address-taken via cgo type wrappers compiled into a
+// different translation unit; without it, --gc-sections strips the function and
+// dlopen of the resulting c-shared .so fails on Linux.
+__attribute__((used)) static envoy_dynamic_module_type_stats_iteration_action cgoBootstrapCounterIteratorC(
     envoy_dynamic_module_type_envoy_buffer name, uint64_t value, void* user_data) {
     return cgoBootstrapCounterIteratorGo(name, value, user_data);
 }
-static envoy_dynamic_module_type_stats_iteration_action cgoBootstrapGaugeIteratorC(
+__attribute__((used)) static envoy_dynamic_module_type_stats_iteration_action cgoBootstrapGaugeIteratorC(
     envoy_dynamic_module_type_envoy_buffer name, uint64_t value, void* user_data) {
     return cgoBootstrapGaugeIteratorGo(name, value, user_data);
 }

@@ -61,6 +61,9 @@ envoy_cc_test(
     ],
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
+        # See //test/extensions/dynamic_modules/http:filter_test for why every test
+        # binary that loads a Go test_data .so depends on all_abi_impls.
+        "//source/extensions/dynamic_modules:all_abi_impls",
         "//source/extensions/matching/http/dynamic_modules:data_input_lib",
         "//source/extensions/matching/input_matchers/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",

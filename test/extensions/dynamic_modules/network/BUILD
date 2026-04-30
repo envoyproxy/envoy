@@ -83,8 +83,9 @@ envoy_cc_test(
     env = {"GODEBUG": "cgocheck=0"},
     rbe_pool = "6gig",
     deps = [
-        "//source/extensions/dynamic_modules:abi_impl",
-        "//source/extensions/filters/http/dynamic_modules:abi_impl",
+        # See //test/extensions/dynamic_modules/http:filter_test for why every test
+        # binary that loads a Go test_data .so depends on all_abi_impls.
+        "//source/extensions/dynamic_modules:all_abi_impls",
         "//source/extensions/filters/network/dynamic_modules:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",

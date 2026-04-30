@@ -49,6 +49,36 @@ envoy_cc_library(
     alwayslink = True,
 )
 
+# A meta-target that aggregates every per-surface abi_impl-style C++ library that
+# implements the `envoy_dynamic_module_callback_*` host callbacks.
+#
+# The Go SDK's `abi/*.go` package is monolithic — importing it pulls in references to
+# every surface's callbacks. So a Go test_data .so always references all of them. Tests
+# that load such .so files must provide all of those symbols in the test binary's
+# symbol table; otherwise dlopen's RTLD_LAZY can't resolve them and load fails. This
+# meta-target lets a test depend on a single line and get every callback the Go SDK
+# may have referenced.
+envoy_cc_library(
+    name = "all_abi_impls",
+    deps = [
+        ":abi_impl",
+        "//source/extensions/access_loggers/dynamic_modules:access_log_lib",
+        "//source/extensions/bootstrap/dynamic_modules:abi_impl",
+        "//source/extensions/clusters/dynamic_modules:cluster_lib",
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:filter_lib",
+        "//source/extensions/filters/listener/dynamic_modules:filter_lib",
+        "//source/extensions/filters/network/dynamic_modules:filter_lib",
+        "//source/extensions/filters/udp/dynamic_modules:filter_lib",
+        "//source/extensions/load_balancing_policies/dynamic_modules:abi_impl",
+        "//source/extensions/matching/input_matchers/dynamic_modules:matcher_lib",
+        "//source/extensions/tracers/dynamic_modules:abi_impl",
+        "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",
+        "//source/extensions/upstreams/http/dynamic_modules:abi_impl",
+    ],
+    alwayslink = True,
+)
+
 # The shared package is pure Go (no cgo) — interfaces, types, and EmptyXxx no-ops shared
 # across the SDK and module code. Modules depend on this transitively via go_sdk and
 # go_sdk_abi.

@@ -28,6 +28,9 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/router:string_accessor_lib",
+        # See //test/extensions/dynamic_modules/http:filter_test for why every test
+        # binary that loads a Go test_data .so depends on all_abi_impls.
+        "//source/extensions/dynamic_modules:all_abi_impls",
         "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",
         "//test/common/tls:ssl_test_utils",
         "//test/common/tls/cert_validator:test_common",
