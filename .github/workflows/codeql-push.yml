@@ -30,8 +30,17 @@ jobs:
     runs-on: ubuntu-22.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
-    # Early checkout is required here to run git diff for C++ change detection
-    # before bind-mounts potentially replaces the workspace.
+    - uses: envoyproxy/toolshed/actions/bind-mounts@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+      if: ! github.event.repository.private
+      with:
+        mounts: |
+          - src: /mnt/workspace
+            target: GITHUB_WORKSPACE
+            chown: "runner:runner"
+          - src: /mnt/runner-cache
+            target: /home/runner/.cache
+            chown: "runner:runner"
+
     - name: Checkout repository
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       with:
@@ -50,19 +59,6 @@ jobs:
         else
             echo "CPP_CHANGED=false" >> "$GITHUB_ENV"
         fi
-
-    - uses: envoyproxy/toolshed/actions/bind-mounts@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
-      if: |
-        env.CPP_CHANGED == 'true'
-        && ! github.event.repository.private
-      with:
-        mounts: |
-          - src: /mnt/workspace
-            target: GITHUB_WORKSPACE
-            chown: "runner:runner"
-          - src: /mnt/runner-cache
-            target: /home/runner/.cache
-            chown: "runner:runner"
 
     - name: Free disk space
       if: |
