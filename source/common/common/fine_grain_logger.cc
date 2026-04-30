@@ -46,13 +46,19 @@ SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntryForFlush(absl::strin
   return getFineGrainLogEntry(absl::StrCat(file, ":", name));
 }
 
+SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntryForFlush(absl::string_view file,
+                                                                     LoggerGroup group)
+    ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
+  return getFineGrainLogEntry(absl::StrCat(file, ":", group.name_));
+}
 spdlog::level::level_enum FineGrainLogContext::getVerbosityDefaultLevel() const {
   absl::ReaderMutexLock l(fine_grain_log_lock_);
   return verbosity_default_level_;
 }
 
-void FineGrainLogContext::initFineGrainLogger(absl::string_view file, absl::string_view name,
-                                              std::atomic<spdlog::logger*>& logger)
+spdlog::logger* FineGrainLogContext::initFineGrainLogger(absl::string_view file,
+                                                         absl::string_view name,
+                                                         std::atomic<spdlog::logger*>& logger)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   std::string key(file);
   if (!name.empty()) {
@@ -68,6 +74,7 @@ void FineGrainLogContext::initFineGrainLogger(absl::string_view file, absl::stri
     target = it->second.get();
   }
   logger.store(target, std::memory_order_release);
+  return target;
 }
 
 bool FineGrainLogContext::setFineGrainLogger(absl::string_view key, level_enum log_level)

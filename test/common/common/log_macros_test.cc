@@ -405,22 +405,22 @@ TEST_F(FormatTest, OutputEscaped) {
  * Test for Fine-Grain Logger convenient macros.
  */
 TEST(FineGrainLog, Global) {
-  FINE_GRAIN_LOG(info, "", "Hello world! Here's a line of fine-grain log!");
-  FINE_GRAIN_LOG(error, "", "FineGrainLog Error! Here's the second message!");
+  FINE_GRAIN_LOG(info, "Hello world! Here's a line of fine-grain log!");
+  FINE_GRAIN_LOG(error, "FineGrainLog Error! Here's the second message!");
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
   FINE_GRAIN_CONN_LOG(warn, "Fake info {} of connection", connection_, 1);
   FINE_GRAIN_STREAM_LOG(warn, "Fake warning {} of stream", stream_, 1);
 
-  FINE_GRAIN_LOG(critical, "", "Critical message for later flush.");
+  FINE_GRAIN_LOG(critical, "Critical message for later flush.");
   FINE_GRAIN_FLUSH_LOG("");
 }
 
 TEST(FineGrainLog, FastPath) {
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::info);
   for (int i = 0; i < 10; i++) {
-    FINE_GRAIN_LOG(warn, "", "Fake warning No. {}", i);
+    FINE_GRAIN_LOG(warn, "Fake warning No. {}", i);
   }
 }
 
@@ -433,31 +433,31 @@ TEST(FineGrainLog, SetLevel) {
 
   res = getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::err);
   EXPECT_EQ(res, true);
-  FINE_GRAIN_LOG(error, "", "FineGrainLog Error! Here's a test for level.");
-  FINE_GRAIN_LOG(warn, "", "Warning: you shouldn't see this message!");
+  FINE_GRAIN_LOG(error, "FineGrainLog Error! Here's a test for level.");
+  FINE_GRAIN_LOG(warn, "Warning: you shouldn't see this message!");
   p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::err);
 
   getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::info);
-  FINE_GRAIN_LOG(info, "", "Info: all loggers back to info.");
-  FINE_GRAIN_LOG(debug, "", "Debug: you shouldn't see this message!");
+  FINE_GRAIN_LOG(info, "Info: all loggers back to info.");
+  FINE_GRAIN_LOG(debug, "Debug: you shouldn't see this message!");
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::info);
 }
 
 TEST(FineGrainLog, Iteration) {
-  FINE_GRAIN_LOG(info, "", "Info: iteration test begins.");
+  FINE_GRAIN_LOG(info, "Info: iteration test begins.");
   getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::info);
   std::string output = getFineGrainLogContext().listFineGrainLoggers();
   EXPECT_THAT(output, HasSubstr("  " __FILE__ ": info"));
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::err);
 
-  FINE_GRAIN_LOG(warn, "", "Warning: now level is warning, format changed (Date removed).");
-  FINE_GRAIN_LOG(warn, "", getFineGrainLogContext().listFineGrainLoggers());
+  FINE_GRAIN_LOG(warn, "Warning: now level is warning, format changed (Date removed).");
+  FINE_GRAIN_LOG(warn, getFineGrainLogContext().listFineGrainLoggers());
 }
 
 TEST(FineGrainLog, ListIteration) {
-  FINE_GRAIN_LOG(info, "", "Info: iteration test begins.");
+  FINE_GRAIN_LOG(info, "Info: iteration test begins.");
   const absl::flat_hash_map<spdlog::level::level_enum, std::string> log_level_strings = {
       {spdlog::level::trace, "trace"}, {spdlog::level::debug, "debug"},
       {spdlog::level::info, "info"},   {spdlog::level::warn, "warn"},
@@ -488,11 +488,11 @@ TEST(FineGrainLog, SetLevelWithLoggerName) {
 }
 
 TEST(FineGrainLog, Context) {
-  FINE_GRAIN_LOG(info, "", "Info: context API needs test.");
+  FINE_GRAIN_LOG(info, "Info: context API needs test.");
   bool enable_fine_grain_logging = Logger::Context::useFineGrainLogger();
   printf(" --> If use fine-grain logger: %d\n", enable_fine_grain_logging);
   if (enable_fine_grain_logging) {
-    FINE_GRAIN_LOG(critical, "", "Cmd option set: all previous Envoy Log should be converted now!");
+    FINE_GRAIN_LOG(critical, "Cmd option set: all previous Envoy Log should be converted now!");
   }
   Logger::Context::enableFineGrainLogger();
   EXPECT_EQ(Logger::Context::useFineGrainLogger(), true);
