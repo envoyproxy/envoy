@@ -364,7 +364,10 @@ envoy_cc_test_library(
 envoy_basic_cc_library(
     name = "test_version_linkstamp",
     srcs = ["test_version_linkstamp.cc"],
-    deps = ["//source/common/version:version_suffix_default"],
+    deps = [
+        "//source/common/version:version_string_lib",
+        "//source/common/version:version_suffix_default",
+    ],
     alwayslink = 1,
 )
 
