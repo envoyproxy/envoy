@@ -245,7 +245,7 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
 
   std::string config;
   if (proto_config.has_filter_config()) {
-    auto config_or_error = MessageUtil::anyToBytes(proto_config.filter_config());
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
     RETURN_IF_NOT_OK_REF(config_or_error.status());
     config = std::move(config_or_error.value());
   }

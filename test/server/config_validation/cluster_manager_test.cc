@@ -9,19 +9,11 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/server/config_validation/cluster_manager.h"
 
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
-#include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {

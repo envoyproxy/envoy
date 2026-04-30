@@ -165,7 +165,6 @@ envoy_cc_test(
         "//test/mocks/ratelimit:ratelimit_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
-        "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",

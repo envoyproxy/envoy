@@ -64,8 +64,6 @@ envoy_extension_cc_test(
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
-        "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
