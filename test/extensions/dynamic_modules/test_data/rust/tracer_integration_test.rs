@@ -36,5 +36,11 @@ struct TestSpan {}
 impl TracerSpan for TestSpan {
   fn set_operation(&mut self, _operation: &str) {}
   fn set_tag(&mut self, _key: &str, _value: &str) {}
+  fn log(&mut self, _timestamp_ns: i64, _event: &str) {}
   fn finish(&mut self) {}
+  fn inject_context(&mut self, _envoy_span: &dyn EnvoyTracerSpan) {}
+  fn spawn_child(&mut self, _operation: &str, _start_time_ns: i64) -> Option<Box<dyn TracerSpan>> {
+    None
+  }
+  fn set_sampled(&mut self, _sampled: bool) {}
 }
