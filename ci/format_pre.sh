@@ -75,6 +75,16 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //tools/cod
 CURRENT=spelling
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/spelling:check_spelling_pedantic -- --mark check --target_root="$PWD"
 
+CURRENT=rustfmt
+mapfile -t RUST_FILES < <(git ls-files '*.rs')
+if [[ "${#RUST_FILES[@]}" -gt 0 ]]; then
+    rustfmt \
+        --unstable-features \
+        --config-path "${PWD}/rustfmt.toml" \
+        --check \
+        "${RUST_FILES[@]}"
+fi
+
 CURRENT=check_format
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:check_format -- fix --fail_on_diff
 
