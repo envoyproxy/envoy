@@ -115,5 +115,9 @@ new_features:
     in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
     instead of using the :ref:`ExtensionWithMatcher
     <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
+- area: access_log
+  change: |
+    Added ``%UPSTREAM_SERVER_NAME%`` access log formatter that emits the SNI value sent by Envoy
+    in the TLS ClientHello to the upstream.
 
 deprecated:

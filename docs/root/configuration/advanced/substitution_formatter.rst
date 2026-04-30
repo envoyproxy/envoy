@@ -1452,6 +1452,12 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%UPSTREAM_SERVER_NAME%``
+  HTTP/TCP/THRIFT
+    The Server Name Indication (SNI) value sent by Envoy in the TLS ClientHello to the upstream.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%UPSTREAM_PEER_CERT%``
   HTTP/TCP/THRIFT
     The server certificate in the URL-encoded PEM format used to establish the upstream TLS connection.
