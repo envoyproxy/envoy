@@ -47,7 +47,17 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       target: release.signed
+      # IMPORTANT: this job handles signing secrets (GPG key, signed release tarball).
+      # - `--config=remote-cache` is used ONLY for the pull-through external downloader
+      #   and read-only cache hits on non-secret actions (toolchains, //tools/distribution:sign, ...).
+      # - `--noremote_upload_local_results` ensures NOTHING built locally in this job is
+      #   uploaded to the remote cache.
+      # The signing genrules themselves are additionally tagged `no-remote` / `no-remote-cache`
+      # in `distribution/BUILD` so they cannot be cached even if these flags were removed.
+      # DO NOT remove either flag without re-evaluating the secret-handling tags below.
       bazel-extra: >-
+        --config=remote-cache
+        --noremote_upload_local_results
         --//distribution:x64-packages=//distribution:custom/x64/packages.x64.tar.gz
         --//distribution:arm64-packages=//distribution:custom/arm64/packages.arm64.tar.gz
         --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst

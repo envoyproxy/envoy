@@ -424,6 +424,19 @@ build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:remote --@envoy//bazel/foreign_cc:parallel_builds
 
 ## RBE (Engflow Envoy)
+#
+# IMPORTANT: SECRETS AND THE REMOTE CACHE
+#
+# Anything that handles secrets (signing keys, signed artifacts, credentials, etc.)
+# SHOULD NOT BE CACHED. Per-action protection is the source of truth:
+#
+#   - tag actions/genrules with BOTH `no-remote` and `no-remote-cache`
+#     (see `distribution/BUILD` for examples)
+#
+# Job-level flags (e.g. `--noremote_upload_local_results` in the sign workflow) are
+# defence-in-depth, NOT a substitute for the per-action tags above. If you are
+# introducing a new CI job that handles secrets, prefer either no cache config at
+# all, or `--config=remote-cache --noremote_upload_local_results` (read-only).
 
 # this is not included in the `--config=rbe` target - set it to publish to engflow ui
 common:bes --bes_backend=grpcs://mordenite.cluster.engflow.com/

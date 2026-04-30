@@ -5,6 +5,23 @@ load(":packages.bzl", "envoy_pkg_distros")
 
 licenses(["notice"])  # Apache 2
 
+# IMPORTANT: SECRET-HANDLING TARGETS
+#
+# Several targets in this file process release-signing material (the GPG signing key
+# and the resulting signed release artifacts). Those targets MUST NOT be cached or
+# executed remotely. Each such target is tagged with both `no-remote` AND
+# `no-remote-cache` (belt-and-braces; `no-remote` already covers caching, but the
+# explicit `no-remote-cache` tag documents intent and survives any future split).
+#
+# If you add a new target here that handles signing keys, signed artifacts, or any
+# other secret material, you MUST tag it with `no-remote` and `no-remote-cache`
+# and add a comment explaining why. See `:multi_arch_debs` and `:signed` below.
+#
+# The CI job that drives signing (`.github/workflows/_publish_release.yml` `sign` job)
+# additionally passes `--noremote_upload_local_results` as a job-level guard, but
+# THAT IS NOT A SUBSTITUTE for these per-target tags — local developer builds and
+# any future job that builds these targets must also be safe by default.
+
 envoy_package()
 
 MAINTAINER = "Envoy maintainers <envoy-maintainers@googlegroups.com>"
@@ -136,6 +153,10 @@ genrule(
     tar cf $$tmpdir2/debs.tar.gz -C "$${tmpdir}" .
     tar cf $@ -C "$${tmpdir2}" .
     """,
+    # SECRET-HANDLING: input tarballs (`:x64-packages`, `:arm64-packages`) contain
+    # the GPG `signing.key`. This action removes it before producing the output, but
+    # the inputs themselves must never be uploaded to the remote cache.
+    tags = ["no-remote", "no-remote-cache"],
 )
 
 genrule(
@@ -169,6 +190,10 @@ genrule(
         -m arm64/envoy-contrib:bin/envoy-contrib-$${VERSION}-linux-aarch_64 \
            --out $@
     """ % VERSION,
-    tags = ["no-remote"],
+    # SECRET-HANDLING: invokes the GPG signer (`//tools/distribution:sign`) with the
+    # release signing key and produces the signed release tarball. Both `no-remote`
+    # and `no-remote-cache` are set to make caching impossible even if a future change
+    # were to split the semantics of these tags.
+    tags = ["no-remote", "no-remote-cache"],
     tools = ["//tools/distribution:sign"],
 )
