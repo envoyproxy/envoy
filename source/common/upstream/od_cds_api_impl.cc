@@ -388,17 +388,17 @@ private:
                 "ODCDS-manager: requesting on-demand update on shared kAds subscription for "
                 "resource {}",
                 resource_name);
-      // Update the underlying ``Watch``'s set of interested resources so that the response
-      // dispatch via ``WatchMap::watchesInterestedIn`` reaches this subscription. Calling
-      // ``requestOnDemandUpdate`` alone only updates the per-type ``DeltaSubscriptionState``
-      // for the wire-side request and never populates ``WatchMap::watch_interest_``, which
-      // would cause the ``DeltaDiscoveryResponse`` carrying ``resource_name`` to be silently
-      // dropped on the shared ``WatchMap[Cluster]``.
+      // Update the underlying ``Watch``'s set of interested resources so the dispatch via
+      // ``WatchMap::watchesInterestedIn`` reaches this subscription when the response
+      // arrives. ``Subscription::requestOnDemandUpdate`` on its own only updates the
+      // ``DeltaSubscriptionState`` for the wire request and never populates
+      // ``WatchMap::watch_interest_``, which would cause the ``DeltaDiscoveryResponse``
+      // carrying ``resource_name`` to be silently dropped on the shared
+      // ``WatchMap[Cluster]``. ``updateResourceInterest`` (via ``Watch::update``) both
+      // populates ``watch_interest_`` and nudges the wire send for the new name through the
+      // watch-map callback, so an additional ``requestOnDemandUpdate`` would only result in
+      // a duplicate wire request without any extra effect on the wire format.
       subscription_->updateResourceInterest(interested_names_);
-      // ``updateResourceInterest`` already nudges the wire send via the watch-map callback,
-      // but we still call ``requestOnDemandUpdate`` so the subscription state correctly tags
-      // this name as on-demand (matching the legacy ``OdCdsApiImpl`` semantics).
-      subscription_->requestOnDemandUpdate({name});
     }
 
   private:

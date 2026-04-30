@@ -421,7 +421,7 @@ TEST_F(XdstpOdCdsApiImplSharedKadsTest, FirstRequestStartsSharedSubscription) {
 // ``requestOnDemandUpdate`` rather than allocating a new ``Subscription``. This is the
 // behavior 1.37's ``OdCdsApiImpl`` exhibited and is what avoids the per-resource ``Watch``
 // dispatch hazard against the wildcard CDS watcher.
-TEST_F(XdstpOdCdsApiImplSharedKadsTest, SecondRequestUsesRequestOnDemandUpdate) {
+TEST_F(XdstpOdCdsApiImplSharedKadsTest, SecondRequestUsesUpdateResourceInterest) {
   expectSharedSubscriptionCreation("cluster_a");
   odcds_->updateOnDemand("cluster_a");
   ASSERT_NE(shared_subscription_, nullptr);
@@ -431,10 +431,12 @@ TEST_F(XdstpOdCdsApiImplSharedKadsTest, SecondRequestUsesRequestOnDemandUpdate) 
   // ``updateResourceInterest`` must carry the union of all on-demand names so the
   // underlying ``Watch`` populates ``WatchMap::watch_interest_`` and the response for
   // ``cluster_b`` is dispatched to this subscription instead of being silently dropped.
+  // ``Subscription::requestOnDemandUpdate`` is intentionally not called: ``Watch::update``
+  // already nudges the wire send via the watch-map callback, and an additional explicit
+  // call would only emit a duplicate ``DeltaDiscoveryRequest`` for ``cluster_b``.
   EXPECT_CALL(*shared_subscription_,
               updateResourceInterest(absl::flat_hash_set<std::string>{"cluster_a", "cluster_b"}));
-  EXPECT_CALL(*shared_subscription_,
-              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"cluster_b"}));
+  EXPECT_CALL(*shared_subscription_, requestOnDemandUpdate(_)).Times(0);
   odcds_->updateOnDemand("cluster_b");
 }
 
@@ -499,8 +501,6 @@ TEST_F(XdstpOdCdsApiImplSharedKadsTest, SubscriptionFailureNotifiesAllInterested
 
   EXPECT_CALL(*shared_subscription_,
               updateResourceInterest(absl::flat_hash_set<std::string>{"cluster_a", "cluster_b"}));
-  EXPECT_CALL(*shared_subscription_,
-              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"cluster_b"}));
   odcds_->updateOnDemand("cluster_b");
 
   ASSERT_NE(shared_callbacks_, nullptr);
