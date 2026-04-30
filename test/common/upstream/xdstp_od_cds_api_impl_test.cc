@@ -428,6 +428,11 @@ TEST_F(XdstpOdCdsApiImplSharedKadsTest, SecondRequestUsesRequestOnDemandUpdate) 
 
   // No second ``subscribeToSingletonResource`` call must happen.
   EXPECT_CALL(xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _)).Times(0);
+  // ``updateResourceInterest`` must carry the union of all on-demand names so the
+  // underlying ``Watch`` populates ``WatchMap::watch_interest_`` and the response for
+  // ``cluster_b`` is dispatched to this subscription instead of being silently dropped.
+  EXPECT_CALL(*shared_subscription_,
+              updateResourceInterest(absl::flat_hash_set<std::string>{"cluster_a", "cluster_b"}));
   EXPECT_CALL(*shared_subscription_,
               requestOnDemandUpdate(absl::flat_hash_set<std::string>{"cluster_b"}));
   odcds_->updateOnDemand("cluster_b");
@@ -442,6 +447,7 @@ TEST_F(XdstpOdCdsApiImplSharedKadsTest, DuplicateRequestIsSquashed) {
   ASSERT_NE(shared_subscription_, nullptr);
 
   EXPECT_CALL(xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _)).Times(0);
+  EXPECT_CALL(*shared_subscription_, updateResourceInterest(_)).Times(0);
   EXPECT_CALL(*shared_subscription_, requestOnDemandUpdate(_)).Times(0);
   odcds_->updateOnDemand("cluster_a");
 }
@@ -491,6 +497,8 @@ TEST_F(XdstpOdCdsApiImplSharedKadsTest, SubscriptionFailureNotifiesAllInterested
   odcds_->updateOnDemand("cluster_a");
   ASSERT_NE(shared_subscription_, nullptr);
 
+  EXPECT_CALL(*shared_subscription_,
+              updateResourceInterest(absl::flat_hash_set<std::string>{"cluster_a", "cluster_b"}));
   EXPECT_CALL(*shared_subscription_,
               requestOnDemandUpdate(absl::flat_hash_set<std::string>{"cluster_b"}));
   odcds_->updateOnDemand("cluster_b");

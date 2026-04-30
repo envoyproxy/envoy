@@ -377,12 +377,28 @@ private:
     }
 
     void requestOnDemandUpdate(absl::string_view resource_name) {
-      interested_names_.insert(std::string(resource_name));
+      const std::string name(resource_name);
+      auto [_, inserted] = interested_names_.insert(name);
+      if (!inserted) {
+        ENVOY_LOG(trace, "ODCDS-manager: shared kAds: resource {} already requested, skipping",
+                  resource_name);
+        return;
+      }
       ENVOY_LOG(debug,
                 "ODCDS-manager: requesting on-demand update on shared kAds subscription for "
                 "resource {}",
                 resource_name);
-      subscription_->requestOnDemandUpdate({std::string(resource_name)});
+      // Update the underlying ``Watch``'s set of interested resources so that the response
+      // dispatch via ``WatchMap::watchesInterestedIn`` reaches this subscription. Calling
+      // ``requestOnDemandUpdate`` alone only updates the per-type ``DeltaSubscriptionState``
+      // for the wire-side request and never populates ``WatchMap::watch_interest_``, which
+      // would cause the ``DeltaDiscoveryResponse`` carrying ``resource_name`` to be silently
+      // dropped on the shared ``WatchMap[Cluster]``.
+      subscription_->updateResourceInterest(interested_names_);
+      // ``updateResourceInterest`` already nudges the wire send via the watch-map callback,
+      // but we still call ``requestOnDemandUpdate`` so the subscription state correctly tags
+      // this name as on-demand (matching the legacy ``OdCdsApiImpl`` semantics).
+      subscription_->requestOnDemandUpdate({name});
     }
 
   private:
