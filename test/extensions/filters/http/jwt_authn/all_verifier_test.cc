@@ -6,6 +6,7 @@
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -691,6 +692,22 @@ TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest,
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   // No JWT present — not a failure, header should not be set.
+  EXPECT_TRUE(headers.get_("x-jwt-signature-verified").empty());
+}
+
+// Test: Verification status header is NOT set when the runtime guard is disabled,
+// even if a JWT is present and fails verification.
+TEST_F(ExtractOnlyWithoutValidationInSingleRequirementTest,
+       VerificationStatusHeaderNotSetWhenRuntimeFlagDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.jwt_authn_add_verification_status_header", "false"}});
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ExpiredToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // Runtime feature disabled — header must not be set even though the JWT failed.
   EXPECT_TRUE(headers.get_("x-jwt-signature-verified").empty());
 }
 

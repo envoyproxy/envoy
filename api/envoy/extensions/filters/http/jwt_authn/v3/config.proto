@@ -621,9 +621,11 @@ message JwtRequirement {
 
 // Configuration for extract-only mode without JWT signature validation.
 //
-// When this mode is active, a verification status header is always set on
-// the request to signal to downstream filters (RBAC, ext_authz) that the
-// JWT claims were NOT cryptographically verified.
+// When this mode is active and a JWT is present in the request but fails
+// signature verification, a verification status header is set on the request
+// to signal to downstream filters (RBAC, ext_authz) that the JWT claims were
+// NOT cryptographically verified. The header is not set when the JWT is valid
+// or when no JWT is present.
 //
 message ExtractOnlyWithoutValidation {
   // Name of the HTTP header set to "false" when a JWT is present but
@@ -643,11 +645,13 @@ message ExtractOnlyWithoutValidation {
   //
   // Custom value: uses the specified header name
   //
-  // This header is set by default, but its creation is guarded by the
-  // ``envoy.reloadable_features.jwt_authn_add_verification_status_header`` runtime flag.
-  // If removal is needed downstream, use header mutation in a subsequent filter.
+  // The header-setting behavior is guarded by the
+  // ``envoy.reloadable_features.jwt_authn_add_verification_status_header`` runtime flag
+  // (default on). If removal is needed downstream, use header mutation in a subsequent filter.
   //
-  // Example: with the default, all requests processed by this mode will have:
+  // Example: when a JWT is present in the request but fails signature
+  // verification, the request will carry:
+  //
   // .. code-block:: yaml
   //
   //    x-jwt-signature-verified: false
