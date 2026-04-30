@@ -151,6 +151,7 @@ envoy_cc_test(
     },
     rbe_pool = "6gig",
     deps = [
+        "//source/common/config:metadata_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",

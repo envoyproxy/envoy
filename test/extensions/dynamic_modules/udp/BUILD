@@ -69,7 +69,10 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
         "//test/extensions/dynamic_modules/test_data/c:udp_stop_iteration",
+        "//test/extensions/dynamic_modules/test_data/go:udp_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:udp_integration_test",
     ],
+    env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//source/extensions/filters/udp/dynamic_modules:config",
         "//source/extensions/filters/udp/udp_proxy:config",

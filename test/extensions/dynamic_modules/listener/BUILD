@@ -50,6 +50,27 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/go:listener_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:listener_integration_test",
+    ],
+    env = {"GODEBUG": "cgocheck=0"},
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/listener/dynamic_modules:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/extensions/dynamic_modules:util",
+        "//test/integration:integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/listener/dynamic_modules/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     data = [

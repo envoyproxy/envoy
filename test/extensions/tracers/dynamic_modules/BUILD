@@ -60,3 +60,20 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/go:tracer_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:tracer_integration_test",
+    ],
+    env = {"GODEBUG": "cgocheck=0"},
+    deps = [
+        "//source/extensions/tracers/dynamic_modules:config",
+        "//test/extensions/dynamic_modules:util",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/tracers/dynamic_modules/v3:pkg_cc_proto",
+    ],
+)

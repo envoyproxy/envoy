@@ -37,3 +37,15 @@ test_program(name = "http_stream_callouts_test")
 test_program(name = "upstream_http_tcp_bridge")
 
 test_program(name = "bootstrap_http_combined_test")
+
+test_program(name = "udp_integration_test")
+
+test_program(name = "matcher_integration_test")
+
+test_program(name = "listener_integration_test")
+
+test_program(name = "tracer_integration_test")
+
+test_program(name = "load_balancer_integration_test")
+
+test_program(name = "cert_validator_test")

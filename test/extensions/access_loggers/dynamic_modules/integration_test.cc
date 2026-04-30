@@ -7,7 +7,8 @@ namespace Envoy {
 // Parameterized over (language, IP version). language selects which test_data subdir
 // (rust, go) the access logger module is loaded from. Both languages ship a module named
 // "access_log_integration_test" exposing a "test_logger" access logger that exercises the
-// full AccessLogContext getter surface.
+// full AccessLogContext getter surface and records select getter results into per-config
+// counters/gauges so this driver can verify correctness via /stats.
 struct AccessLogParam {
   std::string language;
   Network::Address::IpVersion ip_version;
@@ -49,6 +50,16 @@ typed_config:
 
     initialize();
   }
+
+  // Stats from the access logger are scoped under the default metrics namespace
+  // "dynamicmodulescustom.<name>" — see access_loggers/dynamic_modules/config.cc.
+  uint64_t counter(absl::string_view name) {
+    return test_server_->counter(absl::StrCat("dynamicmodulescustom.", name))->value();
+  }
+
+  uint64_t gauge(absl::string_view name) {
+    return test_server_->gauge(absl::StrCat("dynamicmodulescustom.", name))->value();
+  }
 };
 
 namespace {
@@ -81,13 +92,26 @@ TEST_P(DynamicModulesAccessLogIntegrationTest, BasicLogging) {
 
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
-  // Verify the response was received.
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
-  // The access logger was called. We can't easily verify this from the test since the logger
-  // doesn't modify headers, but the test passing means the logger loaded and ran without crashing.
+  // The Go and Rust modules increment counters and set gauges from data they read off
+  // the AccessLogContext — assert those values match the wire data we sent above.
+  test_server_->waitForCounterEq("dynamicmodulescustom.test_log_count", 1);
+
+  // Specific getters: response code, method, path, request protocol.
+  EXPECT_EQ(1, counter("test_response_code_200"));
+  EXPECT_EQ(1, counter("test_method_get"));
+  EXPECT_EQ(1, counter("test_path_test"));
+  EXPECT_EQ(1, counter("test_request_protocol_http2"));
+
+  // Gauges hold the last observed values.
+  EXPECT_EQ(200, gauge("test_response_code_last"));
+  // The 4-header request (method, path, scheme, authority) plus internal envoy headers
+  // means request_headers_count must be at least 4. The exact value depends on Envoy
+  // header insertions so we use a lower bound.
+  EXPECT_GE(gauge("test_request_headers_count"), 4u);
 }
 
 TEST_P(DynamicModulesAccessLogIntegrationTest, MultipleRequests) {
@@ -95,7 +119,6 @@ TEST_P(DynamicModulesAccessLogIntegrationTest, MultipleRequests) {
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
-  // Send multiple requests to verify logging works across requests.
   for (int i = 0; i < 3; i++) {
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
@@ -104,6 +127,37 @@ TEST_P(DynamicModulesAccessLogIntegrationTest, MultipleRequests) {
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
+
+  // Counters accumulate across requests — assert all three were observed.
+  test_server_->waitForCounterEq("dynamicmodulescustom.test_log_count", 3);
+  EXPECT_EQ(3, counter("test_response_code_200"));
+  EXPECT_EQ(3, counter("test_method_get"));
+  EXPECT_EQ(3, counter("test_path_test"));
+}
+
+// Verify a non-matching request increments the log_count counter but NOT the
+// header-specific counters (i.e., the SDK getters didn't fabricate matches that aren't
+// there).
+TEST_P(DynamicModulesAccessLogIntegrationTest, GetterValuesMatchActualRequest) {
+  initializeWithAccessLogger();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Send a POST to a different path so :method != GET and :path != /test.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/other"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  test_server_->waitForCounterEq("dynamicmodulescustom.test_log_count", 1);
+  // :method was POST, not GET — counter should remain 0.
+  EXPECT_EQ(0, counter("test_method_get"));
+  // :path was /other, not /test — counter should remain 0.
+  EXPECT_EQ(0, counter("test_path_test"));
+  // Response was still 200, so this counter does increment.
+  EXPECT_EQ(1, counter("test_response_code_200"));
 }
 
 } // namespace Envoy

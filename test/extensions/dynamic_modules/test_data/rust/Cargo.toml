@@ -85,3 +85,39 @@ name = "network_integration_test"
 path = "network_integration_test.rs"
 crate-type = ["cdylib"]
 test = true
+
+[[example]]
+name = "udp_integration_test"
+path = "udp_integration_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "matcher_integration_test"
+path = "matcher_integration_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "listener_integration_test"
+path = "listener_integration_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "tracer_integration_test"
+path = "tracer_integration_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "load_balancer_integration_test"
+path = "load_balancer_integration_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "cert_validator_test"
+path = "cert_validator_test.rs"
+crate-type = ["cdylib"]
+test = true

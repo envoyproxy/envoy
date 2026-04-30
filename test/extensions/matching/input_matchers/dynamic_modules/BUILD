@@ -56,7 +56,10 @@ envoy_cc_test(
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:matcher_check_headers",
+        "//test/extensions/dynamic_modules/test_data/go:matcher_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:matcher_integration_test",
     ],
+    env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//source/extensions/matching/http/dynamic_modules:data_input_lib",
         "//source/extensions/matching/input_matchers/dynamic_modules:config",

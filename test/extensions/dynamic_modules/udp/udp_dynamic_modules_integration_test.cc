@@ -15,25 +15,54 @@ namespace UdpFilters {
 namespace DynamicModules {
 namespace {
 
-class UdpDynamicModulesIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                         public BaseIntegrationTest {
+// Parameterized over (language, ip_version). The "c" language uses pre-existing C fakes
+// (udp_no_op / udp_stop_iteration); "rust" and "go" use the udp_integration_test module
+// each language ships, which registers two filter names: "test_filter" (passthrough)
+// and "stop_iteration" (drop).
+struct UdpDynamicModulesParam {
+  std::string language;
+  Network::Address::IpVersion ip_version;
+};
+
+class UdpDynamicModulesIntegrationTest : public testing::TestWithParam<UdpDynamicModulesParam>,
+                                          public BaseIntegrationTest {
 public:
   UdpDynamicModulesIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::baseUdpListenerConfig()) {}
+      : BaseIntegrationTest(GetParam().ip_version, ConfigHelper::baseUdpListenerConfig()) {}
 
-  void SetUp() override {
-    // The shared object is created by the build system.
-    // We need to set the DYNAMIC_MODULES_SEARCH_PATH to the location of the shared object.
-    std::string shared_object_path =
-        Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c");
-    std::string shared_object_dir =
-        std::filesystem::path(shared_object_path).parent_path().string();
-    TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", shared_object_dir, 1);
+  // Returns (module_name, filter_name) for the given test variant. The C fakes have
+  // hard-coded module-level behavior (one module per behavior); the SDK languages have a
+  // single module exposing two filter names selectable via filter_name.
+  std::pair<std::string, std::string> moduleAndFilter(const std::string& variant) {
+    if (GetParam().language == "c") {
+      // The C-fake module name encodes the behavior; the filter name is unused by the C
+      // fake but must be set to something.
+      if (variant == "passthrough") {
+        return {"udp_no_op", "test_filter"};
+      }
+      return {"udp_stop_iteration", "test_filter"};
+    }
+    // For Rust/Go we share a single module name and select via filter_name.
+    if (variant == "passthrough") {
+      return {"udp_integration_test", "test_filter"};
+    }
+    return {"udp_integration_test", "stop_iteration"};
   }
 
-  void setup(const std::string& module_name = "udp_no_op") {
+  void SetUp() override {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
+                                    GetParam().language),
+        1);
+    TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
+  }
+
+  void setup(const std::string& variant = "passthrough") {
     FakeUpstreamConfig::UdpConfig config;
     setUdpFakeUpstream(config);
+
+    auto [module_name, filter_name] = moduleAndFilter(variant);
 
     const std::string filter_config = fmt::format(R"EOF(
 name: envoy.filters.udp_listener.dynamic_modules
@@ -42,12 +71,12 @@ typed_config:
   dynamic_module_config:
     name: "{}"
     do_not_close: true
-  filter_name: "test_filter"
+  filter_name: "{}"
   filter_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
     value: "some_config"
 )EOF",
-                                                  module_name);
+                                                  module_name, filter_name);
 
     config_helper_.addListenerFilter(filter_config);
 
@@ -69,19 +98,35 @@ typed_config:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, UdpDynamicModulesIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+namespace {
+std::vector<UdpDynamicModulesParam> getUdpTestParams() {
+  std::vector<UdpDynamicModulesParam> params;
+  for (const auto& language : {"c", "rust", "go"}) {
+    for (const auto ip : TestEnvironment::getIpVersionsForTest()) {
+      params.push_back({language, ip});
+    }
+  }
+  return params;
+}
+
+std::string udpParamName(const testing::TestParamInfo<UdpDynamicModulesParam>& info) {
+  return info.param.language + "_" +
+         (info.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6");
+}
+} // namespace
+
+INSTANTIATE_TEST_SUITE_P(LanguagesAndIpVersions, UdpDynamicModulesIntegrationTest,
+                         testing::ValuesIn(getUdpTestParams()), udpParamName);
 
 TEST_P(UdpDynamicModulesIntegrationTest, BasicDataFlow) {
   setup();
 
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = *Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()), port));
+  const auto listener_address = *Network::Utility::resolveUrl(fmt::format(
+      "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam().ip_version), port));
 
   std::string request = "hello";
-  Network::Test::UdpSyncPeer client(GetParam());
+  Network::Test::UdpSyncPeer client(GetParam().ip_version);
   client.write(request, *listener_address);
 
   Network::UdpRecvData request_datagram;
@@ -90,14 +135,14 @@ TEST_P(UdpDynamicModulesIntegrationTest, BasicDataFlow) {
 }
 
 TEST_P(UdpDynamicModulesIntegrationTest, StopIteration) {
-  setup("udp_stop_iteration");
+  setup("stop_iteration");
 
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = *Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()), port));
+  const auto listener_address = *Network::Utility::resolveUrl(fmt::format(
+      "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam().ip_version), port));
 
   std::string request = "should be blocked";
-  Network::Test::UdpSyncPeer client(GetParam());
+  Network::Test::UdpSyncPeer client(GetParam().ip_version);
   client.write(request, *listener_address);
 
   Network::UdpRecvData request_datagram;
@@ -112,12 +157,12 @@ TEST_P(UdpDynamicModulesIntegrationTest, LargePayload) {
   setup();
 
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = *Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()), port));
+  const auto listener_address = *Network::Utility::resolveUrl(fmt::format(
+      "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam().ip_version), port));
 
   // Use a conservative payload size to avoid platform-specific UDP limits.
   std::string large_request(512, 'x');
-  Network::Test::UdpSyncPeer client(GetParam());
+  Network::Test::UdpSyncPeer client(GetParam().ip_version);
   client.write(large_request, *listener_address);
 
   Network::UdpRecvData request_datagram;
@@ -129,10 +174,10 @@ TEST_P(UdpDynamicModulesIntegrationTest, MultipleDatagrams) {
   setup();
 
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = *Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()), port));
+  const auto listener_address = *Network::Utility::resolveUrl(fmt::format(
+      "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam().ip_version), port));
 
-  Network::Test::UdpSyncPeer client(GetParam());
+  Network::Test::UdpSyncPeer client(GetParam().ip_version);
 
   // Send multiple datagrams.
   for (int i = 0; i < 5; i++) {

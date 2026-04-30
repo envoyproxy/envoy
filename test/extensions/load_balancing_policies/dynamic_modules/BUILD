@@ -37,3 +37,22 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/load_balancing_policies/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/go:load_balancer_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:load_balancer_integration_test",
+    ],
+    env = {"GODEBUG": "cgocheck=0"},
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/load_balancing_policies/dynamic_modules:config",
+        "//test/extensions/dynamic_modules:util",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/dynamic_modules/v3:pkg_cc_proto",
+    ],
+)

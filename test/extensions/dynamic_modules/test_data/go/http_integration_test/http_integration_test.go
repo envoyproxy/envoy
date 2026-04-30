@@ -37,6 +37,9 @@ func init() {
 		"http_config_stream":           &HttpConfigStreamConfigFactory{},
 		"http_struct_config":           &HttpStructConfigFactory{},
 		"list_metadata_callbacks":      &ListMetadataCallbacksConfigFactory{},
+		"dynamic_metadata":             &DynamicMetadataConfigFactory{},
+		"filter_state_writer":          &FilterStateWriterConfigFactory{},
+		"filter_state_reader":          &FilterStateReaderConfigFactory{},
 	})
 }
 
@@ -1469,5 +1472,159 @@ func (f *ListMetadataCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap
 		}
 	}
 
+	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// DynamicMetadata: scalar Get/Set on dynamic metadata.
+//
+// Reads route metadata (configured by the test driver) and writes it back to dynamic
+// metadata. Then writes summary headers so the test can assert via response headers
+// that the read+write cycle preserved values.
+// -----------------------------------------------------------------------------
+
+type DynamicMetadataConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (DynamicMetadataConfigFactory) Create(_ shared.HttpFilterConfigHandle, _ []byte) (shared.HttpFilterFactory, error) {
+	return &DynamicMetadataFilterFactory{}, nil
+}
+
+type DynamicMetadataFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (*DynamicMetadataFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &DynamicMetadataFilter{handle: handle}
+}
+
+type DynamicMetadataFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (f *DynamicMetadataFilter) OnRequestHeaders(_ shared.HeaderMap, _ bool) shared.HeadersStatus {
+	// Read three scalar values from route metadata (set by the test driver in the
+	// route config). Then write the same values into dynamic metadata under a
+	// different namespace so we can read them back on the response side.
+	if v, ok := f.handle.GetMetadataString(shared.MetadataSourceTypeRoute, "test_ns", "string_key"); ok {
+		f.handle.SetMetadata("dm_test", "string_key", v.ToString())
+	}
+	if v, ok := f.handle.GetMetadataNumber(shared.MetadataSourceTypeRoute, "test_ns", "number_key"); ok {
+		f.handle.SetMetadata("dm_test", "number_key", v)
+	}
+	if v, ok := f.handle.GetMetadataBool(shared.MetadataSourceTypeRoute, "test_ns", "bool_key"); ok {
+		f.handle.SetMetadata("dm_test", "bool_key", v)
+	}
+	return shared.HeadersStatusContinue
+}
+
+func (f *DynamicMetadataFilter) OnResponseHeaders(headers shared.HeaderMap, _ bool) shared.HeadersStatus {
+	// Read back from dynamic metadata and surface via response headers.
+	if v, ok := f.handle.GetMetadataString(shared.MetadataSourceTypeDynamic, "dm_test", "string_key"); ok {
+		headers.Set("x-dm-string", v.ToString())
+	}
+	if v, ok := f.handle.GetMetadataNumber(shared.MetadataSourceTypeDynamic, "dm_test", "number_key"); ok {
+		headers.Set("x-dm-number", strconv.FormatFloat(v, 'f', -1, 64))
+	}
+	if v, ok := f.handle.GetMetadataBool(shared.MetadataSourceTypeDynamic, "dm_test", "bool_key"); ok {
+		if v {
+			headers.Set("x-dm-bool", "true")
+		} else {
+			headers.Set("x-dm-bool", "false")
+		}
+	}
+
+	// Surface the keys the SDK reports for our namespace, so we can verify
+	// GetMetadataKeys works.
+	keys := f.handle.GetMetadataKeys(shared.MetadataSourceTypeDynamic, "dm_test")
+	headers.Set("x-dm-key-count", strconv.Itoa(len(keys)))
+
+	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// FilterState: round-trip across two filters.
+//
+// filter_state_writer sets a filter-state value on the request side.
+// filter_state_reader reads the value on the request side and surfaces it via
+// response headers. The test wires both filters in order and asserts the reader
+// observed what the writer set.
+// -----------------------------------------------------------------------------
+
+type FilterStateWriterConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (FilterStateWriterConfigFactory) Create(_ shared.HttpFilterConfigHandle, config []byte) (shared.HttpFilterFactory, error) {
+	// config bytes are the value to write. Empty config = "default_value".
+	value := string(config)
+	if value == "" {
+		value = "default_value"
+	}
+	return &FilterStateWriterFilterFactory{value: value}, nil
+}
+
+type FilterStateWriterFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	value string
+}
+
+func (f *FilterStateWriterFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &FilterStateWriterFilter{handle: handle, value: f.value}
+}
+
+type FilterStateWriterFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+	value  string
+}
+
+func (f *FilterStateWriterFilter) OnRequestHeaders(_ shared.HeaderMap, _ bool) shared.HeadersStatus {
+	f.handle.SetFilterState("test_filter_state_key", []byte(f.value))
+	return shared.HeadersStatusContinue
+}
+
+type FilterStateReaderConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (FilterStateReaderConfigFactory) Create(_ shared.HttpFilterConfigHandle, _ []byte) (shared.HttpFilterFactory, error) {
+	return &FilterStateReaderFilterFactory{}, nil
+}
+
+type FilterStateReaderFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (*FilterStateReaderFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &FilterStateReaderFilter{handle: handle}
+}
+
+type FilterStateReaderFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+	// Captured on the request side and re-emitted on the response side because
+	// filter state may not be preserved exactly the same way for the response
+	// callbacks of the same stream.
+	captured string
+	hasValue bool
+}
+
+func (f *FilterStateReaderFilter) OnRequestHeaders(_ shared.HeaderMap, _ bool) shared.HeadersStatus {
+	if v, ok := f.handle.GetFilterState("test_filter_state_key"); ok {
+		f.captured = v.ToString()
+		f.hasValue = true
+	}
+	return shared.HeadersStatusContinue
+}
+
+func (f *FilterStateReaderFilter) OnResponseHeaders(headers shared.HeaderMap, _ bool) shared.HeadersStatus {
+	if f.hasValue {
+		headers.Set("x-filter-state-value", f.captured)
+	} else {
+		headers.Set("x-filter-state-value", "<missing>")
+	}
 	return shared.HeadersStatusContinue
 }

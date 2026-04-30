@@ -52,21 +52,62 @@ fn new_access_logger_config_fn(
   }
 }
 
-/// Access logger configuration.
+/// Access logger configuration. Holds counter/gauge handles defined at config-time so the
+/// per-request `log` callback can record getter results into them — this lets the C++ test
+/// driver assert correctness via /stats.
 struct TestAccessLoggerConfig {
   _name: String,
   log_counter: CounterHandle,
+  http2_counter: CounterHandle,
+  resp_200_counter: CounterHandle,
+  method_get_counter: CounterHandle,
+  path_test_counter: CounterHandle,
+  has_route_counter: CounterHandle,
+  resp_code_gauge: GaugeHandle,
+  bytes_sent_gauge: GaugeHandle,
+  hdr_count_gauge: GaugeHandle,
 }
 
 impl AccessLoggerConfig for TestAccessLoggerConfig {
   fn new(ctx: &ConfigContext, name: &str, _config: &[u8]) -> Result<Self, String> {
-    // Define a counter metric during configuration.
     let log_counter = ctx
       .define_counter("test_log_count")
-      .ok_or("Failed to define counter")?;
+      .ok_or("Failed to define test_log_count")?;
+    let http2_counter = ctx
+      .define_counter("test_request_protocol_http2")
+      .ok_or("Failed to define test_request_protocol_http2")?;
+    let resp_200_counter = ctx
+      .define_counter("test_response_code_200")
+      .ok_or("Failed to define test_response_code_200")?;
+    let method_get_counter = ctx
+      .define_counter("test_method_get")
+      .ok_or("Failed to define test_method_get")?;
+    let path_test_counter = ctx
+      .define_counter("test_path_test")
+      .ok_or("Failed to define test_path_test")?;
+    let has_route_counter = ctx
+      .define_counter("test_has_route_name")
+      .ok_or("Failed to define test_has_route_name")?;
+    let resp_code_gauge = ctx
+      .define_gauge("test_response_code_last")
+      .ok_or("Failed to define test_response_code_last")?;
+    let bytes_sent_gauge = ctx
+      .define_gauge("test_bytes_sent_last")
+      .ok_or("Failed to define test_bytes_sent_last")?;
+    let hdr_count_gauge = ctx
+      .define_gauge("test_request_headers_count")
+      .ok_or("Failed to define test_request_headers_count")?;
     Ok(Self {
       _name: name.to_string(),
       log_counter,
+      http2_counter,
+      resp_200_counter,
+      method_get_counter,
+      path_test_counter,
+      has_route_counter,
+      resp_code_gauge,
+      bytes_sent_gauge,
+      hdr_count_gauge,
     })
   }
 
@@ -81,6 +122,14 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
     Box::new(TestAccessLogger {
       pending_logs: 0,
       log_counter: self.log_counter,
+      http2_counter: self.http2_counter,
+      resp_200_counter: self.resp_200_counter,
+      method_get_counter: self.method_get_counter,
+      path_test_counter: self.path_test_counter,
+      has_route_counter: self.has_route_counter,
+      resp_code_gauge: self.resp_code_gauge,
+      bytes_sent_gauge: self.bytes_sent_gauge,
+      hdr_count_gauge: self.hdr_count_gauge,
       metrics,
     })
   }
@@ -90,6 +139,14 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
 struct TestAccessLogger {
   pending_logs: u32,
   log_counter: CounterHandle,
+  http2_counter: CounterHandle,
+  resp_200_counter: CounterHandle,
+  method_get_counter: CounterHandle,
+  path_test_counter: CounterHandle,
+  has_route_counter: CounterHandle,
+  resp_code_gauge: GaugeHandle,
+  bytes_sent_gauge: GaugeHandle,
+  hdr_count_gauge: GaugeHandle,
   metrics: MetricsContext,
 }
 
@@ -203,17 +260,45 @@ impl AccessLogger for TestAccessLogger {
     let _response_trailers =
       ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer);
 
-    // Test generic attribute accessors.
-    let _attr_protocol =
-      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestProtocol);
-    let _attr_route =
-      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsRouteName);
-    let _attr_resp_code =
-      ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseCode);
+    // Test generic attribute accessors. Record select results into counters/gauges so
+    // the C++ driver can verify via /stats.
+    if let Some(proto) = ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestProtocol) {
+      if proto.as_slice() == b"HTTP/2" {
+        self.metrics.increment_counter(self.http2_counter, 1);
+      }
+    }
+    if ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsRouteName).is_some() {
+      self.metrics.increment_counter(self.has_route_counter, 1);
+    }
+    if let Some(code) = ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseCode) {
+      self.metrics.set_gauge(self.resp_code_gauge, code as u64);
+      if code == 200 {
+        self.metrics.increment_counter(self.resp_200_counter, 1);
+      }
+    }
     let _attr_conn_id =
       ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId);
     let _attr_mtls =
       ctx.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
+
+    // Header-based counters: bump if :method == GET, :path == /test.
+    if let Some(method) = ctx.get_request_header(":method") {
+      if method.as_slice() == b"GET" {
+        self.metrics.increment_counter(self.method_get_counter, 1);
+      }
+    }
+    if let Some(path) = ctx.get_request_header(":path") {
+      if path.as_slice() == b"/test" {
+        self.metrics.increment_counter(self.path_test_counter, 1);
+      }
+    }
+    // Set request header count gauge.
+    let req_hdr_count = ctx
+      .get_headers_count(abi::envoy_dynamic_module_type_http_header_type::RequestHeader);
+    self.metrics.set_gauge(self.hdr_count_gauge, req_hdr_count as u64);
+    // Set bytes_sent gauge from BytesInfo.
+    let bi = ctx.bytes_info();
+    self.metrics.set_gauge(self.bytes_sent_gauge, bi.bytes_sent);
 
     // Test access log type.
     let log_type = ctx.log_type();

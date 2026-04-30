@@ -122,6 +122,27 @@ TEST_P(DynamicModuleClusterIntegrationTest, SyncHostSelectionMultipleRequests) {
   }
 }
 
+// Verifies that the cluster-level metric defined via DefineCounter (and incremented per
+// host selection in ChooseHost) ends up in the /stats output. The Go module defines
+// "requests_routed" at config-time and increments it for each ChooseHost call. The
+// stat is scoped under "dynamicmodulescustom." (see cluster.cc).
+TEST_P(DynamicModuleClusterIntegrationTest, ClusterCounterMetric) {
+  initializeWithDecCluster("sync_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+
+  // The counter increments once per ChooseHost call. We sent 3 requests, so we expect
+  // at least 3 increments — there may be additional internal selections on retry/probe
+  // paths, so use a >= bound.
+  test_server_->waitForCounterGe("dynamicmodulescustom.requests_routed", 3);
+}
+
 // Verifies that a cluster with asynchronous host selection correctly routes requests.
 //
 // For Go specifically, this exercises the bug fix where ChooseHost was unable to honor a

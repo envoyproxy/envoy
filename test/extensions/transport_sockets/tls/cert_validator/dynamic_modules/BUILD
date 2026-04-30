@@ -21,7 +21,10 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:cert_validator_no_op",
         "//test/extensions/dynamic_modules/test_data/c:cert_validator_not_validated",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/go:cert_validator_test",
+        "//test/extensions/dynamic_modules/test_data/rust:cert_validator_test",
     ],
+    env = {"GODEBUG": "cgocheck=0"},
     rbe_pool = "6gig",
     deps = [
         "//source/common/router:string_accessor_lib",

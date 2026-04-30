@@ -8,7 +8,13 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/bootstrap:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
+    "//test/extensions/dynamic_modules/listener:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
+    "//test/extensions/dynamic_modules/udp:__pkg__",
+    "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
+    "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
+    "//test/extensions/tracers/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
 
@@ -59,3 +65,15 @@ test_program(name = "access_log_integration_test")
 test_program(name = "upstream_http_tcp_bridge")
 
 test_program(name = "cluster_integration_test")
+
+test_program(name = "udp_integration_test")
+
+test_program(name = "matcher_integration_test")
+
+test_program(name = "listener_integration_test")
+
+test_program(name = "tracer_integration_test")
+
+test_program(name = "load_balancer_integration_test")
+
+test_program(name = "cert_validator_test")
