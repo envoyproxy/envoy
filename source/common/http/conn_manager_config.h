@@ -415,6 +415,12 @@ public:
   virtual uint32_t xffNumTrustedHops() const PURE;
 
   /**
+   * @return bool if true and x-envoy-external-address header is present, use its value
+   *         as the downstream remote address instead of extracting from XFF.
+   */
+  virtual bool useExtractedExternalAddress() const PURE;
+
+  /**
    * @return bool don't append the remote address to XFF? This overrides the behavior of
    *              useRemoteAddress() and may be used when XFF should not be modified but we still
    *              want to avoid trusting incoming XFF in remote IP determination.

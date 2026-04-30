@@ -215,6 +215,7 @@ public:
     return *internal_address_config_;
   }
   uint32_t xffNumTrustedHops() const override { return xff_num_trusted_hops_; }
+  bool useExtractedExternalAddress() const override { return use_extracted_external_address_; }
   bool skipXffAppend() const override { return skip_xff_append_; }
   const std::string& via() const override { return via_; }
   Http::ForwardClientCertType forwardClientCert() const override { return forward_client_cert_; }
@@ -316,6 +317,7 @@ private:
   const bool use_remote_address_{};
   const std::unique_ptr<Http::InternalAddressConfig> internal_address_config_;
   const uint32_t xff_num_trusted_hops_;
+  const bool use_extracted_external_address_;
   const bool skip_xff_append_;
   const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;

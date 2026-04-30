@@ -151,6 +151,14 @@ new_features:
   change: |
     Added ``upstream.server_name`` CEL attribute returning the SNI from the established upstream
     TLS connection.
+- area: http
+  change: |
+    Added :ref:`use_extracted_external_address
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_extracted_external_address>`
+    config option to the HTTP connection manager that allows interior proxies (e.g., sidecars, waypoints)
+    to use an existing ``x-envoy-external-address`` header value as the downstream remote address instead
+    of re-extracting from XFF. This is useful in service mesh deployments where an edge proxy has already
+    performed client IP extraction.
 
 - area: tls
   change: |

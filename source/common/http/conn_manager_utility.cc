@@ -160,7 +160,25 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   bool allow_trusted_address_checks = false;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
 
-  if (config.useRemoteAddress()) {
+  // If configured, use an existing x-envoy-external-address header from an upstream proxy
+  // instead of re-extracting from XFF. This is useful for interior proxies in a service mesh.
+  if (config.useExtractedExternalAddress()) {
+    const auto external_address_header = request_headers.EnvoyExternalAddress();
+    if (external_address_header) {
+      const auto address_string = external_address_header->value().getStringView();
+      auto address_or_error = Network::Utility::parseInternetAddressNoThrow(std::string(address_string));
+      if (address_or_error != nullptr) {
+        final_remote_address = address_or_error;
+        allow_trusted_address_checks = true;
+        // Still append to XFF if configured
+        if (!config.skipXffAppend()) {
+          appendXff(request_headers, connection, config);
+        }
+      }
+    }
+  }
+
+  if (final_remote_address == nullptr && config.useRemoteAddress()) {
     allow_trusted_address_checks = request_headers.ForwardedFor() == nullptr;
     // If there are any trusted proxies in front of this Envoy instance (as indicated by
     // the xff_num_trusted_hops configuration option), get the trusted client address
@@ -193,7 +211,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
         request_headers.setForwardedPort(ip->port());
       }
     }
-  } else {
+  } else if (final_remote_address == nullptr) {
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF
     // or through an extension. An extension might be needed when XFF doesn't work (e.g. an
     // irregular network).

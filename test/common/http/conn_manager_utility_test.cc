@@ -3306,5 +3306,123 @@ TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolCustomPort) 
   EXPECT_EQ("https", headers.getForwardedProtoValue());
 }
 
+// Tests for use_extracted_external_address feature.
+
+// Verify that when use_extracted_external_address is enabled and x-envoy-external-address
+// header is present, it is used as the remote address.
+TEST_F(ConnectionManagerUtilityTest, UseExtractedExternalAddressWithHeader) {
+  // Connection from a gateway/upstream proxy
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useExtractedExternalAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+
+  // Header set by upstream edge proxy with the real client IP
+  TestRequestHeaderMapImpl headers{
+      {"x-envoy-external-address", "203.0.113.50"},
+      {"x-forwarded-for", "203.0.113.50, 10.0.0.1"}};
+
+  // Should use the x-envoy-external-address value, not the connection address
+  EXPECT_EQ((MutateRequestRet{"203.0.113.50:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+}
+
+// Verify that when use_extracted_external_address is enabled but header is absent,
+// falls back to normal behavior.
+TEST_F(ConnectionManagerUtilityTest, UseExtractedExternalAddressWithoutHeader) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useExtractedExternalAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+
+  // No x-envoy-external-address header
+  TestRequestHeaderMapImpl headers;
+
+  // Should fall back to connection address
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+}
+
+// Verify that when use_extracted_external_address is disabled, header is ignored.
+TEST_F(ConnectionManagerUtilityTest, UseExtractedExternalAddressDisabled) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useExtractedExternalAddress()).WillByDefault(Return(false));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+
+  // Header present but feature disabled
+  TestRequestHeaderMapImpl headers{{"x-envoy-external-address", "203.0.113.50"}};
+
+  // Should use connection address, not the header
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+}
+
+// Verify that when use_extracted_external_address is enabled with invalid header value,
+// falls back to normal behavior.
+TEST_F(ConnectionManagerUtilityTest, UseExtractedExternalAddressInvalidHeader) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useExtractedExternalAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+
+  // Invalid IP in header
+  TestRequestHeaderMapImpl headers{{"x-envoy-external-address", "not-an-ip"}};
+
+  // Should fall back to connection address
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+}
+
+// Verify that use_extracted_external_address works with IPv6.
+TEST_F(ConnectionManagerUtilityTest, UseExtractedExternalAddressIPv6) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useExtractedExternalAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+
+  // IPv6 client address
+  TestRequestHeaderMapImpl headers{{"x-envoy-external-address", "2001:db8::1"}};
+
+  EXPECT_EQ((MutateRequestRet{"[2001:db8::1]:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+}
+
+// Verify that XFF is still appended when use_extracted_external_address is used.
+TEST_F(ConnectionManagerUtilityTest, UseExtractedExternalAddressAppendsXff) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useExtractedExternalAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, skipXffAppend()).WillByDefault(Return(false));
+
+  TestRequestHeaderMapImpl headers{
+      {"x-envoy-external-address", "203.0.113.50"},
+      {"x-forwarded-for", "203.0.113.50"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  // Should have appended connection address to XFF
+  EXPECT_EQ("203.0.113.50, 10.0.0.1", headers.get_(Headers::get().ForwardedFor));
+}
+
+// Verify that XFF append is skipped when configured.
+TEST_F(ConnectionManagerUtilityTest, UseExtractedExternalAddressSkipXffAppend) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useExtractedExternalAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, skipXffAppend()).WillByDefault(Return(true));
+
+  TestRequestHeaderMapImpl headers{
+      {"x-envoy-external-address", "203.0.113.50"},
+      {"x-forwarded-for", "203.0.113.50"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  // XFF should remain unchanged
+  EXPECT_EQ("203.0.113.50", headers.get_(Headers::get().ForwardedFor));
+}
+
 } // namespace Http
 } // namespace Envoy

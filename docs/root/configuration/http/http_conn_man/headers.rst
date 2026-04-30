@@ -118,6 +118,12 @@ if the request is from an external client. ``x-envoy-external-address`` is not s
 for internal requests. This header can be safely forwarded between internal services for analytics
 purposes without having to deal with the complexities of XFF.
 
+In multi-proxy deployments (e.g., service meshes), interior proxies can be configured with
+:ref:`use_extracted_external_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_extracted_external_address>`
+to use an existing ``x-envoy-external-address`` header value as the downstream remote address,
+instead of re-extracting from XFF. This allows interior proxies to defer to an upstream edge
+proxy's client IP extraction.
+
 .. _config_http_conn_man_headers_x-envoy-force-trace:
 
 x-envoy-force-trace

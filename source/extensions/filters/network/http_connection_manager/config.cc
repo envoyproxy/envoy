@@ -371,6 +371,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
       internal_address_config_(createInternalAddressConfig(config, creation_status)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
+      use_extracted_external_address_(config.use_extracted_external_address()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),

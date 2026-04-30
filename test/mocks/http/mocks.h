@@ -676,6 +676,7 @@ public:
 
   MOCK_METHOD(bool, unixSocketInternal, ());
   MOCK_METHOD(uint32_t, xffNumTrustedHops, (), (const));
+  MOCK_METHOD(bool, useExtractedExternalAddress, (), (const));
   MOCK_METHOD(bool, skipXffAppend, (), (const));
   MOCK_METHOD(const std::string&, via, (), (const));
   MOCK_METHOD(Http::ForwardClientCertType, forwardClientCert, (), (const));

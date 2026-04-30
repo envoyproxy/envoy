@@ -753,6 +753,15 @@ message HttpConnectionManager {
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
   uint32 xff_num_trusted_hops = 19;
 
+  // When true, if an ``x-envoy-external-address`` header is present, use its value
+  // as the downstream remote address instead of extracting from XFF. This is useful
+  // for interior proxies in a service mesh where an upstream edge proxy has already
+  // extracted the original client IP and set this header.
+  //
+  // This should be enabled on interior proxies (e.g., sidecars, waypoints) and
+  // disabled on edge proxies that are responsible for the initial client IP extraction.
+  bool use_extracted_external_address = 60;
+
   // Configuration for original IP detection extensions.
   //
   // When these extensions are configured, Envoy will invoke them with the incoming request headers and
