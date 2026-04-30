@@ -128,6 +128,9 @@ go_library(
     srcs = [
         "sdk/go/abi/access_log.go",
         "sdk/go/abi/bootstrap.go",
+        # Stand-alone .c file that defines C trampolines passed by address from
+        # Go to Envoy. Cannot live in the cgo preamble; see file header for why.
+        "sdk/go/abi/bootstrap_trampolines.c",
         "sdk/go/abi/cert_validator.go",
         "sdk/go/abi/cluster.go",
         "sdk/go/abi/dns_resolver.go",

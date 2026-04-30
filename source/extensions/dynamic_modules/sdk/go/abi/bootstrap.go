@@ -9,12 +9,6 @@ package abi
 #include <string.h>
 #include "../../../abi/abi.h"
 
-// Forward declarations for Go-exported callbacks so we can reference them from C trampolines.
-extern envoy_dynamic_module_type_stats_iteration_action cgoBootstrapCounterIteratorGo(
-    envoy_dynamic_module_type_envoy_buffer name, uint64_t value, void* user_data);
-extern envoy_dynamic_module_type_stats_iteration_action cgoBootstrapGaugeIteratorGo(
-    envoy_dynamic_module_type_envoy_buffer name, uint64_t value, void* user_data);
-
 // cgoInvokeEventCb invokes Envoy's completion callback. The completion callback is a
 // plain C function pointer Envoy hands us via the *_shutdown export hooks; calling it
 // from Go via cgo would require turning the function-pointer field into a Go-callable
@@ -25,17 +19,14 @@ static inline void cgoInvokeEventCb(envoy_dynamic_module_type_event_cb cb, void*
     }
 }
 
-// C-side function pointers we can pass to Envoy. They forward to the Go-exported
-// callbacks. `__attribute__((used))` keeps these from being stripped by --gc-sections
-// even when the only reference is an address-take from Go's cgo-generated wrapper.
-__attribute__((used)) static envoy_dynamic_module_type_stats_iteration_action cgoBootstrapCounterIteratorC(
-    envoy_dynamic_module_type_envoy_buffer name, uint64_t value, void* user_data) {
-    return cgoBootstrapCounterIteratorGo(name, value, user_data);
-}
-__attribute__((used)) static envoy_dynamic_module_type_stats_iteration_action cgoBootstrapGaugeIteratorC(
-    envoy_dynamic_module_type_envoy_buffer name, uint64_t value, void* user_data) {
-    return cgoBootstrapGaugeIteratorGo(name, value, user_data);
-}
+// C trampolines for stats iteration callbacks. Defined in bootstrap_trampolines.c
+// (NOT here in the cgo preamble) so they have external linkage; cgo's address-of
+// for `C.cgoBootstrap*IteratorC` emits an extern relocation that would not resolve
+// against a `static` definition. See bootstrap_trampolines.c for the full rationale.
+extern envoy_dynamic_module_type_stats_iteration_action cgoBootstrapCounterIteratorC(
+    envoy_dynamic_module_type_envoy_buffer name, uint64_t value, void* user_data);
+extern envoy_dynamic_module_type_stats_iteration_action cgoBootstrapGaugeIteratorC(
+    envoy_dynamic_module_type_envoy_buffer name, uint64_t value, void* user_data);
 */
 import "C"
 import (
