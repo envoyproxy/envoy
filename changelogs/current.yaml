@@ -92,18 +92,6 @@ new_features:
     metric processing logic (tag enrichment, name rewriting, custom metric injection)
     into the proxy itself. Configured via
     :ref:`WasmFilterStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig>`.
-- area: tls
-  change: |
-    Added support for building Envoy with OpenSSL as an alternative to the default BoringSSL.
-    This is achieved through a BoringSSL compatibility layer (``bssl-compat``) that translates BoringSSL
-    API calls to OpenSSL, allowing Envoy's TLS code to remain unchanged. To build with OpenSSL, use
-    ``--config=openssl``. HTTP/3 (QUIC) is disabled for OpenSSL builds. Note that OpenSSL builds are
-    not currently covered by the `Envoy security policy <https://github.com/envoyproxy/envoy/blob/main/SECURITY.md>`_.
-    See :repo:`bazel/SSL.md <bazel/SSL.md>` for details.
-- area: dynamic_modules
-  change: |
-    Promoted the dynamic modules HTTP filter (``envoy.filters.http.dynamic_modules``) from alpha
-    to stable.
 - area: basic_auth
   change: |
     Added ``allow_missing`` field to the BasicAuth HTTP filter. When set to ``true``, requests
