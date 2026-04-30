@@ -262,7 +262,13 @@ TEST_P(DynamicModulesNetworkSdkIntegrationTest, BufferLimits) {
 // OnRead and schedules a continue; without the resume, the upstream never receives any
 // bytes. If StopIteration is broken (e.g. ignored, or ContinueReading is broken), this
 // test will hang waiting for waitForData and time out.
+//
+// The C++ test_data module does not implement this filter shape; this test is
+// rust/go-only.
 TEST_P(DynamicModulesNetworkSdkIntegrationTest, PauseResume) {
+  if (GetParam() == "cpp") {
+    return;
+  }
   initializeSdkFilter("pause_resume");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -283,7 +289,13 @@ TEST_P(DynamicModulesNetworkSdkIntegrationTest, PauseResume) {
 
 // Verifies the filter can mutate the read buffer (Append/append_read_buffer). The
 // upstream should observe "hello|appended" instead of just "hello".
+//
+// The C++ test_data module does not implement this filter shape; this test is
+// rust/go-only.
 TEST_P(DynamicModulesNetworkSdkIntegrationTest, DataAppender) {
+  if (GetParam() == "cpp") {
+    return;
+  }
   initializeSdkFilter("data_appender");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));

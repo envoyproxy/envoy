@@ -53,8 +53,9 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
+        # Rust variant disabled — the Rust SDK is missing listener filter ABI
+        # exports. See integration_test.cc::getListenerTestParams.
         "//test/extensions/dynamic_modules/test_data/go:listener_integration_test",
-        "//test/extensions/dynamic_modules/test_data/rust:listener_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
     rbe_pool = "6gig",

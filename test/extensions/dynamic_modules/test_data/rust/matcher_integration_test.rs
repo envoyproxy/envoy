@@ -6,8 +6,17 @@
 //! matcher_config bytes. on_matcher_match returns true iff the named request header is
 //! present with value exactly "match".
 
+use envoy_proxy_dynamic_modules_rust_sdk::abi;
 use envoy_proxy_dynamic_modules_rust_sdk::declare_matcher;
 use envoy_proxy_dynamic_modules_rust_sdk::matcher::*;
+
+// The declare_matcher! macro emits the matcher-specific entry points but NOT
+// envoy_dynamic_module_on_program_init, which Envoy requires for ABI version
+// negotiation. We provide it here manually.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const std::os::raw::c_char {
+  abi::envoy_dynamic_modules_abi_version.as_ptr() as *const std::os::raw::c_char
+}
 
 struct HeaderCheckConfig {
   header_name: String,
