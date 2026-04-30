@@ -76,7 +76,10 @@ CURRENT=spelling
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/spelling:check_spelling_pedantic -- --mark check --target_root="$PWD"
 
 CURRENT=rustfmt
-mapfile -t RUST_FILES < <(git ls-files '*.rs')
+RUST_FILES=()
+while IFS= read -r f; do
+    RUST_FILES+=("$f")
+done < <(git ls-files '*.rs')
 if [[ "${#RUST_FILES[@]}" -gt 0 ]]; then
     rustfmt \
         --unstable-features \
