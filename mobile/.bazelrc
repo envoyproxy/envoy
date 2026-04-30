@@ -114,6 +114,7 @@ build:mobile-clang --host_platform=@mobile_clang_platform
 build:mobile-rbe --google_default_credentials=false
 build:mobile-rbe --remote_cache=grpcs://envoy.cluster.engflow.com
 build:mobile-rbe --remote_executor=grpcs://envoy.cluster.engflow.com
+build:mobile-rbe --experimental_remote_downloader=grpcs://envoy.cluster.engflow.com
 build:mobile-rbe --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:mobile-rbe --bes_results_url=https://envoy.cluster.engflow.com/invocation/
 build:mobile-rbe --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
