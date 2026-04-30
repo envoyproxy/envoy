@@ -155,7 +155,7 @@ public:
                   opentelemetry::proto::metrics::v1::AggregationTemporality histogram_temporality,
                   absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback,
                   int64_t snapshot_time_ns, int64_t delta_start_time_ns,
-                  int64_t cumulative_start_time_ns);
+                  int64_t cumulative_start_time_ns, bool enable_metric_aggregation);
 
   // Adds a gauge metric data point to the streamer.
   void addGauge(std::string&& name, uint64_t value,
@@ -180,8 +180,9 @@ public:
   void send();
 
 private:
-  // Checks if the request limit is reached, and sends if necessary.
-  void sendIfFull();
+  // Checks if the request limit is reached or if no request is active.
+  // Sends the current request if full, and prepares a new one.
+  void sendIfFullAndPrepareRequest();
   // Initializes a new MetricsExportRequest.
   void initNewRequest();
 
@@ -194,6 +195,7 @@ private:
                        opentelemetry::proto::metrics::v1::AggregationTemporality temp) const;
 
   const uint32_t max_dp_;
+  const bool enable_metric_aggregation_;
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
       resource_attributes_;
   const opentelemetry::proto::metrics::v1::AggregationTemporality counter_temporality_;

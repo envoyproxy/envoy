@@ -1800,7 +1800,7 @@ class RequestStreamerTests : public testing::Test {
 public:
   void SetUp() override { resource_attributes_.Add()->set_key("resource_key"); }
 
-  void setupStreamer(uint32_t max_data_point) {
+  void setupStreamer(uint32_t max_data_point, bool enable_metric_aggregation = true) {
     opentelemetry::proto::metrics::v1::AggregationTemporality counter_temp = opentelemetry::proto::
         metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
     opentelemetry::proto::metrics::v1::AggregationTemporality hist_temp = opentelemetry::proto::
@@ -1809,7 +1809,8 @@ public:
     streamer_ = std::make_unique<RequestStreamer>(
         max_data_point, resource_attributes_, counter_temp, hist_temp,
         [this](MetricsExportRequestPtr request) { requests_.push_back(std::move(request)); },
-        0 /* snapshot_time_ns */, 0 /* delta_start_time_ns */, 0 /* cumulative_start_time_ns */);
+        /*snapshot_time_ns=*/0, /*delta_start_time_ns=*/0, /*cumulative_start_time_ns=*/0,
+        enable_metric_aggregation);
   }
 
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
@@ -1821,6 +1822,24 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestEmptyMetrics) {
   setupStreamer(/*max_data_point=*/1);
   streamer_->send();
   EXPECT_EQ(requests_.size(), 0);
+}
+
+TEST_F(RequestStreamerTests, TestNoAggregationEmitsSeparateMetrics) {
+  setupStreamer(/*max_data_point=*/0, /*enable_metric_aggregation=*/false);
+
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", "val1"}};
+  MetricAggregator::SortedAttributesVector attr2 = {{"key2", "val2"}};
+
+  streamer_->addGauge("metric1", 10, std::move(attr1));
+  streamer_->addGauge("metric1", 20, std::move(attr2));
+  streamer_->send();
+
+  EXPECT_EQ(requests_.size(), 1);
+  // We expect 2 separate Metric protos with the same name because aggregation is disabled!
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 2);
+
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics(0).name(), "metric1");
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics(1).name(), "metric1");
 }
 
 TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoLimits) {

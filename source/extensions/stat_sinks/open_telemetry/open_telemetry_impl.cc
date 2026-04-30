@@ -93,14 +93,14 @@ RequestStreamer::RequestStreamer(
         resource_attributes,
     AggregationTemporality counter_temporality, AggregationTemporality histogram_temporality,
     absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback, int64_t snapshot_time_ns,
-    int64_t delta_start_time_ns, int64_t cumulative_start_time_ns)
-    : max_dp_(max_dp), resource_attributes_(resource_attributes),
-      counter_temporality_(counter_temporality), histogram_temporality_(histogram_temporality),
-      send_callback_(std::move(send_callback)), snapshot_time_ns_(snapshot_time_ns),
-      delta_start_time_ns_(delta_start_time_ns),
+    int64_t delta_start_time_ns, int64_t cumulative_start_time_ns, bool enable_metric_aggregation)
+    : max_dp_(max_dp), enable_metric_aggregation_(enable_metric_aggregation),
+      resource_attributes_(resource_attributes), counter_temporality_(counter_temporality),
+      histogram_temporality_(histogram_temporality), send_callback_(std::move(send_callback)),
+      snapshot_time_ns_(snapshot_time_ns), delta_start_time_ns_(delta_start_time_ns),
       cumulative_start_time_ns_(cumulative_start_time_ns) {}
 
-void RequestStreamer::sendIfFull() {
+void RequestStreamer::sendIfFullAndPrepareRequest() {
   if (current_request_ != nullptr && (max_dp_ == 0 || dp_num_ < max_dp_)) {
     return;
   }
@@ -124,13 +124,19 @@ void RequestStreamer::initNewRequest() {
 
 ::opentelemetry::proto::metrics::v1::Metric*
 RequestStreamer::findOrCreateMetric(std::string&& name) {
-  auto it = name_to_metric_.find(name);
-  if (it != name_to_metric_.end()) {
-    return it->second;
+  if (enable_metric_aggregation_) {
+    auto it = name_to_metric_.find(name);
+    if (it != name_to_metric_.end()) {
+      return it->second;
+    }
   }
+
   auto* m = current_scope_metrics_->add_metrics();
   m->set_name(std::move(name));
-  name_to_metric_.emplace(m->name(), m);
+
+  if (enable_metric_aggregation_) {
+    name_to_metric_.emplace(m->name(), m);
+  }
   return m;
 }
 
@@ -155,7 +161,7 @@ void RequestStreamer::setCommonFields(PointType* point,
 
 void RequestStreamer::addGauge(std::string&& name, uint64_t value,
                                MetricAggregator::SortedAttributesVector&& attributes) {
-  sendIfFull();
+  sendIfFullAndPrepareRequest();
   auto* metric = findOrCreateMetric(std::move(name));
   auto* point = metric->mutable_gauge()->add_data_points();
   point->set_as_int(value);
@@ -166,7 +172,7 @@ void RequestStreamer::addGauge(std::string&& name, uint64_t value,
 
 void RequestStreamer::addCounter(std::string&& name, uint64_t value,
                                  MetricAggregator::SortedAttributesVector&& attributes) {
-  sendIfFull();
+  sendIfFullAndPrepareRequest();
   auto temp = counter_temporality_;
   if (value == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
@@ -184,7 +190,7 @@ void RequestStreamer::addCounter(std::string&& name, uint64_t value,
 
 void RequestStreamer::addHistogram(std::string&& name, MetricAggregator::CustomHistogram hist,
                                    MetricAggregator::SortedAttributesVector&& attributes) {
-  sendIfFull();
+  sendIfFullAndPrepareRequest();
   auto temp = histogram_temporality_;
   if (hist.count_ == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
@@ -240,6 +246,7 @@ void RequestStreamer::addAggregationResult(MetricAggregator::AggregationResult&&
 void RequestStreamer::send() {
   if (current_request_ != nullptr && dp_num_ > 0) {
     send_callback_(std::move(current_request_));
+    current_request_ = nullptr;
   }
 }
 
@@ -439,7 +446,8 @@ void OtlpMetricsFlusherImpl::flush(
                                     .count();
   RequestStreamer streamer(config_->maxDataPointsPerRequest(), config_->resource_attributes(),
                            counter_temporality_, histogram_temporality_, std::move(send_callback),
-                           snapshot_time, delta_start_time_ns, cumulative_start_time_ns);
+                           snapshot_time, delta_start_time_ns, cumulative_start_time_ns,
+                           config_->enableMetricAggregation());
 
   if (!config_->enableMetricAggregation()) {
     sinkMetrics(snapshot, streamer);
