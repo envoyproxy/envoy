@@ -95,6 +95,29 @@ void McpRouterFilter::onDestroy() {
   single_backend_callback_ = nullptr;
 }
 
+absl::StatusOr<envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig>
+McpRouterFilter::getClusterConfig() {
+  OptRef<const Upstream::ClusterInfo> cluster_info = decoder_callbacks_->clusterInfo();
+  if (!cluster_info.has_value()) {
+    return absl::NotFoundError("No cluster info");
+  }
+
+  const auto& typed_filter_metadata = cluster_info.ref().metadata().typed_filter_metadata();
+  auto it = typed_filter_metadata.find("envoy.clusters.mcp_multicluster");
+  if (it == typed_filter_metadata.end()) {
+    return absl::NotFoundError(
+        fmt::format("Metadata for 'envoy.clusters.mcp_multicluster' not found in cluster '{}'",
+                    cluster_info.ref().name()));
+  }
+
+  envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig cluster_config;
+  if (!it->second.UnpackTo(&cluster_config)) {
+    return absl::InvalidArgumentError("Failed to parse ClusterConfig metadata: {}");
+  }
+
+  return cluster_config;
+}
+
 Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                          bool end_stream) {
   // TODO(botengyao): also supports /GET endpoints.
@@ -105,6 +128,12 @@ Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap&
   }
 
   request_headers_ = &headers;
+
+  auto cluster_config_or = getClusterConfig();
+  if (cluster_config_or.ok()) {
+    config_ =
+        std::make_shared<McpRouterClusterConfigImpl>(cluster_config_or.value(), std::move(config_));
+  }
 
   // Extract session ID from header
   auto session_header = headers.get(Http::LowerCaseString(std::string(kSessionIdHeader)));

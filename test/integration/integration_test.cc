@@ -941,6 +941,38 @@ TEST_P(IntegrationTest, TestSmuggling) {
   }
 }
 
+TEST_P(IntegrationTest, TestInvalidChunkedEncoding) {
+  autonomous_upstream_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.strict_chunk_parsing", "true");
+#ifdef ENVOY_ENABLE_UHV
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
+  config_helper_.disableDelayClose();
+  initialize();
+  std::string response;
+  const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: chunked\r\n\r\n"
+                              "1\r\nAAAAAA\r\n0\r\n\r\nXXXXXX";
+  sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 400 Bad Request\r\n"));
+}
+
+TEST_P(IntegrationTest, TestInvalidChunkedEncodingDefault) {
+  autonomous_upstream_ = true;
+#ifdef ENVOY_ENABLE_UHV
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                    "true");
+#endif
+  config_helper_.disableDelayClose();
+  initialize();
+  std::string response;
+  const std::string request =
+      "GET / HTTP/1.1\r\nHost: host\r\nConnection: close\r\ntransfer-encoding: chunked\r\n\r\n"
+      "1\r\nAAAAAA\r\n0\r\n\r\nXXXXXX";
+  sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+  EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
+}
+
 TEST_P(IntegrationTest, TestInvalidTransferEncoding) {
 #ifdef ENVOY_ENABLE_UHV
   config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",

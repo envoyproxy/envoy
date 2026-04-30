@@ -50,10 +50,22 @@ setup_clang_toolchain() {
     fi
     config="clang"
     # We only support clang with libc++ now
-    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}" "--config=${config}")
-    BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
     BAZEL_BUILD_OPTIONS+=("--config=${config}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
+    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}" "--config=${config}")
+    for opt in "${BAZEL_BUILD_OPTIONS[@]}"; do
+        case "$opt" in
+            --config=rbe|--config=remote-cache)
+                BAZEL_QUERY_OPTIONS+=("--config=remote-cache")
+                break
+                ;;
+            --config=mobile-rbe)
+                BAZEL_QUERY_OPTIONS+=("--config=mobile-rbe")
+                break
+                ;;
+        esac
+    done
+    BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
     export BAZEL_QUERY_OPTION_LIST
     echo "clang toolchain configured: ${config}"
@@ -366,6 +378,28 @@ case $CI_TARGET in
               > /dev/null
         TOTAL_SIZE="$(du -ch "${ENVOY_CACHE_ROOT}" | grep total | tail -n1 | cut -f1)"
         echo "Generated cache: ${TOTAL_SIZE}"
+        ;;
+
+    deflake)
+        ENVOY_DEFLAKE_RUNS=${ENVOY_DEFLAKE_RUNS:-1000}
+        if [[ -z "$ENVOY_DEFLAKE_TARGET" || -z "$ENVOY_DEFLAKE_TEST" ]]; then
+            echo "Both ENVOY_DEFLAKE_TARGET and ENVOY_DEFLAKE_TEST must be set to use deflake" >&2
+            exit 1
+        fi
+        _BAZEL_ARGS=(
+            "$ENVOY_DEFLAKE_TARGET"
+            "${BAZEL_BUILD_OPTIONS[@]}"
+            --test_arg=--gtest_filter="$ENVOY_DEFLAKE_TEST"
+            --runs_per_test="${ENVOY_DEFLAKE_RUNS}"
+            --test_arg="-l trace"
+            --cache_test_results=no)
+        if [[ -n "$ENVOY_DEFLAKE_JOBS" ]]; then
+            _BAZEL_ARGS+=(--jobs="$ENVOY_DEFLAKE_JOBS")
+        fi
+        echo "Deflake args: " >&2
+        echo "  ${_BAZEL_ARGS[*]}" >&2
+        echo "" >&2
+        bazel test "${_BAZEL_ARGS[@]}"
         ;;
 
     format-api|check_and_fix_proto_format)
@@ -978,6 +1012,8 @@ case $CI_TARGET in
         bazel run --config=ci \
                   --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
                   --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --action_env="CARGO_BAZEL_REPIN=true" \
+                  --host_action_env="CARGO_BAZEL_REPIN=true" \
                   --sandbox_writable_path="${HOME}/.docker/" \
                   --sandbox_writable_path="$HOME" \
                   @envoy-examples//:verify_examples

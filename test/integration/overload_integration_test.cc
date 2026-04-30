@@ -298,6 +298,63 @@ TEST_P(OverloadIntegrationTest, BypassOverloadManagerTest) {
   codec_client_->close();
 }
 
+// TODO: add another test for HTTP2
+TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
+  if (downstreamProtocol() != Http::CodecType::HTTP3) {
+    return; // only relevant for HTTP/3
+  }
+
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.close_idle_http_connections"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          scaled:
+            scaling_threshold: 0.8
+            saturation_threshold: 0.9
+    )EOF"));
+
+  // 1. Establish a QUIC connection
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Wait for the connection to be fully established.
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_http3_total", 1);
+
+  // 2. Send a request and wait for the response to complete.
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // At this point, the EnvoyQuicServerSession should have added itself to the
+  // EnvoyQuicDispatcher's idle list.
+
+  // 2. Trigger the overload state
+  updateResource(0.95); // Set pressure to 0.95, above the 0.9 saturation threshold
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.close_idle_http_connections.active",
+                               1);
+
+  // 3. Advance time to trigger the check_idle_connection_timer (which runs every 100ms).
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+
+  // 4. Wait for the connection to be closed by the server.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Check that the close reason was correct (this stat is incremented in
+  // EnvoyQuicDispatcher)
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+
+  codec_client_->close();
+
+  // Deactivate overload state
+  updateResource(0.7);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.close_idle_http_connections.active",
+                               0);
+}
+
 class Http2RawFrameOverloadIntegrationTest : public BaseOverloadIntegrationTest,
                                              public Http2RawFrameIntegrationTest,
                                              public testing::Test {

@@ -32,12 +32,12 @@ using ScopeSharedPtr = std::shared_ptr<Scope>;
 // Settings for limiting the number of counters, gauges and histograms allowed
 // in a scope. This currently only supports thread local stats.
 struct ScopeStatsLimitSettings {
-  // Max number of counters allowed in this scope. 0 means no limit.
-  uint32_t max_counters = 0;
-  // Max number of gauges allowed in this scope. 0 means no limit.
-  uint32_t max_gauges = 0;
-  // Max number of histograms allowed in this scope. 0 means no limit.
-  uint32_t max_histograms = 0;
+  // Max number of counters allowed in this scope. absl::nullopt means no limit.
+  absl::optional<uint32_t> max_counters = absl::nullopt;
+  // Max number of gauges allowed in this scope. absl::nullopt means no limit.
+  absl::optional<uint32_t> max_gauges = absl::nullopt;
+  // Max number of histograms allowed in this scope. absl::nullopt means no limit.
+  absl::optional<uint32_t> max_histograms = absl::nullopt;
 };
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
@@ -74,6 +74,12 @@ public:
 
   /** @return a const shared_ptr for this */
   ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
+
+  /**
+   * Set a callback to be run when the scope is destroyed.
+   * @param callback the callback to run.
+   */
+  virtual void setCleanupCallback(std::function<void()> callback) = 0;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes

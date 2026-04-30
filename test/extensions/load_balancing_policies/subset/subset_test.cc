@@ -17,9 +17,7 @@
 #include "source/extensions/load_balancing_policies/subset/config.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/common.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"

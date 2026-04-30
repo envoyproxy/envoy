@@ -3,7 +3,6 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/clusters/common/logical_host.h"
 
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
@@ -57,10 +56,17 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
       .WillOnce(ReturnRef(socket_factory));
   description_.resolveTransportSocketFactory(address_, &metadata, nullptr);
 
+  EXPECT_CALL(*mock_host_, lbPolicyDataCount());
+  description_.lbPolicyDataCount();
+
+  EXPECT_CALL(*mock_host_, lbPolicyDataAt(0));
+  description_.lbPolicyDataAt(0);
+
   description_.canary(false);
   description_.priority(0);
   description_.metadata(nullptr);
   description_.setLastHcPassTime(MonotonicTime());
+  description_.addLbPolicyData(nullptr);
 
   Upstream::HealthCheckHostMonitorPtr heath_check_monitor;
   description_.setHealthChecker(std::move(heath_check_monitor));

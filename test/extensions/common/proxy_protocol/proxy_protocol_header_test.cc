@@ -1,7 +1,6 @@
 #include "envoy/network/address.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/logger.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 

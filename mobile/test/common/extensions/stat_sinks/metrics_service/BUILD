@@ -18,7 +18,6 @@ envoy_extension_cc_test(
         "//library/common/extensions/stat_sinks/metrics_service:service_cc_proto",
         "@envoy//test/mocks/grpc:grpc_mocks",
         "@envoy//test/mocks/local_info:local_info_mocks",
-        "@envoy//test/mocks/thread_local:thread_local_mocks",
         "@envoy//test/test_common:logging_lib",
     ],
 )
@@ -35,7 +34,6 @@ envoy_extension_cc_test(
         "@envoy//test/integration:http_integration_lib_light",
         "@envoy//test/mocks/grpc:grpc_mocks",
         "@envoy//test/mocks/local_info:local_info_mocks",
-        "@envoy//test/mocks/thread_local:thread_local_mocks",
         "@envoy//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
