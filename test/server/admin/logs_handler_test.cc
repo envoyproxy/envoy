@@ -79,6 +79,27 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   EXPECT_EQ(Http::Code::OK, postCallback("/logging?group=misc:trace", header_map, response));
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(misc_key)->level(), spdlog::level::trace);
 
+  // Test group matching with specific file:group keys.
+  const std::string key1 = "source/common/http/http.cc:misc";
+  const std::string key2 = "source/common/router/foo.cc:http";
+  std::atomic<spdlog::logger*> logger1;
+  getFineGrainLogContext().initFineGrainLogger("source/common/http/http.cc", "misc", logger1);
+  std::atomic<spdlog::logger*> logger2;
+  getFineGrainLogContext().initFineGrainLogger("source/common/router/foo.cc", "http", logger2);
+
+  // Set all to info first.
+  getFineGrainLogContext().updateVerbosityDefaultLevel(spdlog::level::info);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key1)->level(), spdlog::level::info);
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key2)->level(), spdlog::level::info);
+
+  // Now set group "http" to trace.
+  EXPECT_EQ(Http::Code::OK, postCallback("/logging?group=http:trace", header_map, response));
+
+  // key1 matches "http" because its file basename is "http".
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key1)->level(), spdlog::level::trace);
+  // key2 matches "http" because its group name is "http".
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key2)->level(), spdlog::level::trace);
+
   EXPECT_EQ(Http::Code::BadRequest, postCallback("/logging?group=misc:blah", header_map, response));
   EXPECT_THAT(response.toString(), HasSubstr("error: unknown logger level\n"));
 
