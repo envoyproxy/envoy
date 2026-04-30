@@ -43,8 +43,11 @@ static_resources:
                   claim_to_headers:
                   - header_name: x-jwt-claim-role
                     claim_name: role
+                  # extract_only_without_validation does not verify signatures, so
+                  # an empty key set is sufficient. The JWKS still has to parse, so
+                  # the structure must include the required `keys` field.
                   local_jwks:
-                    inline_string: "{}"
+                    inline_string: '{"keys":[]}'
               rules:
               - match:
                   prefix: "/admin"
