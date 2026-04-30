@@ -162,6 +162,10 @@ public:
   absl::Status onResourceUpdate(absl::string_view resource_name,
                                 const Config::DecodedResourceRef& resource,
                                 const std::string& system_version_info) {
+    ENVOY_LOG(debug,
+              "ODCDS-manager: onResourceUpdate for resource {} (version {}); forwarding to "
+              "CdsApiHelper",
+              resource_name, system_version_info);
     auto [_, exception_msgs] = helper_.onConfigUpdate({resource}, {}, system_version_info);
     if (!exception_msgs.empty()) {
       return absl::InvalidArgumentError(fmt::format("Error adding/updating cluster {} - {}",
@@ -173,6 +177,10 @@ public:
 
   absl::Status onResourceRemoved(absl::string_view resource_name,
                                  const std::string& system_version_info) {
+    ENVOY_LOG(debug,
+              "ODCDS-manager: onResourceRemoved for resource {} (version {}); forwarding to "
+              "CdsApiHelper and notifyMissingCluster",
+              resource_name, system_version_info);
     // TODO(adisuissa): add direct `onResourceRemove(resource_name)` to `helper_`.
     Protobuf::RepeatedPtrField<std::string> removed_resource_list;
     removed_resource_list.Add(std::string(resource_name));
@@ -193,6 +201,11 @@ public:
   }
 
   void addSubscription(absl::string_view resource_name, bool old_ads) {
+    ENVOY_LOG(debug,
+              "ODCDS-manager: addSubscription(resource={}, old_ads={}); subscriptions_size={}, "
+              "contains_resource={}, shared_kads_active={}",
+              resource_name, old_ads, subscriptions_.size(), subscriptions_.contains(resource_name),
+              shared_kads_subscription_ != nullptr);
     if (subscriptions_.contains(resource_name)) {
       ENVOY_LOG(debug, "ODCDS-manager: resource {} is already subscribed to, skipping",
                 resource_name);
@@ -205,6 +218,8 @@ public:
     // the shared ``WatchMap`` populated by a wildcard CDS watcher, can cause delta responses
     // to be routed only to the wildcard watcher and never reach this manager's callback.
     if (old_ads && Runtime::runtimeFeatureEnabled(SharedKadsSubscriptionRuntimeGuard)) {
+      ENVOY_LOG(debug, "ODCDS-manager: routing resource {} through shared kAds subscription",
+                resource_name);
       addSharedKadsSubscription(resource_name);
       return;
     }
@@ -331,6 +346,8 @@ private:
 
   void addSharedKadsSubscription(absl::string_view resource_name) {
     if (shared_kads_subscription_ == nullptr) {
+      ENVOY_LOG(debug, "ODCDS-manager: creating shared kAds subscription (first resource: {})",
+                resource_name);
       shared_kads_subscription_ =
           std::make_unique<SharedKadsSubscription>(*this, validation_visitor_);
       absl::Status status = shared_kads_subscription_->start(resource_name);
@@ -344,6 +361,8 @@ private:
         return;
       }
     } else {
+      ENVOY_LOG(debug, "ODCDS-manager: reusing existing shared kAds subscription for resource {}",
+                resource_name);
       shared_kads_subscription_->requestOnDemandUpdate(resource_name);
     }
     subscriptions_.emplace(std::string(resource_name), std::make_unique<SharedKadsHandle>());
@@ -370,7 +389,9 @@ private:
       RETURN_IF_NOT_OK_REF(subscription_or_error.status());
       subscription_ = std::move(subscription_or_error.value());
       interested_names_.insert(std::string(first_resource_name));
-      ENVOY_LOG(debug, "ODCDS-manager: starting shared kAds subscription for resource {}",
+      ENVOY_LOG(debug,
+                "ODCDS-manager: shared kAds: Subscription::start({}); first request on the "
+                "long-lived subscription",
                 first_resource_name);
       subscription_->start({std::string(first_resource_name)});
       return absl::OkStatus();
@@ -380,14 +401,16 @@ private:
       const std::string name(resource_name);
       auto [_, inserted] = interested_names_.insert(name);
       if (!inserted) {
-        ENVOY_LOG(trace, "ODCDS-manager: shared kAds: resource {} already requested, skipping",
-                  resource_name);
+        ENVOY_LOG(debug,
+                  "ODCDS-manager: shared kAds: requestOnDemandUpdate({}); already in "
+                  "interested_names_ (size={}), short-circuiting (no wire request)",
+                  resource_name, interested_names_.size());
         return;
       }
       ENVOY_LOG(debug,
                 "ODCDS-manager: requesting on-demand update on shared kAds subscription for "
-                "resource {}",
-                resource_name);
+                "resource {}; interested_names_size now {}",
+                resource_name, interested_names_.size());
       // Update the underlying ``Watch``'s set of interested resources so the dispatch via
       // ``WatchMap::watchesInterestedIn`` reaches this subscription when the response
       // arrives. ``Subscription::requestOnDemandUpdate`` on its own only updates the
@@ -413,6 +436,21 @@ private:
     absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                                 const std::string& system_version_info) override {
+      // High-signal diagnostic: this fires for every wire response routed by ``WatchMap`` to
+      // this shared subscription's ``Watch``. If a response with ``added=[X]`` arrives but
+      // this log line for ``X`` is not present, the response was absorbed by another watcher
+      // (typically the bootstrap-level wildcard CDS) before reaching us.
+      std::vector<std::string> added_names;
+      added_names.reserve(added_resources.size());
+      for (const auto& resource : added_resources) {
+        added_names.emplace_back(resource.get().name());
+      }
+      std::vector<std::string> removed_names(removed_resources.begin(), removed_resources.end());
+      ENVOY_LOG(debug,
+                "ODCDS-manager: shared kAds onConfigUpdate(added=[{}], removed=[{}], version={}); "
+                "interested_names_size={}",
+                absl::StrJoin(added_names, ","), absl::StrJoin(removed_names, ","),
+                system_version_info, interested_names_.size());
       for (const auto& resource : added_resources) {
         ENVOY_LOG(trace, "ODCDS-manager: shared kAds: updating resource {}", resource.get().name());
         absl::Status status =
@@ -437,10 +475,9 @@ private:
       // notify every interested resource as missing. Subsequent ``requestOnDemandUpdate``
       // calls will retry through the same subscription.
       ENVOY_LOG(debug,
-                "ODCDS-manager: shared kAds subscription failed (reason = {}): {}; treating all "
-                "{} interested resources as missing",
-                enumToInt(reason), e == nullptr ? "exception not provided" : e->what(),
-                interested_names_.size());
+                "ODCDS-manager: shared kAds onConfigUpdateFailed(reason={}, exception={}); "
+                "treating all {} interested resources as missing",
+                enumToInt(reason), e == nullptr ? "<none>" : e->what(), interested_names_.size());
       for (const auto& resource_name : interested_names_) {
         parent_.onFailure(resource_name);
       }
