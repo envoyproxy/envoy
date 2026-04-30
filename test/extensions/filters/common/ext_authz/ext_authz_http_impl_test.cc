@@ -967,6 +967,74 @@ TEST_F(ExtAuthzHttpClientTest, MultipleSetCookieHeadersOnSuccess) {
   client_->onSuccess(async_request_, std::move(message_response));
 }
 
+// Test path override with encode_raw_headers.
+TEST_F(ExtAuthzHttpClientTest, PathOverrideWithEncodeRawHeaders) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_override: "/overridden_path"
+  encode_raw_headers: true
+  )EOF";
+  initialize(yaml);
+
+  envoy::service::auth::v3::CheckRequest request;
+  auto* http_request = request.mutable_attributes()->mutable_request()->mutable_http();
+  auto* header = http_request->mutable_header_map()->add_headers();
+  header->set_key(":path");
+  header->set_raw_value("/original_path");
+
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        EXPECT_EQ("/overridden_path", message->headers().getPathValue());
+        return &async_request_;
+      }));
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  auto check_response = TestCommon::makeMessageResponse(
+      TestCommon::makeHeaderValueOption({{":status", "200", false}}));
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(async_request_, std::move(check_response));
+}
+
+// Test path prefix with encode_raw_headers.
+TEST_F(ExtAuthzHttpClientTest, PathPrefixWithEncodeRawHeaders) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    path_prefix: "/prefix"
+  encode_raw_headers: true
+  )EOF";
+  initialize(yaml);
+
+  envoy::service::auth::v3::CheckRequest request;
+  auto* http_request = request.mutable_attributes()->mutable_request()->mutable_http();
+  auto* header = http_request->mutable_header_map()->add_headers();
+  header->set_key(":path");
+  header->set_raw_value("/original_path");
+
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        EXPECT_EQ("/prefix/original_path", message->headers().getPathValue());
+        return &async_request_;
+      }));
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  auto check_response = TestCommon::makeMessageResponse(
+      TestCommon::makeHeaderValueOption({{":status", "200", false}}));
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(async_request_, std::move(check_response));
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace Common

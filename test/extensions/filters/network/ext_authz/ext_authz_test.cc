@@ -763,6 +763,55 @@ TEST_F(ExtAuthzFilterTest, NoMetadataContextNamespaces) {
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
 }
 
+// Test that bootstrap metadata labels are correctly extracted.
+TEST_F(ExtAuthzFilterTest, BootstrapMetadataLabels) {
+  const std::string yaml = R"EOF(
+  stat_prefix: "name"
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  bootstrap_metadata_labels_key: "authz_labels"
+  )EOF";
+
+  auto* fields = context_.bootstrap_.mutable_node()->mutable_metadata()->mutable_fields();
+  Protobuf::Struct labels;
+  (*labels.mutable_fields())["label1"] = ValueUtil::stringValue("value1");
+  (*fields)["authz_labels"].mutable_struct_value()->CopyFrom(labels);
+
+  initialize(yaml);
+
+  EXPECT_EQ(1, config_->destinationLabels().size());
+  EXPECT_EQ("value1", config_->destinationLabels().at("label1"));
+}
+
+// Test that filterEnabledMetadata correctly matches metadata.
+TEST_F(ExtAuthzFilterTest, FilterEnabledMetadata) {
+  const std::string yaml = R"EOF(
+  stat_prefix: "name"
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  filter_enabled_metadata:
+    filter: "envoy.filters.network.ext_authz"
+    path:
+    - key: "enabled"
+    value:
+      string_match:
+        exact: "true"
+  )EOF";
+
+  initialize(yaml);
+
+  envoy::config::core::v3::Metadata metadata;
+  auto* fields = (*metadata.mutable_filter_metadata())["envoy.filters.network.ext_authz"].mutable_fields();
+  
+  (*fields)["enabled"] = ValueUtil::stringValue("true");
+  EXPECT_TRUE(config_->filterEnabledMetadata(metadata));
+
+  (*fields)["enabled"] = ValueUtil::stringValue("false");
+  EXPECT_FALSE(config_->filterEnabledMetadata(metadata));
+}
+
 } // namespace ExtAuthz
 } // namespace NetworkFilters
 } // namespace Extensions
