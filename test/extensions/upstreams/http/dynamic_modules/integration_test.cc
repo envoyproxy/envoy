@@ -8,7 +8,7 @@ namespace Envoy {
 namespace {
 
 // Parameterized over (HttpProtocolTestParams, language). language selects which
-// test_data subdir (rust, go) the upstream_http_tcp_bridge module is loaded from. Both
+// test_data subdirectory (rust, go) the upstream_http_tcp_bridge module is loaded from. Both
 // languages ship a "test_bridge" config factory that supports the same two modes:
 // "streaming" (the default) and "local_reply".
 struct DynamicModuleBridgeParam {
@@ -17,7 +17,7 @@ struct DynamicModuleBridgeParam {
 };
 
 class DynamicModuleBridgeIntegrationTest : public testing::TestWithParam<DynamicModuleBridgeParam>,
-                                            public HttpIntegrationTest {
+                                           public HttpIntegrationTest {
 public:
   DynamicModuleBridgeIntegrationTest()
       : HttpIntegrationTest(GetParam().protocol.downstream_protocol, GetParam().protocol.version) {

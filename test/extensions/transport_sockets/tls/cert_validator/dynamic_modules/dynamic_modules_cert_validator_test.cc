@@ -706,20 +706,18 @@ INSTANTIATE_TEST_SUITE_P(SdkLanguages, DynamicModuleCertValidatorLanguageTest,
 
 TEST_P(DynamicModuleCertValidatorLanguageTest, ConfigNewSuccess) {
   auto module = Envoy::Extensions::DynamicModules::newDynamicModuleByName("cert_validator_test",
-                                                                           false, false);
+                                                                          false, false);
   ASSERT_TRUE(module.ok());
-  auto config_or_error =
-      newDynamicModuleCertValidatorConfig("test", "", std::move(module.value()));
+  auto config_or_error = newDynamicModuleCertValidatorConfig("test", "", std::move(module.value()));
   ASSERT_TRUE(config_or_error.ok());
   EXPECT_NE(config_or_error.value()->in_module_config_, nullptr);
 }
 
 TEST_P(DynamicModuleCertValidatorLanguageTest, VerifyCertChainSuccess) {
   auto module = Envoy::Extensions::DynamicModules::newDynamicModuleByName("cert_validator_test",
-                                                                           false, false);
+                                                                          false, false);
   ASSERT_TRUE(module.ok());
-  auto config_or_error =
-      newDynamicModuleCertValidatorConfig("test", "", std::move(module.value()));
+  auto config_or_error = newDynamicModuleCertValidatorConfig("test", "", std::move(module.value()));
   ASSERT_TRUE(config_or_error.ok());
 
   DynamicModuleCertValidator validator(config_or_error.value(), stats_);

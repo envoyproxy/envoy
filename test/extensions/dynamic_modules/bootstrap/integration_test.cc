@@ -22,7 +22,8 @@ public:
                                         const std::string& extension_config = "test_config",
                                         bool do_not_close = false) {
     TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", module_dir, 1);
-    const std::string yaml = fmt::format(R"EOF(
+    const std::string yaml =
+        fmt::format(R"EOF(
       name: envoy.bootstrap.dynamic_modules
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
@@ -34,8 +35,7 @@ public:
           "@type": type.googleapis.com/google.protobuf.StringValue
           value: {}
     )EOF",
-                                         module_name, do_not_close ? "true" : "false",
-                                         extension_name, extension_config);
+                    module_name, do_not_close ? "true" : "false", extension_name, extension_config);
 
     config_helper_.addBootstrapExtension(yaml);
     HttpIntegrationTest::initialize();
@@ -129,23 +129,24 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessGo) {
 // pointers into the loaded .so. The gtest parameterization runs IPv4 then IPv6 in the same
 // process, which would dlclose+dlopen the module between iterations; on aarch64 the second
 // dlopen tends to map the .so at a different address, leaving the cached pointers dangling
-// and causing a SEGV when the test calls them. RTLD_NODELETE keeps the .so resident so the
-// cached pointers stay valid across iterations.
+// and causing a segfault when the test calls them. RTLD_NODELETE keeps the .so resident so
+// the cached pointers stay valid across iterations.
 TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
-  EXPECT_LOG_CONTAINS(
-      "info", "Bootstrap function registry test completed successfully!",
-      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test",
-                                       "test", "test_config", /*do_not_close=*/true));
+  EXPECT_LOG_CONTAINS("info", "Bootstrap function registry test completed successfully!",
+                      initializeWithBootstrapExtension(testDataDir("rust"),
+                                                       "bootstrap_function_registry_test", "test",
+                                                       "test_config", /*do_not_close=*/true));
 }
 
 // Mirror of FunctionRegistryRust against the Go SDK. The Go module exercises the
 // register/get round-trip with sentinel pointers (Go can't directly produce C function
-// pointers from Go funcs). do_not_close=true for the same reason as FunctionRegistryRust.
+// pointers from Go functions). do_not_close is set to true for the same reason as the
+// Rust variant above.
 TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryGo) {
-  EXPECT_LOG_CONTAINS(
-      "info", "Bootstrap function registry test completed successfully!",
-      initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_function_registry_test",
-                                       "test", "test_config", /*do_not_close=*/true));
+  EXPECT_LOG_CONTAINS("info", "Bootstrap function registry test completed successfully!",
+                      initializeWithBootstrapExtension(testDataDir("go"),
+                                                       "bootstrap_function_registry_test", "test",
+                                                       "test_config", /*do_not_close=*/true));
 }
 
 // This test verifies that the Rust bootstrap extension can register, retrieve, and overwrite
@@ -192,9 +193,8 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, TimerRust) {
 // Mirror of TimerRust against the Go SDK. Go uses per-timer onFire closures rather than
 // an on_timer_fired hook, but the externally observable behavior is the same.
 TEST_P(DynamicModulesBootstrapIntegrationTest, TimerGo) {
-  EXPECT_LOG_CONTAINS(
-      "info", "Bootstrap timer test completed successfully!",
-      initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_timer_test"));
+  EXPECT_LOG_CONTAINS("info", "Bootstrap timer test completed successfully!",
+                      initializeWithBootstrapExtension(testDataDir("go"), "bootstrap_timer_test"));
 }
 
 // This test verifies that the Rust bootstrap extension file watcher API works correctly.

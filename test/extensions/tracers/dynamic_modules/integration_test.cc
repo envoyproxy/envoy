@@ -16,7 +16,7 @@ struct TracerIntegrationParam {
 };
 
 class DynamicModuleTracerIntegrationTest : public testing::TestWithParam<TracerIntegrationParam>,
-                                            public HttpIntegrationTest {
+                                           public HttpIntegrationTest {
 public:
   DynamicModuleTracerIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version) {}

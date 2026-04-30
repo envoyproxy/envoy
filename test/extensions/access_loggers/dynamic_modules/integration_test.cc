@@ -4,7 +4,7 @@
 
 namespace Envoy {
 
-// Parameterized over (language, IP version). language selects which test_data subdir
+// Parameterized over (language, IP version). language selects which test_data subdirectory
 // (rust, go) the access logger module is loaded from. Both languages ship a module named
 // "access_log_integration_test" exposing a "test_logger" access logger that exercises the
 // full AccessLogContext getter surface and records select getter results into per-config
@@ -15,7 +15,7 @@ struct AccessLogParam {
 };
 
 class DynamicModulesAccessLogIntegrationTest : public testing::TestWithParam<AccessLogParam>,
-                                                public HttpIntegrationTest {
+                                               public HttpIntegrationTest {
 public:
   DynamicModulesAccessLogIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam().ip_version) {

@@ -12,8 +12,8 @@ namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
 
-// Parameterized over (language, IP version). language selects which test_data subdir is
-// loaded as the dynamic module — currently rust or go. Each language ships a module named
+// Parameterized over (language, IP version). language selects which test_data subdirectory
+// is loaded as the dynamic module — currently rust or go. Each language ships a module named
 // "cluster_integration_test" that exposes the same set of named cluster types
 // (sync_host_selection, async_host_selection, scheduler_host_update, lifecycle_callbacks),
 // so the same test bodies exercise both SDKs.
@@ -22,9 +22,8 @@ struct ClusterIntegrationParam {
   Network::Address::IpVersion ip_version;
 };
 
-class DynamicModuleClusterIntegrationTest
-    : public testing::TestWithParam<ClusterIntegrationParam>,
-      public HttpIntegrationTest {
+class DynamicModuleClusterIntegrationTest : public testing::TestWithParam<ClusterIntegrationParam>,
+                                            public HttpIntegrationTest {
 public:
   DynamicModuleClusterIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version) {}
@@ -82,8 +81,8 @@ std::vector<ClusterIntegrationParam> getClusterIntegrationTestParams() {
   return params;
 }
 
-std::string clusterIntegrationParamName(
-    const testing::TestParamInfo<ClusterIntegrationParam>& info) {
+std::string
+clusterIntegrationParamName(const testing::TestParamInfo<ClusterIntegrationParam>& info) {
   return info.param.language + "_" +
          (info.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6");
 }
@@ -195,8 +194,7 @@ TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
   // Tear the server down explicitly so the on_shutdown hook fires inside this test scope
   // — that lets us assert the completion callback reaches Envoy. If the bug regresses on
   // Go, the reset hangs and the test times out.
-  EXPECT_LOG_CONTAINS("info", "cluster lifecycle: on_shutdown called",
-                      { test_server_.reset(); });
+  EXPECT_LOG_CONTAINS("info", "cluster lifecycle: on_shutdown called", { test_server_.reset(); });
 }
 
 } // namespace DynamicModules

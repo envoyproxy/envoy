@@ -25,14 +25,14 @@ struct UdpDynamicModulesParam {
 };
 
 class UdpDynamicModulesIntegrationTest : public testing::TestWithParam<UdpDynamicModulesParam>,
-                                          public BaseIntegrationTest {
+                                         public BaseIntegrationTest {
 public:
   UdpDynamicModulesIntegrationTest()
       : BaseIntegrationTest(GetParam().ip_version, ConfigHelper::baseUdpListenerConfig()) {}
 
   // Returns (module_name, filter_name) for the given test variant. The C fakes have
   // hard-coded module-level behavior (one module per behavior); the SDK languages have a
-  // single module exposing two filter names selectable via filter_name.
+  // single module exposing two filter names chosen via filter_name.
   std::pair<std::string, std::string> moduleAndFilter(const std::string& variant) {
     if (GetParam().language == "c") {
       // The C-fake module name encodes the behavior; the filter name is unused by the C

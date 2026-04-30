@@ -765,7 +765,7 @@ class DynamicModulesTerminalIntegrationTest
       public HttpIntegrationTest {
 public:
   DynamicModulesTerminalIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), terminal_filter_config) {};
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), terminal_filter_config){};
 
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     terminal_filter_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
@@ -1142,8 +1142,8 @@ TEST_P(DynamicModulesIntegrationTest, ListMetadataCallbacks) {
 
 // Verifies the scalar dynamic-metadata getters and SetMetadata. The route is configured
 // with metadata under "test_ns" containing string/number/bool values; the filter reads
-// them via Route source, writes them into Dynamic source under "dm_test", and on the
-// response side reads them back from Dynamic source and surfaces them via headers.
+// them via Route source, writes them into Dynamic source under a test namespace, and on
+// the response side reads them back from Dynamic source and surfaces them via headers.
 //
 // Verifies: GetMetadataString, GetMetadataNumber, GetMetadataBool, SetMetadata,
 // GetMetadataKeys.
@@ -1153,21 +1153,18 @@ TEST_P(DynamicModulesIntegrationTest, DynamicMetadata) {
   if (GetParam() == "cpp") {
     return;
   }
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        // Add metadata to the (single) route under test_ns.
-        auto* route = hcm.mutable_route_config()
-                          ->mutable_virtual_hosts(0)
-                          ->mutable_routes(0)
-                          ->mutable_metadata();
-        Envoy::Config::Metadata::mutableMetadataValue(*route, "test_ns", "string_key")
-            .set_string_value("hello_metadata");
-        Envoy::Config::Metadata::mutableMetadataValue(*route, "test_ns", "number_key")
-            .set_number_value(42.0);
-        Envoy::Config::Metadata::mutableMetadataValue(*route, "test_ns", "bool_key")
-            .set_bool_value(true);
-      });
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    // Add metadata to the (single) route under test_ns.
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_metadata();
+    Envoy::Config::Metadata::mutableMetadataValue(*route, "test_ns", "string_key")
+        .set_string_value("hello_metadata");
+    Envoy::Config::Metadata::mutableMetadataValue(*route, "test_ns", "number_key")
+        .set_number_value(42.0);
+    Envoy::Config::Metadata::mutableMetadataValue(*route, "test_ns", "bool_key")
+        .set_bool_value(true);
+  });
   initializeFilter("dynamic_metadata");
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -1211,8 +1208,8 @@ TEST_P(DynamicModulesIntegrationTest, FilterStateRoundTrip) {
   if (GetParam() != "rust_static") {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-        TestEnvironment::substitute(
-            "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" + GetParam()),
+        TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
+                                    GetParam()),
         1);
   } else {
     module_name += "_static";
@@ -1232,7 +1229,7 @@ typed_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
     value: ""
 )EOF",
-                                            module_name));
+                                           module_name));
   config_helper_.prependFilter(fmt::format(R"EOF(
 name: envoy.extensions.filters.http.dynamic_modules
 typed_config:
@@ -1244,7 +1241,7 @@ typed_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
     value: round_trip_value
 )EOF",
-                                            module_name));
+                                           module_name));
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

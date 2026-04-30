@@ -1708,3 +1708,10 @@ IWYU
 CRTP
 bitrate
 kbps
+# Words used by dynamic_modules tests/SDKs.
+aarch
+cgo
+cgocheck
+dynamicmodulescustom
+strconv
+FormatFloat

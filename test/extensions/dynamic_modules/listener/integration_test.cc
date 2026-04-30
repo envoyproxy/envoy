@@ -40,21 +40,20 @@ public:
   }
 
   void initializeWithListenerFilter() {
-    config_helper_.addConfigModifier(
-        [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          // Insert the dynamic-module listener filter at the front of the listener filter chain.
-          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-          auto* lf = listener->add_listener_filters();
-          lf->set_name("envoy.filters.listener.dynamic_modules");
-          envoy::extensions::filters::listener::dynamic_modules::v3::DynamicModuleListenerFilter
-              filter_proto;
-          filter_proto.mutable_dynamic_module_config()->set_name("listener_integration_test");
-          filter_proto.set_filter_name("test_filter");
-          Protobuf::StringValue value;
-          value.set_value("test_config");
-          filter_proto.mutable_filter_config()->PackFrom(value);
-          lf->mutable_typed_config()->PackFrom(filter_proto);
-        });
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Insert the dynamic-module listener filter at the front of the listener filter chain.
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      auto* lf = listener->add_listener_filters();
+      lf->set_name("envoy.filters.listener.dynamic_modules");
+      envoy::extensions::filters::listener::dynamic_modules::v3::DynamicModuleListenerFilter
+          filter_proto;
+      filter_proto.mutable_dynamic_module_config()->set_name("listener_integration_test");
+      filter_proto.set_filter_name("test_filter");
+      Protobuf::StringValue value;
+      value.set_value("test_config");
+      filter_proto.mutable_filter_config()->PackFrom(value);
+      lf->mutable_typed_config()->PackFrom(filter_proto);
+    });
     BaseIntegrationTest::initialize();
   }
 };
