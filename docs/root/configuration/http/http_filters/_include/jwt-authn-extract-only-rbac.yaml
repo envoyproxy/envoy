@@ -43,11 +43,18 @@ static_resources:
                   claim_to_headers:
                   - header_name: x-jwt-claim-role
                     claim_name: role
-                  # extract_only_without_validation does not verify signatures, so
-                  # an empty key set is sufficient. The JWKS still has to parse, so
-                  # the structure must include the required `keys` field.
+                  # extract_only_without_validation does not verify signatures,
+                  # but the JWKS must still parse and contain at least one valid
+                  # public key. This dummy RSA key satisfies that requirement
+                  # without being used to verify anything.
                   local_jwks:
-                    inline_string: '{"keys":[]}'
+                    inline_string: |
+                      {"keys": [
+                        {"kty":"RSA",
+                         "n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
+                         "e":"AQAB",
+                         "alg":"RS256",
+                         "kid":"dummy"}]}
               rules:
               - match:
                   prefix: "/admin"
