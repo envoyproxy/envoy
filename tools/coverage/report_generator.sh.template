@@ -93,8 +93,6 @@ create_config() {
 }
 
 run_grcov() {
-    rm -rf "${OUTPUT_DIR}"
-    mkdir -p "${OUTPUT_DIR}"
     $GRCOV \
         "${INFO_FILES[@]}" \
         --precision 1 \
@@ -119,19 +117,17 @@ create_report() {
 }
 
 find_coverage_files() {
+    local count=0
     while IFS= read -r dat_file; do
         if [[ ! -f "$dat_file" ]]; then
+            echo "WARNING: Coverage file $dat_file not found" >&2
             continue
         fi
-        dat_file_abs=$(realpath "$dat_file")
-        dat_dir=$(dirname "$dat_file_abs")
-        dat_basename=$(basename "$dat_file_abs")
-        info_basename="${dat_basename%.dat}.info"
-        pushd "$dat_dir" > /dev/null
-        ln -sf "$dat_basename" "$info_basename"
-        popd > /dev/null
-        info_link="${dat_dir}/${info_basename}"
+        info_basename="coverage_${count}.info"
+        info_link="${OUTPUT_DIR}/${info_basename}"
+        cp "$dat_file" "$info_link"
         INFO_FILES+=("$info_link")
+        count=$((count + 1))
     done < "$REPORTS_FILE"
 }
 
@@ -143,6 +139,8 @@ create_output() {
 }
 
 generate_report() {
+    rm -rf "${OUTPUT_DIR}"
+    mkdir -p "${OUTPUT_DIR}"
     create_config
     find_coverage_files
     run_grcov
