@@ -251,6 +251,11 @@ private:
   mutable absl::Mutex fine_grain_log_lock_;
 
   /**
+   * Parses a logger key into its file and name components.
+   */
+  static std::pair<absl::string_view, absl::string_view> parseKey(absl::string_view key);
+
+  /**
    * Map that stores <key, logger> pairs, key can be the file name.
    */
   FineGrainLogMapSharedPtr fine_grain_log_map_ ABSL_GUARDED_BY(fine_grain_log_lock_) =

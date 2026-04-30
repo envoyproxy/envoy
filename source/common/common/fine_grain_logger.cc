@@ -105,13 +105,17 @@ void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level
 
 std::string FineGrainLogContext::listFineGrainLoggers() ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   absl::ReaderMutexLock l(fine_grain_log_lock_);
-  std::string info =
-      absl::StrJoin(*fine_grain_log_map_, "\n", [](std::string* out, const auto& log_pair) {
-        auto level_str_view = spdlog::level::to_string_view(log_pair.second->level());
-        absl::StrAppend(out, "  ", log_pair.first, ": ",
-                        absl::string_view(level_str_view.data(), level_str_view.size()));
-      });
-  return info;
+  std::vector<std::string> lines;
+  for (const auto& log_pair : *fine_grain_log_map_) {
+    const auto [file, logger_name] = parseKey(log_pair.first);
+    if (!logger_name.empty()) {
+      continue;
+    }
+    auto level_str_view = spdlog::level::to_string_view(log_pair.second->level());
+    lines.push_back(absl::StrCat("  ", file, ": ",
+                                 absl::string_view(level_str_view.data(), level_str_view.size())));
+  }
+  return absl::StrJoin(lines, "\n");
 }
 
 void FineGrainLogContext::setAllFineGrainLoggers(spdlog::level::level_enum level)
@@ -230,37 +234,23 @@ void FineGrainLogContext::appendVerbosityLogUpdate(absl::string_view update_patt
   bool update_is_path = update_pattern.find('/') != update_pattern.npos;
   verbosity_update_info_.emplace_back(std::string(update_pattern), update_is_path, log_level);
 }
-
 level_enum FineGrainLogContext::getLogLevel(absl::string_view key) const {
   if (verbosity_update_info_.empty()) {
     return verbosity_default_level_;
   }
 
-  absl::string_view file = key;
-  absl::string_view logger_name;
-  size_t colon = key.rfind(':');
-#ifdef _WIN32
-  // On Windows, a colon at index 1 is likely a drive letter (e.g., C:\path).
-  if (colon == 1 && key.size() > 1 &&
-      ((key[0] >= 'a' && key[0] <= 'z') || (key[0] >= 'A' && key[0] <= 'Z'))) {
-    colon = absl::string_view::npos;
-  }
-#endif
-  if (colon != absl::string_view::npos) {
-    logger_name = key.substr(colon + 1);
-    file = key.substr(0, colon);
-  }
+  const auto [file, logger_name] = parseKey(key);
 
   // Get basename for file.
-  absl::string_view basename = file;
+  absl::string_view file_basename = file;
   {
-    const size_t sep = basename.rfind('/');
-    if (sep != basename.npos) {
-      basename.remove_prefix(sep + 1);
+    const size_t sep = file_basename.rfind('/');
+    if (sep != file_basename.npos) {
+      file_basename.remove_prefix(sep + 1);
     }
   }
 
-  absl::string_view stem_basename = basename;
+  absl::string_view stem_basename = file_basename;
   {
     const size_t sep = stem_basename.find('.');
     if (sep != stem_basename.npos) {
@@ -284,6 +274,25 @@ level_enum FineGrainLogContext::getLogLevel(absl::string_view key) const {
   }
 
   return verbosity_default_level_;
+}
+
+std::pair<absl::string_view, absl::string_view>
+FineGrainLogContext::parseKey(absl::string_view key) {
+  absl::string_view file = key;
+  absl::string_view name;
+  size_t colon = key.rfind(':');
+#ifdef _WIN32
+  // On Windows, a colon at index 1 is likely a drive letter (e.g., C:\path).
+  if (colon == 1 && key.size() > 1 &&
+      ((key[0] >= 'a' && key[0] <= 'z') || (key[0] >= 'A' && key[0] <= 'Z'))) {
+    colon = absl::string_view::npos;
+  }
+#endif
+  if (colon != absl::string_view::npos) {
+    name = key.substr(colon + 1);
+    file = key.substr(0, colon);
+  }
+  return {file, name};
 }
 
 FineGrainLogContext& getFineGrainLogContext() {

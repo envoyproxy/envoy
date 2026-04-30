@@ -7,7 +7,10 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::HasSubstr;
 
 namespace Envoy {
 
@@ -452,6 +455,19 @@ TEST(FineGrainLog, updateWithMultipleColons) {
   getFineGrainLogContext().updateVerbositySetting(
       {{"path/with:colon/file.cc", static_cast<int>(spdlog::level::err)}});
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key)->level(), spdlog::level::err);
+}
+
+TEST(FineGrainLog, listFineGrainLoggersExcludesGroups) {
+  Logger::Context::enableFineGrainLogger();
+  const std::string file_key = "source/common/http/http.cc";
+  const std::string group_key = "source/common/http/http.cc:http_group";
+  std::atomic<spdlog::logger*> flogger{nullptr};
+  getFineGrainLogContext().initFineGrainLogger(file_key, "", flogger);
+  getFineGrainLogContext().initFineGrainLogger(group_key, "", flogger);
+
+  std::string loggers = getFineGrainLogContext().listFineGrainLoggers();
+  EXPECT_THAT(loggers, HasSubstr(file_key));
+  EXPECT_THAT(loggers, testing::Not(HasSubstr(group_key)));
 }
 
 } // namespace Envoy
