@@ -5,6 +5,22 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: golang
+  change: |
+    Reduced the per-cgo-call mutex acquisition on the Golang HTTP filter by making the
+    ``has_destroyed_`` flag a ``std::atomic<bool>``. CAPI methods whose only Envoy-side work is
+    Filter-owned or runs on the worker thread (``setHeader``, ``removeHeader``, ``setTrailer``,
+    ``removeTrailer``, ``addData``, ``injectData``, ``continueStatus``, ``sendLocalReply``,
+    ``setBufferHelper``, ``copyBuffer``, ``drainBuffer``, ``setUpstreamOverrideHost``,
+    ``clearRouteCache``, ``setDynamicMetadata``, ``setStringFilterState``) no longer take the
+    mutex, eliminating an uncontended atomic compare-and-swap pair on every such call. The
+    mutex is retained on the CAPI methods that inline-dereference Envoy-stream-owned objects
+    from off-thread (``getHeader``, ``copyHeaders``, ``copyTrailers``, ``getIntegerValue``,
+    ``setDrainConnectionUponCompletion``) where it serialises against ``onDestroy`` to prevent
+    the worker thread from freeing the underlying header map or ``StreamInfo`` mid-access, and
+    on the five methods that write to the per-request ``strValue`` scratch buffer
+    (``getStringValue``, ``getDynamicMetadata``, ``getStringFilterState``, ``getStringProperty``,
+    ``getSecret``).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -23,6 +39,13 @@ bug_fixes:
     Fixed a crashing bug in the HTTP filter when a stream was already above the downstream write-buffer
     high watermark at filter-chain construction time. Downstream watermark callback registration is
     now deferred until the in-module filter has been constructed.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where the HTTP filter per-route configuration and the upstream HTTP TCP bridge
+    configuration did not handle the ``google.protobuf.Struct`` configuration message as the API
+    definition requires. Both factories now serialize the ``Struct`` to a JSON string and pass the
+    string to the dynamic module side as the configuration, matching the behavior already in place
+    for every other dynamic module extension factory.
 - area: oauth2
   change: |
     Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously
@@ -36,6 +59,15 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: set_metadata_filter
+  change: |
+    Added :ref:`per-route configuration support <envoy_v3_api_msg_extensions.filters.http.set_metadata.v3.Config>`
+    to the ``set_metadata`` HTTP filter.
+- area: logging
+  change: |
+    Added ``%N`` as a custom spdlog pattern flag that emits the Envoy version string. It can be
+    used in the ``--log-format`` CLI flag or the bootstrap ``application_log_config.log_format``
+    to include the running version in every log line, e.g. ``--log-format "[%N][%l] %v"``.
 - area: dynamic_modules
   change: |
     Added ``envoy_dynamic_module_callback_is_validation_mode`` ABI callback that allows dynamic
@@ -64,6 +96,13 @@ new_features:
     RSA public key exchange on behalf of the client. Added a new
     :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.mysql_proxy.v3.MySQLProxy.downstream_ssl>`
     config option with ``DISABLE``, ``REQUIRE``, and ``ALLOW`` modes.
+- area: composite
+  change: |
+    Added support for the
+    :ref:`inline matcher <envoy_v3_api_field_extensions.filters.http.composite.v3.Composite.matcher>`
+    in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
+    instead of using the :ref:`ExtensionWithMatcher
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
 - area: jwt_authn
   change: |
     Added :ref:`verification_status_header

@@ -10,6 +10,7 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "sdk.h"
+#include "sdk_internal_common.h"
 
 namespace Envoy {
 namespace DynamicModules {
@@ -146,75 +147,13 @@ using ResponseHeaders = HeaderMapImpl<envoy_dynamic_module_type_http_header_type
 using ResponseTrailers = HeaderMapImpl<envoy_dynamic_module_type_http_header_type_ResponseTrailer>;
 
 // Scheduler implementation
-template <bool IsConfigScheduler> class SchedulerImplBase : public Scheduler {
-public:
-  SchedulerImplBase(void* host_ptr) : scheduler_ptr_(newScheduler(host_ptr)) {}
-
-  void schedule(std::function<void()> func) override {
-    uint64_t task_id = 0;
-
-    // Lock to protect access to tasks_ and next_task_id_ manually
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      task_id = next_task_id_++;
-      tasks_[task_id] = std::move(func);
-    }
-
-    commitScheduler(scheduler_ptr_, task_id);
-  }
-
-  void onScheduled(uint64_t task_id) {
-    std::function<void()> func;
-
-    {
-      // Lock to protect access to tasks_ manually
-      std::lock_guard<std::mutex> lock(mutex_);
-      auto it = tasks_.find(task_id);
-      if (it != tasks_.end()) {
-        func = std::move(it->second);
-        tasks_.erase(it);
-      }
-    }
-
-    if (func) {
-      func();
-    }
-  }
-
-  ~SchedulerImplBase() override { deleteScheduler(scheduler_ptr_); }
-
-private:
-  static void* newScheduler(void* host_ptr) {
-    if constexpr (IsConfigScheduler) {
-      return envoy_dynamic_module_callback_http_filter_config_scheduler_new(host_ptr);
-    } else {
-      return envoy_dynamic_module_callback_http_filter_scheduler_new(host_ptr);
-    }
-  }
-  static void deleteScheduler(void* scheduler_ptr) {
-    if constexpr (IsConfigScheduler) {
-      envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler_ptr);
-    } else {
-      envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler_ptr);
-    }
-  }
-  static void commitScheduler(void* scheduler_ptr, uint64_t task_id) {
-    if constexpr (IsConfigScheduler) {
-      envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler_ptr, task_id);
-    } else {
-      envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler_ptr, task_id);
-    }
-  }
-
-  void* scheduler_ptr_{};
-
-  std::mutex mutex_;
-  uint64_t next_task_id_{1}; // 0 is reserved.
-  std::map<uint64_t, std::function<void()>> tasks_;
-};
-
-using SchedulerImpl = SchedulerImplBase<false>;
-using ConfigSchedulerImpl = SchedulerImplBase<true>;
+using SchedulerImpl = SchedulerImplBase<envoy_dynamic_module_callback_http_filter_scheduler_new,
+                                        envoy_dynamic_module_callback_http_filter_scheduler_commit,
+                                        envoy_dynamic_module_callback_http_filter_scheduler_delete>;
+using ConfigSchedulerImpl =
+    SchedulerImplBase<envoy_dynamic_module_callback_http_filter_config_scheduler_new,
+                      envoy_dynamic_module_callback_http_filter_config_scheduler_commit,
+                      envoy_dynamic_module_callback_http_filter_config_scheduler_delete>;
 
 std::optional<std::string_view> bufferViewToOptionalStringView(const BufferView& value,
                                                                bool found) {

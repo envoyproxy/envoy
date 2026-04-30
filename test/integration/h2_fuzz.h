@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
 
 #include "test/common/http/http2/http2_frame.h"
 #include "test/fuzz/fuzz_runner.h"

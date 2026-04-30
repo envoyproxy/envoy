@@ -21,7 +21,6 @@
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
 
 #include "test/extensions/filters/http/rate_limit_quota/client_test_utils.h"
-#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/logging.h"
 

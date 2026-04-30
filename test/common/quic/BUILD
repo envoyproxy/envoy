@@ -93,7 +93,7 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/stats:stats_lib",
-        "//test/mocks/stats:stats_mocks",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:utility_lib",
     ]),
 )
@@ -309,7 +309,6 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",

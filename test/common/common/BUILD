@@ -245,6 +245,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/version:version_string_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
     ],

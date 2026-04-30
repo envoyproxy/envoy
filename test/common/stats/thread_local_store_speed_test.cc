@@ -3,7 +3,6 @@
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/allocator.h"
