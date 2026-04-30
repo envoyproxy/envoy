@@ -95,8 +95,8 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   // Now set group "http" to trace.
   EXPECT_EQ(Http::Code::OK, postCallback("/logging?group=http:trace", header_map, response));
 
-  // key1 matches "http" because its file basename is "http".
-  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key1)->level(), spdlog::level::trace);
+  // key1 (misc group) does NOT match "http" group name, even though its basename is "http".
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key1)->level(), spdlog::level::info);
   // key2 matches "http" because its group name is "http".
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(key2)->level(), spdlog::level::trace);
 
@@ -111,9 +111,9 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   EXPECT_THAT(response.toString(),
               HasSubstr("error: empty logger name or empty logger level in group\n"));
 
-  EXPECT_EQ(Http::Code::BadRequest,
+  // unknown-logger-id is now OK because it's treated as a potential dynamic group name.
+  EXPECT_EQ(Http::Code::OK,
             postCallback("/logging?group=unknown-logger-id:trace", header_map, response));
-  EXPECT_THAT(response.toString(), HasSubstr("unknown logger group: unknown-logger-id"));
 }
 
 TEST_P(AdminInstanceTest, LogLevelGroupWithoutFineGrain) {

@@ -124,7 +124,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
   // Build a map of name:level pairs, a few allocations is ok here since it's
   // not common to call this function at a high rate.
   absl::flat_hash_map<absl::string_view, spdlog::level::level_enum> name_levels;
-  std::vector<std::pair<absl::string_view, int>> glob_levels;
+  std::vector<FineGrainLogContext::VerbosityUpdate> glob_levels;
 
   if (active_key == "paths") {
     // Bulk change log level by name:level pairs, separated by comma.
@@ -144,9 +144,9 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
       }
 
       if (use_fine_grain_logger) {
-        ENVOY_LOG(info, "adding fine-grain log update, glob='{}' level='{}'", name,
+        ENVOY_LOG(info, "adding fine-grain log update, pattern='{}' level='{}'", name,
                   spdlog::level::level_string_views[*level_to_use]);
-        glob_levels.emplace_back(name, *level_to_use);
+        glob_levels.push_back({name, static_cast<int>(*level_to_use), false});
       } else {
         name_levels[name] = *level_to_use;
       }
@@ -167,13 +167,9 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
     if (!level_to_use.ok()) {
       return level_to_use.status();
     }
-    if (Logger::Registry::logger(std::string(name)) != nullptr) {
-      ENVOY_LOG(info, "adding fine-grain log update, glob='{}' level='{}'", name,
-                spdlog::level::level_string_views[*level_to_use]);
-      glob_levels.emplace_back(name, *level_to_use);
-    } else {
-      return absl::InvalidArgumentError(fmt::format("unknown logger group: {}", name));
-    }
+    ENVOY_LOG(info, "adding fine-grain log update, group='{}' level='{}'", name,
+              spdlog::level::level_string_views[*level_to_use]);
+    glob_levels.push_back({name, static_cast<int>(*level_to_use), true});
   } else {
     // Change particular log level by name (legacy non-HTML mechanism).
     const absl::StatusOr<spdlog::level::level_enum> level_to_use = parseLogLevel(active_value);
@@ -182,9 +178,9 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
     }
 
     if (use_fine_grain_logger) {
-      ENVOY_LOG(info, "adding fine-grain log update, glob='{}' level='{}'", active_key,
+      ENVOY_LOG(info, "adding fine-grain log update, pattern='{}' level='{}'", active_key,
                 spdlog::level::level_string_views[*level_to_use]);
-      glob_levels.emplace_back(active_key, *level_to_use);
+      glob_levels.push_back({active_key, static_cast<int>(*level_to_use), false});
     } else {
       if (active_key == "level" || active_key == "paths" || active_key == "group") {
         if (active_key == "group") {

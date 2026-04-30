@@ -24,13 +24,14 @@ inline const char* kDefaultFineGrainLogFormat = "[%Y-%m-%d %T.%e][%t][%l] [%g:%#
  */
 struct VerbosityLogUpdateInfo final {
   const std::string update_pattern;
-  const bool update_is_path; // i.e. it contains a path separator.
+  const bool update_is_path;   // i.e. it contains a path separator.
+  const bool match_group_only; // i.e. it only matches against logger group names.
   const spdlog::level::level_enum log_level;
 
   VerbosityLogUpdateInfo(absl::string_view update_pattern, bool update_is_path,
-                         spdlog::level::level_enum log_level)
+                         bool match_group_only, spdlog::level::level_enum log_level)
       : update_pattern(std::string(update_pattern)), update_is_path(update_is_path),
-        log_level(log_level) {}
+        match_group_only(match_group_only), log_level(log_level) {}
 };
 
 /**
@@ -160,10 +161,21 @@ public:
   FineGrainLogLevelMap getAllFineGrainLogLevelsForTest() ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
+   * Data struct for verbosity updates.
+   */
+  struct VerbosityUpdate {
+    absl::string_view pattern;
+    int level;
+    bool match_group_only = false;
+  };
+
+  /**
    * Updates all loggers based on the verbosity updates <(file, level) ...>.
    * It supports file basename and glob "*" and "?" pattern, eg. ("foo", 2), ("foo/b*", 3)
    * Patterns including a slash character are matched against full path names, while those
    * without are matched against base names (by removing one suffix) only.
+   *
+   * If match_group_only is true, the pattern is only matched against the logger group name.
    *
    * It will store the current verbosity updates and clear all previous modifications for
    * future check when initializing a new logger.
@@ -173,7 +185,7 @@ public:
    *
    * Files which do not match any pattern use the default verbosity log level.
    */
-  void updateVerbositySetting(const std::vector<std::pair<absl::string_view, int>>& updates)
+  void updateVerbositySetting(const std::vector<VerbosityUpdate>& updates)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
@@ -234,7 +246,7 @@ private:
    * Append verbosity level updates to the VerbosityLogUpdateInfo vector.
    */
   void appendVerbosityLogUpdate(absl::string_view update_pattern,
-                                spdlog::level::level_enum log_level)
+                                spdlog::level::level_enum log_level, bool match_group_only)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fine_grain_log_lock_);
 
   /**

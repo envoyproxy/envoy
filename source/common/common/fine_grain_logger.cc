@@ -203,18 +203,18 @@ void FineGrainLogContext::updateVerbosityDefaultLevel(level_enum level) {
   setAllFineGrainLoggers(level);
 }
 
-void FineGrainLogContext::updateVerbositySetting(
-    const std::vector<std::pair<absl::string_view, int>>& updates) {
+void FineGrainLogContext::updateVerbositySetting(const std::vector<VerbosityUpdate>& updates) {
   absl::WriterMutexLock ul(fine_grain_log_lock_);
   verbosity_update_info_.clear();
-  for (const auto& [glob, level] : updates) {
-    if (level < kLogLevelMin || level > kLogLevelMax) {
-      printf(
-          "The log level: %d for glob: %s is out of scope, and it should be in [0, 6]. Skipping.",
-          level, std::string(glob).c_str());
+  for (const auto& update : updates) {
+    if (update.level < kLogLevelMin || update.level > kLogLevelMax) {
+      printf("The log level: %d for pattern: %s is out of scope, and it should be in [0, 6]. "
+             "Skipping.",
+             update.level, std::string(update.pattern).c_str());
       continue;
     }
-    appendVerbosityLogUpdate(glob, static_cast<level_enum>(level));
+    appendVerbosityLogUpdate(update.pattern, static_cast<level_enum>(update.level),
+                             update.match_group_only);
   }
 
   for (const auto& [key, logger] : *fine_grain_log_map_) {
@@ -223,16 +223,18 @@ void FineGrainLogContext::updateVerbositySetting(
 }
 
 void FineGrainLogContext::appendVerbosityLogUpdate(absl::string_view update_pattern,
-                                                   level_enum log_level) {
+                                                   level_enum log_level, bool match_group_only) {
   for (const auto& info : verbosity_update_info_) {
-    if (safeFileNameMatch(info.update_pattern, update_pattern)) {
+    if (info.match_group_only == match_group_only &&
+        safeFileNameMatch(info.update_pattern, update_pattern)) {
       // This is a memory optimization to avoid storing patterns that will never
       // match due to exit early semantics.
       return;
     }
   }
   bool update_is_path = update_pattern.find('/') != update_pattern.npos;
-  verbosity_update_info_.emplace_back(std::string(update_pattern), update_is_path, log_level);
+  verbosity_update_info_.emplace_back(std::string(update_pattern), update_is_path, match_group_only,
+                                      log_level);
 }
 level_enum FineGrainLogContext::getLogLevel(absl::string_view key) const {
   if (verbosity_update_info_.empty()) {
@@ -258,6 +260,13 @@ level_enum FineGrainLogContext::getLogLevel(absl::string_view key) const {
     }
   }
   for (const auto& info : verbosity_update_info_) {
+    if (info.match_group_only) {
+      if (!logger_name.empty() && info.update_pattern == logger_name) {
+        return info.log_level;
+      }
+      continue;
+    }
+
     if (info.update_is_path) {
       // If there are any slashes in the pattern, try to match the full path name.
       if (safeFileNameMatch(info.update_pattern, file)) {
