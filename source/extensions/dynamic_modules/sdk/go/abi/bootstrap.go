@@ -116,12 +116,16 @@ func (h *dymBootstrapConfigHandle) NewScheduler() shared.Scheduler {
 					taskID,
 				)
 			},
+			func(p unsafe.Pointer) {
+				C.envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(
+					(C.envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr)(p),
+				)
+			},
 		)
-		runtime.SetFinalizer(h.wrapper.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(
-				(C.envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr)(s.schedulerPtr),
-			)
-		})
+		// Finalizer is a fallback; the synchronous close() in
+		// envoy_dynamic_module_on_bootstrap_extension_config_destroy is what avoids the
+		// LeakSanitizer report on test exit (Go GC finalizers don't run on process exit).
+		runtime.SetFinalizer(h.wrapper.scheduler, func(s *dymScheduler) { s.close() })
 	}
 	return h.wrapper.scheduler
 }
@@ -530,7 +534,14 @@ func envoy_dynamic_module_on_bootstrap_extension_config_destroy(
 	if w.extension != nil {
 		w.extension.OnDestroy()
 	}
-	w.scheduler = nil
+	if w.scheduler != nil {
+		// Synchronously free the host-side scheduler. We cannot rely on the GC finalizer
+		// here because (a) under LeakSanitizer the test process exits before finalizers
+		// run, and (b) the scheduler holds a pointer into a host extension that is about
+		// to be torn down — leaving the cleanup until later risks a use-after-free.
+		w.scheduler.close()
+		w.scheduler = nil
+	}
 	bootstrapConfigManager.remove(unsafe.Pointer(configPtr))
 }
 

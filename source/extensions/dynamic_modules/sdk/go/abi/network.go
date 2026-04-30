@@ -885,13 +885,15 @@ func (h *dymNetworkFilterHandle) GetScheduler() shared.Scheduler {
 					taskID,
 				)
 			},
+			func(p unsafe.Pointer) {
+				C.envoy_dynamic_module_callback_network_filter_scheduler_delete(
+					C.envoy_dynamic_module_type_network_filter_scheduler_module_ptr(p),
+				)
+			},
 		)
 
-		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_network_filter_scheduler_delete(
-				C.envoy_dynamic_module_type_network_filter_scheduler_module_ptr(s.schedulerPtr),
-			)
-		})
+		// Finalizer is a fallback; the destroy hook should call close() synchronously.
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) { s.close() })
 	}
 	return h.scheduler
 }
@@ -957,15 +959,15 @@ func (h *dymNetworkConfigHandle) GetScheduler() shared.Scheduler {
 					taskID,
 				)
 			},
+			func(p unsafe.Pointer) {
+				C.envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
+					C.envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr(p),
+				)
+			},
 		)
 
-		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
-				C.envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr(
-					s.schedulerPtr,
-				),
-			)
-		})
+		// Finalizer is a fallback; the destroy hook should call close() synchronously.
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) { s.close() })
 	}
 	return h.scheduler
 }
@@ -1007,7 +1009,11 @@ func envoy_dynamic_module_on_network_filter_config_destroy(
 	if configWrapper == nil {
 		return
 	}
-	configWrapper.configHandle.scheduler = nil
+	if configWrapper.configHandle.scheduler != nil {
+		// See bootstrap config destroy for why we close synchronously.
+		configWrapper.configHandle.scheduler.close()
+		configWrapper.configHandle.scheduler = nil
+	}
 	configWrapper.pluginFactory.OnDestroy()
 	networkConfigManager.remove(unsafe.Pointer(configPtr))
 }
@@ -1112,7 +1118,11 @@ func envoy_dynamic_module_on_network_filter_destroy(
 		return
 	}
 	filterWrapper.filterDestroyed = true
-	filterWrapper.scheduler = nil
+	if filterWrapper.scheduler != nil {
+		// See bootstrap config destroy for why we close synchronously.
+		filterWrapper.scheduler.close()
+		filterWrapper.scheduler = nil
+	}
 	if filterWrapper.plugin != nil {
 		filterWrapper.plugin.OnDestroy()
 	}

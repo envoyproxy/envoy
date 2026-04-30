@@ -79,12 +79,14 @@ func (h *dymListenerConfigHandle) GetScheduler() shared.Scheduler {
 					taskID,
 				)
 			},
+			func(p unsafe.Pointer) {
+				C.envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(
+					(C.envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr)(p),
+				)
+			},
 		)
-		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(
-				(C.envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr)(s.schedulerPtr),
-			)
-		})
+		// Finalizer is a fallback; the destroy hook should call close() synchronously.
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) { s.close() })
 	}
 	return h.scheduler
 }
@@ -535,12 +537,14 @@ func (h *dymListenerFilterHandle) GetScheduler() shared.Scheduler {
 					taskID,
 				)
 			},
+			func(p unsafe.Pointer) {
+				C.envoy_dynamic_module_callback_listener_filter_scheduler_delete(
+					(C.envoy_dynamic_module_type_listener_filter_scheduler_module_ptr)(p),
+				)
+			},
 		)
-		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_listener_filter_scheduler_delete(
-				(C.envoy_dynamic_module_type_listener_filter_scheduler_module_ptr)(s.schedulerPtr),
-			)
-		})
+		// Finalizer is a fallback; the destroy hook should call close() synchronously.
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) { s.close() })
 	}
 	return h.scheduler
 }
@@ -590,7 +594,11 @@ func envoy_dynamic_module_on_listener_filter_config_destroy(
 	if wrapper == nil {
 		return
 	}
-	wrapper.configHandle.scheduler = nil
+	if wrapper.configHandle.scheduler != nil {
+		// See bootstrap config destroy for why we close synchronously.
+		wrapper.configHandle.scheduler.close()
+		wrapper.configHandle.scheduler = nil
+	}
 	wrapper.factory.OnDestroy()
 	listenerConfigManager.remove(unsafe.Pointer(configPtr))
 }
@@ -674,7 +682,11 @@ func envoy_dynamic_module_on_listener_filter_destroy(
 	if h.plugin != nil {
 		h.plugin.OnDestroy()
 	}
-	h.scheduler = nil
+	if h.scheduler != nil {
+		// See bootstrap config destroy for why we close synchronously.
+		h.scheduler.close()
+		h.scheduler = nil
+	}
 	listenerFilterManager.remove(unsafe.Pointer(filterPtr))
 }
 

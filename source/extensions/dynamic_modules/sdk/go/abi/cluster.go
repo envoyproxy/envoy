@@ -332,11 +332,13 @@ func (h *dymClusterHandle) NewScheduler() shared.Scheduler {
 				C.envoy_dynamic_module_callback_cluster_scheduler_commit(
 					(C.envoy_dynamic_module_type_cluster_scheduler_module_ptr)(p), taskID)
 			},
+			func(p unsafe.Pointer) {
+				C.envoy_dynamic_module_callback_cluster_scheduler_delete(
+					(C.envoy_dynamic_module_type_cluster_scheduler_module_ptr)(p))
+			},
 		)
-		runtime.SetFinalizer(h.wrapper.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_cluster_scheduler_delete(
-				(C.envoy_dynamic_module_type_cluster_scheduler_module_ptr)(s.schedulerPtr))
-		})
+		// Finalizer is a fallback; the destroy hook should call close() synchronously.
+		runtime.SetFinalizer(h.wrapper.scheduler, func(s *dymScheduler) { s.close() })
 	}
 	return h.wrapper.scheduler
 }
@@ -760,7 +762,11 @@ func envoy_dynamic_module_on_cluster_destroy(
 	if w.cluster != nil {
 		w.cluster.OnDestroy()
 	}
-	w.scheduler = nil
+	if w.scheduler != nil {
+		// See bootstrap config destroy for why we close synchronously.
+		w.scheduler.close()
+		w.scheduler = nil
+	}
 	clusterManager.remove(unsafe.Pointer(clusterPtr))
 }
 

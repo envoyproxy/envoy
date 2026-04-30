@@ -373,16 +373,36 @@ type dymScheduler struct {
 	nextTaskID    uint64
 	tasks         map[uint64]func()
 	commitFunc    func(unsafe.Pointer, C.uint64_t)
+	// deleteFunc invokes the host's *_scheduler_delete callback for this scheduler.
+	// Stored here so close() can free the host-side allocation synchronously from the
+	// destroy hook (the finalizer-only path leaks under LeakSanitizer because Go GC
+	// finalizers don't run on process exit).
+	deleteFunc func(unsafe.Pointer)
 }
 
 func newDymScheduler(
 	schedulerPtr unsafe.Pointer,
 	commitFunc func(unsafe.Pointer, C.uint64_t),
+	deleteFunc func(unsafe.Pointer),
 ) *dymScheduler {
 	return &dymScheduler{
 		schedulerPtr: schedulerPtr,
 		tasks:        make(map[uint64]func()),
 		commitFunc:   commitFunc,
+		deleteFunc:   deleteFunc,
+	}
+}
+
+// close synchronously frees the host-side scheduler. Idempotent: subsequent calls and
+// the runtime finalizer both no-op once schedulerPtr is nil. Must be called from the
+// extension's destroy hook so the host allocation is reclaimed before the .so unloads.
+func (s *dymScheduler) close() {
+	s.schedulerLock.Lock()
+	ptr := s.schedulerPtr
+	s.schedulerPtr = nil
+	s.schedulerLock.Unlock()
+	if ptr != nil && s.deleteFunc != nil {
+		s.deleteFunc(ptr)
 	}
 }
 
@@ -1048,13 +1068,18 @@ func (h *dymHttpFilterHandle) GetScheduler() shared.Scheduler {
 					taskID,
 				)
 			},
+			func(p unsafe.Pointer) {
+				C.envoy_dynamic_module_callback_http_filter_scheduler_delete(
+					(C.envoy_dynamic_module_type_http_filter_scheduler_module_ptr)(p),
+				)
+			},
 		)
 
-		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_http_filter_scheduler_delete(
-				(C.envoy_dynamic_module_type_http_filter_scheduler_module_ptr)(s.schedulerPtr),
-			)
-		})
+		// Finalizer is a fallback for the case where the host never invokes the destroy
+		// hook (e.g., embedded use cases). The synchronous close() in the destroy hook is
+		// the primary path; once close() runs, schedulerPtr is nil and the finalizer is
+		// a no-op.
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) { s.close() })
 	}
 	return h.scheduler
 }
@@ -1945,13 +1970,15 @@ func (h *dymConfigHandle) GetScheduler() shared.Scheduler {
 					taskID,
 				)
 			},
+			func(p unsafe.Pointer) {
+				C.envoy_dynamic_module_callback_http_filter_config_scheduler_delete(
+					(C.envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr)(p),
+				)
+			},
 		)
 
-		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_http_filter_config_scheduler_delete(
-				(C.envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr)(s.schedulerPtr),
-			)
-		})
+		// See dymHttpFilterHandle.GetScheduler for why the finalizer is a fallback.
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) { s.close() })
 	}
 	return h.scheduler
 }
@@ -2013,7 +2040,12 @@ func envoy_dynamic_module_on_http_filter_config_destroy(
 	if factoryWrapper == nil {
 		return
 	}
-	factoryWrapper.configHandle.scheduler = nil
+	if factoryWrapper.configHandle.scheduler != nil {
+		// See bootstrap config destroy for why we close synchronously instead of
+		// dropping the reference and waiting for the GC finalizer.
+		factoryWrapper.configHandle.scheduler.close()
+		factoryWrapper.configHandle.scheduler = nil
+	}
 	factoryWrapper.pluginFactory.OnDestroy()
 	configManager.remove(unsafe.Pointer(configPtr))
 }
@@ -2190,7 +2222,11 @@ func envoy_dynamic_module_on_http_filter_stream_complete(
 		return
 	}
 	pluginWrapper.streamCompleted = true
-	pluginWrapper.scheduler = nil
+	if pluginWrapper.scheduler != nil {
+		// See bootstrap config destroy for why we close synchronously.
+		pluginWrapper.scheduler.close()
+		pluginWrapper.scheduler = nil
+	}
 	pluginWrapper.plugin.OnStreamComplete()
 	// data is held in Go memory and is freed when the wrapper is GC'd after pluginManager
 	// removes it; no explicit teardown is needed.
