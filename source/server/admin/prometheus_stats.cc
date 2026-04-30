@@ -353,16 +353,6 @@ public:
 private:
   // Helper method to add labels to a metric from tags.
   void addLabelsToMetric(io::prometheus::client::Metric* metric,
-                         const std::vector<Stats::Tag>& tags) const {
-    metric->mutable_label()->Reserve(tags.size());
-    for (const auto& tag : tags) {
-      auto* label = metric->add_label();
-      label->set_name(sanitizeName(tag.name_));
-      label->set_value(sanitizeValue(tag.value_));
-    }
-  }
-
-  void addLabelsToMetric(io::prometheus::client::Metric* metric,
                          std::vector<Stats::Tag>&& tags) const {
     metric->mutable_label()->Reserve(tags.size());
     for (auto& tag : tags) {
