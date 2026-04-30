@@ -591,9 +591,17 @@ XdsManagerImpl::replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ad
   // The failover_client may be null (no failover defined).
   ASSERT(primary_client != nullptr);
 
+  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> lrs_factory =
+      [&, primary_client]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    auto reporter = std::make_unique<Upstream::LoadStatsReporterImpl>(
+        local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
+    return reporter;
+  };
+
   // This will cause a disconnect from the current sources, and replacement of the clients.
   status = ads_mux_->updateMuxSource(std::move(primary_client), std::move(failover_client),
-                                     *stats_.rootScope(), std::move(backoff_strategy), ads_config);
+                                     *stats_.rootScope(), std::move(backoff_strategy), ads_config,
+                                     lrs_factory);
   return status;
 }
 

@@ -235,7 +235,8 @@ absl::Status GrpcMuxImpl<S, F, RQ, RS>::updateMuxSource(
     Grpc::RawAsyncClientSharedPtr&& primary_async_client,
     Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
     BackOffStrategyPtr&& backoff_strategy,
-    const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
+    const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(ads_config_source);
