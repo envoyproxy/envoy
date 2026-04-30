@@ -628,26 +628,28 @@ message JwtRequirement {
 // or when no JWT is present.
 //
 message ExtractOnlyWithoutValidation {
-  // Name of the HTTP header set to "false" when a JWT is present but
-  // fails signature verification. The header is NOT set when:
-  //   - The JWT is valid (verification succeeded), or
-  //   - No JWT is present in the request.
+  // Name of the HTTP header set to "false" when a JWT is present but fails
+  // signature verification. The header is NOT set when:
+  //
+  // - The JWT is valid (verification succeeded), or
+  // - No JWT is present in the request.
   //
   // This means the header's presence is a meaningful signal to downstream
-  // filters: if set, the JWT was present but could not be verified, and
-  // any extracted claim headers should not be trusted for authorization.
+  // filters: if set, the JWT was present but could not be verified, and any
+  // extracted claim headers should not be trusted for authorization.
   //
-  // Downstream filters (RBAC, ext_authz) SHOULD check for the absence of
-  // this header (or its non-"false" value) before trusting JWT-derived
-  // claim headers for authorization decisions.
+  // Downstream filters (RBAC, ext_authz) SHOULD check for the absence of this
+  // header (or its non-"false" value) before trusting JWT-derived claim headers
+  // for authorization decisions.
   //
-  // Default (unset or empty): ``x-jwt-signature-verified``
+  // Default (unset or empty): ``x-jwt-signature-verified``.
   //
-  // Custom value: uses the specified header name
+  // Custom value: uses the specified header name.
   //
   // The header-setting behavior is guarded by the
-  // ``envoy.reloadable_features.jwt_authn_add_verification_status_header`` runtime flag
-  // (default on). If removal is needed downstream, use header mutation in a subsequent filter.
+  // ``envoy.reloadable_features.jwt_authn_add_verification_status_header``
+  // runtime flag (default on). If removal is needed downstream, use header
+  // mutation in a subsequent filter.
   //
   // Example: when a JWT is present in the request but fails signature
   // verification, the request will carry:
