@@ -40,7 +40,7 @@ jobs:
     - name: Detect C++ changes
       run: |
         if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" main 2>/dev/null
+            git fetch --depth=1 "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" main 2>/dev/null
             TO_OTHER=FETCH_HEAD
         else
             TO_OTHER=HEAD^1
@@ -73,12 +73,6 @@ jobs:
         to_remove: |
           /usr/local/.ghcup
           /usr/local/lib/android
-
-    - name: Checkout repository
-      if: env.CPP_CHANGED == 'true'
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      with:
-        fetch-depth: 2
 
     - name: Get build targets
       if: env.CPP_CHANGED == 'true'
@@ -125,7 +119,7 @@ jobs:
     # Running codeql-action/analyze unconditionally ensures every merge commit gets
     # a github-code-scanning check run with conclusion 'success', which Scorecard
     # requires to award full SAST score.
-    - name: Initialize CodeQL
+    - name: Initialize CodeQL (noop)
       if: env.CPP_CHANGED != 'true'
       uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2
       with:
