@@ -42,6 +42,7 @@ GraphiteStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
     return absl::InvalidArgumentError(
         "unexpected graphite statsd specifier: statsd_specifier not set");
   }
+  return absl::InvalidArgumentError("unexpected graphite statsd specifier enum");
 }
 
 ProtobufTypes::MessagePtr GraphiteStatsdSinkFactory::createEmptyConfigProto() {
