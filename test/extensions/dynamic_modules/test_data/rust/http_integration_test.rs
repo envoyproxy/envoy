@@ -1960,14 +1960,23 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     use abi::envoy_dynamic_module_type_metadata_source::Route;
-    if let Some(buf) = envoy_filter.get_metadata_string(Route, "test_ns", "string_key") {
-      let s = String::from_utf8_lossy(buf.as_slice()).to_string();
+
+    // Get-then-set pattern: the Get* methods return a reference borrowing envoy_filter
+    // immutably; subsequent Set* calls need a mutable borrow. Materialize values into
+    // owned forms first so the immutable borrow ends before the mutating calls.
+    let str_val: Option<String> = envoy_filter
+      .get_metadata_string(Route, "test_ns", "string_key")
+      .map(|b| String::from_utf8_lossy(b.as_slice()).to_string());
+    let num_val: Option<f64> = envoy_filter.get_metadata_number(Route, "test_ns", "number_key");
+    let bool_val: Option<bool> = envoy_filter.get_metadata_bool(Route, "test_ns", "bool_key");
+
+    if let Some(s) = str_val {
       envoy_filter.set_dynamic_metadata_string("dm_test", "string_key", &s);
     }
-    if let Some(n) = envoy_filter.get_metadata_number(Route, "test_ns", "number_key") {
+    if let Some(n) = num_val {
       envoy_filter.set_dynamic_metadata_number("dm_test", "number_key", n);
     }
-    if let Some(b) = envoy_filter.get_metadata_bool(Route, "test_ns", "bool_key") {
+    if let Some(b) = bool_val {
       envoy_filter.set_dynamic_metadata_bool("dm_test", "bool_key", b);
     }
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
@@ -1979,20 +1988,29 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     use abi::envoy_dynamic_module_type_metadata_source::Dynamic;
-    if let Some(buf) = envoy_filter.get_metadata_string(Dynamic, "dm_test", "string_key") {
-      envoy_filter.set_response_header("x-dm-string", buf.as_slice());
-    }
-    if let Some(n) = envoy_filter.get_metadata_number(Dynamic, "dm_test", "number_key") {
-      envoy_filter.set_response_header("x-dm-number", n.to_string().as_bytes());
-    }
-    if let Some(b) = envoy_filter.get_metadata_bool(Dynamic, "dm_test", "bool_key") {
-      envoy_filter.set_response_header("x-dm-bool", b.to_string().as_bytes());
-    }
 
+    // The metadata getters return references into `envoy_filter`, holding an immutable
+    // borrow. We must materialize Vec<u8> copies before calling the mutating
+    // `set_response_header` so the borrow checker is satisfied.
+    let str_val: Option<Vec<u8>> = envoy_filter
+      .get_metadata_string(Dynamic, "dm_test", "string_key")
+      .map(|b| b.as_slice().to_vec());
+    let num_val: Option<f64> = envoy_filter.get_metadata_number(Dynamic, "dm_test", "number_key");
+    let bool_val: Option<bool> = envoy_filter.get_metadata_bool(Dynamic, "dm_test", "bool_key");
     let key_count = envoy_filter
       .get_metadata_keys(Dynamic, "dm_test")
       .map(|v| v.len())
       .unwrap_or(0);
+
+    if let Some(s) = str_val {
+      envoy_filter.set_response_header("x-dm-string", &s);
+    }
+    if let Some(n) = num_val {
+      envoy_filter.set_response_header("x-dm-number", n.to_string().as_bytes());
+    }
+    if let Some(b) = bool_val {
+      envoy_filter.set_response_header("x-dm-bool", b.to_string().as_bytes());
+    }
     envoy_filter.set_response_header("x-dm-key-count", key_count.to_string().as_bytes());
 
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue

@@ -13,12 +13,12 @@ public:
 
   NetworkFilterStatus onRead(NetworkBuffer&, bool) override {
     if (!reads_disabled_) {
-      const auto disable_status = handle_.readDisable(true);
+      [[maybe_unused]] const auto disable_status = handle_.readDisable(true);
       assert(disable_status == NetworkReadDisableStatus::TransitionedToReadDisabled);
       assert(!handle_.readEnabled());
       reads_disabled_ = true;
 
-      const auto enable_status = handle_.readDisable(false);
+      [[maybe_unused]] const auto enable_status = handle_.readDisable(false);
       assert(enable_status == NetworkReadDisableStatus::TransitionedToReadEnabled);
       assert(handle_.readEnabled());
     }
@@ -77,7 +77,8 @@ public:
   void onDestroy() override {}
 
 private:
-  NetworkFilterHandle& handle_;
+  // Only referenced inside assert(), which is compiled out in release builds.
+  [[maybe_unused]] NetworkFilterHandle& handle_;
 };
 
 class ConnectionStateFactory : public NetworkFilterFactory {
