@@ -205,8 +205,8 @@ jobs:
           target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
         filter: |
           .["target-branch"] as $branch
-          | if ($branch | test("^release/v[0-9]+\\.[0-9]+$")) then
-              ($branch | sub("^release/v"; "") + ".0") as $version_str
+          | if ($branch | test("^(release/v|patches/)[0-9]+\\.[0-9]+$")) then
+              ($branch | sub("^(release/v|patches/)"; "") + ".0") as $version_str
               | ($version_str | utils::version) as $version
               | if ($version.major < 1 or ($version.major == 1 and $version.minor <= 37)) then
                   .bazel["docs-x64"] = "skip"
