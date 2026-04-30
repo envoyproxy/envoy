@@ -2,12 +2,12 @@
 // test_data/rust/bootstrap_file_watcher_test.rs.
 //
 // Config format: two file paths separated by `|`. The module:
-//   1. Adds a watch on each path via AddFileWatch.
-//   2. Schedules three timer-driven writes (timer A → file_a; timer B → file_b;
-//      timer C → file_a again) so the watcher must report at least 2 changes on file_a
-//      and 1 change on file_b.
-//   3. Defers SignalInitComplete until all expected change counts are seen, proving the
-//      watch dispatch path works end-to-end.
+//  1. Adds a watch on each path via AddFileWatch.
+//  2. Schedules three timer-driven writes (timer A → file_a; timer B → file_b;
+//     timer C → file_a again) so the watcher must report at least 2 changes on file_a
+//     and 1 change on file_b.
+//  3. Defers SignalInitComplete until all expected change counts are seen, proving the
+//     watch dispatch path works end-to-end.
 package main
 
 import (
@@ -85,12 +85,12 @@ func (f *fileWatcherConfigFactory) Create(handle shared.BootstrapExtensionConfig
 }
 
 type fileWatcherState struct {
-	handle      shared.BootstrapExtensionConfigHandle
-	pathA       string
-	pathB       string
-	mu          sync.Mutex
-	aCount      atomic.Uint32
-	bCount      atomic.Uint32
+	handle       shared.BootstrapExtensionConfigHandle
+	pathA        string
+	pathB        string
+	mu           sync.Mutex
+	aCount       atomic.Uint32
+	bCount       atomic.Uint32
 	initSignaled atomic.Bool
 }
 

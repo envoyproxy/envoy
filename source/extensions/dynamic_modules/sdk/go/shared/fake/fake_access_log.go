@@ -94,10 +94,10 @@ type FakeAccessLogContext struct {
 	JA3Hash string
 	JA4Hash string
 
-	RequestHeadersBytes        uint64
-	ResponseHeadersBytes       uint64
-	ResponseTrailersBytes      uint64
-	UpstreamProtocol           string
+	RequestHeadersBytes         uint64
+	ResponseHeadersBytes        uint64
+	ResponseTrailersBytes       uint64
+	UpstreamProtocol            string
 	UpstreamPoolReadyDurationNs int64
 
 	WorkerIndex uint32
@@ -307,14 +307,20 @@ func (c *FakeAccessLogContext) GetLocalReplyBody() (shared.UnsafeEnvoyBuffer, bo
 	return optBuf(c.LocalReplyBody)
 }
 
-func (c *FakeAccessLogContext) GetTraceID() (shared.UnsafeEnvoyBuffer, bool) { return optBuf(c.TraceID) }
-func (c *FakeAccessLogContext) GetSpanID() (shared.UnsafeEnvoyBuffer, bool)  { return optBuf(c.SpanID) }
-func (c *FakeAccessLogContext) IsTraceSampled() bool                         { return c.TraceSampled }
+func (c *FakeAccessLogContext) GetTraceID() (shared.UnsafeEnvoyBuffer, bool) {
+	return optBuf(c.TraceID)
+}
+func (c *FakeAccessLogContext) GetSpanID() (shared.UnsafeEnvoyBuffer, bool) { return optBuf(c.SpanID) }
+func (c *FakeAccessLogContext) IsTraceSampled() bool                        { return c.TraceSampled }
 
 // ---- additional stream info ----
 
-func (c *FakeAccessLogContext) GetJA3Hash() (shared.UnsafeEnvoyBuffer, bool) { return optBuf(c.JA3Hash) }
-func (c *FakeAccessLogContext) GetJA4Hash() (shared.UnsafeEnvoyBuffer, bool) { return optBuf(c.JA4Hash) }
+func (c *FakeAccessLogContext) GetJA3Hash() (shared.UnsafeEnvoyBuffer, bool) {
+	return optBuf(c.JA3Hash)
+}
+func (c *FakeAccessLogContext) GetJA4Hash() (shared.UnsafeEnvoyBuffer, bool) {
+	return optBuf(c.JA4Hash)
+}
 
 func (c *FakeAccessLogContext) GetRequestHeadersBytes() uint64   { return c.RequestHeadersBytes }
 func (c *FakeAccessLogContext) GetResponseHeadersBytes() uint64  { return c.ResponseHeadersBytes }

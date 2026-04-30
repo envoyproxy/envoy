@@ -2,10 +2,10 @@
 // test_data/rust/bootstrap_stats_test.rs.
 //
 // Two phases:
-//   1. config_new — define unlabeled and labeled counters/gauges/histograms, mutate them,
-//      and emit log lines the C++ test asserts on.
-//   2. on_server_initialized — exercise read-only stats access (get_counter_value /
-//      get_gauge_value / get_histogram_summary / iterate_*) including non-existent keys.
+//  1. config_new — define unlabeled and labeled counters/gauges/histograms, mutate them,
+//     and emit log lines the C++ test asserts on.
+//  2. on_server_initialized — exercise read-only stats access (get_counter_value /
+//     get_gauge_value / get_histogram_summary / iterate_*) including non-existent keys.
 package main
 
 import (

@@ -125,12 +125,12 @@ type Cluster interface {
 // EmptyCluster is a no-op Cluster. OnShutdown calls completion immediately.
 type EmptyCluster struct{}
 
-func (*EmptyCluster) OnInit(handle ClusterHandle)         { handle.PreInitComplete() }
+func (*EmptyCluster) OnInit(handle ClusterHandle)                                     { handle.PreInitComplete() }
 func (*EmptyCluster) NewLoadBalancer(_ ClusterLoadBalancerHandle) ClusterLoadBalancer { return nil }
-func (*EmptyCluster) OnServerInitialized(_ ClusterHandle)                              {}
-func (*EmptyCluster) OnDrainStarted(_ ClusterHandle)                                   {}
-func (*EmptyCluster) OnShutdown(_ ClusterHandle, completion func())                    { completion() }
-func (*EmptyCluster) OnDestroy()                                                       {}
+func (*EmptyCluster) OnServerInitialized(_ ClusterHandle)                             {}
+func (*EmptyCluster) OnDrainStarted(_ ClusterHandle)                                  {}
+func (*EmptyCluster) OnShutdown(_ ClusterHandle, completion func())                   { completion() }
+func (*EmptyCluster) OnDestroy()                                                      {}
 
 // ClusterFactory creates the per-cluster Cluster instance.
 type ClusterFactory interface {
@@ -142,7 +142,7 @@ type ClusterFactory interface {
 type EmptyClusterFactory struct{}
 
 func (*EmptyClusterFactory) Create(_ ClusterConfigHandle) Cluster { return &EmptyCluster{} }
-func (*EmptyClusterFactory) OnDestroy()                            {}
+func (*EmptyClusterFactory) OnDestroy()                           {}
 
 // ClusterConfigFactory is the top-level factory the module registers via
 // sdk.RegisterClusterConfigFactories.

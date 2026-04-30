@@ -29,10 +29,10 @@ const (
 type CertValidatorClientValidationStatus uint32
 
 const (
-	CertValidatorClientValidationStatusNotValidated      CertValidatorClientValidationStatus = 0
+	CertValidatorClientValidationStatusNotValidated        CertValidatorClientValidationStatus = 0
 	CertValidatorClientValidationStatusNoClientCertificate CertValidatorClientValidationStatus = 1
-	CertValidatorClientValidationStatusValidated         CertValidatorClientValidationStatus = 2
-	CertValidatorClientValidationStatusFailed            CertValidatorClientValidationStatus = 3
+	CertValidatorClientValidationStatusValidated           CertValidatorClientValidationStatus = 2
+	CertValidatorClientValidationStatusFailed              CertValidatorClientValidationStatus = 3
 )
 
 // CertValidatorValidationResult is the value returned by CertValidator.VerifyCertChain. Use

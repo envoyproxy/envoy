@@ -19,7 +19,9 @@
 // register the address of a package-level Go function variable. Both extensions live
 // in the same .so, so the consumer can dereference the registered unsafe.Pointer back
 // to a *func and call it. This still exercises the Envoy round-trip:
-//   sdk.RegisterFunction (host-side store) -> Envoy registry -> sdk.GetFunction (host-side load)
+//
+//	sdk.RegisterFunction (host-side store) -> Envoy registry -> sdk.GetFunction (host-side load)
+//
 // and asserts the registered pointer survives that round-trip with bit-equality.
 package main
 

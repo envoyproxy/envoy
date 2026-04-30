@@ -1,8 +1,9 @@
 // UDP listener filter integration test module.
 //
 // Two filters:
-//   "test_filter"      — passthrough; returns Continue on every datagram.
-//   "stop_iteration"   — drops every datagram by returning StopIteration.
+//
+//	"test_filter"      — passthrough; returns Continue on every datagram.
+//	"stop_iteration"   — drops every datagram by returning StopIteration.
 //
 // The integration driver sends UDP datagrams through Envoy's udp_proxy and asserts that
 // passthrough datagrams reach the upstream while stop_iteration drops them.

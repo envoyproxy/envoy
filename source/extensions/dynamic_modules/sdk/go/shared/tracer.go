@@ -158,19 +158,19 @@ type TracerSpan interface {
 // UseLocalDecision returns true.
 type EmptyTracerSpan struct{}
 
-func (*EmptyTracerSpan) SetOperation(_ string)                       {}
-func (*EmptyTracerSpan) SetTag(_, _ string)                          {}
-func (*EmptyTracerSpan) Log(_ int64, _ string)                       {}
-func (*EmptyTracerSpan) Finish()                                     {}
-func (*EmptyTracerSpan) InjectContext(_ TracerSpanContext)            {}
-func (*EmptyTracerSpan) SpawnChild(_ string, _ int64) TracerSpan      { return nil }
-func (*EmptyTracerSpan) SetSampled(_ bool)                           {}
-func (*EmptyTracerSpan) UseLocalDecision() bool                       { return true }
-func (*EmptyTracerSpan) GetBaggage(_ string) ([]byte, bool)           { return nil, false }
-func (*EmptyTracerSpan) SetBaggage(_, _ string)                      {}
-func (*EmptyTracerSpan) GetTraceID() ([]byte, bool)                   { return nil, false }
-func (*EmptyTracerSpan) GetSpanID() ([]byte, bool)                    { return nil, false }
-func (*EmptyTracerSpan) OnDestroy()                                  {}
+func (*EmptyTracerSpan) SetOperation(_ string)                   {}
+func (*EmptyTracerSpan) SetTag(_, _ string)                      {}
+func (*EmptyTracerSpan) Log(_ int64, _ string)                   {}
+func (*EmptyTracerSpan) Finish()                                 {}
+func (*EmptyTracerSpan) InjectContext(_ TracerSpanContext)       {}
+func (*EmptyTracerSpan) SpawnChild(_ string, _ int64) TracerSpan { return nil }
+func (*EmptyTracerSpan) SetSampled(_ bool)                       {}
+func (*EmptyTracerSpan) UseLocalDecision() bool                  { return true }
+func (*EmptyTracerSpan) GetBaggage(_ string) ([]byte, bool)      { return nil, false }
+func (*EmptyTracerSpan) SetBaggage(_, _ string)                  {}
+func (*EmptyTracerSpan) GetTraceID() ([]byte, bool)              { return nil, false }
+func (*EmptyTracerSpan) GetSpanID() ([]byte, bool)               { return nil, false }
+func (*EmptyTracerSpan) OnDestroy()                              {}
 
 // TracerSpanContext is the per-call handle passed to Tracer.StartSpan (where it gives access
 // to incoming trace-context headers) and to TracerSpan.InjectContext (where it lets the

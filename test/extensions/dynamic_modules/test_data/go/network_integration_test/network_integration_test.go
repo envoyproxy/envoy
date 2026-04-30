@@ -242,8 +242,8 @@ func (*dataAppenderFactory) Create(handle shared.NetworkFilterHandle) shared.Net
 
 type dataAppenderFilter struct {
 	shared.EmptyNetworkFilter
-	handle    shared.NetworkFilterHandle
-	appended  bool
+	handle   shared.NetworkFilterHandle
+	appended bool
 }
 
 func (f *dataAppenderFilter) OnRead(buf shared.NetworkBuffer, _ bool) shared.NetworkFilterStatus {

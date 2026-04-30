@@ -89,9 +89,9 @@ type EmptyDnsResolver struct{}
 func (*EmptyDnsResolver) Resolve(_ DnsResolverConfigHandle, _ string, _ DnsLookupFamily, _ uint64) any {
 	return nil
 }
-func (*EmptyDnsResolver) Cancel(_ any)    {}
+func (*EmptyDnsResolver) Cancel(_ any)     {}
 func (*EmptyDnsResolver) ResetNetworking() {}
-func (*EmptyDnsResolver) OnDestroy()      {}
+func (*EmptyDnsResolver) OnDestroy()       {}
 
 // DnsResolverFactory creates the per-Envoy-resolver DnsResolver instance.
 type DnsResolverFactory interface {

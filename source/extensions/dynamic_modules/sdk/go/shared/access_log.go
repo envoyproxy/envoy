@@ -17,20 +17,20 @@ package shared
 type AccessLogType uint32
 
 const (
-	AccessLogTypeNotSet                                AccessLogType = 0
-	AccessLogTypeTcpUpstreamConnected                  AccessLogType = 1
-	AccessLogTypeTcpPeriodic                           AccessLogType = 2
-	AccessLogTypeTcpConnectionEnd                      AccessLogType = 3
-	AccessLogTypeDownstreamStart                       AccessLogType = 4
-	AccessLogTypeDownstreamPeriodic                    AccessLogType = 5
-	AccessLogTypeDownstreamEnd                         AccessLogType = 6
-	AccessLogTypeUpstreamPoolReady                     AccessLogType = 7
-	AccessLogTypeUpstreamPeriodic                      AccessLogType = 8
-	AccessLogTypeUpstreamEnd                           AccessLogType = 9
+	AccessLogTypeNotSet                                  AccessLogType = 0
+	AccessLogTypeTcpUpstreamConnected                    AccessLogType = 1
+	AccessLogTypeTcpPeriodic                             AccessLogType = 2
+	AccessLogTypeTcpConnectionEnd                        AccessLogType = 3
+	AccessLogTypeDownstreamStart                         AccessLogType = 4
+	AccessLogTypeDownstreamPeriodic                      AccessLogType = 5
+	AccessLogTypeDownstreamEnd                           AccessLogType = 6
+	AccessLogTypeUpstreamPoolReady                       AccessLogType = 7
+	AccessLogTypeUpstreamPeriodic                        AccessLogType = 8
+	AccessLogTypeUpstreamEnd                             AccessLogType = 9
 	AccessLogTypeDownstreamTunnelSuccessfullyEstablished AccessLogType = 10
-	AccessLogTypeUdpTunnelUpstreamConnected            AccessLogType = 11
-	AccessLogTypeUdpPeriodic                           AccessLogType = 12
-	AccessLogTypeUdpSessionEnd                         AccessLogType = 13
+	AccessLogTypeUdpTunnelUpstreamConnected              AccessLogType = 11
+	AccessLogTypeUdpPeriodic                             AccessLogType = 12
+	AccessLogTypeUdpSessionEnd                           AccessLogType = 13
 )
 
 // ResponseFlag corresponds to envoy_dynamic_module_type_response_flag and Envoy's
@@ -39,36 +39,36 @@ const (
 type ResponseFlag uint32
 
 const (
-	ResponseFlagFailedLocalHealthCheck         ResponseFlag = 0
-	ResponseFlagNoHealthyUpstream              ResponseFlag = 1
-	ResponseFlagUpstreamRequestTimeout         ResponseFlag = 2
-	ResponseFlagLocalReset                     ResponseFlag = 3
-	ResponseFlagUpstreamRemoteReset            ResponseFlag = 4
-	ResponseFlagUpstreamConnectionFailure      ResponseFlag = 5
-	ResponseFlagUpstreamConnectionTermination  ResponseFlag = 6
-	ResponseFlagUpstreamOverflow               ResponseFlag = 7
-	ResponseFlagNoRouteFound                   ResponseFlag = 8
-	ResponseFlagDelayInjected                  ResponseFlag = 9
-	ResponseFlagFaultInjected                  ResponseFlag = 10
-	ResponseFlagRateLimited                    ResponseFlag = 11
-	ResponseFlagUnauthorizedExternalService    ResponseFlag = 12
-	ResponseFlagRateLimitServiceError          ResponseFlag = 13
-	ResponseFlagDownstreamConnectionTermination ResponseFlag = 14
-	ResponseFlagUpstreamRetryLimitExceeded     ResponseFlag = 15
-	ResponseFlagStreamIdleTimeout              ResponseFlag = 16
-	ResponseFlagInvalidEnvoyRequestHeaders     ResponseFlag = 17
-	ResponseFlagDownstreamProtocolError        ResponseFlag = 18
+	ResponseFlagFailedLocalHealthCheck           ResponseFlag = 0
+	ResponseFlagNoHealthyUpstream                ResponseFlag = 1
+	ResponseFlagUpstreamRequestTimeout           ResponseFlag = 2
+	ResponseFlagLocalReset                       ResponseFlag = 3
+	ResponseFlagUpstreamRemoteReset              ResponseFlag = 4
+	ResponseFlagUpstreamConnectionFailure        ResponseFlag = 5
+	ResponseFlagUpstreamConnectionTermination    ResponseFlag = 6
+	ResponseFlagUpstreamOverflow                 ResponseFlag = 7
+	ResponseFlagNoRouteFound                     ResponseFlag = 8
+	ResponseFlagDelayInjected                    ResponseFlag = 9
+	ResponseFlagFaultInjected                    ResponseFlag = 10
+	ResponseFlagRateLimited                      ResponseFlag = 11
+	ResponseFlagUnauthorizedExternalService      ResponseFlag = 12
+	ResponseFlagRateLimitServiceError            ResponseFlag = 13
+	ResponseFlagDownstreamConnectionTermination  ResponseFlag = 14
+	ResponseFlagUpstreamRetryLimitExceeded       ResponseFlag = 15
+	ResponseFlagStreamIdleTimeout                ResponseFlag = 16
+	ResponseFlagInvalidEnvoyRequestHeaders       ResponseFlag = 17
+	ResponseFlagDownstreamProtocolError          ResponseFlag = 18
 	ResponseFlagUpstreamMaxStreamDurationReached ResponseFlag = 19
-	ResponseFlagResponseFromCacheFilter        ResponseFlag = 20
-	ResponseFlagNoFilterConfigFound            ResponseFlag = 21
-	ResponseFlagDurationTimeout                ResponseFlag = 22
-	ResponseFlagUpstreamProtocolError          ResponseFlag = 23
-	ResponseFlagNoClusterFound                 ResponseFlag = 24
-	ResponseFlagOverloadManager                ResponseFlag = 25
-	ResponseFlagDnsResolutionFailed            ResponseFlag = 26
-	ResponseFlagDropOverLoad                   ResponseFlag = 27
-	ResponseFlagDownstreamRemoteReset          ResponseFlag = 28
-	ResponseFlagUnconditionalDropOverload      ResponseFlag = 29
+	ResponseFlagResponseFromCacheFilter          ResponseFlag = 20
+	ResponseFlagNoFilterConfigFound              ResponseFlag = 21
+	ResponseFlagDurationTimeout                  ResponseFlag = 22
+	ResponseFlagUpstreamProtocolError            ResponseFlag = 23
+	ResponseFlagNoClusterFound                   ResponseFlag = 24
+	ResponseFlagOverloadManager                  ResponseFlag = 25
+	ResponseFlagDnsResolutionFailed              ResponseFlag = 26
+	ResponseFlagDropOverLoad                     ResponseFlag = 27
+	ResponseFlagDownstreamRemoteReset            ResponseFlag = 28
+	ResponseFlagUnconditionalDropOverload        ResponseFlag = 29
 )
 
 // AccessLogTimingInfo carries per-stream timing data. All durations are in nanoseconds; -1
@@ -77,13 +77,13 @@ type AccessLogTimingInfo struct {
 	// StartTimeUnixNs is the request start time as a Unix timestamp in nanoseconds.
 	StartTimeUnixNs int64
 	// RequestCompleteDurationNs is the duration from start to request complete.
-	RequestCompleteDurationNs int64
-	FirstUpstreamTxByteSentNs       int64
-	LastUpstreamTxByteSentNs        int64
-	FirstUpstreamRxByteReceivedNs   int64
-	LastUpstreamRxByteReceivedNs    int64
-	FirstDownstreamTxByteSentNs     int64
-	LastDownstreamTxByteSentNs      int64
+	RequestCompleteDurationNs     int64
+	FirstUpstreamTxByteSentNs     int64
+	LastUpstreamTxByteSentNs      int64
+	FirstUpstreamRxByteReceivedNs int64
+	LastUpstreamRxByteReceivedNs  int64
+	FirstDownstreamTxByteSentNs   int64
+	LastDownstreamTxByteSentNs    int64
 }
 
 // AccessLogBytesInfo carries per-stream byte-count totals. All values are 0 if not available.

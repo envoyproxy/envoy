@@ -39,11 +39,11 @@ func NewFakeSpan(operation string) *FakeSpan {
 	}
 }
 
-func (s *FakeSpan) SetTag(key, value string)        { s.Tags[key] = value }
-func (s *FakeSpan) SetOperation(operation string)   { s.Operation = operation }
-func (s *FakeSpan) Log(event string)                { s.Logs = append(s.Logs, event) }
-func (s *FakeSpan) SetSampled(sampled bool)         { s.Sampled = sampled }
-func (s *FakeSpan) SetBaggage(key, value string)    { s.Baggage[key] = value }
+func (s *FakeSpan) SetTag(key, value string)      { s.Tags[key] = value }
+func (s *FakeSpan) SetOperation(operation string) { s.Operation = operation }
+func (s *FakeSpan) Log(event string)              { s.Logs = append(s.Logs, event) }
+func (s *FakeSpan) SetSampled(sampled bool)       { s.Sampled = sampled }
+func (s *FakeSpan) SetBaggage(key, value string)  { s.Baggage[key] = value }
 
 func (s *FakeSpan) GetBaggage(key string) (shared.UnsafeEnvoyBuffer, bool) {
 	v, ok := s.Baggage[key]

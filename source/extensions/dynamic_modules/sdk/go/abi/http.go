@@ -32,7 +32,6 @@ type httpFilterConfigWrapperPerRoute struct {
 	config any
 }
 
-
 const numManagerShards = 32
 
 // The managers to keep track of configs and plugins.

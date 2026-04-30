@@ -732,12 +732,12 @@ func envoy_dynamic_module_on_cluster_new(
 	return C.envoy_dynamic_module_type_cluster_module_ptr(clusterPtr)
 }
 
-//export envoy_dynamic_module_on_cluster_init
-//
 // Init is the first lifecycle callback after _new; it must not see a destroyed wrapper
 // (Envoy serializes _new -> _init -> _destroy on the main thread). The destroyed-flag
 // guards on subsequent hooks below cover the case where a late callback races with the
 // destroy hook running concurrently on the same thread.
+//
+//export envoy_dynamic_module_on_cluster_init
 func envoy_dynamic_module_on_cluster_init(
 	hostClusterPtr C.envoy_dynamic_module_type_cluster_envoy_ptr,
 	clusterPtr C.envoy_dynamic_module_type_cluster_module_ptr,

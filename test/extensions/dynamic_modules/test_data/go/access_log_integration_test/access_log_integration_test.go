@@ -8,17 +8,19 @@
 //     can assert via /stats that the values match what Envoy actually saw on the wire.
 //
 // Counters defined (all incremented per Log() call):
-//   test_log_count                — number of Log() calls observed.
-//   test_request_protocol_http2   — incremented when request_protocol == "HTTP/2".
-//   test_response_code_200        — incremented when response_code == 200.
-//   test_method_get               — incremented when :method == "GET".
-//   test_path_test                — incremented when :path == "/test".
-//   test_has_route_name           — incremented when xds_route_name returned ok.
+//
+//	test_log_count                — number of Log() calls observed.
+//	test_request_protocol_http2   — incremented when request_protocol == "HTTP/2".
+//	test_response_code_200        — incremented when response_code == 200.
+//	test_method_get               — incremented when :method == "GET".
+//	test_path_test                — incremented when :path == "/test".
+//	test_has_route_name           — incremented when xds_route_name returned ok.
 //
 // Gauges (set per Log() call):
-//   test_response_code_last       — last observed response_code as uint64.
-//   test_bytes_sent_last          — last observed bytes_sent from BytesInfo.
-//   test_request_headers_count    — current request header count.
+//
+//	test_response_code_last       — last observed response_code as uint64.
+//	test_bytes_sent_last          — last observed bytes_sent from BytesInfo.
+//	test_request_headers_count    — current request header count.
 package main
 
 import (

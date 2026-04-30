@@ -86,15 +86,19 @@ type TransportSocket interface {
 // bytes; CanFlushClose returns true; everything else is a no-op.
 type EmptyTransportSocket struct{}
 
-func (*EmptyTransportSocket) SetCallbacks(_ TransportSocketHandle)                              {}
-func (*EmptyTransportSocket) OnConnected(_ TransportSocketHandle)                               {}
-func (*EmptyTransportSocket) DoRead(_ TransportSocketHandle) TransportSocketIoResult            { return TransportSocketIoResult{Action: TransportSocketPostIoActionKeepOpen} }
-func (*EmptyTransportSocket) DoWrite(_ TransportSocketHandle, _ uint64, _ bool) TransportSocketIoResult { return TransportSocketIoResult{Action: TransportSocketPostIoActionKeepOpen} }
-func (*EmptyTransportSocket) OnClose(_ TransportSocketHandle, _ NetworkConnectionEvent)         {}
-func (*EmptyTransportSocket) GetProtocol() []byte                                               { return nil }
-func (*EmptyTransportSocket) GetFailureReason() []byte                                          { return nil }
-func (*EmptyTransportSocket) CanFlushClose() bool                                               { return true }
-func (*EmptyTransportSocket) OnDestroy()                                                        {}
+func (*EmptyTransportSocket) SetCallbacks(_ TransportSocketHandle) {}
+func (*EmptyTransportSocket) OnConnected(_ TransportSocketHandle)  {}
+func (*EmptyTransportSocket) DoRead(_ TransportSocketHandle) TransportSocketIoResult {
+	return TransportSocketIoResult{Action: TransportSocketPostIoActionKeepOpen}
+}
+func (*EmptyTransportSocket) DoWrite(_ TransportSocketHandle, _ uint64, _ bool) TransportSocketIoResult {
+	return TransportSocketIoResult{Action: TransportSocketPostIoActionKeepOpen}
+}
+func (*EmptyTransportSocket) OnClose(_ TransportSocketHandle, _ NetworkConnectionEvent) {}
+func (*EmptyTransportSocket) GetProtocol() []byte                                       { return nil }
+func (*EmptyTransportSocket) GetFailureReason() []byte                                  { return nil }
+func (*EmptyTransportSocket) CanFlushClose() bool                                       { return true }
+func (*EmptyTransportSocket) OnDestroy()                                                {}
 
 // TransportSocketFactory creates per-connection TransportSocket instances. Implementations must
 // be safe for concurrent calls.

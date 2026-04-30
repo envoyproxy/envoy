@@ -46,11 +46,11 @@ type UpstreamHttpTcpBridge interface {
 // EmptyUpstreamHttpTcpBridge is a no-op UpstreamHttpTcpBridge.
 type EmptyUpstreamHttpTcpBridge struct{}
 
-func (*EmptyUpstreamHttpTcpBridge) EncodeHeaders(_ UpstreamHttpTcpBridgeHandle, _ bool) {}
-func (*EmptyUpstreamHttpTcpBridge) EncodeData(_ UpstreamHttpTcpBridgeHandle, _ bool)    {}
-func (*EmptyUpstreamHttpTcpBridge) EncodeTrailers(_ UpstreamHttpTcpBridgeHandle)        {}
+func (*EmptyUpstreamHttpTcpBridge) EncodeHeaders(_ UpstreamHttpTcpBridgeHandle, _ bool)  {}
+func (*EmptyUpstreamHttpTcpBridge) EncodeData(_ UpstreamHttpTcpBridgeHandle, _ bool)     {}
+func (*EmptyUpstreamHttpTcpBridge) EncodeTrailers(_ UpstreamHttpTcpBridgeHandle)         {}
 func (*EmptyUpstreamHttpTcpBridge) OnUpstreamData(_ UpstreamHttpTcpBridgeHandle, _ bool) {}
-func (*EmptyUpstreamHttpTcpBridge) OnDestroy()                                          {}
+func (*EmptyUpstreamHttpTcpBridge) OnDestroy()                                           {}
 
 // UpstreamHttpTcpBridgeFactory creates per-request bridge instances. Implementations must be
 // safe for concurrent calls.

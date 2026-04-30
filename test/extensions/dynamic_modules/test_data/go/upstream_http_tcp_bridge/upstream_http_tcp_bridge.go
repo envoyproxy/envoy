@@ -1,10 +1,11 @@
 // Upstream HTTP/TCP bridge test module. Mirrors test_data/rust/upstream_http_tcp_bridge.rs.
 //
 // Two modes selected by the config bytes:
-//   "local_reply" — short-circuits with a 403 local reply on encode_headers.
-//   anything else — streaming bridge: forwards request method as a "METHOD=X " prefix to
-//                   the upstream, then forwards the request body, and converts upstream
-//                   bytes back into HTTP response data.
+//
+//	"local_reply" — short-circuits with a 403 local reply on encode_headers.
+//	anything else — streaming bridge: forwards request method as a "METHOD=X " prefix to
+//	                the upstream, then forwards the request body, and converts upstream
+//	                bytes back into HTTP response data.
 //
 // Loaded by test/extensions/upstreams/http/dynamic_modules/integration_test.cc which is
 // parameterized over (rust, go).

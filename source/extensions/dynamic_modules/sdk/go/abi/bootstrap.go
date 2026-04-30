@@ -58,7 +58,7 @@ type bootstrapConfigWrapper struct {
 	watchers   map[string]func(path string, events shared.FileWatcherEvent)
 
 	// admin handlers keyed by path prefix.
-	adminMu      sync.Mutex
+	adminMu       sync.Mutex
 	adminHandlers map[string]shared.BootstrapAdminHandler
 
 	// callout callbacks indexed by callout id.
@@ -71,7 +71,7 @@ type bootstrapConfigWrapper struct {
 	// Pending shutdown completion. Stored when OnShutdown is in flight; the runtime invokes
 	// the C completion_callback exactly once when the module's wrapper completion func is
 	// called.
-	shutdownMu       sync.Mutex
+	shutdownMu         sync.Mutex
 	shutdownCompletion *bootstrapShutdownCompletion
 }
 

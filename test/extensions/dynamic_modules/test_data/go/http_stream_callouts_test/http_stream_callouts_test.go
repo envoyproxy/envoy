@@ -3,11 +3,11 @@
 // Exercises the StartHttpStream / SendHttpStreamData / SendHttpStreamTrailers /
 // ResetHttpStream API family across five filter shapes:
 //
-//   basic_stream_lifecycle  - start, receive headers/data, complete
-//   bidirectional_streaming - send chunks + trailers, count received chunks
-//   multiple_streams        - 3 concurrent streams
-//   stream_reset            - reset on first headers callback
-//   upstream_reset          - rely on upstream to reset
+//	basic_stream_lifecycle  - start, receive headers/data, complete
+//	bidirectional_streaming - send chunks + trailers, count received chunks
+//	multiple_streams        - 3 concurrent streams
+//	stream_reset            - reset on first headers callback
+//	upstream_reset          - rely on upstream to reset
 //
 // This module is built but currently has no integration driver — its purpose is to
 // exercise the SDK API surface at compile time, paralleling the Rust module of the

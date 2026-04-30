@@ -82,7 +82,7 @@ func (*EmptyLoadBalancer) ChooseHost(_ LoadBalancerHandle, _ LoadBalancerContext
 	return HostSelection{}, false
 }
 func (*EmptyLoadBalancer) OnHostMembershipUpdate(_ LoadBalancerHandle, _, _ uint64) {}
-func (*EmptyLoadBalancer) OnDestroy()                                                {}
+func (*EmptyLoadBalancer) OnDestroy()                                               {}
 
 // LoadBalancerFactory creates per-worker LoadBalancer instances.
 type LoadBalancerFactory interface {

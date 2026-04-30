@@ -25,26 +25,48 @@ import (
 // tests don't accidentally cross-register.
 // -----------------------------------------------------------------------------
 
-type fakeHttpFilterConfigFactory struct{ shared.EmptyHttpFilterConfigFactory }
-type fakeNetworkFilterConfigFactory struct{ shared.EmptyNetworkFilterConfigFactory }
-type fakeListenerFilterConfigFactory struct{ shared.EmptyListenerFilterConfigFactory }
-type fakeUdpListenerFilterConfigFactory struct{ shared.EmptyUdpListenerFilterConfigFactory }
-type fakeAccessLoggerConfigFactory struct{ shared.EmptyAccessLoggerConfigFactory }
-type fakeMatcherConfigFactory struct{ shared.EmptyMatcherConfigFactory }
-type fakeCertValidatorConfigFactory struct{ shared.EmptyCertValidatorConfigFactory }
-type fakeDnsResolverConfigFactory struct{ shared.EmptyDnsResolverConfigFactory }
+type fakeHttpFilterConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+type fakeNetworkFilterConfigFactory struct {
+	shared.EmptyNetworkFilterConfigFactory
+}
+type fakeListenerFilterConfigFactory struct {
+	shared.EmptyListenerFilterConfigFactory
+}
+type fakeUdpListenerFilterConfigFactory struct {
+	shared.EmptyUdpListenerFilterConfigFactory
+}
+type fakeAccessLoggerConfigFactory struct {
+	shared.EmptyAccessLoggerConfigFactory
+}
+type fakeMatcherConfigFactory struct {
+	shared.EmptyMatcherConfigFactory
+}
+type fakeCertValidatorConfigFactory struct {
+	shared.EmptyCertValidatorConfigFactory
+}
+type fakeDnsResolverConfigFactory struct {
+	shared.EmptyDnsResolverConfigFactory
+}
 type fakeUpstreamHttpTcpBridgeConfigFactory struct {
 	shared.EmptyUpstreamHttpTcpBridgeConfigFactory
 }
-type fakeTracerConfigFactory struct{ shared.EmptyTracerConfigFactory }
+type fakeTracerConfigFactory struct {
+	shared.EmptyTracerConfigFactory
+}
 type fakeTransportSocketFactoryConfigFactory struct {
 	shared.EmptyTransportSocketFactoryConfigFactory
 }
-type fakeLoadBalancerConfigFactory struct{ shared.EmptyLoadBalancerConfigFactory }
+type fakeLoadBalancerConfigFactory struct {
+	shared.EmptyLoadBalancerConfigFactory
+}
 type fakeBootstrapExtensionConfigFactory struct {
 	shared.EmptyBootstrapExtensionConfigFactory
 }
-type fakeClusterConfigFactory struct{ shared.EmptyClusterConfigFactory }
+type fakeClusterConfigFactory struct {
+	shared.EmptyClusterConfigFactory
+}
 
 // -----------------------------------------------------------------------------
 // HTTP filter registry
@@ -315,11 +337,11 @@ func TestClusterRegistry(t *testing.T) {
 // fakeProgramHandle is a recording shared.ProgramHandle. Each method writes its inputs to
 // fields that the test inspects after the call.
 type fakeProgramHandle struct {
-	concurrency      uint32
-	validation       bool
-	functions        map[string]unsafe.Pointer
-	sharedData       map[string]unsafe.Pointer
-	registerFnFails  bool
+	concurrency       uint32
+	validation        bool
+	functions         map[string]unsafe.Pointer
+	sharedData        map[string]unsafe.Pointer
+	registerFnFails   bool
 	registerDataFails bool
 
 	logs []logRecord

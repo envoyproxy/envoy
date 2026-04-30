@@ -93,9 +93,9 @@ type BootstrapExtension interface {
 type EmptyBootstrapExtension struct{}
 
 func (*EmptyBootstrapExtension) OnNew(_ BootstrapExtensionHandle)                     {}
-func (*EmptyBootstrapExtension) OnServerInitialized(_ BootstrapExtensionHandle)        {}
-func (*EmptyBootstrapExtension) OnWorkerThreadInitialized(_ BootstrapExtensionHandle)  {}
-func (*EmptyBootstrapExtension) OnDrainStarted(_ BootstrapExtensionHandle)             {}
+func (*EmptyBootstrapExtension) OnServerInitialized(_ BootstrapExtensionHandle)       {}
+func (*EmptyBootstrapExtension) OnWorkerThreadInitialized(_ BootstrapExtensionHandle) {}
+func (*EmptyBootstrapExtension) OnDrainStarted(_ BootstrapExtensionHandle)            {}
 func (*EmptyBootstrapExtension) OnShutdown(_ BootstrapExtensionHandle, completion func()) {
 	completion()
 }
