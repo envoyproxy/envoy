@@ -201,7 +201,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                        {Admin::ParamDescriptor::Type::String, "group",
                         "Change given logger group to desired level, set to "
                         "<logger_group_name>:<desired_level>. "
-                        "logger_group_name can be a logger name or a glob expression."},
+                        "logger_group_name must be a logger name."},
                        {Admin::ParamDescriptor::Type::Enum, "level",
                         "desired logging level, this will change all loggers's level",
                         prepend("", LogsHandler::levelStrings())}}),

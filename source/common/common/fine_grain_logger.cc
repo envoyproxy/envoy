@@ -277,7 +277,7 @@ level_enum FineGrainLogContext::getLogLevel(absl::string_view key) const {
       if (safeFileNameMatch(info.update_pattern, stem_basename)) {
         return info.log_level;
       }
-      if (!logger_name.empty() && safeFileNameMatch(info.update_pattern, logger_name)) {
+      if (!logger_name.empty() && info.update_pattern == logger_name) {
         return info.log_level;
       }
     }
