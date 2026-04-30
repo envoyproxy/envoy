@@ -271,7 +271,7 @@ impl AccessLogger for TestAccessLogger {
       self.metrics.increment_counter(self.has_route_counter, 1);
     }
     if let Some(code) = ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseCode) {
-      self.metrics.set_gauge(self.resp_code_gauge, code as u64);
+      self.metrics.set_gauge(self.resp_code_gauge, code);
       if code == 200 {
         self.metrics.increment_counter(self.resp_200_counter, 1);
       }
