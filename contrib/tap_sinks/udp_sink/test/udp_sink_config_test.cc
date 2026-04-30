@@ -13,7 +13,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/registry.h"
 
 namespace Envoy {
 namespace Extensions {
