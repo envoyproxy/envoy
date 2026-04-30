@@ -3592,7 +3592,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
       // is not complete yet, it will finally result in resetting of the downstream stream.
       upstream_request_->encodeResetStream(Http::StreamResetReason::ProtocolError);
       ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(Http::StreamResetReason::RemoteRstNoError, response->resetReason());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
 
       cleanupUpstreamAndDownstream();
     });
@@ -3623,7 +3623,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
       // is not complete yet, it will finally result in resetting of the stream.
       upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
       ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(Http::StreamResetReason::RemoteRstNoError, response->resetReason());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
 
       cleanupUpstreamAndDownstream();
     });
@@ -3693,7 +3693,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationToD
       // is not complete yet, it will finally result in resetting of the stream.
       upstream_request_->encodeResetStream(Http::StreamResetReason::LocalReset);
       ASSERT_TRUE(response->waitForReset());
-      EXPECT_EQ(Http::StreamResetReason::RemoteRstNoError, response->resetReason());
+      EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
 
       cleanupUpstreamAndDownstream();
     });
@@ -3705,8 +3705,8 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogationLeg
 
   std::vector<Http::StreamResetReason> reasons = {Http::StreamResetReason::ProtocolError,
                                                   Http::StreamResetReason::LocalReset};
-  std::vector<Http::StreamResetReason> result_reasons = {Http::StreamResetReason::RemoteRstNoError,
-                                                         Http::StreamResetReason::RemoteRstNoError};
+  std::vector<Http::StreamResetReason> result_reasons = {
+      Http::StreamResetReason::RemoteResetNoError, Http::StreamResetReason::RemoteResetNoError};
 
   // There are four streams created in total, client stream, Envoy server stream,
   // Envoy client stream and upstream server stream.

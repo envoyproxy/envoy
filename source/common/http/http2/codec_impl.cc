@@ -179,7 +179,7 @@ int reasonToReset(StreamResetReason reason, bool response_end_stream_sent) {
     return OGHTTP2_REFUSED_STREAM;
   case StreamResetReason::ConnectError:
     return OGHTTP2_CONNECT_ERROR;
-  case StreamResetReason::RemoteRstNoError:
+  case StreamResetReason::RemoteResetNoError:
     return OGHTTP2_NO_ERROR;
   case StreamResetReason::ProtocolError:
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
@@ -1546,7 +1546,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
           stats_.deferred_stream_close_.inc();
           return okStatus();
         }
-        stream->runResetCallbacks(StreamResetReason::RemoteRstNoError, absl::string_view());
+        stream->runResetCallbacks(StreamResetReason::RemoteResetNoError, absl::string_view());
       } else {
         StreamResetReason reason;
         if (stream->reset_due_to_messaging_error_) {

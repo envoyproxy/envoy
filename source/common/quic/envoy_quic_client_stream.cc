@@ -282,7 +282,7 @@ bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
     Http::StreamResetReason reason;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_preserve_rst_no_error") &&
         error.internal_code() == quic::QUIC_STREAM_NO_ERROR) {
-      reason = Http::StreamResetReason::RemoteRstNoError;
+      reason = Http::StreamResetReason::RemoteResetNoError;
     } else {
       reason = quicRstErrorToEnvoyRemoteResetReason(error.internal_code());
     }
@@ -401,7 +401,7 @@ void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
     Http::StreamResetReason reason;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_preserve_rst_no_error") &&
         frame.error_code == quic::QUIC_STREAM_NO_ERROR && read_side_was_closed) {
-      reason = Http::StreamResetReason::RemoteRstNoError;
+      reason = Http::StreamResetReason::RemoteResetNoError;
     } else {
       reason = quicRstErrorToEnvoyRemoteResetReason(frame.error_code);
     }

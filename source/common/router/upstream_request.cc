@@ -479,7 +479,7 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                     absl::string_view transport_failure_reason) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  if (reason != Http::StreamResetReason::RemoteRstNoError) {
+  if (reason != Http::StreamResetReason::RemoteResetNoError) {
     if (span_ != nullptr) {
       // Add tags about reset.
       span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);

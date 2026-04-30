@@ -431,7 +431,7 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
   // First check "never retry" conditions so we can short circuit (we never
   // retry if the reset reason is overflow).
   if (reset_reason == Http::StreamResetReason::Overflow ||
-      reset_reason == Http::StreamResetReason::RemoteRstNoError) {
+      reset_reason == Http::StreamResetReason::RemoteResetNoError) {
     return RetryDecision::NoRetry;
   }
 

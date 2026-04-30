@@ -5969,7 +5969,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamRstStreamNoErrorAfterCompleteResponse) {
   // Without this, onUpstreamComplete() preemptively sends a local RST_STREAM to the upstream
   // when the complete response is received, closing the stream before the upstream's
   // RST_STREAM(NO_ERROR) arrives. With this enabled, the upstream stream stays open (half-closed
-  // remote), allowing the RST_STREAM(NO_ERROR) to reach the router through RemoteRstNoError.
+  // remote), allowing the RST_STREAM(NO_ERROR) to reach the router through RemoteResetNoError.
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   initialize();
@@ -6058,7 +6058,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailers) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     ASSERT_TRUE(response->waitForReset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteRstNoError, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteResetNoError, response->resetReason());
     codec_client_->close();
   }
 }

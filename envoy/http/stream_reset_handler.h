@@ -42,7 +42,7 @@ enum class StreamResetReason {
   // If a remote RST_STREAM(NO_ERROR) was received after a complete response.
   // Per RFC 9113 Section 8.1 (HTTP/2) and RFC 9114 Section 4.1 (HTTP/3), this is not an error, and
   // the client should not discard the response.
-  RemoteRstNoError,
+  RemoteResetNoError,
 };
 
 /**

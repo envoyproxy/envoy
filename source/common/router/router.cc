@@ -1586,7 +1586,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                    *callbacks_, Http::Utility::resetReasonToString(reset_reason),
                    transport_failure_reason);
 
-  if (reset_reason == Http::StreamResetReason::RemoteRstNoError) {
+  if (reset_reason == Http::StreamResetReason::RemoteResetNoError) {
     auto request_ptr = upstream_request.removeFromList(upstream_requests_);
     callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
     if (numRequestsAwaitingHeaders() == 0 && pending_retries_ == 0 &&
@@ -1699,8 +1699,8 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::CoreResponseFlag::UpstreamRemoteReset;
   case Http::StreamResetReason::ProtocolError:
     return StreamInfo::CoreResponseFlag::UpstreamProtocolError;
-  case Http::StreamResetReason::RemoteRstNoError:
-    IS_ENVOY_BUG("unexpected RemoteRstNoError in streamResetReasonToResponseFlag");
+  case Http::StreamResetReason::RemoteResetNoError:
+    IS_ENVOY_BUG("unexpected RemoteResetNoError in streamResetReasonToResponseFlag");
     return StreamInfo::CoreResponseFlag::UpstreamRemoteReset;
   case Http::StreamResetReason::OverloadManager:
     return StreamInfo::CoreResponseFlag::OverloadManager;
