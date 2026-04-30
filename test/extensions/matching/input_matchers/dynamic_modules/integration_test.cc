@@ -16,7 +16,7 @@ struct MatcherIntegrationParam {
 };
 
 class DynamicModuleMatcherIntegrationTest : public testing::TestWithParam<MatcherIntegrationParam>,
-                                             public HttpIntegrationTest {
+                                            public HttpIntegrationTest {
 public:
   DynamicModuleMatcherIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam().ip_version) {

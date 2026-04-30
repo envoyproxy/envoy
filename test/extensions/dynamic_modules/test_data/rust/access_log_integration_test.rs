@@ -262,15 +262,22 @@ impl AccessLogger for TestAccessLogger {
 
     // Test generic attribute accessors. Record select results into counters/gauges so
     // the C++ driver can verify via /stats.
-    if let Some(proto) = ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestProtocol) {
+    if let Some(proto) =
+      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestProtocol)
+    {
       if proto.as_slice() == b"HTTP/2" {
         self.metrics.increment_counter(self.http2_counter, 1);
       }
     }
-    if ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsRouteName).is_some() {
+    if ctx
+      .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsRouteName)
+      .is_some()
+    {
       self.metrics.increment_counter(self.has_route_counter, 1);
     }
-    if let Some(code) = ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseCode) {
+    if let Some(code) =
+      ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseCode)
+    {
       self.metrics.set_gauge(self.resp_code_gauge, code);
       if code == 200 {
         self.metrics.increment_counter(self.resp_200_counter, 1);
@@ -293,9 +300,11 @@ impl AccessLogger for TestAccessLogger {
       }
     }
     // Set request header count gauge.
-    let req_hdr_count = ctx
-      .get_headers_count(abi::envoy_dynamic_module_type_http_header_type::RequestHeader);
-    self.metrics.set_gauge(self.hdr_count_gauge, req_hdr_count as u64);
+    let req_hdr_count =
+      ctx.get_headers_count(abi::envoy_dynamic_module_type_http_header_type::RequestHeader);
+    self
+      .metrics
+      .set_gauge(self.hdr_count_gauge, req_hdr_count as u64);
     // Set bytes_sent gauge from BytesInfo.
     let bi = ctx.bytes_info();
     self.metrics.set_gauge(self.bytes_sent_gauge, bi.bytes_sent);

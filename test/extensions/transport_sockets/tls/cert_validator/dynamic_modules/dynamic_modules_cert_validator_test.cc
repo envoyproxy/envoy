@@ -75,8 +75,33 @@ TEST_F(DynamicModuleCertValidatorTest, ConfigNewModuleNotFound) {
 }
 
 TEST_F(DynamicModuleCertValidatorTest, ConfigNewMissingSymbol) {
-  // The "no_op" module does not implement cert validator functions.
+  // The "no_op" module does not implement cert validator functions, so the
+  // very first symbol lookup (config_new) fails.
   auto config_or_error = createConfig("no_op");
+  ASSERT_FALSE(config_or_error.ok());
+}
+
+// The next four tests cover the per-symbol fallback paths in
+// newDynamicModuleCertValidatorConfig. Each fake defines all cert-validator
+// symbols except one, forcing exactly that resolution to fail.
+
+TEST_F(DynamicModuleCertValidatorTest, ConfigNewMissingConfigDestroy) {
+  auto config_or_error = createConfig("cert_validator_missing_config_destroy");
+  ASSERT_FALSE(config_or_error.ok());
+}
+
+TEST_F(DynamicModuleCertValidatorTest, ConfigNewMissingDoVerify) {
+  auto config_or_error = createConfig("cert_validator_missing_do_verify");
+  ASSERT_FALSE(config_or_error.ok());
+}
+
+TEST_F(DynamicModuleCertValidatorTest, ConfigNewMissingGetVerifyMode) {
+  auto config_or_error = createConfig("cert_validator_missing_get_verify_mode");
+  ASSERT_FALSE(config_or_error.ok());
+}
+
+TEST_F(DynamicModuleCertValidatorTest, ConfigNewMissingUpdateDigest) {
+  auto config_or_error = createConfig("cert_validator_missing_update_digest");
   ASSERT_FALSE(config_or_error.ok());
 }
 
@@ -206,6 +231,28 @@ TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainNotValidatedDefaultStatus)
                                              "example.com");
   EXPECT_EQ(ValidationResults::ValidationStatus::Successful, results.status);
   // Module explicitly returns NotValidated detailed status.
+  EXPECT_EQ(Envoy::Ssl::ClientValidationStatus::NotValidated, results.detailed_status);
+}
+
+// Exercises the default branch of the detailed_status switch in doVerifyCertChain.
+// The fake returns an out-of-range enum value, which the validator must translate to
+// NotValidated.
+TEST_F(DynamicModuleCertValidatorTest, VerifyCertChainUnknownDetailedStatus) {
+  auto config_or_error = createConfig("cert_validator_unknown_status");
+  ASSERT_TRUE(config_or_error.ok());
+
+  DynamicModuleCertValidator validator(config_or_error.value(), stats_);
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+  sk_X509_push(cert_chain.get(), cert.release());
+
+  CSmartPtr<SSL_CTX, SSL_CTX_free> ssl_ctx(SSL_CTX_new(TLS_method()));
+  auto results = validator.doVerifyCertChain(*cert_chain, nullptr, nullptr, *ssl_ctx, {}, false,
+                                             "example.com");
+  EXPECT_EQ(ValidationResults::ValidationStatus::Successful, results.status);
   EXPECT_EQ(Envoy::Ssl::ClientValidationStatus::NotValidated, results.detailed_status);
 }
 
@@ -571,6 +618,33 @@ TEST_F(DynamicModuleCertValidatorTest, FilterStateSetNullValue) {
   EXPECT_FALSE(ok);
 
   config->current_callbacks_ = nullptr;
+}
+
+// Directly exercises the set_error_details callback to cover its no-op branches when the
+// caller passes a null buffer or zero length. The cert_validator_fail fake covers the
+// happy path; this test covers the early-return paths.
+TEST_F(DynamicModuleCertValidatorTest, SetErrorDetailsNullAndEmptyAreNoOps) {
+  auto config_or_error = createConfig("cert_validator_no_op");
+  ASSERT_TRUE(config_or_error.ok());
+  auto& config = config_or_error.value();
+
+  // Null pointer: should leave last_error_details_ unset.
+  envoy_dynamic_module_callback_cert_validator_set_error_details(static_cast<void*>(config.get()),
+                                                                 {nullptr, 0});
+  EXPECT_FALSE(config->last_error_details_.has_value());
+
+  // Non-null pointer with zero length: still treated as a no-op.
+  const char placeholder = 'x';
+  envoy_dynamic_module_callback_cert_validator_set_error_details(
+      static_cast<void*>(config.get()), {const_cast<char*>(&placeholder), 0});
+  EXPECT_FALSE(config->last_error_details_.has_value());
+
+  // Sanity: non-empty buffer goes through and stores the value.
+  const std::string err = "module says no";
+  envoy_dynamic_module_callback_cert_validator_set_error_details(
+      static_cast<void*>(config.get()), {const_cast<char*>(err.data()), err.size()});
+  ASSERT_TRUE(config->last_error_details_.has_value());
+  EXPECT_EQ(err, config->last_error_details_.value());
 }
 
 TEST_F(DynamicModuleCertValidatorTest, FilterStateGetNullKey) {

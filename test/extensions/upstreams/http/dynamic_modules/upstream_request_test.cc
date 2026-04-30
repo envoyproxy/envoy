@@ -407,6 +407,45 @@ TEST_F(HttpTcpBridgeAbiEdgeCasesTest, EdgeCaseCallbacksExercised) {
 }
 
 // =============================================================================
+// HttpTcpBridge tests for send_upstream_data and send_response_trailers ABI
+// callbacks. The "send_upstream" fake calls send_upstream_data (with data and
+// then with empty/end_stream) from encode_headers, and calls
+// send_response_headers + send_response_trailers (both with a vector and with
+// NULL) from on_upstream_data.
+// =============================================================================
+
+class HttpTcpBridgeSendUpstreamTest : public HttpTcpBridgeTest {
+public:
+  HttpTcpBridgeSendUpstreamTest() { createBridge("upstream_bridge_send_upstream"); }
+};
+
+TEST_F(HttpTcpBridgeSendUpstreamTest, EncodeHeadersWritesUpstream) {
+  // First send_upstream_data call writes "hello-upstream" with end_stream=true. The bridge
+  // calls enableHalfClose(true) and writes the buffer. The second call has empty data with
+  // end_stream=true; sendUpstreamData still half-closes and writes a zero-length buffer.
+  EXPECT_CALL(mock_connection_, enableHalfClose(true)).Times(2);
+  EXPECT_CALL(mock_connection_, write(_, true)).Times(2);
+
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
+  auto status = bridge_->encodeHeaders(headers, false);
+  EXPECT_TRUE(status.ok());
+}
+
+TEST_F(HttpTcpBridgeSendUpstreamTest, OnUpstreamDataSendsResponseTrailers) {
+  // First the bridge sends response headers (decodeHeaders) with end_stream=false, then a
+  // trailer map with two entries (decodeTrailers), then a second send_response_trailers with
+  // a NULL vector (skips the loop, decodeTrailers is still invoked with empty map).
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeTrailers(_)).Times(2);
+
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/test"}};
+  EXPECT_TRUE(bridge_->encodeHeaders(headers, false).ok());
+
+  Buffer::OwnedImpl data("upstream-data");
+  bridge_->onUpstreamData(data, false);
+}
+
+// =============================================================================
 // Edge case tests for connection and event handling.
 // =============================================================================
 

@@ -190,7 +190,19 @@ test_program(name = "cert_validator_empty_digest")
 
 test_program(name = "cert_validator_filter_state")
 
+test_program(name = "cert_validator_missing_config_destroy")
+
+test_program(name = "cert_validator_missing_do_verify")
+
+test_program(name = "cert_validator_missing_get_verify_mode")
+
+test_program(name = "cert_validator_missing_update_digest")
+
+test_program(name = "cert_validator_unknown_status")
+
 test_program(name = "upstream_bridge_no_op")
+
+test_program(name = "upstream_bridge_send_upstream")
 
 test_program(name = "upstream_bridge_config_new_fail")
 

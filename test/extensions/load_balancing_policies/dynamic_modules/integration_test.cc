@@ -45,8 +45,8 @@ public:
       policy->mutable_typed_extension_config()->set_name(
           "envoy.load_balancing_policies.dynamic_modules");
 
-      envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
-          lb_config;
+      envoy::extensions::load_balancing_policies::dynamic_modules::v3::
+          DynamicModulesLoadBalancerConfig lb_config;
       lb_config.mutable_dynamic_module_config()->set_name("load_balancer_integration_test");
       lb_config.set_lb_policy_name("first_host_lb");
       policy->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(lb_config);

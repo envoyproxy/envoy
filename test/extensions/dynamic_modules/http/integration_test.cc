@@ -765,7 +765,7 @@ class DynamicModulesTerminalIntegrationTest
       public HttpIntegrationTest {
 public:
   DynamicModulesTerminalIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), terminal_filter_config){};
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), terminal_filter_config) {};
 
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     terminal_filter_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(

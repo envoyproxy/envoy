@@ -2052,9 +2052,7 @@ struct FilterStateReaderConfig {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FilterStateReaderConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(FilterStateReaderFilter {
-      captured: None,
-    })
+    Box::new(FilterStateReaderFilter { captured: None })
   }
 }
 

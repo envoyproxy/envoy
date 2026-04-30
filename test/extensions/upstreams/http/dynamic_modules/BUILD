@@ -19,6 +19,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_headers_end_stream_no_body",
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_send_upstream",
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_stop_and_buffer",
     ],
     rbe_pool = "6gig",
