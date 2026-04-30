@@ -48,6 +48,8 @@ jobs:
     with:
       target: release.signed
       bazel-extra: >-
+        --config=rbe
+        --noremote_upload_local_results
         --//distribution:x64-packages=//distribution:custom/x64/packages.x64.tar.gz
         --//distribution:arm64-packages=//distribution:custom/arm64/packages.arm64.tar.gz
         --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst
