@@ -1,12 +1,11 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/dynamic_modules/config.h"
 
-#include <cstring>
-
 #include "envoy/common/exception.h"
 #include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.validate.h"
 #include "envoy/router/string_accessor.h"
 
+#include "source/common/common/safe_memcpy.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -230,7 +229,7 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
   // enum values. A misbehaving module could return any int; we map unknown values to
   // NotValidated to fail open.
   int raw_detailed_status;
-  std::memcpy(&raw_detailed_status, &result.detailed_status, sizeof(int));
+  safeMemcpy(&raw_detailed_status, &result.detailed_status);
   Envoy::Ssl::ClientValidationStatus detailed_status;
   switch (raw_detailed_status) {
   case envoy_dynamic_module_type_cert_validator_client_validation_status_NotValidated:

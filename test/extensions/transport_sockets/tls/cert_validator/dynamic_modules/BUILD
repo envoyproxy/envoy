@@ -23,6 +23,8 @@ envoy_cc_test(
     env = {"GODEBUG": "cgocheck=0"},
     rbe_pool = "6gig",
     deps = [
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3:pkg_cc_proto",
         # See //test/extensions/dynamic_modules/http:filter_test for why every test
         # binary that loads a Go test_data .so depends on all_abi_impls.
         "//source/extensions/dynamic_modules:all_abi_impls",

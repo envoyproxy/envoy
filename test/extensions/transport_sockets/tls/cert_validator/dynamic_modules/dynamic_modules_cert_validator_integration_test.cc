@@ -49,6 +49,11 @@ public:
     TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
   }
 
+  void TearDown() override {
+    HttpIntegrationTest::cleanupUpstreamAndDownstream();
+    codec_client_.reset();
+  }
+
   void initializeWithValidator(const std::string& module_name) {
     auto* validator_config = new envoy::config::core::v3::TypedExtensionConfig();
     TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -108,13 +113,10 @@ TEST_P(DynamicModulesCertValidatorIntegrationTest, ValidatorAccepts) {
       (GetParam().language == "c") ? "cert_validator_no_op" : "cert_validator_test";
   initializeWithValidator(module);
 
-  auto conn = makeSslClient();
-  auto codec = makeHttpConnection(std::move(conn));
-  auto response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  codec->close();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClient();
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 // Drives a TLS handshake against a listener using the C-only cert_validator_filter_state
@@ -133,6 +135,11 @@ public:
                                TestEnvironment::substitute(
                                    "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
                                1);
+  }
+
+  void TearDown() override {
+    HttpIntegrationTest::cleanupUpstreamAndDownstream();
+    codec_client_.reset();
   }
 
   void initializeWithFilterStateValidator() {
@@ -154,6 +161,16 @@ typed_config:
                                     .setCustomValidatorConfig(validator_config));
     HttpIntegrationTest::initialize();
   }
+
+  Network::ClientConnectionPtr makeSslClient() {
+    Network::Address::InstanceConstSharedPtr address =
+        Ssl::getSslAddress(version_, lookupPort("http"));
+    auto factory = Ssl::createClientSslTransportSocketFactory(Ssl::ClientSslTransportOptions(),
+                                                              context_manager_, *api_);
+    return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                               factory->createTransportSocket(nullptr, nullptr),
+                                               nullptr, nullptr);
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesCertValidatorFilterStateTest,
@@ -163,20 +180,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesCertValidatorFilterStateTest,
 TEST_P(DynamicModulesCertValidatorFilterStateTest, FilterStateCallbacksRoundTrip) {
   initializeWithFilterStateValidator();
 
-  Network::Address::InstanceConstSharedPtr address =
-      Ssl::getSslAddress(version_, lookupPort("http"));
-  auto factory = Ssl::createClientSslTransportSocketFactory(Ssl::ClientSslTransportOptions(),
-                                                            context_manager_, *api_);
-  auto conn = dispatcher_->createClientConnection(
-      address, Network::Address::InstanceConstSharedPtr(),
-      factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
-
-  auto codec = makeHttpConnection(std::move(conn));
-  auto response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  codec->close();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClient();
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 } // namespace
