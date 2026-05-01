@@ -29,7 +29,7 @@ public:
         [entry = std::move(entry_), cb = std::move(cb),
          cacheable_response_checker = std::move(cacheable_response_checker_)](
             Http::ResponseHeaderMapPtr headers, EndStream end_stream) mutable {
-          if (cacheable_response_checker->isCacheableResponse(*headers)) {
+          if (headers != nullptr && cacheable_response_checker->isCacheableResponse(*headers)) {
             entry->clearUncacheableState();
           }
           cb(std::move(headers), end_stream);

@@ -274,7 +274,6 @@ envoy_cc_test(
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
-        "//test/test_common:registry_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

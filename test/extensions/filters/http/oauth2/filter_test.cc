@@ -316,6 +316,34 @@ public:
     return c;
   }
 
+  // Test helpers exposing private OAuth2Filter methods. OAuth2Filter declares
+  // `friend class OAuth2Test`, but `TEST_F(OAuth2Test, ...)` expands to a class
+  // *derived* from OAuth2Test, and C++ friendship is not inherited — so the
+  // test bodies cannot call the privates directly. These wrappers bridge that.
+  //
+  // We also prime `filter_->config_` here. In production it is set inside
+  // resolveAndSetActiveConfig() which only runs from decodeHeaders(); the tests
+  // below (DecryptTokenSameSecret, DecryptTokenDecryptionFails,
+  // DecryptTokenSpuriousSuccessReturnsOriginalInput, GarbagePlaintextCookieDoesNotCrash)
+  // call encryptToken/decryptToken directly without first going through
+  // decodeHeaders, so without this priming they would dereference a null
+  // config_ inside encryptToken/decryptToken (segfault at small offset, e.g. 0x318).
+  // DecryptTokenEmpty doesn't crash because decryptToken early-returns on empty
+  // input before touching config_.
+  void primeActiveConfigForTest() const {
+    if (filter_->config_ == nullptr) {
+      filter_->resolveAndSetActiveConfig();
+    }
+  }
+  std::string encryptTokenForTest(const std::string& token) const {
+    primeActiveConfigForTest();
+    return filter_->encryptToken(token);
+  }
+  std::string decryptTokenForTest(const std::string& ct) const {
+    primeActiveConfigForTest();
+    return filter_->decryptToken(ct);
+  }
+
   // Validates the behavior of the cookie validator.
   void expectValidCookies(const CookieNames& cookie_names, const std::string& cookie_domain) {
     // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
@@ -5424,6 +5452,120 @@ TEST_F(OAuth2Test, OAuthCallbackGetAccessTokenSyncContinue) {
       .WillOnce(Return(OAuth2Client::OAuthState::FailureContinue));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: decryptToken is called with an empty string.
+ * Expected behavior: returns empty string.
+ */
+TEST_F(OAuth2Test, DecryptTokenEmpty) { EXPECT_EQ(decryptTokenForTest(""), ""); }
+
+/**
+ * Scenario: decryptToken is called with a ciphertext that was encrypted with the same HMAC secret.
+ * Expected behavior: returns the original plaintext.
+ */
+TEST_F(OAuth2Test, DecryptTokenSameSecret) {
+  const std::string plaintext = "some_access_token_value";
+  const std::string ciphertext = encryptTokenForTest(plaintext);
+  EXPECT_EQ(decryptTokenForTest(ciphertext), plaintext);
+}
+
+/**
+ * Scenario: decryptToken is called with a token that is not a valid AES ciphertext (e.g. a
+ * legacy unencrypted token or a ciphertext from a different key where PKCS#7 padding fails).
+ * Expected behavior: returns the original input unchanged and emits an error log.
+ */
+TEST_F(OAuth2Test, DecryptTokenDecryptionFails) {
+  // This looks like a bearer token but is not valid AES-CBC ciphertext encrypted under the
+  // filter's HMAC secret. EVP_DecryptFinal_ex will reject the PKCS#7 padding.
+  const std::string unencrypted = "j5Vhtnz_uyhDVTrSri3GzLoroprQYVoXsp61kIq_JC4";
+  EXPECT_LOG_CONTAINS("error", "failed to decrypt token",
+                      { EXPECT_EQ(decryptTokenForTest(unencrypted), unencrypted); });
+}
+
+/**
+ * Scenario: decryptToken is called with a ciphertext that, when AES-CBC decrypted under the
+ * filter's HMAC secret, passes the PKCS#7 padding check but produces bytes that are not valid
+ * HTTP header field values (e.g. null bytes, control characters).
+ *
+ * This is the "spurious success" path: PKCS#7 padding validation passes with ~1/256 probability
+ * when decrypting ciphertext under the wrong key, but the resulting "plaintext" is binary garbage.
+ * The same path is reachable by explicitly encrypting a binary string with the correct key.
+ *
+ * Before the fix: decryptToken returns the garbage plaintext, which later crashes Envoy with
+ * HeaderStringValidator::assertValid() when the value is used in a Cookie header.
+ * After the fix: decryptToken detects the invalid plaintext and returns the original ciphertext.
+ */
+TEST_F(OAuth2Test, DecryptTokenSpuriousSuccessReturnsOriginalInput) {
+  // Encrypt a string containing bytes that are not valid HTTP header field values
+  // (null byte, control chars, high bytes). This ciphertext decrypts correctly under the filter's
+  // key, so EVP_DecryptFinal_ex succeeds, but the resulting plaintext fails headerValueIsValid.
+  const std::string binary_plaintext("\x00\x01\x02\xff", 4);
+  const std::string ciphertext = encryptTokenForTest(binary_plaintext);
+  // Tighter assertion: match on the message that is unique to the new headerValueIsValid branch
+  // ("plaintext is not a valid header value"), rather than the generic "failed to decrypt token"
+  // prefix that is shared with the pre-existing EVP_DecryptFinal_ex failure path. A regression
+  // that re-introduced the crash via the old error path would emit a different message and fail
+  // this test.
+  EXPECT_LOG_CONTAINS("error", "plaintext is not a valid header value",
+                      { EXPECT_EQ(decryptTokenForTest(ciphertext), ciphertext); });
+}
+
+/**
+ * Scenario: A request arrives with a RefreshToken cookie whose AES-CBC decryption "succeeds"
+ * (PKCS#7 padding is valid) but produces binary garbage that is not a valid HTTP header value.
+ * This can happen when the HMAC secret has been rotated and the old ciphertext accidentally passes
+ * the padding check under the new key (~1/256 probability per token per request).
+ *
+ * Before the fix: decryptAndUpdateOAuthTokenCookies crashes with HeaderStringValidator::assertValid
+ * because the binary plaintext is StrJoin-ed into the Cookie header value.
+ * After the fix: decodeHeaders continues gracefully and returns a redirect to the OAuth server.
+ */
+TEST_F(OAuth2Test, GarbagePlaintextCookieDoesNotCrash) {
+  // Create a ciphertext that decrypts (under the filter's key) to binary bytes that are not valid
+  // HTTP header field values, simulating the spurious-success case.
+  const std::string binary_plaintext("\x00\x01\x02\xff", 4);
+  const std::string garbage_ciphertext = encryptTokenForTest(binary_plaintext);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=" + garbage_ciphertext},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Assert the redirect actually happened: filter took the redirect path (302 with Location)
+  // rather than crashing or returning a 401. We only check Status=="302" and Location is set
+  // to avoid brittleness from Set-Cookie values, nonce, and CSRF in the full header map.
+  // redirectToOAuthServer calls decoder_callbacks_->encodeHeaders with end_stream=true.
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(testing::Truly([](const Http::ResponseHeaderMap& headers) {
+                               return headers.getStatusValue() == "302" &&
+                                      !headers.getLocationValue().empty();
+                             }),
+                             true));
+
+  // Tighter assertion: match on the message that is unique to the new headerValueIsValid branch.
+  // A regression that re-introduced the crash via the old EVP_DecryptFinal_ex-failure path would
+  // emit a different message and cause this test to fail.
+  // Before the fix this line would trigger a crash (ENVOY_BUG assertion in HeaderStringValidator).
+  // After the fix it should complete without crashing and redirect to the OAuth server.
+  EXPECT_LOG_CONTAINS("error", "plaintext is not a valid header value", {
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, false));
+  });
+
+  // After the fix, the Cookie header should contain the original (valid ASCII) ciphertext,
+  // not the binary garbage that decryption produced.
+  auto cookies = Http::Utility::parseCookies(request_headers);
+  // Use ASSERT_TRUE first so the test fails clearly (not with out_of_range) if the cookie were
+  // dropped instead of preserved.
+  ASSERT_TRUE(cookies.contains("RefreshToken"));
+  EXPECT_EQ(cookies.at("RefreshToken"), garbage_ciphertext);
 }
 
 } // namespace Oauth2

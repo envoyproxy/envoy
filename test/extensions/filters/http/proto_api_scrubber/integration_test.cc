@@ -12,7 +12,6 @@
 #include "test/extensions/filters/http/proto_api_scrubber/scrubber_test.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/proto/apikeys.pb.h"
-#include "test/test_common/registry.h"
 
 #include "cel/expr/syntax.pb.h"
 #include "fmt/format.h"

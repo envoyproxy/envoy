@@ -55,7 +55,6 @@ envoy_extension_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:listen_socket_lib",
         "//source/extensions/io_socket/user_space:io_handle_impl_lib",
-        "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",

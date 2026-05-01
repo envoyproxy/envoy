@@ -3,7 +3,6 @@
 #include "source/extensions/access_loggers/dynamic_modules/access_log_config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"

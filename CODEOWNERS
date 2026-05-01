@@ -159,7 +159,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @paul-r-gall
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @paul-r-gall
-/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
+/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123 @kyessenov
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @kyessenov @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @yanavlasov
@@ -303,8 +303,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # health check
 /*/extensions/filters/http/health_check @mattklein123 @adisuissa
 # lua
-/*/extensions/filters/http/lua @mattklein123 @wbpcode
-/*/extensions/filters/common/lua @mattklein123 @wbpcode
+/*/extensions/filters/http/lua @mattklein123 @wbpcode @derekargueta
+/*/extensions/filters/common/lua @mattklein123 @wbpcode @derekargueta
 # rbac
 /*/extensions/filters/network/rbac @yangminzhu @yanavlasov
 /*/extensions/filters/http/rbac @yangminzhu @yanavlasov
@@ -477,6 +477,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
 /contrib/kafka/ @mattklein123 @adamkotwasinski
+/contrib/stat_sinks/wasm_filter/ @prashanthjos @UNOWNED
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui
 /contrib/mysql_proxy/ @rshriram @venilnoronha
 /contrib/postgres/protocol/ @agrawroh @cpakulski @jarupatj
@@ -496,5 +497,6 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/peak_ewma/load_balancing_policies/ @rroblak @UNOWNED
 /contrib/kae/ @Misakokoro @UNOWNED
 /contrib/istio @kyessenov @wbpcode @keithmattix @krinkinmu @zirain
+/contrib/reverse_tunnel_reporter @agrawroh @aakugan @basundhara-c
 
 /compat/openssl/ @tedjpoole @envoyproxy/envoy-openssl-sync

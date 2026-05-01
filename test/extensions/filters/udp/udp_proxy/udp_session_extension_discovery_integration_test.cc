@@ -10,7 +10,6 @@
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
 
 namespace Envoy {
 namespace {
