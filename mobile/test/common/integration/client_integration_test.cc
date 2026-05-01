@@ -1899,11 +1899,12 @@ TEST_P(ClientIntegrationTest, HttpsWithEarlyData) {
   // Wait for session ticket to be received (QUIC sends it after handshake)
   timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(500));
 
+  int old_upstream_cx_destroy = getCounterValue("cluster.base.upstream_cx_destroy");
   // Close connection to force reconnect and use session ticket
   ASSERT_TRUE(upstream_connection_->close());
   ASSERT_TRUE(upstream_connection_->waitForDisconnect());
   upstream_connection_.reset();
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_destroy", 1));
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_destroy", old_upstream_cx_destroy + 1));
 
   // Reset terminal callback for the second request.
   ConditionalInitializer terminal_callback;
