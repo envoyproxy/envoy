@@ -21,10 +21,10 @@ namespace Envoy {
 
 namespace Extensions {
 namespace Clusters {
-  class DnsSrvClusterTest;
-  class DnsSrvClusterTest_CreateClusterWithMinimalConfig_Test;
-}
-}
+class DnsSrvClusterTest;
+class DnsSrvClusterTest_CreateClusterWithMinimalConfig_Test;
+} // namespace Clusters
+} // namespace Extensions
 
 namespace Upstream {
 
@@ -82,7 +82,8 @@ private:
     const uint32_t weight_;
     const uint32_t dns_port_;
     std::list<Network::Address::InstanceConstSharedPtr> resolved_targets_;
-    Network::DnsResolver::ResolutionStatus resolve_status_{Network::DnsResolver::ResolutionStatus::Failure};
+    Network::DnsResolver::ResolutionStatus resolve_status_{
+        Network::DnsResolver::ResolutionStatus::Failure};
     std::string resolve_status_details_;
     Network::ActiveDnsQuery* active_dns_query_{nullptr};
   };

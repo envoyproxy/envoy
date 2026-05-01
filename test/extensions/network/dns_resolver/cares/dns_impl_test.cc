@@ -2006,9 +2006,9 @@ TEST_P(DnsImplTest, DnsSrvSyncResolutionFailure) {
   bool callback_called = false;
   DnsResolver::ResolutionStatus result_status = static_cast<DnsResolver::ResolutionStatus>(-1);
 
-  ActiveDnsQuery* query = resolver_->resolveSrv(
-      invalid_name,
-      [&](DnsResolver::ResolutionStatus status, absl::string_view, std::list<DnsResponse>&&) {
+  ActiveDnsQuery* query =
+      resolver_->resolveSrv(invalid_name, [&](DnsResolver::ResolutionStatus status,
+                                              absl::string_view, std::list<DnsResponse>&&) {
         result_status = status;
         callback_called = true;
       });

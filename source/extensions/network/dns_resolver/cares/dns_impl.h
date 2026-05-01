@@ -123,8 +123,7 @@ private:
   struct PendingSrvResolution : public PendingResolution {
     PendingSrvResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
                          const std::string& dns_name, DnsResolverImpl& parent)
-        : PendingResolution(parent, callback, dispatcher, channel,
-                            dns_name) {}
+        : PendingResolution(parent, callback, dispatcher, channel, dns_name) {}
 
     /**
      * c-ares ares_query_dnsrec() query callback for initiation.
