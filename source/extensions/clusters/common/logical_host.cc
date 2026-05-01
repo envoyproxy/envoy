@@ -108,6 +108,8 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
       std::make_shared<RealHostDescription>(address, shared_from_this()));
 }
 
+// TODO(jukie): once a per-host OOB address override is added, dial that
+// instead of the snapshotted data address.
 Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,

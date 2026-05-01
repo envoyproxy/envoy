@@ -602,6 +602,8 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
 }
 
 // Dial host data address; pass full address list for happy-eyeballs across IPv4/IPv6.
+// TODO(jukie): once a per-host OOB address override is added, replace
+// address() with a dedicated accessor.
 Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
