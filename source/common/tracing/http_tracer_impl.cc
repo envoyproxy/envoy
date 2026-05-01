@@ -240,6 +240,11 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
                                       const Config& tracing_config, bool upstream_span) {
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
+  span.setTag(Tracing::Tags::get().NetworkProtocolName, Tracing::Tags::get().Http);
+  if (stream_info.protocol().has_value()) {
+    span.setTag(Tracing::Tags::get().NetworkProtocolVersion,
+                Http::Utility::getProtocolVersionString(stream_info.protocol().value()));
+  }
 
   // Cluster info.
   if (const auto cluster_info = stream_info.upstreamClusterInfo()) {

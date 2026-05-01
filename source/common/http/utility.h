@@ -462,6 +462,13 @@ bool sanitizeConnectionHeader(Http::RequestHeaderMap& headers);
 const std::string& getProtocolString(const Protocol p);
 
 /**
+ * Get the version string for the given http protocol.
+ * @param protocol for which to return the version string representation.
+ * @return string representation of the protocol version.
+ */
+const std::string& getProtocolVersionString(const Protocol p);
+
+/**
  * Constructs the original URI sent from the client from
  * the request headers.
  * @param request headers from the original request

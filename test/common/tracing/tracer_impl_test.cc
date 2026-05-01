@@ -455,6 +455,9 @@ TEST_F(TracerImplTest, ChildGrpcUpstreamSpanTest) {
   EXPECT_CALL(*second_span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(*second_span,
+              setTag(Eq(Tracing::Tags::get().NetworkProtocolName), Eq(Tracing::Tags::get().Http)));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().NetworkProtocolVersion), Eq("2")));
+  EXPECT_CALL(*second_span,
               setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq(expected_ip + ":0")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip + ":0")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake cluster")));

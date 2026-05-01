@@ -1069,6 +1069,21 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   return EMPTY_STRING;
 }
 
+const std::string& Utility::getProtocolVersionString(const Protocol protocol) {
+  switch (protocol) {
+  case Protocol::Http10:
+    return Headers::get().ProtocolVersionStrings.Http10String;
+  case Protocol::Http11:
+    return Headers::get().ProtocolVersionStrings.Http11String;
+  case Protocol::Http2:
+    return Headers::get().ProtocolVersionStrings.Http2String;
+  case Protocol::Http3:
+    return Headers::get().ProtocolVersionStrings.Http3String;
+  }
+
+  return EMPTY_STRING;
+}
+
 std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,
                                       const absl::optional<uint32_t> max_path_length) {
   if (!request_headers.Path()) {

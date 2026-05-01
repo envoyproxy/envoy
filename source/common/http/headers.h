@@ -376,6 +376,13 @@ public:
   } ProtocolStrings;
 
   struct {
+    const std::string Http10String{"1.0"};
+    const std::string Http11String{"1.1"};
+    const std::string Http2String{"2"};
+    const std::string Http3String{"3"};
+  } ProtocolVersionStrings;
+
+  struct {
     const std::string ContentLengthTooSmall{"ContentLengthTooSmall"};
     const std::string ContentTypeNotAllowed{"ContentTypeNotAllowed"};
     const std::string EtagNotAllowed{"EtagNotAllowed"};

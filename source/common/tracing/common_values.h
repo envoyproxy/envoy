@@ -32,6 +32,8 @@ public:
   const std::string PeerPort = "peer.port";
   const std::string PeerService = "peer.service";
   const std::string SpanKind = "span.kind";
+  const std::string NetworkProtocolName = "network.protocol.name";
+  const std::string NetworkProtocolVersion = "network.protocol.version";
 
   // Non-standard tag names.
   const std::string DownstreamCluster = "downstream_cluster";
@@ -59,6 +61,7 @@ public:
 
   // Tag values.
   const std::string Canceled = "canceled";
+  const std::string Http = "http";
   const std::string Proxy = "proxy";
   const std::string True = "true";
 };
