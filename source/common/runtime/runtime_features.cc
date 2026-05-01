@@ -62,6 +62,7 @@ RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
 RUNTIME_GUARD(envoy_reloadable_features_happy_eyeballs_sort_non_ip_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_header_mutation_url_encode_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_health_check_after_cluster_warming);
+RUNTIME_GUARD(envoy_reloadable_features_hide_transport_failure_reason_in_response_body);
 RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http_async_client_retry_respect_buffer_limits);
@@ -145,6 +146,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 FALSE_RUNTIME_GUARD(envoy_restart_features_upstream_http_filters_with_tcp_proxy);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
+// TODO(doogie): Flip to true once QUIC session ticket support is stable.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_session_ticket_support);
 // TODO(#10646) change to true when UHV is sufficiently tested
 // For more information about Universal Header Validation, please see
 // https://github.com/envoyproxy/envoy/issues/10646

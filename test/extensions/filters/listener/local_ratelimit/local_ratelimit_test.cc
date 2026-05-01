@@ -6,7 +6,6 @@
 #include "source/extensions/filters/listener/local_ratelimit/local_ratelimit.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/stats/mocks.h"
 
 #include "absl/strings/str_format.h"
 #include "gmock/gmock.h"

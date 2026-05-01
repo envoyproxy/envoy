@@ -113,6 +113,60 @@ downstream_tls_context:
                             "TLS Client Authentication is not supported over QUIC");
 }
 
+// QuicServerTransportSocketFactory implements DownstreamTransportSocketFactory
+// only so it can be stored on a FilterChain, not to actually create transport
+// sockets — QUIC connections use the QUICHE stack directly via
+// EnvoyQuicServerSession. Verify createDownstreamTransportSocket() panics if
+// accidentally called.
+TEST_F(QuicServerTransportSocketFactoryConfigTest, CreateDownstreamTransportSocketPanics) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+      Network::DownstreamTransportSocketFactoryPtr);
+  EXPECT_DEATH(transport_socket_factory->createDownstreamTransportSocket(), "not implemented");
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, GetSessionTicketConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+      Network::DownstreamTransportSocketFactoryPtr);
+  auto& quic_factory = static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory);
+  auto config = quic_factory.getSessionTicketConfig();
+  // Default config has no session ticket keys and doesn't disable resumption.
+  EXPECT_FALSE(config.has_keys);
+  EXPECT_FALSE(config.disable_stateless_resumption);
+  EXPECT_FALSE(config.handles_session_resumption);
+}
+
 class QuicClientTransportSocketFactoryTest : public testing::Test {
 public:
   QuicClientTransportSocketFactoryTest() {

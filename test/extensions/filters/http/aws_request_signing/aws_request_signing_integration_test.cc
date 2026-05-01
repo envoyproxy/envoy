@@ -1,7 +1,6 @@
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"

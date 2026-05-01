@@ -7,7 +7,6 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"

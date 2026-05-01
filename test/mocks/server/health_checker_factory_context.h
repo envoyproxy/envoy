@@ -6,7 +6,6 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"

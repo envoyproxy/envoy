@@ -6,9 +6,7 @@
 #include "source/extensions/bootstrap/wasm/config.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 

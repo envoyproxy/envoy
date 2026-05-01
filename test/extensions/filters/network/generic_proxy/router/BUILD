@@ -22,7 +22,6 @@ envoy_cc_test(
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",
         "//test/extensions/filters/network/generic_proxy/mocks:route_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -41,7 +40,6 @@ envoy_cc_test(
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",
         "//test/extensions/filters/network/generic_proxy/mocks:route_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )
