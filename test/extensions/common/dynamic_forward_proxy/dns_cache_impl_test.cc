@@ -2536,7 +2536,7 @@ TEST_F(DnsCacheImplTest, LoadDnsCacheEntryRaceWithInlineResolve) {
         callback(Network::DnsResolver::ResolutionStatus::Completed, "",
                  TestUtility::makeDnsResponse({"10.0.0.1"}));
         // returns nullptr instead of an active query.
-        return nullptr; 
+        return nullptr;
       }));
 
   EXPECT_CALL(*timeout_timer, disableTimer());
@@ -2550,8 +2550,8 @@ TEST_F(DnsCacheImplTest, LoadDnsCacheEntryRaceWithInlineResolve) {
   EXPECT_CALL(*refresh_timer, enableTimer(std::chrono::milliseconds(dns_ttl_), _));
 
   // Because of the inline resolve, onLoadDnsCacheComplete is posted as a deferred callback inside
-  // loadDnsCacheEntry, instead of being called later in finishResolve. 
-  // This is the "race" that we're testing for: the callback is posted before the handle is inserted into pending_resolutions_. 
+  // loadDnsCacheEntry, instead of being called later in finishResolve.
+  // This is the "race" that we're testing for: the callback is posted before the handle is inserted into pending_resolutions_.
   // L171-183 detects this case and posts a deferred onHostMapUpdate, which calls onLoadDnsCacheComplete with the resolved host info.
   EXPECT_CALL(callbacks,
               onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
@@ -2587,7 +2587,7 @@ TEST_F(DnsCacheImplTest, LoadDnsCacheEntryNoRaceWithAsyncResolve) {
 
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
   EXPECT_NE(result.handle_, nullptr);
-  EXPECT_EQ(absl::nullopt, result.host_info_); 
+  EXPECT_EQ(absl::nullopt, result.host_info_);
   checkStats(1, 0, 0, 0, 1, 0, 1);
 
   // Now fire resolve_cb to complete the async resolution.
@@ -2602,7 +2602,7 @@ TEST_F(DnsCacheImplTest, LoadDnsCacheEntryNoRaceWithAsyncResolve) {
                                       DnsHostInfoEquals("10.0.0.1:80", "foo.com", false),
                                       Network::DnsResolver::ResolutionStatus::Completed));
   EXPECT_CALL(*refresh_timer, enableTimer(std::chrono::milliseconds(dns_ttl_), _));
-  
+
   resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"10.0.0.1"}));
   checkStats(1, 1, 0, 1, 1, 0, 1);
