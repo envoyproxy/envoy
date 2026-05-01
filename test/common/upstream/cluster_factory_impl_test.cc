@@ -19,13 +19,12 @@
 #include "test/integration/clusters/cluster_factory_config.pb.validate.h"
 #include "test/integration/clusters/custom_static_cluster.h"
 #include "test/mocks/common.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/registry.h"
 
 using testing::NiceMock;
 

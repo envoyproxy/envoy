@@ -7,7 +7,6 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/server/instance.h"
