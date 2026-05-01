@@ -6,4 +6,4 @@ set -e -o pipefail
 
 echo "Building devcontainer: ${BUILD_CONTAINER}"
 
-sed "s|%%ENVOY_BUILD_IMAGE%%|${BUILD_CONTAINER}|g" .devcontainer/Dockerfile.in > .devcontainer/Dockerfile
+sed -E "s|^FROM .*|FROM ${BUILD_CONTAINER}|" .devcontainer/Dockerfile.in > .devcontainer/Dockerfile
