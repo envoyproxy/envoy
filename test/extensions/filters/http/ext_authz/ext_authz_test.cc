@@ -20,6 +20,7 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
@@ -52,11 +53,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
-
-// Matcher to convert a Buffer::Instance to its string representation for composition.
-MATCHER_P(BufferString, m, "") {
-  return testing::ExplainMatchResult(m, arg->toString(), result_listener);
-}
 
 // Matcher to parse a buffer string into a CheckRequest proto.
 MATCHER_P(AsCheckRequest, m, "") {
