@@ -5669,10 +5669,10 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
       .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
 
   // Mock the sendRaw call with matcher-based validation for the gRPC authorization check.
-  EXPECT_CALL(*mock_raw_grpc_client,
-              sendRaw(_, _,
-                      BufferString(AsCheckRequest(HasContextExtension("test_key", "test_value"))),
-                      _, _, _))
+  EXPECT_CALL(
+      *mock_raw_grpc_client,
+      sendRaw(_, _, BufferPtrString(AsCheckRequest(HasContextExtension("test_key", "test_value"))),
+              _, _, _))
       .WillOnce([&](absl::string_view /*service_full_name*/, absl::string_view /*method_name*/,
                     Buffer::InstancePtr&& /*request*/, Grpc::RawAsyncRequestCallbacks& callbacks,
                     Tracing::Span& parent_span,

@@ -99,6 +99,10 @@ MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
 }
 
 MATCHER_P(BufferString, m, "") {
+  return testing::ExplainMatchResult(m, arg.toString(), result_listener);
+}
+
+MATCHER_P(BufferPtrString, m, "") {
   return testing::ExplainMatchResult(m, arg->toString(), result_listener);
 }
 
