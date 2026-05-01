@@ -30,8 +30,8 @@ namespace {
 using ::nlohmann::json;
 namespace McpConstants = Envoy::Extensions::Filters::Common::Mcp::McpConstants;
 
-constexpr uint32_t DEFAULT_MAX_REQUEST_BODY_SIZE = 65536;
-constexpr uint32_t DEFAULT_MAX_RESPONSE_BODY_SIZE = 65536;
+constexpr uint32_t DEFAULT_MAX_REQUEST_BODY_SIZE = 1024 * 64;    // 64KB
+constexpr uint32_t DEFAULT_MAX_RESPONSE_BODY_SIZE = 1024 * 1024; // 1MB
 
 bool isMcpProtocolVersionSupported(absl::string_view protocol_version) {
   static const absl::NoDestructor<absl::flat_hash_set<absl::string_view>> supported_mcp_versions({
@@ -195,11 +195,6 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  const uint32_t max_request_body_size = config_->maxRequestBodySize();
-  if (max_request_body_size > 0 && max_request_body_size > decoder_callbacks_->bufferLimit()) {
-    decoder_callbacks_->setBufferLimit(max_request_body_size);
-  }
-
   return Http::FilterHeadersStatus::StopIteration;
 }
 
@@ -220,7 +215,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
   }
 
   if (!end_stream) {
-    return Http::FilterDataStatus::StopIterationAndWatermark;
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   const size_t total_size = request_body_.length();
@@ -274,11 +269,6 @@ Http::FilterHeadersStatus McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseH
     return Http::FilterHeadersStatus::Continue;
   }
 
-  const uint32_t max_response_body_size = config_->maxResponseBodySize();
-  if (max_response_body_size > 0 && max_response_body_size > encoder_callbacks_->bufferLimit()) {
-    encoder_callbacks_->setBufferLimit(max_response_body_size);
-  }
-
   return Http::FilterHeadersStatus::StopIteration;
 }
 
@@ -312,7 +302,7 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   }
 
   if (!end_stream) {
-    return Http::FilterDataStatus::StopIterationAndWatermark;
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   encodeJsonRpcData(encoder_callbacks_->responseHeaders());

@@ -747,7 +747,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolListRewritePathForRequestAndTranslateRes
   // Assumes the request body is split into different parts.
   Buffer::OwnedImpl request_first_body(R"json({"jsonrpc":"2.0")json");
   EXPECT_EQ(filter_->decodeData(request_first_body, /*end_stream=*/false),
-            Http::FilterDataStatus::StopIterationAndWatermark);
+            Http::FilterDataStatus::StopIterationNoBuffer);
   Buffer::OwnedImpl request_second_body(R"json(,"id":12,"method":"tools/list"})json");
   EXPECT_EQ(filter_->decodeData(request_second_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
@@ -771,7 +771,7 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolListRewritePathForRequestAndTranslateRes
           R"json({"jsonrpc":"2.0","id":12,"result":{"tools":[{"name":"google.api.CreateApiKey"}]}})json"));
 }
 
-TEST_F(McpJsonRestBridgeFilterTest, EncodeDataReturnsStopIterationAndWatermarkWhenNotEndOfStream) {
+TEST_F(McpJsonRestBridgeFilterTest, EncodeDataReturnsStopIterationNoBufferWhenNotEndOfStream) {
   request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
   Buffer::OwnedImpl request_body(
       R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}}}})json");
@@ -789,7 +789,7 @@ TEST_F(McpJsonRestBridgeFilterTest, EncodeDataReturnsStopIterationAndWatermarkWh
             Http::FilterHeadersStatus::StopIteration);
   Buffer::OwnedImpl first_chunk("part1");
   EXPECT_EQ(filter_->encodeData(first_chunk, /*end_stream=*/false),
-            Http::FilterDataStatus::StopIterationAndWatermark);
+            Http::FilterDataStatus::StopIterationNoBuffer);
   EXPECT_TRUE(first_chunk.toString().empty());
   Buffer::OwnedImpl second_chunk("part2");
   EXPECT_EQ(filter_->encodeData(second_chunk, /*end_stream=*/true),
@@ -1175,7 +1175,6 @@ TEST_F(McpJsonRestBridgeFilterTest, RequestBodyExceedsLimitReturnsError) {
 
   request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
 
-  EXPECT_CALL(decoder_callbacks_, setBufferLimit(10));
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
   EXPECT_CALL(decoder_callbacks_,
@@ -1216,7 +1215,6 @@ TEST_F(McpJsonRestBridgeFilterTest, ResponseBodyExceedsLimitReturnsError) {
   EXPECT_EQ(filter_->decodeData(request_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
 
-  EXPECT_CALL(encoder_callbacks_, setBufferLimit(10));
   EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
   EXPECT_CALL(
