@@ -1,0 +1,10 @@
+bootstrap_extensions:
+- name: envoy_test.bootstrap.foo
+  typed_config:
+    "@type": type.googleapis.com/test.common.config.DummyConfig
+    a: foo
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9000

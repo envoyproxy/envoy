@@ -4,7 +4,6 @@
 #include "source/extensions/network/dns_resolver/hickory/hickory_dns_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/api/mocks.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"

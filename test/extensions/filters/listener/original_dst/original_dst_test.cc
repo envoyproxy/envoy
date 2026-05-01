@@ -98,6 +98,20 @@ TEST_F(OriginalDstTest, InternalFilterState) {
   EXPECT_EQ(remote->asString(), socket_.connectionInfoProvider().remoteAddress()->asString());
 }
 
+TEST_F(OriginalDstTest, InternalFilterStateNullAddress) {
+  expectInternalAddress();
+  cb_.filter_state_.setData("envoy.filters.listener.original_dst.local_ip",
+                            std::make_shared<Network::AddressObject>(nullptr),
+                            StreamInfo::FilterState::StateType::Mutable,
+                            StreamInfo::FilterState::LifeSpan::Connection);
+  cb_.filter_state_.setData("envoy.filters.listener.original_dst.remote_ip",
+                            std::make_shared<Network::AddressObject>(nullptr),
+                            StreamInfo::FilterState::StateType::Mutable,
+                            StreamInfo::FilterState::LifeSpan::Connection);
+  filter_.onAccept(cb_);
+  EXPECT_FALSE(socket_.connectionInfoProvider().localAddressRestored());
+}
+
 } // namespace
 } // namespace OriginalDst
 } // namespace ListenerFilters

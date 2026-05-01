@@ -59,7 +59,7 @@ jobs:
             && ! fromJSON(inputs.caches).bazel[format('{0}-{1}', inputs.output-base, inputs.arch)])
       }}
     steps:
-    - uses: envoyproxy/toolshed/actions/bind-mounts@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/bind-mounts@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       with:
         mounts: |
           - src: /mnt/workspace
@@ -73,9 +73,9 @@ jobs:
             target: /build
             chown: "runner:docker"
     - name: Free diskspace
-      uses: envoyproxy/toolshed/actions/diskspace@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+      uses: envoyproxy/toolshed/actions/diskspace@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       if: inputs.arch == 'x64' && github.event.repository.private
-    - uses: envoyproxy/toolshed/actions/github/checkout@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/github/checkout@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -83,14 +83,14 @@ jobs:
         config: |
           fetch-depth: 1
 
-    - uses: envoyproxy/toolshed/actions/appauth@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/appauth@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       id: appauth
       name: Appauth (mutex lock)
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
 
-    - uses: envoyproxy/toolshed/actions/cache/prime@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/cache/prime@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       id: bazel-cache
       name: Prime Bazel cache
       with:
@@ -109,9 +109,9 @@ jobs:
           cd /source
           export BAZEL_BUILD_EXTRA_OPTIONS="--config=ci --config=rbe"
           export ENVOY_CACHE_ROOT=/build/bazel_root
-          export ENVOY_CACHE_OUTPUT_BASE="${{ inputs.output-base }}"
-          export ENVOY_CACHE_TARGETS=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
-          export ENVOY_CACHE_WORKING_DIR="${{ inputs.working-dir }}"
+          export ENVOY_CACHE_OUTPUT_BASE="${INPUT_OUTPUT_BASE}"
+          export ENVOY_CACHE_TARGETS=$(echo "${INPUT_TARGETS}" | sed 's/ / + /g')
+          export ENVOY_CACHE_WORKING_DIR="${INPUT_WORKING_DIR}"
           # ironically the repository_cache is just about the only thing you dont want to cache
           export ENVOY_REPOSITORY_CACHE=/tmp/cache
           ./ci/do_ci.sh cache-create
@@ -128,3 +128,6 @@ jobs:
         run-as-sudo: false
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        INPUT_OUTPUT_BASE: ${{ inputs.output-base }}
+        INPUT_TARGETS: ${{ inputs.targets }}
+        INPUT_WORKING_DIR: ${{ inputs.working-dir }}

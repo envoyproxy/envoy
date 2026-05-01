@@ -32,7 +32,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",

@@ -1,3 +1,4 @@
+#include <atomic>
 #include <thread>
 
 #include "source/common/event/timer_impl.h"
@@ -12,6 +13,21 @@
 
 namespace Envoy {
 namespace SharedPool {
+
+namespace {
+struct Counted {
+  explicit Counted(int v) : v_(v) { ++live; }
+  Counted(const Counted& o) : v_(o.v_) { ++live; }
+  Counted(Counted&& o) noexcept : v_(o.v_) { ++live; }
+  ~Counted() { --live; }
+  bool operator==(const Counted& o) const { return v_ == o.v_; }
+  int v_;
+  inline static std::atomic<int> live{0};
+};
+struct CountedHash {
+  size_t operator()(const Counted& c) const { return static_cast<size_t>(c.v_); }
+};
+} // namespace
 
 class SharedPoolTest : public testing::Test {
 protected:
@@ -220,6 +236,43 @@ TEST_F(SharedPoolTest, HashCollision) {
   }
 
   EXPECT_EQ(0, pool->poolSize());
+}
+
+TEST_F(SharedPoolTest, DispatcherTeardownDropsCrossThreadDeleteFreesObject) {
+  ASSERT_EQ(0, Counted::live.load());
+
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  std::vector<Event::PostCb> posted_cbs;
+  EXPECT_CALL(dispatcher, post(testing::_)).WillRepeatedly(testing::Invoke([&](Event::PostCb cb) {
+    posted_cbs.push_back(std::move(cb));
+  }));
+
+  auto pool = std::make_shared<ObjectSharedPool<Counted, CountedHash>>(dispatcher);
+  auto obj = pool->getObject(Counted{7});
+  ASSERT_EQ(1, Counted::live.load());
+  ASSERT_TRUE(posted_cbs.empty());
+
+  // Drop the last shared_ptr from a different thread, triggering the cross-thread delete path.
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+  auto thread = thread_factory.createThread([&]() { obj.reset(); });
+  thread->join();
+
+  // One callback should have been posted (the deferred delete).
+  ASSERT_EQ(1u, posted_cbs.size());
+  // The object is still alive — held by the captured unique_ptr inside the posted lambda.
+  EXPECT_EQ(1, Counted::live.load());
+
+  // Simulate dispatcher teardown: drop the queued callback without running it.
+  // The captured unique_ptr destructor must free the object.
+  posted_cbs.clear();
+
+  // Regression assertion: prior to the fix, the raw T* was captured by value and the
+  // callback destructor could not free it, causing a leak (live would still be 1).
+  EXPECT_EQ(0, Counted::live.load());
+
+  // Release the pool; the object is already destroyed, so this is a no-op for the counter.
+  pool.reset();
+  EXPECT_EQ(0, Counted::live.load());
 }
 
 } // namespace SharedPool

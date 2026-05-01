@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
@@ -12,6 +13,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
+#include "envoy/extensions/early_data/v3/default_early_data_policy.pb.h"
 
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
@@ -228,6 +230,16 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
 
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableEarlyData(bool early_data_on) {
+  enable_early_data_ = early_data_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableScone(bool enable) {
+  scone_enabled_ = enable;
   return *this;
 }
 
@@ -578,6 +590,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   auto* backoff = route_to->mutable_retry_policy()->mutable_retry_back_off();
   backoff->mutable_base_interval()->set_nanos(250000000);
   backoff->mutable_max_interval()->set_seconds(60);
+
+  if (!enable_early_data_) {
+    auto* early_data = route_to->mutable_early_data_policy();
+    early_data->set_name("envoy.route.early_data_policy.default");
+    ::envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
+    early_data->mutable_typed_config()->PackFrom(config);
+  }
 
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
@@ -953,6 +972,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       }
     }
 
+    if (scone_enabled_) {
+      quic_protocol_options->mutable_enable_scone()->set_value(true);
+    }
+
     if (use_quic_platform_packet_writer_ || enable_quic_connection_migration_) {
       envoy_mobile::extensions::quic_packet_writer::platform::QuicPlatformPacketWriterConfig
           writer_config;
@@ -1119,7 +1142,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 #endif // ENVOY_MOBILE_XDS
 
-  envoy::config::listener::v3::ApiListenerManager api;
+  envoy::config::bootstrap::v3::ApiListenerManager api;
   auto* listener_manager = bootstrap->mutable_listener_manager();
   listener_manager->mutable_typed_config()->PackFrom(api);
   listener_manager->set_name("envoy.listener_manager_impl.api");

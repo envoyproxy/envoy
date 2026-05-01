@@ -700,8 +700,12 @@ bool ProcessorState::isLastResponseAfterBodyResp(bool eos_seen_in_body) const {
   return false;
 }
 
+// Return the status of onData() call for STREAMED and FULL_DUPLEX_STREAMED mode.
 Http::FilterDataStatus ProcessorState::getBodyCallbackResultInStreamedMode(bool end_stream) {
-  if (end_stream || callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+  const bool return_stop_iteration =
+      (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_return_stop_iteration") ||
+       end_stream || callbackState() == ProcessorState::CallbackState::HeadersCallback);
+  if (return_stop_iteration) {
     setPaused(true);
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }

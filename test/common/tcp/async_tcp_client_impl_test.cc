@@ -1,7 +1,6 @@
 #include "source/common/tcp/async_tcp_client_impl.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"

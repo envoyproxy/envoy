@@ -180,8 +180,6 @@ protected:
   bool observability_mode_ = false;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
-  FilterConfigSharedPtr config_;
-  std::shared_ptr<Filter> filter_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<::Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   testing::NiceMock<::Envoy::Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -198,6 +196,8 @@ protected:
   envoy::config::core::v3::Metadata dynamic_metadata_;
   testing::NiceMock<Network::MockConnection> connection_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  FilterConfigSharedPtr config_;
+  std::shared_ptr<Filter> filter_;
   TestScopedRuntime scoped_runtime_;
 };
 

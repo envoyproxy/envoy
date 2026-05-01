@@ -57,7 +57,7 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 12]
+// [#next-free-field: 14]
 message QuicProtocolOptions {
   // Config for QUIC connection migration across network interfaces, i.e. cellular to WIFI, upon
   // network change events from the platform, i.e. the current network gets
@@ -173,6 +173,17 @@ message QuicProtocolOptions {
   // If absent, the feature will be disabled.
   // [#not-implemented-hide:]
   ConnectionMigrationSettings connection_migration = 11;
+
+  // Timeout for a QUIC connection to schedule memory reduction callback when the network has been idle for a while.
+  // This value should be smaller than the idle timeout to take effect.
+  // If not specified, memory reduction is set to infinite by QUIC connection (disabled).
+  google.protobuf.Duration memory_reduction_timeout = 12
+      [(validate.rules).duration = {gte {seconds: 1}}];
+
+  // If true, the QUIC connection will signal support for `SCONE <https://datatracker.ietf.org/doc/draft-ietf-scone-protocol/>`_ (Standard
+  // Communication with Network Elements) and process SCONE packets.
+  // If not present, the QUICHE default behavior will be used.
+  google.protobuf.BoolValue enable_scone = 13;
 }
 
 message UpstreamHttpProtocolOptions {
@@ -541,7 +552,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -774,6 +785,12 @@ message Http2ProtocolOptions {
   //   request failures.
   google.protobuf.UInt32Value max_header_field_size_kb = 19
       [(validate.rules).uint32 = {lte: 256 gte: 64}];
+
+  // Whether to disallow obsolete text for oghttp2 in header field values.
+  // If not set, it defaults to false.
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
+  // obs-text = %x80-FF
+  google.protobuf.BoolValue disallow_obs_text = 20;
 }
 
 // [#not-implemented-hide:]
@@ -785,7 +802,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -827,6 +844,12 @@ message Http3ProtocolOptions {
   // Disables connection level flow control for HTTP/3 streams. This is useful in situations where the streams share the same connection
   // but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
   bool disable_connection_flow_control_for_streams = 8;
+
+  // Whether to disallow obsolete text in header field values.
+  // If not set, it defaults to true for alignment with current behavior.
+  // As defined in RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
+  // an obs-text character is a character in the range %x80-FF
+  google.protobuf.BoolValue disallow_obs_text = 9;
 }
 
 // A message to control transformations to the :scheme header

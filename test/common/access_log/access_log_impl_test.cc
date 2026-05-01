@@ -17,8 +17,6 @@
 #include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
