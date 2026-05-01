@@ -35,10 +35,12 @@ jobs:
     permissions:
       actions: read
       contents: read
+      checks: write
     steps:
     - uses: envoyproxy/toolshed/actions/jq@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       name: Incoming data
       id: needs
+      if: always()
       with:
         input: |
           check_name: ${{ fromJSON(inputs.needs).load.outputs.check-name }}
@@ -89,6 +91,7 @@ jobs:
 
     - uses: envoyproxy/toolshed/actions/jq@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       name: Print summary
+      if: always()
       with:
         input: ${{ toJSON(steps.needs.outputs.value).summary-title }}
         filter: |
@@ -98,18 +101,31 @@ jobs:
     - uses: envoyproxy/toolshed/actions/appauth@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       name: Appauth
       id: appauth
+      if: always()
+      continue-on-error: true
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
     - uses: envoyproxy/toolshed/actions/github/checks@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       name: Update check
+      if: always() && steps.appauth.outputs.token != ''
       with:
         action: update
         checks: ${{ toJSON(fromJSON(steps.needs.outputs.value).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
+    # Last-resort fallback: mark the check using the workflow's built-in token
+    # so the check never stays stuck in queued/in_progress when appauth is failing.
+    - uses: envoyproxy/toolshed/actions/github/checks@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+      name: Update check (fallback)
+      if: always() && steps.appauth.outputs.token == ''
+      with:
+        action: update
+        checks: ${{ toJSON(fromJSON(steps.needs.outputs.value).checks) }}
+        token: ${{ github.token }}
+
     # This is necessary to ensure that any retests have their checks updated
     - name: Fail the job
-      if: ${{ fromJSON(steps.needs.outputs.value).conclusion != 'success' }}
+      if: always() && fromJSON(steps.needs.outputs.value).conclusion != 'success'
       run: |
         exit 1
