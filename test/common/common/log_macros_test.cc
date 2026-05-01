@@ -499,4 +499,18 @@ TEST(FineGrainLog, Context) {
   EXPECT_EQ(Logger::Context::getFineGrainLogFormat(), "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v");
 }
 
+class TestFlushLoggable : public Logger::Loggable<Logger::Id::main> {
+public:
+  void doFlush() { ENVOY_FLUSH_LOG(); }
+};
+
+TEST(FineGrainLog, envoyFlushLogMacro) {
+  Logger::Context::enableFineGrainLogger();
+  TestFlushLoggable loggable;
+  loggable.doFlush();
+
+  Logger::Context::disableFineGrainLogger();
+  loggable.doFlush();
+}
+
 } // namespace Envoy

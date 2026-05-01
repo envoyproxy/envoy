@@ -885,6 +885,24 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormatMultipleJFlags) {
   object.logTaggedMessageWithPreCreatedTags();
 }
 
+TEST(LoggerContextTest, getFineGrainLogFormatAndLevel) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Context logging_context{spdlog::level::warn, "[[%n]] %v", lock, false};
+  Context::enableFineGrainLogger();
+
+  EXPECT_EQ(Context::getFineGrainLogFormat(), "[[%n]] %v");
+  EXPECT_EQ(Context::getFineGrainDefaultLevel(), spdlog::level::warn);
+  EXPECT_TRUE(Context::useFineGrainLogger());
+}
+
+TEST(LoggerRegistryTest, initializedAndSinkPattern) {
+  // Exercise Registry::initialized()
+  EXPECT_TRUE(Registry::initialized());
+
+  // Exercise DelegatingLogSink::set_pattern
+  Registry::getSink()->set_pattern("%v");
+}
+
 } // namespace
 } // namespace Logger
 } // namespace Envoy

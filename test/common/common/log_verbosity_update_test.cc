@@ -357,4 +357,92 @@ TEST(FineGrainLog, listFineGrainLoggersExcludesGroups) {
   EXPECT_THAT(loggers, testing::Not(HasSubstr(group_key)));
 }
 
+TEST(FineGrainLog, getFineGrainLogEntryForFlush) {
+  Logger::Context::enableFineGrainLogger();
+
+  // Initialize logger for this file
+  std::atomic<spdlog::logger*> flogger{nullptr};
+  getFineGrainLogContext().initFineGrainLogger(__FILE__, "", flogger);
+
+  // Test with empty name
+  SpdLoggerSharedPtr p1 = getFineGrainLogContext().getFineGrainLogEntryForFlush(__FILE__, "");
+  EXPECT_NE(p1, nullptr);
+  EXPECT_EQ(p1->name(), __FILE__);
+
+  // Test with LoggerGroup
+  LoggerGroup group("test_group");
+  SpdLoggerSharedPtr p2 = getFineGrainLogContext().getFineGrainLogEntryForFlush(__FILE__, group);
+  EXPECT_EQ(p2, nullptr);
+
+  // Now create it and check again
+  std::atomic<spdlog::logger*> flogger2{nullptr};
+  getFineGrainLogContext().initFineGrainLogger(__FILE__, "test_group", flogger2);
+  p2 = getFineGrainLogContext().getFineGrainLogEntryForFlush(__FILE__, group);
+  EXPECT_NE(p2, nullptr);
+  EXPECT_EQ(p2->name(), absl::StrCat(__FILE__, ":test_group"));
+}
+
+TEST(FineGrainLog, initWithDispatch) {
+  std::atomic<spdlog::logger*> flogger{nullptr};
+
+  // Test initWithDispatch with no extra args
+  getFineGrainLogContext().initWithDispatch(__FILE__, flogger);
+  EXPECT_NE(flogger.load(), nullptr);
+
+  // Test initWithDispatch with LoggerGroup
+  std::atomic<spdlog::logger*> flogger2{nullptr};
+  LoggerGroup group("dispatch_group", "[%n] %v");
+  getFineGrainLogContext().initWithDispatch(__FILE__, flogger2, group);
+  EXPECT_NE(flogger2.load(), nullptr);
+  EXPECT_EQ(flogger2.load()->name(), absl::StrCat(__FILE__, ":dispatch_group"));
+
+  // Test initWithDispatch with something else
+  std::atomic<spdlog::logger*> flogger3{nullptr};
+  getFineGrainLogContext().initWithDispatch(__FILE__, flogger3, "not a group");
+  EXPECT_NE(flogger3.load(), nullptr);
+  EXPECT_EQ(flogger3.load()->name(), __FILE__);
+}
+
+TEST(FineGrainLog, removeFineGrainLogEntryForTest) {
+  std::atomic<spdlog::logger*> flogger{nullptr};
+  getFineGrainLogContext().initFineGrainLogger("to_be_removed", "", flogger);
+  EXPECT_NE(getFineGrainLogContext().getFineGrainLogEntry("to_be_removed"), nullptr);
+
+  getFineGrainLogContext().removeFineGrainLogEntryForTest("to_be_removed");
+  EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry("to_be_removed"), nullptr);
+}
+
+TEST(FineGrainLog, setAllFineGrainLoggers) {
+  getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::warn);
+  std::string list = getFineGrainLogContext().listFineGrainLoggers();
+  EXPECT_THAT(list, HasSubstr("warn"));
+
+  FineGrainLogLevelMap levels = getFineGrainLogContext().getAllFineGrainLogLevelsForTest();
+  EXPECT_FALSE(levels.empty());
+}
+
+TEST(FineGrainLog, safeFileNameMatchTricky) {
+  EXPECT_TRUE(FineGrainLogContext::safeFileNameMatch("", ""));
+  EXPECT_FALSE(FineGrainLogContext::safeFileNameMatch("", "a"));
+  EXPECT_TRUE(FineGrainLogContext::safeFileNameMatch("*", ""));
+  EXPECT_TRUE(FineGrainLogContext::safeFileNameMatch("**", ""));
+  EXPECT_FALSE(FineGrainLogContext::safeFileNameMatch("a", ""));
+  EXPECT_TRUE(FineGrainLogContext::safeFileNameMatch("a*", "a"));
+  EXPECT_TRUE(FineGrainLogContext::safeFileNameMatch("*a", "a"));
+  EXPECT_FALSE(FineGrainLogContext::safeFileNameMatch("*a", "b"));
+}
+
+TEST(FineGrainLog, updateVerbositySettingInvalidLevelAndOptimization) {
+  // Test invalid level
+  getFineGrainLogContext().updateVerbositySetting({{"pattern", 10}});
+
+  // Test optimization in appendVerbosityLogUpdate
+  std::atomic<spdlog::logger*> flogger{nullptr};
+  getFineGrainLogContext().initFineGrainLogger("any", "", flogger);
+  getFineGrainLogContext().updateVerbositySetting({{"*", 1}, {"subpattern", 2}});
+
+  FineGrainLogLevelMap levels = getFineGrainLogContext().getAllFineGrainLogLevelsForTest();
+  EXPECT_EQ(levels["any"], spdlog::level::debug); // level 1 is debug
+}
+
 } // namespace Envoy
