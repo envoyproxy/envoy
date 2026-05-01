@@ -19,11 +19,11 @@ Resource createInitialResource(absl::string_view service_name,
   Resource resource{};
 
   // Creates initial resource with the static service.name and telemetry.sdk.* attributes.
-  if (options.set_service_name_resource_attribute_ && !service_name.empty()) {
+  if (options.set_service_name_resource_attribute && !service_name.empty()) {
     resource.attributes_[kServiceNameKey] = service_name;
   }
 
-  if (options.set_telemetry_sdk_resource_attributes_) {
+  if (options.set_telemetry_sdk_resource_attributes) {
     resource.attributes_[kTelemetrySdkLanguageKey] = kDefaultTelemetrySdkLanguage;
     resource.attributes_[kTelemetrySdkNameKey] = kDefaultTelemetrySdkName;
     resource.attributes_[kTelemetrySdkVersionKey] = Envoy::VersionInfo::version();

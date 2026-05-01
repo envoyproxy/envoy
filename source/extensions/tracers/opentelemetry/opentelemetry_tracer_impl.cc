@@ -77,15 +77,10 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
   auto& factory_context = context.serverFactoryContext();
 
   ResourceProviderOptions options;
-  if (opentelemetry_config.has_set_telemetry_sdk_resource_attributes()) {
-    options.set_telemetry_sdk_resource_attributes_ =
-        opentelemetry_config.set_telemetry_sdk_resource_attributes().value();
-  }
-
-  if (opentelemetry_config.has_set_service_name_resource_attribute()) {
-    options.set_service_name_resource_attribute_ =
-        opentelemetry_config.set_service_name_resource_attribute().value();
-  }
+  options.set_telemetry_sdk_resource_attributes = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      opentelemetry_config, set_telemetry_sdk_resource_attributes, true);
+  options.set_service_name_resource_attribute = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      opentelemetry_config, set_service_name_resource_attribute, true);
 
   Resource resource = resource_provider.getResource(
       opentelemetry_config.resource_detectors(), context.serverFactoryContext(),

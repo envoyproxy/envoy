@@ -116,7 +116,7 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfiguredAttributesDisabled) {
 
   ResourceProviderImpl resource_provider;
   ResourceProviderOptions options;
-  options.set_telemetry_sdk_resource_attributes_ = false;
+  options.set_telemetry_sdk_resource_attributes = false;
   Resource resource = resource_provider.getResource(opentelemetry_config.resource_detectors(),
                                                     server_factory_context_,
                                                     opentelemetry_config.service_name(), options);
@@ -142,7 +142,7 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfiguredServiceNameDisabled) {
 
   ResourceProviderImpl resource_provider;
   ResourceProviderOptions options;
-  options.set_service_name_resource_attribute_ = false;
+  options.set_service_name_resource_attribute = false;
   Resource resource = resource_provider.getResource(opentelemetry_config.resource_detectors(),
                                                     server_factory_context_,
                                                     opentelemetry_config.service_name(), options);

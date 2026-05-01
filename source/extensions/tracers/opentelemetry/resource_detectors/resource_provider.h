@@ -29,16 +29,13 @@ struct ResourceProviderOptions {
    * @brief Whether to automatically include telemetry SDK metadata attributes
    * (`telemetry.sdk.language`, `telemetry.sdk.name`, `telemetry.sdk.version`).
    */
-  bool set_telemetry_sdk_resource_attributes_{true};
+  bool set_telemetry_sdk_resource_attributes{true};
   /**
    * @brief Whether to automatically include the `service.name` resource attribute.
    */
-  bool set_service_name_resource_attribute_{true};
+  bool set_service_name_resource_attribute{true};
 
-  bool operator==(const ResourceProviderOptions& other) const {
-    return set_telemetry_sdk_resource_attributes_ == other.set_telemetry_sdk_resource_attributes_ &&
-           set_service_name_resource_attribute_ == other.set_service_name_resource_attribute_;
-  }
+  bool operator==(const ResourceProviderOptions& other) const = default;
 };
 
 class ResourceProvider : public Logger::Loggable<Logger::Id::tracing> {

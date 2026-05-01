@@ -149,7 +149,7 @@ TEST_F(OpenTelemetryDriverTest, PassSetTelemetrySdkResourceAttributesFalse) {
   auto mock_resource_provider = NiceMock<MockResourceProvider>();
 
   ResourceProviderOptions expected_options;
-  expected_options.set_telemetry_sdk_resource_attributes_ = false;
+  expected_options.set_telemetry_sdk_resource_attributes = false;
   EXPECT_CALL(mock_resource_provider, getResource(_, _, _, expected_options))
       .WillOnce(Return(resource));
 
@@ -215,7 +215,7 @@ TEST_F(OpenTelemetryDriverTest, PassSetServiceNameResourceAttributeFalse) {
   auto mock_resource_provider = NiceMock<MockResourceProvider>();
 
   ResourceProviderOptions expected_options;
-  expected_options.set_service_name_resource_attribute_ = false;
+  expected_options.set_service_name_resource_attribute = false;
   EXPECT_CALL(mock_resource_provider, getResource(_, _, _, expected_options))
       .WillOnce(Return(resource));
 
