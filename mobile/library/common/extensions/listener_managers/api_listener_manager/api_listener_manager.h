@@ -7,7 +7,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/config/listener/v3/listener.pb.validate.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 
 #include "source/server/listener_manager_factory.h"
 
@@ -109,11 +109,11 @@ public:
                         std::unique_ptr<ListenerComponentFactory>&&, WorkerFactory&, bool,
                         Quic::QuicStatNames&) override {
     const auto& api_config =
-        MessageUtil::downcastAndValidate<const envoy::config::listener::v3::ApiListenerManager&>(
+        MessageUtil::downcastAndValidate<const envoy::config::bootstrap::v3::ApiListenerManager&>(
             config, server.messageValidationContext().staticValidationVisitor());
     bool use_worker_thread =
         (api_config.threading_model() ==
-         envoy::config::listener::v3::ApiListenerManager::STANDALONE_WORKER_THREAD);
+         envoy::config::bootstrap::v3::ApiListenerManager::STANDALONE_WORKER_THREAD);
     return std::make_unique<ApiListenerManagerImpl>(server, use_worker_thread);
   }
   std::string name() const override { return "envoy.listener_manager_impl.api"; }
