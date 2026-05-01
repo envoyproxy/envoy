@@ -41,17 +41,31 @@ message Composite {
   // as it avoids duplicating the filter chain configuration.
   map<string, FilterChainConfiguration> named_filter_chains = 1;
 
-  // [#not-implemented-hide:]
   // The match tree that will be used to select an action to execute. The action type should be
   // :ref:`ExecuteFilterAction
   // <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`.
+  //
+  // .. warning::
+  //   This should only be set when using the Composite filter as in the :ref:`http_filters
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`.
+  //   Never set this field when using the Composite filter with the :ref:`ExtensionWithMatcher
+  //   <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` which will result in
+  //   undefined behavior.
+  //
   xds.type.matcher.v3.Matcher matcher = 2;
 }
 
 // Per-route configuration for the Composite filter.
-// [#not-implemented-hide:]
 message CompositePerRoute {
   // Override of the match tree for this route.
+  //
+  // .. warning::
+  //   This should only be set when using the Composite filter as in the :ref:`http_filters
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http_filters>`.
+  //   Never set this field when using the Composite filter with the :ref:`ExtensionWithMatcher
+  //   <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` which will result in
+  //   undefined behavior.
+  //
   xds.type.matcher.v3.Matcher matcher = 1 [(validate.rules).message = {required: true}];
 }
 

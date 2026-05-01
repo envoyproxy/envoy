@@ -390,8 +390,14 @@ TEST_F(StatNameTest, List) {
   StatName names[] = {makeStat("hello.world"), makeStat("goodbye.world")};
   StatNameList name_list;
   EXPECT_FALSE(name_list.populated());
+  EXPECT_EQ(0, name_list.size());
   table_.populateList(names, ARRAY_SIZE(names), name_list);
   EXPECT_TRUE(name_list.populated());
+  EXPECT_EQ(2, name_list.size());
+
+  // Random-access via at().
+  EXPECT_EQ("hello.world", table_.toString(name_list.at(0)));
+  EXPECT_EQ("goodbye.world", table_.toString(name_list.at(1)));
 
   // First, decode only the first name.
   name_list.iterate([this](StatName stat_name) -> bool {
@@ -410,6 +416,36 @@ TEST_F(StatNameTest, List) {
   EXPECT_EQ("goodbye.world", decoded_strings[1]);
   name_list.clear(table_);
   EXPECT_FALSE(name_list.populated());
+  EXPECT_EQ(0, name_list.size());
+}
+
+// Exercises StatNameList::at() walking across entries whose encoded sizes
+// straddle the single-byte varint boundary (dataSize 127/128). This catches
+// any mistake in advancing the pointer with StatName::size() across a
+// 1-byte-vs-2-byte length prefix.
+TEST_F(StatNameTest, ListAtVarintBoundary) {
+  // Build names with controlled dataSize via the dynamic-storage path:
+  //   dataSize = 1 (LiteralStringIndicator) + varint_size(len) + len.
+  StatNameDynamicPool dynamic(table_);
+  constexpr int lower_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) - 3;
+  constexpr int upper_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) + 3;
+
+  std::vector<StatName> names;
+  std::vector<std::string> expected;
+  for (int len = lower_bound; len <= upper_bound; ++len) {
+    std::string s(len, 'a' + ((len - lower_bound) % 26));
+    expected.push_back(s);
+    names.push_back(dynamic.add(s));
+  }
+
+  StatNameList name_list;
+  table_.populateList(names.data(), names.size(), name_list);
+  EXPECT_EQ(expected.size(), name_list.size());
+
+  for (uint32_t i = 0; i < expected.size(); ++i) {
+    EXPECT_EQ(expected[i], table_.toString(name_list.at(i))) << "index=" << i;
+  }
+  name_list.clear(table_);
 }
 
 TEST_F(StatNameTest, HashTable) {
@@ -724,6 +760,127 @@ TEST_F(StatNameTest, StatNameEmptyEquivalent) {
   EXPECT_NE(empty2, non_empty);
   EXPECT_NE(empty1.hash(), non_empty.hash());
   EXPECT_NE(empty2.hash(), non_empty.hash());
+}
+
+TEST_F(StatNameTest, StatNameEqualityFastPaths) {
+  // Pointer-identity: same backing storage compares equal without memcmp.
+  StatName a = makeStat("foo.bar");
+  StatName alias(a.dataIncludingSize());
+  EXPECT_EQ(a, alias);
+
+  // Null vs zero-length: both are empty() and must compare equal in both directions.
+  StatName null_name;
+  StatName zero_length = makeStat("");
+  EXPECT_EQ(null_name, zero_length);
+  EXPECT_EQ(zero_length, null_name);
+
+  // Null vs non-empty: must not compare equal.
+  EXPECT_NE(null_name, a);
+  EXPECT_NE(a, null_name);
+}
+
+TEST_F(StatNameTest, EqualityWithMultiByteVarint) {
+  // Sweep segment counts around the varint boundary to catch off-by-one
+  // errors in decodeNumber's fast-path vs slow-path. Each segment gets a
+  // unique symbol assigned sequentially. Symbols 1-127 encode as 1 byte
+  // each; symbol 128+ encodes as 2 bytes. Pre-allocating throwaway symbols
+  // shifts the numbering so that different padding values produce different
+  // dataSizes for the same segment count. We verify that the sweep covers
+  // both sides of the 128 boundary (the fast-path/slow-path transition in
+  // the length-prefix varint).
+  bool seen[150] = {};
+
+  // Sweep a few potential padding numbers just to make sure we cover. This
+  // is over-testing but that's ok.
+  constexpr int lower_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) - 5;
+  constexpr int upper_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) + 5;
+  for (int padding = 0; padding <= 10; ++padding) {
+    for (int num_segments = lower_bound; num_segments <= upper_bound; ++num_segments) {
+      clearStorage();
+
+      // Pre-allocate throwaway symbols to shift symbol numbering.
+      for (int p = 0; p < padding; ++p) {
+        makeStat(absl::StrCat("pad", p));
+      }
+
+      std::string long_name = "s0";
+      for (int i = 1; i < num_segments; ++i) {
+        absl::StrAppend(&long_name, ".s", i);
+      }
+
+      // Two pool entries for the same name: distinct backing storage, identical content.
+      StatName x = makeStat(long_name);
+      StatName y = makeStat(long_name);
+      size_t ds = x.dataSize();
+      ASSERT_LT(ds, 150);
+      seen[ds] = true;
+      EXPECT_NE(x.dataIncludingSize(), y.dataIncludingSize())
+          << "padding=" << padding << " segments=" << num_segments;
+      EXPECT_EQ(x, y) << "padding=" << padding << " segments=" << num_segments;
+      EXPECT_EQ(x.hash(), y.hash()) << "padding=" << padding << " segments=" << num_segments;
+
+      // Same segment count but shifted names — memcmp mismatch.
+      std::string long_name_alt = "s1";
+      for (int i = 2; i < num_segments + 1; ++i) {
+        absl::StrAppend(&long_name_alt, ".s", i);
+      }
+      StatName z = makeStat(long_name_alt);
+      EXPECT_NE(x, z) << "padding=" << padding << " segments=" << num_segments;
+    }
+  }
+  // Confirm every dataSize across the varint boundary was exercised.
+  for (int i = lower_bound; i <= upper_bound; ++i) {
+    EXPECT_TRUE(seen[i]) << "dataSize " << i << " was never hit";
+  }
+}
+
+TEST_F(StatNameTest, EqualitySizeMismatch) {
+  // Two non-null, different-pointer names with different encoded sizes:
+  // exercises the early lhs_sz != rhs_sz exit in operator==.
+  StatName short_name = makeStat("foo.bar");
+  StatName long_name = makeStat("foo.bar.baz");
+  EXPECT_NE(short_name, long_name);
+  EXPECT_NE(long_name, short_name);
+}
+
+TEST_F(StatNameTest, EncodingSizeBytesAtBoundaries) {
+  // Verify the branch-free encodingSizeBytes formula at every varint boundary.
+  auto esb = SymbolTable::Encoding::encodingSizeBytes;
+  EXPECT_EQ(1, esb(0));
+  EXPECT_EQ(1, esb(1));
+  EXPECT_EQ(1, esb(126));
+  EXPECT_EQ(1, esb(127)); // last 1-byte value
+  EXPECT_EQ(2, esb(128)); // first 2-byte value
+  EXPECT_EQ(2, esb(129));
+  EXPECT_EQ(2, esb(16383)); // last 2-byte value (2^14 - 1)
+  EXPECT_EQ(3, esb(16384)); // first 3-byte value (2^14)
+  EXPECT_EQ(3, esb(16385));
+  EXPECT_EQ(3, esb((1 << 21) - 1)); // last 3-byte
+  EXPECT_EQ(4, esb(1 << 21));       // first 4-byte
+  EXPECT_EQ(4, esb((1 << 28) - 1)); // last 4-byte
+  EXPECT_EQ(5, esb(1 << 28));       // first 5-byte
+}
+
+TEST_F(StatNameTest, EqualityAtVarintBoundary) {
+  // Dynamic names give precise control over dataSize():
+  //   dataSize = 1 (LiteralStringIndicator) + varint_size(name.size()) + name.size()
+  // Sweep base_len across the outer-varint boundary (dataSize 127/128) so we
+  // hit both the decodeNumber fast-path and slow-path for operator==/hash.
+  StatNameDynamicPool dynamic(table_);
+  constexpr int lower_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) - 5;
+  constexpr int upper_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) + 5;
+
+  for (int base_len = lower_bound; base_len <= upper_bound; ++base_len) {
+    const std::string s(base_len, 'a');
+    StatName a = dynamic.add(s);
+    StatName b = dynamic.add(s);
+
+    // Distinct backing storage, identical content.
+    EXPECT_NE(a.dataIncludingSize(), b.dataIncludingSize()) << "base_len=" << base_len;
+    ASSERT_TRUE(a == b) << "base_len=" << base_len;
+    EXPECT_EQ(a.hash(), b.hash()) << "base_len=" << base_len;
+    EXPECT_FALSE(a.empty()) << "base_len=" << base_len;
+  }
 }
 
 TEST_F(StatNameTest, StartsWith) {

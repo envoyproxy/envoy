@@ -1,6 +1,11 @@
 //! Access logger support for dynamic modules.
 //!
 //! This module provides traits and types for implementing access loggers as dynamic modules.
+//! The recommended entry point is the `access_logger:` arm of
+//! [`crate::declare_all_init_functions!`], which registers a factory through
+//! [`crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION`] and lets a single module dispatch by
+//! `logger_name`. The legacy [`crate::declare_access_logger!`] macro is preserved as a
+//! single-config shim over the same factory.
 
 use crate::{abi, EnvoyBuffer};
 use std::ffi::c_void;
@@ -197,12 +202,25 @@ impl MetricsContext {
 }
 
 /// Trait that the dynamic module must implement to provide the access logger configuration.
-pub trait AccessLoggerConfig: Sized + Send + Sync + 'static {
+///
+/// The trait is dyn-safe: the
+/// [`NewAccessLoggerConfigFunction`](crate::NewAccessLoggerConfigFunction) factory returns `Box<dyn
+/// AccessLoggerConfig>`, which lets a single module host multiple logger implementations and
+/// dispatch between them by `name`. Methods bounded by `Self: Sized` are excluded from the vtable,
+/// so [`AccessLoggerConfig::new`] remains callable from `impl` blocks via the legacy
+/// [`crate::declare_access_logger!`] shim.
+pub trait AccessLoggerConfig: Send + Sync {
   /// Create a new configuration from the provided name and config bytes.
   ///
   /// The `ctx` provides access to metrics definition APIs. Metrics should be defined
   /// during configuration creation and the handles stored in the config for later use.
-  fn new(ctx: &ConfigContext, name: &str, config: &[u8]) -> Result<Self, String>;
+  ///
+  /// Only invoked by the legacy [`crate::declare_access_logger!`] shim. Callers using
+  /// [`crate::declare_all_init_functions!`]'s `access_logger:` arm provide a free factory
+  /// function instead and do not need to implement this method.
+  fn new(ctx: &ConfigContext, name: &str, config: &[u8]) -> Result<Self, String>
+  where
+    Self: Sized;
 
   /// Create a logger instance. Called per-thread for thread-local loggers.
   ///
@@ -1232,10 +1250,145 @@ impl LogContext {
   }
 }
 
-/// Macro to declare access logger entry points.
+/// Wrapper that stores the trait object together with the config-scope Envoy pointer.
 ///
-/// This macro generates the required C ABI functions that Envoy calls to interact with
-/// the access logger implementation.
+/// Envoy does not re-pass the config-scope pointer to the per-worker logger callback, so the
+/// SDK captures it at config creation and reuses it to build a [`MetricsContext`] in
+/// [`envoy_dynamic_module_on_access_logger_new`].
+struct AccessLoggerConfigHandle {
+  inner: Box<dyn AccessLoggerConfig>,
+  config_envoy_ptr: *mut c_void,
+}
+
+// SAFETY: `inner` is `Send + Sync` via the `AccessLoggerConfig` bound. `config_envoy_ptr`
+// addresses Envoy's `DynamicModuleAccessLogConfig`, which is thread-safe for the operations
+// invoked through `MetricsContext`.
+unsafe impl Send for AccessLoggerConfigHandle {}
+unsafe impl Sync for AccessLoggerConfigHandle {}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_new(
+  config_envoy_ptr: *mut c_void,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> *const c_void {
+  // The name and config originate from protobuf string/bytes fields, so they are valid
+  // UTF-8 and within bounds when received here. Mirrors the http filter FFI entry point.
+  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+    name.ptr as *const _,
+    name.length,
+  ));
+  let config_bytes = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+  let ctx = ConfigContext::new(config_envoy_ptr);
+
+  envoy_dynamic_module_on_access_logger_config_new_impl(
+    &ctx,
+    name_str,
+    config_bytes,
+    crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION
+      .get()
+      .expect("NEW_ACCESS_LOGGER_CONFIG_FUNCTION must be set"),
+    config_envoy_ptr,
+  )
+}
+
+/// Testable wrapper for [`envoy_dynamic_module_on_access_logger_config_new`].
+///
+/// Mirrors `http::envoy_dynamic_module_on_http_filter_config_new_impl`: the FFI entry point
+/// extracts the inputs and resolves the registered factory; this function performs the
+/// `Option`-to-pointer conversion that unit tests can drive directly.
+pub fn envoy_dynamic_module_on_access_logger_config_new_impl(
+  ctx: &ConfigContext,
+  name: &str,
+  config: &[u8],
+  new_fn: &crate::NewAccessLoggerConfigFunction,
+  config_envoy_ptr: *mut c_void,
+) -> *const c_void {
+  match new_fn(ctx, name, config) {
+    Some(inner) => Box::into_raw(Box::new(AccessLoggerConfigHandle {
+      inner,
+      config_envoy_ptr,
+    })) as *const c_void,
+    None => ptr::null(),
+  }
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_destroy(
+  config_ptr: *const c_void,
+) {
+  drop(Box::from_raw(config_ptr as *mut AccessLoggerConfigHandle));
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_new(
+  config_ptr: *const c_void,
+  logger_envoy_ptr: *mut c_void,
+) -> *const c_void {
+  let handle = &*(config_ptr as *const AccessLoggerConfigHandle);
+  let metrics = MetricsContext::new(handle.config_envoy_ptr);
+  let logger: Box<dyn AccessLogger> = handle.inner.create_logger(metrics, logger_envoy_ptr);
+  crate::wrap_into_c_void_ptr!(logger)
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_log(
+  envoy_ptr: *mut c_void,
+  logger_ptr: *mut c_void,
+  log_type: abi::envoy_dynamic_module_type_access_log_type,
+) {
+  let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
+  let access_log_type = AccessLogType::from_abi(log_type);
+  let ctx = LogContext::new(envoy_ptr, access_log_type);
+  logger.log(&ctx);
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_destroy(logger_ptr: *mut c_void) {
+  crate::drop_wrapped_c_void_ptr!(logger_ptr, AccessLogger);
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_flush(logger_ptr: *mut c_void) {
+  let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
+  logger.flush();
+}
+
+/// Declare access-logger entry points for a single user-supplied config type.
+///
+/// This is the legacy single-config entry point. New callers should prefer
+/// [`crate::declare_all_init_functions!`]'s `access_logger:` arm, which dispatches to
+/// different config types by `logger_name` and lets a single module host multiple loggers.
+///
+/// Like every other single-type init macro in the SDK (for example
+/// [`crate::declare_bootstrap_init_functions!`] or
+/// [`crate::declare_cluster_init_functions!`]), this macro emits
+/// `envoy_dynamic_module_on_program_init` and therefore cannot be combined with another
+/// init macro in the same crate.
 ///
 /// # Example
 ///
@@ -1246,21 +1399,16 @@ impl LogContext {
 /// struct MyLoggerConfig {
 ///   format: String,
 ///   logs_counter: CounterHandle,
-///   config_envoy_ptr: *mut std::ffi::c_void,
 /// }
 ///
-/// unsafe impl Send for MyLoggerConfig {}
-/// unsafe impl Sync for MyLoggerConfig {}
-///
 /// impl AccessLoggerConfig for MyLoggerConfig {
-///   fn new(ctx: &ConfigContext, name: &str, config: &[u8]) -> Result<Self, String> {
+///   fn new(ctx: &ConfigContext, _name: &str, config: &[u8]) -> Result<Self, String> {
 ///     let logs_counter = ctx
 ///       .define_counter("logs_total")
 ///       .ok_or("Failed to define counter")?;
 ///     Ok(Self {
 ///       format: String::from_utf8_lossy(config).to_string(),
 ///       logs_counter,
-///       config_envoy_ptr: ctx.envoy_ptr(),
 ///     })
 ///   }
 ///
@@ -1297,94 +1445,25 @@ impl LogContext {
 #[macro_export]
 macro_rules! declare_access_logger {
   ($config_type:ty) => {
-    /// Wrapper that stores both the config and the envoy pointer for metrics access.
-    struct AccessLoggerConfigWrapper {
-      config: $config_type,
-      config_envoy_ptr: *mut ::std::ffi::c_void,
-    }
-
-    unsafe impl Send for AccessLoggerConfigWrapper {}
-    unsafe impl Sync for AccessLoggerConfigWrapper {}
-
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_access_logger_config_new(
-      config_envoy_ptr: *mut ::std::ffi::c_void,
-      name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
-      config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
-    ) -> *const ::std::ffi::c_void {
-      let name_str = unsafe {
-        let slice = ::std::slice::from_raw_parts(name.ptr as *const u8, name.length);
-        ::std::str::from_utf8(slice).unwrap_or("")
-      };
-      let config_bytes =
-        unsafe { ::std::slice::from_raw_parts(config.ptr as *const u8, config.length) };
-
-      let ctx = $crate::access_log::ConfigContext::new(config_envoy_ptr);
-      match <$config_type as $crate::access_log::AccessLoggerConfig>::new(
-        &ctx,
-        name_str,
-        config_bytes,
-      ) {
-        Ok(c) => {
-          let wrapper = AccessLoggerConfigWrapper {
-            config: c,
-            config_envoy_ptr,
-          };
-          Box::into_raw(Box::new(wrapper)) as *const ::std::ffi::c_void
-        },
-        Err(_) => ::std::ptr::null(),
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      fn __single_access_logger_factory(
+        ctx: &$crate::access_log::ConfigContext,
+        name: &str,
+        config: &[u8],
+      ) -> ::std::option::Option<::std::boxed::Box<dyn $crate::access_log::AccessLoggerConfig>> {
+        match <$config_type as $crate::access_log::AccessLoggerConfig>::new(ctx, name, config) {
+          Ok(c) => ::std::option::Option::Some(::std::boxed::Box::new(c)
+            as ::std::boxed::Box<dyn $crate::access_log::AccessLoggerConfig>),
+          Err(_) => ::std::option::Option::None,
+        }
       }
-    }
-
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_access_logger_config_destroy(
-      config_ptr: *const ::std::ffi::c_void,
-    ) {
-      unsafe {
-        drop(Box::from_raw(config_ptr as *mut AccessLoggerConfigWrapper));
-      }
-    }
-
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_access_logger_new(
-      config_ptr: *const ::std::ffi::c_void,
-      logger_envoy_ptr: *mut ::std::ffi::c_void,
-    ) -> *const ::std::ffi::c_void {
-      let wrapper = unsafe { &*(config_ptr as *const AccessLoggerConfigWrapper) };
-      let metrics = $crate::access_log::MetricsContext::new(wrapper.config_envoy_ptr);
-      let logger = wrapper.config.create_logger(metrics, logger_envoy_ptr);
-      Box::into_raw(Box::new(logger)) as *const ::std::ffi::c_void
-    }
-
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_access_logger_log(
-      envoy_ptr: *mut ::std::ffi::c_void,
-      logger_ptr: *mut ::std::ffi::c_void,
-      log_type: $crate::abi::envoy_dynamic_module_type_access_log_type,
-    ) {
-      let logger = unsafe { &mut *(logger_ptr as *mut Box<dyn $crate::access_log::AccessLogger>) };
-      let access_log_type = $crate::access_log::AccessLogType::from_abi(log_type);
-      let ctx = $crate::access_log::LogContext::new(envoy_ptr, access_log_type);
-      logger.log(&ctx);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_access_logger_destroy(
-      logger_ptr: *mut ::std::ffi::c_void,
-    ) {
-      unsafe {
-        drop(Box::from_raw(
-          logger_ptr as *mut Box<dyn $crate::access_log::AccessLogger>,
-        ));
-      }
-    }
-
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_access_logger_flush(
-      logger_ptr: *mut ::std::ffi::c_void,
-    ) {
-      let logger = unsafe { &mut *(logger_ptr as *mut Box<dyn $crate::access_log::AccessLogger>) };
-      logger.flush();
+      $crate::set_factory_once!(
+        $crate::NEW_ACCESS_LOGGER_CONFIG_FUNCTION,
+        __single_access_logger_factory as $crate::NewAccessLoggerConfigFunction,
+        "NEW_ACCESS_LOGGER_CONFIG_FUNCTION"
+      );
+      $crate::abi::envoy_dynamic_modules_abi_version.as_ptr() as *const ::std::os::raw::c_char
     }
   };
 }

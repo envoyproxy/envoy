@@ -11,7 +11,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
-#include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

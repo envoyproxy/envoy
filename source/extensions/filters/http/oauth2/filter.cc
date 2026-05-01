@@ -51,7 +51,7 @@ constexpr const char* OIDCLogoutUrlFormatString =
     "{0}?id_token_hint={1}&client_id={2}&post_logout_redirect_uri={3}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
-
+constexpr absl::string_view ServiceUnavailableBodyMessage = "Service Unavailable";
 constexpr absl::string_view queryParamsError = "error";
 constexpr absl::string_view queryParamsCode = "code";
 constexpr absl::string_view queryParamsState = "state";
@@ -608,20 +608,35 @@ bool OAuth2CookieValidator::timestampIsValid() const {
 
 bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
-OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
-                           std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source,
+OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr default_config,
+                           OAuth2ClientFactory oauth_client_factory,
+                           ValidatorFactory validator_factory, TimeSource& time_source,
                            Random::RandomGenerator& random)
-    : validator_(std::make_shared<OAuth2CookieValidator>(time_source, config->cookieNames(),
-                                                         config->cookieDomain())),
-      oauth_client_(std::move(oauth_client)), config_(std::move(config)), time_source_(time_source),
-      random_(random) {
-
-  oauth_client_->setCallbacks(*this);
+    : default_config_(std::move(default_config)),
+      oauth_client_factory_(std::move(oauth_client_factory)),
+      validator_factory_(std::move(validator_factory)), time_source_(time_source), random_(random) {
 }
 
-void OAuth2Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  PassThroughDecoderFilter::setDecoderFilterCallbacks(callbacks);
-  oauth_client_->setDecoderFilterCallbacks(callbacks);
+void OAuth2Filter::resolveAndSetActiveConfig() {
+  const auto* route_specific_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
+  const FilterConfig* config =
+      route_specific_config != nullptr ? route_specific_config : default_config_.get();
+
+  if (config == nullptr) {
+    return;
+  }
+  if (config_ == config) {
+    return;
+  }
+
+  config_ = config;
+  validator_ = validator_factory_(time_source_, *config_);
+
+  oauth_client_ = oauth_client_factory_(*config_);
+  oauth_client_->setCallbacks(*this);
+  ASSERT(decoder_callbacks_ != nullptr);
+  oauth_client_->setDecoderFilterCallbacks(*decoder_callbacks_);
 }
 
 /**
@@ -638,6 +653,15 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   headers.remove(OAuth2Headers::get().OAuthStatus);
   headers.remove(OAuth2Headers::get().OAuthFailureReason);
 
+  // Resolve the active configuration for the request. Per-route configuration can override the
+  // default filter configuration, so this step is necessary to determine which configuration to use
+  // for the current request.
+  resolveAndSetActiveConfig();
+  // If no config is set, OAuth2 is disabled for this request.
+  if (config_ == nullptr) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   // Skip Filter and continue chain if a Passthrough header is matching.
   // Only increment counters here; do not modify request headers, as there may be
   // other instances of this filter configured that still need to process the request.
@@ -646,6 +670,11 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       config_->stats().oauth_passthrough_.inc();
       return Http::FilterHeadersStatus::Continue;
     }
+  }
+
+  if (!config_->requiredSecretsAvailable()) {
+    sendSecretsNotReadyResponse("OAuth2 secrets are not ready");
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   // Decrypt the OAuth tokens and update the corresponding cookies in the request headers
@@ -852,10 +881,6 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
     return;
   }
 
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
-    return;
-  }
-
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
   if (cookies.empty()) {
     return;
@@ -891,10 +916,7 @@ std::string OAuth2Filter::encryptToken(const std::string& token) const {
     return token;
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
-    return encrypt(token, config_->hmacSecret(), random_);
-  }
-  return token;
+  return encrypt(token, config_->hmacSecret(), random_);
 }
 
 std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const {
@@ -903,15 +925,26 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
   }
 
   DecryptResult decrypt_result = decrypt(encrypted_token, config_->hmacSecret());
-  if (decrypt_result.error.has_value()) {
+
+  // Decryption can spuriously succeed against a token that was either never encrypted, or was
+  // encrypted under a different secret — PKCS#7 padding is valid by chance with probability
+  // ~1/256, leaving us with arbitrary binary bytes that would later fail HeaderString validation
+  // when written back into the Cookie header. Treat any plaintext that is not a valid header value
+  // as a decrypt failure and fall through to the legacy/wrong-secret behavior below.
+  const bool decrypt_failed = decrypt_result.error.has_value() ||
+                              !Http::HeaderUtility::headerValueIsValid(decrypt_result.plaintext);
+
+  if (decrypt_failed) {
     ENVOY_STREAM_LOG(error, "failed to decrypt token: {}, error: {}", *decoder_callbacks_,
-                     encrypted_token, decrypt_result.error.value());
+                     encrypted_token,
+                     decrypt_result.error.value_or("plaintext is not a valid header value"));
     // There are two cases:
     // 1. The token is a legacy unencrypted token.
     // In this case, we return the token as-is to allow the request to proceed.
-    // 2. The token is encrypted, but the decryption failed due to the HMAC secret is changed.
-    // In this case, we return the original encrypted token, the HMAC validation will fail
-    // and the user will be redirected to the OAuth server for re-authentication.
+    // 2. The token is encrypted, but the decryption failed (or produced invalid plaintext) due to
+    // the HMAC secret being changed. In this case, we return the original encrypted token; the HMAC
+    // validation will fail and the user will be redirected to the OAuth server for
+    // re-authentication.
     return encrypted_token;
   }
   return decrypt_result.plaintext;
@@ -1027,7 +1060,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       {cookie_names.bearer_token_, config_->bearerTokenCookieSettings().path_},
       {cookie_names.id_token_, config_->idTokenCookieSettings().path_},
       {cookie_names.refresh_token_, config_->refreshTokenCookieSettings().path_},
-
+      {cookie_names.oauth_expires_, config_->expiresCookieSettings().path_},
   };
 
   absl::flat_hash_map<std::string, std::string> request_cookies =
@@ -1421,6 +1454,14 @@ void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
         }
       },
       absl::nullopt, details);
+}
+
+void OAuth2Filter::sendSecretsNotReadyResponse(const std::string& details) {
+  ENVOY_STREAM_LOG(warn, "Responding with 503 Service Unavailable. Cause: {}", *decoder_callbacks_,
+                   details);
+  config_->stats().oauth_failure_.inc();
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, ServiceUnavailableBodyMessage,
+                                     nullptr, absl::nullopt, details);
 }
 
 bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) const {

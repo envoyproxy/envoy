@@ -38,17 +38,14 @@
 #include "test/common/http/common.h"
 #include "test/common/router/router_test_base.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -1763,6 +1760,95 @@ TEST_F(RouterTest, UpstreamTimeout) {
                 .value());
   EXPECT_EQ(
       1U, callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_timeout_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// Verify that a gRPC request hitting the global response timeout gets
+// DEADLINE_EXCEEDED (grpc-status 4) instead of UNAVAILABLE.
+TEST_F(RouterTest, GrpcUpstreamTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded", "true"}});
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
+                                         {"grpc-timeout", "20S"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  callbacks_.is_grpc_request_ = true;
+  router_->decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_->decodeData(data, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/grpc"},
+                                                   {"grpc-status", "4"},
+                                                   {"grpc-message", "upstream request timeout"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// Verify that a gRPC request hitting the per-try timeout gets
+// DEADLINE_EXCEEDED (grpc-status 4) instead of UNAVAILABLE.
+TEST_F(RouterTest, GrpcUpstreamPerTryTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded", "true"}});
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
+                                         {"grpc-timeout", "20S"},
+                                         {"x-envoy-internal", "true"},
+                                         {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  callbacks_.is_grpc_request_ = true;
+  router_->decodeHeaders(headers, false);
+
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Buffer::OwnedImpl data;
+  router_->decodeData(data, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/grpc"},
+                                                   {"grpc-status", "4"},
+                                                   {"grpc-message", "upstream request timeout"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+  per_try_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -5455,6 +5541,37 @@ TEST_F(RouterTest, InternalRedirectWithRequestBodyBufferOverflow) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_internal_redirect_failed_total")
                     .value());
+}
+
+// Regression test: when an upstream filter (e.g. the buffer filter) has already buffered all
+// request data, the decoding buffer and the data argument to decodeData() are the same object.
+// The buffer overflow check must not double-count the size in this case.
+TEST_F(RouterTest, InternalRedirectNoDoubleCountWhenDecodingBufferIsData) {
+  // Body is 15 bytes, limit is 20. Without the fix, the check would compute 15+15=30 > 20
+  // and incorrectly mark the request as buffer-overflowed.
+  Buffer::OwnedImpl body_data("fifteen_bytes!!");
+  ASSERT_EQ(15, body_data.length());
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(20));
+  // Return a pointer to the SAME buffer to simulate the buffer filter having
+  // already buffered the data into the shared decoding buffer.
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&body_data));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+
+  enableRedirects();
+  sendRequest(false);
+
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
+
+  // Data should be buffered (not rejected) since 15 < 20.
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(body_data, true));
+
+  // The redirect should proceed because the buffer did not overflow.
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+
+  router_->onDestroy();
 }
 
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {

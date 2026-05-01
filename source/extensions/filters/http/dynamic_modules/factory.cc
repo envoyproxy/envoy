@@ -245,16 +245,21 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
 
   std::string config;
   if (proto_config.has_filter_config()) {
-    auto config_or_error = MessageUtil::anyToBytes(proto_config.filter_config());
+    auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.filter_config());
     RETURN_IF_NOT_OK_REF(config_or_error.status());
     config = std::move(config_or_error.value());
+  }
+
+  absl::string_view filter_name = proto_config.filter_name();
+  if (filter_name.empty()) {
+    filter_name = proto_config.per_route_config_name();
   }
 
   absl::StatusOr<Envoy::Extensions::DynamicModules::HttpFilters::
                      DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-              proto_config.per_route_config_name(), config, std::move(dynamic_module.value()));
+              filter_name, config, std::move(dynamic_module.value()));
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create pre-route filter config: " +

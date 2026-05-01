@@ -1945,8 +1945,7 @@ envoy_dynamic_module_type_http_filter_scheduler_module_ptr
 envoy_dynamic_module_callback_http_filter_scheduler_new(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return new DynamicModuleHttpFilterScheduler(filter->weak_from_this(),
-                                              filter->decoder_callbacks_->dispatcher());
+  return new DynamicModuleHttpFilterScheduler(filter->weak_from_this());
 }
 
 void envoy_dynamic_module_callback_http_filter_scheduler_delete(
@@ -1966,8 +1965,7 @@ envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr
 envoy_dynamic_module_callback_http_filter_config_scheduler_new(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
-  return new DynamicModuleHttpFilterConfigScheduler(filter_config->weak_from_this(),
-                                                    filter_config->main_thread_dispatcher_);
+  return new DynamicModuleHttpFilterConfigScheduler(filter_config->weak_from_this());
 }
 
 void envoy_dynamic_module_callback_http_filter_config_scheduler_delete(

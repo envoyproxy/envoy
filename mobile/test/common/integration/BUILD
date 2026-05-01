@@ -36,10 +36,12 @@ envoy_cc_test(
         "@envoy//source/common/quic:udp_gso_batch_writer_lib",
         "@envoy//source/extensions/udp_packet_writer/gso:config",
         "@envoy//test/extensions/filters/http/dynamic_forward_proxy:test_resolver_lib",
+        "@envoy//test/test_common:registry_lib",
         "@envoy//test/test_common:test_random_generator_lib",
         "@envoy//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_build_config//:test_extensions",
+        "@quiche//:quic_test_tools_test_utils_lib",
     ],
 )
 
