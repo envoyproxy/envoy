@@ -7,7 +7,6 @@
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"

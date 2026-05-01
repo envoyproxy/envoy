@@ -15,7 +15,6 @@
 #include "test/common/buffer/utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/tls/ssl_test_utility.h"
-#include "test/mocks/api/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"

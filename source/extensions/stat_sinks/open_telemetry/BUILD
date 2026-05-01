@@ -28,8 +28,10 @@ envoy_cc_library(
     hdrs = ["open_telemetry_impl.h"],
     deps = [
         ":stat_match_action_lib",
+        "//envoy/common:optref_lib",
         "//envoy/grpc:async_client_interface",
         "//envoy/singleton:instance_interface",
+        "//source/common/common:logger_lib",
         "//source/common/common:matchers_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/stats:stat_match_input_lib",

@@ -36,9 +36,9 @@ StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                  server.threadLocal(), server.clusterManager(),
                                                  server.scope(), statsd_sink.prefix());
   case envoy::config::metrics::v3::StatsdSink::StatsdSpecifierCase::STATSD_SPECIFIER_NOT_SET:
-    break; // Fall through to PANIC
+    return absl::InvalidArgumentError("unexpected statsd specifier: statsd_specifier not set");
   }
-  PANIC("unexpected statsd specifier case num");
+  return absl::InvalidArgumentError("unexpected statsd specifier case num");
 }
 
 ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {

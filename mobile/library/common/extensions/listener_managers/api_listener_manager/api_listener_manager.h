@@ -4,6 +4,7 @@
 
 #include "absl/synchronization/notification.h"
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/config/listener/v3/listener.pb.validate.h"
@@ -117,7 +118,7 @@ public:
   }
   std::string name() const override { return "envoy.listener_manager_impl.api"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::listener::v3::ApiListenerManager>();
+    return std::make_unique<envoy::config::bootstrap::v3::ApiListenerManager>();
   }
 };
 

@@ -15,7 +15,6 @@
 #include "source/extensions/watchdog/profile_action/profile_action.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"

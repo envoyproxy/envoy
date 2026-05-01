@@ -78,9 +78,11 @@ envoy_cc_test(
     srcs = [
         "mysql_filter_test.cc",
     ],
+    external_deps = ["ssl"],
     deps = [
         ":mysql_test_utils_lib",
         "//contrib/mysql_proxy/filters/network/source:config",
+        "//source/common/crypto:utility_lib",
         "//test/mocks/network:network_mocks",
     ],
 )
@@ -101,6 +103,32 @@ envoy_cc_test(
         "//source/common/tcp_proxy",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "mysql_ssl_integration_test",
+    srcs = [
+        "mysql_ssl_integration_test.cc",
+    ],
+    data = [
+        "mysql_ssl_allow_test_config.yaml",
+        "mysql_ssl_disable_test_config.yaml",
+        "mysql_ssl_require_test_config.yaml",
+        "//test/config/integration/certs",
+    ],
+    external_deps = ["ssl"],
+    rbe_pool = "6gig",
+    deps = [
+        ":mysql_test_utils_lib",
+        "//contrib/mysql_proxy/filters/network/source:config",
+        "//contrib/mysql_proxy/filters/network/source:filter_lib",
+        "//source/common/tcp_proxy",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/starttls:config",
+        "//test/integration:integration_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ],
 )
 

@@ -42,9 +42,10 @@ public:
   FilterMetadataStatus decodeMetadata(MetadataMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
-    // We always register for downstream watermark callbacks. This allows all filters
-    // including the terminal filter to receive flow control events.
-    decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
+    // Registration is deferred until the in-module filter exists: the factory wires callbacks
+    // before initializeInModuleFilter(), and addDownstreamWatermarkCallbacks() synchronously
+    // replays any pending onAboveWriteBufferHighWatermark() into the newly registered callback.
+    maybeRegisterDownstreamWatermarkCallbacks();
   }
   void decodeComplete() override;
 
@@ -242,6 +243,13 @@ private:
    */
   void destroy();
 
+  /**
+   * Registers this filter for downstream watermark callbacks once both decoder callbacks have been
+   * set and the in-module filter has been constructed. Idempotent; safe to call from either
+   * entry point regardless of which runs first.
+   */
+  void maybeRegisterDownstreamWatermarkCallbacks();
+
   // True if the filter is in the continue state. This is to avoid prohibited calls to
   // continueDecoding() or continueEncoding() multiple times.
   bool in_continue_ = false;
@@ -257,6 +265,10 @@ private:
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
   Stats::StatNameDynamicPool stat_name_pool_;
   uint32_t worker_index_;
+  // Tracks whether addDownstreamWatermarkCallbacks() has been invoked on decoder_callbacks_.
+  // Also gates the paired remove in onDestroy(), because removeDownstreamWatermarkCallbacks()
+  // asserts that the callback was previously added.
+  bool downstream_watermark_callbacks_registered_ = false;
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -389,14 +401,20 @@ using DynamicModuleHttpFilterWeakPtr = std::weak_ptr<DynamicModuleHttpFilter>;
  */
 class DynamicModuleHttpFilterScheduler {
 public:
-  DynamicModuleHttpFilterScheduler(DynamicModuleHttpFilterWeakPtr filter,
-                                   Event::Dispatcher& dispatcher)
-      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleHttpFilterScheduler(DynamicModuleHttpFilterWeakPtr filter)
+      : filter_(std::move(filter)) {}
 
   void commit(uint64_t event_id) {
-    dispatcher_.post([filter = filter_, event_id]() {
-      if (DynamicModuleHttpFilterSharedPtr filter_shared = filter.lock()) {
-        filter_shared->onScheduled(event_id);
+    // Lock the filter so the dispatcher reference obtained via its callbacks stays valid across
+    // `post`.
+    auto filter_shared = filter_.lock();
+    if (!filter_shared || filter_shared->isDestroyed() ||
+        filter_shared->decoder_callbacks_ == nullptr) {
+      return;
+    }
+    filter_shared->decoder_callbacks_->dispatcher().post([filter = filter_, event_id]() {
+      if (DynamicModuleHttpFilterSharedPtr fs = filter.lock()) {
+        fs->onScheduled(event_id);
       }
     });
   }
@@ -405,8 +423,6 @@ private:
   // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the filter.
   DynamicModuleHttpFilterWeakPtr filter_;
-  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
-  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace HttpFilters

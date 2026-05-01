@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message OpenTelemetryConfig {
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
@@ -62,4 +62,14 @@ message OpenTelemetryConfig {
   // This field specifies the maximum number of spans that can be cached. If not specified, the
   // default is 1024.
   google.protobuf.UInt32Value max_cache_size = 6;
+
+  // Specifies whether to set the telemetry SDK resource attributes.
+  // The following attributes will be set:
+  //
+  // - telemetry.sdk.language
+  // - telemetry.sdk.name
+  // - telemetry.sdk.version
+  //
+  // If not specified, the default is to set these attributes.
+  google.protobuf.BoolValue set_telemetry_sdk_resource_attributes = 7;
 }
