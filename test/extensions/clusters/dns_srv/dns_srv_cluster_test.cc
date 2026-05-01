@@ -300,9 +300,6 @@ TEST_F(DnsSrvClusterTest, OneHostnameOneIp) {
   Network::DnsResolver::ResolveCb a_callback1;
   expectResolve("ok.example.com", Network::DnsLookupFamily::All, a_callback1);
 
-  // Network::DnsResolver::ResolveCb a_callback2;
-  // expectResolve("fail.example.com", Network::DnsLookupFamily::All, a_callback2);
-
   createCluster();
 
   ASSERT_TRUE(srv_callback != nullptr);

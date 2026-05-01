@@ -120,14 +120,11 @@ private:
     PendingResponse pending_response_{ResolutionStatus::Failure, {}};
   };
 
-  /*
-  DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
-                        ares_channel channel, const std::string& dns_name*/
   struct PendingSrvResolution : public PendingResolution {
     PendingSrvResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
                          const std::string& dns_name, DnsResolverImpl& parent)
         : PendingResolution(parent, callback, dispatcher, channel,
-                            dns_name) /*, resolver_(parent)*/ {}
+                            dns_name) {}
 
     /**
      * c-ares ares_query_dnsrec() query callback for initiation.
@@ -153,9 +150,6 @@ private:
     // keeping the type/name according to c-ares API
     // this query ID is filled by ares_query_dnsrec()
     unsigned short ares_query_id_ = 0;
-
-    // The resolver instance.
-    // DnsResolverImpl& resolver_;
   };
 
   class AddrInfoPendingResolution final : public PendingResolution {

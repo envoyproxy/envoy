@@ -157,14 +157,14 @@ void DnsSrvCluster::allTargetsResolved() {
 
       priority_state_manager.registerHostForPriority(new_hosts.back(), locality_lb_endpoints);
     }
-
-    info_->configUpdateStats().update_success_.inc();
   }
 
   if (some_targets_resolved) {
     HostVector hosts_added;
     HostVector hosts_removed;
     HostVector hosts;
+
+    info_->configUpdateStats().update_success_.inc();
 
     if (updateDynamicHostList(new_hosts, hosts, hosts_added, hosts_removed, all_hosts_,
                               all_new_hosts)) {

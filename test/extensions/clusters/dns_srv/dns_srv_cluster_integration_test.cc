@@ -46,13 +46,10 @@ TEST_P(DnsSrvClusterIntegrationTest, BasicDnsSrvClusterTest) {
             ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), debug,
                                 "DNS record request for {}", dns_name);
 
-            std::string ip_value = "127.0.0.1";
-            if (version_ == Network::Address::IpVersion::v6) {
-              ip_value = "::1";
-            }
-
+            std::string ip_value = Network::Test::getLoopbackAddressString(version_);
             dns_callback(Network::DnsResolver::ResolutionStatus::Completed, "test resolve: success",
                          TestUtility::makeDnsResponse({ip_value}));
+
             return nullptr;
           }));
 
