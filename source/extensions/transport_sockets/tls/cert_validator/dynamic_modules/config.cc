@@ -225,7 +225,7 @@ ValidationResults DynamicModuleCertValidator::doVerifyCertChain(
     stats_.fail_verify_error_.inc();
   }
 
-  // Read the field through its underlying integer to avoid UBSan tripping on out-of-range
+  // Read the field through its underlying integer to avoid UBSAN tripping on out-of-range
   // enum values. A misbehaving module could return any int; we map unknown values to
   // NotValidated to fail open.
   int raw_detailed_status;

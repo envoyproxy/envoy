@@ -54,7 +54,7 @@ public:
     codec_client_.reset();
   }
 
-  void initializeWithValidator(const std::string& module_name) {
+  void initialize() override {
     auto* validator_config = new envoy::config::core::v3::TypedExtensionConfig();
     TestUtility::loadFromYaml(fmt::format(R"EOF(
 name: envoy.tls.cert_validator.dynamic_modules
@@ -64,7 +64,7 @@ typed_config:
     name: {}
   validator_name: test
 )EOF",
-                                          module_name),
+                                          module_name_),
                               *validator_config);
 
     config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
@@ -84,6 +84,8 @@ typed_config:
                                                factory->createTransportSocket(nullptr, nullptr),
                                                nullptr, nullptr);
   }
+
+  std::string module_name_;
 };
 
 namespace {
@@ -109,9 +111,7 @@ INSTANTIATE_TEST_SUITE_P(LanguagesAndIpVersions, DynamicModulesCertValidatorInte
 
 TEST_P(DynamicModulesCertValidatorIntegrationTest, ValidatorAccepts) {
   // The C fakes are named cert_validator_no_op; the Go/Rust ones are named cert_validator_test.
-  const std::string module =
-      (GetParam().language == "c") ? "cert_validator_no_op" : "cert_validator_test";
-  initializeWithValidator(module);
+  module_name_ = (GetParam().language == "c") ? "cert_validator_no_op" : "cert_validator_test";
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClient();
@@ -142,7 +142,7 @@ public:
     codec_client_.reset();
   }
 
-  void initializeWithFilterStateValidator() {
+  void initialize() override {
     auto* validator_config = new envoy::config::core::v3::TypedExtensionConfig();
     TestUtility::loadFromYaml(R"EOF(
 name: envoy.tls.cert_validator.dynamic_modules
@@ -178,8 +178,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesCertValidatorFilterStateTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(DynamicModulesCertValidatorFilterStateTest, FilterStateCallbacksRoundTrip) {
-  initializeWithFilterStateValidator();
-
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClient();
   };
