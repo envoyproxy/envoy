@@ -114,10 +114,8 @@ Configuration parameters
        data fresh in all-local mode. The deficit is redistributed
        proportionally to host count. Set to 0 to disable (safe only with
        out-of-band ORCA reporting or when cross-zone traffic must be strictly
-       avoided). Range: [0, 1). Note: at very high remote-locality counts
-       combined with low aggregate request rates, per-host sample intervals
-       can exceed ``weight_expiration_period``; see
-       :ref:`Caveats <load_aware_locality_caveats>`.
+       avoided). Range: [0, 1). See
+       :ref:`Caveats <load_aware_locality_caveats>` for scaling notes.
    * - ``weight_expiration_period``
      - 180 s
      - Per-host sample validity window. Hosts that have not reported within
@@ -202,7 +200,24 @@ Weight computation
 ^^^^^^^^^^^^^^^^^^
 
 On each ``weight_update_period`` tick, the main thread recomputes per-
-locality routing weights:
+locality routing weights in five stages:
+
+1. **Filter and average.** Drop hosts whose last ORCA report is older than
+   ``weight_expiration_period`` and average utilization across the remaining
+   hosts in each locality.
+2. **Smooth.** Apply EWMA smoothing per locality. Localities with no fresh
+   samples carry their prior smoothed value and are marked stale.
+3. **Headroom weight.** Compute each locality's base weight as
+   ``host_count * (1 - smoothed_util)`` -- capacity-weighted headroom. Stale
+   localities fall back to ``host_count``.
+4. **Local preference.** If the local locality is within
+   ``utilization_variance_threshold`` of the host-count-weighted remote
+   average, snap to all-local routing.
+5. **Probe floor.** Enforce ``remote_probe_fraction`` by redistributing a
+   slice of local weight back across remote localities proportional to host
+   count.
+
+The pseudocode below captures the exact semantics:
 
 ::
 
@@ -302,10 +317,9 @@ fresh.
   ensures a minimum slice of traffic still reaches remote localities so
   ORCA data does not go stale. The deficit is taken from the local
   weight (clamped at 0) and distributed across remotes proportional to
-  host count -- not headroom -- to sample all remotes fairly.
-- **Disabling probing.** Set ``remote_probe_fraction`` to 0 only if OOB
-  ORCA reporting is available or zero cross-zone traffic is required.
-  Without probing, the policy reacts slowly to remote load changes.
+  host count -- not headroom -- to sample all remotes fairly. Without
+  probing, the policy reacts slowly to remote load changes; see
+  :ref:`Caveats <load_aware_locality_caveats>` for scaling notes.
 
 .. _load_aware_locality_weight_expiration:
 
@@ -329,7 +343,7 @@ Tune higher to tolerate longer reporting gaps; tune lower to prune
 draining backends faster. Set to 0 s to disable expiration entirely.
 
 Cold-start behavior
-"""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^
 
 At startup (or with no ORCA data) every locality defaults to utilization
 0, full headroom, so weights reduce to host counts -- equivalent to
@@ -338,7 +352,7 @@ is applied raw (no EWMA blending), so the policy begins differentiating
 within a single ``weight_update_period`` cycle.
 
 Priority support
-""""""""""""""""
+^^^^^^^^^^^^^^^^
 
 The policy respects Envoy's
 :ref:`priority levels <arch_overview_load_balancing_priority_levels>`.
@@ -361,7 +375,7 @@ weight, computed from the same per-host ORCA data in a single tick pass.
 .. _load_aware_locality_caveats:
 
 Caveats and known limitations
-"""""""""""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - **Hash-based child policies.** Ring hash and Maglev build their hash
   structures from the host set they are given. With this policy, that set
@@ -400,7 +414,7 @@ Caveats and known limitations
   rarely the behavior subset users expect.
 
 Statistics
-""""""""""
+^^^^^^^^^^
 
 The policy emits stats under ``cluster.<cluster_name>.load_aware_locality.*``:
 
