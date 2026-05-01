@@ -15,6 +15,32 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "filter_extra_test",
+    size = "small",
+    srcs = ["filter_extra_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        ":filter_test_common_lib",
+        "//source/extensions/filters/http/ext_proc",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "logging_info_test",
+    size = "small",
+    srcs = ["logging_info_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/filters/http/ext_proc",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_test",
     size = "small",
     srcs = ["config_test.cc"],
