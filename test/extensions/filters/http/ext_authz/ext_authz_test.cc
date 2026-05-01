@@ -6972,8 +6972,9 @@ TEST_F(HttpFilterTest, ShadowModeWithRequestBody) {
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
 }
 
-// Test that when headers size or count limits are reached during header removal, the response is rejected.
-// Note: Header removal usually reduces size/count, but headersWithinLimits is still checked.
+// Test that when headers size or count limits are reached during header removal, the response is
+// rejected. Note: Header removal usually reduces size/count, but headersWithinLimits is still
+// checked.
 TEST_F(HttpFilterTest, HeaderRemovalLimitReached) {
   InSequence s;
 
@@ -6986,8 +6987,9 @@ TEST_F(HttpFilterTest, HeaderRemovalLimitReached) {
   // Create a header map that is ALREADY over the limit.
   // We'll use 3 headers with a max count of 2.
   auto limited_headers = Http::TestRequestHeaderMapImpl(
-      {{":method", "GET"}, {":path", "/"}, {"some-header", "value"}, {"another-header", "value"}}, 100, 2);
-  
+      {{":method", "GET"}, {":path", "/"}, {"some-header", "value"}, {"another-header", "value"}},
+      100, 2);
+
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
@@ -7002,19 +7004,21 @@ TEST_F(HttpFilterTest, HeaderRemovalLimitReached) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::InternalServerError)));
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
       }));
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   // Remove one header. Even after removal, 3 headers remain, which is > 2.
   response.headers_to_remove = {"some-header"};
-  
+
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, config_->stats().request_header_limits_reached_.value());
 }
 
-// Test that when headers size or count limits are reached during query parameter modification, the response is rejected.
+// Test that when headers size or count limits are reached during query parameter modification, the
+// response is rejected.
 TEST_F(HttpFilterTest, QueryParameterModificationLimitReached) {
   InSequence s;
 
@@ -7025,7 +7029,8 @@ TEST_F(HttpFilterTest, QueryParameterModificationLimitReached) {
   )EOF");
 
   // Create a header map with very low limits.
-  auto limited_headers = Http::TestRequestHeaderMapImpl({{"some-header", "value"}, {"another-header", "value"}}, 1, 1);
+  auto limited_headers =
+      Http::TestRequestHeaderMapImpl({{"some-header", "value"}, {"another-header", "value"}}, 1, 1);
   limited_headers.setPath("/path");
 
   prepareCheck();
@@ -7042,13 +7047,14 @@ TEST_F(HttpFilterTest, QueryParameterModificationLimitReached) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::InternalServerError)));
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
       }));
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.query_parameters_to_set = {{"foo", "bar"}};
-  
+
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, config_->stats().request_header_limits_reached_.value());
 }
@@ -7078,20 +7084,23 @@ TEST_F(HttpFilterTest, ResponseHeaderLimitReachedDuringEncode) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.response_headers_to_add = {{"x-new-header", "value"}};
-  
+
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
   // Now trigger encodeHeaders with a limited map.
   Http::TestResponseHeaderMapImpl response_headers({{":status", "200"}}, 100, 1);
-  
-  EXPECT_CALL(encoder_filter_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers, false));
+
+  EXPECT_CALL(encoder_filter_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(1U, config_->stats().response_header_limits_reached_.value());
 }
 
-// Test that when saw_invalid_append_actions is true and validate_mutations is true, the response is rejected.
+// Test that when saw_invalid_append_actions is true and validate_mutations is true, the response is
+// rejected.
 TEST_F(HttpFilterTest, InvalidAppendActionRejected) {
   InSequence s;
 
@@ -7116,13 +7125,14 @@ TEST_F(HttpFilterTest, InvalidAppendActionRejected) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::InternalServerError)));
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
       }));
 
   auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
   response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response->saw_invalid_append_actions = true;
-  
+
   request_callbacks_->onComplete(std::move(response));
   EXPECT_EQ(1U, config_->stats().invalid_.value());
 }
@@ -7133,20 +7143,20 @@ TEST(ExtAuthzLoggingInfoTestExtra, ConvenienceMethods) {
   info.setLatency(std::chrono::microseconds(100));
   info.setBytesSent(200);
   info.setBytesReceived(300);
-  
+
   info.clearLatency();
   EXPECT_FALSE(info.latency().has_value());
-  
+
   info.clearBytesSent();
   EXPECT_FALSE(info.bytesSent().has_value());
-  
+
   info.clearBytesReceived();
   EXPECT_FALSE(info.bytesReceived().has_value());
-  
+
   info.setClusterInfo(std::make_shared<NiceMock<Upstream::MockClusterInfo>>());
   info.clearClusterInfo();
   EXPECT_EQ(nullptr, info.clusterInfo());
-  
+
   info.setUpstreamHost(std::make_shared<NiceMock<Upstream::MockHostDescription>>());
   info.clearUpstreamHost();
   EXPECT_EQ(nullptr, info.upstreamHost());
@@ -7163,7 +7173,8 @@ TEST_F(HttpFilterTest, MetadataContextExtra) {
   )EOF");
 
   envoy::config::core::v3::Metadata metadata;
-  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(ReturnRef(metadata));
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   EXPECT_CALL(connection_.stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
@@ -7184,7 +7195,10 @@ TEST_F(HttpFilterTest, PerRouteGrpcClientFallback) {
   )EOF");
 
   auto per_route_config = envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute();
-  per_route_config.mutable_check_settings()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("per_route_cluster");
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_cluster");
   auto config_per_route = std::make_unique<FilterConfigPerRoute>(per_route_config);
 
   Router::RouteSpecificFilterConfigs per_route_configs;
@@ -7230,7 +7244,7 @@ TEST_F(HttpFilterTest, ShadowModeDisabledFilter) {
   // Filter is disabled, but in shadow mode it should continue and set shadow filter state.
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
-  
+
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
   const auto* shadow =

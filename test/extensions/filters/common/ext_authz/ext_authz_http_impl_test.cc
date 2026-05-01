@@ -987,11 +987,12 @@ TEST_F(ExtAuthzHttpClientTest, PathOverrideWithEncodeRawHeaders) {
   header->set_raw_value("/original_path");
 
   EXPECT_CALL(async_client_, send_(_, _, _))
-      .WillOnce(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
-                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-        EXPECT_EQ("/overridden_path", message->headers().getPathValue());
-        return &async_request_;
-      }));
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ("/overridden_path", message->headers().getPathValue());
+            return &async_request_;
+          }));
 
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
@@ -1021,11 +1022,12 @@ TEST_F(ExtAuthzHttpClientTest, PathPrefixWithEncodeRawHeaders) {
   header->set_raw_value("/original_path");
 
   EXPECT_CALL(async_client_, send_(_, _, _))
-      .WillOnce(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
-                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-        EXPECT_EQ("/prefix/original_path", message->headers().getPathValue());
-        return &async_request_;
-      }));
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ("/prefix/original_path", message->headers().getPathValue());
+            return &async_request_;
+          }));
 
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 

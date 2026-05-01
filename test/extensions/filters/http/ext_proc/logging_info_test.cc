@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
+
 #include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -38,9 +40,10 @@ TEST(ExtProcLoggingInfoTest, SerializeAsProto) {
   info.setReceivedImmediateResponse();
   info.recordGrpcStatusBeforeFirstCall(Grpc::Status::DeadlineExceeded);
 
-  info.recordProcessingEffect(ProcessorState::CallbackState::HeadersCallback,
-                              envoy::config::core::v3::TrafficDirection::INBOUND,
-                              Filters::Common::ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded);
+  info.recordProcessingEffect(
+      ProcessorState::CallbackState::HeadersCallback,
+      envoy::config::core::v3::TrafficDirection::INBOUND,
+      Filters::Common::ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded);
   info.recordProcessingEffect(ProcessorState::CallbackState::BufferedBodyCallback,
                               envoy::config::core::v3::TrafficDirection::INBOUND,
                               Filters::Common::ProcessingEffect::Effect::InvalidMutationRejected);
@@ -78,10 +81,10 @@ TEST(ExtProcLoggingInfoTest, SerializeAsProto) {
   EXPECT_EQ(4.0, fields.at("grpc_status_before_first_call").number_value());
 }
 
-TEST(ExtProcLoggingInfoTest, SerializeAsString) {
+TEST(ExtProcLoggingInfoTest, AsSerializedString) {
   Protobuf::Struct metadata;
   ExtProcLoggingInfo info(metadata);
-  
+
   info.recordGrpcCall(std::chrono::microseconds(100), Grpc::Status::Ok,
                       ProcessorState::CallbackState::HeadersCallback,
                       envoy::config::core::v3::TrafficDirection::INBOUND);
@@ -107,7 +110,7 @@ TEST(ExtProcLoggingInfoTest, SerializeAsString) {
   info.setFailedOpen();
   info.setReceivedImmediateResponse();
   info.recordGrpcStatusBeforeFirstCall(Grpc::Status::DeadlineExceeded);
-  
+
   auto str = info.serializeAsString();
   EXPECT_TRUE(str.has_value());
   EXPECT_THAT(str.value(), testing::HasSubstr("rh:100:0"));
@@ -123,7 +126,7 @@ TEST(ExtProcLoggingInfoTest, GetField) {
   info.setBytesSent(123);
   info.setBytesReceived(456);
   info.setFailedOpen();
-  
+
   EXPECT_THAT(info.getField("bytes_sent"), testing::VariantWith<int64_t>(123));
   EXPECT_THAT(info.getField("bytes_received"), testing::VariantWith<int64_t>(456));
   EXPECT_THAT(info.getField("failed_open"), testing::VariantWith<int64_t>(1));

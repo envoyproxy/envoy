@@ -803,8 +803,9 @@ TEST_F(ExtAuthzFilterTest, FilterEnabledMetadata) {
   initialize(yaml);
 
   envoy::config::core::v3::Metadata metadata;
-  auto* fields = (*metadata.mutable_filter_metadata())["envoy.filters.network.ext_authz"].mutable_fields();
-  
+  auto* fields =
+      (*metadata.mutable_filter_metadata())["envoy.filters.network.ext_authz"].mutable_fields();
+
   (*fields)["enabled"] = ValueUtil::stringValue("true");
   EXPECT_TRUE(config_->filterEnabledMetadata(metadata));
 
