@@ -9,6 +9,31 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "dynamic_modules_cert_validator_integration_test",
+    size = "large",
+    srcs = ["dynamic_modules_cert_validator_integration_test.cc"],
+    data = [
+        "//test/common/tls/test_data:certs",
+        "//test/config/integration/certs",
+        "//test/extensions/dynamic_modules/test_data/c:cert_validator_filter_state",
+        "//test/extensions/dynamic_modules/test_data/c:cert_validator_no_op",
+        "//test/extensions/dynamic_modules/test_data/go:cert_validator_test",
+        "//test/extensions/dynamic_modules/test_data/rust:cert_validator_test",
+    ],
+    env = {"GODEBUG": "cgocheck=0"},
+    rbe_pool = "6gig",
+    deps = [
+        # See //test/extensions/dynamic_modules/http:filter_test for why every test
+        # binary that loads a Go test_data .so depends on all_abi_impls.
+        "//source/extensions/dynamic_modules:all_abi_impls",
+        "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "dynamic_modules_cert_validator_test",
     srcs = ["dynamic_modules_cert_validator_test.cc"],
     data = [
