@@ -443,7 +443,7 @@ ProcessorState::handleStreamedBodyCallback(const CommonResponse& common_response
 absl::StatusOr<bool>
 ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_response) {
   Buffer::OwnedImpl chunk_data;
-  QueuedChunkPtr chunk = dequeueStreamingChunk(chunk_data);
+  absl::optional<QueuedChunk> chunk = dequeueStreamingChunk(chunk_data);
   if (!chunk) {
     ENVOY_BUG(false, "Bad partial body callback state");
     return absl::InternalError("Invalid chunk in partial body callback");
@@ -574,7 +574,7 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
   }
 }
 
-QueuedChunkPtr ProcessorState::dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
+absl::optional<QueuedChunk> ProcessorState::dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
   return chunk_queue_.pop(out_data);
 }
 
@@ -602,8 +602,8 @@ void ProcessorState::continueIfNecessary() {
 
 bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_response) {
   Buffer::OwnedImpl chunk_data;
-  QueuedChunkPtr chunk = dequeueStreamingChunk(chunk_data);
-  ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
+  absl::optional<QueuedChunk> chunk = dequeueStreamingChunk(chunk_data);
+  ENVOY_BUG(chunk.has_value(), "Bad streamed body callback state");
   if (common_response.has_body_mutation()) {
     Effect processing_effect;
     ENVOY_STREAM_LOG(debug, "Applying body response to chunk of data. Size = {}",
@@ -851,46 +851,42 @@ void EncodingProcessorState::setLocalResponseStreaming() {
 
 void ChunkQueue::push(Buffer::Instance& data, bool end_stream) {
   // Adding the chunk into the queue.
-  auto next_chunk = std::make_unique<QueuedChunk>();
-  next_chunk->length = data.length();
-  next_chunk->end_stream = end_stream;
-  queue_.push_back(std::move(next_chunk));
+  queue_.push_back({end_stream, static_cast<uint32_t>(data.length())});
   bytes_enqueued_ += data.length();
 
   // Adding the data to the buffer.
   received_data_.move(data);
 }
 
-QueuedChunkPtr ChunkQueue::pop(Buffer::OwnedImpl& out_data) {
+absl::optional<QueuedChunk> ChunkQueue::pop(Buffer::OwnedImpl& out_data) {
   if (queue_.empty()) {
-    return nullptr;
+    return absl::nullopt;
   }
 
-  QueuedChunkPtr chunk = std::move(queue_.front());
+  QueuedChunk chunk = queue_.front();
   queue_.pop_front();
-  bytes_enqueued_ -= chunk->length;
+  bytes_enqueued_ -= chunk.length;
 
   // Move the corresponding data out.
-  out_data.move(received_data_, chunk->length);
+  out_data.move(received_data_, chunk.length);
   return chunk;
 }
 
 const QueuedChunk& ChunkQueue::consolidate() {
   if (queue_.size() > 1) {
-    auto new_chunk = std::make_unique<QueuedChunk>();
-    new_chunk->end_stream = queue_.back()->end_stream;
-    new_chunk->length = bytes_enqueued_;
+    bool end_stream = queue_.back().end_stream;
     queue_.clear();
-    queue_.push_front(std::move(new_chunk));
+    queue_.push_front({end_stream, bytes_enqueued_});
   }
-  auto& chunk = *(queue_.front());
+  auto& chunk = queue_.front();
   return chunk;
 }
 
 void ChunkQueue::clear() {
-  if (queue_.size() > 1) {
+  if (!queue_.empty()) {
     received_data_.drain(received_data_.length());
     queue_.clear();
+    bytes_enqueued_ = 0;
   }
 }
 

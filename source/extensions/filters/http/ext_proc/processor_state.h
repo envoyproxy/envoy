@@ -17,6 +17,7 @@
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
 #include "absl/status/status.h"
+#include "absl/types/optional.h"
 #include "matching_utils.h"
 
 namespace Envoy {
@@ -32,7 +33,6 @@ public:
   bool end_stream = false;
   uint32_t length = 0;
 };
-using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
 
 class ChunkQueue {
 public:
@@ -43,13 +43,13 @@ public:
   bool empty() const { return queue_.empty(); }
   void push(Buffer::Instance& data, bool end_stream);
   void clear();
-  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
+  absl::optional<QueuedChunk> pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
-  const std::deque<QueuedChunkPtr>& queue() const { return queue_; }
+  const std::deque<QueuedChunk>& queue() const { return queue_; }
 
 private:
-  std::deque<QueuedChunkPtr> queue_;
+  std::deque<QueuedChunk> queue_;
   // The total size of chunks in the queue.
   uint32_t bytes_enqueued_{};
   // The received data that had not been sent to downstream/upstream.
@@ -222,7 +222,7 @@ public:
   // Move the contents of "data" into a QueuedChunk object on the streaming queue.
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream);
   // If the queue has chunks, return the head of the queue.
-  QueuedChunkPtr dequeueStreamingChunk(Buffer::OwnedImpl& out_data);
+  absl::optional<QueuedChunk> dequeueStreamingChunk(Buffer::OwnedImpl& out_data);
   // Consolidate all the chunks on the queue into a single one and return a reference.
   const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
