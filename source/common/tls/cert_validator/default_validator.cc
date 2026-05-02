@@ -534,12 +534,35 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
     bool auto_sni_san_match = config_->autoSniSanMatch();
     rc = EVP_DigestUpdate(md.get(), &auto_sni_san_match, sizeof(auto_sni_san_match));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    // Only hash when the flag is enabled, so session IDs for existing deployments
+    // (where the flag defaults to false) stay byte-identical to pre-feature behavior.
+    if (config_->suppressClientCaList()) {
+      bool suppress = true;
+      rc = EVP_DigestUpdate(md.get(), &suppress, sizeof(suppress));
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
   }
 }
 
 absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
                                                               bool require_client_cert) {
   if (config_ == nullptr || config_->caCert().empty()) {
+    return absl::OkStatus();
+  }
+
+  // When the CA list is suppressed, skip building the name stack entirely. The
+  // trust anchors are already loaded into the X509_STORE in initializeSslContexts(),
+  // which also rejects malformed bundles. Verify mode and depth are still applied.
+  if (config_->suppressClientCaList()) {
+    if (require_client_cert) {
+      SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+    }
+    if (config_->maxVerifyDepth().has_value()) {
+      uint32_t max_verify_depth = std::min(config_->maxVerifyDepth().value(), uint32_t{INT_MAX});
+      max_verify_depth = max_verify_depth > 0 ? max_verify_depth - 1 : 0;
+      SSL_CTX_set_verify_depth(ctx, static_cast<int>(max_verify_depth));
+    }
     return absl::OkStatus();
   }
 

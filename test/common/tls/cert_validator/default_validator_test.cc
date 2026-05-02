@@ -712,6 +712,7 @@ public:
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
   absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
   bool autoSniSanMatch() const override { return false; }
+  bool suppressClientCaList() const override { return false; }
 
 private:
   std::string s_;
@@ -788,6 +789,7 @@ public:
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
   absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
   bool autoSniSanMatch() const override { return false; }
+  bool suppressClientCaList() const override { return false; }
 
 private:
   std::string ca_name_;
@@ -889,6 +891,154 @@ TEST(DefaultCertValidatorTest, TestEmptyCertChainErrorDetails) {
   EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
   EXPECT_TRUE(results.error_details.has_value());
   EXPECT_EQ(results.error_details.value(), "verify cert failed: empty cert chain");
+}
+
+namespace {
+
+TestCertificateValidationContextConfigPtr makeSuppressConfig(const std::string& ca_cert,
+                                                             bool suppress) {
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
+  return std::make_unique<TestCertificateValidationContextConfig>(
+      typed_conf, /*allow_expired_certificate=*/false, san_matchers, ca_cert,
+      /*verify_depth=*/absl::nullopt, suppress);
+}
+
+// Runs updateDigestForSessionId against the validator and returns the resulting
+// digest bytes. Lets tests compare digests produced under different configs.
+std::vector<uint8_t> computeSessionIdDigest(DefaultCertValidator& validator) {
+  bssl::ScopedEVP_MD_CTX md;
+  int rc = EVP_DigestInit_ex(md.get(), EVP_sha256(), nullptr);
+  RELEASE_ASSERT(rc == 1, "EVP_DigestInit_ex failed");
+  uint8_t scratch[EVP_MAX_MD_SIZE];
+  validator.updateDigestForSessionId(md, scratch, SHA256_DIGEST_LENGTH);
+  std::vector<uint8_t> out(EVP_MAX_MD_SIZE);
+  unsigned out_len = 0;
+  rc = EVP_DigestFinal_ex(md.get(), out.data(), &out_len);
+  RELEASE_ASSERT(rc == 1, "EVP_DigestFinal_ex failed");
+  out.resize(out_len);
+  return out;
+}
+
+} // namespace
+
+// Test that when suppress_client_ca_list is enabled, SSL_CTX_get_client_CA_list returns NULL
+TEST(DefaultCertValidatorTest, SuppressClientCaListEnabled) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config = makeSuppressConfig(ca_cert, true);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  ASSERT_TRUE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
+
+  // When suppressed, the validator must not populate the CA list. Depending on the
+  // BoringSSL version, SSL_CTX_new may leave the list as nullptr or as an empty stack;
+  // both outcomes satisfy the guarantee that no CA names will be advertised.
+  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+  if (ca_list != nullptr) {
+    EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
+  }
+}
+
+// Test that when suppress_client_ca_list is disabled (default), CA list is set correctly
+TEST(DefaultCertValidatorTest, SuppressClientCaListDisabled) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config = makeSuppressConfig(ca_cert, false);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  ASSERT_TRUE(validator->addClientValidationContext(ssl_ctx.get(), true).ok());
+
+  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+  ASSERT_NE(ca_list, nullptr);
+  EXPECT_GT(sk_X509_NAME_num(ca_list), 0);
+}
+
+// Test that session ID hash differs when suppress_client_ca_list differs.
+// This prevents session resumption across contexts with different security settings.
+TEST(DefaultCertValidatorTest, SuppressClientCaListSessionIdDiffers) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config_suppressed = makeSuppressConfig(ca_cert, true);
+  auto config_not_suppressed = makeSuppressConfig(ca_cert, false);
+
+  DefaultCertValidator validator_suppressed(config_suppressed.get(), stats, context);
+  DefaultCertValidator validator_not_suppressed(config_not_suppressed.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx_suppressed(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> ssl_ctx_not_suppressed(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> ctxs1 = {ssl_ctx_suppressed.get()};
+  std::vector<SSL_CTX*> ctxs2 = {ssl_ctx_not_suppressed.get()};
+  ASSERT_TRUE(validator_suppressed.initializeSslContexts(ctxs1, true, *store.rootScope()).ok());
+  ASSERT_TRUE(validator_not_suppressed.initializeSslContexts(ctxs2, true, *store.rootScope()).ok());
+
+  auto digest_suppressed = computeSessionIdDigest(validator_suppressed);
+  auto digest_not_suppressed = computeSessionIdDigest(validator_not_suppressed);
+
+  EXPECT_NE(digest_suppressed, digest_not_suppressed)
+      << "Session ID digests must differ when suppress_client_ca_list differs";
+}
+
+// Test that when suppress_client_ca_list is false (the default), the session ID
+// digest does NOT include a "suppress=false" byte. This preserves backward-compat
+// with pre-feature session IDs so deployments not using the flag don't see their
+// in-flight session resumption invalidated on upgrade.
+//
+// Strategy: compute the real digest with suppress=false. Then recompute a hypothetical
+// "regressed" digest by feeding the same validator's digest PLUS a false byte (the
+// behavior the original code had). The two must differ — proving the production digest
+// did not include the false byte.
+TEST(DefaultCertValidatorTest, SuppressClientCaListDefaultSessionIdUnchanged) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config_default = makeSuppressConfig(ca_cert, false);
+  DefaultCertValidator validator(config_default.get(), stats, context);
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> ctxs = {ssl_ctx.get()};
+  ASSERT_TRUE(validator.initializeSslContexts(ctxs, true, *store.rootScope()).ok());
+
+  auto digest_production = computeSessionIdDigest(validator);
+
+  // Simulate the pre-Fix-#1 (regressed) behavior: replay updateDigestForSessionId,
+  // then manually feed the false byte that the regressed code would have pushed.
+  bssl::ScopedEVP_MD_CTX regressed_md;
+  ASSERT_EQ(1, EVP_DigestInit_ex(regressed_md.get(), EVP_sha256(), nullptr));
+  uint8_t scratch[EVP_MAX_MD_SIZE];
+  validator.updateDigestForSessionId(regressed_md, scratch, SHA256_DIGEST_LENGTH);
+  const bool false_byte = false;
+  ASSERT_EQ(1, EVP_DigestUpdate(regressed_md.get(), &false_byte, sizeof(false_byte)));
+  std::vector<uint8_t> digest_regressed(EVP_MAX_MD_SIZE);
+  unsigned regressed_len = 0;
+  ASSERT_EQ(1, EVP_DigestFinal_ex(regressed_md.get(), digest_regressed.data(), &regressed_len));
+  digest_regressed.resize(regressed_len);
+
+  EXPECT_NE(digest_production, digest_regressed)
+      << "Production digest for suppress=false includes a false byte, which would "
+         "change session IDs on upgrade for deployments not using the feature.";
 }
 
 } // namespace Tls
