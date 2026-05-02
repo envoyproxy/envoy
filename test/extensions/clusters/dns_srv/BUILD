@@ -15,6 +15,8 @@ envoy_cc_test(
     deps = [
         "//source/extensions/clusters/dns_srv:cluster",
         "//test/integration:http_integration_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:registry_lib",
         "@envoy_api//envoy/extensions/clusters/dns_srv/v3:pkg_cc_proto",
     ],
 )
