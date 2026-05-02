@@ -662,7 +662,7 @@ TEST_F(HickoryDnsImplTest, ResolveSrvNotImplemented) {
 
   bool callback_called = false;
   auto* query = resolver_->resolveSrv(
-      "localhost", DnsLookupFamily::All,
+      "localhost",
       [this, &callback_called](DnsResolver::ResolutionStatus status ABSL_ATTRIBUTE_UNUSED,
                                absl::string_view ABSL_ATTRIBUTE_UNUSED,
                                std::list<DnsResponse>&& response ABSL_ATTRIBUTE_UNUSED) {
