@@ -299,6 +299,28 @@ TEST_F(BacktraceActionTest, OnNonFatalSignalNoMatchingSlot) {
   NonFatalSignalHandler::callNonFatalSignalHandlers(SIGUSR2, &info, nullptr);
 }
 
+TEST_F(BacktraceActionNoSignalTest, WarnWhenSignalHandlerNotRegistered) {
+  // Fill all handler slots with a dummy to force BacktraceAction registration to fail.
+  auto dummy = +[](int, siginfo_t*, void*) {};
+  for (size_t i = 0; i < NonFatalSignalHandler::MaxHandlers; ++i) {
+    NonFatalSignalHandler::registerNonFatalSignalHandler(dummy);
+  }
+
+  envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
+  action_ = std::make_unique<BacktraceAction>(config, context_);
+
+  const auto now = api_->timeSource().monotonicTime();
+  const std::vector<std::pair<Thread::ThreadId, MonotonicTime>> pairs = {
+      {Thread::ThreadId(1), now}};
+  EXPECT_LOG_CONTAINS(
+      "warn", "signal handler not registered",
+      action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, pairs, now));
+
+  for (size_t i = 0; i < NonFatalSignalHandler::MaxHandlers; ++i) {
+    NonFatalSignalHandler::removeNonFatalSignalHandler(dummy);
+  }
+}
+
 } // namespace
 } // namespace BacktraceAction
 } // namespace Watchdog

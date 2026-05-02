@@ -45,6 +45,13 @@ BacktraceAction::BacktraceAction(
   }
 }
 
+BacktraceAction::~BacktraceAction() {
+  if (signal_handler_registered_) {
+    NonFatalSignalHandler::removeNonFatalSignalHandler(onNonFatalSignal);
+    signal_handler_registered_ = false;
+  }
+}
+
 void BacktraceAction::onNonFatalSignal(int /*sig*/, siginfo_t* info, void* context) {
   // Only handle signals sent by our own process.
   if (info == nullptr || info->si_pid != getpid()) {
