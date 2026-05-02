@@ -6,6 +6,7 @@ import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 import "envoy/type/v3/hash_policy.proto";
@@ -119,7 +120,7 @@ message TcpProxy {
   // Configuration for tunneling TCP over other transports or application layers.
   // Tunneling is supported over HTTP/1.1 and HTTP/2. The upstream protocol is
   // determined by the cluster configuration.
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message TunnelingConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
@@ -200,6 +201,12 @@ message TcpProxy {
     // This enables customizing the key used by access log formatters such as
     // ``%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:<key>)%``.
     string request_id_metadata_key = 9;
+
+    // Specifies a collection of Formatter plugins that can be used in substitution formatters
+    // in ``headers_to_add``.
+    // See the formatters extensions documentation for details.
+    // [#extension-category: envoy.formatter]
+    repeated config.core.v3.TypedExtensionConfig formatters = 10;
   }
 
   message OnDemand {

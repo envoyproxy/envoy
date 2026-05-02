@@ -1,6 +1,7 @@
 #include "envoy/grpc/async_client.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/histogram_impl.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
@@ -8,7 +9,6 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 
@@ -60,6 +60,19 @@ public:
                                             sink_config.mutable_custom_metric_conversions());
     }
     return std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
+  }
+
+  int64_t getGaugeValueByName(const MetricsExportRequestSharedPtr& request,
+                              const std::string& name) {
+    for (const auto& metric : request->resource_metrics()[0].scope_metrics()[0].metrics()) {
+      if (metric.name() == name) {
+        if (!metric.has_gauge() || metric.gauge().data_points().empty()) {
+          return -1;
+        }
+        return metric.gauge().data_points()[0].as_int();
+      }
+    }
+    return -1;
   }
 
   std::string getTagExtractedName(const std::string name) { return name + "-tagged"; }
@@ -189,14 +202,24 @@ TEST_F(OpenTelemetryGrpcMetricsExporterImplTest, PartialSuccess) {
 
 class OtlpMetricsFlusherTests : public OpenTelemetryStatsSinkTests {
 public:
-  void expectMetricsCount(MetricsExportRequestSharedPtr& request, int count) {
+  MetricsExportRequestSharedPtr flushToSingleRequest(const OtlpMetricsFlusherImpl& flusher) {
+    std::vector<MetricsExportRequestPtr> requests;
+    flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                  [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+    if (requests.size() != 1) {
+      return nullptr;
+    }
+    return std::move(requests[0]);
+  }
+
+  void expectMetricsCount(const MetricsExportRequestSharedPtr& request, int count) {
     EXPECT_EQ(1, request->resource_metrics().size());
     EXPECT_EQ(1, request->resource_metrics()[0].scope_metrics().size());
     EXPECT_EQ(count, request->resource_metrics()[0].scope_metrics()[0].metrics().size());
   }
 
-  const opentelemetry::proto::metrics::v1::Metric& metricAt(int index,
-                                                            MetricsExportRequestSharedPtr metrics) {
+  const opentelemetry::proto::metrics::v1::Metric&
+  metricAt(int index, const MetricsExportRequestSharedPtr& metrics) {
     return metrics->resource_metrics()[0].scope_metrics()[0].metrics()[index];
   }
 
@@ -236,8 +259,38 @@ public:
         });
   }
 
-  const opentelemetry::proto::metrics::v1::Metric* findMetric(MetricsExportRequestSharedPtr metrics,
-                                                              const std::string& name) {
+  void sortDataPoints(opentelemetry::proto::metrics::v1::Metric& metric) {
+    auto sort_by_attr = [](const auto& a, const auto& b) {
+      auto get_attr_str = [](const auto& dp) {
+        if (dp.attributes().empty())
+          return std::string("");
+        std::vector<std::string> attrs;
+        for (const auto& attr : dp.attributes()) {
+          attrs.push_back(attr.key() + "=" + attr.value().string_value());
+        }
+        std::sort(attrs.begin(), attrs.end());
+        std::string res;
+        for (const auto& s : attrs)
+          res += s + ";";
+        return res;
+      };
+      return get_attr_str(a) < get_attr_str(b);
+    };
+
+    if (metric.has_gauge()) {
+      std::sort(metric.mutable_gauge()->mutable_data_points()->begin(),
+                metric.mutable_gauge()->mutable_data_points()->end(), sort_by_attr);
+    } else if (metric.has_sum()) {
+      std::sort(metric.mutable_sum()->mutable_data_points()->begin(),
+                metric.mutable_sum()->mutable_data_points()->end(), sort_by_attr);
+    } else if (metric.has_histogram()) {
+      std::sort(metric.mutable_histogram()->mutable_data_points()->begin(),
+                metric.mutable_histogram()->mutable_data_points()->end(), sort_by_attr);
+    }
+  }
+
+  const opentelemetry::proto::metrics::v1::Metric*
+  findMetric(const MetricsExportRequestSharedPtr& metrics, const std::string& name) {
     for (const auto& metric : metrics->resource_metrics()[0].scope_metrics()[0].metrics()) {
       if (metric.name() == name) {
         return &metric;
@@ -246,8 +299,8 @@ public:
     return nullptr;
   }
 
-  const opentelemetry::proto::metrics::v1::Metric* findGauge(MetricsExportRequestSharedPtr metrics,
-                                                             const std::string& name) {
+  const opentelemetry::proto::metrics::v1::Metric*
+  findGauge(const MetricsExportRequestSharedPtr& metrics, const std::string& name) {
     const auto* metric = findMetric(metrics, name);
     EXPECT_NE(metric, nullptr) << "Gauge metric '" << name << "' not found.";
     if (metric == nullptr) {
@@ -257,8 +310,8 @@ public:
     return metric;
   }
 
-  const opentelemetry::proto::metrics::v1::Metric* findSum(MetricsExportRequestSharedPtr metrics,
-                                                           const std::string& name) {
+  const opentelemetry::proto::metrics::v1::Metric*
+  findSum(const MetricsExportRequestSharedPtr& metrics, const std::string& name) {
     const auto* metric = findMetric(metrics, name);
     EXPECT_NE(metric, nullptr) << "Sum metric '" << name << "' not found.";
     if (metric == nullptr) {
@@ -269,7 +322,7 @@ public:
   }
 
   const opentelemetry::proto::metrics::v1::Metric*
-  findHistogram(MetricsExportRequestSharedPtr metrics, const std::string& name) {
+  findHistogram(const MetricsExportRequestSharedPtr& metrics, const std::string& name) {
     const auto* metric = findMetric(metrics, name);
     EXPECT_NE(metric, nullptr) << "Histogram metric '" << name << "' not found.";
     if (metric == nullptr) {
@@ -367,8 +420,8 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
   addHostGaugeToSnapshot("test_host_gauge", 4);
   addHistogramToSnapshot("test_histogram");
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
   expectMetricsCount(metrics, 5);
 
   {
@@ -407,12 +460,15 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithDefaultOptions) {
   }
 
   gauge_storage_.back()->used_ = false;
-  metrics = flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
-  expectMetricsCount(metrics, 4);
+  metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, /*count=*/4);
 }
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithStatsPrefix) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix"));
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/false, /*report_histograms_as_deltas=*/false,
+      /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true, "prefix"));
 
   addCounterToSnapshot("test_counter", 1, 1);
   addHostCounterToSnapshot("test_host_counter", 1, 1);
@@ -420,8 +476,8 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithStatsPrefix) {
   addGaugeToSnapshot("test_host_gauge", 1);
   addHistogramToSnapshot("test_histogram");
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
   expectMetricsCount(metrics, 5);
 
   {
@@ -452,14 +508,16 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithStatsPrefix) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithNoTaggedName) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, false));
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/false, /*report_histograms_as_deltas=*/false,
+      /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/false));
 
   addCounterToSnapshot("test_counter", 1, 1);
   addGaugeToSnapshot("test_gauge", 1);
   addHistogramToSnapshot("test_histogram");
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
   expectMetricsCount(metrics, 3);
 
   {
@@ -480,13 +538,15 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithNoTaggedName) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithNoAttributes) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, false, true));
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/false, /*report_histograms_as_deltas=*/false,
+      /*emit_tags_as_attributes=*/false, /*use_tag_extracted_name=*/true));
 
   addCounterToSnapshot("test_counter", 1, 1);
   addGaugeToSnapshot("test_gauge", 1);
   addHistogramToSnapshot("test_histogram");
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
   expectMetricsCount(metrics, 3);
   {
     const auto* metric = findGauge(metrics, getTagExtractedName("test_gauge"));
@@ -518,17 +578,17 @@ TEST_F(OtlpMetricsFlusherTests, GaugeMetric) {
   addHostGaugeToSnapshot("test_host_gauge1", 3);
   addHostGaugeToSnapshot("test_host_gauge2", 4);
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
   expectMetricsCount(metrics, 4);
   expectGauge(*findGauge(metrics, getTagExtractedName("test_gauge1")),
-              getTagExtractedName("test_gauge1"), 1);
+              getTagExtractedName("test_gauge1"), /*value=*/1);
   expectGauge(*findGauge(metrics, getTagExtractedName("test_gauge2")),
-              getTagExtractedName("test_gauge2"), 2);
+              getTagExtractedName("test_gauge2"), /*value=*/2);
   expectGauge(*findGauge(metrics, getTagExtractedName("test_host_gauge1")),
-              getTagExtractedName("test_host_gauge1"), 3);
+              getTagExtractedName("test_host_gauge1"), /*value=*/3);
   expectGauge(*findGauge(metrics, getTagExtractedName("test_host_gauge2")),
-              getTagExtractedName("test_host_gauge2"), 4);
+              getTagExtractedName("test_host_gauge2"), /*value=*/4);
 }
 
 TEST_F(OtlpMetricsFlusherTests, CumulativeCounterMetric) {
@@ -539,13 +599,13 @@ TEST_F(OtlpMetricsFlusherTests, CumulativeCounterMetric) {
   addHostCounterToSnapshot("test_host_counter1", 2, 4);
   addHostCounterToSnapshot("test_host_counter2", 5, 10);
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
   expectMetricsCount(metrics, 4);
   expectSum(*findSum(metrics, getTagExtractedName("test_counter1")),
-            getTagExtractedName("test_counter1"), 1, false);
+            getTagExtractedName("test_counter1"), /*value=*/1, /*is_delta=*/false);
   expectSum(*findSum(metrics, getTagExtractedName("test_counter2")),
-            getTagExtractedName("test_counter2"), 3, false);
+            getTagExtractedName("test_counter2"), /*value=*/3, /*is_delta=*/false);
   expectSum(*findSum(metrics, getTagExtractedName("test_host_counter1")),
             getTagExtractedName("test_host_counter1"), 4, false);
   expectSum(*findSum(metrics, getTagExtractedName("test_host_counter2")),
@@ -553,7 +613,9 @@ TEST_F(OtlpMetricsFlusherTests, CumulativeCounterMetric) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, DeltaCounterMetric) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(true, false, true, true));
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/true, /*report_histograms_as_deltas=*/false,
+      /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true));
 
   addCounterToSnapshot("test_counter1", 1, 1);
   addCounterToSnapshot("test_counter2", 2, 3);
@@ -561,9 +623,8 @@ TEST_F(OtlpMetricsFlusherTests, DeltaCounterMetric) {
   addHostCounterToSnapshot("test_host_counter1", 2, 4);
   addHostCounterToSnapshot("test_host_counter2", 5, 10);
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
-
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
   expectMetricsCount(metrics, 4);
   expectSum(*findSum(metrics, getTagExtractedName("test_counter1")),
             getTagExtractedName("test_counter1"), 1, true);
@@ -581,29 +642,117 @@ TEST_F(OtlpMetricsFlusherTests, CumulativeHistogramMetric) {
   addHistogramToSnapshot("test_histogram1");
   addHistogramToSnapshot("test_histogram2");
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
   expectMetricsCount(metrics, 2);
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram1")),
-                  getTagExtractedName("test_histogram1"), false);
+                  getTagExtractedName("test_histogram1"), /*is_delta=*/false);
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram2")),
-                  getTagExtractedName("test_histogram2"), false);
+                  getTagExtractedName("test_histogram2"), /*is_delta=*/false);
 }
 
 TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(false, true, true, true));
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/false, /*report_histograms_as_deltas=*/true,
+      /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true));
 
   addHistogramToSnapshot("test_histogram1", true);
   addHistogramToSnapshot("test_histogram2", true);
   addHistogramToSnapshot("test_histogram3", true, true, {}, false);
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
   expectMetricsCount(metrics, 2);
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram1")),
-                  getTagExtractedName("test_histogram1"), true);
+                  getTagExtractedName("test_histogram1"), /*is_delta=*/true);
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram2")),
-                  getTagExtractedName("test_histogram2"), true);
+                  getTagExtractedName("test_histogram2"), /*is_delta=*/true);
+}
+
+TEST_F(OtlpMetricsFlusherTests, SetResourceAttributes) {
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(true, false, true, true, "", {{"key_foo", "val_foo"}}));
+  addCounterToSnapshot("test_counter1", 1, 1);
+
+  auto metrics = flushToSingleRequest(flusher);
+  ASSERT_NE(metrics, nullptr);
+  expectMetricsCount(metrics, 1);
+  expectSum(metricAt(0, metrics), getTagExtractedName("test_counter1"), 1, true);
+  EXPECT_EQ(1, metrics->resource_metrics().size());
+  EXPECT_EQ(1, metrics->resource_metrics()[0].resource().attributes().size());
+  EXPECT_EQ("key_foo", metrics->resource_metrics()[0].resource().attributes()[0].key());
+  EXPECT_EQ("val_foo",
+            metrics->resource_metrics()[0].resource().attributes()[0].value().string_value());
+}
+
+TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestNoLimits) {
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+  sink_config.set_max_data_points_per_request(0);
+  Tracers::OpenTelemetry::Resource resource;
+  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
+  OtlpMetricsFlusherImpl flusher(options);
+
+  for (int i = 0; i < 10; ++i) {
+    addCounterToSnapshot(fmt::format("counter{}", i), 1, 1);
+  }
+
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+
+  // 10 data points, 0 limit -> 1 request
+  ASSERT_EQ(requests.size(), 1);
+  EXPECT_EQ(10, requests[0]->resource_metrics(0).scope_metrics(0).metrics_size());
+}
+
+TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestEmptyMetrics) {
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+  sink_config.set_max_data_points_per_request(10);
+  Tracers::OpenTelemetry::Resource resource;
+  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
+  OtlpMetricsFlusherImpl flusher(options);
+
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+
+  EXPECT_EQ(requests.size(), 0);
+}
+
+TEST_F(OtlpMetricsFlusherTests, DeltaCountersAllZeroNoExport) {
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/true, /*report_histograms_as_deltas=*/false,
+      /*emit_tags_as_attributes=*/true, /*use_tag_extracted_name=*/true));
+
+  addCounterToSnapshot("test_counter1", 0, 1);
+  addCounterToSnapshot("test_counter2", 0, 3);
+
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+
+  EXPECT_EQ(requests.size(), 0);
+}
+
+TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestWithLimits) {
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+  sink_config.set_max_data_points_per_request(2);
+  Tracers::OpenTelemetry::Resource resource;
+  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
+  OtlpMetricsFlusherImpl flusher(options);
+
+  for (int i = 0; i < 5; ++i) {
+    addCounterToSnapshot(fmt::format("counter{}", i), 1, 1);
+  }
+
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+
+  ASSERT_EQ(requests.size(), 3);
+  EXPECT_EQ(2, requests[0]->resource_metrics(0).scope_metrics(0).metrics_size());
+  EXPECT_EQ(2, requests[1]->resource_metrics(0).scope_metrics(0).metrics_size());
+  EXPECT_EQ(1, requests[2]->resource_metrics(0).scope_metrics(0).metrics_size());
 }
 
 using OtlpMetricsFlusherAggregationTests = OtlpMetricsFlusherTests;
@@ -670,16 +819,23 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationCounter) 
   addCounterToSnapshot("unmapped_counter", 0, 1, true, {{"keyX", "valX"}});
   addCounterToSnapshot("unmapped_counter", 0, 5, true, {{"keyY", "valY"}});
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+  ASSERT_EQ(1, requests.size());
+  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
   const int expected_metrics_count = 2;
   expectMetricsCount(metrics, expected_metrics_count);
 
-  auto& exported_metrics =
-      const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
-          metrics->resource_metrics()[0].scope_metrics()[0].metrics());
+  auto& exported_metrics = *metrics->mutable_resource_metrics()
+                                ->Mutable(0)
+                                ->mutable_scope_metrics()
+                                ->Mutable(0)
+                                ->mutable_metrics();
   sortMetrics(exported_metrics);
-
+  for (auto& m : exported_metrics) {
+    sortDataPoints(m);
+  }
   // Counter: new_counter_name (remapped)
   const auto& metric = exported_metrics[0];
   EXPECT_EQ("new_counter_name", metric.name());
@@ -697,10 +853,10 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationCounter) 
   EXPECT_EQ(getTagExtractedName("prefix.unmapped_counter"), unmapped_metric.name());
   EXPECT_TRUE(unmapped_metric.has_sum());
   EXPECT_EQ(2, unmapped_metric.sum().data_points().size());
-  // data point 1: keyX: valX
+  // data point 1: keyY: valY
   EXPECT_EQ(1, unmapped_metric.sum().data_points()[0].as_int());
   expectAttributes(unmapped_metric.sum().data_points()[0].attributes(), "keyX", "valX");
-  // data point 2: keyY: valY
+  // data point 2: keyX: valX
   EXPECT_EQ(5, unmapped_metric.sum().data_points()[1].as_int());
   expectAttributes(unmapped_metric.sum().data_points()[1].attributes(), "keyY", "valY");
 }
@@ -767,15 +923,23 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationGauge) {
   addGaugeToSnapshot("unmapped_gauge", 4, true, {{"keyX", "valX"}});
   addGaugeToSnapshot("unmapped_gauge", 10, true, {{"keyY", "valY"}});
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+  ASSERT_EQ(1, requests.size());
+  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
   const int expected_metrics_count = 2;
   expectMetricsCount(metrics, expected_metrics_count);
 
-  auto& exported_metrics =
-      const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
-          metrics->resource_metrics()[0].scope_metrics()[0].metrics());
+  auto& exported_metrics = *metrics->mutable_resource_metrics()
+                                ->Mutable(0)
+                                ->mutable_scope_metrics()
+                                ->Mutable(0)
+                                ->mutable_metrics();
   sortMetrics(exported_metrics);
+  for (auto& m : exported_metrics) {
+    sortDataPoints(m);
+  }
   // Gauge: new_gauge_name (remapped)
   const auto& metric = exported_metrics[0];
   EXPECT_EQ("new_gauge_name", metric.name());
@@ -863,15 +1027,23 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationHistogram
   addHistogramToSnapshot("unmapped_histogram", false, true, {{"keyX", "valX"}});
   addHistogramToSnapshot("unmapped_histogram", false, true, {{"keyY", "valY"}});
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+  ASSERT_EQ(1, requests.size());
+  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
   const int expected_metrics_count = 2;
   expectMetricsCount(metrics, expected_metrics_count);
 
-  auto& exported_metrics =
-      const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
-          metrics->resource_metrics()[0].scope_metrics()[0].metrics());
+  auto& exported_metrics = *metrics->mutable_resource_metrics()
+                                ->Mutable(0)
+                                ->mutable_scope_metrics()
+                                ->Mutable(0)
+                                ->mutable_metrics();
   sortMetrics(exported_metrics);
+  for (auto& m : exported_metrics) {
+    sortDataPoints(m);
+  }
   // Histogram: new_histogram_name (remapped)
   const auto& metric = exported_metrics[0];
   EXPECT_EQ("new_histogram_name", metric.name());
@@ -1013,17 +1185,22 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
         }
       )pb"));
 
-  addCounterToSnapshot("test_counter", 1, 1, true, {{"key", "val1"}});
-  addGaugeToSnapshot("test_gauge", 1, true, {{"key", "valA"}});
-  addHistogramToSnapshot("test_histogram", false, true, {{"key", "hist1"}});
+  addCounterToSnapshot("test_counter", /*delta=*/1, /*value=*/1, /*used=*/true, {{"key", "val1"}});
+  addGaugeToSnapshot("test_gauge", /*value=*/1, /*used=*/true, {{"key", "valA"}});
+  addHistogramToSnapshot("test_histogram", /*is_delta=*/false, /*used=*/true, {{"key", "hist1"}});
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
-  expectMetricsCount(metrics, 3);
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+  ASSERT_EQ(1, requests.size());
+  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
+  expectMetricsCount(metrics, /*count=*/3);
 
-  auto& exported_metrics =
-      const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
-          metrics->resource_metrics()[0].scope_metrics()[0].metrics());
+  auto& exported_metrics = *metrics->mutable_resource_metrics()
+                                ->Mutable(0)
+                                ->mutable_scope_metrics()
+                                ->Mutable(0)
+                                ->mutable_metrics();
   sortMetrics(exported_metrics);
 
   // Expected metrics in sorted order:
@@ -1040,10 +1217,13 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
     EXPECT_EQ(1, metric.sum().data_points()[0].as_int());
     const auto& attrs = metric.sum().data_points()[0].attributes();
     EXPECT_EQ(2, attrs.size());
-    EXPECT_EQ("key", attrs[0].key());
-    EXPECT_EQ("val1", attrs[0].value().string_value());
-    EXPECT_EQ("static_key_c", attrs[1].key());
-    EXPECT_EQ("static_val_c", attrs[1].value().string_value());
+    std::vector<KeyValue> sorted_attrs(attrs.begin(), attrs.end());
+    std::sort(sorted_attrs.begin(), sorted_attrs.end(),
+              [](const KeyValue& a, const KeyValue& b) { return a.key() < b.key(); });
+    EXPECT_EQ("key", sorted_attrs[0].key());
+    EXPECT_EQ("val1", sorted_attrs[0].value().string_value());
+    EXPECT_EQ("static_key_c", sorted_attrs[1].key());
+    EXPECT_EQ("static_val_c", sorted_attrs[1].value().string_value());
   }
 
   // Gauge: static_gauge
@@ -1055,10 +1235,13 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
     EXPECT_EQ(1, metric.gauge().data_points()[0].as_int());
     const auto& attrs = metric.gauge().data_points()[0].attributes();
     EXPECT_EQ(2, attrs.size());
-    EXPECT_EQ("key", attrs[0].key());
-    EXPECT_EQ("valA", attrs[0].value().string_value());
-    EXPECT_EQ("static_key_g", attrs[1].key());
-    EXPECT_EQ("static_val_g", attrs[1].value().string_value());
+    std::vector<KeyValue> sorted_attrs(attrs.begin(), attrs.end());
+    std::sort(sorted_attrs.begin(), sorted_attrs.end(),
+              [](const KeyValue& a, const KeyValue& b) { return a.key() < b.key(); });
+    EXPECT_EQ("key", sorted_attrs[0].key());
+    EXPECT_EQ("valA", sorted_attrs[0].value().string_value());
+    EXPECT_EQ("static_key_g", sorted_attrs[1].key());
+    EXPECT_EQ("static_val_g", sorted_attrs[1].value().string_value());
   }
 
   // Histogram: static_histogram
@@ -1069,11 +1252,66 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
     EXPECT_EQ(1, metric.histogram().data_points().size());
     const auto& attrs = metric.histogram().data_points()[0].attributes();
     EXPECT_EQ(2, attrs.size());
-    EXPECT_EQ("key", attrs[0].key());
-    EXPECT_EQ("hist1", attrs[0].value().string_value());
-    EXPECT_EQ("static_key_h", attrs[1].key());
-    EXPECT_EQ("static_val_h", attrs[1].value().string_value());
+    std::vector<KeyValue> sorted_attrs(attrs.begin(), attrs.end());
+    std::sort(sorted_attrs.begin(), sorted_attrs.end(),
+              [](const KeyValue& a, const KeyValue& b) { return a.key() < b.key(); });
+    EXPECT_EQ("key", sorted_attrs[0].key());
+    EXPECT_EQ("hist1", sorted_attrs[0].value().string_value());
+    EXPECT_EQ("static_key_h", sorted_attrs[1].key());
+    EXPECT_EQ("static_val_h", sorted_attrs[1].value().string_value());
   }
+}
+
+TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithDifferentlyOrderedTags) {
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "", {}, R"pb(
+    matcher_list {
+    }
+  )pb"));
+
+  // Add 4 counters with the same name but different tag orders (permutations of 3 labels)
+  addCounterToSnapshot("test_counter", /*delta=*/1, /*value=*/1, /*used=*/true,
+                       {{"a", "1"}, {"b", "2"}, {"c", "3"}});
+  addCounterToSnapshot("test_counter", /*delta=*/2, /*value=*/2, /*used=*/true,
+                       {{"b", "2"}, {"c", "3"}, {"a", "1"}});
+  addCounterToSnapshot("test_counter", /*delta=*/3, /*value=*/3, /*used=*/true,
+                       {{"c", "3"}, {"a", "1"}, {"b", "2"}});
+  addCounterToSnapshot("test_counter", /*delta=*/4, /*value=*/4, /*used=*/true,
+                       {{"a", "1"}, {"c", "3"}, {"b", "2"}});
+
+  std::vector<MetricsExportRequestPtr> requests;
+
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+
+  ASSERT_EQ(1, requests.size());
+  auto& exported_metrics = *requests[0]
+                                ->mutable_resource_metrics()
+                                ->Mutable(0)
+                                ->mutable_scope_metrics()
+                                ->Mutable(0)
+                                ->mutable_metrics();
+
+  // We expect exactly ONE counter in the output because they should be aggregated!
+  ASSERT_EQ(1, exported_metrics.size());
+  const auto& metric = exported_metrics[0];
+  EXPECT_EQ(getTagExtractedName("test_counter"), metric.name());
+  EXPECT_TRUE(metric.has_sum());
+
+  // We expect only ONE data point because they should be aggregated!
+  ASSERT_EQ(1, metric.sum().data_points().size());
+
+  // Accumulated value should be aggregated (1 + 2 + 3 + 4 = 10)
+  EXPECT_EQ(10, metric.sum().data_points()[0].as_int());
+
+  // Tags should be sorted in the output as well!
+  const auto& attrs = metric.sum().data_points()[0].attributes();
+  EXPECT_EQ(3, attrs.size());
+  EXPECT_EQ("a", attrs[0].key());
+  EXPECT_EQ("1", attrs[0].value().string_value());
+  EXPECT_EQ("b", attrs[1].key());
+  EXPECT_EQ("2", attrs[1].value().string_value());
+  EXPECT_EQ("c", attrs[2].key());
+  EXPECT_EQ("3", attrs[2].value().string_value());
 }
 
 TEST_F(OtlpMetricsFlusherTests, DropMetrics) {
@@ -1110,20 +1348,23 @@ TEST_F(OtlpMetricsFlusherTests, DropMetrics) {
         }
       )pb"));
 
-  addCounterToSnapshot("test_counter", 1, 1);
-  addCounterToSnapshot("drop_counter", 1, 1);
-  addHostCounterToSnapshot("test_host_counter", 1, 1);
-  addHostCounterToSnapshot("drop_host_counter", 1, 1);
-  addGaugeToSnapshot("test_gauge", 1);
-  addGaugeToSnapshot("drop_gauge", 1);
-  addHostGaugeToSnapshot("test_host_gauge", 4);
-  addHostGaugeToSnapshot("drop_host_gauge", 4);
+  addCounterToSnapshot("test_counter", /*delta=*/1, /*value=*/1);
+  addCounterToSnapshot("drop_counter", /*delta=*/1, /*value=*/1);
+  addHostCounterToSnapshot("test_host_counter", /*delta=*/1, /*value=*/1);
+  addHostCounterToSnapshot("drop_host_counter", /*delta=*/1, /*value=*/1);
+  addGaugeToSnapshot("test_gauge", /*value=*/1);
+  addGaugeToSnapshot("drop_gauge", /*value=*/1);
+  addHostGaugeToSnapshot("test_host_gauge", /*value=*/4);
+  addHostGaugeToSnapshot("drop_host_gauge", /*value=*/4);
   addHistogramToSnapshot("test_histogram");
   addHistogramToSnapshot("drop_histogram");
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
-  expectMetricsCount(metrics, 5);
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+  ASSERT_EQ(1, requests.size());
+  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
+  expectMetricsCount(metrics, /*count=*/5);
 
   EXPECT_NE(nullptr, findMetric(metrics, getTagExtractedName("test_counter")));
   EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_counter")));
@@ -1182,30 +1423,18 @@ TEST_F(OtlpMetricsFlusherTests, OnNoMatchDrop) {
         }
       )pb"));
 
-  addCounterToSnapshot("keep_counter", 1, 1);
-  addCounterToSnapshot("drop_via_on_no_match_counter", 1, 1);
+  addCounterToSnapshot("keep_counter", /*delta=*/1, /*value=*/1);
+  addCounterToSnapshot("drop_via_on_no_match_counter", /*delta=*/1, /*value=*/1);
 
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
-  expectMetricsCount(metrics, 1);
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+  ASSERT_EQ(1, requests.size());
+  MetricsExportRequestSharedPtr metrics = std::move(requests[0]);
+  expectMetricsCount(metrics, /*count=*/1);
 
   EXPECT_NE(nullptr, findMetric(metrics, "new_kept_metric"));
   EXPECT_EQ(nullptr, findMetric(metrics, getTagExtractedName("drop_via_on_no_match_counter")));
-}
-
-TEST_F(OtlpMetricsFlusherTests, SetResourceAttributes) {
-  OtlpMetricsFlusherImpl flusher(
-      otlpOptions(true, false, true, true, "", {{"key_foo", "val_foo"}}));
-  addCounterToSnapshot("test_counter1", 1, 1);
-  MetricsExportRequestSharedPtr metrics =
-      flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_);
-  expectMetricsCount(metrics, 1);
-  expectSum(metricAt(0, metrics), getTagExtractedName("test_counter1"), 1, true);
-  EXPECT_EQ(1, metrics->resource_metrics().size());
-  EXPECT_EQ(1, metrics->resource_metrics()[0].resource().attributes().size());
-  EXPECT_EQ("key_foo", metrics->resource_metrics()[0].resource().attributes()[0].key());
-  EXPECT_EQ("val_foo",
-            metrics->resource_metrics()[0].resource().attributes()[0].value().string_value());
 }
 
 class MockOpenTelemetryGrpcMetricsExporter : public OpenTelemetryGrpcMetricsExporter {
@@ -1217,7 +1446,9 @@ public:
 
 class MockOtlpMetricsFlusher : public OtlpMetricsFlusher {
 public:
-  MOCK_METHOD(MetricsExportRequestPtr, flush, (Stats::MetricSnapshot&, int64_t, int64_t),
+  MOCK_METHOD(void, flush,
+              (Stats::MetricSnapshot&, int64_t, int64_t,
+               absl::AnyInvocable<void(MetricsExportRequestPtr)>),
               (const, override));
 };
 
@@ -1238,8 +1469,11 @@ TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   // First flush: last_flush_time_ns should be the created_at value (1000).
   MetricsExportRequestPtr request1 = std::make_unique<MetricsExportRequest>();
   EXPECT_CALL(*flusher_, flush(_, /*delta_start_time_ns=*/1000,
-                               /*cumulative_start_time_ns=*/1000))
-      .WillOnce(Return(ByMove(std::move(request1))));
+                               /*cumulative_start_time_ns=*/1000, _))
+      .WillOnce(Invoke([&](Stats::MetricSnapshot&, int64_t, int64_t,
+                           absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) {
+        send_callback(std::move(request1));
+      }));
   EXPECT_CALL(*exporter_, send(_));
   sink.flush(snapshot_);
 
@@ -1247,10 +1481,536 @@ TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   // snapshot used in the first flush, which is expected_time_ns_.
   MetricsExportRequestPtr request2 = std::make_unique<MetricsExportRequest>();
   EXPECT_CALL(*flusher_, flush(_, /*delta_start_time_ns=*/expected_time_ns_,
-                               /*cumulative_start_time_ns=*/1000))
-      .WillOnce(Return(ByMove(std::move(request2))));
+                               /*cumulative_start_time_ns=*/1000, _))
+      .WillOnce(Invoke([&](Stats::MetricSnapshot&, int64_t, int64_t,
+                           absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) {
+        send_callback(std::move(request2));
+      }));
   EXPECT_CALL(*exporter_, send(_));
   sink.flush(snapshot_);
+}
+
+class MetricAggregatorTests : public testing::Test {
+public:
+  using AggregationTemporality = opentelemetry::proto::metrics::v1::AggregationTemporality;
+
+  void setupAggregator(AggregationTemporality counter_temp, AggregationTemporality hist_temp) {
+    metric_aggregator_ = std::make_unique<MetricAggregator>(counter_temp, hist_temp);
+  }
+
+  class CustomMockHistogramStatistics : public Stats::HistogramStatistics {
+  public:
+    std::string quantileSummary() const override { return ""; }
+    std::string bucketSummary() const override { return ""; }
+    const std::vector<double>& supportedQuantiles() const override { return supported_quantiles_; }
+    const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
+    Stats::ConstSupportedBuckets& supportedBuckets() const override { return supported_buckets_; }
+    const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
+    std::vector<uint64_t> computeDisjointBuckets() const override { return computed_buckets_; }
+    uint64_t sampleCount() const override { return sample_count_; }
+    uint64_t outOfBoundCount() const override { return 0; }
+    double sampleSum() const override { return sample_sum_; }
+
+    std::vector<double> supported_quantiles_;
+    std::vector<double> computed_quantiles_;
+    std::vector<double> supported_buckets_{};
+    std::vector<uint64_t> computed_buckets_{};
+    uint64_t sample_count_{0};
+    double sample_sum_{0};
+  };
+
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attributes_;
+  std::unique_ptr<MetricAggregator> metric_aggregator_;
+  CustomMockHistogramStatistics custom_stats_;
+
+  void mockHistogram(const std::vector<double>& supported_buckets,
+                     const std::vector<uint64_t>& computed_buckets, uint64_t sample_count,
+                     uint64_t sample_sum) {
+    custom_stats_.supported_buckets_ = supported_buckets;
+    custom_stats_.computed_buckets_ = computed_buckets;
+    custom_stats_.sample_count_ = sample_count;
+    custom_stats_.sample_sum_ = sample_sum;
+  }
+
+  uint64_t getGaugeValue(const MetricAggregator::AggregationResult& metrics,
+                         const std::string& name,
+                         const MetricAggregator::SortedAttributesVector& attrs) {
+    MetricAggregator::MetricKey key{std::string(name),
+                                    MetricAggregator::SortedAttributesVector(attrs)};
+    auto it = metrics.gauge_data_.find(key);
+    if (it != metrics.gauge_data_.end()) {
+      return it->second;
+    }
+    return 0;
+  }
+
+  uint64_t getCounterValue(const MetricAggregator::AggregationResult& metrics,
+                           const std::string& name,
+                           const MetricAggregator::SortedAttributesVector& attrs) {
+    MetricAggregator::MetricKey key{std::string(name),
+                                    MetricAggregator::SortedAttributesVector(attrs)};
+    auto it = metrics.counter_data_.find(key);
+    if (it != metrics.counter_data_.end()) {
+      return it->second;
+    }
+    return 0;
+  }
+
+  const MetricAggregator::CustomHistogram*
+  getHistogramPoint(const MetricAggregator::AggregationResult& metrics, const std::string& name,
+                    const MetricAggregator::SortedAttributesVector& attrs) {
+    MetricAggregator::MetricKey key{std::string(name),
+                                    MetricAggregator::SortedAttributesVector(attrs)};
+    auto it = metrics.histogram_data_.find(key);
+    if (it != metrics.histogram_data_.end()) {
+      return &it->second;
+    }
+    return nullptr;
+  }
+};
+
+TEST_F(MetricAggregatorTests, GaugeAggregation) {
+  setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                  /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+  MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
+
+  metric_aggregator_->addGauge("metric1", /*value=*/10,
+                               MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addGauge("metric2", /*value=*/20,
+                               MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addGauge(
+      "metric1", /*value=*/30,
+      MetricAggregator::SortedAttributesVector{{"key1", ""}}); // Aggregated with 10 (10+30=40)
+  metric_aggregator_->addGauge("metric3", /*value=*/40,
+                               MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addGauge(
+      "metric1", /*value=*/50,
+      MetricAggregator::SortedAttributesVector{{"key2", ""}}); // New point for `attr2`
+  metric_aggregator_->addGauge("metric4", /*value=*/60,
+                               MetricAggregator::SortedAttributesVector{{"key1", ""}});
+
+  auto metrics = metric_aggregator_->releaseResult();
+  EXPECT_EQ(metrics.gauge_data_.size(), 5);
+  EXPECT_EQ(getGaugeValue(metrics, "metric1", attr1), 40); // Aggregated
+  EXPECT_EQ(getGaugeValue(metrics, "metric2", attr1), 20);
+  EXPECT_EQ(getGaugeValue(metrics, "metric1", attr2), 50);
+  EXPECT_EQ(getGaugeValue(metrics, "metric3", attr1), 40);
+  EXPECT_EQ(getGaugeValue(metrics, "metric4", attr1), 60);
+}
+
+TEST_F(MetricAggregatorTests, CounterAggregationDelta) {
+  setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA,
+                  /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+  MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
+
+  metric_aggregator_->addCounter("metric1", /*value=*/5,
+                                 MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addCounter("metric2", /*value=*/15,
+                                 MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addCounter(
+      "metric1", /*value=*/10,
+      MetricAggregator::SortedAttributesVector{{"key2", ""}}); // Diff attribute
+  metric_aggregator_->addCounter("metric1", /*value=*/20,
+                                 MetricAggregator::SortedAttributesVector{{"key1", ""}});
+
+  auto metrics = metric_aggregator_->releaseResult();
+  EXPECT_EQ(metrics.counter_data_.size(), 3);
+  EXPECT_EQ(getCounterValue(metrics, "metric1", attr1), 25); // 5 + 20 (delta)
+  EXPECT_EQ(getCounterValue(metrics, "metric2", attr1), 15);
+  EXPECT_EQ(getCounterValue(metrics, "metric1", attr2), 10);
+}
+TEST_F(MetricAggregatorTests, CounterAggregationCumulative) {
+  setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                  /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+  MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
+
+  metric_aggregator_->addCounter("metric1", /*value=*/10,
+                                 MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addCounter("metric2", /*value=*/20,
+                                 MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addCounter(
+      "metric1", /*value=*/15,
+      MetricAggregator::SortedAttributesVector{{"key2", ""}}); // Diff attribute
+  metric_aggregator_->addCounter(
+      "metric1", /*value=*/25,
+      MetricAggregator::SortedAttributesVector{{"key1", ""}}); // Collides with first
+
+  auto metrics = metric_aggregator_->releaseResult();
+  EXPECT_EQ(metrics.counter_data_.size(), 3);
+  EXPECT_EQ(getCounterValue(metrics, "metric1", attr1), 35); // 10 + 25 (value)
+  EXPECT_EQ(getCounterValue(metrics, "metric2", attr1), 20);
+  EXPECT_EQ(getCounterValue(metrics, "metric1", attr2), 15);
+}
+
+TEST_F(MetricAggregatorTests, CounterAggregationDifferentTagOrders) {
+  setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                  /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+
+  // They must be sorted when creating SortedAttributesVector!
+  MetricAggregator::SortedAttributesVector attr1 = {{"a", "1"}, {"b", "2"}, {"c", "3"}};
+  MetricAggregator::SortedAttributesVector attr2 = {
+      {"a", "1"}, {"b", "2"}, {"c", "3"}}; // Identical!
+
+  metric_aggregator_->addCounter(
+      "metric_perm", /*value=*/1,
+      MetricAggregator::SortedAttributesVector{{"a", "1"}, {"b", "2"}, {"c", "3"}});
+  metric_aggregator_->addCounter(
+      "metric_perm", /*value=*/2,
+      MetricAggregator::SortedAttributesVector{{"a", "1"}, {"b", "2"}, {"c", "3"}});
+
+  auto metrics = metric_aggregator_->releaseResult();
+  EXPECT_EQ(metrics.counter_data_.size(), 1);
+  EXPECT_EQ(getCounterValue(metrics, "metric_perm", attr1), 3); // 1 + 2 = 3
+}
+
+TEST_F(MetricAggregatorTests, HistogramAggregationCumulative) {
+  setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                  /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+  MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
+
+  std::vector<double> supported_buckets = {10, 20, 30};
+  std::vector<uint64_t> computed_buckets1 = {1, 2, 3};
+  std::vector<uint64_t> computed_buckets2 = {4, 5, 6};
+
+  mockHistogram(supported_buckets, computed_buckets1, 6, 60);
+  metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                   MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addHistogram("metric2", custom_stats_,
+                                   MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  metric_aggregator_->addHistogram(
+      "metric1", custom_stats_,
+      MetricAggregator::SortedAttributesVector{{"key2", ""}}); // Diff attribute
+
+  mockHistogram(supported_buckets, computed_buckets2, 15, 150);
+  metric_aggregator_->addHistogram(
+      "metric1", custom_stats_,
+      MetricAggregator::SortedAttributesVector{{"key1", ""}}); // Aggregates with first
+
+  auto metrics = metric_aggregator_->releaseResult();
+  EXPECT_EQ(metrics.histogram_data_.size(), 3);
+
+  auto* dp1 = getHistogramPoint(metrics, "metric1", attr1);
+  ASSERT_NE(dp1, nullptr);
+  EXPECT_EQ(dp1->count_, 21); // 6 + 15
+  EXPECT_EQ(dp1->sum_, 210);
+
+  auto* dp2 = getHistogramPoint(metrics, "metric2", attr1);
+  ASSERT_NE(dp2, nullptr);
+  EXPECT_EQ(dp2->count_, 6);
+
+  auto* dp3 =
+      getHistogramPoint(metrics, "metric1", MetricAggregator::SortedAttributesVector{{"key2", ""}});
+  ASSERT_NE(dp3, nullptr);
+  EXPECT_EQ(dp3->count_, 6);
+}
+
+TEST_F(MetricAggregatorTests, HistogramAggregationDelta) {
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+
+  std::vector<double> supported_buckets = {10, 20, 30};
+
+  {
+    setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                    /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
+
+    // 1. Add a 0-count histogram -> should be ignored (early return)
+    metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                     MetricAggregator::SortedAttributesVector{{"key1", ""}});
+
+    auto metrics = metric_aggregator_->releaseResult();
+    EXPECT_TRUE(metrics.histogram_data_.empty());
+  }
+
+  {
+    setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                    /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA);
+
+    // 2. Add valid data
+    std::vector<uint64_t> computed_buckets1 = {1, 2, 3};
+    mockHistogram(supported_buckets, computed_buckets1, 6, 60);
+    metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                     MetricAggregator::SortedAttributesVector{{"key1", ""}});
+    metric_aggregator_->addHistogram("metric2", custom_stats_,
+                                     MetricAggregator::SortedAttributesVector{{"key1", ""}});
+    metric_aggregator_->addHistogram(
+        "metric1", custom_stats_,
+        MetricAggregator::SortedAttributesVector{{"key2", ""}}); // Diff attribute
+
+    // 3. Add colliding data -> should aggregate (sum up)
+    std::vector<uint64_t> computed_buckets2 = {4, 5, 6};
+    mockHistogram(supported_buckets, computed_buckets2, 15, 150);
+    metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                     MetricAggregator::SortedAttributesVector{{"key1", ""}});
+
+    auto metrics = metric_aggregator_->releaseResult();
+    EXPECT_EQ(metrics.histogram_data_.size(), 3);
+
+    auto* dp1 = getHistogramPoint(metrics, "metric1", attr1);
+    ASSERT_NE(dp1, nullptr);
+    EXPECT_EQ(dp1->count_, 21); // 6 + 15
+    EXPECT_EQ(dp1->sum_, 210);
+
+    auto* dp2 = getHistogramPoint(metrics, "metric2", attr1);
+    ASSERT_NE(dp2, nullptr);
+    EXPECT_EQ(dp2->count_, 6);
+
+    auto* dp3 = getHistogramPoint(metrics, "metric1",
+                                  MetricAggregator::SortedAttributesVector{{"key2", ""}});
+    ASSERT_NE(dp3, nullptr);
+    EXPECT_EQ(dp3->count_, 6);
+  }
+}
+
+TEST_F(MetricAggregatorTests, HistogramAggregationBoundariesMismatch) {
+  setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                  /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+  std::vector<double> supported_buckets1 = {10, 20, 30};
+  std::vector<uint64_t> computed_buckets1 = {1, 2, 3};
+
+  mockHistogram(supported_buckets1, computed_buckets1, 6, 60);
+  metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                   MetricAggregator::SortedAttributesVector{{"key1", ""}});
+
+  // Add histogram with different boundaries
+  std::vector<double> supported_buckets2 = {10, 25, 30}; // Diff boundary
+  std::vector<uint64_t> computed_buckets2 = {4, 5, 6};
+  mockHistogram(supported_buckets2, computed_buckets2, 15, 150);
+  EXPECT_LOG_CONTAINS("error", "Histogram bounds mismatch", {
+    metric_aggregator_->addHistogram("metric1", custom_stats_,
+                                     MetricAggregator::SortedAttributesVector{{"key1", ""}});
+  });
+
+  auto metrics = metric_aggregator_->releaseResult();
+  EXPECT_EQ(metrics.histogram_data_.size(),
+            1); // Should not aggregate, so only 1 entry (the first one)
+
+  auto it = metrics.histogram_data_.begin();
+  EXPECT_EQ(it->first.name(), "metric1");
+  EXPECT_EQ(it->second.count_, 6); // Only first histogram data
+  EXPECT_EQ(it->second.sum_, 60);
+}
+
+class RequestStreamerTests : public testing::Test {
+public:
+  void SetUp() override { resource_attributes_.Add()->set_key("resource_key"); }
+
+  void setupStreamer(uint32_t max_data_point, bool enable_metric_aggregation = true) {
+    opentelemetry::proto::metrics::v1::AggregationTemporality counter_temp = opentelemetry::proto::
+        metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
+    opentelemetry::proto::metrics::v1::AggregationTemporality hist_temp = opentelemetry::proto::
+        metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
+
+    streamer_ = std::make_unique<RequestStreamer>(
+        max_data_point, resource_attributes_, counter_temp, hist_temp,
+        [this](MetricsExportRequestPtr request) { requests_.push_back(std::move(request)); },
+        /*snapshot_time_ns=*/0, /*delta_start_time_ns=*/0, /*cumulative_start_time_ns=*/0,
+        enable_metric_aggregation);
+  }
+
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
+  std::vector<MetricsExportRequestPtr> requests_;
+  std::unique_ptr<RequestStreamer> streamer_;
+};
+
+TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestEmptyMetrics) {
+  setupStreamer(/*max_data_point=*/1);
+  streamer_->send();
+  EXPECT_EQ(requests_.size(), 0);
+}
+
+TEST_F(RequestStreamerTests, TestNoAggregationEmitsSeparateMetrics) {
+  setupStreamer(/*max_data_point=*/0, /*enable_metric_aggregation=*/false);
+
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", "val1"}};
+  MetricAggregator::SortedAttributesVector attr2 = {{"key2", "val2"}};
+
+  streamer_->addGauge("metric1", 10, std::move(attr1));
+  streamer_->addGauge("metric1", 20, std::move(attr2));
+  streamer_->send();
+
+  EXPECT_EQ(requests_.size(), 1);
+  // We expect 2 separate Metric protos with the same name because aggregation is disabled!
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 2);
+
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics(0).name(), "metric1");
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics(1).name(), "metric1");
+}
+
+TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoLimits) {
+  setupStreamer(/*max_data_point=*/0);
+
+  for (int i = 0; i < 1000; i++) {
+    streamer_->addGauge("metric" + std::to_string(i), i, {});
+  }
+  streamer_->send();
+
+  EXPECT_EQ(requests_.size(), 1);
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 1000);
+}
+
+TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestWithLimits) {
+  setupStreamer(/*max_data_point=*/2);
+
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+  streamer_->addGauge("metric1", 1, {});
+  streamer_->addGauge("metric1", 2, std::move(attr1));
+  streamer_->addGauge("metric2", 3, {});
+  streamer_->send();
+
+  EXPECT_EQ(requests_.size(), 2);
+
+  auto count_dp = [](const MetricsExportRequestPtr& req) {
+    uint32_t count = 0;
+    for (const auto& metric : req->resource_metrics(0).scope_metrics(0).metrics()) {
+      count += metric.gauge().data_points_size();
+    }
+    return count;
+  };
+
+  EXPECT_EQ(count_dp(requests_[0]), 2);
+  EXPECT_EQ(count_dp(requests_[1]), 1);
+}
+
+TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestGauge) {
+  setupStreamer(/*max_data_point=*/1);
+
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+  MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
+
+  streamer_->addGauge("metric1", 1, std::move(attr1));
+  streamer_->addGauge("metric1", 2, std::move(attr2));
+  streamer_->send();
+
+  EXPECT_EQ(requests_.size(), 2);
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 1);
+  EXPECT_EQ(requests_[1]->resource_metrics(0).scope_metrics(0).metrics_size(), 1);
+}
+
+TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationCounter) {
+  setupStreamer(/*max_data_point=*/2);
+
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+  MetricAggregator::SortedAttributesVector attr2 = {{"key2", ""}};
+
+  streamer_->addCounter("metric1", 10, {});
+  streamer_->addCounter("metric1", 20, std::move(attr1));
+  streamer_->addCounter("metric1", 30, std::move(attr2));
+  streamer_->send();
+  EXPECT_EQ(requests_.size(), 2);
+
+  auto count_dp = [](const MetricsExportRequestPtr& req) {
+    uint32_t count = 0;
+    for (const auto& metric : req->resource_metrics(0).scope_metrics(0).metrics()) {
+      count += metric.sum().data_points_size(); // Counters are Sum metrics in OTLP
+    }
+    return count;
+  };
+
+  EXPECT_EQ(count_dp(requests_[0]), 2);
+  EXPECT_EQ(count_dp(requests_[1]), 1);
+
+  // Verify each point's value is what we expect (10, 20, 30), order is non-deterministic.
+  std::set<uint64_t> expected_values = {10, 20, 30};
+  for (const auto& req : requests_) {
+    for (const auto& metric : req->resource_metrics(0).scope_metrics(0).metrics()) {
+      for (const auto& dp : metric.sum().data_points()) {
+        EXPECT_EQ(expected_values.count(dp.as_int()), 1);
+        expected_values.erase(dp.as_int());
+      }
+    }
+  }
+  EXPECT_TRUE(expected_values.empty());
+}
+
+TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoAggregationCounter) {
+  setupStreamer(/*max_data_point=*/1);
+
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+
+  streamer_->addCounter("metric1", 10, {});
+  streamer_->addCounter("metric1", 20, std::move(attr1));
+  streamer_->send();
+
+  EXPECT_EQ(requests_.size(), 2);
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 1);
+  EXPECT_EQ(
+      requests_[0]->resource_metrics(0).scope_metrics(0).metrics(0).sum().data_points(0).as_int(),
+      10);
+  EXPECT_EQ(requests_[1]->resource_metrics(0).scope_metrics(0).metrics_size(), 1);
+  EXPECT_EQ(
+      requests_[1]->resource_metrics(0).scope_metrics(0).metrics(0).sum().data_points(0).as_int(),
+      20);
+}
+
+TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestAggregationHistogram) {
+  setupStreamer(/*max_data_point=*/2);
+
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+
+  MetricAggregator::CustomHistogram hist1{1, 10.0, {1}, {10.0}};
+  MetricAggregator::CustomHistogram hist2{2, 20.0, {2}, {20.0}};
+  MetricAggregator::CustomHistogram hist3{3, 30.0, {3}, {30.0}};
+
+  streamer_->addHistogram("metric1", hist1, {});
+  streamer_->addHistogram("metric1", hist2, std::move(attr1));
+  streamer_->addHistogram("metric2", hist3, {});
+  streamer_->send();
+  EXPECT_EQ(requests_.size(), 2);
+
+  auto count_dp = [](const MetricsExportRequestPtr& req) {
+    uint32_t count = 0;
+    for (const auto& metric : req->resource_metrics(0).scope_metrics(0).metrics()) {
+      count += metric.histogram().data_points_size(); // Histograms use .histogram()
+    }
+    return count;
+  };
+
+  EXPECT_EQ(count_dp(requests_[0]), 2);
+  EXPECT_EQ(count_dp(requests_[1]), 1);
+
+  // Verify each point's count and sum is what we expect, order is non-deterministic.
+  std::set<uint64_t> expected_counts = {1, 2, 3};
+  for (const auto& req : requests_) {
+    for (const auto& metric : req->resource_metrics(0).scope_metrics(0).metrics()) {
+      for (const auto& dp : metric.histogram().data_points()) {
+        EXPECT_EQ(expected_counts.count(dp.count()), 1);
+        expected_counts.erase(dp.count());
+        if (dp.count() == 1) {
+          EXPECT_EQ(dp.sum(), 10.0);
+        } else if (dp.count() == 2) {
+          EXPECT_EQ(dp.sum(), 20.0);
+        } else if (dp.count() == 3) {
+          EXPECT_EQ(dp.sum(), 30.0);
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(expected_counts.empty());
+}
+
+TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoAggregationHistogram) {
+  setupStreamer(/*max_data_point=*/1);
+
+  MetricAggregator::SortedAttributesVector attr1 = {{"key1", ""}};
+
+  MetricAggregator::CustomHistogram hist1{1, 10.0, {1}, {10.0}};
+  MetricAggregator::CustomHistogram hist2{2, 20.0, {2}, {20.0}};
+
+  streamer_->addHistogram("metric1", hist1, {});
+  streamer_->addHistogram("metric1", hist2, std::move(attr1));
+  streamer_->send();
+
+  EXPECT_EQ(requests_.size(), 2);
+
+  EXPECT_EQ(requests_.size(), 2);
+  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 1);
+  EXPECT_EQ(requests_[1]->resource_metrics(0).scope_metrics(0).metrics_size(), 1);
 }
 
 } // namespace

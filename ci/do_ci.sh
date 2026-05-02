@@ -50,10 +50,22 @@ setup_clang_toolchain() {
     fi
     config="clang"
     # We only support clang with libc++ now
-    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}" "--config=${config}")
-    BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
     BAZEL_BUILD_OPTIONS+=("--config=${config}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
+    BAZEL_QUERY_OPTIONS=("${BAZEL_GLOBAL_OPTIONS[@]}" "--config=${config}")
+    for opt in "${BAZEL_BUILD_OPTIONS[@]}"; do
+        case "$opt" in
+            --config=rbe|--config=remote-cache)
+                BAZEL_QUERY_OPTIONS+=("--config=remote-cache")
+                break
+                ;;
+            --config=mobile-rbe)
+                BAZEL_QUERY_OPTIONS+=("--config=mobile-rbe")
+                break
+                ;;
+        esac
+    done
+    BAZEL_QUERY_OPTION_LIST="${BAZEL_QUERY_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
     export BAZEL_QUERY_OPTION_LIST
     echo "clang toolchain configured: ${config}"

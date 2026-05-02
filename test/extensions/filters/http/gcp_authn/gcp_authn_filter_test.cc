@@ -6,9 +6,7 @@
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/gcp_authn/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/init/mocks.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"

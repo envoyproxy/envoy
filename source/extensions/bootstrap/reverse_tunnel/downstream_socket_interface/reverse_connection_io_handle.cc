@@ -72,9 +72,11 @@ void ReverseConnectionIOHandle::cleanup() {
     trigger_pipe_read_fd_ = -1;
   }
 
-  // Cancel the retry timer safely.
-  if (rev_conn_retry_timer_ && rev_conn_retry_timer_->enabled()) {
-    ENVOY_LOG_MISC(trace, "reverse_tunnel: cancelling and resetting retry timer.");
+  // Reset the retry timer. Don't call enabled() here — it asserts
+  // dispatcher_.isThreadSafe(), which fails when the destructor runs on the main
+  // thread during shutdown (the timer was created on a worker thread).
+  if (rev_conn_retry_timer_) {
+    ENVOY_LOG_MISC(trace, "reverse_tunnel: resetting retry timer.");
     rev_conn_retry_timer_.reset();
   }
 

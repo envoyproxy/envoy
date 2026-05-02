@@ -9,7 +9,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -34,9 +34,8 @@ struct LedsStats {
  * Multiple subscriptions with the same LEDS collection name can use a single
  * subscription.
  */
-class LedsSubscription
-    : private Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::LbEndpoint>,
-      private Logger::Loggable<Logger::Id::upstream> {
+class LedsSubscription : public Config::SubscriptionCallbacks,
+                         private Logger::Loggable<Logger::Id::upstream> {
 public:
   using UpdateCb = std::function<void()>;
   using LbEndpointsMap = absl::flat_hash_map<std::string, envoy::config::endpoint::v3::LbEndpoint>;
@@ -76,6 +75,7 @@ private:
   const UpdateCb callback_;
   // Once the endpoints of the locality are updated, it is considered active.
   bool initial_update_attempt_complete_{false};
+  const Config::ResourceTypeHelper<envoy::config::endpoint::v3::LbEndpoint> resource_type_helper_;
   Config::SubscriptionPtr subscription_;
 };
 

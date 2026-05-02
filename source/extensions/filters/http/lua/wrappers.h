@@ -524,11 +524,12 @@ private:
 };
 
 /**
- * Lua wrapper for a stats Counter.
+ * Lua wrapper for a stats Counter. Stores the stat name and re-queries the scope on each use
+ * to avoid holding a reference that could outlive the stats store.
  */
 class CounterWrapper : public Filters::Common::Lua::BaseLuaObject<CounterWrapper> {
 public:
-  explicit CounterWrapper(Stats::Counter& counter) : counter_(counter) {}
+  CounterWrapper(Stats::Scope& scope, std::string name) : scope_(scope), name_(std::move(name)) {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"inc", static_luaInc}, {"add", static_luaAdd}, {"value", static_luaValue}};
@@ -554,15 +555,21 @@ private:
    */
   DECLARE_LUA_FUNCTION(CounterWrapper, luaValue);
 
-  Stats::Counter& counter_;
+  Stats::Counter& counter() {
+    return Stats::Utility::counterFromElements(scope_, {Stats::DynamicName(name_)});
+  }
+
+  Stats::Scope& scope_;
+  const std::string name_;
 };
 
 /**
- * Lua wrapper for a stats Gauge.
+ * Lua wrapper for a stats Gauge. Stores the stat name and re-queries the scope on each use
+ * to avoid holding a reference that could outlive the stats store.
  */
 class GaugeWrapper : public Filters::Common::Lua::BaseLuaObject<GaugeWrapper> {
 public:
-  explicit GaugeWrapper(Stats::Gauge& gauge) : gauge_(gauge) {}
+  GaugeWrapper(Stats::Scope& scope, std::string name) : scope_(scope), name_(std::move(name)) {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"inc", static_luaInc}, {"dec", static_luaDec}, {"add", static_luaAdd},
@@ -609,15 +616,23 @@ private:
    */
   DECLARE_LUA_FUNCTION(GaugeWrapper, luaValue);
 
-  Stats::Gauge& gauge_;
+  Stats::Gauge& gauge() {
+    return Stats::Utility::gaugeFromElements(scope_, {Stats::DynamicName(name_)},
+                                             Stats::Gauge::ImportMode::NeverImport);
+  }
+
+  Stats::Scope& scope_;
+  const std::string name_;
 };
 
 /**
- * Lua wrapper for a stats Histogram.
+ * Lua wrapper for a stats Histogram. Stores the stat name and re-queries the scope on each use
+ * to avoid holding a reference that could outlive the stats store.
  */
 class HistogramWrapper : public Filters::Common::Lua::BaseLuaObject<HistogramWrapper> {
 public:
-  explicit HistogramWrapper(Stats::Histogram& histogram) : histogram_(histogram) {}
+  HistogramWrapper(Stats::Scope& scope, std::string name, Stats::Histogram::Unit unit)
+      : scope_(scope), name_(std::move(name)), unit_(unit) {}
 
   static ExportedFunctions exportedFunctions() { return {{"recordValue", static_luaRecordValue}}; }
 
@@ -629,7 +644,13 @@ private:
    */
   DECLARE_LUA_FUNCTION(HistogramWrapper, luaRecordValue);
 
-  Stats::Histogram& histogram_;
+  Stats::Histogram& histogram() {
+    return Stats::Utility::histogramFromElements(scope_, {Stats::DynamicName(name_)}, unit_);
+  }
+
+  Stats::Scope& scope_;
+  const std::string name_;
+  const Stats::Histogram::Unit unit_;
 };
 
 /**
