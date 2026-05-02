@@ -86,10 +86,11 @@ There has been several third party engagements focused on Envoy security:
 
 ### Reporting security vulnerabilities
 
-If you've found a vulnerability or a potential vulnerability in Envoy please let us know at
-[envoy-security](mailto:envoy-security@googlegroups.com). We'll send a confirmation
-email to acknowledge your report, and we'll send an additional email when we've identified the issue
-positively or negatively.
+If you've found a vulnerability or a potential vulnerability in Envoy, please
+[open a GitHub Security Advisory](https://github.com/envoyproxy/envoy/security/advisories/new).
+This is the preferred reporting channel, as the reports can be triaged directly on GitHub.
+
+Alternatively, you may email [envoy-security@googlegroups.com](mailto:envoy-security@googlegroups.com).
 
 For further details please see our complete [security release process](SECURITY.md).
 

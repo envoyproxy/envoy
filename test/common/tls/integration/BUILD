@@ -19,7 +19,6 @@ envoy_cc_test_library(
     deps = [
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration:http_integration_lib",
-        "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -50,7 +49,6 @@ envoy_cc_test(
         "//test/common/tls/cert_selector:async_cert_selector",
         "//test/common/tls/cert_validator:timed_cert_validator",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
-        "//test/mocks/secret:secret_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

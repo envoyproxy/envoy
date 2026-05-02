@@ -5,7 +5,6 @@
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 

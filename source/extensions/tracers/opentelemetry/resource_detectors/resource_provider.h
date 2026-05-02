@@ -38,8 +38,8 @@ public:
   virtual Resource
   getResource(const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
                   resource_detectors,
-              Server::Configuration::ServerFactoryContext& context,
-              absl::string_view service_name) const PURE;
+              Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
+              bool set_telemetry_sdk_resource_attributes) const PURE;
 };
 using ResourceProviderPtr = std::shared_ptr<ResourceProvider>;
 
@@ -48,8 +48,8 @@ public:
   Resource
   getResource(const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
                   resource_detectors,
-              Server::Configuration::ServerFactoryContext& context,
-              absl::string_view service_name) const override;
+              Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
+              bool set_telemetry_sdk_resource_attributes) const override;
 };
 
 } // namespace OpenTelemetry
