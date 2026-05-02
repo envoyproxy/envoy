@@ -510,6 +510,7 @@ envoy_cc_test(
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//test/common/formatter:command_extension_lib",
         "//test/common/stream_info:test_int_accessor_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_factory_context_mocks",
