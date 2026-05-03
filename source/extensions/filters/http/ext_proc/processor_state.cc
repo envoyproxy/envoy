@@ -603,7 +603,10 @@ void ProcessorState::continueIfNecessary() {
 bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_response) {
   Buffer::OwnedImpl chunk_data;
   absl::optional<QueuedChunk> chunk = dequeueStreamingChunk(chunk_data);
-  ENVOY_BUG(chunk.has_value(), "Bad streamed body callback state");
+  if (!chunk.has_value()) {
+    IS_ENVOY_BUG("Bad streamed body callback state");
+    return false;
+  }
   if (common_response.has_body_mutation()) {
     Effect processing_effect;
     ENVOY_STREAM_LOG(debug, "Applying body response to chunk of data. Size = {}",
