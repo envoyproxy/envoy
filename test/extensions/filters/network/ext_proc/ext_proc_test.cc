@@ -1329,6 +1329,76 @@ TEST_F(NetworkExtProcFilterTest, LoggingInfoOnError) {
   EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
 }
 
+TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataAllowed) {
+  std::vector<std::string> receiving_namespaces = {"test-namespace"};
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor
+      config;
+  config.set_failure_mode_allow(false);
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "ext_proc_server");
+  for (const auto& ns : receiving_namespaces) {
+    config.mutable_metadata_options()
+        ->mutable_receiving_namespaces()
+        ->add_untyped(ns);
+  }
+
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ =
+      std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  auto response = std::make_unique<
+      envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto* dynamic_metadata = response->mutable_dynamic_metadata();
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["key1"].set_string_value("value1");
+  *(*dynamic_metadata->mutable_fields())["test-namespace"]
+       .mutable_struct_value() = struct_obj;
+
+  EXPECT_CALL(stream_info_, setDynamicMetadata("test-namespace", _)).Times(1);
+
+  filter_->onReceiveMessage(std::move(response));
+}
+
+TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataNotAllowed) {
+  std::vector<std::string> receiving_namespaces = {"test-namespace"};
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor
+      config;
+  config.set_failure_mode_allow(false);
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "ext_proc_server");
+  for (const auto& ns : receiving_namespaces) {
+    config.mutable_metadata_options()
+        ->mutable_receiving_namespaces()
+        ->add_untyped(ns);
+  }
+
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ =
+      std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  auto response = std::make_unique<
+      envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto* dynamic_metadata = response->mutable_dynamic_metadata();
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["key1"].set_string_value("value1");
+  *(*dynamic_metadata->mutable_fields())["other-namespace"]
+       .mutable_struct_value() = struct_obj;
+
+  EXPECT_CALL(stream_info_, setDynamicMetadata("other-namespace", _)).Times(0);
+
+  filter_->onReceiveMessage(std::move(response));
+}
+
 } // namespace
 } // namespace ExtProc
 } // namespace NetworkFilters

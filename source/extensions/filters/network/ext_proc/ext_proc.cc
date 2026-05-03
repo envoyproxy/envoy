@@ -371,6 +371,18 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
     return;
   }
 
+  if (response->has_dynamic_metadata()) {
+    const auto& response_metadata = response->dynamic_metadata();
+    for (const auto& [key, value] : response_metadata.fields()) {
+      if (config_->untypedReceivingMetadataNamespaces().contains(key)) {
+        if (value.has_struct_value()) {
+          read_callbacks_->connection().streamInfo().setDynamicMetadata(
+              key, value.struct_value());
+        }
+      }
+    }
+  }
+
   if (response->has_read_data()) {
     const auto& data = response->read_data();
     if (timeout_manager_ && read_pending_) {
