@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/container/flat_hash_set.h"
-
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/network/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/network/ext_proc/v3/ext_proc.pb.validate.h"
@@ -15,6 +13,8 @@
 #include "envoy/service/network_ext_proc/v3/network_external_processor.pb.h"
 
 #include "source/extensions/filters/network/ext_proc/client_impl.h"
+
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -96,31 +96,28 @@ private:
  */
 class Config {
 public:
- Config(const envoy::extensions::filters::network::ext_proc::v3::
-            NetworkExternalProcessor& config,
-        Stats::Scope& scope)
-     : failure_mode_allow_(config.failure_mode_allow()),
-       processing_mode_(config.processing_mode()),
-       grpc_service_(config.grpc_service()),
-       untyped_forwarding_namespaces_(
-           config.metadata_options().forwarding_namespaces().untyped().begin(),
-           config.metadata_options().forwarding_namespaces().untyped().end()),
-       typed_forwarding_namespaces_(
-           config.metadata_options().forwarding_namespaces().typed().begin(),
-           config.metadata_options().forwarding_namespaces().typed().end()),
-       untyped_receiving_namespaces_(
-           config.metadata_options().receiving_namespaces().untyped().begin(),
-           config.metadata_options().receiving_namespaces().untyped().end()),
-       stats_(generateStats(config.stat_prefix(), scope)),
-       message_timeout_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
-           config, message_timeout, DefaultMessageTimeoutMs))) {};
+  Config(const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& config,
+         Stats::Scope& scope)
+      : failure_mode_allow_(config.failure_mode_allow()),
+        processing_mode_(config.processing_mode()), grpc_service_(config.grpc_service()),
+        untyped_forwarding_namespaces_(
+            config.metadata_options().forwarding_namespaces().untyped().begin(),
+            config.metadata_options().forwarding_namespaces().untyped().end()),
+        typed_forwarding_namespaces_(
+            config.metadata_options().forwarding_namespaces().typed().begin(),
+            config.metadata_options().forwarding_namespaces().typed().end()),
+        untyped_receiving_namespaces_(
+            config.metadata_options().receiving_namespaces().untyped().begin(),
+            config.metadata_options().receiving_namespaces().untyped().end()),
+        stats_(generateStats(config.stat_prefix(), scope)),
+        message_timeout_(std::chrono::milliseconds(
+            PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs))) {};
 
- bool failureModeAllow() const { return failure_mode_allow_; }
+  bool failureModeAllow() const { return failure_mode_allow_; }
 
- const envoy::extensions::filters::network::ext_proc::v3::ProcessingMode&
- processingMode() const {
-   return processing_mode_;
- }
+  const envoy::extensions::filters::network::ext_proc::v3::ProcessingMode& processingMode() const {
+    return processing_mode_;
+  }
 
   const envoy::config::core::v3::GrpcService& grpcService() const { return grpc_service_; }
 
@@ -135,8 +132,6 @@ public:
   const absl::flat_hash_set<std::string>& untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
-
-
 
   const NetworkExtProcStats& stats() const { return stats_; }
 
