@@ -300,10 +300,10 @@ TEST_F(BacktraceActionTest, OnNonFatalSignalNoMatchingSlot) {
 }
 
 TEST_F(BacktraceActionNoSignalTest, WarnWhenSignalHandlerNotRegistered) {
-  // Fill all handler slots with a dummy to force BacktraceAction registration to fail.
-  auto dummy = +[](int, siginfo_t*, void*) {};
+  // Fill all handler slots with a no-op handler to force BacktraceAction registration to fail.
+  auto noopHandler = +[](int, siginfo_t*, void*) {};
   for (size_t i = 0; i < NonFatalSignalHandler::MaxHandlers; ++i) {
-    NonFatalSignalHandler::registerNonFatalSignalHandler(dummy);
+    NonFatalSignalHandler::registerNonFatalSignalHandler(noopHandler);
   }
 
   envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
@@ -317,7 +317,7 @@ TEST_F(BacktraceActionNoSignalTest, WarnWhenSignalHandlerNotRegistered) {
       action_->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, pairs, now));
 
   for (size_t i = 0; i < NonFatalSignalHandler::MaxHandlers; ++i) {
-    NonFatalSignalHandler::removeNonFatalSignalHandler(dummy);
+    NonFatalSignalHandler::removeNonFatalSignalHandler(noopHandler);
   }
 }
 
