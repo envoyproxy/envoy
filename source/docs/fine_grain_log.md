@@ -7,8 +7,8 @@ Fine-Grain Logger is a logger with finer grained log level control and runtime l
 ### Basic Usage
 The basic usage of Fine-Grain Logger is to explicitly call its macros:
 ```
-  FINE_GRAIN_LOG(info, "", "Hello world! Here's a line of fine-grain log!");
-  FINE_GRAIN_LOG(error, "", "FineGrainLog Error! Here's the second message!");
+  FINE_GRAIN_LOG(info, "Hello world! Here's a line of fine-grain log!");
+  FINE_GRAIN_LOG(error, "FineGrainLog Error! Here's the second message!");
 ```
 If the level of log message is higher than that of the file, macros above will print messages with the file name like this:
 ```
@@ -28,7 +28,7 @@ A command line option is provided to enable Fine-Grain Logger: `--enable-fine-gr
 
 If Fine-Grain Logger is enabled, the default log format is `"[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v"`, where the logger name is omitted compared to Envoy's default as it's the same as file name. The default log level is info, if not specified by user of any logging context.
 
-Note that Envoy's logger can still be used in Fine-Grain mode. These macros are not replaced: `GET_MISC_LOGGER, ENVOY_LOG_MISC, ENVOY_LOGGER, ENVOY_LOG_TO_LOGGER, ENVOY_CONN_LOG_TO_LOGGER, ENVOY_STREAM_LOG_TO_LOGGER`. For example, `ENVOY_LOG_LOGGER(ENVOY_LOGGER(), LEVEL, ...)` is equivalent to `ENVOY_LOG` in Envoy mode.
+Note that Envoy's logger can still be used in Fine-Grain mode. These macros are not replaced: `GET_MISC_LOGGER, ENVOY_LOG_MISC, ENVOY_LOGGER, ENVOY_LOG_TO_LOGGER, ENVOY_CONN_LOG_TO_LOGGER, ENVOY_STREAM_LOG_TO_LOGGER`. For example, `ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ...)` is equivalent to `ENVOY_LOG` in Envoy mode.
 
 If Fine-Grain Logger is not enabled, existing Envoy's logger is used. In this mode, basic macros like `FINE_GRAIN_LOG` can be used but the main part of `ENVOY_LOG` will keep the same. One limitation is that logger update in admin page is not supported by default as it detects Envoy mode. The reason is: Envoy mode is designed only to be back compatible. To address it, developers can use `Logger::Context::enableFineGrainLogger()` to manually enable Fine-Grain Logger.
 
@@ -78,4 +78,3 @@ Fine-Grain Logger provides control interfaces through command line and admin pag
 To pass the arguments such as log format and default log level to Fine-Grain Logger, `fine_grain_log_format` and `fine_grain_default_level` are added in `class Context` and they are updated when a new logging context is activated. `getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(level, format)` is called in `Context::activate()` to set log format and update loggers' previous default level to the new level.
 
 To support the runtime update in admin page, log handler in admin page uses `getFineGrainLogContext().listFineGrainLoggers()` to show all Fine-Grain Loggers, `getFineGrainLogContext().setFineGrainLogger(name, level)` to set a specific logger, `getFineGrainLogContext().setAllFineGrainLoggers(level)` to set all loggers, and `getFineGrainLogContext().updateVerbositySetting(glob_levels)` to set glob matched loggers.
-
