@@ -278,6 +278,42 @@ TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
   ENVOY_LOG_EVENT_TO_LOGGER(Registry::getLog(Id::misc), debug, "misc_event", "log");
 }
 
+TEST_F(NamedLogTest, FineGrainNamedLogsAreSentToSink) {
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+
+  Registry::setLogLevel(spdlog::level::info);
+
+  // Enable fine grain logging.
+  Context::enableFineGrainLogger();
+  EXPECT_TRUE(Context::useFineGrainLogger());
+
+  // Set fine grain level to DEBUG.
+  Context::changeAllLogLevels(spdlog::level::debug);
+
+  EXPECT_CALL(sink, log(_, _));
+  EXPECT_CALL(sink, logWithStableName("test_event", "debug", "assert", "test log 1"));
+  ENVOY_LOG_EVENT(debug, "test_event", "test log 1");
+
+  Context::disableFineGrainLogger();
+}
+
+TEST_F(NamedLogTest, FineGrainTaggedLogsAreSentToSink) {
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+
+  Registry::setLogLevel(spdlog::level::info);
+
+  // Enable fine grain logging.
+  Context::enableFineGrainLogger();
+
+  // Set fine grain level to DEBUG.
+  Context::changeAllLogLevels(spdlog::level::debug);
+
+  EXPECT_CALL(sink, log(_, _));
+  ENVOY_TAGGED_LOG(debug, (std::map<std::string, std::string>{{"key", "val"}}), "test log");
+
+  Context::disableFineGrainLogger();
+}
+
 TEST(LoggerTest, LogWithLogDetails) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
 

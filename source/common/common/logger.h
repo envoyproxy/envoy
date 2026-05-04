@@ -568,7 +568,7 @@ public:
 
 #define ENVOY_TAGGED_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, FORMAT, ...)                               \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
                           ::Envoy::Logger::Utility::serializeLogTags(TAGS), ##__VA_ARGS__);        \
     }                                                                                              \
@@ -576,7 +576,7 @@ public:
 
 #define ENVOY_TAGGED_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, CONNECTION, FORMAT, ...)              \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       std::map<std::string, std::string> log_tags = TAGS;                                          \
       log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
       ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
@@ -586,7 +586,7 @@ public:
 
 #define ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, STREAM, FORMAT, ...)                \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       std::map<std::string, std::string> log_tags = TAGS;                                          \
       log_tags.emplace("ConnectionId",                                                             \
                        (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0"); \
@@ -664,7 +664,7 @@ public:
 #define ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                  \
   do {                                                                                             \
     ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
                                                               fmt::format(__VA_ARGS__));           \
     }                                                                                              \
@@ -686,7 +686,7 @@ public:
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       static auto* countdown = new std::atomic<uint64_t>();                                        \
       if (countdown->fetch_add(1) < N) {                                                           \
         ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                         \
@@ -696,7 +696,7 @@ public:
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER_IF(LOGGER, LEVEL, N, CONDITION, ...)                           \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) && (CONDITION)) {                                      \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL) && (CONDITION)) {                        \
       static auto* countdown = new std::atomic<uint64_t>();                                        \
       if (countdown->fetch_add(1) < N) {                                                           \
         ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                         \
@@ -735,7 +735,7 @@ public:
 
 #define ENVOY_LOG_EVERY_NTH_TO_LOGGER(LOGGER, LEVEL, N, ...)                                       \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       static auto* count = new std::atomic<uint64_t>();                                            \
       if ((count->fetch_add(1) % N) == 0) {                                                        \
         ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                         \
@@ -751,7 +751,7 @@ public:
 
 #define ENVOY_LOG_EVERY_POW_2_TO_LOGGER(LOGGER, LEVEL, ...)                                        \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       static auto* count = new std::atomic<uint64_t>();                                            \
       if (std::bitset<64>(1 /* for the first hit*/ + count->fetch_add(1)).count() == 1) {          \
         ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                         \
@@ -772,7 +772,7 @@ using t_logclock = std::chrono::steady_clock; // NOLINT
 
 #define ENVOY_LOG_PERIODIC_TO_LOGGER(LOGGER, LEVEL, CHRONO_DURATION, ...)                          \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       static auto* last_hit = new std::atomic<int64_t>();                                          \
       auto last = last_hit->load();                                                                \
       const auto now = t_logclock::now().time_since_epoch().count();                               \
