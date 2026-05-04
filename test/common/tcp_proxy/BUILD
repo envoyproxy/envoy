@@ -83,6 +83,7 @@ envoy_cc_test(
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/tcp_proxy",
+        "//test/common/formatter:command_extension_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/router:router_filter_interface",
@@ -92,6 +93,7 @@ envoy_cc_test(
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/request_id/uuid/v3:pkg_cc_proto",

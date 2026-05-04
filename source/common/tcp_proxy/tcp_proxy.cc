@@ -27,6 +27,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/request_id_extension_impl.h"
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
@@ -39,6 +40,7 @@
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -941,13 +943,31 @@ const std::string& TunnelResponseTrailers::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_trailers");
 }
 
+Router::HeaderParserPtr buildTunnelingHeaderParser(
+    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::TunnelingConfig&
+        tunneling_config,
+    Server::Configuration::FactoryContext& context) {
+  if (tunneling_config.formatters().empty()) {
+    return THROW_OR_RETURN_VALUE(
+        Envoy::Router::HeaderParser::configure(tunneling_config.headers_to_add()),
+        Router::HeaderParserPtr);
+  }
+
+  Server::GenericFactoryContextImpl generic_context(context);
+  auto command_parsers =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+                                tunneling_config.formatters(), generic_context),
+                            Formatter::CommandParserPtrVector);
+  return THROW_OR_RETURN_VALUE(
+      Envoy::Router::HeaderParser::configure(tunneling_config.headers_to_add(), command_parsers),
+      Router::HeaderParserPtr);
+}
+
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     Stats::Scope& stats_scope,
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
     Server::Configuration::FactoryContext& context)
-    : header_parser_(THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(
-                                               config_message.tunneling_config().headers_to_add()),
-                                           Router::HeaderParserPtr)),
+    : header_parser_(buildTunnelingHeaderParser(config_message.tunneling_config(), context)),
       propagate_response_headers_(config_message.tunneling_config().propagate_response_headers()),
       propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
       post_path_(config_message.tunneling_config().post_path()),

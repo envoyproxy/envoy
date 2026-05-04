@@ -154,6 +154,7 @@ build:mobile-tsan --config=tsan
 build:mobile-tsan --config=mobile-clang
 build:mobile-tsan --build_tests_only
 test:mobile-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+build:mobile-tsan --test_timeout=240,1200,3000,9600
 
 
 #############################################################################

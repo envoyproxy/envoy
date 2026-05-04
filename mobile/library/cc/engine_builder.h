@@ -157,6 +157,11 @@ public:
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
   EngineBuilder& enableHttp3(bool http3_on);
+  // If true, all HTTP requests are handled on a dedicated worker thread instead of on the Envoy
+  // main thread which also handles all xDS requests.
+  // Note: Engine in worker thread model doesn't support platform certificate validation and system
+  // proxy settings. And these settings will be ignored if worker thread model is enabled.
+  EngineBuilder& enableWorkerThread(bool use_worker_thread);
   EngineBuilder& enableEarlyData(bool early_data_on);
   EngineBuilder& enableScone(bool enable);
   EngineBuilder& addQuicConnectionOption(std::string option);
@@ -377,7 +382,9 @@ private:
   absl::optional<NodeLocality> node_locality_ = absl::nullopt;
   absl::optional<Protobuf::Struct> node_metadata_ = absl::nullopt;
   bool enable_stats_collection_ = true;
-  bool enable_network_change_monitor_ = false;
+  bool use_worker_thread_{false};
+  bool enable_network_change_monitor_{false};
+
 #ifdef ENVOY_MOBILE_XDS
   absl::optional<XdsBuilder> xds_builder_ = absl::nullopt;
 #endif // ENVOY_MOBILE_XDS

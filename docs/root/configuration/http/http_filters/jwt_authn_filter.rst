@@ -235,3 +235,55 @@ comes from the owning HTTP connection manager.
   jwks_fetch_failed, Counter, Total failed JWKS remote fetch attempts
   jwt_cache_hit, Counter, Total JWT cache hits where a previously validated token was reused
   jwt_cache_miss, Counter, Total JWT cache misses requiring full token validation
+
+
+.. _config_jwt_authn_extract_only_security:
+
+Extract-Only Mode Security Considerations
+------------------------------------------
+
+.. warning::
+
+   **SECURITY WARNING**: The ``extract_only_without_validation``
+   requirement type does **NOT** verify JWT signatures. Any party can craft
+   a JWT with arbitrary claims, and those claims will be extracted and
+   forwarded as HTTP headers.
+
+   **Verification status header (default on):**
+
+   When this mode is active, Envoy sets a verification status header on
+   requests whose JWT is present but fails signature verification:
+
+   .. code-block:: yaml
+
+      x-jwt-signature-verified: false
+
+   The header is NOT set when the JWT is valid or when no JWT is present.
+   This means the header's presence is a meaningful signal: if set, the
+   JWT failed verification and downstream filters should not trust any
+   JWT-derived claim headers.
+
+   **RBAC integration:**
+
+   If RBAC policies match on JWT-derived claim headers (e.g.,
+   ``x-jwt-claim-role``), add a corresponding principal check for the
+   verification status header. Example RBAC policy that only allows
+   verified admin claims:
+
+   .. literalinclude:: _include/jwt-authn-extract-only-rbac.yaml
+       :language: yaml
+       :lines: 58-73
+       :lineno-start: 58
+       :linenos:
+       :caption: :download:`jwt-authn-extract-only-rbac.yaml <_include/jwt-authn-extract-only-rbac.yaml>`
+
+   **Configuration:**
+
+   The header name is configurable via ``verification_status_header`` in
+   ``ExtractOnlyWithoutValidation``. The header is set by default, but this behavior can be
+   disabled via the ``envoy.reloadable_features.jwt_authn_add_verification_status_header``
+   runtime flag.
+
+   **Recommended alternative:** Use ``provider_name`` with ``remote_jwks``
+   or ``local_jwks`` for full signature verification.
+

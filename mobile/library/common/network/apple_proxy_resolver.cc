@@ -42,6 +42,7 @@ AppleProxyResolver::resolveProxy(const std::string& target_url_string,
                                  ProxySettingsResolvedCallback proxy_resolution_completed) {
   ASSERT(started_, "AppleProxyResolver not started.");
   ASSERT(dispatcher_ != nullptr, "Dispatcher not set on the AppleProxyResolver.");
+  ASSERT(dispatcher_->isThreadSafe(), "Proxy resolution must happen on the main thread.");
 
   std::string pac_file_url;
   {

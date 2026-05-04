@@ -84,6 +84,8 @@ protected:
     });
   }
 
+  void TearDown() override { http_client_.shutdownApiListener(); }
+
   struct StreamCallbacksCalled {
     uint32_t on_headers_calls_{0};
     uint32_t on_data_calls_{0};

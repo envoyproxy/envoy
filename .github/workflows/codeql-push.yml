@@ -102,14 +102,9 @@ jobs:
     - name: Initialize CodeQL
       if: env.CPP_CHANGED == 'true'
       uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225  # codeql-bundle-v4.35.2
-      env:
-        # NOTE: these env vars are undocumented/experimental - they are likely to require a future update
-        CODEQL_EXTRACTOR_CPP_OPTION_EXCLUDE_HEADER_PATTERNS: "bin/clang.*/.*"
-        CODEQL_EXTRACTOR_CPP_WIP_IGNORE_SYSTEM_HEADERS: "true"
       with:
         languages: cpp
         trap-caching: false
-        config-file: ./.github/codeql/codeql-config.yml
 
     # No-op analysis to satisfy Scorecard SAST check when no C++ changes are present.
     # Running codeql-action/analyze unconditionally ensures every merge commit gets
@@ -133,8 +128,15 @@ jobs:
        #  - bazel/repository_locations.bzl
        #  - .github/workflows/codeql-daily.yml
        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
-       mkdir -p bin/clang18.1.8
-       cd bin/clang18.1.8
+       #
+       # IMPORTANT: the clang bundle MUST be unpacked outside $GITHUB_WORKSPACE (we use $RUNNER_TEMP).
+       # The CodeQL C++ extractor treats anything under the source root as project code, so headers
+       # under a checkout subdirectory would be analysed as Envoy source and produce false positives
+       # (e.g. cpp/new-free-mismatch in <vector>, alert #1881). Keeping it under $RUNNER_TEMP makes
+       # CodeQL classify those headers as system headers — same as /usr/include/c++/** on a normal
+       # build. Do NOT move this back into the checkout tree.
+       mkdir -p "${RUNNER_TEMP}/clang18.1.8"
+       cd "${RUNNER_TEMP}/clang18.1.8"
        wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz
        tar -xf clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
 
@@ -144,7 +146,7 @@ jobs:
         bazel shutdown
         bazel build \
             -c fastbuild \
-            --repo_env=BAZEL_LLVM_PATH="$(realpath bin/clang18.1.8)" \
+            --repo_env=BAZEL_LLVM_PATH="${RUNNER_TEMP}/clang18.1.8" \
             --spawn_strategy=local \
             --discard_analysis_cache \
             --nouse_action_cache \
