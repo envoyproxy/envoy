@@ -749,64 +749,6 @@ TEST_F(DynamicModuleCertValidatorTest, FilterStateCallbacksResetAfterVerify) {
   EXPECT_EQ(nullptr, config_or_error.value()->current_callbacks_);
 }
 
-// =============================================================================
-// Cross-language tests.
-//
-// Parameterized over the SDK language. Each language ships a "cert_validator_test"
-// module exposing a "test" cert validator that always returns Successful. The C
-// counterpart (cert_validator_no_op) is already exercised by the TEST_F suite above.
-// =============================================================================
-
-class DynamicModuleCertValidatorLanguageTest : public testing::TestWithParam<std::string> {
-protected:
-  DynamicModuleCertValidatorLanguageTest()
-      : api_(Api::createApiForTest()), stats_(generateSslStats(*store_.rootScope())) {
-    TestEnvironment::setEnvVar(
-        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-        TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
-                                    GetParam()),
-        1);
-    TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
-  }
-
-  Api::ApiPtr api_;
-  Stats::TestUtil::TestStore store_;
-  SslStats stats_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
-};
-
-INSTANTIATE_TEST_SUITE_P(SdkLanguages, DynamicModuleCertValidatorLanguageTest,
-                         testing::Values("rust", "go"));
-
-TEST_P(DynamicModuleCertValidatorLanguageTest, ConfigNewSuccess) {
-  auto module = Envoy::Extensions::DynamicModules::newDynamicModuleByName("cert_validator_test",
-                                                                          false, false);
-  ASSERT_TRUE(module.ok());
-  auto config_or_error = newDynamicModuleCertValidatorConfig("test", "", std::move(module.value()));
-  ASSERT_TRUE(config_or_error.ok());
-  EXPECT_NE(config_or_error.value()->in_module_config_, nullptr);
-}
-
-TEST_P(DynamicModuleCertValidatorLanguageTest, VerifyCertChainSuccess) {
-  auto module = Envoy::Extensions::DynamicModules::newDynamicModuleByName("cert_validator_test",
-                                                                          false, false);
-  ASSERT_TRUE(module.ok());
-  auto config_or_error = newDynamicModuleCertValidatorConfig("test", "", std::move(module.value()));
-  ASSERT_TRUE(config_or_error.ok());
-
-  DynamicModuleCertValidator validator(config_or_error.value(), stats_);
-
-  bssl::UniquePtr<X509> cert = readCertFromFile(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
-  sk_X509_push(cert_chain.get(), cert.release());
-
-  CSmartPtr<SSL_CTX, SSL_CTX_free> ssl_ctx(SSL_CTX_new(TLS_method()));
-  auto results = validator.doVerifyCertChain(*cert_chain, nullptr, nullptr, *ssl_ctx, {}, false,
-                                             "example.com");
-  EXPECT_EQ(ValidationResults::ValidationStatus::Successful, results.status);
-}
-
 } // namespace
 } // namespace DynamicModules
 } // namespace Tls

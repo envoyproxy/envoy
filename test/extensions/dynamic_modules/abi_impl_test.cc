@@ -296,6 +296,15 @@ WEAK_STUB(BootstrapExtensionConfigRecordHistogramValue,
           envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
               nullptr, 0, nullptr, 0, 100))
 
+WEAK_STUB(CertValidatorSetErrorDetails,
+          envoy_dynamic_module_callback_cert_validator_set_error_details(nullptr, {nullptr, 0}))
+WEAK_STUB(CertValidatorSetFilterState,
+          envoy_dynamic_module_callback_cert_validator_set_filter_state(nullptr, {nullptr, 0},
+                                                                        {nullptr, 0}))
+WEAK_STUB(CertValidatorGetFilterState,
+          envoy_dynamic_module_callback_cert_validator_get_filter_state(nullptr, {nullptr, 0},
+                                                                        nullptr))
+
 WEAK_STUB(ClusterAddHosts,
           envoy_dynamic_module_callback_cluster_add_hosts(nullptr, 0, nullptr, nullptr, nullptr,
                                                           nullptr, nullptr, nullptr, 0, 0, nullptr))
