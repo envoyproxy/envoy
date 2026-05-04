@@ -46,6 +46,7 @@ public:
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
   bool useLocalDecision() const override { return use_local_decision_; }
+  bool exportedSpan() const override;
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
   std::string getTraceId() const override;

@@ -391,6 +391,15 @@ TEST(NetworkUtility, GetOriginalDst) {
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
       .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ("12.34.56.78:9527", Utility::getOriginalDst(socket)->asString());
+
+  // Invalid family returned by SO_ORIGINAL_DST should cause addressFromSockAddr to fail and
+  // getOriginalDst to return nullptr
+  sin.sin_family = AF_UNSPEC;
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
+      .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
+
+  sin.sin_family = AF_INET;
 #ifndef WIN32
   // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))

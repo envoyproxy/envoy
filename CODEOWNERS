@@ -78,7 +78,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # sni_dynamic_forward_proxy extension
 /*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @UNOWNED
 # tracers.datadog extension
-/*/extensions/tracers/datadog @dmehala @mattklein123
+/*/extensions/tracers/datadog @xlamorlette-datadog @zacharycmontoya @mattklein123
 # tracers.xray extension
 /*/extensions/tracers/xray @mattklein123 @nbaws
 # tracers.skywalking extension
@@ -159,7 +159,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @paul-r-gall
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @paul-r-gall
-/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
+/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123 @kyessenov
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @kyessenov @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @yanavlasov
@@ -172,6 +172,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/retry/priority/previous_priorities @ravenblackx @mattklein123
 /*/extensions/retry/host @ravenblackx @mattklein123
 /*/extensions/filters/network/http_connection_manager @yanavlasov @mattklein123
+/*/extensions/filters/network/tcp_bandwidth_limit @yanavlasov @nezdolik @antonkanug
 /*/extensions/filters/network/tcp_proxy @zuercher @ggreenway
 /*/extensions/filters/network/echo @yanavlasov @adisuissa
 /*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
@@ -302,8 +303,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # health check
 /*/extensions/filters/http/health_check @mattklein123 @adisuissa
 # lua
-/*/extensions/filters/http/lua @mattklein123 @wbpcode
-/*/extensions/filters/common/lua @mattklein123 @wbpcode
+/*/extensions/filters/http/lua @mattklein123 @wbpcode @derekargueta
+/*/extensions/filters/common/lua @mattklein123 @wbpcode @derekargueta
 # rbac
 /*/extensions/filters/network/rbac @yangminzhu @yanavlasov
 /*/extensions/filters/http/rbac @yangminzhu @yanavlasov
@@ -476,6 +477,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
 /contrib/kafka/ @mattklein123 @adamkotwasinski
+/contrib/stat_sinks/wasm_filter/ @prashanthjos @UNOWNED
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui
 /contrib/mysql_proxy/ @rshriram @venilnoronha
 /contrib/postgres/protocol/ @agrawroh @cpakulski @jarupatj
@@ -495,5 +497,6 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/peak_ewma/load_balancing_policies/ @rroblak @UNOWNED
 /contrib/kae/ @Misakokoro @UNOWNED
 /contrib/istio @kyessenov @wbpcode @keithmattix @krinkinmu @zirain
+/contrib/reverse_tunnel_reporter @agrawroh @aakugan @basundhara-c
 
 /compat/openssl/ @tedjpoole @envoyproxy/envoy-openssl-sync

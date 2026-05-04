@@ -13,6 +13,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -2983,17 +2984,100 @@ TEST_F(DynamicModuleHttpFilterTest, SetBufferLimitNoCallbacks) {
   envoy_dynamic_module_callback_http_set_buffer_limit(filter_no_callbacks.get(), 2048);
 }
 
-TEST_F(DynamicModuleHttpFilterTest, WatermarkCallbacksAutoRegisteredAndCleanedUp) {
-  // Create a new filter with callbacks.
-  auto filter = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+// Lifecycle tests that exercise the ordering of setDecoderFilterCallbacks() relative to
+// initializeInModuleFilter(). Each test body constructs and sequences the filter itself so it
+// can pick the ordering under test.
+class DynamicModuleHttpFilterLifecycleTest : public testing::Test {
+public:
+  void SetUp() override {
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+        "test_filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+        *stats_scope_, context_);
+    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    filter_config_ = filter_config_or_status.value();
+  }
 
-  // Watermark callbacks should be automatically registered when decoder callbacks are set.
+  Stats::SymbolTableImpl symbol_table_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr stats_scope_{stats_store_.createScope("")};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  DynamicModuleHttpFilterConfigSharedPtr filter_config_;
+};
+
+// Production ordering: addStreamFilter() wires callbacks before initializeInModuleFilter()
+// runs. Registration must land on init, not on the setter, and the paired remove must fire on
+// destroy.
+TEST_F(DynamicModuleHttpFilterLifecycleTest, WatermarkRegistersAtInitAndCleanedUpAtDestroy) {
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+  EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::_)).Times(0);
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::Ref(*filter)));
+  filter->initializeInModuleFilter();
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, removeDownstreamWatermarkCallbacks(testing::Ref(*filter)));
+  filter->onDestroy();
+}
+
+// Inverted ordering used by callers that run initializeInModuleFilter() before
+// setDecoderFilterCallbacks(). Registration must still land, this time on the setter side.
+TEST_F(DynamicModuleHttpFilterLifecycleTest, WatermarkRegistersAtSetCallbacksWhenInitRanFirst) {
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+
+  filter->initializeInModuleFilter();
+
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::Ref(*filter)));
   filter->setDecoderFilterCallbacks(decoder_callbacks);
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks);
 
-  // Destroy should clean up watermark callbacks.
   EXPECT_CALL(decoder_callbacks, removeDownstreamWatermarkCallbacks(testing::Ref(*filter)));
+  filter->onDestroy();
+}
+
+// Regression for the production crash: the FilterManager synchronously replays
+// onAboveWriteBufferHighWatermark() into the callback from inside
+// addDownstreamWatermarkCallbacks(). The replay must only reach the filter after
+// in_module_filter_ is set, so the ASSERT in onAboveWriteBufferHighWatermark holds.
+TEST_F(DynamicModuleHttpFilterLifecycleTest, WatermarkSyncReplayDoesNotFireBeforeInit) {
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+  EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::_)).Times(0);
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::Ref(*filter)))
+      .WillOnce(testing::Invoke(
+          [](Http::DownstreamWatermarkCallbacks& cb) { cb.onAboveWriteBufferHighWatermark(); }));
+  filter->initializeInModuleFilter();
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, removeDownstreamWatermarkCallbacks(testing::Ref(*filter)));
+  filter->onDestroy();
+}
+
+// onDestroy() must skip removeDownstreamWatermarkCallbacks() when registration never happened;
+// the underlying remove asserts the callback was previously added.
+TEST_F(DynamicModuleHttpFilterLifecycleTest,
+       OnDestroySkipsRemoveWhenDecoderCallbacksSetButInitNeverRan) {
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  EXPECT_CALL(decoder_callbacks, removeDownstreamWatermarkCallbacks(testing::_)).Times(0);
   filter->onDestroy();
 }
 
@@ -3396,6 +3480,138 @@ TEST(ABIImpl, ReceivedBufferedResponseBody) {
   // current_response_body_ is the same as encodingBuffer() - received buffered body.
   EXPECT_CALL(callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&current_body));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_received_buffered_response_body(&filter));
+}
+
+// =============================================================================
+// Tests for scheduler callbacks.
+// =============================================================================
+
+class DynamicModuleHttpFilterSchedulerTest : public testing::Test {
+public:
+  void SetUp() override {
+    ON_CALL(context_, mainThreadDispatcher())
+        .WillByDefault(testing::ReturnRef(main_thread_dispatcher_));
+    ON_CALL(decoder_callbacks_, dispatcher())
+        .WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
+
+    auto dynamic_module = Envoy::Extensions::DynamicModules::newDynamicModule(
+        testSharedObjectPath("no_op", "c"), false);
+    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+
+    auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+        "test_filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+        *stats_store_.rootScope(), context_);
+    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    filter_config_ = filter_config_or_status.value();
+
+    filter_ = std::make_shared<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+    filter_->initializeInModuleFilter();
+  }
+
+  void TearDown() override { filter_.reset(); }
+
+  void* filterPtr() { return static_cast<void*>(filter_.get()); }
+  void* configPtr() { return static_cast<void*>(filter_config_.get()); }
+
+  Stats::SymbolTableImpl symbol_table_;
+  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  DynamicModuleHttpFilterConfigSharedPtr filter_config_;
+  std::shared_ptr<DynamicModuleHttpFilter> filter_;
+};
+
+// Covers the happy path: `commit` posts to the dispatcher resolved via decoder callbacks.
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitPostsToWorkerDispatcher) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_))
+      .WillOnce(testing::Invoke([&](Event::PostCb cb) { captured_cb = std::move(cb); }));
+
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 123);
+  ASSERT_TRUE(captured_cb);
+  captured_cb();
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+// Covers the `!filter_shared` early return.
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitAfterFilterDestroyedIsNoOp) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_.reset();
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_)).Times(0);
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 123);
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+// Covers the `filter_shared->isDestroyed()` early return.
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitAfterOnDestroyIsNoOp) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_->onDestroy();
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_)).Times(0);
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 123);
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+// Covers the `decoder_callbacks_ == nullptr` early return.
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterSchedulerCommitWithoutDecoderCallbacksIsNoOp) {
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_)).Times(0);
+  envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 123);
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+// Covers the happy path for the config scheduler: `commit` posts to the main thread dispatcher.
+TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterConfigSchedulerCommitPostsToMainDispatcher) {
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_config_scheduler_new(configPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(main_thread_dispatcher_, post(testing::_))
+      .WillOnce(testing::Invoke([&](Event::PostCb cb) { captured_cb = std::move(cb); }));
+
+  envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler, 456);
+  ASSERT_TRUE(captured_cb);
+  captured_cb();
+
+  envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler);
+}
+
+// Covers the `!config_shared` early return of the config scheduler.
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterConfigSchedulerCommitAfterConfigDestroyedIsNoOp) {
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_config_scheduler_new(configPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_.reset();
+  filter_config_.reset();
+
+  EXPECT_CALL(main_thread_dispatcher_, post(testing::_)).Times(0);
+  envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler, 456);
+
+  envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler);
 }
 
 } // namespace HttpFilters

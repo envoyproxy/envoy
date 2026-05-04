@@ -881,10 +881,6 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
     return;
   }
 
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
-    return;
-  }
-
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
   if (cookies.empty()) {
     return;
@@ -920,10 +916,7 @@ std::string OAuth2Filter::encryptToken(const std::string& token) const {
     return token;
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
-    return encrypt(token, config_->hmacSecret(), random_);
-  }
-  return token;
+  return encrypt(token, config_->hmacSecret(), random_);
 }
 
 std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const {
@@ -932,15 +925,26 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
   }
 
   DecryptResult decrypt_result = decrypt(encrypted_token, config_->hmacSecret());
-  if (decrypt_result.error.has_value()) {
+
+  // Decryption can spuriously succeed against a token that was either never encrypted, or was
+  // encrypted under a different secret — PKCS#7 padding is valid by chance with probability
+  // ~1/256, leaving us with arbitrary binary bytes that would later fail HeaderString validation
+  // when written back into the Cookie header. Treat any plaintext that is not a valid header value
+  // as a decrypt failure and fall through to the legacy/wrong-secret behavior below.
+  const bool decrypt_failed = decrypt_result.error.has_value() ||
+                              !Http::HeaderUtility::headerValueIsValid(decrypt_result.plaintext);
+
+  if (decrypt_failed) {
     ENVOY_STREAM_LOG(error, "failed to decrypt token: {}, error: {}", *decoder_callbacks_,
-                     encrypted_token, decrypt_result.error.value());
+                     encrypted_token,
+                     decrypt_result.error.value_or("plaintext is not a valid header value"));
     // There are two cases:
     // 1. The token is a legacy unencrypted token.
     // In this case, we return the token as-is to allow the request to proceed.
-    // 2. The token is encrypted, but the decryption failed due to the HMAC secret is changed.
-    // In this case, we return the original encrypted token, the HMAC validation will fail
-    // and the user will be redirected to the OAuth server for re-authentication.
+    // 2. The token is encrypted, but the decryption failed (or produced invalid plaintext) due to
+    // the HMAC secret being changed. In this case, we return the original encrypted token; the HMAC
+    // validation will fail and the user will be redirected to the OAuth server for
+    // re-authentication.
     return encrypted_token;
   }
   return decrypt_result.plaintext;
@@ -1056,7 +1060,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       {cookie_names.bearer_token_, config_->bearerTokenCookieSettings().path_},
       {cookie_names.id_token_, config_->idTokenCookieSettings().path_},
       {cookie_names.refresh_token_, config_->refreshTokenCookieSettings().path_},
-
+      {cookie_names.oauth_expires_, config_->expiresCookieSettings().path_},
   };
 
   absl::flat_hash_map<std::string, std::string> request_cookies =

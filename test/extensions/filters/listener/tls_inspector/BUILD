@@ -42,7 +42,6 @@ envoy_cc_test(
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
@@ -62,7 +61,6 @@ envoy_cc_test(
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
@@ -147,7 +145,6 @@ envoy_cc_test(
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/integration:integration_lib",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

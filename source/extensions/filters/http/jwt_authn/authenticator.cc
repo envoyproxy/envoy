@@ -433,6 +433,7 @@ void AuthenticatorImpl::setPayloadMetadata(const Protobuf::Struct& jwt_payload) 
   const auto& normalize = provider.normalize_payload_in_metadata();
   if (normalize.space_delimited_claims().empty()) {
     set_extracted_jwt_data_cb_(provider.payload_in_metadata(), jwt_payload);
+    return;
   }
   // Make a temporary copy to normalize the JWT struct.
   Protobuf::Struct out_payload = jwt_payload;

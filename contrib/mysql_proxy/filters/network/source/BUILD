@@ -27,8 +27,10 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/crypto:utility_lib",
         "//source/common/network:filter_lib",
         "//source/extensions/filters/network:well_known_names",
+        "@envoy_api//contrib/envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -78,6 +80,7 @@ envoy_cc_library(
     name = "util_lib",
     srcs = ["mysql_utils.cc"],
     hdrs = ["mysql_utils.h"],
+    external_deps = ["ssl"],
     deps = [
         ":codec_interface",
         "//source/common/buffer:buffer_lib",

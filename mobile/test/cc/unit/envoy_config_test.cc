@@ -86,7 +86,8 @@ TEST(TestConfig, ConfigIsApplied) {
       .addRuntimeGuard("quic_no_tcp_delay", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
-      .setDeviceOs("probably-ubuntu-on-CI");
+      .setDeviceOs("probably-ubuntu-on-CI")
+      .enableScone(true);
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   const std::string config_str = bootstrap->ShortDebugString();
@@ -113,6 +114,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "key: \"app_version\" value { string_value: \"1.2.3\" } }",
       "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
       "initial_stream_window_size { value: 6291456 }",
+      "enable_scone { value: true }",
       "initial_connection_window_size { value: 15728640 }"};
 
   for (const auto& string : must_contain) {
@@ -333,6 +335,17 @@ TEST(TestConfig, DisableHttp3) {
   EXPECT_THAT(
       bootstrap->ShortDebugString(),
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
+}
+
+TEST(TestConfig, EnableEarlyData) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), Not(HasSubstr("early_data_policy")));
+
+  engine_builder.enableEarlyData(false);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("envoy.route.early_data_policy.default"));
 }
 
 TEST(TestConfig, UdpSocketReceiveBufferSize) {

@@ -20,7 +20,6 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

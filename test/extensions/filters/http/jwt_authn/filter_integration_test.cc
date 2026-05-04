@@ -7,7 +7,6 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
-#include "test/test_common/registry.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;

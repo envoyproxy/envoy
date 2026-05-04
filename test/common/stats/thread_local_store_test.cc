@@ -680,6 +680,22 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, CleanupCallback) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  bool called = false;
+  {
+    ScopeSharedPtr scope = store_->createScope("scope.");
+    scope->setCleanupCallback([&called]() { called = true; });
+  }
+  EXPECT_TRUE(called);
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
 TEST_F(StatsThreadLocalStoreTest, Eviction) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);

@@ -14,11 +14,29 @@
 #include "source/exe/terminate_handler.h"
 #endif
 
+#include <functional>
+
 namespace Envoy {
 
 // If Envoy is built with lite protos, this will register Envoy-Mobile specific
 // descriptors for reflection.
 void registerMobileProtoDescriptors();
+
+class MobileListenerHooks : public ListenerHooks {
+public:
+  MobileListenerHooks(std::function<void()> on_workers_started)
+      : on_workers_started_(on_workers_started) {}
+  void onWorkerListenerAdded() override {}
+  void onWorkerListenerRemoved() override {}
+  void onWorkersStarted() override {
+    if (on_workers_started_) {
+      on_workers_started_();
+    }
+  }
+
+private:
+  std::function<void()> on_workers_started_;
+};
 
 /**
  * This class is used instead of Envoy::MainCommon to customize logic for the Envoy Mobile setting.
@@ -26,7 +44,8 @@ void registerMobileProtoDescriptors();
  */
 class EngineCommon {
 public:
-  EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options);
+  EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options,
+               std::function<void()> on_workers_started = nullptr);
   bool run() {
     base_->runServer();
     return true;
@@ -47,7 +66,7 @@ private:
 #endif
   std::shared_ptr<Envoy::OptionsImplBase> options_;
   Event::RealTimeSystem real_time_system_; // NO_CHECK_FORMAT(real_time)
-  DefaultListenerHooks default_listener_hooks_;
+  MobileListenerHooks mobile_listener_hooks_;
   ProdComponentFactory prod_component_factory_;
   std::shared_ptr<StrippedMainBase> base_;
 };
