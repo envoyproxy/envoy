@@ -1,3 +1,4 @@
+load("@rules_rust//rust:defs.bzl", "rust_test")
 load("//test/extensions/dynamic_modules/test_data/rust:test_data.bzl", "test_program")
 
 licenses(["notice"])  # Apache 2
@@ -48,6 +49,8 @@ test_program(name = "bootstrap_admin_handler_test")
 
 test_program(name = "bootstrap_cluster_lifecycle_test")
 
+test_program(name = "reverse_tunnel_reporter_test")
+
 test_program(name = "bootstrap_listener_lifecycle_test")
 
 test_program(name = "network_integration_test")
@@ -59,3 +62,19 @@ test_program(name = "access_log_integration_test")
 test_program(name = "upstream_http_tcp_bridge")
 
 test_program(name = "cluster_integration_test")
+
+# Two-envoy e2e test for the reverse tunnel reporter ABI hooks. Spawns
+# upstream + downstream `envoy-static` and verifies the .so receives every
+# lifecycle callback. Tagged `manual` because it requires ENVOY_BIN and
+# ENVOY_DYNAMIC_MODULES_SEARCH_PATH to be set; missing/invalid → skipped.
+rust_test(
+    name = "reverse_tunnel_reporter_e2e_test",
+    srcs = ["reverse_tunnel_reporter_e2e_test.rs"],
+    crate_root = "reverse_tunnel_reporter_e2e_test.rs",
+    edition = "2021",
+    tags = [
+        "manual",
+        "no_tsan",
+        "nocoverage",
+    ],
+)

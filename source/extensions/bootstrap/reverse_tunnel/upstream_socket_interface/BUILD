@@ -43,11 +43,28 @@ envoy_cc_extension(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":dynamic_module_reporter_lib",
         ":reverse_tunnel_acceptor_includes",
         ":upstream_socket_manager_lib",
         "//source/common/common:logger_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/protobuf",
+    ],
+    alwayslink = 1,
+)
+
+envoy_cc_extension(
+    name = "dynamic_module_reporter_lib",
+    srcs = ["dynamic_module_reporter.cc"],
+    hdrs = ["dynamic_module_reporter.h"],
+    deps = [
+        "//envoy/extensions/bootstrap/reverse_tunnel:reverse_tunnel_reporter_lib",
+        "//envoy/registry",
+        "//envoy/server:factory_context_interface",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/reporter/dynamic_modules/v3:pkg_cc_proto",
     ],
     alwayslink = 1,
 )

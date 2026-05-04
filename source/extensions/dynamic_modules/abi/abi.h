@@ -12206,6 +12206,80 @@ void envoy_dynamic_module_callback_transport_socket_set_is_readable(
 void envoy_dynamic_module_callback_transport_socket_flush_write_buffer(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
 
+// -----------------------------------------------------------------------------
+// Bootstrap Extension - Reverse Tunnel Reporter
+// -----------------------------------------------------------------------------
+
+/**
+ * Opaque handle representing the module-side reverse tunnel reporter object.
+ * Created by envoy_dynamic_module_on_reverse_tunnel_reporter_new and passed to
+ * all subsequent reverse tunnel event hooks.
+ */
+typedef void* envoy_dynamic_module_type_reverse_tunnel_reporter_module_ptr;
+
+/**
+ * envoy_dynamic_module_on_reverse_tunnel_reporter_new is called when Envoy creates a reverse
+ * tunnel reporter backed by this dynamic module. The module should allocate and return an opaque
+ * reporter object. The returned pointer is passed to all subsequent reverse tunnel event hooks
+ * and freed by envoy_dynamic_module_on_reverse_tunnel_reporter_destroy.
+ *
+ * @param reporter_config opaque config bytes from the reporter_config proto field. May be empty.
+ * @return opaque pointer to the module-side reporter object, or nullptr on failure.
+ */
+envoy_dynamic_module_type_reverse_tunnel_reporter_module_ptr
+envoy_dynamic_module_on_reverse_tunnel_reporter_new(
+    envoy_dynamic_module_type_envoy_buffer reporter_config);
+
+/**
+ * envoy_dynamic_module_on_reverse_tunnel_reporter_destroy is called when the reporter is torn
+ * down. The module must free any resources associated with reporter_ptr.
+ *
+ * @param reporter_ptr is the pointer returned by
+ * envoy_dynamic_module_on_reverse_tunnel_reporter_new.
+ */
+void envoy_dynamic_module_on_reverse_tunnel_reporter_destroy(
+    envoy_dynamic_module_type_reverse_tunnel_reporter_module_ptr reporter_ptr);
+
+/**
+ * envoy_dynamic_module_on_reverse_tunnel_server_initialized is called once after Envoy server
+ * initialization completes.
+ *
+ * @param reporter_ptr is the pointer returned by
+ * envoy_dynamic_module_on_reverse_tunnel_reporter_new.
+ */
+void envoy_dynamic_module_on_reverse_tunnel_server_initialized(
+    envoy_dynamic_module_type_reverse_tunnel_reporter_module_ptr reporter_ptr);
+
+/**
+ * envoy_dynamic_module_on_reverse_tunnel_connected is called when a reverse tunnel connection is
+ * established. Buffers are owned by Envoy and valid only for the duration of this call.
+ *
+ * @param reporter_ptr is the pointer returned by
+ * envoy_dynamic_module_on_reverse_tunnel_reporter_new.
+ * @param node_id identifies the remote tunnel endpoint.
+ * @param cluster_id identifies the remote cluster.
+ * @param tenant_id identifies the tenant scope (may be empty).
+ */
+void envoy_dynamic_module_on_reverse_tunnel_connected(
+    envoy_dynamic_module_type_reverse_tunnel_reporter_module_ptr reporter_ptr,
+    envoy_dynamic_module_type_envoy_buffer node_id,
+    envoy_dynamic_module_type_envoy_buffer cluster_id,
+    envoy_dynamic_module_type_envoy_buffer tenant_id);
+
+/**
+ * envoy_dynamic_module_on_reverse_tunnel_disconnected is called when a reverse tunnel connection
+ * is torn down. Buffers are owned by Envoy and valid only for the duration of this call.
+ *
+ * @param reporter_ptr is the pointer returned by
+ * envoy_dynamic_module_on_reverse_tunnel_reporter_new.
+ * @param node_id identifies the remote tunnel endpoint.
+ * @param cluster_id identifies the remote cluster.
+ */
+void envoy_dynamic_module_on_reverse_tunnel_disconnected(
+    envoy_dynamic_module_type_reverse_tunnel_reporter_module_ptr reporter_ptr,
+    envoy_dynamic_module_type_envoy_buffer node_id,
+    envoy_dynamic_module_type_envoy_buffer cluster_id);
+
 #ifdef __cplusplus
 }
 #endif

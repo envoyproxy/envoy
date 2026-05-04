@@ -84,3 +84,20 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "dynamic_module_reporter_test",
+    size = "small",
+    srcs = ["dynamic_module_reporter_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/c:reverse_tunnel_reporter_missing_required",
+        "//test/extensions/dynamic_modules/test_data/c:reverse_tunnel_reporter_no_op",
+    ],
+    deps = [
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:dynamic_module_reporter_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/reporter/dynamic_modules/v3:pkg_cc_proto",
+    ],
+)

@@ -17,6 +17,7 @@ pub mod listener;
 pub mod load_balancer;
 pub mod matcher;
 pub mod network;
+pub mod reverse_tunnel;
 pub mod tracer;
 pub mod transport_socket;
 pub mod udp_listener;

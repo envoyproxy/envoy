@@ -155,6 +155,7 @@ paths:
     - source/extensions/access_loggers
     # Bootstrap extension factories must throw per interface documentation.
     - source/extensions/bootstrap/dynamic_modules/factory.cc
+    - source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/dynamic_module_reporter.cc
     - source/extensions/clusters/eds/
     - source/extensions/clusters/logical_dns
     - source/extensions/clusters/original_dst

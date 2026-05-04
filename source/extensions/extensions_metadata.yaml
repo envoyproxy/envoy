@@ -117,6 +117,13 @@ envoy.bootstrap.reverse_tunnel.upstream_socket_interface:
   status: wip
   type_urls:
   - envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+envoy.extensions.reverse_tunnel.reporting_service.dynamic_modules:
+  categories:
+  - envoy.extensions.reverse_tunnel.reporting_service
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.bootstrap.reverse_tunnel.reporter.dynamic_modules.v3.DynamicModuleReverseTunnelReporter
 envoy.clusters.reverse_connection:
   categories:
   - envoy.clusters

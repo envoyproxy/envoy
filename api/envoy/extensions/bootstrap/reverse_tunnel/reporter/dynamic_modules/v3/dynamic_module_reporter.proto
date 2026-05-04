@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package envoy.extensions.bootstrap.reverse_tunnel.reporter.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_tunnel.reporter.dynamic_modules.v3";
+option java_outer_classname = "DynamicModuleReporterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/reverse_tunnel/reporter/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Reverse Tunnel Reporter]
+// [#extension: envoy.extensions.reverse_tunnel.reporting_service.dynamic_modules]
+
+// Configuration for a reverse-tunnel reporter backed by a dynamic module.
+// The module receives lifecycle callbacks when the server initializes and when
+// reverse tunnel connections are established or torn down.
+message DynamicModuleReverseTunnelReporter {
+  // Specifies the shared-object level configuration. This field is required.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // Opaque bytes passed to the module's reporter-new ABI hook. The module
+  // is responsible for interpreting this configuration. If not specified, an
+  // empty byte slice is passed.
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  // without the wrapper.
+  google.protobuf.Any reporter_config = 2;
+}

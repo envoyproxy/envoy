@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 package(default_visibility = [
     "//test/extensions/access_loggers/dynamic_modules:__pkg__",
+    "//test/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:__pkg__",
     "//test/extensions/clusters/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/bootstrap:__pkg__",
@@ -211,3 +212,7 @@ test_program(name = "tracer_no_op")
 test_program(name = "tracer_config_fail")
 
 test_program(name = "tracer_with_values")
+
+test_program(name = "reverse_tunnel_reporter_no_op")
+
+test_program(name = "reverse_tunnel_reporter_missing_required")
