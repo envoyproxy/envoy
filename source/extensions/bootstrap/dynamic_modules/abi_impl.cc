@@ -196,16 +196,17 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
 
 namespace {
 
-// Helper to build a StatNameTagVector from label names and label values.
+// Builds the tag vector using a caller-owned stack-local pool so the shared `stat_name_pool_`
+// is not mutated from worker threads. Returned tags borrow storage from `dynamic_pool`.
 Envoy::Stats::StatNameTagVector buildTagsForBootstrapMetric(
-    DynamicModuleBootstrapExtensionConfig& config, const Envoy::Stats::StatNameVec& label_names,
+    Envoy::Stats::StatNameDynamicPool& dynamic_pool, const Envoy::Stats::StatNameVec& label_names,
     envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length) {
   ASSERT(label_values_length == label_names.size());
   Envoy::Stats::StatNameTagVector tags;
   tags.reserve(label_values_length);
   for (size_t i = 0; i < label_values_length; i++) {
     absl::string_view label_value_view(label_values[i].ptr, label_values[i].length);
-    auto label_value = config.stat_name_pool_.add(label_value_view);
+    auto label_value = dynamic_pool.add(label_value_view);
     tags.push_back(Envoy::Stats::StatNameTag(label_names[i], label_value));
   }
   return tags;
@@ -222,6 +223,9 @@ envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* counter_id_ptr) {
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   absl::string_view name_view(name.ptr, name.length);
   Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
 
@@ -266,7 +270,8 @@ envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
   if (label_values_length != counter->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags = buildTagsForBootstrapMetric(*config, counter->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, counter->getLabelNames(), label_values,
                                           label_values_length);
   counter->add(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
@@ -279,6 +284,9 @@ envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* gauge_id_ptr) {
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   absl::string_view name_view(name.ptr, name.length);
   Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
   Envoy::Stats::Gauge::ImportMode import_mode = Envoy::Stats::Gauge::ImportMode::Accumulate;
@@ -322,7 +330,8 @@ envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
   if (label_values_length != gauge->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags = buildTagsForBootstrapMetric(*config, gauge->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->getLabelNames(), label_values,
                                           label_values_length);
   gauge->set(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
@@ -350,7 +359,8 @@ envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
   if (label_values_length != gauge->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags = buildTagsForBootstrapMetric(*config, gauge->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->getLabelNames(), label_values,
                                           label_values_length);
   gauge->add(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
@@ -378,7 +388,8 @@ envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
   if (label_values_length != gauge->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags = buildTagsForBootstrapMetric(*config, gauge->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, gauge->getLabelNames(), label_values,
                                           label_values_length);
   gauge->sub(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
@@ -391,6 +402,9 @@ envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* histogram_id_ptr) {
   auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   absl::string_view name_view(name.ptr, name.length);
   Envoy::Stats::StatName main_stat_name = config->stat_name_pool_.add(name_view);
   Envoy::Stats::Histogram::Unit unit = Envoy::Stats::Histogram::Unit::Unspecified;
@@ -434,7 +448,8 @@ envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
   if (label_values_length != histogram->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
-  auto tags = buildTagsForBootstrapMetric(*config, histogram->getLabelNames(), label_values,
+  Envoy::Stats::StatNameDynamicPool dynamic_pool(config->stats_scope_->symbolTable());
+  auto tags = buildTagsForBootstrapMetric(dynamic_pool, histogram->getLabelNames(), label_values,
                                           label_values_length);
   histogram->recordValue(*config->stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;

@@ -73,6 +73,8 @@ public:
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
 
@@ -2087,8 +2089,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
   envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
 }
 
-// Covers the `dispatcher == nullptr` early return of the listener filter scheduler when the
-// filter has not yet received `onAccept` (so the cached dispatcher has not been published).
+// Verifies that `commit` is a no-op when `onAccept` has not yet wired callbacks and no dispatcher
+// has been cached.
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
        ListenerFilterSchedulerCommitBeforeOnAcceptIsNoOp) {
   auto fresh_filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
@@ -2367,6 +2369,8 @@ public:
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
 
@@ -2661,7 +2665,7 @@ TEST_F(DynamicModuleListenerFilterHttpCalloutTest, FilterDestructionCancelsPendi
   filter_.reset();
 }
 
-// Covers the `on_listener_filter_http_callout_done_ == nullptr` branch of `onSuccess`.
+// Verifies that `onSuccess` is a safe no-op when `on_listener_filter_http_callout_done_` is null.
 TEST_F(DynamicModuleListenerFilterHttpCalloutTest, HttpCalloutOnSuccessWithoutCalloutDoneHook) {
   NiceMock<Upstream::MockThreadLocalCluster> cluster;
   NiceMock<Http::MockAsyncClient> async_client;
@@ -2699,8 +2703,8 @@ TEST_F(DynamicModuleListenerFilterHttpCalloutTest, HttpCalloutOnSuccessWithoutCa
       ->onSuccess(request, std::move(response));
 }
 
-// Covers the `on_listener_filter_http_callout_done_ == nullptr` branch of `onFailure` along with
-// the `ExceedResponseBufferLimit` path of the reason switch.
+// Verifies that `onFailure` is a safe no-op when `on_listener_filter_http_callout_done_` is null,
+// exercising the `ExceedResponseBufferLimit` path of the reason switch.
 TEST_F(DynamicModuleListenerFilterHttpCalloutTest, HttpCalloutOnFailureWithoutCalloutDoneHook) {
   NiceMock<Upstream::MockThreadLocalCluster> cluster;
   NiceMock<Http::MockAsyncClient> async_client;
@@ -2735,19 +2739,35 @@ TEST_F(DynamicModuleListenerFilterHttpCalloutTest, HttpCalloutOnFailureWithoutCa
       ->onFailure(request, Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
 }
 
-// Covers `DynamicModuleListenerFilter::onScheduled` when `in_module_filter_` is null.
+// Verifies that `onScheduled` is a safe no-op when `in_module_filter_` is null.
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
        ListenerFilterOnScheduledWithoutInModuleFilterIsNoOp) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
   filter->onScheduled(42);
 }
 
-// Covers the `on_listener_filter_config_scheduled_ == nullptr` branch of
-// `DynamicModuleListenerFilterConfig::onScheduled`.
+// Verifies that `DynamicModuleListenerFilterConfig::onScheduled` is a safe no-op when
+// `on_listener_filter_config_scheduled_` is null.
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
        ListenerFilterConfigOnScheduledWithoutHookIsNoOp) {
   filter_config_->on_listener_filter_config_scheduled_ = nullptr;
   filter_config_->onScheduled(42);
+}
+
+// Verifies the factory auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, MetricsFrozenAfterInit) {
+  filter_config_->stat_creation_frozen_ = true;
+  envoy_dynamic_module_type_module_buffer name = {const_cast<char*>("frozen_counter"), 14};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_listener_filter_config_define_counter(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_listener_filter_config_define_gauge(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+                static_cast<void*>(filter_config_.get()), name, &out_id));
 }
 
 } // namespace ListenerFilters
