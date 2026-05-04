@@ -1,6 +1,5 @@
 #include "source/common/tls/ssl_socket.h"
 
-#include "envoy/common/platform.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
@@ -26,31 +25,6 @@ namespace Tls {
 namespace {
 
 constexpr absl::string_view NotReadyReason{"TLS error: Secret is not supplied by SDS"};
-
-absl::optional<Api::IoError::IoErrorCode> checkForConnectionReset(Network::IoHandle& io_handle) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
-    return absl::nullopt;
-  }
-
-  // Check BoringSSL's error queue for a system-level connection reset.
-  const uint32_t err = ERR_peek_error();
-  if (ERR_GET_LIB(err) == ERR_LIB_SYS && ERR_GET_REASON(err) == SOCKET_ERROR_CONNRESET) {
-    return Api::IoError::IoErrorCode::ConnectionReset;
-  }
-
-  // Fallback: query SO_ERROR on the underlying socket. This reliably detects a pending
-  // connection reset even when the BIO layer did not capture it in the error queue
-  // (e.g., when a TLS close_notify was received before the TCP RST).
-  int so_error = 0;
-  socklen_t len = sizeof(so_error);
-  auto result = io_handle.getOption(SOL_SOCKET, SO_ERROR, &so_error, &len);
-  if (result.return_value_ == 0 && so_error == SOCKET_ERROR_CONNRESET) {
-    return Api::IoError::IoErrorCode::ConnectionReset;
-  }
-
-  return absl::nullopt;
-}
 
 } // namespace
 
@@ -148,7 +122,6 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   bool end_stream = false;
   PostIoAction action = PostIoAction::KeepOpen;
   uint64_t bytes_read = 0;
-  absl::optional<Api::IoError::IoErrorCode> err_code;
   while (keep_reading) {
     uint64_t bytes_read_this_iteration = 0;
     Buffer::Reservation reservation = read_buffer.reserveForRead();
@@ -165,21 +138,14 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
           break;
         case SSL_ERROR_ZERO_RETURN:
           // Graceful shutdown using close_notify TLS alert.
-          // Also check for a pending connection reset: the peer may have sent close_notify
-          // followed by a TCP RST (e.g., AbortReset close). The TLS layer processes the
-          // close_notify first, but the RST is pending on the socket.
-          err_code = checkForConnectionReset(callbacks_->ioHandle());
           end_stream = true;
           break;
         case SSL_ERROR_SYSCALL:
           if (result.error_.value() == 0) {
             // Non-graceful shutdown by closing the underlying socket.
-            // Check for connection reset even on EOF — the peer may have sent RST.
-            err_code = checkForConnectionReset(callbacks_->ioHandle());
             end_stream = true;
             break;
           }
-          err_code = checkForConnectionReset(callbacks_->ioHandle());
           FALLTHRU;
         case SSL_ERROR_WANT_WRITE:
           // Renegotiation has started. We don't handle renegotiation so just fall through.
@@ -204,12 +170,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
   ENVOY_CONN_LOG(trace, "ssl read {} bytes", callbacks_->connection(), bytes_read);
 
-  // Fallback: if inline detection didn't catch it, check if drainErrorQueue() found a reset.
-  if (action == PostIoAction::Close && !err_code.has_value()) {
-    err_code = detected_io_error_;
-  }
-
-  return {action, bytes_read, end_stream, err_code};
+  return {action, bytes_read, end_stream, detected_io_error_};
 }
 
 void SslSocket::onPrivateKeyMethodComplete() { resumeHandshake(); }
@@ -357,19 +318,15 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
       int err = SSL_get_error(rawSsl(), rc);
       ENVOY_CONN_LOG(trace, "ssl error occurred while write: {}", callbacks_->connection(),
                      Utility::getErrorDescription(err));
-      absl::optional<Api::IoError::IoErrorCode> write_err_code;
       switch (err) {
       case SSL_ERROR_WANT_WRITE:
         bytes_to_retry_ = bytes_to_write;
         break;
-      case SSL_ERROR_SYSCALL:
-        write_err_code = checkForConnectionReset(callbacks_->ioHandle());
-        FALLTHRU;
       case SSL_ERROR_WANT_READ:
       // Renegotiation has started. We don't handle renegotiation so just fall through.
       default:
         drainErrorQueue();
-        return {PostIoAction::Close, total_bytes_written, false, write_err_code};
+        return {PostIoAction::Close, total_bytes_written, false, detected_io_error_};
       }
 
       break;
