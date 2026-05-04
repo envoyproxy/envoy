@@ -145,7 +145,7 @@ Http::FilterDataStatus BandwidthShare::encodeData(Buffer::Instance& data, bool e
     // If upstream has trailers, addEncodedTrailers won't be called
     bool trailer_added = false;
     if (end_stream && config.enableResponseTrailers()) {
-      encoder_callbacks_->addEncodedTrailers();
+      trailers_ = &encoder_callbacks_->addEncodedTrailers();
       trailer_added = true;
     }
 

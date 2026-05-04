@@ -104,7 +104,7 @@ TEST_F(ConfigTest, ValidTenantNameSelectorPlainStringParses) {
   auto filter_cb = filterFactory();
   ASSERT_OK(filter_cb);
   Http::MockFilterChainFactoryCallbacks callbacks;
-  EXPECT_CALL(callbacks, addStreamDecoderFilter);
+  EXPECT_CALL(callbacks, addStreamFilter);
   (*filter_cb)(callbacks);
 }
 

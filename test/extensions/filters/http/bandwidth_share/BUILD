@@ -47,9 +47,9 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/bandwidth_share:config",
-        # For matchers
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/extensions/filters/http/bandwidth_share/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

@@ -9,6 +9,15 @@ namespace BandwidthShareFilter {
 
 SINGLETON_MANAGER_REGISTRATION(fair_token_bucket_singleton);
 
+namespace {
+
+uint64_t bytesPerSecond(const Runtime::UInt32& kbps_runtime_config) {
+  // The proto/runtime value is in KiB/s; the token bucket accounts in bytes.
+  return static_cast<uint64_t>(kbps_runtime_config.value()) * 1024;
+}
+
+} // namespace
+
 std::shared_ptr<TokenBucketSingleton>
 TokenBucketSingleton::get(Singleton::Manager& singleton_manager, TimeSource& time_source,
                           Stats::Scope& stats_scope) {
@@ -24,11 +33,12 @@ absl::Status TokenBucketSingleton::setBucket(absl::string_view bucket_id,
   Thread::LockGuard lock(mu_);
   auto it = buckets_.find(bucket_id);
   if (it == buckets_.end()) {
-    uint32_t max_tokens_value = max_tokens_runtime_config.value();
+    const uint64_t max_tokens_value = bytesPerSecond(max_tokens_runtime_config);
     buckets_.emplace(
-        bucket_id,
-        Entry{FairTokenBucket::Bucket::create(max_tokens_value, time_source_, fill_interval),
-              max_tokens_value, fill_interval, std::move(max_tokens_runtime_config)});
+        bucket_id, Entry{max_tokens_value == 0 ? nullptr
+                                               : FairTokenBucket::Bucket::create(
+                                                     max_tokens_value, time_source_, fill_interval),
+                         max_tokens_value, fill_interval, std::move(max_tokens_runtime_config)});
     return absl::OkStatus();
   }
   auto& entry = it->second;
@@ -58,12 +68,14 @@ TokenBucketSingleton::getBucket(absl::string_view bucket_id) {
   // passed to setBucket successfully.
   ASSERT(it != buckets_.end());
   auto& entry = it->second;
-  uint32_t max_tokens_value = entry.max_tokens_runtime_config_.value();
+  const uint64_t max_tokens_value = bytesPerSecond(entry.max_tokens_runtime_config_);
   if (entry.max_tokens_ != max_tokens_value) {
     // Runtime value of the bucket size has changed, replace the bucket.
     entry.max_tokens_ = max_tokens_value;
     entry.bucket_ =
-        FairTokenBucket::Bucket::create(max_tokens_value, time_source_, entry.fill_interval_);
+        max_tokens_value == 0
+            ? nullptr
+            : FairTokenBucket::Bucket::create(max_tokens_value, time_source_, entry.fill_interval_);
   }
   if (entry.max_tokens_ == 0) {
     return nullptr;

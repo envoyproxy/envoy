@@ -1,11 +1,38 @@
+#include <string>
+
+#include "envoy/extensions/filters/http/bandwidth_share/v3/bandwidth_share.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/protobuf/utility.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/mocks/http/mocks.h"
+#include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace {
+
+using ::testing::_;
+using ::testing::Contains;
+using ::testing::Not;
+using ::testing::Property;
+using ::testing::ResultOf;
+using ::testing::StartsWith;
+
+using BandwidthShareProto = envoy::extensions::filters::http::bandwidth_share::v3::BandwidthShare;
+using HttpConnectionManagerProto =
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
+
+template <class NameMatcher> auto MetricNameMatches(NameMatcher name_matcher) {
+  return Property(&Stats::Metric::name, name_matcher);
+}
+
+template <class MetricMatcher> auto HasMetric(MetricMatcher metric_matcher) {
+  return Contains(
+      ResultOf([](const auto& metric) -> const Stats::Metric& { return *metric; }, metric_matcher));
+}
 
 class BandwidthShareIntegrationTest : public Event::TestUsingSimulatedTime,
                                       public HttpIntegrationTest,
@@ -21,6 +48,20 @@ public:
     });
     config_helper_.prependFilter(config);
     initialize();
+  }
+
+  void initializeFilterWithRouteConfig(const std::string& filter_config,
+                                       const std::string& route_config) {
+    config_helper_.addConfigModifier([route_config](HttpConnectionManagerProto& hcm) {
+      BandwidthShareProto per_route_config;
+      TestUtility::loadFromYaml(route_config, per_route_config);
+      auto* typed_config = hcm.mutable_route_config()
+                               ->mutable_virtual_hosts(0)
+                               ->mutable_routes(0)
+                               ->mutable_typed_per_filter_config();
+      (*typed_config)["bwshare"].PackFrom(per_route_config);
+    });
+    initializeFilter(filter_config);
   }
 
   std::string disabledFilter() {
@@ -40,9 +81,53 @@ public:
       response_limit: {bucket_id: "bucket2", kbps: {default_value: 1, runtime_key: "a"}}
   )";
   }
-  uint64_t counterValue(absl::string_view c) { return test_server_->counter(std::string{c}); }
+  std::string runtimeControlledRequestFilter() {
+    return R"(
+    name: bwshare
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare
+      request_limit:
+        bucket_id: "runtime_bucket"
+        kbps: {default_value: 1, runtime_key: "bandwidth_share.runtime_request_kbps"}
+  )";
+  }
+  std::string responseTrailersFilter() {
+    return R"(
+    name: bwshare
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare
+      request_limit: {bucket_id: "trailer_request", kbps: {default_value: 1, runtime_key: "trailer_request"}}
+      response_limit: {bucket_id: "trailer_response", kbps: {default_value: 1, runtime_key: "trailer_response"}}
+      enable_response_trailers: true
+      response_trailer_prefix: x-test-
+  )";
+  }
+  std::string tenantTaggedRouteConfig() {
+    return R"(
+    request_limit: {bucket_id: "route_bucket", kbps: {default_value: 1, runtime_key: "route_request"}}
+    tenant_name_selector:
+      on_no_match:
+        action:
+          name: use_constant_string_as_tenant_name
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: gold
+    tenant_configs:
+      "gold": {include_stats_tag: true}
+  )";
+  }
+  uint64_t counterValue(const std::string& name) {
+    const auto counter = test_server_->counter(name);
+    return counter != nullptr ? counter->value() : 0;
+  }
+
+  uint64_t gaugeValue(const std::string& name) {
+    const auto gauge = test_server_->gauge(name);
+    return gauge != nullptr ? gauge->value() : 0;
+  }
+
   Http::TestRequestHeaderMapImpl request_headers_post_{
-      {":method", "POST"}, {":authority", "test"}, {":path", "/test"}};
+      {":method", "POST"}, {":scheme", "http"}, {":authority", "test"}, {":path", "/test"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"}};
 
   Http::TestRequestTrailerMapImpl any_request_trailers_{{"x-foo", "foo"}};
@@ -51,7 +136,7 @@ public:
 
 TEST_F(BandwidthShareIntegrationTest, DisabledJustPassesThrough) {
   initializeFilter(disabledFilter());
-  auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto codec_client = makeHttpConnection(lookupPort("http"));
   auto [request_encoder, response_decoder] = codec_client->startRequest(request_headers_post_);
   codec_client->sendData(request_encoder, std::string(2048, 'a'), false);
   codec_client->sendTrailers(request_encoder, any_request_trailers_);
@@ -62,13 +147,60 @@ TEST_F(BandwidthShareIntegrationTest, DisabledJustPassesThrough) {
   upstream_request_->encodeTrailers(any_response_trailers_);
   ASSERT_TRUE(response_decoder->waitForEndStream());
 
-  // TODO: make the metrics the right ones
-  EXPECT_THAT(counterValue("bandwidth_share.bytes"), 0);
+  EXPECT_THAT(test_server_->counters(),
+              Not(HasMetric(MetricNameMatches(StartsWith("bandwidth_share.")))));
+  EXPECT_THAT(test_server_->gauges(),
+              Not(HasMetric(MetricNameMatches(StartsWith("bandwidth_share.")))));
 }
 
 TEST_F(BandwidthShareIntegrationTest, LimitCausesPausesBothWays) {
   initializeFilter(twoWay1kFilter());
-  auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  const std::string request_bytes_pending =
+      "bandwidth_share.bytes_pending.bucket_id.bucket1.tenant..direction.request";
+  const std::string response_bytes_pending =
+      "bandwidth_share.bytes_pending.bucket_id.bucket2.tenant..direction.response";
+  const std::string request_streams_currently_limited =
+      "bandwidth_share.streams_currently_limited.bucket_id.bucket1.tenant..direction.request";
+  const std::string response_streams_currently_limited =
+      "bandwidth_share.streams_currently_limited.bucket_id.bucket2.tenant..direction.response";
+  auto codec_client = makeHttpConnection(lookupPort("http"));
+  auto [request_encoder, response_decoder] = codec_client->startRequest(request_headers_post_);
+  codec_client->sendData(request_encoder, std::string(2048, 'a'), false);
+  codec_client->sendTrailers(request_encoder, any_request_trailers_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  test_server_->waitForGaugeGe(request_bytes_pending, 1);
+  EXPECT_EQ(1, gaugeValue(request_streams_currently_limited));
+  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(response_headers_, false);
+  response_decoder->waitForHeaders();
+  upstream_request_->encodeData(2048, false);
+  upstream_request_->encodeTrailers(any_response_trailers_);
+  test_server_->waitForGaugeGe(response_bytes_pending, 1);
+  EXPECT_EQ(1, gaugeValue(response_streams_currently_limited));
+  test_server_->waitForGaugeEq(response_bytes_pending, 0);
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+
+  EXPECT_GT(
+      counterValue("bandwidth_share.bytes.bucket_id.bucket1.tenant..direction.request.handling."
+                   "limited"),
+      512);
+  EXPECT_GT(
+      counterValue("bandwidth_share.bytes.bucket_id.bucket2.tenant..direction.response.handling."
+                   "limited"),
+      512);
+  EXPECT_EQ(0, gaugeValue(request_streams_currently_limited));
+  EXPECT_EQ(0, gaugeValue(response_streams_currently_limited));
+  EXPECT_EQ(0, gaugeValue(request_bytes_pending));
+  EXPECT_EQ(0, gaugeValue(response_bytes_pending));
+}
+
+TEST_F(BandwidthShareIntegrationTest, RuntimeZeroLimitPassesThrough) {
+  config_helper_.addRuntimeOverride("bandwidth_share.runtime_request_kbps", "0");
+  initializeFilter(runtimeControlledRequestFilter());
+  auto codec_client = makeHttpConnection(lookupPort("http"));
   auto [request_encoder, response_decoder] = codec_client->startRequest(request_headers_post_);
   codec_client->sendData(request_encoder, std::string(2048, 'a'), false);
   codec_client->sendTrailers(request_encoder, any_request_trailers_);
@@ -79,8 +211,74 @@ TEST_F(BandwidthShareIntegrationTest, LimitCausesPausesBothWays) {
   upstream_request_->encodeTrailers(any_response_trailers_);
   ASSERT_TRUE(response_decoder->waitForEndStream());
 
-  // TODO: make the metrics the right ones
-  EXPECT_THAT(counterValue("bandwidth_share.bytes"), 0);
+  EXPECT_THAT(test_server_->counters(),
+              Not(HasMetric(MetricNameMatches(StartsWith("bandwidth_share.")))));
+  EXPECT_THAT(test_server_->gauges(),
+              Not(HasMetric(MetricNameMatches(StartsWith("bandwidth_share.")))));
+}
+
+TEST_F(BandwidthShareIntegrationTest, RouteConfigCanLimitAndTagTenantStats) {
+  initializeFilterWithRouteConfig(disabledFilter(), tenantTaggedRouteConfig());
+  const std::string request_bytes_pending =
+      "bandwidth_share.bytes_pending.bucket_id.route_bucket.tenant.gold.direction.request";
+  const std::string request_streams_currently_limited =
+      "bandwidth_share.streams_currently_limited.bucket_id.route_bucket.tenant.gold.direction."
+      "request";
+  auto codec_client = makeHttpConnection(lookupPort("http"));
+  auto [request_encoder, response_decoder] = codec_client->startRequest(request_headers_post_);
+  codec_client->sendData(request_encoder, std::string(2048, 'a'), false);
+  codec_client->sendTrailers(request_encoder, any_request_trailers_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  test_server_->waitForGaugeGe(request_bytes_pending, 1);
+  EXPECT_EQ(1, gaugeValue(request_streams_currently_limited));
+  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(response_headers_, true);
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+
+  EXPECT_GT(
+      counterValue("bandwidth_share.bytes.bucket_id.route_bucket.tenant.gold.direction.request."
+                   "handling.limited"),
+      512);
+  EXPECT_EQ(0, gaugeValue(request_streams_currently_limited));
+  EXPECT_EQ(0, gaugeValue(request_bytes_pending));
+}
+
+TEST_F(BandwidthShareIntegrationTest, AddsResponseTrailersAfterLimitedResponse) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  initializeFilter(responseTrailersFilter());
+  const std::string request_bytes_pending =
+      "bandwidth_share.bytes_pending.bucket_id.trailer_request.tenant..direction.request";
+  const std::string response_bytes_pending =
+      "bandwidth_share.bytes_pending.bucket_id.trailer_response.tenant..direction.response";
+  auto codec_client = makeHttpConnection(lookupPort("http"));
+  auto [request_encoder, response_decoder] = codec_client->startRequest(request_headers_post_);
+  codec_client->sendData(request_encoder, std::string(2048, 'a'), false);
+  codec_client->sendTrailers(request_encoder, any_request_trailers_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  test_server_->waitForGaugeGe(request_bytes_pending, 1);
+  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(response_headers_, false);
+  response_decoder->waitForHeaders();
+  upstream_request_->encodeData(2048, true);
+  test_server_->waitForGaugeGe(response_bytes_pending, 1);
+  test_server_->waitForGaugeEq(response_bytes_pending, 0);
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+  ASSERT_NE(nullptr, response_decoder->trailers());
+
+  EXPECT_THAT(*response_decoder->trailers(),
+              ContainsHeader("x-test-bandwidth-request-delay-ms", _));
+  EXPECT_THAT(*response_decoder->trailers(),
+              ContainsHeader("x-test-bandwidth-response-delay-ms", _));
+  EXPECT_THAT(*response_decoder->trailers(),
+              ContainsHeader("x-test-bandwidth-request-duration-ms", _));
+  EXPECT_THAT(*response_decoder->trailers(),
+              ContainsHeader("x-test-bandwidth-response-duration-ms", _));
 }
 
 } // namespace

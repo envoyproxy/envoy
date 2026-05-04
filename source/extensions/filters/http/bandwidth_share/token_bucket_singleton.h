@@ -51,12 +51,12 @@ public:
 private:
   Thread::MutexBasicLockable mu_;
   struct Entry {
-    Entry(std::shared_ptr<FairTokenBucket::Bucket> bucket, uint32_t max_tokens,
+    Entry(std::shared_ptr<FairTokenBucket::Bucket> bucket, uint64_t max_tokens,
           std::chrono::milliseconds fill_interval, Runtime::UInt32&& max_tokens_runtime_config)
         : bucket_(std::move(bucket)), max_tokens_(max_tokens), fill_interval_(fill_interval),
           max_tokens_runtime_config_(std::move(max_tokens_runtime_config)) {}
     std::shared_ptr<FairTokenBucket::Bucket> bucket_;
-    uint32_t max_tokens_ = 0;
+    uint64_t max_tokens_ = 0;
     std::chrono::milliseconds fill_interval_ = std::chrono::milliseconds{};
     const Runtime::UInt32 max_tokens_runtime_config_;
   };

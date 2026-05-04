@@ -133,7 +133,7 @@ BandwidthShareFilterFactory::createFilterFactoryFromProtoTyped(
   }
   return
       [ss = std::move(shared_state).value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(std::make_unique<BandwidthShare>(ss));
+        callbacks.addStreamFilter(std::make_shared<BandwidthShare>(ss));
       };
 }
 
