@@ -1456,9 +1456,7 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_SERVER_NAME%``
   HTTP/TCP/THRIFT
-    The SNI used for the upstream TLS connection. Returns the SNI from the established TLS
-    connection if available; falls back to the requested server name from filter state otherwise
-    (e.g. on TLS handshake failure).
+    The TLS SNI value used to establish the upstream TLS connection.
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
