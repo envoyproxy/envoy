@@ -5,7 +5,6 @@
 #include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/singleton/manager_impl.h"
 
-#include "test/mocks/secret/mocks.h"
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "gmock/gmock.h"

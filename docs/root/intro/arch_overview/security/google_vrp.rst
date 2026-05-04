@@ -22,8 +22,11 @@ to be eligible for the program:
    :ref:`execution environment <arch_overview_google_vrp_ee>` and be consistent with the
    program's :ref:`threat model <arch_overview_google_vrp_threat_model>`.
 
-2. Vulnerabilities must be reported to **both** envoy-security@googlegroups.com and via https://bughunters.google.com/report.
-   Vulenrabilities must be kept under embargo while triage and potential security releases occur.
+2. Vulnerabilities must be reported to **both** the Envoy project and via https://bughunters.google.com/report.
+   To report to the Envoy project, preferably
+   `open a GitHub Security Advisory <https://github.com/envoyproxy/envoy/security/advisories/new>`_
+   — alternatively, you may email envoy-security@googlegroups.com
+   Vulnerabilities must be kept under embargo while triage and potential security releases occur.
    Please follow the :repo:`disclosure guidance <SECURITY.md#disclosures>` when submitting reports.
    Disclosure SLOs are documented :repo:`here <SECURITY.md#fix-and-disclosure-slos>`. In general,
    security disclosures are subject to the `Linux Foundation's privacy policy

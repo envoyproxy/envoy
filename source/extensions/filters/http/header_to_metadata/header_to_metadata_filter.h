@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -112,7 +113,7 @@ public:
   static absl::StatusOr<Rule> create(const ProtoRule& rule, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
   const absl::optional<Matcher::RegexReplace>& regexReplace() const { return regex_replace_; }
-  std::shared_ptr<const ValueSelector> selector_;
+  std::unique_ptr<const ValueSelector> selector_;
 
 private:
   Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& creation_status);
