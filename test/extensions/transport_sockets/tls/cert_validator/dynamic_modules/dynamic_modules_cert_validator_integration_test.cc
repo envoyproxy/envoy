@@ -1,14 +1,19 @@
 // Integration tests for the dynamic_modules cert validator. These tests run a real Envoy
-// server with a TLS listener whose validator is provided by a dynamically loaded module, and
-// drive a TLS handshake from a client cert. Unlike the unit test in this same directory,
-// the validator's extern "C" callbacks (set_error_details, set_filter_state,
-// get_filter_state) are reached through a dlopen'd .so calling into the host — i.e. through
-// the dynamic linker rather than a direct C++ call. That dynamic-linker path is what
-// exercises the strong definitions in config.cc end-to-end.
+// server with a TLS listener, and drive a TLS handshake from a client whose cert validator
+// is the dynamic_modules validator backed by a dynamically loaded module. Unlike the unit
+// test in this same directory, the validator's extern "C" callbacks (set_error_details,
+// set_filter_state, get_filter_state) are reached through a dlopen'd .so calling into the
+// host — i.e. through the dynamic linker rather than a direct C++ call. That dynamic-linker
+// path is what exercises the strong definitions in config.cc end-to-end.
+//
+// The validator is mounted on the *client* side because that's the simpler wiring: the
+// server presents its certificate as part of the TLS handshake, so the client validator's
+// do_verify_cert_chain runs without any further configuration. Putting the validator on the
+// server side would also require populating the server's TLS CertificateRequest CA list to
+// convince BoringSSL clients to send their certs.
 
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -29,11 +34,10 @@ struct CertValidatorIntegrationParam {
   Network::Address::IpVersion ip_version;
 };
 
-// Drives a TLS handshake against an Envoy listener whose downstream TLS context is
-// configured with the dynamic_modules cert validator backed by the named module. The
-// validators in the C/Go/Rust test_data ship a "test"-named validator that always returns
-// Successful, so a successful end-to-end handshake is the assertion that the cert validator
-// strong code path ran.
+// Drives a TLS handshake against an Envoy listener with the dynamic_modules cert validator
+// mounted on the *client* side, backed by the named module. The C/Go/Rust validators always
+// return Successful; if the dynamic-module strong code path runs and the validator returns
+// Successful, the handshake completes and the request flows.
 class DynamicModulesCertValidatorIntegrationTest
     : public testing::TestWithParam<CertValidatorIntegrationParam>,
       public HttpIntegrationTest {
@@ -56,55 +60,31 @@ public:
   }
 
   void initialize() override {
-    auto* validator_config = new envoy::config::core::v3::TypedExtensionConfig();
-    TestUtility::loadFromYaml(fmt::format(R"EOF(
-name: envoy.tls.cert_validator.dynamic_modules
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig
-  dynamic_module_config:
-    name: {}
-  validator_name: test
-)EOF",
-                                          module_name_),
-                              *validator_config);
-
-    config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
-                                    .setRsaCert(true)
-                                    .setTlsV13(true)
-                                    .setRsaCertOcspStaple(false)
-                                    .setCustomValidatorConfig(validator_config));
-
-    // Add a trusted_ca alongside the custom validator so the server populates a non-empty CA
-    // list in its TLS CertificateRequest. BoringSSL clients require that list before sending
-    // their cert. Chain validation is still done by the dynamic module via the custom verify
-    // callback; the CA list is only an advertisement.
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* filter_chain =
-          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-      auto* transport_socket = filter_chain->mutable_transport_socket();
-      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-      transport_socket->mutable_typed_config()->UnpackTo(&tls_context);
-      tls_context.mutable_common_tls_context()
-          ->mutable_validation_context()
-          ->mutable_trusted_ca()
-          ->set_filename(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
-    });
-
+    // Configure the listener with a default server-side TLS context (no custom validator on
+    // the server). The custom validator is wired in on the client side via
+    // makeSslClient() below.
+    config_helper_.addSslConfig(
+        ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true).setRsaCertOcspStaple(
+            false));
     HttpIntegrationTest::initialize();
   }
 
   Network::ClientConnectionPtr makeSslClient() {
+    Ssl::ClientSslTransportOptions options;
+    options.setCustomCertValidatorConfig(client_validator_config_);
+
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("http"));
-    auto factory = Ssl::createClientSslTransportSocketFactory(Ssl::ClientSslTransportOptions(),
-                                                              context_manager_, *api_);
+    auto factory = Ssl::createClientSslTransportSocketFactory(options, context_manager_, *api_);
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                factory->createTransportSocket(nullptr, nullptr),
                                                nullptr, nullptr);
   }
 
-  std::string module_name_;
+  // The TypedExtensionConfig pointer set on the client transport options. Owned by the test;
+  // freed in TearDown via the unique_ptr.
+  envoy::config::core::v3::TypedExtensionConfig* client_validator_config_{nullptr};
+  std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> validator_config_storage_;
 };
 
 namespace {
@@ -130,7 +110,21 @@ INSTANTIATE_TEST_SUITE_P(LanguagesAndIpVersions, DynamicModulesCertValidatorInte
 
 TEST_P(DynamicModulesCertValidatorIntegrationTest, ValidatorAccepts) {
   // The C fakes are named cert_validator_no_op; the Go/Rust ones are named cert_validator_test.
-  module_name_ = (GetParam().language == "c") ? "cert_validator_no_op" : "cert_validator_test";
+  const std::string module_name =
+      (GetParam().language == "c") ? "cert_validator_no_op" : "cert_validator_test";
+
+  validator_config_storage_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+name: envoy.tls.cert_validator.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_validator.dynamic_modules.v3.DynamicModuleCertValidatorConfig
+  dynamic_module_config:
+    name: {}
+  validator_name: test
+)EOF",
+                                        module_name),
+                            *validator_config_storage_);
+  client_validator_config_ = validator_config_storage_.get();
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClient();
@@ -138,10 +132,11 @@ TEST_P(DynamicModulesCertValidatorIntegrationTest, ValidatorAccepts) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
-// Drives a TLS handshake against a listener using the C-only cert_validator_filter_state
-// module. That module's do_verify_cert_chain calls set_filter_state and get_filter_state,
-// only returning Successful if the round-trip succeeds — so a successful handshake means the
-// strong filter-state callbacks ran through the dynamic linker resolution path.
+// Drives a TLS handshake against a listener whose client-side cert validator is the C-only
+// cert_validator_filter_state module. That module's do_verify_cert_chain calls
+// set_filter_state and get_filter_state, and only returns Successful if the round-trip
+// succeeds — so a successful handshake means the strong filter-state callbacks ran through
+// the dynamic linker resolution path.
 class DynamicModulesCertValidatorFilterStateTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
@@ -162,7 +157,14 @@ public:
   }
 
   void initialize() override {
-    auto* validator_config = new envoy::config::core::v3::TypedExtensionConfig();
+    config_helper_.addSslConfig(
+        ConfigHelper::ServerSslOptions().setRsaCert(true).setTlsV13(true).setRsaCertOcspStaple(
+            false));
+    HttpIntegrationTest::initialize();
+  }
+
+  Network::ClientConnectionPtr makeSslClient() {
+    validator_config_storage_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
     TestUtility::loadFromYaml(R"EOF(
 name: envoy.tls.cert_validator.dynamic_modules
 typed_config:
@@ -171,40 +173,20 @@ typed_config:
     name: cert_validator_filter_state
   validator_name: test
 )EOF",
-                              *validator_config);
+                              *validator_config_storage_);
 
-    config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
-                                    .setRsaCert(true)
-                                    .setTlsV13(true)
-                                    .setRsaCertOcspStaple(false)
-                                    .setCustomValidatorConfig(validator_config));
+    Ssl::ClientSslTransportOptions options;
+    options.setCustomCertValidatorConfig(validator_config_storage_.get());
 
-    // See DynamicModulesCertValidatorIntegrationTest::initialize for why we add trusted_ca.
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* filter_chain =
-          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-      auto* transport_socket = filter_chain->mutable_transport_socket();
-      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-      transport_socket->mutable_typed_config()->UnpackTo(&tls_context);
-      tls_context.mutable_common_tls_context()
-          ->mutable_validation_context()
-          ->mutable_trusted_ca()
-          ->set_filename(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-      transport_socket->mutable_typed_config()->PackFrom(tls_context);
-    });
-
-    HttpIntegrationTest::initialize();
-  }
-
-  Network::ClientConnectionPtr makeSslClient() {
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("http"));
-    auto factory = Ssl::createClientSslTransportSocketFactory(Ssl::ClientSslTransportOptions(),
-                                                              context_manager_, *api_);
+    auto factory = Ssl::createClientSslTransportSocketFactory(options, context_manager_, *api_);
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                factory->createTransportSocket(nullptr, nullptr),
                                                nullptr, nullptr);
   }
+
+  std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> validator_config_storage_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesCertValidatorFilterStateTest,
