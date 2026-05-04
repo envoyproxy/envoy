@@ -128,5 +128,10 @@ new_features:
     in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
     instead of using the :ref:`ExtensionWithMatcher
     <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
+- area: network_ext_proc
+  change: |
+    Added support for receiving untyped dynamic metadata from the external processing server.
+    Configured via :ref:`receiving_namespaces
+    <envoy_v3_api_field_extensions.filters.network.ext_proc.v3.MetadataOptions.receiving_namespaces>`.
 
 deprecated:

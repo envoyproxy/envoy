@@ -108,5 +108,6 @@ message MetadataOptions {
 
   // Describes which typed or untyped dynamic metadata namespaces to receive
   // from the external processing server.
+  // Receiving of typed metadata is not supported.
   MetadataNamespaces receiving_namespaces = 2;
 }
