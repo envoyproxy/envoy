@@ -303,33 +303,6 @@ envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
   return envoy_dynamic_module_type_metrics_result_MetricNotFound;
 }
 
-// ---------------------- Cert Validator callbacks ------------------------
-// These are weak symbols that provide default stub implementations. The actual implementation
-// is provided in the cert validator config.cc when the cert validator extension is used.
-
-__attribute__((weak)) void envoy_dynamic_module_callback_cert_validator_set_error_details(
-    envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_validator_set_error_details: "
-               "not implemented in this context");
-}
-
-__attribute__((weak)) bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
-    envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_validator_set_filter_state: "
-               "not implemented in this context");
-  return false;
-}
-
-__attribute__((weak)) bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
-    envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_cert_validator_get_filter_state: "
-               "not implemented in this context");
-  return false;
-}
-
 // ---------------------- Bootstrap extension admin handler callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations
 // are provided in the bootstrap extension abi_impl.cc when the bootstrap extension is used.
