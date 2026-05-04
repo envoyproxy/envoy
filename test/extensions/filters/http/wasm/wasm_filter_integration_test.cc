@@ -12,7 +12,6 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
-#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -320,6 +319,17 @@ public:
       : state_(std::move(state)) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    bool first_request = false;
+    {
+      absl::MutexLock l(&state_->mu);
+      first_request = !state_->headers_processed;
+    }
+    // Only the first request triggers the read-disable that the bug repro
+    // depends on. Follow-up requests pass through normally so they reach the
+    // upstream and exercise the Wasm filter's reload path.
+    if (!first_request) {
+      return Http::FilterHeadersStatus::Continue;
+    }
     decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     {
       absl::MutexLock l(&state_->mu);
@@ -408,11 +418,21 @@ name: setup-filter
 )EOF");
 
   // Prepend the Wasm filter (will end up first in chain — hit by deferred data).
+  // Use FAIL_RELOAD so that any Wasm panic during the test (i.e. the bug
+  // reproduction firing proxy_on_request_body on a destroyed context) puts the
+  // VM into RuntimeError; the next request through the filter then triggers a
+  // VM reload and bumps the wasm.<name>.vm_reload_* counters. With the fix in
+  // place, no panic occurs and these counters stay at 0.
   const std::string wasm_filter = TestEnvironment::substitute(R"EOF(
 name: envoy.filters.http.wasm
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
   config:
+    name: deferred_data_regression
+    failure_policy: FAIL_RELOAD
+    reload_config:
+      backoff:
+        base_interval: 0.01s
     vm_config:
       runtime: envoy.wasm.runtime.v8
       code:
@@ -422,9 +442,6 @@ typed_config:
   config_helper_.prependFilter(wasm_filter);
 
   initialize();
-
-  // Start log recording so we can check for the Wasm panic.
-  Envoy::StartStopRecording recording(Envoy::GetLogSink());
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -500,21 +517,30 @@ typed_config:
            "callback fired on the destroyed filter chain (use-after-free bug)";
   }
 
-  // Check 2: no Wasm panic "invalid context_id" in the logs.
-  auto messages = recording.messages();
-  bool found_wasm_panic = false;
-  std::string panic_message;
-  for (const auto& msg : messages) {
-    if (msg.find("proxy_on_request_body failed") != std::string::npos ||
-        msg.find("invalid context_id") != std::string::npos) {
-      found_wasm_panic = true;
-      panic_message = msg;
-      break;
-    }
-  }
-  EXPECT_FALSE(found_wasm_panic) << "proxy_on_request_body was called after the Wasm context was "
-                                    "destroyed via proxy_on_delete.\nLog: "
-                                 << panic_message;
+  // Check 2: send a normal follow-up request that traverses the Wasm filter on
+  // the same worker thread. With the bug present, the Wasm VM was put into
+  // RuntimeError by the deferred decodeData panic, and FAIL_RELOAD will trigger
+  // a reload here — incrementing one of the vm_reload_* counters. With the fix,
+  // the VM is healthy and no reload is attempted.
+  const uint64_t initial_rq_total =
+      test_server_->counter("http.config_test.downstream_rq_total")->value();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto follow_up_response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_total", initial_rq_total + 1);
+  // The reload check (when the bug is present) runs on the worker thread as
+  // part of the Wasm filter's per-request setup; downstream_rq_total can tick
+  // before that work has finished. Post a fence to the same worker dispatcher
+  // and wait for it so any pending vm_reload_* increments have landed before
+  // we read the counters below.
+  absl::Notification follow_up_drained;
+  conn_dispatcher->post([&follow_up_drained]() { follow_up_drained.Notify(); });
+  follow_up_drained.WaitForNotification();
+  codec_client_->close();
+
+  constexpr absl::string_view stat_prefix = "wasm.deferred_data_regression.";
+  EXPECT_EQ(0, test_server_->counter(absl::StrCat(stat_prefix, "vm_reload_success"))->value());
+  EXPECT_EQ(0, test_server_->counter(absl::StrCat(stat_prefix, "vm_reload_backoff"))->value());
+  EXPECT_EQ(0, test_server_->counter(absl::StrCat(stat_prefix, "vm_reload_failure"))->value());
 }
 
 } // namespace
