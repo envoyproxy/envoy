@@ -43,6 +43,7 @@ jobs:
       rbe: true
       request: ${{ inputs.request }}
       skip: ${{ matrix.skip != false && true || false }}
+      skip-on-failure: ${{ matrix.skip-on-failure || false }}
       slack-channel: ${{ matrix.slack-channel || '' }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
