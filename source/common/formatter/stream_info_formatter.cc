@@ -1667,10 +1667,20 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                              {"UPSTREAM_SERVER_NAME",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
-                                 return std::make_unique<
-                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.sni();
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       if (stream_info.upstreamInfo() &&
+                                           stream_info.upstreamInfo()->upstreamSslConnection() !=
+                                               nullptr) {
+                                         auto sni = stream_info.upstreamInfo()
+                                                        ->upstreamSslConnection()
+                                                        ->sni();
+                                         if (!sni.empty()) {
+                                           return std::string(sni);
+                                         }
+                                       }
+                                       return absl::nullopt;
                                      });
                                }}},
                              {"UPSTREAM_PEER_ISSUER",

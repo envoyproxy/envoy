@@ -117,7 +117,11 @@ new_features:
     <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
 - area: access_log
   change: |
-    Added ``%UPSTREAM_SERVER_NAME%`` access log formatter that emits the SNI value sent by Envoy
-    in the TLS ClientHello to the upstream.
+    Added ``%UPSTREAM_SERVER_NAME%`` access log formatter returning the SNI from the established upstream
+    TLS connection.
+- area: attributes
+  change: |
+    Added ``upstream.server_name`` CEL attribute returning the SNI from the established upstream
+    TLS connection.
 
 deprecated:
