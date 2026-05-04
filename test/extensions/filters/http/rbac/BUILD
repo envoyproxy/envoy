@@ -138,7 +138,6 @@ envoy_cc_fuzz_test(
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],

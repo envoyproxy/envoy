@@ -11,7 +11,6 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
 
-#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"

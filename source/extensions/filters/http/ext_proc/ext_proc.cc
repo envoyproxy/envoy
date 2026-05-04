@@ -707,7 +707,7 @@ void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, b
   if (processing_request_modifier_) {
     ProcessingRequestModifier::Params params = {
         .traffic_direction = state.trafficDirection(),
-        .callbacks = state.callbacks(),
+        .callbacks = state.filterCallbacks(),
         .request_headers = state.requestHeaders(),
         .response_headers = state.responseHeaders(),
         .response_trailers = state.responseTrailers(),
@@ -1536,7 +1536,7 @@ void Filter::onNewTimeout(const Protobuf::Duration& override_message_timeout) {
 void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& req) {
   // get the callbacks from the ProcessorState. This will be the appropriate
   // callbacks for the current state of the filter
-  auto* cb = state.callbacks();
+  auto* cb = state.filterCallbacks();
   envoy::config::core::v3::Metadata forwarding_metadata;
 
   // Forward cluster metadata if so configured.
@@ -1610,8 +1610,8 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
   }
 
   auto activation_ptr = Filters::Common::Expr::createActivation(
-      &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
-      state.callbacks()->streamInfo().getRequestHeaders(),
+      &config_->expressionManager().localInfo(), state.filterCallbacks()->streamInfo(),
+      state.filterCallbacks()->streamInfo().getRequestHeaders(),
       dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
       dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
   auto attributes = state.evaluateAttributes(config_->expressionManager(), *activation_ptr);

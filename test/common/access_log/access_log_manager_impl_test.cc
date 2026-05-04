@@ -5,7 +5,6 @@
 #include "source/common/filesystem/file_shared_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"

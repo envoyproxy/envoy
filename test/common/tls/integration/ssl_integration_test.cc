@@ -25,7 +25,6 @@
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
