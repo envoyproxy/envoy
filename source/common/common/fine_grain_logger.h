@@ -35,67 +35,11 @@ struct VerbosityLogUpdateInfo final {
 };
 
 /**
- * Tag for specifying a logger group in FINE_GRAIN_LOG.
- */
-struct LoggerGroup {
-  explicit LoggerGroup(absl::string_view name, absl::string_view format = "")
-      : name_(name), format_(format) {}
-  absl::string_view name_;
-  absl::string_view format_;
-};
-
-/**
  * Stores the lock and functions used by Fine-Grain Logger's macro so that we don't need to declare
  * them globally. Functions are provided to initialize a logger, set log level, flush a logger.
  */
 class FineGrainLogContext {
 public:
-  /**
-   * Dispatcher for initializing a logger.
-   */
-  template <typename T, typename... Args>
-  spdlog::logger* initWithDispatch(absl::string_view file, std::atomic<spdlog::logger*>& logger,
-                                   const T& arg1, const Args&...) {
-    if constexpr (std::is_same_v<T, LoggerGroup>) {
-      return initFineGrainLogger(file, arg1.name_, logger);
-    } else {
-      return initFineGrainLogger(file, "", logger);
-    }
-  }
-
-  /**
-   * Fallback for initWithDispatch when no arguments are provided to the macro.
-   */
-  spdlog::logger* initWithDispatch(absl::string_view file, std::atomic<spdlog::logger*>& logger) {
-    return initFineGrainLogger(file, "", logger);
-  }
-
-  /**
-   * Dispatcher for logging a message.
-   */
-  template <typename T, typename... Args>
-  void logWithDispatch(spdlog::logger& logger, spdlog::source_loc loc,
-                       spdlog::level::level_enum level, const T& arg1, const Args&... args) {
-    if constexpr (std::is_same_v<T, LoggerGroup>) {
-      if constexpr (sizeof...(args) > 0) {
-        if (arg1.format_.empty()) {
-          // If LoggerGroup has no format, the first arg in 'args' is the format string.
-          // We must use a nested helper to unpack and apply fmt::runtime to the first arg.
-          logUnpacked(logger, loc, level, args...);
-        } else {
-          logger.log(loc, level, fmt::runtime(arg1.format_), args...);
-        }
-      } else {
-        if (!arg1.format_.empty()) {
-          logger.log(loc, level, fmt::runtime(arg1.format_));
-        }
-      }
-    } else {
-      // Use fmt::runtime to allow passing the format string through the template.
-      logger.log(loc, level, fmt::runtime(arg1), args...);
-    }
-  }
-
   /**
    * Gets a logger from map given a key (e.g. file name).
    */
@@ -107,12 +51,6 @@ public:
    */
   SpdLoggerSharedPtr getFineGrainLogEntryForFlush(absl::string_view file,
                                                   absl::string_view name = "")
-      ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
-
-  /**
-   * Gets a logger from map given a file and group.
-   */
-  SpdLoggerSharedPtr getFineGrainLogEntryForFlush(absl::string_view file, LoggerGroup group)
       ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_);
 
   /**
@@ -216,20 +154,6 @@ public:
   }
 
 private:
-  template <typename Fmt, typename... Args>
-  void logUnpacked(spdlog::logger& logger, spdlog::source_loc loc, spdlog::level::level_enum level,
-                   const Fmt& fmt, const Args&... args) {
-    logger.log(loc, level, fmt::runtime(fmt), args...);
-  }
-
-  /**
-   * Fallback for logWithDispatch when no format/args are provided (unlikely but for completeness).
-   */
-  void logWithDispatch(spdlog::logger& logger, spdlog::source_loc loc,
-                       spdlog::level::level_enum level) {
-    logger.log(loc, level, "");
-  }
-
   /**
    * Initializes sink for the initialization of loggers, needed only in benchmark test.
    */

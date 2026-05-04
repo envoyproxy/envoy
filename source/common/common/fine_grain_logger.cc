@@ -45,12 +45,6 @@ SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntryForFlush(absl::strin
   }
   return getFineGrainLogEntry(absl::StrCat(file, ":", name));
 }
-
-SpdLoggerSharedPtr FineGrainLogContext::getFineGrainLogEntryForFlush(absl::string_view file,
-                                                                     LoggerGroup group)
-    ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
-  return getFineGrainLogEntry(absl::StrCat(file, ":", group.name_));
-}
 spdlog::level::level_enum FineGrainLogContext::getVerbosityDefaultLevel() const {
   absl::ReaderMutexLock l(fine_grain_log_lock_);
   return verbosity_default_level_;
