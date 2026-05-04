@@ -29,8 +29,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
                                ClusterFactoryContext& cluster_context,
                                absl::Status& creation_status)
     : BaseDynamicClusterImpl(cluster, cluster_context, creation_status),
-      Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          cluster_context.messageValidationVisitor(), "cluster_name"),
+      resource_type_helper_(cluster_context.messageValidationVisitor(), "cluster_name"),
       local_info_(cluster_context.serverFactoryContext().localInfo()),
       eds_resources_cache_(
           cluster_context.serverFactoryContext().clusterManager().edsResourcesCache()) {
@@ -44,13 +43,13 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
   } else {
     initialize_phase_ = InitializePhase::Secondary;
   }
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")) {
     subscription_ = THROW_OR_RETURN_VALUE(
         cluster_context.serverFactoryContext().xdsManager().subscribeToSingletonResource(
             edsServiceName(), eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(),
-            *this, resource_decoder_, {}),
+            *this, resource_type_helper_.resourceDecoder(), {}),
         Config::SubscriptionPtr);
   } else {
     subscription_ = THROW_OR_RETURN_VALUE(
@@ -58,7 +57,8 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
             .clusterManager()
             .subscriptionFactory()
             .subscriptionFromConfigSource(eds_config, Grpc::Common::typeUrl(resource_name),
-                                          info_->statsScope(), *this, resource_decoder_, {}),
+                                          info_->statsScope(), *this,
+                                          resource_type_helper_.resourceDecoder(), {}),
         Config::SubscriptionPtr);
   }
 }

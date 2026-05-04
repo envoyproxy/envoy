@@ -36,7 +36,6 @@ envoy_extension_cc_test(
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/server:instance_mocks",
-        "//test/test_common:simulated_time_system_lib",
     ],
 )
 

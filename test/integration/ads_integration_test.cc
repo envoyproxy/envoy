@@ -3156,6 +3156,9 @@ TEST_P(AdsIntegrationTest, MultipleVhdsOverAds) {
   // reachable from listener_1.
   sendDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TestTypeUrl::get().VirtualHost, {}, {}, {"route_config_0/foo"}, "1");
+
+  test_server_->waitForCounterGe("http.ads_test.rds.vhds.route_config_0.config_reload", 2);
+
   send_request_and_verify("http1", foo_request_headers, true);
   send_request_and_verify("http1", bar_request_headers);
 

@@ -19,7 +19,6 @@
 #include "source/server/admin/admin.h"
 #endif
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"

@@ -55,7 +55,6 @@ env:
 
 jobs:
   request:
-    if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
     runs-on: ubuntu-24.04
     outputs:
       build-image: ${{ toJSON(fromJSON(steps.env.outputs.data).request.build-image) }}
@@ -63,18 +62,18 @@ jobs:
       request: ${{ steps.env.outputs.data }}
       trusted: true
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/jq@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/actions/github/checkout@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/github/checkout@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       id: checkout
       name: Checkout Envoy repository
     - name: Generate environment variables
-      uses: envoyproxy/toolshed/actions/envoy/ci/env@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+      uses: envoyproxy/toolshed/actions/envoy/ci/env@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       id: env
       with:
         branch-name: ${{ inputs.branch-name }}
@@ -86,7 +85,7 @@ jobs:
 
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/actions/github/env/summary@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+      uses: envoyproxy/toolshed/actions/github/env/summary@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -110,5 +109,5 @@ jobs:
     needs: request
     if: ${{ inputs.cache-docker }}
     with:
-      request: ${{ toJSON(needs.request.outputs) }}
+      caches: ${{ needs.request.outputs.caches }}
       image-tag: ${{ fromJSON(needs.request.outputs.build-image).default }}
