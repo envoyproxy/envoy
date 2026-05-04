@@ -451,7 +451,9 @@ jobs:
 
     - name: Notify Slack on failure
       if: ${{ failure() && inputs.slack-channel != '' }}
-      uses: slackapi/slack-github-action@v2.0.0
+      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
+      env:
+        JOB_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       with:
         method: chat.postMessage
         token: ${{ secrets.slack-bot-token }}
@@ -459,7 +461,7 @@ jobs:
           channel: "${{ inputs.slack-channel }}"
           text: "CI job failed: ${{ inputs.target }}"
           blocks:
-            - type: section
-              text:
-                type: mrkdwn
-                text: ":x: *CI job failed:* `${{ inputs.target }}`\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
+          - type: section
+            text:
+              type: mrkdwn
+              text: ":x: *CI job failed:* `${{ inputs.target }}`\n<${{ env.JOB_URL }}|View workflow run>"
