@@ -42,7 +42,7 @@ public:
                      QuicConnectionIdGeneratorPtr&& cid_generator,
                      QuicConnectionIdWorkerSelector worker_selector,
                      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
-                     bool reject_new_connections = false);
+                     bool reject_new_connections = false, bool enable_session_idle_list = false);
 
   ~ActiveQuicListener() override;
 
@@ -72,6 +72,8 @@ public:
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
+
+  void onCloseIdleHttpConnections(bool is_saturated) override;
 
 protected:
   Event::Dispatcher& dispatcher() { return dispatcher_; }

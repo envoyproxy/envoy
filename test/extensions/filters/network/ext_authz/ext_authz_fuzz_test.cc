@@ -8,7 +8,6 @@
 #include "test/extensions/filters/network/ext_authz/ext_authz_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"

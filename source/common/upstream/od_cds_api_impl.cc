@@ -30,20 +30,21 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
                            MissingClusterNotifier& notifier, Stats::Scope& scope,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            absl::Status& creation_status)
-    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
-                                                                           "name"),
-      helper_(cm, xds_manager, "odcds"), notifier_(notifier),
-      scope_(scope.createScope("cluster_manager.odcds.")) {
+    : helper_(cm, xds_manager, "odcds"), notifier_(notifier),
+      scope_(scope.createScope("cluster_manager.odcds.")),
+      resource_type_helper_(validation_visitor, "name") {
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   absl::StatusOr<Config::SubscriptionPtr> subscription_or_error;
   if (!odcds_resources_locator.has_value()) {
     subscription_or_error = cm.subscriptionFactory().subscriptionFromConfigSource(
-        odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+        odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+        resource_type_helper_.resourceDecoder(), {});
   } else {
     subscription_or_error = cm.subscriptionFactory().collectionSubscriptionFromUrl(
-        *odcds_resources_locator, odcds_config, resource_name, *scope_, *this, resource_decoder_);
+        *odcds_resources_locator, odcds_config, resource_name, *scope_, *this,
+        resource_type_helper_.resourceDecoder());
   }
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
@@ -196,16 +197,15 @@ public:
 
 private:
   // A singleton subscription handler.
-  class PerSubscriptionData : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster> {
+  class PerSubscriptionData : public Config::SubscriptionCallbacks {
   public:
     PerSubscriptionData(XdstpOdcdsSubscriptionsManager& parent, absl::string_view resource_name,
                         ProtobufMessage::ValidationVisitor& validation_visitor)
-        : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
-                                                                               "name"),
-          parent_(parent), resource_name_(resource_name) {}
+        : parent_(parent), resource_name_(resource_name),
+          resource_type_helper_(validation_visitor, "name") {}
 
     absl::Status initializeSubscription(bool old_ads) {
-      const auto resource_type = getResourceName();
+      const auto resource_type = resource_type_helper_.getResourceName();
       // If old_ads is set, creates a subscription using the staticAdsConfigSource.
       // Otherwise, the subscribeToSingletonResource will take care of
       // subscription via the ADS source.
@@ -215,7 +215,8 @@ private:
               old_ads
                   ? makeOptRef<const envoy::config::core::v3::ConfigSource>(staticAdsConfigSource())
                   : absl::nullopt,
-              Grpc::Common::typeUrl(resource_type), *parent_.scope_, *this, resource_decoder_, {});
+              Grpc::Common::typeUrl(resource_type), *parent_.scope_, *this,
+              resource_type_helper_.resourceDecoder(), {});
       RETURN_IF_NOT_OK_REF(subscription_or_error.status());
       subscription_ = std::move(subscription_or_error.value());
       subscription_->start({resource_name_});
@@ -283,6 +284,7 @@ private:
     // TODO(adisuissa): this can be converted to an absl::string_view and point to the
     // subscriptions_ map key.
     const std::string resource_name_;
+    const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
     Config::SubscriptionPtr subscription_;
     bool resource_was_updated_{false};
   };

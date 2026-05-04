@@ -566,10 +566,15 @@ impl EnvoyBootstrapExtensionConfigScheduler for Box<dyn EnvoyBootstrapExtensionC
 /// A timer handle for bootstrap extensions on the main thread event loop.
 ///
 /// The timer is created via [`EnvoyBootstrapExtensionConfig::new_timer`] and fires by calling
-/// [`BootstrapExtensionConfig::on_timer_fired`]. All methods must be called on the main thread.
+/// [`BootstrapExtensionConfig::on_timer_fired`]. All methods must be called on the main thread,
+/// including dropping the owning handle, since the underlying Envoy timer deregisters from the
+/// main thread dispatcher when destroyed.
 ///
 /// The owning handle (returned by `new_timer`) will automatically destroy the underlying Envoy
-/// timer when dropped.
+/// timer when dropped. If the handle is stored in a context that may be dropped off the main
+/// thread (for example, a future spawned onto a worker pool), the module is responsible for
+/// ensuring the drop happens on the main thread, typically by posting the drop through an
+/// [`EnvoyBootstrapExtensionConfigScheduler`].
 ///
 /// Each timer has a unique [`id`](EnvoyBootstrapExtensionTimer::id) that is stable for its
 /// lifetime. This allows modules with multiple timers to identify which timer fired in the

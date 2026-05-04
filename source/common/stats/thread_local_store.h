@@ -19,6 +19,7 @@
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/null_text_readout.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/stats/tag_utility.h"
 #include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -35,7 +36,7 @@ namespace Stats {
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
-                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table,
+                           StatNameTagSpan stat_name_tags, SymbolTable& symbol_table,
                            absl::optional<uint32_t> bins);
   ~ThreadLocalHistogramImpl() override;
 
@@ -85,7 +86,7 @@ class ThreadLocalStoreImpl;
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
-                      StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
+                      StatName tag_extracted_name, StatNameTagSpan stat_name_tags,
                       ConstSupportedBuckets& supported_buckets, absl::optional<uint32_t> bins,
                       uint64_t id);
   ~ParentHistogramImpl() override;
@@ -294,6 +295,10 @@ private:
               StatsMatcherSharedPtr scope_matcher = nullptr);
     ~ScopeImpl() override;
 
+    void setCleanupCallback(std::function<void()> callback) override {
+      cleanup_callback_ = std::move(callback);
+    }
+
     // Stats::Scope
     Counter& counterFromStatNameWithTags(const StatName& name,
                                          StatNameTagVectorOptConstRef tags) override;
@@ -330,6 +335,13 @@ private:
       StatNameManagedStorage storage(name, symbolTable());
       return textReadoutFromStatName(storage.statName());
     }
+
+    Counter& getOrCreateCounterBase(const TagUtility::TagStatNameJoiner& joiner);
+    Gauge& getOrCreateGaugeBase(const TagUtility::TagStatNameJoiner& joiner,
+                                Gauge::ImportMode import_mode);
+    Histogram& getOrCreateHistogramBase(const TagUtility::TagStatNameJoiner& joiner,
+                                        Histogram::Unit unit);
+    TextReadout& getOrCreateTextReadoutBase(const TagUtility::TagStatNameJoiner& joiner);
 
     template <class StatMap, class StatFn> bool iterHelper(StatFn fn, const StatMap& map) const {
       for (auto& iter : map) {
@@ -387,7 +399,7 @@ private:
 
     template <class StatType>
     using MakeStatFn = std::function<RefcountPtr<StatType>(
-        Allocator&, StatName name, StatName tag_extracted_name, const StatNameTagVector& tags)>;
+        Allocator&, StatName name, StatName tag_extracted_name, StatNameTagSpan tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
@@ -404,7 +416,7 @@ private:
      */
     template <class StatType>
     StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
-                           const absl::optional<StatNameTagVector>& stat_name_tags,
+                           absl::optional<StatNameTagSpan> stat_name_tags,
                            StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatsMatcher::FastResult fast_reject_result,
                            StatNameStorageSet& central_rejected_stats,
@@ -481,6 +493,7 @@ private:
   private:
     StatNameStorage prefix_;
     mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
+    std::function<void()> cleanup_callback_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {

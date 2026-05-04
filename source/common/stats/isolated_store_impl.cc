@@ -18,33 +18,30 @@ IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table
   symbol_table_storage_ = std::move(symbol_table);
 }
 
-static StatNameTagVector tagVectorFromOpt(StatNameTagVectorOptConstRef tags) {
-  return tags ? tags->get() : StatNameTagVector{};
+static StatNameTagSpan tagSpanFromOpt(absl::optional<StatNameTagSpan> tags) {
+  return tags ? tags.value() : StatNameTagSpan{};
 }
 
 IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
     : alloc_(symbol_table),
-      counters_([this](const TagUtility::TagStatNameJoiner& joiner,
-                       StatNameTagVectorOptConstRef tags) -> CounterSharedPtr {
+      counters_([this](const TagUtility::TagStatNameJoiner& joiner) -> CounterSharedPtr {
         return alloc_.makeCounter(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                  tagVectorFromOpt(tags));
+                                  tagSpanFromOpt(joiner.effectiveTags()));
       }),
-      gauges_([this](const TagUtility::TagStatNameJoiner& joiner, StatNameTagVectorOptConstRef tags,
+      gauges_([this](const TagUtility::TagStatNameJoiner& joiner,
                      Gauge::ImportMode import_mode) -> GaugeSharedPtr {
         return alloc_.makeGauge(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                tagVectorFromOpt(tags), import_mode);
+                                tagSpanFromOpt(joiner.effectiveTags()), import_mode);
       }),
       histograms_([this](const TagUtility::TagStatNameJoiner& joiner,
-                         StatNameTagVectorOptConstRef tags,
                          Histogram::Unit unit) -> HistogramSharedPtr {
         return {new HistogramImpl(joiner.nameWithTags(), unit, *this, joiner.tagExtractedName(),
-                                  tagVectorFromOpt(tags))};
+                                  tagSpanFromOpt(joiner.effectiveTags()))};
       }),
       text_readouts_([this](const TagUtility::TagStatNameJoiner& joiner,
-                            StatNameTagVectorOptConstRef tags,
                             TextReadout::Type) -> TextReadoutSharedPtr {
         return alloc_.makeTextReadout(joiner.nameWithTags(), joiner.tagExtractedName(),
-                                      tagVectorFromOpt(tags));
+                                      tagSpanFromOpt(joiner.effectiveTags()));
       }),
       null_counter_(symbol_table), null_gauge_(symbol_table), null_histogram_(symbol_table),
       null_text_readout_(symbol_table) {}

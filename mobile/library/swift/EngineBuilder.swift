@@ -19,6 +19,7 @@ open class EngineBuilder: NSObject {
   private var enableGzipDecompression: Bool = true
   private var enableBrotliDecompression: Bool = false
   private var enableHttp3: Bool = true
+  private var enableEarlyData: Bool = true
   private var quicHints: [String: Int] = [:]
   private var quicCanonicalSuffixes: [String] = []
   private var enableInterfaceBinding: Bool = false
@@ -188,6 +189,17 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enableHttp3(_ enableHttp3: Bool) -> Self {
     self.enableHttp3 = enableHttp3
+    return self
+  }
+
+  /// Specify whether to enable early data (0-RTT) support. Defaults to true.
+  ///
+  /// - parameter enableEarlyData: whether or not to enable early data.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableEarlyData(_ enableEarlyData: Bool) -> Self {
+    self.enableEarlyData = enableEarlyData
     return self
   }
 
@@ -541,6 +553,7 @@ open class EngineBuilder: NSObject {
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
       dnsNumRetries: self.dnsNumRetries,
       enableHttp3: self.enableHttp3,
+      enableEarlyData: self.enableEarlyData,
       quicHints: self.quicHints.mapValues { NSNumber(value: $0) },
       quicCanonicalSuffixes: self.quicCanonicalSuffixes,
       enableGzipDecompression: self.enableGzipDecompression,

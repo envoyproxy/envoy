@@ -11,6 +11,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
