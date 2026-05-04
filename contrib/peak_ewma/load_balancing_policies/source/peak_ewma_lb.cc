@@ -90,18 +90,14 @@ PeakEwmaLoadBalancer::PeakEwmaLoadBalancer(
 // Host management.
 void PeakEwmaLoadBalancer::addPeakEwmaLbPolicyDataToHosts(const Upstream::HostVector& hosts) {
   for (const auto& host_ptr : hosts) {
-    if (!host_ptr->lbPolicyData().has_value()) {
-      host_ptr->setLbPolicyData(std::make_unique<PeakEwmaHostLbPolicyData>(max_samples_));
+    if (!host_ptr->typedLbPolicyData<PeakEwmaHostLbPolicyData>().has_value()) {
+      host_ptr->addLbPolicyData(std::make_unique<PeakEwmaHostLbPolicyData>(max_samples_));
     }
   }
 }
 
 PeakEwmaHostLbPolicyData* PeakEwmaLoadBalancer::getPeakEwmaData(Upstream::HostConstSharedPtr host) {
-  auto lb_data = host->lbPolicyData();
-  if (!lb_data.has_value()) {
-    return nullptr;
-  }
-  return dynamic_cast<PeakEwmaHostLbPolicyData*>(lb_data.ptr());
+  return host->typedLbPolicyData<PeakEwmaHostLbPolicyData>().ptr();
 }
 
 void PeakEwmaLoadBalancer::maybeAggregate() {

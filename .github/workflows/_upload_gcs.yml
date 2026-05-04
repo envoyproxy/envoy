@@ -25,7 +25,7 @@ jobs:
       matrix:
         artifact: ${{ fromJSON(inputs.artifacts) }}
     steps:
-    - uses: actions/download-artifact@v8.0.0
+    - uses: actions/download-artifact@v8.0.1
       with:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact }}

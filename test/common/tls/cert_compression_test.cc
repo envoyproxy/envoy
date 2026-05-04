@@ -11,6 +11,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+#ifndef ENVOY_SSL_OPENSSL
 // Test data for round-trip compression tests
 constexpr uint8_t kTestData[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
 constexpr size_t kTestDataLen = sizeof(kTestData);
@@ -138,6 +139,7 @@ TEST(CertCompressionZlibTest, DecompressBadLength) {
                                       CBB_data(compressed.get()), compressed_len));
                       });
 }
+#endif // ENVOY_SSL_OPENSSL
 
 //
 // Registration Tests
