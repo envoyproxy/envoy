@@ -4,7 +4,6 @@
 #include "source/common/json/json_loader.h"
 #include "source/extensions/access_loggers/fluentd/substitution_formatter.h"
 
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"

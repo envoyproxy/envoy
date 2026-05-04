@@ -5,6 +5,8 @@
 
 #include "test/common/integration/xds_integration_test.h"
 #include "test/test_common/environment.h"
+#include "extension_registry.h"
+#include "source/common/tls/server_context_impl.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -34,12 +36,16 @@ public:
     xds_builder.addRuntimeDiscoveryService("some_rtds_resource", /*timeout_in_seconds=*/1)
         .setSslRootCerts(getUpstreamCert());
     builder_.setXds(std::move(xds_builder));
+    builder_.setLogLevel(Logger::Logger::trace);
+    builder_.enforceTrustChainVerification(false);
     XdsIntegrationTest::createEnvoy();
   }
 
-  void SetUp() override { initialize(); }
+  void SetUp() override {}
 
   void runReloadTest() {
+    initialize();
+
     stream_ = createNewStream(createDefaultStreamCallbacks());
     // Send a request on the data plane.
     stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
@@ -110,6 +116,11 @@ TEST_P(RtdsIntegrationTest, RtdsReloadWithDfpMixedScheme) {
 
 TEST_P(RtdsIntegrationTest, RtdsReloadWithoutDfpMixedScheme) {
   TestScopedStaticReloadableFeaturesRuntime scoped_runtime({{"async_host_selection", false}});
+  runReloadTest();
+}
+
+TEST_P(RtdsIntegrationTest, RtdsReloadWithWorkerThread) {
+  builder_.enableWorkerThread(true);
   runReloadTest();
 }
 

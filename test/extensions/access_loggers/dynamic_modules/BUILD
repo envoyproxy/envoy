@@ -42,7 +42,6 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/dynamic_modules:access_log_lib",
         "//test/extensions/dynamic_modules:util",
-        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
