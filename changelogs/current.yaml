@@ -138,5 +138,10 @@ new_features:
     from validated ones. The header is not set on a successfully verified JWT or when no JWT is present.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.jwt_authn_add_verification_status_header`` to ``false``.
+- area: network_ext_proc
+  change: |
+    Added ``close_sidestream`` to :ref:`ProcessingResponse
+    <envoy_v3_api_msg_service.network_ext_proc.v3.ProcessingResponse>` to allow the external processor to request
+    closing the gRPC stream early, causing subsequent data to bypass the network ``ext_proc`` filter.
 
 deprecated:
