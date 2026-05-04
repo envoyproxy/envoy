@@ -31,7 +31,7 @@ TEST(SdkMocksTest, MocksAreInstantiable) {
 
 TEST(SdkMocksTest, RefreshRouteClusterIsMockable) {
   MockHttpFilterHandle handle;
-  EXPECT_CALL(handle, refreshRouteCluster()).Times(1);
+  EXPECT_CALL(handle, refreshRouteCluster());
   handle.refreshRouteCluster();
 }
 
