@@ -6,8 +6,6 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/router/config_utility.h"
 
-#include "weighted_cluster_specifier.h"
-
 namespace Envoy {
 namespace Router {
 
@@ -165,7 +163,7 @@ WeightedClusterSpecifierPlugin::WeightedClusterSpecifierPlugin(
     return;
   }
 
-  // If runtime key prefix is not configured, we the total cluster weight will be static and can be
+  // If runtime key prefix is not configured, the total cluster weight will be static and can be
   // cached. Otherwise, the total cluster weight needs to be computed for every request since the
   // cluster weight can be dynamically changed through runtime.
   if (runtime_key_prefix.empty()) {
@@ -255,6 +253,11 @@ public:
   }
   void refreshRouteCluster(const Http::RequestHeaderMap& headers,
                            const StreamInfo::StreamInfo&) const override {
+    // Note this function will refresh the target cluster but the cluster specific
+    // metadata match criteria, header manipulation and so on may have been applied to the request
+    // based on the initially selected cluster configuration and won't be applied again.
+    // This is known limitation of the current implementation.
+    //
     // Dynamic route entry is created for each request and only used for single request in single
     // thread. So, it is safe to update the cluster config or state in the route entry without
     // worrying about thread safety or affecting other requests.
