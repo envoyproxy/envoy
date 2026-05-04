@@ -6,6 +6,7 @@
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tcp_proxy/upstream.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
@@ -16,6 +17,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -570,6 +572,32 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamInfo) 
       .WillRepeatedly(testing::ReturnRef(connection_info));
   EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
   this->upstream_->setRequestEncoder(this->encoder_, false);
+}
+
+TEST(TunnelingConfigHelperImplTest, FormatterExtensionRendersInHeader) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Stats::MockStore> store;
+  Stats::MockScope& scope = store.mockScope();
+
+  TcpProxy config;
+  auto* tunneling = config.mutable_tunneling_config();
+  tunneling->set_hostname("host.example.com:443");
+  auto* formatter = tunneling->add_formatters();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+  auto* header = tunneling->add_headers_to_add();
+  header->mutable_header()->set_key("x-custom");
+  header->mutable_header()->set_value("%COMMAND_EXTENSION()%");
+
+  TunnelingConfigHelperImpl helper(scope, config, context);
+
+  Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  helper.headerEvaluator().evaluateHeaders(headers, {&headers, nullptr}, stream_info);
+  EXPECT_EQ(headers.get_("x-custom"), "TestFormatter");
 }
 
 TEST_P(HttpUpstreamRequestEncoderTest,
