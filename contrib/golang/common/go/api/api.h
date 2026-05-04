@@ -170,3 +170,4 @@ CAPIStatus envoyGoHttpTcpBridgeSetSelfHalfCloseForUpstreamConn(void* r, int enab
 
 #ifdef __cplusplus
 } // extern "C"
+#endif
