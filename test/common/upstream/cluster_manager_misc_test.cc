@@ -758,6 +758,110 @@ TEST_F(SockOptsTest, SockOptsWithExtraSourceAddressAndClusterManagerOpts) {
   expectSetsockopts(names_vals);
 }
 
+// Validate that IP_BIND_ADDRESS_NO_PORT is automatically set when upstream_bind_config
+// specifies a source address with port 0. This defers ephemeral port allocation from
+// bind() to connect() time, preventing ephemeral port exhaustion when connecting to
+// multiple destination endpoints.
+TEST_F(SockOptsTest, BindAddressNoPortWithPortZero) {
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    GTEST_SKIP() << "IP_BIND_ADDRESS_NO_PORT is not supported on this platform";
+  }
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockOptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockOptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: 127.0.0.6
+          port_value: 0
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT, 1}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+// Validate that IP_BIND_ADDRESS_NO_PORT is NOT set when the source address has a non-zero port.
+TEST_F(SockOptsTest, NoBindAddressNoPortWithNonZeroPort) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockOptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockOptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: 127.0.0.6
+          port_value: 12345
+  )EOF";
+  initialize(yaml);
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    expectOnlyNoSigpipeOptions();
+  } else {
+    expectNoSocketOptions();
+  }
+}
+
+// Validate that IP_BIND_ADDRESS_NO_PORT is set on the bootstrap cluster manager
+// upstream_bind_config when port is 0.
+TEST_F(SockOptsTest, BindAddressNoPortClusterManagerBindConfig) {
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    GTEST_SKIP() << "IP_BIND_ADDRESS_NO_PORT is not supported on this platform";
+  }
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockOptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockOptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+  cluster_manager:
+    upstream_bind_config:
+      source_address:
+        address: 127.0.0.6
+        port_value: 0
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT, 1}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
 // Validate that when tcp keepalives are set in the Cluster, we see the socket
 // option propagated to setsockopt(). This is as close to an end-to-end test as we have for this
 // feature, due to the complexity of creating an integration test involving the network stack. We

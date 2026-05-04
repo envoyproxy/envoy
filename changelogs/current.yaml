@@ -37,6 +37,13 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: upstream
+  change: |
+    Set ``IP_BIND_ADDRESS_NO_PORT`` socket option on upstream connections when ``upstream_bind_config``
+    specifies a source address with port 0. This defers ephemeral port allocation from ``bind()`` to
+    ``connect()`` time, allowing the kernel to assign ports unique to each (src_ip, src_port, dst_ip,
+    dst_port) 4-tuple and preventing ephemeral port exhaustion when connecting to multiple destination
+    endpoints. This is the same fix applied to the original_src filter in release 1.34.0.
 - area: load_report
   change: |
     Fixed a bug in load stats reporting where reports were dropped if only custom metrics or completed

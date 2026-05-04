@@ -247,6 +247,17 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
                                             base_socket_options);
     ::Envoy::Network::Socket::appendOptions(upstream_local_address.socket_options_,
                                             cluster_socket_options);
+    // When binding to a specific IP with port 0, set IP_BIND_ADDRESS_NO_PORT to defer
+    // ephemeral port allocation from bind() to connect() time. This allows the kernel to
+    // assign ports unique to each (src_ip, src_port, dst_ip, dst_port) 4-tuple, preventing
+    // ephemeral port exhaustion when connecting to multiple destinations.
+    if (upstream_local_address.address_ != nullptr &&
+        upstream_local_address.address_->ip() != nullptr &&
+        upstream_local_address.address_->ip()->port() == 0) {
+      ::Envoy::Network::Socket::appendOptions(
+          upstream_local_address.socket_options_,
+          ::Envoy::Network::SocketOptionFactory::buildBindAddressNoPort());
+    }
 
     upstream_local_addresses.push_back(upstream_local_address);
 
@@ -271,6 +282,13 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
         ::Envoy::Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
                                                 cluster_socket_options);
       }
+      if (extra_upstream_local_address.address_ != nullptr &&
+          extra_upstream_local_address.address_->ip() != nullptr &&
+          extra_upstream_local_address.address_->ip()->port() == 0) {
+        ::Envoy::Network::Socket::appendOptions(
+            extra_upstream_local_address.socket_options_,
+            ::Envoy::Network::SocketOptionFactory::buildBindAddressNoPort());
+      }
       upstream_local_addresses.push_back(extra_upstream_local_address);
     }
 
@@ -286,6 +304,13 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
                                               base_socket_options);
       ::Envoy::Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
                                               cluster_socket_options);
+      if (additional_upstream_local_address.address_ != nullptr &&
+          additional_upstream_local_address.address_->ip() != nullptr &&
+          additional_upstream_local_address.address_->ip()->port() == 0) {
+        ::Envoy::Network::Socket::appendOptions(
+            additional_upstream_local_address.socket_options_,
+            ::Envoy::Network::SocketOptionFactory::buildBindAddressNoPort());
+      }
       upstream_local_addresses.push_back(additional_upstream_local_address);
     }
   } else {
