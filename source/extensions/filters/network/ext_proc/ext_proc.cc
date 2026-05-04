@@ -402,6 +402,14 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
     ENVOY_CONN_LOG(debug, "Response contained no data, continuing", read_callbacks_->connection());
     stats_.empty_response_received_.inc();
   }
+
+  // Check if we should close the sidestream and bypass further processing.
+  if (response->close_sidestream()) {
+    ENVOY_CONN_LOG(debug, "External processor requested to close sidestream. Future data will bypass ext_proc.",
+                   read_callbacks_->connection());
+    processing_complete_ = true;
+    closeStream();
+  }
 }
 
 void NetworkExtProcFilter::onGrpcError(Grpc::Status::GrpcStatus status,

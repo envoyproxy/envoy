@@ -1329,6 +1329,44 @@ TEST_F(NetworkExtProcFilterTest, LoggingInfoOnError) {
   EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
 }
 
+// Test close_sidestream functionality
+TEST_F(NetworkExtProcFilterTest, CloseSidestream) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Initial call, should intercept and send request
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Simulate response with close_sidestream = true
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  response.set_close_sidestream(true);
+
+  // Expect the stream to be gracefully closed
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+
+  // Verify stream closed counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+
+  // Subsequent data should pass through directly (SKIP mode equivalent behavior)
+  Buffer::OwnedImpl more_data("more");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(more_data, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(more_data, false));
+}
+
 } // namespace
 } // namespace ExtProc
 } // namespace NetworkFilters
