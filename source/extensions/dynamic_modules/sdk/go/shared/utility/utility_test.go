@@ -3,6 +3,7 @@ package utility
 import (
 	"testing"
 
+	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared/fake"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared/mocks"
 	gomock "go.uber.org/mock/gomock"
@@ -139,4 +140,39 @@ func TestClearRouteCache_MockIsCalled(t *testing.T) {
 	handle := mocks.NewMockHttpFilterHandle(ctrl)
 	handle.EXPECT().ClearRouteCache().Times(1)
 	handle.ClearRouteCache()
+}
+
+func TestGetDynamicMetadata(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		filter   string
+		path     string
+		value    string
+		expectOk bool
+	}{
+		{"missing namespace", "no_such_filter", "method", "", false},
+		{"flat string key", "mcp_filter", "method", "tools/call", true},
+		{"dotted path", "mcp_filter", "params.protocolVersion", "2025-11-25", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			var retBuf shared.UnsafeEnvoyBuffer
+			if tt.expectOk {
+				retBuf = fake.NewFakeBodyBuffer([]byte(tt.value)).GetChunks()[0]
+			}
+
+			handle := mocks.NewMockHttpFilterHandle(ctrl)
+			handle.EXPECT().GetDynamicMetadata(tt.filter, tt.path).Return(retBuf, tt.expectOk)
+
+			result, ok := handle.GetDynamicMetadata(tt.filter, tt.path)
+			if ok != tt.expectOk {
+				t.Fatalf("got ok=%v, want %v", ok, tt.expectOk)
+			}
+			if ok && result.Len != uint64(len(tt.value)) {
+				t.Errorf("got len=%d, want %d", result.Len, len(tt.value))
+			}
+		})
+	}
 }

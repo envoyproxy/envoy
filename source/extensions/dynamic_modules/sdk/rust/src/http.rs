@@ -992,6 +992,15 @@ pub trait EnvoyHttpFilter {
     index: usize,
   ) -> Option<bool>;
 
+  /// Get a string value from dynamic metadata by filter name and dotted key path.
+  /// Supports nested access with dot-separated paths (e.g., "a.b.c").
+  /// Only string values are supported; non-string values return `None`.
+  fn get_dynamic_metadata<'a>(
+    &'a self,
+    filter_name: &str,
+    path: &str,
+  ) -> Option<EnvoyBuffer<'a>>;
+
   /// Get the bytes-typed filter state value with the given key.
   /// If the filter state is not found or is the wrong type, this returns `None`.
   fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
@@ -2570,6 +2579,26 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     };
     if success {
       Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_dynamic_metadata(&self, filter_name: &str, path: &str) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_dynamic_metadata(
+        self.raw_ptr,
+        str_to_module_buffer(filter_name),
+        str_to_module_buffer(path),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
     }

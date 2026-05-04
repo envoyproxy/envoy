@@ -36,6 +36,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "metadata_utils_lib",
+    srcs = ["metadata_utils.cc"],
+    hdrs = ["metadata_utils.h"],
+    deps = [
+        "//source/common/config:metadata_lib",
+        "//source/extensions/dynamic_modules/abi",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "abi_impl",
     srcs = ["abi_impl.cc"],
     deps = [

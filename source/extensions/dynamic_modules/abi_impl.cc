@@ -3220,6 +3220,14 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_http_get_metadata_list_
   return false;
 }
 
+__attribute__((weak)) bool envoy_dynamic_module_callback_http_get_dynamic_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_http_get_dynamic_metadata: "
+               "not implemented in this context");
+  return false;
+}
+
 // DNS resolver callbacks.
 __attribute__((weak)) void envoy_dynamic_module_callback_dns_resolve_complete(
     envoy_dynamic_module_type_dns_resolver_envoy_ptr, uint64_t,

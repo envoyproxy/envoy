@@ -238,6 +238,25 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
   assert!(ON_STREAM_COMPLETE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_dynamic_metadata(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _filter_name: abi::envoy_dynamic_module_type_module_buffer,
+  _path: abi::envoy_dynamic_module_type_module_buffer,
+  _result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  false
+}
+
+#[test]
+fn test_http_filter_get_dynamic_metadata_weak_stub() {
+  let envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  assert!(envoy_filter.get_dynamic_metadata("mcp_filter", "method").is_none());
+  assert!(envoy_filter.get_dynamic_metadata("mcp_filter", "params.protocolVersion").is_none());
+}
+
 // =============================================================================
 // Listener Filter Tests
 // =============================================================================

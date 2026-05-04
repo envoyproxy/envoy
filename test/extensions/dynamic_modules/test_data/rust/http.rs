@@ -732,6 +732,16 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     );
     assert_eq!(metadata.unwrap().as_slice(), b"host");
 
+    // Read nested dynamic metadata by dotted path (pre-populated by C++ test).
+    let nested = envoy_filter.get_dynamic_metadata("nested_ns", "params.protocolVersion");
+    assert_eq!(nested.unwrap().as_slice(), b"2025-11-25");
+    // Set and read back a flat string.
+    envoy_filter.set_dynamic_metadata_string("ns_dynamic", "method", "tools/call");
+    let flat = envoy_filter.get_dynamic_metadata("ns_dynamic", "method");
+    assert_eq!(flat.unwrap().as_slice(), b"tools/call");
+    // Non-string value returns false.
+    assert!(envoy_filter.get_dynamic_metadata("ns_req_header", "key").is_none());
+
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 

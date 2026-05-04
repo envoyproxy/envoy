@@ -539,6 +539,20 @@ func (p *dynamicMetadataCallbacksFilter) OnRequestHeaders(headers shared.HeaderM
 		panic(fmt.Sprintf("host metadata mismatch: %v", val))
 	}
 
+	// Read nested dynamic metadata by dotted path (pre-populated by C++ test).
+	if val, ok := p.handle.GetDynamicMetadata("nested_ns", "params.protocolVersion"); !ok || val.ToUnsafeString() != "2025-11-25" {
+		panic(fmt.Sprintf("dynamic metadata dotted path mismatch: %v", val))
+	}
+	// Set and read back a flat string.
+	p.handle.SetMetadata("ns_dynamic", "method", "tools/call")
+	if val, ok := p.handle.GetDynamicMetadata("ns_dynamic", "method"); !ok || val.ToUnsafeString() != "tools/call" {
+		panic(fmt.Sprintf("dynamic metadata flat key mismatch: %v", val))
+	}
+	// Non-string value returns false.
+	if _, ok := p.handle.GetDynamicMetadata("ns_req_header", "key"); ok {
+		panic("expected false for number value via GetDynamicMetadata")
+	}
+
 	return shared.HeadersStatusContinue
 }
 

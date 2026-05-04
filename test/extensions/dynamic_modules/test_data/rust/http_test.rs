@@ -326,6 +326,29 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
     })
     .returning(|_, _, _| Some(EnvoyBuffer::new(b"host")))
     .once();
+  // Dotted path into nested dynamic metadata.
+  envoy_filter
+    .expect_get_dynamic_metadata()
+    .withf(|ns, path| ns == "nested_ns" && path == "params.protocolVersion")
+    .returning(|_, _| Some(EnvoyBuffer::new(b"2025-11-25")))
+    .once();
+  // Set and read back a flat string via get_dynamic_metadata.
+  envoy_filter
+    .expect_set_dynamic_metadata_string()
+    .withf(|ns, key, val| ns == "ns_dynamic" && key == "method" && val == "tools/call")
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_dynamic_metadata()
+    .withf(|ns, path| ns == "ns_dynamic" && path == "method")
+    .returning(|_, _| Some(EnvoyBuffer::new(b"tools/call")))
+    .once();
+  // Non-string value returns None.
+  envoy_filter
+    .expect_get_dynamic_metadata()
+    .withf(|ns, path| ns == "ns_req_header" && path == "key")
+    .returning(|_, _| None)
+    .once();
   assert_eq!(
     f.on_request_headers(&mut envoy_filter, false),
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue

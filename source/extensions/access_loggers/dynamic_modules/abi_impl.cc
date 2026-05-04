@@ -1,4 +1,3 @@
-#include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -6,8 +5,8 @@
 #include "source/extensions/access_loggers/dynamic_modules/access_log.h"
 #include "source/extensions/access_loggers/dynamic_modules/access_log_config.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/metadata_utils.h"
 
-#include "absl/strings/str_split.h"
 #include "access_log.h"
 
 namespace Envoy {
@@ -799,27 +798,8 @@ bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
     envoy_dynamic_module_type_module_buffer filter_name,
     envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
-  std::string filter_name_str(filter_name.ptr, filter_name.length);
-  std::string path_str(path.ptr, path.length);
-  std::vector<std::string> path_parts = absl::StrSplit(path_str, '.');
-
-  const auto& metadata = logger->stream_info_->dynamicMetadata();
-  const auto& value =
-      Envoy::Config::Metadata::metadataValue(&metadata, filter_name_str, path_parts);
-
-  if (value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
-    return false;
-  }
-
-  // Note: Currently only string values are supported. Complex types would require serialization
-  // to a buffer, but the ABI uses zero-copy pointers to Envoy memory.
-  if (value.kind_case() == Protobuf::Value::kStringValue) {
-    const auto& str = value.string_value();
-    *result = {const_cast<char*>(str.data()), str.size()};
-    return true;
-  }
-
-  return false;
+  return Envoy::Extensions::DynamicModules::getDynamicMetadataStringByPath(
+      logger->stream_info_->dynamicMetadata(), filter_name, path, result);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_filter_state(

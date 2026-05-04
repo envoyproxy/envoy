@@ -782,6 +782,23 @@ func (h *dymHttpFilterHandle) GetMetadataListBool(source shared.MetadataSourceTy
 	return bool(value), true
 }
 
+func (h *dymHttpFilterHandle) GetDynamicMetadata(filterName, path string) (shared.UnsafeEnvoyBuffer, bool) {
+	var result C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_http_get_dynamic_metadata(
+		h.hostPluginPtr,
+		stringToModuleBuffer(filterName),
+		stringToModuleBuffer(path),
+		&result,
+	)
+	if !bool(ret) || result.ptr == nil || result.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+
+	runtime.KeepAlive(filterName)
+	runtime.KeepAlive(path)
+	return envoyBufferToUnsafeEnvoyBuffer(result), true
+}
+
 func (h *dymHttpFilterHandle) SetMetadata(metadataNamespace, key string, value any) {
 	var numValue float64 = 0
 	var isNum bool = false

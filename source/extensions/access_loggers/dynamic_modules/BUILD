@@ -32,12 +32,12 @@ envoy_cc_library(
     deps = [
         ":access_log_config_lib",
         "//envoy/access_log:access_log_interface",
-        "//source/common/config:metadata_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/access_loggers/common:access_log_base",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metadata_utils_lib",
     ],
 )
 

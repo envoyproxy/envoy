@@ -332,6 +332,8 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
 
   stream_info.route_ = route;
   EXPECT_CALL(callbacks, clusterInfo()).Times(testing::AnyNumber());
@@ -351,6 +353,13 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   upstream_info->upstream_host_ = upstream_host;
   Envoy::Config::Metadata::mutableMetadataValue(*host_metadata, "metadata", "host_key")
       .set_string_value("host");
+
+  // Pre-populate nested dynamic metadata for dotted-path traversal via GetDynamicMetadata.
+  (*(*metadata.mutable_filter_metadata())["nested_ns"].mutable_fields())["params"]
+      .mutable_struct_value()
+      ->mutable_fields()
+      ->insert({"protocolVersion", ValueUtil::stringValue("2025-11-25")});
+
   filter->setDecoderFilterCallbacks(callbacks);
 
   Http::TestRequestHeaderMapImpl request_headers{};

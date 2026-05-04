@@ -456,6 +456,13 @@ type HttpFilterHandle interface {
 	// the element is not a bool.
 	GetMetadataListBool(source MetadataSourceType, metadataNamespace, key string, index int) (bool, bool)
 
+	// GetDynamicMetadata retrieves a string value from dynamic metadata by filter name
+	// and dotted key path (e.g., "a.b.c" traverses nested structs).
+	// Only string values are supported; non-string values return false.
+	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
+	// copy the data if you need to keep it and use it later.
+	GetDynamicMetadata(filterName, path string) (UnsafeEnvoyBuffer, bool)
+
 	// GetFilterState retrieves the serialized filter state value of the stream.
 	// @Param key the filter state key.
 	// @Return the filter state value if found, otherwise an empty UnsafeEnvoyBuffer.

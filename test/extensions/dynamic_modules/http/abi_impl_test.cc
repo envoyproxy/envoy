@@ -1247,6 +1247,58 @@ TEST(ABIImpl, metadata_list) {
       {"scalar_key", 10}, &list_size));
 }
 
+TEST(ABIImpl, get_dynamic_metadata) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+
+  const std::string ns = "mcp_filter";
+  const std::string method_key = "method";
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+
+  // No stream info.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata(
+      &filter, {ns.data(), ns.size()}, {method_key.data(), method_key.size()}, &result));
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+
+  // Flat string key.
+  Protobuf::Struct struct_obj;
+  (*struct_obj.mutable_fields())["method"] = ValueUtil::stringValue("tools/call");
+  (*metadata.mutable_filter_metadata())["mcp_filter"] = struct_obj;
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_http_get_dynamic_metadata(
+      &filter, {ns.data(), ns.size()}, {method_key.data(), method_key.size()}, &result));
+  EXPECT_EQ(absl::string_view(result.ptr, result.length), "tools/call");
+
+  // Dotted path into nested struct.
+  auto& fields = *(*metadata.mutable_filter_metadata())["mcp_filter"].mutable_fields();
+  (*fields["params"].mutable_struct_value()->mutable_fields())["protocolVersion"].set_string_value(
+      "2025-11-25");
+
+  const std::string dotted_path = "params.protocolVersion";
+  ASSERT_TRUE(envoy_dynamic_module_callback_http_get_dynamic_metadata(
+      &filter, {ns.data(), ns.size()}, {dotted_path.data(), dotted_path.size()}, &result));
+  EXPECT_EQ(absl::string_view(result.ptr, result.length), "2025-11-25");
+
+  // Missing nested key.
+  const std::string missing_path = "params.nonExistent";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata(
+      &filter, {ns.data(), ns.size()}, {missing_path.data(), missing_path.size()}, &result));
+
+  // Non-string value.
+  (*fields["params"].mutable_struct_value()->mutable_fields())["count"].set_number_value(42);
+  const std::string number_path = "params.count";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata(
+      &filter, {ns.data(), ns.size()}, {number_path.data(), number_path.size()}, &result));
+}
+
 TEST(ABIImpl, attribute_bool) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};

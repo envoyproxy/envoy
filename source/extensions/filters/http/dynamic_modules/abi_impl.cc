@@ -13,6 +13,7 @@
 #include "source/common/tracing/null_span_impl.h"
 #include "source/common/tracing/tracer_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/metadata_utils.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 namespace Envoy {
@@ -2426,6 +2427,21 @@ void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
     return;
   }
   downstream_callbacks->refreshRouteCluster();
+}
+
+bool envoy_dynamic_module_callback_http_get_dynamic_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  return Envoy::Extensions::DynamicModules::getDynamicMetadataStringByPath(
+      stream_info->dynamicMetadata(), filter_name, path, result);
 }
 
 } // extern "C"

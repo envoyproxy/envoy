@@ -2154,6 +2154,26 @@ bool envoy_dynamic_module_callback_http_get_metadata_list_bool(
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     size_t index, bool* result);
 
+/**
+ * envoy_dynamic_module_callback_http_get_dynamic_metadata is called by the module to get
+ * a string value from dynamic metadata by filter name and dotted key path.
+ * Supports nested key access with dot-separated paths (e.g., "a.b.c").
+ *
+ * Only dynamic metadata is supported (not route/cluster/host metadata).
+ * Currently only string values are supported; non-string values return false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (dot-separated for nested access).
+ * @param result is the pointer to the envoy_buffer where the string value will be stored.
+ * @return true if the value exists and is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_dynamic_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
 // -------------------------- Filter State Callbacks ---------------------------
 
 /**

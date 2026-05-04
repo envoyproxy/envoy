@@ -986,6 +986,21 @@ func (mr *MockHttpFilterHandleMockRecorder) GetData(key any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetData", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetData), key)
 }
 
+// GetDynamicMetadata mocks base method.
+func (m *MockHttpFilterHandle) GetDynamicMetadata(filterName, path string) (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDynamicMetadata", filterName, path)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetDynamicMetadata indicates an expected call of GetDynamicMetadata.
+func (mr *MockHttpFilterHandleMockRecorder) GetDynamicMetadata(filterName, path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDynamicMetadata", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetDynamicMetadata), filterName, path)
+}
+
 // GetFilterState mocks base method.
 func (m *MockHttpFilterHandle) GetFilterState(key string) (shared.UnsafeEnvoyBuffer, bool) {
 	m.ctrl.T.Helper()

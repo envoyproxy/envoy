@@ -53,6 +53,15 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "metadata_utils_test",
+    srcs = ["metadata_utils_test.cc"],
+    deps = [
+        "//source/extensions/dynamic_modules:metadata_utils_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "util",
     srcs = ["util.cc"],
