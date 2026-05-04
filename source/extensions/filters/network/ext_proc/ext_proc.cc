@@ -405,9 +405,21 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
 
   // Check if we should close the sidestream and bypass further processing.
   if (response->close_sidestream()) {
-    ENVOY_CONN_LOG(debug, "External processor requested to close sidestream. Future data will bypass ext_proc.",
-                   read_callbacks_->connection());
+    ENVOY_CONN_LOG(
+        debug,
+        "External processor requested to close sidestream. Future data will bypass ext_proc.",
+        read_callbacks_->connection());
     processing_complete_ = true;
+    // Ensure that any pending close-disabling is balanced and re-enabled.
+    // If the sidestream is closed early (e.g. with an empty response containing neither
+    // read_data nor write_data set), the close callbacks would remain disabled indefinitely,
+    // leading to connection leaks.
+    if (disable_count_read_ > 0) {
+      updateCloseCallbackStatus(false, true);
+    }
+    if (disable_count_write_ > 0) {
+      updateCloseCallbackStatus(false, false);
+    }
     closeStream();
   }
 }
