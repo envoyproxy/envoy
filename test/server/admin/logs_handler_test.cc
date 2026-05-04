@@ -121,7 +121,6 @@ TEST_P(AdminInstanceTest, LogLevelGroupWithoutFineGrain) {
   Buffer::OwnedImpl response;
 
   Logger::Context::disableFineGrainLogger();
-  // Fine-grain logging is disabled by default in these tests unless explicitly enabled.
   EXPECT_EQ(Http::Code::BadRequest,
             postCallback("/logging?group=misc:trace", header_map, response));
   EXPECT_THAT(response.toString(),
