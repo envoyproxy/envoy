@@ -370,7 +370,8 @@ TEST(FineGrainLog, getFineGrainLogEntryForFlush) {
   EXPECT_EQ(p1->name(), __FILE__);
 
   // Test with group name
-  SpdLoggerSharedPtr p2 = getFineGrainLogContext().getFineGrainLogEntryForFlush(__FILE__, "test_group");
+  SpdLoggerSharedPtr p2 =
+      getFineGrainLogContext().getFineGrainLogEntryForFlush(__FILE__, "test_group");
   EXPECT_EQ(p2, nullptr);
 
   // Now create it and check again
