@@ -62,6 +62,8 @@ public:
   // Returns the required cluster name for validation.
   const std::string& requiredClusterName() const { return required_cluster_name_; }
 
+  bool skipRebalancing() const { return skip_rebalancing_; }
+
 private:
   ReverseTunnelFilterConfig(
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
@@ -83,6 +85,8 @@ private:
 
   // Required cluster name for validation (empty means no validation).
   const std::string required_cluster_name_;
+
+  const bool skip_rebalancing_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

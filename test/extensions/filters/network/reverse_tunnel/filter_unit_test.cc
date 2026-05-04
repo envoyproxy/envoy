@@ -479,6 +479,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
   EXPECT_FALSE(config->autoCloseConnections());
   EXPECT_EQ("/reverse_connections/request", config->requestPath());
   EXPECT_EQ("GET", config->requestMethod());
+  EXPECT_FALSE(config->skipRebalancing());
 }
 
 // Test RequestDecoder methods not fully covered.
@@ -2092,6 +2093,15 @@ TEST_F(ReverseTunnelFilterWithTenantIsolationTest, FilterReadsTenantIsolationFro
   auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
   ASSERT_NE(nullptr, parse_error);
   EXPECT_EQ(1, parse_error->value());
+}
+
+TEST_F(ReverseTunnelFilterUnitTest, FilterConfigLoadsSkipRebalancing) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_skip_rebalancing(true);
+
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  EXPECT_TRUE(config_or_error.value()->skipRebalancing());
 }
 
 } // namespace
