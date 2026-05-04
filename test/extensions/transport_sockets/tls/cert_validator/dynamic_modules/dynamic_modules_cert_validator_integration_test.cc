@@ -8,6 +8,7 @@
 
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -72,6 +73,26 @@ typed_config:
                                     .setTlsV13(true)
                                     .setRsaCertOcspStaple(false)
                                     .setCustomValidatorConfig(validator_config));
+
+    // The dynamic_modules cert validator fully replaces BoringSSL's default chain
+    // verification (via SSL_CTX_set_custom_verify), but we still need a trusted_ca
+    // configured so the server populates a non-empty CA list in its TLS CertificateRequest
+    // — without that, BoringSSL clients won't send their certificate and the server's
+    // verify callback sees an empty peer chain. The CA is only used as a hint for the
+    // client; the actual validation is performed by our dynamic module.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* filter_chain =
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+      auto* transport_socket = filter_chain->mutable_transport_socket();
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      transport_socket->mutable_typed_config()->UnpackTo(&tls_context);
+      tls_context.mutable_common_tls_context()
+          ->mutable_validation_context()
+          ->mutable_trusted_ca()
+          ->set_filename(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+    });
+
     HttpIntegrationTest::initialize();
   }
 
@@ -159,6 +180,21 @@ typed_config:
                                     .setTlsV13(true)
                                     .setRsaCertOcspStaple(false)
                                     .setCustomValidatorConfig(validator_config));
+
+    // See DynamicModulesCertValidatorIntegrationTest::initialize for why we add trusted_ca.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* filter_chain =
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+      auto* transport_socket = filter_chain->mutable_transport_socket();
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      transport_socket->mutable_typed_config()->UnpackTo(&tls_context);
+      tls_context.mutable_common_tls_context()
+          ->mutable_validation_context()
+          ->mutable_trusted_ca()
+          ->set_filename(TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+    });
+
     HttpIntegrationTest::initialize();
   }
 
