@@ -841,7 +841,6 @@ TEST_F(CacheSessionsTest, RangeRequestWhenLengthIsUnknownReturnsNotSatisfiable) 
   Mock::VerifyAndClearExpectations(&headers_callback1);
 }
 
-
 TEST_F(CacheSessionsTest, PassthroughWithUpstreamResetCallsGetHeadersCallbackWithNullPointer) {
   Mock::VerifyAndClearExpectations(mock_cacheable_response_checker_.get());
   EXPECT_CALL(*mock_cacheable_response_checker_, isCacheableResponse)
@@ -865,7 +864,6 @@ TEST_F(CacheSessionsTest, PassthroughWithUpstreamResetCallsGetHeadersCallbackWit
   ASSERT_THAT(result1, NotNull());
   EXPECT_THAT(result1->status_, Eq(CacheEntryStatus::Uncacheable));
 
-  
   ActiveLookupResultPtr result2;
   cache_sessions_->lookup(testLookupRequest("/a"),
                           [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
@@ -879,9 +877,9 @@ TEST_F(CacheSessionsTest, PassthroughWithUpstreamResetCallsGetHeadersCallbackWit
   result2->http_source_->getHeaders(
       [&headers2](Http::ResponseHeaderMapPtr h, EndStream) { headers2 = std::move(h); });
   ASSERT_THAT(fake_upstream_get_headers_callbacks_[1], NotNull());
-  // Simulate an upstream reset by calling the get headers callback with a nullptr and reset end stream.
-  consumeCallback(fake_upstream_get_headers_callbacks_[1])(nullptr,
-                                                           EndStream::Reset);
+  // Simulate an upstream reset by calling the get headers callback with a nullptr and reset end
+  // stream.
+  consumeCallback(fake_upstream_get_headers_callbacks_[1])(nullptr, EndStream::Reset);
   EXPECT_THAT(headers2, IsNull());
 }
 
