@@ -28,8 +28,7 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
                        Server::Configuration::ServerFactoryContext& factory_context,
                        bool support_multi_ads_sources, absl::Status& creation_status)
-    : helper_(cm, "cds"),
-      resource_type_helper_(validation_visitor, "name"), cm_(cm),
+    : helper_(cm, "cds"), resource_type_helper_(validation_visitor, "name"), cm_(cm),
       scope_(scope.createScope("cluster_manager.cds.")), factory_context_(factory_context),
       stats_({ALL_CDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       support_multi_ads_sources_(support_multi_ads_sources) {
