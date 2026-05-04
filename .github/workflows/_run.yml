@@ -394,6 +394,7 @@ jobs:
     # NOTE: This is where untrusted code can be run!!!
     #  Only post-failure notification steps (which don't use any repo code) should follow this step.
     - uses: envoyproxy/toolshed/actions/github/run@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+      id: ci-run
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
         args: ${{ inputs.args != '--' && inputs.args || inputs.target }}
@@ -450,7 +451,7 @@ jobs:
         ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
 
     - name: Notify Slack on failure
-      if: ${{ failure() && inputs.slack-channel != '' }}
+      if: ${{ steps.ci-run.outputs.exit-code != 0 && inputs.slack-channel != '' }}
       uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
       env:
         JOB_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

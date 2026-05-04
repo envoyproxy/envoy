@@ -42,6 +42,7 @@ jobs:
         Error:
       rbe: true
       request: ${{ inputs.request }}
+      catch-errors: ${{ matrix.catch-errors || false }}
       skip: ${{ matrix.skip != false && true || false }}
       slack-channel: ${{ matrix.slack-channel || '' }}
       target: ${{ matrix.target }}
