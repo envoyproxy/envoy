@@ -74,12 +74,10 @@ typed_config:
                                     .setRsaCertOcspStaple(false)
                                     .setCustomValidatorConfig(validator_config));
 
-    // The dynamic_modules cert validator fully replaces BoringSSL's default chain
-    // verification (via SSL_CTX_set_custom_verify), but we still need a trusted_ca
-    // configured so the server populates a non-empty CA list in its TLS CertificateRequest
-    // — without that, BoringSSL clients won't send their certificate and the server's
-    // verify callback sees an empty peer chain. The CA is only used as a hint for the
-    // client; the actual validation is performed by our dynamic module.
+    // Add a trusted_ca alongside the custom validator so the server populates a non-empty CA
+    // list in its TLS CertificateRequest. BoringSSL clients require that list before sending
+    // their cert. Chain validation is still done by the dynamic module via the custom verify
+    // callback; the CA list is only an advertisement.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);

@@ -5,13 +5,16 @@
 #include "envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3/dynamic_modules.pb.validate.h"
 #include "envoy/router/string_accessor.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 
+#include "openssl/pem.h"
 #include "openssl/ssl.h"
+#include "openssl/x509.h"
 
 // Callback implementations for the cert validator ABI. These are called by the module during
 // do_verify_cert_chain.
@@ -160,6 +163,39 @@ absl::Status DynamicModuleCertValidator::addClientValidationContext(SSL_CTX* con
   } else {
     SSL_CTX_set_verify(context, SSL_VERIFY_PEER, nullptr);
   }
+
+  // If the surrounding CertificateValidationContext supplied a trusted_ca bundle, parse it and
+  // install it as the client CA list. BoringSSL servers send this list in the TLS
+  // CertificateRequest so the client knows which CAs the server expects in the chain it sends.
+  // Without it, BoringSSL clients refuse to send any certificate. The actual chain validation is
+  // still delegated to the dynamic module via the custom verify callback.
+  if (config_->ca_cert_pem_.empty()) {
+    return absl::OkStatus();
+  }
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(config_->ca_cert_pem_.data()),
+                                           config_->ca_cert_pem_.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  bssl::UniquePtr<STACK_OF(X509_NAME)> list(
+      sk_X509_NAME_new([](auto* a, auto* b) -> int { return X509_NAME_cmp(*a, *b); }));
+  RELEASE_ASSERT(list != nullptr, "");
+  for (;;) {
+    bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+    if (cert == nullptr) {
+      break;
+    }
+    const X509_NAME* name = X509_get_subject_name(cert.get());
+    if (name == nullptr) {
+      return absl::InvalidArgumentError("Failed to extract subject from trusted CA certificate");
+    }
+    if (sk_X509_NAME_find(list.get(), nullptr, name)) {
+      continue;
+    }
+    bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
+    if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
+      return absl::InvalidArgumentError("Failed to copy subject from trusted CA certificate");
+    }
+  }
+  SSL_CTX_set_client_CA_list(context, list.release());
   return absl::OkStatus();
 }
 
@@ -335,6 +371,12 @@ absl::StatusOr<CertValidatorPtr> DynamicModuleCertValidatorFactory::createCertVa
   if (!factory_config_or_error.ok()) {
     return factory_config_or_error.status();
   }
+
+  // Capture any trusted_ca PEM bytes so addClientValidationContext can populate the client CA
+  // list. The PEM bytes are not used for verification — that is the dynamic module's job — but
+  // they are necessary for the server's TLS CertificateRequest to advertise a non-empty list,
+  // which BoringSSL clients require before they will send their certificate.
+  factory_config_or_error.value()->ca_cert_pem_ = config->caCert();
 
   return std::make_unique<DynamicModuleCertValidator>(std::move(factory_config_or_error.value()),
                                                       stats);

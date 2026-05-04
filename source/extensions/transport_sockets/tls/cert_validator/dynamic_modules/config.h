@@ -59,6 +59,13 @@ public:
   // filter state callbacks can access the connection's stream info. Reset after each call.
   Network::TransportSocketCallbacks* current_callbacks_ = nullptr;
 
+  // Optional PEM bytes of trusted CA certificates from the surrounding
+  // CertificateValidationContext. The dynamic module fully replaces the chain-verification logic,
+  // so the CAs are not used to validate peer certs. They are only used to populate the client CA
+  // list in the server's TLS CertificateRequest, so BoringSSL clients know which CAs the server
+  // expects to see in their chain. Empty if no trusted_ca was configured.
+  std::string ca_cert_pem_;
+
 private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleCertValidatorConfig>>
   newDynamicModuleCertValidatorConfig(
