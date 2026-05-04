@@ -446,26 +446,15 @@ jobs:
 
     - name: Notify Slack on failure
       if: ${{ failure() && inputs.slack-channel != '' }}
-      env:
-        SLACK_BOT_TOKEN: ${{ secrets.slack-bot-token }}
-      run: |
-        JOB_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        curl -sf -X POST https://slack.com/api/chat.postMessage \
-          -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-          -H "Content-type: application/json" \
-          --data "$(cat <<EOF
-        {
-          "channel": "${{ inputs.slack-channel }}",
-          "text": "CI job failed: ${{ inputs.target }}",
-          "blocks": [
-            {
-              "type": "section",
-              "text": {
-                "type": "mrkdwn",
-                "text": ":x: *CI job failed:* \`${{ inputs.target }}\`\n<${JOB_URL}|View workflow run>"
-              }
-            }
-          ]
-        }
-        EOF
-        )"
+      uses: slackapi/slack-github-action@v2.0.0
+      with:
+        method: chat.postMessage
+        token: ${{ secrets.slack-bot-token }}
+        payload: |
+          channel: "${{ inputs.slack-channel }}"
+          text: "CI job failed: ${{ inputs.target }}"
+          blocks:
+            - type: section
+              text:
+                type: mrkdwn
+                text: ":x: *CI job failed:* `${{ inputs.target }}`\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
