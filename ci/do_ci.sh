@@ -997,9 +997,17 @@ case $CI_TARGET in
             echo "FAIL: Distroless container uses the root user" >&2
             exit 1
         fi
-        docker build -f ci/Dockerfile-distroless-testing --target=envoy-distroless -t distroless-testing .
+        DISTROLESS_DEV_DIGEST=$(docker image inspect envoyproxy/envoy:distroless-dev --format '{{.Id}}') \
+            || { echo "FAIL: envoyproxy/envoy:distroless-dev image not found locally" >&2; exit 1; }
+        CONTRIB_DISTROLESS_DEV_DIGEST=$(docker image inspect envoyproxy/envoy:contrib-distroless-dev --format '{{.Id}}') \
+            || { echo "FAIL: envoyproxy/envoy:contrib-distroless-dev image not found locally" >&2; exit 1; }
+        docker build -f ci/Dockerfile-distroless-testing --target=envoy-distroless -t distroless-testing \
+            --build-arg DISTROLESS_DEV_DIGEST="${DISTROLESS_DEV_DIGEST}" \
+            --build-arg CONTRIB_DISTROLESS_DEV_DIGEST="${CONTRIB_DISTROLESS_DEV_DIGEST}" .
         docker run --rm distroless-testing
-        docker build -f ci/Dockerfile-distroless-testing --target=envoy-contrib-distroless -t distroless-contrib-testing .
+        docker build -f ci/Dockerfile-distroless-testing --target=envoy-contrib-distroless -t distroless-contrib-testing \
+            --build-arg DISTROLESS_DEV_DIGEST="${DISTROLESS_DEV_DIGEST}" \
+            --build-arg CONTRIB_DISTROLESS_DEV_DIGEST="${CONTRIB_DISTROLESS_DEV_DIGEST}" .
         docker run --rm distroless-contrib-testing
         ;;
 
