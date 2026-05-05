@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/debugging/leak_check.h"
 #include "absl/status/statusor.h"
 #include "absl/types/optional.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -168,7 +169,7 @@ public:
 
     envoy_engine->run(options);
 
-    auto engine_wrapper = std::shared_ptr<Engine>(new Engine(envoy_engine.release()));
+    auto engine_wrapper = std::shared_ptr<Engine>(new Engine(absl::IgnoreLeak(envoy_engine.release())));
 
     static_cast<T*>(this)->PostRunSetup(engine_wrapper.get());
 

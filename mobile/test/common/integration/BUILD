@@ -217,7 +217,7 @@ envoy_cc_test_library_with_engine_builder(
     ],
 )
 
-envoy_cc_test_library_with_engine_builder(
+envoy_cc_test_library(
     name = "xds_test_server_lib",
     srcs = [
         "xds_test_server.cc",
@@ -227,7 +227,6 @@ envoy_cc_test_library_with_engine_builder(
     ],
     repository = "@envoy",
     deps = [
-        ":base_client_integration_test_lib",
         "@envoy//source/common/event:libevent_lib",
         "@envoy//source/common/tls:context_config_lib",
         "@envoy//source/common/tls:context_lib",

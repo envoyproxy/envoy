@@ -1,4 +1,4 @@
-#include "engine_builder.h"
+#include "library/cc/mobile_engine_builder.h"
 
 #include <stdint.h>
 #include <sys/socket.h>
@@ -27,6 +27,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/common/runtime/runtime_features.h"
+#include "envoy/type/matcher/v3/string.pb.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -48,103 +49,63 @@
 namespace Envoy {
 namespace Platform {
 
-EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>()) {}
+MobileEngineBuilder::MobileEngineBuilder() {}
 
-EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
+MobileEngineBuilder& MobileEngineBuilder::setNetworkThreadPriority(int thread_priority) {
   network_thread_priority_ = thread_priority;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setBufferHighWatermark(size_t high_watermark) {
-  high_watermark_ = high_watermark;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
-  log_level_ = log_level;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setLogger(std::unique_ptr<EnvoyLogger> logger) {
-  logger_ = std::move(logger);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::enableLogger(bool logger_on) {
-  enable_logger_ = logger_on;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks) {
-  callbacks_ = std::move(callbacks);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setOnEngineRunning(absl::AnyInvocable<void()> closure) {
-  callbacks_->on_engine_running_ = std::move(closure);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setOnEngineExit(absl::AnyInvocable<void()> closure) {
-  callbacks_->on_exit_ = std::move(closure);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setEventTracker(std::unique_ptr<EnvoyEventTracker> event_tracker) {
-  event_tracker_ = std::move(event_tracker);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addConnectTimeoutSeconds(int connect_timeout_seconds) {
+MobileEngineBuilder& MobileEngineBuilder::addConnectTimeoutSeconds(int connect_timeout_seconds) {
   connect_timeout_seconds_ = connect_timeout_seconds;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addDnsRefreshSeconds(int dns_refresh_seconds) {
+MobileEngineBuilder& MobileEngineBuilder::addDnsRefreshSeconds(int dns_refresh_seconds) {
   dns_refresh_seconds_ = dns_refresh_seconds;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addDnsMinRefreshSeconds(int dns_min_refresh_seconds) {
+MobileEngineBuilder& MobileEngineBuilder::addDnsMinRefreshSeconds(int dns_min_refresh_seconds) {
   dns_min_refresh_seconds_ = dns_min_refresh_seconds;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addDnsFailureRefreshSeconds(int base, int max) {
+MobileEngineBuilder& MobileEngineBuilder::addDnsFailureRefreshSeconds(int base, int max) {
   dns_failure_refresh_seconds_base_ = base;
   dns_failure_refresh_seconds_max_ = max;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds) {
+MobileEngineBuilder& MobileEngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds) {
   dns_query_timeout_seconds_ = dns_query_timeout_seconds;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setDisableDnsRefreshOnFailure(bool disable_dns_refresh_on_failure) {
+MobileEngineBuilder&
+MobileEngineBuilder::setDisableDnsRefreshOnFailure(bool disable_dns_refresh_on_failure) {
   disable_dns_refresh_on_failure_ = disable_dns_refresh_on_failure;
   return *this;
 }
 
-EngineBuilder&
-EngineBuilder::setDisableDnsRefreshOnNetworkChange(bool disable_dns_refresh_on_network_change) {
+MobileEngineBuilder& MobileEngineBuilder::setDisableDnsRefreshOnNetworkChange(
+    bool disable_dns_refresh_on_network_change) {
   disable_dns_refresh_on_network_change_ = disable_dns_refresh_on_network_change;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setDnsNumRetries(uint32_t dns_num_retries) {
+MobileEngineBuilder& MobileEngineBuilder::setDnsNumRetries(uint32_t dns_num_retries) {
   dns_num_retries_ = dns_num_retries;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setGetaddrinfoNumThreads(uint32_t num_threads) {
+MobileEngineBuilder& MobileEngineBuilder::setGetaddrinfoNumThreads(uint32_t num_threads) {
   getaddrinfo_num_threads_ = num_threads;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::string>& hostnames) {
-  // Add a default port of 443 for all hosts. We'll eventually change this API so it takes a single
-  // {host, pair} and it can be called multiple times.
+MobileEngineBuilder&
+MobileEngineBuilder::addDnsPreresolveHostnames(const std::vector<std::string>& hostnames) {
   dns_preresolve_hostnames_.clear();
   for (const std::string& hostname : hostnames) {
     dns_preresolve_hostnames_.push_back({hostname /* host */, 443 /* port */});
@@ -152,220 +113,220 @@ EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::s
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setDnsResolver(
+MobileEngineBuilder& MobileEngineBuilder::setDnsResolver(
     const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) {
   dns_resolver_config_ = dns_resolver_config;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setAdditionalSocketOptions(
+MobileEngineBuilder& MobileEngineBuilder::setAdditionalSocketOptions(
     const std::vector<envoy::config::core::v3::SocketOption>& socket_options) {
   socket_options_ = socket_options;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addMaxConnectionsPerHost(int max_connections_per_host) {
+MobileEngineBuilder& MobileEngineBuilder::addMaxConnectionsPerHost(int max_connections_per_host) {
   max_connections_per_host_ = max_connections_per_host;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addH2ConnectionKeepaliveIdleIntervalMilliseconds(
+MobileEngineBuilder& MobileEngineBuilder::addH2ConnectionKeepaliveIdleIntervalMilliseconds(
     int h2_connection_keepalive_idle_interval_milliseconds) {
   h2_connection_keepalive_idle_interval_milliseconds_ =
       h2_connection_keepalive_idle_interval_milliseconds;
   return *this;
 }
 
-EngineBuilder&
-EngineBuilder::addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds) {
+MobileEngineBuilder& MobileEngineBuilder::addH2ConnectionKeepaliveTimeoutSeconds(
+    int h2_connection_keepalive_timeout_seconds) {
   h2_connection_keepalive_timeout_seconds_ = h2_connection_keepalive_timeout_seconds;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addKeyValueStore(std::string name,
-                                               KeyValueStoreSharedPtr key_value_store) {
+MobileEngineBuilder& MobileEngineBuilder::addKeyValueStore(std::string name,
+                                                           KeyValueStoreSharedPtr key_value_store) {
   key_value_stores_[std::move(name)] = std::move(key_value_store);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setAppVersion(std::string app_version) {
+MobileEngineBuilder& MobileEngineBuilder::setAppVersion(std::string app_version) {
   app_version_ = std::move(app_version);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setAppId(std::string app_id) {
+MobileEngineBuilder& MobileEngineBuilder::setAppId(std::string app_id) {
   app_id_ = std::move(app_id);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setDeviceOs(std::string device_os) {
+MobileEngineBuilder& MobileEngineBuilder::setDeviceOs(std::string device_os) {
   device_os_ = std::move(device_os);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setStreamIdleTimeoutSeconds(int stream_idle_timeout_seconds) {
-  stream_idle_timeout_seconds_ = stream_idle_timeout_seconds;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setPerTryIdleTimeoutSeconds(int per_try_idle_timeout_seconds) {
+MobileEngineBuilder&
+MobileEngineBuilder::setPerTryIdleTimeoutSeconds(int per_try_idle_timeout_seconds) {
   per_try_idle_timeout_seconds_ = per_try_idle_timeout_seconds;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableGzipDecompression(bool gzip_decompression_on) {
+MobileEngineBuilder& MobileEngineBuilder::enableGzipDecompression(bool gzip_decompression_on) {
   gzip_decompression_filter_ = gzip_decompression_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableBrotliDecompression(bool brotli_decompression_on) {
+MobileEngineBuilder& MobileEngineBuilder::enableBrotliDecompression(bool brotli_decompression_on) {
   brotli_decompression_filter_ = brotli_decompression_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
+MobileEngineBuilder& MobileEngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   socket_tagging_filter_ = socket_tagging_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
+MobileEngineBuilder& MobileEngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableEarlyData(bool early_data_on) {
+MobileEngineBuilder& MobileEngineBuilder::enableEarlyData(bool early_data_on) {
   enable_early_data_ = early_data_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableScone(bool enable) {
+MobileEngineBuilder& MobileEngineBuilder::enableScone(bool enable) {
   scone_enabled_ = enable;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addQuicConnectionOption(std::string option) {
+MobileEngineBuilder& MobileEngineBuilder::addQuicConnectionOption(std::string option) {
   quic_connection_options_.push_back(std::move(option));
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addQuicClientConnectionOption(std::string option) {
+MobileEngineBuilder& MobileEngineBuilder::addQuicClientConnectionOption(std::string option) {
   quic_client_connection_options_.push_back(std::move(option));
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setHttp3ConnectionOptions(std::string options) {
+MobileEngineBuilder& MobileEngineBuilder::setHttp3ConnectionOptions(std::string options) {
   http3_connection_options_ = std::move(options);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setHttp3ClientConnectionOptions(std::string options) {
+MobileEngineBuilder& MobileEngineBuilder::setHttp3ClientConnectionOptions(std::string options) {
   http3_client_connection_options_ = std::move(options);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addQuicHint(std::string host, int port) {
+MobileEngineBuilder& MobileEngineBuilder::addQuicHint(std::string host, int port) {
   quic_hints_.emplace_back(std::move(host), port);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
+MobileEngineBuilder& MobileEngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
   quic_suffixes_.emplace_back(std::move(suffix));
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNumTimeoutsToTriggerPortMigration(int num_timeouts) {
+MobileEngineBuilder& MobileEngineBuilder::setNumTimeoutsToTriggerPortMigration(int num_timeouts) {
   num_timeouts_to_trigger_port_migration_ = num_timeouts;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) {
+MobileEngineBuilder& MobileEngineBuilder::enableInterfaceBinding(bool interface_binding_on) {
   enable_interface_binding_ = interface_binding_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setUdpSocketReceiveBufferSize(int32_t size) {
+MobileEngineBuilder& MobileEngineBuilder::setUdpSocketReceiveBufferSize(int32_t size) {
   udp_socket_receive_buffer_size_ = size;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setUdpSocketSendBufferSize(int32_t size) {
+MobileEngineBuilder& MobileEngineBuilder::setUdpSocketSendBufferSize(int32_t size) {
   udp_socket_send_buffer_size_ = size;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on) {
+MobileEngineBuilder&
+MobileEngineBuilder::enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on) {
   enable_drain_post_dns_refresh_ = drain_post_dns_refresh_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_verification_on) {
+MobileEngineBuilder&
+MobileEngineBuilder::enforceTrustChainVerification(bool trust_chain_verification_on) {
   enforce_trust_chain_verification_ = trust_chain_verification_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setUpstreamTlsSni(std::string sni) {
+MobileEngineBuilder& MobileEngineBuilder::setUpstreamTlsSni(std::string sni) {
   upstream_tls_sni_ = std::move(sni);
   return *this;
 }
 
-EngineBuilder&
-EngineBuilder::setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds) {
+MobileEngineBuilder&
+MobileEngineBuilder::setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds) {
   quic_connection_idle_timeout_seconds_ = quic_connection_idle_timeout_seconds;
   return *this;
 }
 
-EngineBuilder&
-EngineBuilder::setKeepAliveInitialIntervalMilliseconds(int keepalive_initial_interval_ms) {
+MobileEngineBuilder&
+MobileEngineBuilder::setKeepAliveInitialIntervalMilliseconds(int keepalive_initial_interval_ms) {
   keepalive_initial_interval_ms_ = keepalive_initial_interval_ms;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setMaxConcurrentStreams(int max_concurrent_streams) {
+MobileEngineBuilder& MobileEngineBuilder::setMaxConcurrentStreams(int max_concurrent_streams) {
   max_concurrent_streams_ = max_concurrent_streams;
   return *this;
 }
 
-EngineBuilder&
-EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
-  if (use_worker_thread_) {
-    // Platform certificate validation is not supported with worker thread.
+MobileEngineBuilder& MobileEngineBuilder::enablePlatformCertificatesValidation(
+    bool platform_certificates_validation_on) {
+  if (useWorkerThread()) {
     return *this;
   }
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on, int save_interval_seconds) {
+MobileEngineBuilder& MobileEngineBuilder::enableDnsCache(bool dns_cache_on,
+                                                         int save_interval_seconds) {
   dns_cache_on_ = dns_cache_on;
   dns_cache_save_interval_seconds_ = save_interval_seconds;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
-                                                StringAccessorSharedPtr accessor) {
+MobileEngineBuilder& MobileEngineBuilder::addStringAccessor(std::string name,
+                                                            StringAccessorSharedPtr accessor) {
   string_accessors_[std::move(name)] = std::move(accessor);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string typed_config) {
+MobileEngineBuilder& MobileEngineBuilder::addNativeFilter(std::string name,
+                                                          std::string typed_config) {
   native_filter_chain_.emplace_back(NativeFilterConfig(std::move(name), std::move(typed_config)));
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addNativeFilter(const std::string& name,
-                                              const Protobuf::Any& typed_config) {
+MobileEngineBuilder& MobileEngineBuilder::addNativeFilter(const std::string& name,
+                                                          const Protobuf::Any& typed_config) {
   native_filter_chain_.push_back(NativeFilterConfig(name, typed_config));
   return *this;
 }
 
 #if defined(__APPLE__)
-EngineBuilder& EngineBuilder::enableNetworkChangeMonitor(bool network_change_monitor_on) {
+MobileEngineBuilder&
+MobileEngineBuilder::enableNetworkChangeMonitor(bool network_change_monitor_on) {
   enable_network_change_monitor_ = network_change_monitor_on;
   return *this;
 }
 #endif
 
-std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
+std::string MobileEngineBuilder::nativeNameToConfig(absl::string_view name) {
 #ifdef ENVOY_ENABLE_FULL_PROTOS
   return absl::StrCat("[type.googleapis.com/"
                       "envoymobile.extensions.filters.http.platform_bridge.PlatformBridge] {"
@@ -385,11 +346,14 @@ std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
 #endif
 }
 
-EngineBuilder& EngineBuilder::enableWorkerThread(bool use_worker_thread) {
-  use_worker_thread_ = use_worker_thread;
-  if (use_worker_thread_) {
-    // Platform certificate validation and system proxy settings are not supported with worker
-    // thread.
+MobileEngineBuilder& MobileEngineBuilder::addPlatformFilter(const std::string& name) {
+  addNativeFilter("envoy.filters.http.platform_bridge", nativeNameToConfig(name));
+  return *this;
+}
+
+MobileEngineBuilder& MobileEngineBuilder::enableWorkerThread(bool use_worker_thread) {
+  Platform::EngineBuilderBase<MobileEngineBuilder>::enableWorkerThread(use_worker_thread);
+  if (useWorkerThread()) {
     platform_certificates_validation_on_ = false;
 #ifdef __APPLE__
     respect_system_proxy_settings_ = false;
@@ -398,73 +362,61 @@ EngineBuilder& EngineBuilder::enableWorkerThread(bool use_worker_thread) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
-  addNativeFilter("envoy.filters.http.platform_bridge", nativeNameToConfig(name));
+MobileEngineBuilder& MobileEngineBuilder::addRuntimeGuard(std::string guard, bool value) {
+  addReloadableRuntimeGuard(std::move(guard), value);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addRuntimeGuard(std::string guard, bool value) {
-  runtime_guards_.emplace_back(std::move(guard), value);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool value) {
-  restart_runtime_guards_.emplace_back(std::move(guard), value);
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::enableStatsCollection(bool stats_collection_on) {
-  enable_stats_collection_ = stats_collection_on;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setNodeId(std::string node_id) {
+MobileEngineBuilder& MobileEngineBuilder::setNodeId(std::string node_id) {
   node_id_ = std::move(node_id);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zone,
-                                              std::string sub_zone) {
+MobileEngineBuilder& MobileEngineBuilder::setNodeLocality(std::string region, std::string zone,
+                                                          std::string sub_zone) {
   node_locality_ = {std::move(region), std::move(zone), std::move(sub_zone)};
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNodeMetadata(Protobuf::Struct node_metadata) {
+MobileEngineBuilder& MobileEngineBuilder::setNodeMetadata(Protobuf::Struct node_metadata) {
   node_metadata_ = std::move(node_metadata);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setUseQuicPlatformPacketWriter(bool use_quic_platform_packet_writer) {
+MobileEngineBuilder&
+MobileEngineBuilder::setUseQuicPlatformPacketWriter(bool use_quic_platform_packet_writer) {
   use_quic_platform_packet_writer_ = use_quic_platform_packet_writer;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableQuicConnectionMigration(bool quic_connection_migration_on) {
+MobileEngineBuilder&
+MobileEngineBuilder::enableQuicConnectionMigration(bool quic_connection_migration_on) {
   enable_quic_connection_migration_ = quic_connection_migration_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setMigrateIdleQuicConnection(bool migrate_idle_quic_connection) {
+MobileEngineBuilder&
+MobileEngineBuilder::setMigrateIdleQuicConnection(bool migrate_idle_quic_connection) {
   migrate_idle_quic_connection_ = migrate_idle_quic_connection;
   return *this;
 }
 
-EngineBuilder&
-EngineBuilder::setMaxIdleTimeBeforeQuicMigrationSeconds(int max_idle_time_before_quic_migration) {
+MobileEngineBuilder& MobileEngineBuilder::setMaxIdleTimeBeforeQuicMigrationSeconds(
+    int max_idle_time_before_quic_migration) {
   max_idle_time_before_quic_migration_seconds_ = max_idle_time_before_quic_migration;
   return *this;
 }
 
-EngineBuilder&
-EngineBuilder::setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_network) {
+MobileEngineBuilder&
+MobileEngineBuilder::setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_network) {
   max_time_on_non_default_network_seconds_ = max_time_on_non_default_network;
   return *this;
 }
 
 #if defined(__APPLE__)
-EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh_interval_secs) {
-  if (use_worker_thread_) {
-    // System proxy settings are not supported with worker thread.
+MobileEngineBuilder& MobileEngineBuilder::respectSystemProxySettings(bool value,
+                                                                     int refresh_interval_secs) {
+  if (useWorkerThread()) {
     return *this;
   }
   respect_system_proxy_settings_ = value;
@@ -474,123 +426,24 @@ EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setIosNetworkServiceType(int ios_network_service_type) {
+MobileEngineBuilder& MobileEngineBuilder::setIosNetworkServiceType(int ios_network_service_type) {
   ios_network_service_type_ = ios_network_service_type;
   return *this;
 }
 #endif
 
 #ifdef ENVOY_MOBILE_XDS
-XdsBuilder::XdsBuilder(std::string xds_server_address, const uint32_t xds_server_port)
-    : xds_server_address_(std::move(xds_server_address)), xds_server_port_(xds_server_port) {}
 
-XdsBuilder& XdsBuilder::addInitialStreamHeader(std::string header, std::string value) {
-  envoy::config::core::v3::HeaderValue header_value;
-  header_value.set_key(std::move(header));
-  header_value.set_value(std::move(value));
-  xds_initial_grpc_metadata_.emplace_back(std::move(header_value));
-  return *this;
-}
-
-XdsBuilder& XdsBuilder::setSslRootCerts(std::string root_certs) {
-  ssl_root_certs_ = std::move(root_certs);
-  return *this;
-}
-
-XdsBuilder& XdsBuilder::addRuntimeDiscoveryService(std::string resource_name,
-                                                   const int timeout_in_seconds) {
-  rtds_resource_name_ = std::move(resource_name);
-  rtds_timeout_in_seconds_ = timeout_in_seconds > 0 ? timeout_in_seconds : DefaultXdsTimeout;
-  return *this;
-}
-
-XdsBuilder& XdsBuilder::addClusterDiscoveryService(std::string cds_resources_locator,
-                                                   const int timeout_in_seconds) {
-  enable_cds_ = true;
-  cds_resources_locator_ = std::move(cds_resources_locator);
-  cds_timeout_in_seconds_ = timeout_in_seconds > 0 ? timeout_in_seconds : DefaultXdsTimeout;
-  return *this;
-}
-
-void XdsBuilder::build(envoy::config::bootstrap::v3::Bootstrap& bootstrap) const {
-  auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
-  ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-  ads_config->set_set_node_on_first_message_only(true);
-  ads_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-
-  auto& grpc_service = *ads_config->add_grpc_services();
-  grpc_service.mutable_envoy_grpc()->set_cluster_name("base");
-  grpc_service.mutable_envoy_grpc()->set_authority(
-      absl::StrCat(xds_server_address_, ":", xds_server_port_));
-
-  if (!xds_initial_grpc_metadata_.empty()) {
-    grpc_service.mutable_initial_metadata()->Assign(xds_initial_grpc_metadata_.begin(),
-                                                    xds_initial_grpc_metadata_.end());
-  }
-
-  if (!rtds_resource_name_.empty()) {
-    auto* layered_runtime = bootstrap.mutable_layered_runtime();
-    auto* layer = layered_runtime->add_layers();
-    layer->set_name("rtds_layer");
-    auto* rtds_layer = layer->mutable_rtds_layer();
-    rtds_layer->set_name(rtds_resource_name_);
-    auto* rtds_config = rtds_layer->mutable_rtds_config();
-    rtds_config->mutable_ads();
-    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_in_seconds_);
-  }
-
-  if (enable_cds_) {
-    auto* cds_config = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
-    if (cds_resources_locator_.empty()) {
-      cds_config->mutable_ads();
-    } else {
-      bootstrap.mutable_dynamic_resources()->set_cds_resources_locator(cds_resources_locator_);
-      cds_config->mutable_api_config_source()->set_api_type(
-          envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
-      cds_config->mutable_api_config_source()->set_transport_api_version(
-          envoy::config::core::v3::ApiVersion::V3);
-    }
-    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_in_seconds_);
-    cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    bootstrap.add_node_context_params("cluster");
-    // Stat prefixes that we use in tests.
-    auto* list =
-        bootstrap.mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
-    list->add_patterns()->set_exact("cluster_manager.active_clusters");
-    list->add_patterns()->set_exact("cluster_manager.cluster_added");
-    list->add_patterns()->set_exact("cluster_manager.cluster_updated");
-    list->add_patterns()->set_exact("cluster_manager.cluster_removed");
-    // Allow SDS related stats.
-    list->add_patterns()->mutable_safe_regex()->set_regex("sds\\..*");
-    list->add_patterns()->mutable_safe_regex()->set_regex(".*\\.ssl_context_update_by_sds");
-  }
-}
-
-EngineBuilder& EngineBuilder::setXds(XdsBuilder xds_builder) {
+MobileEngineBuilder& MobileEngineBuilder::setXds(XdsBuilder xds_builder) {
   xds_builder_ = std::move(xds_builder);
-  // Add the XdsBuilder's xDS server hostname and port to the list of DNS addresses to preresolve in
-  // the `base` DFP cluster.
   dns_preresolve_hostnames_.push_back(
       {xds_builder_->xds_server_address_ /* host */, xds_builder_->xds_server_port_ /* port */});
   return *this;
 }
 #endif // ENVOY_MOBILE_XDS
 
-std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
-  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
-      std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
-
-  // Set up the HCM
-  envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager
-      api_listener_config;
-  auto* hcm = api_listener_config.mutable_config();
-  hcm->set_stat_prefix("hcm");
-  hcm->set_server_header_transformation(
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-          PASS_THROUGH);
-  hcm->mutable_stream_idle_timeout()->set_seconds(stream_idle_timeout_seconds_);
-  auto* route_config = hcm->mutable_route_config();
+absl::Status MobileEngineBuilder::configureRouteConfig(
+    envoy::config::route::v3::RouteConfiguration* route_config) {
   route_config->set_name("api_router");
 
   auto* api_service = route_config->add_virtual_hosts();
@@ -618,13 +471,18 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     ::envoy::extensions::early_data::v3::DefaultEarlyDataPolicy config;
     early_data->mutable_typed_config()->PackFrom(config);
   }
+  return absl::OkStatus();
+}
 
+absl::Status MobileEngineBuilder::configureHttpFilters(
+    std::function<envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter*()>
+        add_filter) {
   for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
        ++filter) {
-    auto* native_filter = hcm->add_http_filters();
+    auto* native_filter = add_filter();
     native_filter->set_name(filter->name_);
     if (!filter->textproto_typed_config_.empty()) {
-#ifdef ENVOY_ENABLE_FULL_PROTOS
+#if ENVOY_ENABLE_FULL_PROTOS
       Protobuf::TextFormat::ParseFromString((*filter).textproto_typed_config_,
                                             native_filter->mutable_typed_config());
       RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
@@ -639,10 +497,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     }
   }
 
-  // Set up the optional filters
   if (enable_http3_) {
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
-    auto* cache_filter = hcm->add_http_filters();
+    auto* cache_filter = add_filter();
     cache_filter->set_name("alternate_protocols_cache");
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
   }
@@ -661,7 +518,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     decompressor_config.mutable_response_direction_config()
         ->mutable_common_config()
         ->set_ignore_no_transform_header(true);
-    auto* gzip_filter = hcm->add_http_filters();
+    auto* gzip_filter = add_filter();
     gzip_filter->set_name("envoy.filters.http.decompressor");
     gzip_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
@@ -678,33 +535,40 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     decompressor_config.mutable_response_direction_config()
         ->mutable_common_config()
         ->set_ignore_no_transform_header(true);
-    auto* brotli_filter = hcm->add_http_filters();
+    auto* brotli_filter = add_filter();
     brotli_filter->set_name("envoy.filters.http.decompressor");
     brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
   if (socket_tagging_filter_) {
     envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
-    auto* tag_filter = hcm->add_http_filters();
+    auto* tag_filter = add_filter();
     tag_filter->set_name("envoy.filters.http.socket_tag");
     tag_filter->mutable_typed_config()->PackFrom(tag_config);
   }
 
-  // Set up the always-present filters
   envoymobile::extensions::filters::http::network_configuration::NetworkConfiguration
       network_config;
   network_config.set_enable_drain_post_dns_refresh(enable_drain_post_dns_refresh_);
   network_config.set_enable_interface_binding(enable_interface_binding_);
-  auto* network_filter = hcm->add_http_filters();
+  auto* network_filter = add_filter();
   network_filter->set_name("envoy.filters.http.network_configuration");
   network_filter->mutable_typed_config()->PackFrom(network_config);
 
   envoymobile::extensions::filters::http::local_error::LocalError local_config;
-  auto* local_filter = hcm->add_http_filters();
+  auto* local_filter = add_filter();
   local_filter->set_name("envoy.filters.http.local_error");
   local_filter->mutable_typed_config()->PackFrom(local_config);
 
   envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig dfp_config;
-  auto* dns_cache_config = dfp_config.mutable_dns_cache_config();
+  configureDnsCache(dfp_config.mutable_dns_cache_config());
+  auto* dfp_filter = add_filter();
+  dfp_filter->set_name("envoy.filters.http.dynamic_forward_proxy");
+  dfp_filter->mutable_typed_config()->PackFrom(dfp_config);
+  return absl::OkStatus();
+}
+
+void MobileEngineBuilder::configureDnsCache(
+    envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig* dns_cache_config) const {
   dns_cache_config->set_name("base_dns_cache");
   dns_cache_config->set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
   dns_cache_config->mutable_host_ttl()->set_seconds(86400);
@@ -757,29 +621,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     address->set_address(host);
     address->set_port_value(port);
   }
+}
 
-  auto* dfp_filter = hcm->add_http_filters();
-  dfp_filter->set_name("envoy.filters.http.dynamic_forward_proxy");
-  dfp_filter->mutable_typed_config()->PackFrom(dfp_config);
-
-  auto* router_filter = hcm->add_http_filters();
-  envoy::extensions::filters::http::router::v3::Router router_config;
-  router_filter->set_name("envoy.router");
-  router_filter->mutable_typed_config()->PackFrom(router_config);
-
-  auto* static_resources = bootstrap->mutable_static_resources();
-
-  // Finally create the base listener, and point it at the HCM.
-  auto* base_listener = static_resources->add_listeners();
-  base_listener->set_name("base_api_listener");
-  auto* base_address = base_listener->mutable_address();
-  base_address->mutable_socket_address()->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
-  base_address->mutable_socket_address()->set_address("0.0.0.0");
-  base_address->mutable_socket_address()->set_port_value(10000);
-  base_listener->mutable_per_connection_buffer_limit_bytes()->set_value(10485760);
-  base_listener->mutable_api_listener()->mutable_api_listener()->PackFrom(api_listener_config);
-
-  // Basic TLS config.
+absl::Status MobileEngineBuilder::configureStaticClusters(
+    Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster>* clusters) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_socket;
   if (!upstream_tls_sni_.empty()) {
     tls_socket.set_sni(upstream_tls_sni_);
@@ -812,16 +657,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     }
 #endif // ENVOY_MOBILE_XDS
     if (certs.empty()) {
-      // The xDS builder doesn't supply root certs, so we'll use the certs packed with Envoy Mobile,
-      // if the build config allows it.
       const char* inline_certs = ""
 #ifndef EXCLUDE_CERTIFICATES
 #include "library/common/config/certificates.inc"
 #endif
                                  "";
       certs = inline_certs;
-      // The certificates in certificates.inc are prefixed with 2 spaces per
-      // line to be ingressed into YAML.
       absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
     }
     if (!certs.empty()) {
@@ -833,18 +674,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   ssl_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
   ssl_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_socket);
 
-  envoy::config::core::v3::TransportSocket base_tls_socket;
-  base_tls_socket.set_name("envoy.transport_sockets.http_11_proxy");
-  base_tls_socket.mutable_typed_config()->PackFrom(ssl_proxy_socket);
-
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions h2_protocol_options;
   h2_protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
 
-  // Base cluster config (DFP cluster config)
-  auto* base_cluster = static_resources->add_clusters();
+  envoy::config::cluster::v3::Cluster* base_cluster = clusters->Add();
   envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig base_cluster_config;
   envoy::config::cluster::v3::Cluster::CustomClusterType base_cluster_type;
-  base_cluster_config.mutable_dns_cache_config()->CopyFrom(*dns_cache_config);
+  configureDnsCache(base_cluster_config.mutable_dns_cache_config());
   base_cluster_type.set_name("envoy.clusters.dynamic_forward_proxy");
   base_cluster_type.mutable_typed_config()->PackFrom(base_cluster_config);
 
@@ -919,7 +755,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *alpn_options.mutable_auto_config()->mutable_http_protocol_options());
 
   // Base clear-text cluster.
-  auto* base_clear = static_resources->add_clusters();
+  envoy::config::cluster::v3::Cluster* base_clear = clusters->Add();
   base_clear->set_name("base_clear");
   base_clear->mutable_connect_timeout()->set_seconds(connect_timeout_seconds_);
   base_clear->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
@@ -1065,42 +901,48 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       sock_opt->CopyFrom(socket_option);
     }
   }
+  return absl::OkStatus();
+}
 
-  // Set up stats.
-  if (enable_stats_collection_) {
-    auto* list =
-        bootstrap->mutable_stats_config()->mutable_stats_matcher()->mutable_inclusion_list();
-    list->add_patterns()->set_prefix("cluster.base.upstream_rq_");
-    list->add_patterns()->set_prefix("cluster.stats.upstream_rq_");
-    list->add_patterns()->set_prefix("cluster.base.upstream_cx_");
-    list->add_patterns()->set_prefix("cluster.stats.upstream_cx_");
-    list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
-    list->add_patterns()->set_exact("cluster.base.upstream_http3_broken");
-    list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
-    list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
-    list->add_patterns()->set_prefix("http.hcm.decompressor.");
-    list->add_patterns()->set_prefix("pulse.");
-    list->add_patterns()->set_prefix("runtime.load_success");
-    list->add_patterns()->set_prefix("dns_cache");
-    list->add_patterns()->mutable_safe_regex()->set_regex(
-        "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
-        "total)");
-    list->add_patterns()->set_contains("quic_connection_close_error_code");
-    list->add_patterns()->set_contains("quic_reset_stream_error_code");
-  } else {
-    bootstrap->mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
-  }
-  bootstrap->mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
+void MobileEngineBuilder::addStatsInclusionStringMatchers() {
+  auto add_prefix = [this](const std::string& prefix) {
+    envoy::type::matcher::v3::StringMatcher matcher;
+    matcher.set_prefix(prefix);
+    addStatsInclusionPattern(std::move(matcher));
+  };
+  auto add_regex = [this](const std::string& regex) {
+    envoy::type::matcher::v3::StringMatcher matcher;
+    matcher.mutable_safe_regex()->set_regex(regex);
+    addStatsInclusionPattern(std::move(matcher));
+  };
+  add_prefix("cluster.base.upstream_rq_");
+  add_prefix("cluster.stats.upstream_rq_");
+  add_prefix("cluster.base.upstream_cx_");
+  add_prefix("cluster.stats.upstream_cx_");
+  add_regex("^cluster\\.base\\.http2\\.keepalive_timeout$");
+  add_regex("^cluster\\.base\\.upstream_http3_broken$");
+  add_regex("^cluster\\.stats\\.http2\\.keepalive_timeout$");
+  add_prefix("http.hcm.downstream_rq_");
+  add_prefix("http.hcm.decompressor.");
+  add_prefix("pulse.");
+  add_prefix("runtime.load_success");
+  add_prefix("dns_cache");
+  add_regex("^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
+            "total)");
+  add_regex(".*quic_connection_close_error_code.*");
+  add_regex(".*quic_reset_stream_error_code.*");
+}
 
-  // Set up watchdog
-  auto* watchdog = bootstrap->mutable_watchdogs();
-  watchdog->mutable_main_thread_watchdog()->mutable_megamiss_timeout()->set_seconds(60);
-  watchdog->mutable_main_thread_watchdog()->mutable_miss_timeout()->set_seconds(60);
-  watchdog->mutable_worker_watchdog()->mutable_megamiss_timeout()->set_seconds(60);
-  watchdog->mutable_worker_watchdog()->mutable_miss_timeout()->set_seconds(60);
+void MobileEngineBuilder::addWatchdog() {
+  envoy::config::bootstrap::v3::Watchdogs watchdog;
+  watchdog.mutable_main_thread_watchdog()->mutable_megamiss_timeout()->set_seconds(60);
+  watchdog.mutable_main_thread_watchdog()->mutable_miss_timeout()->set_seconds(60);
+  watchdog.mutable_worker_watchdog()->mutable_megamiss_timeout()->set_seconds(60);
+  watchdog.mutable_worker_watchdog()->mutable_miss_timeout()->set_seconds(60);
+  setWatchdog(std::move(watchdog));
+}
 
-  // Set up node
-  auto* node = bootstrap->mutable_node();
+absl::Status MobileEngineBuilder::configureNode(envoy::config::core::v3::Node* node) {
   node->set_id(node_id_.empty() ? "envoy-mobile" : node_id_);
   node->set_cluster("envoy-mobile");
   if (node_locality_ && !node_locality_->region.empty()) {
@@ -1116,73 +958,25 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   (*metadata.mutable_fields())["app_version"].set_string_value(app_version_);
   (*metadata.mutable_fields())["device_os"].set_string_value(device_os_);
 
-  // Set up runtime.
-  auto* runtime = bootstrap->mutable_layered_runtime()->add_layers();
-  runtime->set_name("static_layer_0");
-  Protobuf::Struct envoy_layer;
-  Protobuf::Struct& runtime_values =
-      *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
-  Protobuf::Struct& reloadable_features =
-      *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
-  for (auto& guard_and_value : runtime_guards_) {
-    if (Runtime::RuntimeFeaturesDefaults::get().getFlag(absl::StrJoin(
-            {"envoy", "reloadable_features", guard_and_value.first}, ".")) == nullptr) {
-      // Not a registered runtime guard, skip it.
-      continue;
-    }
-    (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
-        guard_and_value.second);
-  }
-  Protobuf::Struct& restart_features =
-      *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
-  for (auto& guard_and_value : restart_runtime_guards_) {
-    if (Runtime::RuntimeFeaturesDefaults::get().getFlag(
-            absl::StrJoin({"envoy", "restart_features", guard_and_value.first}, ".")) == nullptr) {
-      // Not a registered runtime guard, skip it.
-      continue;
-    }
-    (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
-        guard_and_value.second);
-  }
-  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
-  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
-  Protobuf::Struct& overload_values =
-      *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
-  (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(
-      "4294967295");
-  runtime->mutable_static_layer()->MergeFrom(envoy_layer);
+  return absl::OkStatus();
+}
 
-  bootstrap->mutable_typed_dns_resolver_config()->CopyFrom(
-      *dns_cache_config->mutable_typed_dns_resolver_config());
-
-  bootstrap->mutable_dynamic_resources();
-
+absl::Status MobileEngineBuilder::configXds(envoy::config::bootstrap::v3::Bootstrap* bootstrap) {
+  (void)bootstrap;
 #ifdef ENVOY_MOBILE_XDS
   if (xds_builder_) {
     xds_builder_->build(*bootstrap);
   }
 #endif // ENVOY_MOBILE_XDS
-
-  envoy::config::bootstrap::v3::ApiListenerManager api;
-  if (!use_worker_thread_) {
-    api.set_threading_model(envoy::config::bootstrap::v3::ApiListenerManager::MAIN_THREAD_ONLY);
-  } else {
-    api.set_threading_model(
-        envoy::config::bootstrap::v3::ApiListenerManager::STANDALONE_WORKER_THREAD);
-  }
-  auto* listener_manager = bootstrap->mutable_listener_manager();
-  listener_manager->mutable_typed_config()->PackFrom(api);
-  listener_manager->set_name("envoy.listener_manager_impl.api");
-
-  return bootstrap;
+  return absl::OkStatus();
 }
 
-EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine = absl::IgnoreLeak(new InternalEngine(
-      std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-      network_thread_priority_, high_watermark_, disable_dns_refresh_on_network_change_,
-      enable_logger_, use_worker_thread_));
+EngineSharedPtr MobileEngineBuilder::build() {
+  return Platform::EngineBuilderBase<MobileEngineBuilder>::build().value();
+}
 
+void MobileEngineBuilder::PreRunSetup(InternalEngine* engine) {
+  engine->disableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change_);
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
     if (!Api::External::retrieveApi(name, true)) {
@@ -1206,26 +1000,12 @@ EngineSharedPtr EngineBuilder::build() {
     registerAppleProxyResolver(proxy_settings_refresh_interval_secs_);
   }
 #endif
+}
 
-  Engine* engine = new Engine(envoy_engine);
-
-  auto options = std::make_shared<Envoy::OptionsImplBase>();
-  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
-  if (bootstrap) {
-    options->setConfigProto(std::move(bootstrap));
-  }
-  options->setLogLevel(static_cast<spdlog::level::level_enum>(log_level_));
-  options->setConcurrency(1);
-  envoy_engine->run(options);
-
+void MobileEngineBuilder::PostRunSetup(Engine* engine) {
   if (enable_network_change_monitor_) {
     engine->initializeNetworkChangeMonitor();
   }
-
-  // we can't construct via std::make_shared
-  // because Engine is only constructible as a friend
-  auto engine_ptr = EngineSharedPtr(engine);
-  return engine_ptr;
 }
 
 } // namespace Platform
