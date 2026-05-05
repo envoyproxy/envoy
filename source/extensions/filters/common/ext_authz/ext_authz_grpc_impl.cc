@@ -110,6 +110,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
   ENVOY_LOG(trace, "Received CheckResponse: {}", response->DebugString());
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
   authz_response->grpc_status = response->status().code();
+  authz_response->raw_check_response = *response;
   if (response->status().code() == Grpc::Status::WellKnownGrpcStatus::Ok) {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     authz_response->status = CheckStatus::OK;

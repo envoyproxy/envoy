@@ -133,6 +133,8 @@ struct Response {
   // The gRPC status returned by the authorization server when it is making a
   // gRPC call.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status{absl::nullopt};
+  // The raw CheckResponse proto, if available.
+  absl::optional<envoy::service::auth::v3::CheckResponse> raw_check_response;
 };
 
 using ResponsePtr = std::unique_ptr<Response>;

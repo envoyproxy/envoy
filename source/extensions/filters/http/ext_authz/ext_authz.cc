@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "absl/strings/escaping.h"
+
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/common/assert.h"
@@ -75,6 +77,68 @@ bool headersWithinLimits(const Http::HeaderMap& headers) {
          headers.byteSize() <= headers.maxHeadersKb() * 1024;
 }
 
+void copyHeaderFieldIntoResponse(
+    Filters::Common::ExtAuthz::ResponsePtr& response,
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers) {
+  for (const auto& header : headers) {
+    if (header.append().value()) {
+      response->headers_to_append.emplace_back(header.header().key(), header.header().value());
+    } else {
+      response->headers_to_set.emplace_back(header.header().key(), header.header().value());
+    }
+  }
+}
+
+void copyOkResponseMutations(Filters::Common::ExtAuthz::ResponsePtr& response,
+                             const envoy::service::auth::v3::OkHttpResponse& ok_response) {
+  copyHeaderFieldIntoResponse(response, ok_response.headers());
+
+  for (const auto& header : ok_response.response_headers_to_add()) {
+    if (header.has_append()) {
+      if (header.append().value()) {
+        response->response_headers_to_add.emplace_back(header.header().key(),
+                                                       header.header().value());
+      } else {
+        response->response_headers_to_set.emplace_back(header.header().key(),
+                                                       header.header().value());
+      }
+    } else {
+      switch (header.append_action()) {
+      case Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+        response->response_headers_to_add.emplace_back(header.header().key(),
+                                                       header.header().value());
+        break;
+      case Router::HeaderValueOption::ADD_IF_ABSENT:
+        response->response_headers_to_add_if_absent.emplace_back(header.header().key(),
+                                                                 header.header().value());
+        break;
+      case Router::HeaderValueOption::OVERWRITE_IF_EXISTS:
+        response->response_headers_to_overwrite_if_exists.emplace_back(header.header().key(),
+                                                                       header.header().value());
+        break;
+      case Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+        response->response_headers_to_set.emplace_back(header.header().key(),
+                                                       header.header().value());
+        break;
+      default:
+        response->saw_invalid_append_actions = true;
+        break;
+      }
+    }
+  }
+
+  response->headers_to_remove = std::vector<std::string>{ok_response.headers_to_remove().begin(),
+                                                         ok_response.headers_to_remove().end()};
+
+  for (const auto& query_parameter : ok_response.query_parameters_to_set()) {
+    response->query_parameters_to_set.emplace_back(query_parameter.key(), query_parameter.value());
+  }
+
+  response->query_parameters_to_remove =
+      std::vector<std::string>{ok_response.query_parameters_to_remove().begin(),
+                               ok_response.query_parameters_to_remove().end()};
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
@@ -136,6 +200,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       include_tls_session_(config.include_tls_session()),
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
+      check_response_metadata_key_(config.check_response_metadata_key()),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
@@ -397,6 +462,93 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   initiating_call_ = false;
 }
 
+bool Filter::tryCacheHit() {
+  const std::string& metadata_key = config_->checkResponseMetadataKey();
+  if (metadata_key.empty()) {
+    return false;
+  }
+
+  const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
+  const auto& filter_metadata = metadata.filter_metadata();
+  const auto metadata_it = filter_metadata.find("envoy.filters.http.ext_authz");
+  if (metadata_it == filter_metadata.end()) {
+    return false;
+  }
+
+  const auto& fields = metadata_it->second.fields();
+  const auto field_it = fields.find(metadata_key);
+  if (field_it == fields.end()) {
+    return false;
+  }
+
+  std::string unescaped;
+  envoy::service::auth::v3::CheckResponse check_response;
+  if (!absl::Base64Unescape(field_it->second.string_value(), &unescaped)) {
+    ENVOY_STREAM_LOG(warn, "ext_authz failed to Base64 decode cached response in metadata key {}",
+                     *decoder_callbacks_, metadata_key);
+    stats_.invalid_cached_response_.inc();
+    return false;
+  }
+
+  if (!check_response.ParseFromString(unescaped)) {
+    ENVOY_STREAM_LOG(warn, "ext_authz failed to parse cached CheckResponse in metadata key {}",
+                     *decoder_callbacks_, metadata_key);
+    stats_.invalid_cached_response_.inc();
+    return false;
+  }
+
+  ENVOY_STREAM_LOG(debug, "ext_authz found cached CheckResponse in metadata key {}",
+                   *decoder_callbacks_, metadata_key);
+
+  Filters::Common::ExtAuthz::ResponsePtr authz_response =
+      std::make_unique<Filters::Common::ExtAuthz::Response>(
+          Filters::Common::ExtAuthz::Response{});
+
+  authz_response->grpc_status = check_response.status().code();
+  authz_response->raw_check_response = check_response;
+  if (check_response.status().code() == Grpc::Status::WellKnownGrpcStatus::Ok) {
+    authz_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+    if (check_response.has_ok_response()) {
+      copyOkResponseMutations(authz_response, check_response.ok_response());
+    }
+  } else if (check_response.has_error_response()) {
+    authz_response->status = Filters::Common::ExtAuthz::CheckStatus::Error;
+    const auto& error_response = check_response.error_response();
+    copyHeaderFieldIntoResponse(authz_response, error_response.headers());
+    const uint32_t status_code = error_response.status().code();
+    if (status_code > 0) {
+      authz_response->status_code = static_cast<Http::Code>(status_code);
+    }
+    authz_response->body = error_response.body();
+  } else {
+    authz_response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+    authz_response->status_code = Http::Code::Forbidden;
+    if (check_response.has_denied_response()) {
+      copyHeaderFieldIntoResponse(authz_response,
+                                  check_response.denied_response().headers());
+      const uint32_t status_code = check_response.denied_response().status().code();
+      if (status_code > 0) {
+        authz_response->status_code = static_cast<Http::Code>(status_code);
+      }
+      authz_response->body = check_response.denied_response().body();
+    }
+  }
+
+  if (check_response.has_ok_response() &&
+      check_response.ok_response().has_dynamic_metadata()) {
+    authz_response->dynamic_metadata = check_response.ok_response().dynamic_metadata();
+  } else {
+    authz_response->dynamic_metadata = check_response.dynamic_metadata();
+  }
+
+  initiating_call_ = true;
+  filter_return_ = FilterReturn::StopDecoding;
+  applyResponse(std::move(authz_response));
+  initiating_call_ = false;
+
+  return true;
+}
+
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   const auto per_route_flags = getPerRouteFlags(decoder_callbacks_->route());
   skip_check_ = per_route_flags.skip_check_;
@@ -435,6 +587,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   request_headers_ = &headers;
+
+  if (tryCacheHit()) {
+    return filter_return_ == FilterReturn::StopDecoding
+               ? Http::FilterHeadersStatus::StopAllIterationAndWatermark
+               : Http::FilterHeadersStatus::Continue;
+  }
+
   const auto& check_settings = per_route_flags.check_settings_;
   buffer_data_ = (config_->withRequestBody() || check_settings.has_with_request_body()) &&
                  !check_settings.disable_request_body_buffering() &&
@@ -651,10 +810,29 @@ CheckResult Filter::validateAndCheckDecoderHeaderMutation(
 
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   state_ = State::Complete;
-  using Filters::Common::ExtAuthz::CheckStatus;
-  Stats::StatName empty_stat_name;
 
   updateLoggingInfo(response->grpc_status);
+
+  const std::string& metadata_key = config_->checkResponseMetadataKey();
+  if (!metadata_key.empty() && response->raw_check_response.has_value()) {
+    std::string serialized_response;
+    if (response->raw_check_response->SerializeToString(&serialized_response)) {
+      Protobuf::Struct struct_value;
+      (*struct_value.mutable_fields())[metadata_key].set_string_value(
+          absl::Base64Escape(serialized_response));
+      decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
+                                                          struct_value);
+      ENVOY_STREAM_LOG(debug, "ext_authz stored CheckResponse in metadata key {}",
+                       *decoder_callbacks_, metadata_key);
+    }
+  }
+
+  applyResponse(std::move(response));
+}
+
+void Filter::applyResponse(Filters::Common::ExtAuthz::ResponsePtr response) {
+  using Filters::Common::ExtAuthz::CheckStatus;
+  Stats::StatName empty_stat_name;
 
   if (response->saw_invalid_append_actions) {
     if (config_->validateMutations()) {

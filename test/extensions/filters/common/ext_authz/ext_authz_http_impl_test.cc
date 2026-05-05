@@ -465,6 +465,26 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   client_->onSuccess(async_request_, std::move(check_response));
 }
 
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkRawResponseSynthesized) {
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}, {"x-upstream-ok", "yes", false}});
+  auto check_response = TestCommon::makeMessageResponse(expected_headers);
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_, onComplete_(_))
+      .WillOnce(Invoke([](ResponsePtr& response) {
+        EXPECT_EQ(CheckStatus::OK, response->status);
+        ASSERT_TRUE(response->raw_check_response.has_value());
+        const auto& raw = response->raw_check_response.value();
+        EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, raw.status().code());
+        ASSERT_TRUE(raw.has_ok_response());
+        ASSERT_EQ(1, raw.ok_response().headers_size());
+        EXPECT_EQ("x-upstream-ok", raw.ok_response().headers(0).header().key());
+        EXPECT_EQ("yes", raw.ok_response().headers(0).header().value());
+      }));
+  client_->onSuccess(async_request_, std::move(check_response));
+}
+
 using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string>;
 
 // Verify client response headers when authorization_headers_to_add is configured.

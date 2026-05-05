@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -386,6 +386,16 @@ message ExtAuthz {
   //
   // Defaults to ``false``.
   bool shadow_mode = 32;
+
+  // [WARNING]: Users must ensure that the configured key does not conflict with 
+  // keys returned by the authorization server itself in its dynamic metadata 
+  // (either via the dynamic_metadata field in CheckResponse or headers mapped to 
+  // dynamic metadata). A collision could allow an external server to overwrite 
+  // or corrupt the cache, potentially leading to security bypasses or unexpected behavior.
+  //
+  // If, during ``decodeHeaders``, this dynamic metadata key contains a serialized CheckResponse,
+  // the filter will apply that CheckResponse as if it had been returned by the external service (which won't be called).
+  string check_response_metadata_key = 33;
 }
 
 // Serialized form of the shadow-mode authorization decision written to FilterState

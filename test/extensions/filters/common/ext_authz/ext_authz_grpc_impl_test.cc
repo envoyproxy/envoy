@@ -101,6 +101,31 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkRawResponsePopulated) {
+  initialize();
+
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  auto* metadata_fields = check_response->mutable_ok_response()->mutable_dynamic_metadata()->mutable_fields();
+  (*metadata_fields)["foo"] = ValueUtil::stringValue("ok");
+
+  envoy::service::auth::v3::CheckResponse expected_response = *check_response;
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_, onComplete_(_))
+      .WillOnce(Invoke([expected_response](ResponsePtr& response) {
+        EXPECT_EQ(CheckStatus::OK, response->status);
+        ASSERT_TRUE(response->raw_check_response.has_value());
+        EXPECT_TRUE(TestUtility::protoEqual(expected_response, response->raw_check_response.value()));
+      }));
+
+  client_->onSuccess(std::move(check_response), span_);
+}
+
 TEST_F(ExtAuthzGrpcClientTest, StreamInfo) {
   initialize();
 

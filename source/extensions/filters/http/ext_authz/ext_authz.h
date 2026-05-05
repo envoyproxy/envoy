@@ -52,7 +52,8 @@ namespace ExtAuthz {
   COUNTER(request_header_limits_reached)                                                           \
   COUNTER(response_header_limits_reached)                                                          \
   COUNTER(shadow_denied)                                                                           \
-  COUNTER(shadow_error)
+  COUNTER(shadow_error)                                                                            \
+  COUNTER(invalid_cached_response)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -279,6 +280,8 @@ public:
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
+  const std::string& checkResponseMetadataKey() const { return check_response_metadata_key_; }
+
   const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
     return allowed_headers_matcher_;
   }
@@ -348,6 +351,7 @@ private:
   const bool include_peer_certificate_;
   const bool include_tls_session_;
   const bool charge_cluster_response_stats_;
+  const std::string check_response_metadata_key_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
@@ -532,6 +536,8 @@ private:
   // by non-const reference so we can std::move ``headers_to_set`` into the object instead
   // of copying.
   void setShadowFilterState(Filters::Common::ExtAuthz::Response& response);
+  void applyResponse(Filters::Common::ExtAuthz::ResponsePtr response);
+  bool tryCacheHit();
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
   void updateEffect(const Filters::Common::ProcessingEffect::Effect effect);
