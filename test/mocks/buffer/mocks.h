@@ -19,8 +19,8 @@ namespace Envoy {
 template <class BaseClass> class MockBufferBase : public BaseClass {
 public:
   MockBufferBase();
-  MockBufferBase(std::function<void()> below_low, std::function<void()> above_high,
-                 std::function<void()> above_overflow);
+  MockBufferBase(absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                 absl::AnyInvocable<void()> above_overflow);
 
   MOCK_METHOD(void, move, (Buffer::Instance & rhs));
   MOCK_METHOD(void, move, (Buffer::Instance & rhs, uint64_t length));
@@ -43,15 +43,15 @@ private:
 };
 
 template <>
-MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase(std::function<void()> below_low,
-                                                        std::function<void()> above_high,
-                                                        std::function<void()> above_overflow);
+MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase(absl::AnyInvocable<void()> below_low,
+                                                        absl::AnyInvocable<void()> above_high,
+                                                        absl::AnyInvocable<void()> above_overflow);
 template <> MockBufferBase<Buffer::WatermarkBuffer>::MockBufferBase();
 
 template <>
-MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(std::function<void()> below_low,
-                                                  std::function<void()> above_high,
-                                                  std::function<void()> above_overflow);
+MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(absl::AnyInvocable<void()> below_low,
+                                                  absl::AnyInvocable<void()> above_high,
+                                                  absl::AnyInvocable<void()> above_overflow);
 template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase();
 
 class MockBuffer : public MockBufferBase<Buffer::OwnedImpl> {
@@ -65,9 +65,9 @@ class MockWatermarkBuffer : public MockBufferBase<Buffer::WatermarkBuffer> {
 public:
   using BaseClass = MockBufferBase<Buffer::WatermarkBuffer>;
 
-  MockWatermarkBuffer(std::function<void()> below_low, std::function<void()> above_high,
-                      std::function<void()> above_overflow)
-      : BaseClass(below_low, above_high, above_overflow) {
+  MockWatermarkBuffer(absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                      absl::AnyInvocable<void()> above_overflow)
+      : BaseClass(std::move(below_low), std::move(above_high), std::move(above_overflow)) {
     ON_CALL(*this, move(testing::_))
         .WillByDefault(testing::Invoke(this, &MockWatermarkBuffer::baseMove));
   }
@@ -78,17 +78,18 @@ public:
   MockBufferFactory();
   ~MockBufferFactory() override;
 
-  Buffer::InstancePtr createBuffer(std::function<void()> below_low,
-                                   std::function<void()> above_high,
-                                   std::function<void()> above_overflow) override {
-    auto buffer = Buffer::InstancePtr{createBuffer_(below_low, above_high, above_overflow)};
+  Buffer::InstancePtr createBuffer(absl::AnyInvocable<void()> below_low,
+                                   absl::AnyInvocable<void()> above_high,
+                                   absl::AnyInvocable<void()> above_overflow) override {
+    auto buffer = Buffer::InstancePtr{
+        createBuffer_(std::move(below_low), std::move(above_high), std::move(above_overflow))};
     ASSERT(buffer != nullptr);
     return buffer;
   }
 
   MOCK_METHOD(Buffer::Instance*, createBuffer_,
-              (std::function<void()> below_low, std::function<void()> above_high,
-               std::function<void()> above_overflow));
+              (absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+               absl::AnyInvocable<void()> above_overflow));
 
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, createAccount, (Http::StreamResetHandler&));
   MOCK_METHOD(uint64_t, resetAccountsGivenPressure, (float));
