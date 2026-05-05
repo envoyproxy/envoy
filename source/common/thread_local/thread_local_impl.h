@@ -11,8 +11,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/non_copyable.h"
 
-#include "absl/container/flat_hash_set.h"
-
 namespace Envoy {
 namespace ThreadLocal {
 
@@ -86,7 +84,7 @@ private:
   Thread::MainThread main_thread_;
   std::vector<Slot*> slots_;
   // A collection of indices of freed slots.
-  absl::flat_hash_set<uint32_t> free_slot_indexes_;
+  std::vector<uint32_t> free_slot_indexes_;
   std::list<std::reference_wrapper<Event::Dispatcher>> registered_threads_;
   Event::Dispatcher* main_thread_dispatcher_{};
   std::atomic<bool> shutdown_{};
