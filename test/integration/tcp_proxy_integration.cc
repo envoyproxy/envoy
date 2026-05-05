@@ -1,5 +1,6 @@
 #include "test/integration/tcp_proxy_integration.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

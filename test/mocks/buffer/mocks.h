@@ -11,6 +11,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {

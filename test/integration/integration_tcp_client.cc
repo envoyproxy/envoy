@@ -21,6 +21,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_time_system.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
