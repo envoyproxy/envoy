@@ -670,6 +670,13 @@ protected:
     EXPECT_THAT(loggedMetadata, ProtoEq(expected_metadata));
   }
 
+  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  Envoy::Event::SimulatedTimeSystem* test_time_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
+  TestScopedRuntime scoped_runtime_;
+
   absl::optional<envoy::config::core::v3::GrpcService> final_expected_grpc_service_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   std::unique_ptr<MockClient> client_;
@@ -677,10 +684,8 @@ protected:
   ProcessingRequest last_request_;
   bool server_closed_stream_ = false;
   bool observability_mode_ = false;
-  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::shared_ptr<Filter> filter_;
-  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<::Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   testing::NiceMock<::Envoy::Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Router::RouteConstSharedPtr route_;
@@ -692,12 +697,8 @@ protected:
   TestResponseTrailerMapImpl response_trailers_;
   std::vector<Event::MockTimer*> timers_;
   Event::MockTimer* deferred_close_timer_;
-  Envoy::Event::SimulatedTimeSystem* test_time_;
   envoy::config::core::v3::Metadata dynamic_metadata_;
   testing::NiceMock<Network::MockConnection> connection_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
-  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
-  TestScopedRuntime scoped_runtime_;
   DoStartOption do_start_option_ = DEFAULT;
 };
 

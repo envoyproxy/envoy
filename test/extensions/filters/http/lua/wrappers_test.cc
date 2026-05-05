@@ -1918,6 +1918,35 @@ TEST_F(LuaStatsScopeWrapperTest, CounterOperations) {
   wrapper.reset();
 }
 
+// Verify that two separately obtained wrappers for the same counter name share the same
+// underlying stat. This validates that re-querying the scope finds the existing stat
+// rather than creating a new one each time.
+TEST_F(LuaStatsScopeWrapperTest, CounterSharedIdentity) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local c1 = object:counter("shared")
+      c1:inc()
+      local c2 = object:counter("shared")
+      c2:add(4)
+      testPrint(tostring(c1:value()))
+      testPrint(tostring(c2:value()))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  EXPECT_CALL(printer_, testPrint("5"));
+  EXPECT_CALL(printer_, testPrint("5"));
+  start("callMe");
+
+  EXPECT_EQ(5, store_.counter("lua.shared").value());
+  wrapper.reset();
+}
+
 // Test counter with negative add fails.
 TEST_F(LuaStatsScopeWrapperTest, CounterNegativeAddFails) {
   const std::string SCRIPT{R"EOF(
@@ -1973,6 +2002,34 @@ TEST_F(LuaStatsScopeWrapperTest, GaugeOperations) {
 
   // Verify the gauge was created with the correct prefix.
   EXPECT_EQ(105, store_.gauge("lua.test_gauge", Stats::Gauge::ImportMode::NeverImport).value());
+  wrapper.reset();
+}
+
+// Verify that two separately obtained wrappers for the same gauge name share the same
+// underlying stat.
+TEST_F(LuaStatsScopeWrapperTest, GaugeSharedIdentity) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local g1 = object:gauge("shared")
+      g1:set(10)
+      local g2 = object:gauge("shared")
+      g2:add(5)
+      testPrint(tostring(g1:value()))
+      testPrint(tostring(g2:value()))
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  EXPECT_CALL(printer_, testPrint("15"));
+  EXPECT_CALL(printer_, testPrint("15"));
+  start("callMe");
+
+  EXPECT_EQ(15, store_.gauge("lua.shared", Stats::Gauge::ImportMode::NeverImport).value());
   wrapper.reset();
 }
 
@@ -2050,6 +2107,33 @@ TEST_F(LuaStatsScopeWrapperTest, HistogramOperations) {
   auto histogram = store_.findHistogramByString("lua.test_histogram");
   ASSERT_TRUE(histogram.has_value());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified, histogram->get().unit());
+  wrapper.reset();
+}
+
+// Verify that two separately obtained wrappers for the same histogram name share the same
+// underlying stat — i.e. only one histogram is registered in the store.
+TEST_F(LuaStatsScopeWrapperTest, HistogramSharedIdentity) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local h1 = object:histogram("shared", "ms")
+      h1:recordValue(10)
+      local h2 = object:histogram("shared", "ms")
+      h2:recordValue(20)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Filters::Common::Lua::LuaDeathRef<StatsScopeWrapper> wrapper(
+      StatsScopeWrapper::create(coroutine_->luaState(), *store_.rootScope()->createScope("lua")),
+      true);
+  start("callMe");
+
+  // Verify only one histogram was created, not two.
+  ASSERT_TRUE(store_.findHistogramByString("lua.shared").has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds,
+            store_.findHistogramByString("lua.shared")->get().unit());
   wrapper.reset();
 }
 
