@@ -1,3 +1,4 @@
+#include <chrono>
 #include <string>
 
 #include "envoy/extensions/filters/http/bandwidth_share/v3/bandwidth_share.pb.h"
@@ -344,6 +345,36 @@ TEST_F(BandwidthShareIntegrationTest, RuntimeLimitChangesApplyToNewStreams) {
   EXPECT_EQ(0, gaugeValue(request_bytes_pending));
 }
 
+TEST_F(BandwidthShareIntegrationTest, PendingResponseBytesDecreaseWhileStillBuffered) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  initializeFilter(responseOnly1kFilter());
+  const std::string response_bytes_pending =
+      "bandwidth_share.bytes_pending.bucket_id.response_bucket.tenant..direction.response";
+  makeDownstreamConnection();
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+  codec_client_->sendData(request_encoder, std::string(1, 'a'), true);
+  waitForNextUpstreamRequest();
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(response_headers_, false);
+  response_decoder->waitForHeaders();
+  upstream_request_->encodeData(4096, false);
+
+  test_server_->waitForGaugeGe(response_bytes_pending, 2048);
+  Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+  while (gaugeValue(response_bytes_pending) >= 1024) {
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    ASSERT_TRUE(bound.withinBound())
+        << "timed out waiting for " << response_bytes_pending << " to be < 1024, current value "
+        << gaugeValue(response_bytes_pending);
+  }
+  EXPECT_GT(gaugeValue(response_bytes_pending), 0);
+
+  upstream_request_->encodeData(1, true);
+  test_server_->waitForGaugeEq(response_bytes_pending, 0);
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+}
+
 TEST_F(BandwidthShareIntegrationTest, RouteConfigCanLimitAndTagTenantStats) {
   initializeFilterWithRouteConfig(disabledFilter(), tenantTaggedRouteConfig());
   const std::string request_bytes_pending =
@@ -432,6 +463,44 @@ TEST_F(BandwidthShareIntegrationTest, AddsResponseTrailersToUpstreamTrailers) {
   test_server_->waitForGaugeGe(response_bytes_pending, 1);
   test_server_->waitForGaugeEq(response_bytes_pending, 0);
   upstream_request_->encodeTrailers(any_response_trailers_);
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+  ASSERT_NE(nullptr, response_decoder->trailers());
+
+  EXPECT_THAT(*response_decoder->trailers(), ContainsHeader("x-bar", "bar"));
+  EXPECT_THAT(*response_decoder->trailers(),
+              ContainsHeader("x-test-bandwidth-request-delay-ms", _));
+  EXPECT_THAT(*response_decoder->trailers(),
+              ContainsHeader("x-test-bandwidth-response-delay-ms", _));
+  EXPECT_THAT(*response_decoder->trailers(),
+              ContainsHeader("x-test-bandwidth-request-duration-ms", _));
+  EXPECT_THAT(*response_decoder->trailers(),
+              ContainsHeader("x-test-bandwidth-response-duration-ms", _));
+}
+
+TEST_F(BandwidthShareIntegrationTest, PausesUpstreamTrailersBehindBufferedResponse) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  initializeFilter(responseTrailersFilter());
+  const std::string request_bytes_pending =
+      "bandwidth_share.bytes_pending.bucket_id.trailer_request.tenant..direction.request";
+  const std::string response_bytes_pending =
+      "bandwidth_share.bytes_pending.bucket_id.trailer_response.tenant..direction.response";
+  makeDownstreamConnection();
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+  codec_client_->sendData(request_encoder, std::string(2048, 'a'), false);
+  codec_client_->sendTrailers(request_encoder, any_request_trailers_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  test_server_->waitForGaugeGe(request_bytes_pending, 1);
+  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(response_headers_, false);
+  response_decoder->waitForHeaders();
+  upstream_request_->encodeData(2048, false);
+  test_server_->waitForGaugeGe(response_bytes_pending, 1);
+  upstream_request_->encodeTrailers(any_response_trailers_);
+  test_server_->waitForGaugeEq(response_bytes_pending, 0);
   ASSERT_TRUE(response_decoder->waitForEndStream());
   ASSERT_NE(nullptr, response_decoder->trailers());
 
