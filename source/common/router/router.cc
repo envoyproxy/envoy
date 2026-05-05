@@ -2311,6 +2311,12 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
   }
 
   if (cross_cluster_retry_) {
+    // If the cross cluster retry is enabled, we need to refresh the route cluster for this attempt.
+    //
+    // TODO(wbpcode): In current implementation, although we will refresh the target upstream
+    // cluster for this retry attempt. But part of initial cluster's configuration like circuit
+    // breaking, retry policy and so on will still be used for this request because it will bring
+    // lots of complexity to refresh all these state and bring limited benefit.
     callbacks_->downstreamCallbacks()->refreshRouteCluster();
   }
 
