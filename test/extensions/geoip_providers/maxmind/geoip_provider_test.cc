@@ -7,7 +7,6 @@
 #include "source/extensions/geoip_providers/maxmind/geoip_provider.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"

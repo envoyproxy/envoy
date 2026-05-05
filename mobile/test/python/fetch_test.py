@@ -39,6 +39,7 @@ class TestFetchRequest(unittest.TestCase):
             .set_log_level(LogLevel.trace)
             .add_runtime_guard("dns_cache_set_ip_version_to_remove", True)
             .set_on_engine_running(lambda: engine_running.set())
+            .enable_worker_thread(True)
             .build()
         )
         self.assertTrue(engine_running.wait(timeout=30), "Engine did not start within timeout")

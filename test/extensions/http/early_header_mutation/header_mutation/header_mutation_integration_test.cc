@@ -3,7 +3,6 @@
 
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
-#include "test/test_common/registry.h"
 
 namespace Envoy {
 namespace {
