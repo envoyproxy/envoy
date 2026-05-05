@@ -33,8 +33,9 @@ SlotPtr InstanceImpl::allocateSlot() {
     slots_.push_back(slot.get());
     return slot;
   }
-  const uint32_t idx = free_slot_indexes_.front();
-  free_slot_indexes_.pop_front();
+  auto it = free_slot_indexes_.begin();
+  const uint32_t idx = *it;
+  free_slot_indexes_.erase(it);
   ASSERT(idx < slots_.size());
   SlotPtr slot = std::make_unique<SlotImpl>(*this, idx);
   slots_[idx] = slot.get();
@@ -161,10 +162,9 @@ void InstanceImpl::removeSlot(uint32_t slot) {
   }
 
   slots_[slot] = nullptr;
-  ASSERT(std::find(free_slot_indexes_.begin(), free_slot_indexes_.end(), slot) ==
-             free_slot_indexes_.end(),
+  ASSERT(!free_slot_indexes_.contains(slot),
          fmt::format("slot index {} already in free slot set!", slot));
-  free_slot_indexes_.push_back(slot);
+  free_slot_indexes_.insert(slot);
   runOnAllThreads([slot]() -> void {
     // This runs on each thread and clears the slot, making it available for a new allocations.
     // This is safe even if a new allocation comes in, because everything happens with post() and
