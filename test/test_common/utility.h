@@ -48,6 +48,12 @@ using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 
 namespace Envoy {
 
+namespace DeprecatedStatWaitHelpers {
+
+template <class... Args> constexpr bool always_false = false;
+
+} // namespace DeprecatedStatWaitHelpers
+
 #if defined(__has_feature) &&                                                                      \
     (__has_feature(thread_sanitizer) || __has_feature(memory_sanitizer) ||                         \
      __has_feature(address_sanitizer))
@@ -241,6 +247,20 @@ public:
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
                  Event::Dispatcher* dispatcher = nullptr);
 
+  template <class... Args> static AssertionResult waitForCounterEq(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "TestUtility::waitForCounterEq was removed; use "
+                  "TestUtility::waitForCounter(..., testing::Eq(value), ...) instead.");
+    return AssertionFailure();
+  }
+
+  template <class... Args> static AssertionResult waitForCounterGe(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "TestUtility::waitForCounterGe was removed; use "
+                  "TestUtility::waitForCounter(..., testing::Ge(value), ...) instead.");
+    return AssertionFailure();
+  }
+
   /**
    * Wait for a proactive resource usage in the overload manager to be == a given value.
    * @param overload_state used to lookup corresponding proactive resource.
@@ -272,6 +292,20 @@ public:
   waitForGauge(Stats::Store& store, const std::string& name,
                testing::Matcher<uint64_t> value_matcher, Event::TestTimeSystem& time_system,
                std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  template <class... Args> static AssertionResult waitForGaugeEq(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "TestUtility::waitForGaugeEq was removed; use "
+                  "TestUtility::waitForGauge(..., testing::Eq(value), ...) instead.");
+    return AssertionFailure();
+  }
+
+  template <class... Args> static AssertionResult waitForGaugeGe(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "TestUtility::waitForGaugeGe was removed; use "
+                  "TestUtility::waitForGauge(..., testing::Ge(value), ...) instead.");
+    return AssertionFailure();
+  }
 
   /**
    * Wait for a gauge to be destroyed.

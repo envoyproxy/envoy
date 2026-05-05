@@ -474,9 +474,33 @@ public:
                                             dispatcher));
   }
 
+  template <class... Args> void waitForCounterEq(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForCounterEq was removed; use "
+                  "IntegrationTestServer::waitForCounter(name, testing::Eq(value), ...) instead.");
+  }
+
+  template <class... Args> void waitForCounterGe(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForCounterGe was removed; use "
+                  "IntegrationTestServer::waitForCounter(name, testing::Ge(value), ...) instead.");
+  }
+
   void waitForGauge(const std::string& name, testing::Matcher<uint64_t> value_matcher,
                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForGauge(statStore(), name, value_matcher, time_system_, timeout));
+  }
+
+  template <class... Args> void waitForGaugeEq(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForGaugeEq was removed; use "
+                  "IntegrationTestServer::waitForGauge(name, testing::Eq(value), ...) instead.");
+  }
+
+  template <class... Args> void waitForGaugeGe(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForGaugeGe was removed; use "
+                  "IntegrationTestServer::waitForGauge(name, testing::Ge(value), ...) instead.");
   }
 
   void waitForCounterExists(const std::string& name) override {
