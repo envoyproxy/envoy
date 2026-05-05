@@ -845,7 +845,8 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     // different clusters may be selected for different attempts. It would make the retry logic more
     // complicated.
     cross_cluster_retry_ = effective_retry_policy->refreshClusterOnRetry() &&
-                           !hedging_params_.hedge_on_per_try_timeout_;
+                           !hedging_params_.hedge_on_per_try_timeout_ &&
+                           callbacks_->downstreamCallbacks().has_value();
   }
 
   absl::InlinedVector<std::reference_wrapper<const ShadowPolicy>, 2> active_shadow_policies;

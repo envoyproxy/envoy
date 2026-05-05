@@ -1792,10 +1792,11 @@ message RetryPolicy {
   // By default, the target upstream cluster of a retry request is the same as the original request,
   // and Envoy will not try to refresh it when retrying.
   // If this field is set to true, Envoy will try to refresh the target upstream cluster when
-  // retrying a request. This is useful when users want the cross clusters retry feature.
+  // retrying a request. This is useful when users want to try different upstream cluster for
+  // each retry attempt.
   //
   // .. note::
-  //   This only make sense when the cluster selection support the dynamic refresh,
+  //   This only make sense when the route cluster specifier support the dynamic refresh,
   //   e.g. :ref:`matcher cluster specifier
   //   <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`.
   bool refresh_cluster_on_retry = 14;
