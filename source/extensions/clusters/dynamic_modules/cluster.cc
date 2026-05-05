@@ -135,6 +135,8 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
     return absl::InvalidArgumentError("Failed to create in-module cluster configuration");
   }
 
+  config->stat_creation_frozen_ = true;
+
   return config;
 }
 

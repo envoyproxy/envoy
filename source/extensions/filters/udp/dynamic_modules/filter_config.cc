@@ -67,6 +67,7 @@ DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
   in_module_config_ =
       on_filter_config_new_(static_cast<void*>(this), {filter_name_.c_str(), filter_name_.size()},
                             {filter_config_.data(), filter_config_.size()});
+  stat_creation_frozen_ = true;
 }
 
 DynamicModuleUdpListenerFilterConfig::~DynamicModuleUdpListenerFilterConfig() {
