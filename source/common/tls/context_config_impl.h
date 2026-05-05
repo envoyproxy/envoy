@@ -105,7 +105,7 @@ private:
       unsigned default_version);
 
   const std::string alpn_protocols_;
-  std::shared_ptr<const std::string> cipher_suites_;
+  const std::shared_ptr<const std::string> cipher_suites_;
   const std::string ecdh_curves_;
   const std::string signature_algorithms_;
 
