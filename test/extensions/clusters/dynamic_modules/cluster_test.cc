@@ -1,3 +1,5 @@
+#include <thread>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 
@@ -3250,6 +3252,94 @@ TEST_F(DynamicModuleClusterTest, LbRepeatedConstructTeardownWithUpdates) {
         Upstream::HostSetImpl::partitionHosts(all_hosts, Upstream::HostsPerLocalityImpl::empty()),
         {}, {hosts[1]}, {}, absl::nullopt, absl::nullopt);
   }
+}
+
+// =============================================================================
+// Off-main-thread guard tests for cluster ABI callbacks.
+// =============================================================================
+
+// Verifies that `cluster_add_hosts` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, AddHostsOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_module_buffer addr = {"127.0.0.1:10001", 15};
+  uint32_t weight = 1;
+  envoy_dynamic_module_type_module_buffer empty = {"", 0};
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_FALSE(envoy_dynamic_module_callback_cluster_add_hosts(
+              cluster_ptr, 0, &addr, &weight, &empty, &empty, &empty, nullptr, 0, 1, &host_ptr));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_add_hosts must be called on the main thread");
+}
+
+// Verifies that `cluster_remove_hosts` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, RemoveHostsOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptrs[1] = {nullptr};
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_EQ(0u,
+                    envoy_dynamic_module_callback_cluster_remove_hosts(cluster_ptr, host_ptrs, 1));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_remove_hosts must be called on the main thread");
+}
+
+// Verifies that `cluster_update_host_health` is fail-closed when called off the main thread.
+TEST_F(DynamicModuleClusterTest, UpdateHostHealthOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          EXPECT_FALSE(envoy_dynamic_module_callback_cluster_update_host_health(
+              cluster_ptr, nullptr, envoy_dynamic_module_type_host_health_Healthy));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_update_host_health must be called on the main "
+      "thread");
+}
+
+// Verifies that `cluster_pre_init_complete` is a safe no-op when called off the main thread.
+TEST_F(DynamicModuleClusterTest, PreInitCompleteOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t(
+            [&] { envoy_dynamic_module_callback_cluster_pre_init_complete(cluster_ptr); });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_pre_init_complete must be called on the main thread");
 }
 
 } // namespace

@@ -3,6 +3,7 @@
 // This file provides host-side implementations for the cluster dynamic module ABI callbacks.
 
 #include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 #include "source/common/http/message_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -91,6 +92,14 @@ bool envoy_dynamic_module_callback_cluster_add_hosts(
     const envoy_dynamic_module_type_module_buffer* sub_zones,
     const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
     size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs) {
+  // `cluster_add_hosts` mutates `priority_set_` and runs member-update callbacks; both are
+  // main-thread-only. The previous `ASSERT_IS_MAIN_OR_TEST_THREAD` is compiled out under NDEBUG,
+  // so guard explicitly and fail closed.
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_cluster_add_hosts must be called on the main thread");
+    return false;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
   std::vector<std::string> address_strings;
   address_strings.reserve(count);
@@ -139,6 +148,11 @@ bool envoy_dynamic_module_callback_cluster_add_hosts(
 size_t envoy_dynamic_module_callback_cluster_remove_hosts(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     const envoy_dynamic_module_type_cluster_host_envoy_ptr* host_envoy_ptrs, size_t count) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_cluster_remove_hosts must be called on the main thread");
+    return 0;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
   std::vector<Envoy::Upstream::HostSharedPtr> hosts;
   hosts.reserve(count);
@@ -152,6 +166,11 @@ bool envoy_dynamic_module_callback_cluster_update_host_health(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
     envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
     envoy_dynamic_module_type_host_health health_status) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_update_host_health must be called on the "
+                 "main thread");
+    return false;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
   auto host = cluster->findHost(host_envoy_ptr);
   return cluster->updateHostHealth(std::move(host), health_status);
@@ -172,6 +191,11 @@ envoy_dynamic_module_callback_cluster_find_host_by_address(
 
 void envoy_dynamic_module_callback_cluster_pre_init_complete(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_pre_init_complete must be called on the "
+                 "main thread");
+    return;
+  }
   getCluster(cluster_envoy_ptr)->preInitComplete();
 }
 
