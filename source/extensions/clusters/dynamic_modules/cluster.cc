@@ -762,30 +762,42 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
-  // Pre-capture the worker dispatcher and prepare the cancellation flag before calling into the
-  // module. The module's choose_host may spawn a background thread that calls
-  // async_host_selection_complete, which reads these fields. Setting them beforehand establishes
-  // a happens-before relationship via the thread::spawn synchronization in the module.
+  // Build a fresh per-pending-selection slot before calling into the module. The slot carries
+  // the dispatcher and cancellation flag for this `chooseHost` call only and is never reused
+  // across overlapping selections.
   const auto* connection = context != nullptr ? context->downstreamConnection() : nullptr;
-  active_async_dispatcher_ = connection != nullptr ? &connection->dispatcher() : nullptr;
-  active_async_cancelled_ = std::make_shared<std::atomic<bool>>(false);
+  auto slot = std::make_shared<AsyncHostSelectionSlot>();
+  slot->dispatcher = connection != nullptr ? &connection->dispatcher() : nullptr;
+  slot->cancelled = std::make_shared<std::atomic<bool>>(false);
 
   envoy_dynamic_module_type_cluster_host_envoy_ptr host_ptr = nullptr;
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle = nullptr;
+
+  // Publish the slot into the per-LB map before the module call. The module may spawn a
+  // background thread that immediately calls `async_host_selection_complete`; the completion
+  // path looks up the slot by `context` in this map and the mutex publish establishes
+  // happens-before for that read. If the module returns synchronously below, we erase the slot
+  // so a misbehaved module that fires completion after a sync return cannot deliver to the
+  // wrong context.
+  {
+    absl::MutexLock lock(&async_slots_mutex_);
+    async_slots_[context] = slot;
+  }
   handle_->cluster_->config()->on_cluster_lb_choose_host_(in_module_lb_, context, &host_ptr,
                                                           &async_handle);
 
   if (async_handle != nullptr) {
-    // Async pending: the module will call the completion callback later.
-    auto cancelable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
+    auto cancellable = std::make_unique<DynamicModuleAsyncHostSelectionHandle>(
         async_handle, in_module_lb_,
-        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_, active_async_cancelled_);
-    return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
+        handle_->cluster_->config()->on_cluster_lb_cancel_host_selection_, slot, this, context);
+    return Upstream::HostSelectionResponse{nullptr, std::move(cancellable)};
   }
 
-  // Synchronous result or no host. Clear the async state.
-  active_async_dispatcher_ = nullptr;
-  active_async_cancelled_ = nullptr;
+  // Synchronous result: the slot we pre-published is unused. Erase it under the lock.
+  {
+    absl::MutexLock lock(&async_slots_mutex_);
+    async_slots_.erase(context);
+  }
 
   if (host_ptr == nullptr) {
     return {nullptr};
@@ -796,7 +808,37 @@ DynamicModuleLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   return {host};
 }
 
+std::shared_ptr<AsyncHostSelectionSlot> DynamicModuleLoadBalancer::lookupAsyncSlot(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context) const {
+  absl::MutexLock lock(&async_slots_mutex_);
+  auto it = async_slots_.find(context);
+  return it == async_slots_.end() ? nullptr : it->second;
+}
+
+void DynamicModuleLoadBalancer::removeAsyncSlot(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context) const {
+  absl::MutexLock lock(&async_slots_mutex_);
+  async_slots_.erase(context);
+}
+
+void DynamicModuleLoadBalancer::insertAsyncSlotForTest(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context,
+    std::shared_ptr<AsyncHostSelectionSlot> slot) const {
+  absl::MutexLock lock(&async_slots_mutex_);
+  async_slots_[context] = std::move(slot);
+}
+
 DynamicModuleAsyncHostSelectionHandle::~DynamicModuleAsyncHostSelectionHandle() {
+  // Erase the slot from the load balancer's map so a late completion is silently dropped. The
+  // call routes through `withActiveInstance` (registry-mutex-guarded) because per-worker load
+  // balancers can be recreated on host-membership changes, so the cached `lb_` pointer may
+  // already refer to a freed instance. The registry lookup verifies liveness under the lock.
+  if (lb_ != nullptr) {
+    DynamicModuleLoadBalancer::withActiveInstance(lb_,
+                                                  [this](const DynamicModuleLoadBalancer& live_lb) {
+                                                    live_lb.removeAsyncSlot(context_key_);
+                                                  });
+  }
   // Free the module-side async handle. The cancel function takes ownership of the handle and
   // drops it, so this works for both cancellation and normal completion paths.
   if (async_handle_ != nullptr && cancel_fn_ != nullptr) {
@@ -806,7 +848,22 @@ DynamicModuleAsyncHostSelectionHandle::~DynamicModuleAsyncHostSelectionHandle() 
 }
 
 void DynamicModuleAsyncHostSelectionHandle::cancel() {
-  cancelled_->store(true, std::memory_order_release);
+  // Set the cancellation flag first so any in-flight module-thread completion observes it. The
+  // `slot_` shared_ptr is held independently of the load balancer, so this write is safe even
+  // if the load balancer has already been destroyed.
+  if (slot_ != nullptr && slot_->cancelled != nullptr) {
+    slot_->cancelled->store(true, std::memory_order_release);
+  }
+  // Then erase from the load balancer's map so a subsequent completion never finds the slot.
+  // `withActiveInstance` validates that `lb_` is still in the live registry under the mutex; if
+  // the load balancer has already been destroyed the callback is skipped, and the slot is torn
+  // down by the load balancer's destructor.
+  if (lb_ != nullptr) {
+    DynamicModuleLoadBalancer::withActiveInstance(lb_,
+                                                  [this](const DynamicModuleLoadBalancer& live_lb) {
+                                                    live_lb.removeAsyncSlot(context_key_);
+                                                  });
+  }
 }
 
 const Upstream::PrioritySet& DynamicModuleLoadBalancer::prioritySet() const {

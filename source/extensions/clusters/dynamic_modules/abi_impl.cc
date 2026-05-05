@@ -1237,26 +1237,32 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
     details_str.assign(details.ptr, details.length);
   }
 
-  // The module may invoke this callback on any thread and race the load balancer destructor.
-  // Validate the raw pointer against the live registry and snapshot the state we need under the
-  // registry lock.
-  std::shared_ptr<std::atomic<bool>> cancelled;
-  Envoy::Event::Dispatcher* dispatcher = nullptr;
+  // The module may invoke this callback on any thread and race the load balancer destructor or
+  // overlapping `chooseHost` calls. Validate the raw pointer against the live registry and look
+  // up the per-pending-selection slot keyed by `context_envoy_ptr`. The slot is owned jointly
+  // by the load balancer's `async_slots_` map and the async selection handle; keeping a strong
+  // ref via `shared_ptr` lets us drop the load balancer lock before posting.
+  using Envoy::Extensions::Clusters::DynamicModules::AsyncHostSelectionSlot;
+  std::shared_ptr<AsyncHostSelectionSlot> slot;
   DynamicModuleClusterHandleSharedPtr handle;
   const bool found = DynamicModuleLoadBalancer::withActiveInstance(
       lb_raw, [&](const DynamicModuleLoadBalancer& lb) {
-        cancelled = lb.activeAsyncCancelled();
-        dispatcher = lb.activeAsyncDispatcher();
+        slot = lb.lookupAsyncSlot(context_envoy_ptr);
         handle = lb.handle();
       });
-  if (!found) {
+  if (!found || slot == nullptr) {
+    // Either the load balancer was destroyed or no in-flight selection matches this context.
+    // Drop silently; this is also the path that closes the residual address-reuse window when
+    // the load balancer pointer has been recycled to a new instance.
     return;
   }
 
-  if (dispatcher != nullptr) {
-    // Post to the worker thread. The handle keeps the cluster alive until the callback runs.
-    dispatcher->post([context_envoy_ptr, host, details_str = std::move(details_str),
-                      cancelled = std::move(cancelled), handle = std::move(handle)]() {
+  if (slot->dispatcher != nullptr) {
+    // Post to the worker thread. The cluster handle keeps the cluster alive until the callback
+    // runs. The slot's `cancelled` flag is re-checked on the worker side so a router-side
+    // cancel that fires after the post is queued still wins.
+    slot->dispatcher->post([context_envoy_ptr, host, details_str = std::move(details_str),
+                            cancelled = slot->cancelled, handle = std::move(handle)]() {
       if (cancelled != nullptr && cancelled->load(std::memory_order_acquire)) {
         return;
       }
@@ -1268,7 +1274,11 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
       context->onAsyncHostSelection(std::move(host_shared), std::string(details_str));
     });
   } else {
-    // No worker dispatcher. Complete inline on the calling thread.
+    // No worker dispatcher captured for this slot. Complete inline on the calling thread; the
+    // cancellation flag is honored here too so a router-side cancel that landed first wins.
+    if (slot->cancelled != nullptr && slot->cancelled->load(std::memory_order_acquire)) {
+      return;
+    }
     auto* context = getContext(context_envoy_ptr);
     Envoy::Upstream::HostConstSharedPtr host_shared;
     if (host != nullptr) {

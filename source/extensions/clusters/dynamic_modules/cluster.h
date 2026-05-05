@@ -28,6 +28,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/functional/function_ref.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -520,6 +521,26 @@ private:
   std::weak_ptr<DynamicModuleCluster> cluster_;
 };
 
+class DynamicModuleLoadBalancer;
+
+/**
+ * Per-pending-selection state owned jointly by the async-selection handle (router side) and the
+ * load balancer's `async_slots_` map (module-completion side). One slot exists per in-flight
+ * async host selection. Both fields are immutable post-construction except `cancelled`, which is
+ * set with release ordering.
+ *
+ * Note: the `async_slots_` map is keyed by raw `LoadBalancerContext*`. If the router frees a
+ * context after cancel and a new context is later allocated at the same address for which the
+ * load balancer issues another async pick, a late module completion for the original request
+ * would resolve to the new slot. The lookup never dereferences freed memory, so the worst case
+ * is wrong-request delivery rather than a use-after-free. Closing this fully requires
+ * round-tripping a per-selection cookie through the C ABI; that is a follow-up.
+ */
+struct AsyncHostSelectionSlot {
+  Event::Dispatcher* dispatcher;
+  std::shared_ptr<std::atomic<bool>> cancelled;
+};
+
 /**
  * Async host selection handle that bridges the dynamic module's async host selection to Envoy's
  * LoadBalancerContext::onAsyncHostSelection. This is created when the module returns an async
@@ -531,9 +552,11 @@ public:
   DynamicModuleAsyncHostSelectionHandle(
       envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle,
       envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb,
-      OnClusterLbCancelHostSelectionType cancel_fn, std::shared_ptr<std::atomic<bool>> cancelled)
+      OnClusterLbCancelHostSelectionType cancel_fn, std::shared_ptr<AsyncHostSelectionSlot> slot,
+      const DynamicModuleLoadBalancer* lb,
+      envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_key)
       : async_handle_(async_handle), in_module_lb_(in_module_lb), cancel_fn_(cancel_fn),
-        cancelled_(std::move(cancelled)) {}
+        slot_(std::move(slot)), lb_(lb), context_key_(context_key) {}
 
   ~DynamicModuleAsyncHostSelectionHandle() override;
 
@@ -543,7 +566,11 @@ private:
   envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_{nullptr};
   OnClusterLbCancelHostSelectionType cancel_fn_;
-  std::shared_ptr<std::atomic<bool>> cancelled_;
+  // Shared with the load balancer's `async_slots_` map; setting `slot_->cancelled` from
+  // `cancel()` is observed by the completion-callback's posted lambda.
+  std::shared_ptr<AsyncHostSelectionSlot> slot_;
+  const DynamicModuleLoadBalancer* lb_;
+  envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_key_;
 };
 
 /**
@@ -579,20 +606,26 @@ public:
   const DynamicModuleClusterHandleSharedPtr& handle() const { return handle_; }
 
   /**
-   * Returns the shared cancellation flag for the current async host selection. When the router
-   * cancels the selection (e.g., stream timeout), the flag is set so the posted completion
-   * callback becomes a no-op. Returns nullptr when there is no active async selection.
+   * Looks up the per-pending-selection slot for `context`. Called from any thread by the
+   * async-host-selection completion ABI callback under `withActiveInstance`'s registry lock.
+   * Returns nullptr if no in-flight selection matches.
    */
-  std::shared_ptr<std::atomic<bool>> activeAsyncCancelled() const {
-    return active_async_cancelled_;
-  }
+  std::shared_ptr<AsyncHostSelectionSlot>
+  lookupAsyncSlot(envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context) const;
 
   /**
-   * Returns the worker thread's dispatcher captured during chooseHost. Used by the async
-   * completion callback in abi_impl.cc to post to the correct worker thread without accessing
-   * the LoadBalancerContext from a background thread.
+   * Removes the per-pending-selection slot for `context`, if present. Called by the async
+   * selection handle on cancel and destruction so subsequent module completions for this
+   * context are dropped.
    */
-  Event::Dispatcher* activeAsyncDispatcher() const { return active_async_dispatcher_; }
+  void removeAsyncSlot(envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context) const;
+
+  /**
+   * Test-only entry point that publishes an async slot for `context`. Production code reaches
+   * this state via `chooseHost` returning an async pending result.
+   */
+  void insertAsyncSlotForTest(envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context,
+                              std::shared_ptr<AsyncHostSelectionSlot> slot) const;
 
   // Per-host custom data storage.
   bool setHostData(uint32_t priority, size_t index, uintptr_t data);
@@ -620,12 +653,15 @@ private:
   const Upstream::PrioritySet& priority_set_;
   envoy_dynamic_module_type_cluster_lb_module_ptr in_module_lb_;
 
-  // Shared cancellation flag for the active async host selection. Set in chooseHost when the
-  // module returns AsyncPending, and read by the posted completion callback in abi_impl.cc.
-  std::shared_ptr<std::atomic<bool>> active_async_cancelled_;
-
-  // Worker thread dispatcher captured during chooseHost for async completion posting.
-  Event::Dispatcher* active_async_dispatcher_{nullptr};
+  // Per-pending-selection slot map, keyed by the `LoadBalancerContext*` the module sees in
+  // `choose_host` and returns through `async_host_selection_complete`. The mutex serializes
+  // concurrent module-thread reads against worker-thread `chooseHost`, `cancel`, and destructor
+  // mutations. The handle holds its own `shared_ptr` to each slot so cancel-vs-completion races
+  // resolve without a use-after-free.
+  mutable absl::Mutex async_slots_mutex_;
+  mutable absl::flat_hash_map<envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+                              std::shared_ptr<AsyncHostSelectionSlot>>
+      async_slots_ ABSL_GUARDED_BY(async_slots_mutex_);
 
   // Per-host data storage keyed by (priority, index). This is per-LB-instance (per-worker).
   absl::flat_hash_map<std::pair<uint32_t, size_t>, uintptr_t> per_host_data_;

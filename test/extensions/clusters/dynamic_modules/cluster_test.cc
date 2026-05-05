@@ -2429,10 +2429,15 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancel) {
       reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
   auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
 
-  auto cancelled = std::make_shared<std::atomic<bool>>(false);
-  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, cancelled);
+  auto slot = std::make_shared<AsyncHostSelectionSlot>();
+  slot->dispatcher = nullptr;
+  slot->cancelled = std::make_shared<std::atomic<bool>>(false);
+  // Pass a null load balancer pointer so the handle skips the map-removal step; this isolates
+  // the cancellation-flag logic from any load balancer state.
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, slot, nullptr,
+                                               nullptr);
   handle.cancel();
-  EXPECT_TRUE(cancelled->load());
+  EXPECT_TRUE(slot->cancelled->load());
 }
 
 // Test DynamicModuleAsyncHostSelectionHandle cancel with null cancel_fn.
@@ -2441,9 +2446,12 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancelNullFn) {
       reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
   auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
 
-  auto cancelled = std::make_shared<std::atomic<bool>>(false);
-  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, cancelled);
-  // Should not crash with nullptr cancel function.
+  auto slot = std::make_shared<AsyncHostSelectionSlot>();
+  slot->dispatcher = nullptr;
+  slot->cancelled = std::make_shared<std::atomic<bool>>(false);
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, slot, nullptr,
+                                               nullptr);
+  // Should not crash with a null cancel function.
   handle.cancel();
 }
 
@@ -2475,6 +2483,12 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteWithHost) {
 
   auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
   auto* context_ptr = static_cast<void*>(&context);
+  // The production path inserts the slot inside `chooseHost` when the module returns an async
+  // pending result; insert directly here to isolate the completion-callback behavior.
+  auto slot = std::make_shared<AsyncHostSelectionSlot>();
+  slot->dispatcher = nullptr;
+  slot->cancelled = std::make_shared<std::atomic<bool>>(false);
+  lb_instance->insertAsyncSlotForTest(context_ptr, slot);
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
       lb_envoy_ptr, context_ptr, raw_host_ptr, {"resolved", 8});
@@ -2499,6 +2513,10 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteNullHost) {
 
   auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
   auto* context_ptr = static_cast<void*>(&context);
+  auto slot = std::make_shared<AsyncHostSelectionSlot>();
+  slot->dispatcher = nullptr;
+  slot->cancelled = std::make_shared<std::atomic<bool>>(false);
+  lb_instance->insertAsyncSlotForTest(context_ptr, slot);
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
       lb_envoy_ptr, context_ptr, nullptr, {"dns_failure", 11});
@@ -2523,6 +2541,10 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteEmptyDetails) {
 
   auto* lb_envoy_ptr = static_cast<void*>(lb_instance.get());
   auto* context_ptr = static_cast<void*>(&context);
+  auto slot = std::make_shared<AsyncHostSelectionSlot>();
+  slot->dispatcher = nullptr;
+  slot->cancelled = std::make_shared<std::atomic<bool>>(false);
+  lb_instance->insertAsyncSlotForTest(context_ptr, slot);
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(lb_envoy_ptr, context_ptr,
                                                                          nullptr, {nullptr, 0});
@@ -2547,6 +2569,162 @@ TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteAfterLbDestroyedDrops
 
   envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
       raw_lb_ptr, static_cast<void*>(&context), nullptr, {"dropped", 7});
+}
+
+// Verifies that overlapping in-flight async host selections on the same load balancer have
+// independent slots: cancelling one does not cancel the other, and the completion callback only
+// drops the cancelled context's delivery.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionOverlappingSelectionsHaveIndependentSlots) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  // Two distinct `LoadBalancerContext` pointers represent two overlapping in-flight requests.
+  NiceMock<Upstream::MockLoadBalancerContext> ctx_a;
+  NiceMock<Upstream::MockLoadBalancerContext> ctx_b;
+
+  auto slot_a = std::make_shared<AsyncHostSelectionSlot>();
+  slot_a->dispatcher = nullptr;
+  slot_a->cancelled = std::make_shared<std::atomic<bool>>(false);
+  auto slot_b = std::make_shared<AsyncHostSelectionSlot>();
+  slot_b->dispatcher = nullptr;
+  slot_b->cancelled = std::make_shared<std::atomic<bool>>(false);
+
+  lb_instance->insertAsyncSlotForTest(static_cast<void*>(&ctx_a), slot_a);
+  lb_instance->insertAsyncSlotForTest(static_cast<void*>(&ctx_b), slot_b);
+
+  // Cancel `ctx_a`'s slot; `ctx_b`'s slot must remain unaffected.
+  slot_a->cancelled->store(true, std::memory_order_release);
+  EXPECT_TRUE(slot_a->cancelled->load(std::memory_order_acquire));
+  EXPECT_FALSE(slot_b->cancelled->load(std::memory_order_acquire))
+      << "overlapping async selection's cancellation flag was clobbered";
+
+  // Completion for `ctx_a` is dropped because the slot was cancelled.
+  EXPECT_CALL(ctx_a, onAsyncHostSelection(_, _)).Times(0);
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      static_cast<void*>(lb_instance.get()), static_cast<void*>(&ctx_a), nullptr, {"a", 1});
+
+  // Completion for `ctx_b` is delivered normally.
+  EXPECT_CALL(ctx_b, onAsyncHostSelection(_, _))
+      .WillOnce([](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        EXPECT_EQ(host, nullptr);
+        EXPECT_EQ(details, "b");
+      });
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      static_cast<void*>(lb_instance.get()), static_cast<void*>(&ctx_b), nullptr, {"b", 1});
+}
+
+// Verifies that `cancel()` on a handle bound to a live load balancer removes the slot from the
+// load balancer's map so subsequent completion callbacks for the same context are dropped.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancelRemovesSlotFromLiveLb) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto cluster_handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance =
+      std::make_unique<DynamicModuleLoadBalancer>(cluster_handle, cluster->prioritySet());
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<void*>(&context);
+  auto slot = std::make_shared<AsyncHostSelectionSlot>();
+  slot->dispatcher = nullptr;
+  slot->cancelled = std::make_shared<std::atomic<bool>>(false);
+  lb_instance->insertAsyncSlotForTest(context_ptr, slot);
+  ASSERT_NE(nullptr, lb_instance->lookupAsyncSlot(context_ptr));
+
+  auto* dummy_async_handle =
+      reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
+  auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, slot,
+                                               lb_instance.get(), context_ptr);
+  handle.cancel();
+  EXPECT_TRUE(slot->cancelled->load(std::memory_order_acquire));
+  EXPECT_EQ(nullptr, lb_instance->lookupAsyncSlot(context_ptr));
+}
+
+// Verifies that destroying the handle while the load balancer is still alive removes the slot
+// from the load balancer's map.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleDestructorRemovesSlotFromLiveLb) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto cluster_handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance =
+      std::make_unique<DynamicModuleLoadBalancer>(cluster_handle, cluster->prioritySet());
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<void*>(&context);
+  auto slot = std::make_shared<AsyncHostSelectionSlot>();
+  slot->dispatcher = nullptr;
+  slot->cancelled = std::make_shared<std::atomic<bool>>(false);
+  lb_instance->insertAsyncSlotForTest(context_ptr, slot);
+  ASSERT_NE(nullptr, lb_instance->lookupAsyncSlot(context_ptr));
+
+  auto* dummy_async_handle =
+      reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
+  auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
+  {
+    DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, slot,
+                                                 lb_instance.get(), context_ptr);
+  }
+  EXPECT_EQ(nullptr, lb_instance->lookupAsyncSlot(context_ptr));
+}
+
+// Verifies that `cancel()` on a handle whose load balancer has already been destroyed is a safe
+// no-op and still sets the slot's cancellation flag (the flag is owned independently of the
+// load balancer).
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionHandleCancelAfterLbDestroyedIsSafe) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto cluster_handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance =
+      std::make_unique<DynamicModuleLoadBalancer>(cluster_handle, cluster->prioritySet());
+  const auto* raw_lb_ptr = lb_instance.get();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  auto* context_ptr = static_cast<void*>(&context);
+  auto slot = std::make_shared<AsyncHostSelectionSlot>();
+  slot->dispatcher = nullptr;
+  slot->cancelled = std::make_shared<std::atomic<bool>>(false);
+
+  auto* dummy_async_handle =
+      reinterpret_cast<envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr>(0xCAFE);
+  auto* dummy_lb = reinterpret_cast<envoy_dynamic_module_type_cluster_lb_module_ptr>(0xBEEF);
+  DynamicModuleAsyncHostSelectionHandle handle(dummy_async_handle, dummy_lb, nullptr, slot,
+                                               raw_lb_ptr, context_ptr);
+  lb_instance.reset();
+  handle.cancel();
+  EXPECT_TRUE(slot->cancelled->load(std::memory_order_acquire));
+}
+
+// Verifies that a completion callback for a context that was never registered with the load
+// balancer is dropped silently rather than delivered to the router.
+TEST_F(DynamicModuleClusterTest, AsyncHostSelectionCompleteForUnknownContextIsDropped) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_TRUE(result.ok());
+  auto& [cluster, lb] = result.value();
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(
+      std::dynamic_pointer_cast<DynamicModuleCluster>(cluster));
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+
+  // Intentionally skip publishing a slot for this context.
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  EXPECT_CALL(context, onAsyncHostSelection(_, _)).Times(0);
+
+  envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+      static_cast<void*>(lb_instance.get()), static_cast<void*>(&context), nullptr, {"x", 1});
 }
 
 // Covers pointer reuse: a new load balancer allocated at the same address as a freed one must
