@@ -140,7 +140,8 @@ impl EnvoyUpstreamHttpTcpBridgeImpl {
     let mut result = Vec::new();
     for buf in buffers.iter().take(num_slices) {
       if !buf.ptr.is_null() && buf.length > 0 {
-        let slice = unsafe { std::slice::from_raw_parts(buf.ptr as *const u8, buf.length) };
+        let slice =
+          unsafe { crate::ffi_helpers::slice_from_raw_or_empty(buf.ptr as *const u8, buf.length) };
         result.extend_from_slice(slice);
       }
     }
@@ -180,7 +181,9 @@ impl EnvoyUpstreamHttpTcpBridge for EnvoyUpstreamHttpTcpBridgeImpl {
       )
     };
     if found && !result.ptr.is_null() {
-      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
       (Some(slice.to_vec()), total_count)
     } else {
       (None, total_count)
@@ -220,8 +223,10 @@ impl EnvoyUpstreamHttpTcpBridge for EnvoyUpstreamHttpTcpBridgeImpl {
       .iter()
       .map(|h| unsafe {
         (
-          std::slice::from_raw_parts(h.key_ptr as *const u8, h.key_length).to_vec(),
-          std::slice::from_raw_parts(h.value_ptr as *const u8, h.value_length).to_vec(),
+          crate::ffi_helpers::slice_from_raw_or_empty(h.key_ptr as *const u8, h.key_length)
+            .to_vec(),
+          crate::ffi_helpers::slice_from_raw_or_empty(h.value_ptr as *const u8, h.value_length)
+            .to_vec(),
         )
       })
       .collect()
@@ -320,17 +325,15 @@ pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
-    let name_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        name.ptr as *const _,
-        name.length,
-      ))
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
     };
-    let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
     let new_config_fn = NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION
       .get()
       .expect("NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION must be set");
-    match new_config_fn(name_str, config_slice) {
+    match new_config_fn(name_str.as_ref(), config_slice) {
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }
