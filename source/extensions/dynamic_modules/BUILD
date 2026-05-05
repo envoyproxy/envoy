@@ -17,8 +17,10 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/common:exception_lib",
+        "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
         "//source/extensions/dynamic_modules/abi",
+        "@boringssl//:crypto",
     ],
 )
 
