@@ -4,6 +4,7 @@
 #include <iterator>
 #include <memory>
 #include <set>
+#include <thread>
 
 #include "envoy/registry/registry.h"
 
@@ -3523,7 +3524,8 @@ public:
   std::shared_ptr<DynamicModuleHttpFilter> filter_;
 };
 
-// Covers the happy path: `commit` posts to the dispatcher resolved via decoder callbacks.
+// Covers the happy path: `commit` posts to the dispatcher cached when decoder callbacks were
+// wired.
 TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitPostsToWorkerDispatcher) {
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -3556,7 +3558,7 @@ TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitAfterFilte
   envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
 }
 
-// Covers the `filter_shared->isDestroyed()` early return.
+// Covers the `dispatcher == nullptr` early return after `onDestroy()` clears the cache.
 TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitAfterOnDestroyIsNoOp) {
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -3571,7 +3573,8 @@ TEST_F(DynamicModuleHttpFilterSchedulerTest, HttpFilterSchedulerCommitAfterOnDes
   envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
 }
 
-// Covers the `decoder_callbacks_ == nullptr` early return.
+// Covers the `dispatcher == nullptr` early return when decoder callbacks have not been wired
+// (so the cached dispatcher has not been published).
 TEST_F(DynamicModuleHttpFilterSchedulerTest,
        HttpFilterSchedulerCommitWithoutDecoderCallbacksIsNoOp) {
   auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
@@ -3612,6 +3615,49 @@ TEST_F(DynamicModuleHttpFilterSchedulerTest,
   envoy_dynamic_module_callback_http_filter_config_scheduler_commit(scheduler, 456);
 
   envoy_dynamic_module_callback_http_filter_config_scheduler_delete(scheduler);
+}
+
+// Verifies `commit()` from a foreign thread after `onDestroy()` is a safe no-op. Run under
+// `--config=tsan` to confirm no data race on `decoder_callbacks_`.
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterSchedulerCommitFromForeignThreadAfterDestroyIsNoOp) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_->onDestroy();
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_)).Times(0);
+
+  std::thread foreign(
+      [&]() { envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 999); });
+  foreign.join();
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
+}
+
+// Verifies `commit()` from a foreign thread before destroy posts via the cached dispatcher and
+// that the lambda re-locks the weak_ptr correctly.
+TEST_F(DynamicModuleHttpFilterSchedulerTest,
+       HttpFilterSchedulerCommitFromForeignThreadBeforeDestroyPosts) {
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  auto* scheduler = envoy_dynamic_module_callback_http_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(testing::_))
+      .WillOnce(testing::Invoke([&](Event::PostCb cb) { captured_cb = std::move(cb); }));
+
+  std::thread foreign(
+      [&]() { envoy_dynamic_module_callback_http_filter_scheduler_commit(scheduler, 42); });
+  foreign.join();
+
+  ASSERT_TRUE(captured_cb);
+  captured_cb();
+
+  envoy_dynamic_module_callback_http_filter_scheduler_delete(scheduler);
 }
 
 } // namespace HttpFilters

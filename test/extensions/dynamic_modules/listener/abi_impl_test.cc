@@ -1,4 +1,5 @@
 #include <chrono>
+#include <thread>
 #include <vector>
 
 #include "source/common/http/message_impl.h"
@@ -1954,10 +1955,6 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, MaxReadBytes) {
 // =============================================================================
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterSchedulerNewDelete) {
-  // Set up the dispatcher for the filter.
-  NiceMock<Event::MockDispatcher> worker_dispatcher;
-  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
-
   auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
   EXPECT_NE(nullptr, scheduler);
 
@@ -1965,19 +1962,14 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterSchedulerNewDel
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterSchedulerCommit) {
-  // Set up the dispatcher for the filter.
-  NiceMock<Event::MockDispatcher> worker_dispatcher;
-  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
-
   auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
   EXPECT_NE(nullptr, scheduler);
 
-  // Expect the callback to be posted.
-  EXPECT_CALL(worker_dispatcher, post(_));
+  // The dispatcher cached during `onAccept` (in SetUp) is `worker_thread_dispatcher_`.
+  EXPECT_CALL(worker_thread_dispatcher_, post(_));
 
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
 
-  // Clean up.
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
 }
 
@@ -2005,16 +1997,12 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterConfigScheduler
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
        ListenerFilterSchedulerCommitInvokesOnScheduled) {
-  // Set up the dispatcher for the filter.
-  NiceMock<Event::MockDispatcher> worker_dispatcher;
-  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
-
   auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
   EXPECT_NE(nullptr, scheduler);
 
   // Capture the posted callback and invoke it to verify onScheduled is called.
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_dispatcher, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
   }));
 
@@ -2025,7 +2013,6 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
   // Since the no_op module's on_scheduled is a no-op, we just verify it doesn't crash.
   captured_cb();
 
-  // Clean up.
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
 }
 
@@ -2055,16 +2042,12 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
        ListenerFilterSchedulerCommitAfterFilterDestroyedDoesNotCrash) {
-  // Set up the dispatcher for the filter.
-  NiceMock<Event::MockDispatcher> worker_dispatcher;
-  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
-
   auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
   EXPECT_NE(nullptr, scheduler);
 
   // Capture the posted callback.
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_dispatcher, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
   }));
 
@@ -2076,7 +2059,6 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
   // Invoke the captured callback - should not crash because the scheduler holds a weak_ptr.
   captured_cb();
 
-  // Clean up.
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
 }
 
@@ -2105,16 +2087,56 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
   envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
 }
 
-// Covers the `dispatcher == nullptr` early return of the listener filter scheduler.
+// Covers the `dispatcher == nullptr` early return of the listener filter scheduler when the
+// filter has not yet received `onAccept` (so the cached dispatcher has not been published).
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
-       ListenerFilterSchedulerCommitWithoutCallbacksIsNoOp) {
-  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+       ListenerFilterSchedulerCommitBeforeOnAcceptIsNoOp) {
+  auto fresh_filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(
+      static_cast<void*>(fresh_filter.get()));
   ASSERT_NE(nullptr, scheduler);
-
-  filter_->setCallbacksForTest(nullptr);
 
   EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+// Verifies `commit()` from a foreign thread before destroy posts via the cached dispatcher.
+// Run under `--config=tsan` to confirm no data race on `callbacks_`.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterSchedulerCommitFromForeignThreadBeforeDestroyPosts) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  std::thread foreign(
+      [&]() { envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 42); });
+  foreign.join();
+
+  ASSERT_TRUE(captured_cb);
+  captured_cb();
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+// Verifies `commit()` from a foreign thread after the filter is destroyed is a safe no-op.
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterSchedulerCommitFromForeignThreadAfterDestroyIsNoOp) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  ASSERT_NE(nullptr, scheduler);
+
+  filter_.reset();
+
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).Times(0);
+
+  std::thread foreign(
+      [&]() { envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 999); });
+  foreign.join();
 
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
 }
