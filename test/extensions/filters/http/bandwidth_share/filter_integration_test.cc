@@ -95,6 +95,14 @@ public:
         kbps: {default_value: 1, runtime_key: "bandwidth_share.runtime_request_kbps"}
   )";
   }
+  std::string responseOnly1kFilter() {
+    return R"(
+    name: bwshare
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare
+      response_limit: {bucket_id: "response_bucket", kbps: {default_value: 1, runtime_key: "response"}}
+  )";
+  }
   std::string responseTrailersFilter() {
     return R"(
     name: bwshare
@@ -236,6 +244,59 @@ TEST_F(BandwidthShareIntegrationTest, LimitCausesPausesBothWays) {
   EXPECT_EQ(0, gaugeValue(response_streams_currently_limited));
   EXPECT_EQ(0, gaugeValue(request_bytes_pending));
   EXPECT_EQ(0, gaugeValue(response_bytes_pending));
+}
+
+TEST_F(BandwidthShareIntegrationTest, ResetWhileRequestBytesBufferedCleansStats) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  initializeFilter(runtimeControlledRequestFilter());
+  const std::string request_bytes_pending =
+      "bandwidth_share.bytes_pending.bucket_id.runtime_bucket.tenant..direction.request";
+  const std::string request_streams_currently_limited =
+      "bandwidth_share.streams_currently_limited.bucket_id.runtime_bucket.tenant..direction."
+      "request";
+  makeDownstreamConnection();
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+  codec_client_->sendData(request_encoder, std::string(2048, 'a'), false);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  test_server_->waitForGaugeGe(request_bytes_pending, 1);
+  EXPECT_EQ(1, gaugeValue(request_streams_currently_limited));
+
+  codec_client_->sendReset(request_encoder);
+  ASSERT_TRUE(response_decoder->waitForReset());
+  ASSERT_TRUE(upstream_request_->waitForReset(*dispatcher_));
+
+  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  EXPECT_EQ(0, gaugeValue(request_streams_currently_limited));
+}
+
+TEST_F(BandwidthShareIntegrationTest, ResetWhileResponseBytesBufferedCleansStats) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  initializeFilter(responseOnly1kFilter());
+  const std::string response_bytes_pending =
+      "bandwidth_share.bytes_pending.bucket_id.response_bucket.tenant..direction.response";
+  const std::string response_streams_currently_limited =
+      "bandwidth_share.streams_currently_limited.bucket_id.response_bucket.tenant..direction."
+      "response";
+  makeDownstreamConnection();
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+  codec_client_->sendData(request_encoder, std::string(1, 'a'), true);
+  waitForNextUpstreamRequest();
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(response_headers_, false);
+  response_decoder->waitForHeaders();
+  upstream_request_->encodeData(2048, false);
+  test_server_->waitForGaugeGe(response_bytes_pending, 1);
+  EXPECT_EQ(1, gaugeValue(response_streams_currently_limited));
+
+  upstream_request_->encodeResetStream();
+  ASSERT_TRUE(response_decoder->waitForReset());
+
+  test_server_->waitForGaugeEq(response_bytes_pending, 0);
+  EXPECT_EQ(0, gaugeValue(response_streams_currently_limited));
 }
 
 TEST_F(BandwidthShareIntegrationTest, RuntimeLimitChangesApplyToNewStreams) {
