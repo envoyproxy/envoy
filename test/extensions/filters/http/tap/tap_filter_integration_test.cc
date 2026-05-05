@@ -11,6 +11,11 @@
 namespace Envoy {
 namespace {
 
+using ::testing::AnyOf;
+using ::testing::Eq;
+using ::testing::Ge;
+using ::testing::StrEq;
+
 class TapIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
@@ -1245,10 +1250,6 @@ typed_config:
   ASSERT_EQ(1, traces.size());
   EXPECT_TRUE(traces[0].has_http_buffered_trace());
   EXPECT_TRUE(traces[0].http_buffered_trace().has_upstream_connection());
-  using ::testing::AnyOf;
-  using ::testing::Eq;
-  using ::testing::Ge;
-  using ::testing::StrEq;
   std::string upstream_local_address = traces[0]
                                            .http_buffered_trace()
                                            .upstream_connection()
