@@ -593,10 +593,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_new(
   match result {
     Ok(ptr) => ptr,
     Err(panic) => {
-      crate::envoy_log_error!(
-        "on_tracer_config_new: caught panic: {}",
-        crate::panic_payload_to_string(panic)
-      );
+      crate::log_ffi_panic("envoy_dynamic_module_on_tracer_config_new", panic);
       std::ptr::null()
     },
   }
@@ -610,11 +607,16 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_new(
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_config_destroy(
   config_module_ptr: abi::envoy_dynamic_module_type_tracer_config_module_ptr,
 ) {
-  let config = config_module_ptr as *mut *mut dyn TracerConfig;
-  unsafe {
-    let _outer = Box::from_raw(config);
-    let _inner = Box::from_raw(*config);
-  }
+  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    let config = config_module_ptr as *mut *mut dyn TracerConfig;
+    unsafe {
+      let _outer = Box::from_raw(config);
+      let _inner = Box::from_raw(*config);
+    }
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_tracer_config_destroy", panic);
+  });
 }
 
 /// # Safety
@@ -645,10 +647,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_start_span(
   match result {
     Ok(ptr) => ptr,
     Err(panic) => {
-      crate::envoy_log_error!(
-        "on_tracer_start_span: caught panic: {}",
-        crate::panic_payload_to_string(panic)
-      );
+      crate::log_ffi_panic("envoy_dynamic_module_on_tracer_start_span", panic);
       std::ptr::null()
     },
   }
@@ -759,10 +758,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_spawn_child(
   match result {
     Ok(ptr) => ptr,
     Err(panic) => {
-      crate::envoy_log_error!(
-        "on_tracer_span_spawn_child: caught panic: {}",
-        crate::panic_payload_to_string(panic)
-      );
+      crate::log_ffi_panic("envoy_dynamic_module_on_tracer_span_spawn_child", panic);
       std::ptr::null()
     },
   }
@@ -937,10 +933,15 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_get_span_id(
 pub unsafe extern "C" fn envoy_dynamic_module_on_tracer_span_destroy(
   span_module_ptr: abi::envoy_dynamic_module_type_tracer_span_module_ptr,
 ) {
-  let wrapper = span_module_ptr as *mut SpanWrapper;
-  unsafe {
-    let _ = Box::from_raw(wrapper);
-  }
+  let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    let wrapper = span_module_ptr as *mut SpanWrapper;
+    unsafe {
+      let _ = Box::from_raw(wrapper);
+    }
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_tracer_span_destroy", panic);
+  });
 }
 
 /// Declare the init functions for the tracer dynamic module.
@@ -952,16 +953,24 @@ macro_rules! declare_tracer_init_functions {
   ($f:ident, $new_tracer_config_fn:expr) => {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
-        envoy_proxy_dynamic_modules_rust_sdk::NEW_TRACER_CONFIG_FUNCTION,
-        $new_tracer_config_fn,
-        "NEW_TRACER_CONFIG_FUNCTION"
-      );
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_TRACER_CONFIG_FUNCTION,
+          $new_tracer_config_fn,
+          "NEW_TRACER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
       }
     }
   };

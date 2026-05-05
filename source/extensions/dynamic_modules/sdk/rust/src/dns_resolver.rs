@@ -636,7 +636,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_config_new(
     }
   }))
   .unwrap_or_else(|panic| {
-    log_panic("envoy_dynamic_module_on_dns_resolver_config_new", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_dns_resolver_config_new", panic);
     std::ptr::null()
   })
 }
@@ -653,7 +653,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_config_destroy(
     drop_wrapped_c_void_ptr!(config_module_ptr, DnsResolverConfig);
   }))
   .map_err(|panic| {
-    log_panic("envoy_dynamic_module_on_dns_resolver_config_destroy", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_dns_resolver_config_destroy", panic);
   });
 }
 
@@ -676,7 +676,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_new(
     Box::into_raw(wrapper) as abi::envoy_dynamic_module_type_dns_resolver_module_ptr
   }))
   .unwrap_or_else(|panic| {
-    log_panic("envoy_dynamic_module_on_dns_resolver_new", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_dns_resolver_new", panic);
     std::ptr::null()
   })
 }
@@ -694,7 +694,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_destroy(
     let _ = unsafe { Box::from_raw(wrapper) };
   }))
   .map_err(|panic| {
-    log_panic("envoy_dynamic_module_on_dns_resolver_destroy", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_dns_resolver_destroy", panic);
   });
 }
 
@@ -735,7 +735,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolve(
     }
   }))
   .unwrap_or_else(|panic| {
-    log_panic("envoy_dynamic_module_on_dns_resolve", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_dns_resolve", panic);
     std::ptr::null_mut()
   })
 }
@@ -755,7 +755,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolve_cancel(
     query.cancel();
   }))
   .map_err(|panic| {
-    log_panic("envoy_dynamic_module_on_dns_resolve_cancel", panic);
+    crate::log_ffi_panic("envoy_dynamic_module_on_dns_resolve_cancel", panic);
   });
 }
 
@@ -772,18 +772,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_reset_networking(
     wrapper.resolver.reset_networking();
   }))
   .map_err(|panic| {
-    log_panic(
+    crate::log_ffi_panic(
       "envoy_dynamic_module_on_dns_resolver_reset_networking",
       panic,
     );
   });
-}
-
-/// Log a panic caught at an FFI boundary.
-fn log_panic(function_name: &str, panic: Box<dyn std::any::Any + Send>) {
-  crate::envoy_log_error!(
-    "{}: caught panic: {}",
-    function_name,
-    crate::panic_payload_to_string(panic)
-  );
 }

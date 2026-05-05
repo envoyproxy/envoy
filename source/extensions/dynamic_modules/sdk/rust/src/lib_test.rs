@@ -5666,3 +5666,72 @@ fn test_envoy_dynamic_module_on_access_logger_new_destroy() {
   }
   assert!(LOGGER_DROPPED.load(std::sync::atomic::Ordering::SeqCst));
 }
+
+// =================================================================================================
+// FFI panic-handling helpers
+// =================================================================================================
+
+#[test]
+fn test_panic_payload_to_string_handles_string_payload() {
+  let payload: Box<dyn std::any::Any + Send> = Box::new(String::from("formatted panic message"));
+  assert_eq!(panic_payload_to_string(payload), "formatted panic message");
+}
+
+#[test]
+fn test_panic_payload_to_string_handles_str_payload() {
+  let payload: Box<dyn std::any::Any + Send> = Box::new("static panic message");
+  assert_eq!(panic_payload_to_string(payload), "static panic message");
+}
+
+#[test]
+fn test_panic_payload_to_string_falls_back_for_unknown_payload() {
+  let payload: Box<dyn std::any::Any + Send> = Box::new(42_i32);
+  assert_eq!(
+    panic_payload_to_string(payload),
+    "<non-string panic payload>"
+  );
+}
+
+#[test]
+fn test_log_ffi_panic_handles_unknown_payload_without_panicking() {
+  // The logging path must not itself panic when the payload type is not recognized; otherwise
+  // the secondary panic would unwind across the FFI boundary that the outer `catch_unwind` is
+  // there to prevent.
+  let payload: Box<dyn std::any::Any + Send> = Box::new(42_i32);
+  log_ffi_panic("test_entry_point", payload);
+}
+
+#[test]
+fn test_outer_ffi_pattern_returns_fail_closed_pointer_on_panic() {
+  // Mirrors the exact `catch_unwind` + `unwrap_or_else` shape used by every FFI entry that
+  // returns a pointer, exercised end-to-end with the SDK's `log_ffi_panic` helper.
+  let result: *const std::ffi::c_void = std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+    || -> *const std::ffi::c_void {
+      panic!("simulated factory panic");
+    },
+  ))
+  .unwrap_or_else(|payload| {
+    log_ffi_panic(
+      "test_outer_ffi_pattern_returns_fail_closed_pointer_on_panic",
+      payload,
+    );
+    std::ptr::null()
+  });
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_outer_ffi_pattern_returns_fail_closed_bool_on_panic() {
+  // Mirrors the FFI shape used by entries that return a bool (e.g. `on_program_init`).
+  let result: bool = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> bool {
+    panic!("simulated factory panic");
+  }))
+  .unwrap_or_else(|payload| {
+    log_ffi_panic(
+      "test_outer_ffi_pattern_returns_fail_closed_bool_on_panic",
+      payload,
+    );
+    false
+  });
+  assert!(!result);
+}
