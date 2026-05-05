@@ -72,8 +72,8 @@ public:
         .WillOnce(
             Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
                        absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-              client_write_buffer_ =
-                  new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
+              client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+                  std::move(below_low), std::move(above_high), std::move(above_overflow));
               ON_CALL(*client_write_buffer_, move(_))
                   .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
               ON_CALL(*client_write_buffer_, drain(_))
