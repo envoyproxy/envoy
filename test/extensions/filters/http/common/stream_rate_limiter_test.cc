@@ -1,3 +1,6 @@
+#include <functional>
+#include <vector>
+
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -16,6 +19,7 @@
 
 using testing::_;
 using testing::AnyNumber;
+using testing::ElementsAre;
 using testing::NiceMock;
 using testing::Return;
 
@@ -26,7 +30,11 @@ namespace Common {
 
 class StreamRateLimiterTest : public testing::Test {
 public:
-  void setUpTest(uint16_t limit_kbps) {
+  using WriteStatsCb = std::function<void(uint64_t, uint64_t, std::chrono::milliseconds)>;
+
+  void setUpTest(
+      uint16_t limit_kbps,
+      WriteStatsCb write_stats_cb = [](uint64_t, uint64_t, std::chrono::milliseconds) {}) {
     EXPECT_CALL(decoder_callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
     EXPECT_CALL(decoder_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
 
@@ -37,10 +45,7 @@ public:
         [this](Buffer::Instance& data, bool end_stream) {
           decoder_callbacks_.injectDecodedDataToFilterChain(data, end_stream);
         },
-        [this] { decoder_callbacks_.continueDecoding(); },
-        [](uint64_t /*len*/, uint64_t /*buffered*/, std::chrono::milliseconds) {
-          // config->stats().decode_allowed_size_.set(len);
-        },
+        [this] { decoder_callbacks_.continueDecoding(); }, std::move(write_stats_cb),
         decoder_callbacks_.dispatcher_, decoder_callbacks_.scope(),
         StreamRateLimiter::simpleTokenBucket(limit_kbps, time_system_));
   }
@@ -124,6 +129,29 @@ TEST_F(StreamRateLimiterTest, RateLimitOnSingleStream) {
 
   limiter_->destroy();
   EXPECT_EQ(limiter_->destroyed(), true);
+}
+
+TEST_F(StreamRateLimiterTest, ReportsBufferedBytesInStatsCallback) {
+  ON_CALL(decoder_callbacks_, bufferLimit()).WillByDefault(Return(1100));
+  Event::MockTimer* token_timer = new NiceMock<Event::MockTimer>(&decoder_callbacks_.dispatcher_);
+  std::vector<uint64_t> buffered_bytes;
+  setUpTest(1, [&buffered_bytes](uint64_t, uint64_t buffered, std::chrono::milliseconds) {
+    buffered_bytes.push_back(buffered);
+  });
+
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+
+  EXPECT_CALL(decoder_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
+  Buffer::OwnedImpl data(std::string(1126, 'a'));
+  limiter_->writeData(data, false);
+
+  EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
+  EXPECT_CALL(decoder_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  token_timer->invokeCallback();
+
+  EXPECT_THAT(buffered_bytes, ElementsAre(102));
+  limiter_->destroy();
 }
 
 } // namespace Common
