@@ -104,8 +104,8 @@ TEST_P(SdsIntegrationTest, SdsForUpstreamCluster) {
   ASSERT_TRUE(waitForCounter(fmt::format("sds.{}.update_success", SECRET_NAME), Ge(1)));
   ASSERT_TRUE(
       waitForCounter(fmt::format("cluster.{}.client_ssl_socket_factory.ssl_context_update_by_sds",
-                                   XDS_CLUSTER_NAME),
-                       Ge(1)));
+                                 XDS_CLUSTER_NAME),
+                     Ge(1)));
 }
 
 } // namespace

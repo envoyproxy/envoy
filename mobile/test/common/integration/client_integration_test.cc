@@ -33,9 +33,9 @@
 
 using testing::_;
 using testing::AnyNumber;
+using testing::Ge;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -476,8 +476,8 @@ TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAn
   internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_4G, 123);
   internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_4G, 123);
   ASSERT_TRUE(waitForCounter("http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_"
-                               "MIGRATION_NO_MIGRATABLE_STREAMS",
-                               Ge(1)));
+                             "MIGRATION_NO_MIGRATABLE_STREAMS",
+                             Ge(1)));
 
   // A new connection will be created on the new default network to serve new requests.
   EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 123))
@@ -671,8 +671,8 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkDisconnectedAnd
   internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_WIFI, 1);
 
   ASSERT_TRUE(waitForCounter("http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_"
-                               "MIGRATION_NO_MIGRATABLE_STREAMS",
-                               Ge(1)));
+                             "MIGRATION_NO_MIGRATABLE_STREAMS",
+                             Ge(1)));
 }
 
 TEST_P(ClientIntegrationTest, LargeResponse) {
