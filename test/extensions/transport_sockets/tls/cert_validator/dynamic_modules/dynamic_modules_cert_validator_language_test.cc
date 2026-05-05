@@ -17,6 +17,7 @@
 #include "source/common/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/dynamic_modules/config.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/common/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -30,8 +31,6 @@ namespace TransportSockets {
 namespace Tls {
 namespace DynamicModules {
 namespace {
-
-using ::testing::NiceMock;
 
 class DynamicModuleCertValidatorLanguageTest : public testing::TestWithParam<std::string> {
 protected:

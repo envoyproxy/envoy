@@ -90,6 +90,7 @@ envoy_cc_test(
         # binary that loads a Go test_data .so depends on all_abi_impls.
         "//source/extensions/dynamic_modules:all_abi_impls",
         "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/common/tls:ssl_test_utils",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
