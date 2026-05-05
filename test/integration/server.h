@@ -467,26 +467,16 @@ public:
              Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata,
              bool use_admin_server);
 
-  void waitForCounterEq(const std::string& name, uint64_t value,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
-                        Event::Dispatcher* dispatcher = nullptr) override {
-    ASSERT_TRUE(
-        TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout, dispatcher));
+  void waitForCounter(const std::string& name, testing::Matcher<uint64_t> value_matcher,
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+                      Event::Dispatcher* dispatcher = nullptr) override {
+    ASSERT_TRUE(TestUtility::waitForCounter(statStore(), name, value_matcher, time_system_, timeout,
+                                            dispatcher));
   }
 
-  void waitForCounterGe(const std::string& name, uint64_t value,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
-    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
-  }
-
-  void waitForGaugeEq(const std::string& name, uint64_t value,
-                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
-  }
-
-  void waitForGaugeGe(const std::string& name, uint64_t value,
-                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
+  void waitForGauge(const std::string& name, testing::Matcher<uint64_t> value_matcher,
+                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
+    ASSERT_TRUE(TestUtility::waitForGauge(statStore(), name, value_matcher, time_system_, timeout));
   }
 
   void waitForCounterExists(const std::string& name) override {

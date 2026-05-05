@@ -17,6 +17,8 @@
 #include "contrib/config/test/invalid_proto_kv_store_config.pb.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -339,9 +341,9 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   initialize();
 
   // Wait until the discovery responses have been processed.
-  test_server_->waitForCounterGe(
-      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  test_server_->waitForCounterGe("runtime.load_success", 2);
+  test_server_->waitForCounter(
+      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", Ge(1));
+  test_server_->waitForCounter("runtime.load_success", Ge(2));
 
   // Verify that the xDS resources are used by Envoy.
   checkSecretExists(std::string(CLIENT_CERT_NAME), /*version_info=*/"1");
@@ -362,7 +364,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   )EOF");
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TestTypeUrl::get().Runtime, {rtds_resource}, "2", rtds_stream_.get());
-  test_server_->waitForCounterGe("runtime.load_success", 3);
+  test_server_->waitForCounter("runtime.load_success", Ge(3));
 
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
@@ -372,10 +374,10 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   shutdownAndRestartTestServer();
 
   // Wait until SDS and RTDS have been loaded from the KV store and updated the Envoy instance.
-  test_server_->waitForCounterGe(
-      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+  test_server_->waitForCounter(
+      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", Ge(1));
   // Two runtime loads are expected, one for the admin layer and one for the RTDS layer.
-  test_server_->waitForCounterGe("runtime.load_success", 2);
+  test_server_->waitForCounter("runtime.load_success", Ge(2));
 
   // Verify that the latest resource values in the KV store are used by Envoy.
   EXPECT_EQ(2, test_server_->counter("xds.kv_store.load_success")->value());
@@ -401,7 +403,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TestTypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"3", rtds_stream_.get());
 
-  test_server_->waitForCounterGe("runtime.load_success", 3);
+  test_server_->waitForCounter("runtime.load_success", Ge(3));
 
   // Verify that the values from the xDS response are used instead of from the persisted xDS once
   // connectivity is re-established.
@@ -538,7 +540,7 @@ TEST_P(InvalidProtoKeyValueStoreXdsDelegateIntegrationTest, InvalidProto) {
   initialize();
 
   // Make sure that the proto parsing of a serialized resource with an invalid enum value fails.
-  test_server_->waitForCounterEq("xds.kv_store.xds_load_failed", 1);
+  test_server_->waitForCounter("xds.kv_store.xds_load_failed", Eq(1));
 }
 
 } // namespace
