@@ -77,9 +77,6 @@ TokenBucketSingleton::getBucket(absl::string_view bucket_id) {
             ? nullptr
             : FairTokenBucket::Bucket::create(max_tokens_value, time_source_, entry.fill_interval_);
   }
-  if (entry.max_tokens_ == 0) {
-    return nullptr;
-  }
   return entry.bucket_;
 }
 

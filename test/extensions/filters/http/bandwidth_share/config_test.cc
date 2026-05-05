@@ -88,6 +88,50 @@ TEST_F(ConfigTest, ProtoValidationIsApplied) {
                           "value must be inside range \\[20ms, 1s\\]");
 }
 
+TEST_F(ConfigTest, ReusedBucketIdWithDifferentRuntimeKeyIsAConfigError) {
+  setConfigFromYaml(R"YAML(
+    name: "first_bucket_config"
+    typed_config:
+      "@type": "type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare"
+      request_limit: {bucket_id: "shared_bucket", kbps: {default_value: 1000, runtime_key: "first"}}
+  )YAML");
+  auto first_config = routeConfig();
+  ASSERT_OK(first_config);
+
+  setConfigFromYaml(R"YAML(
+    name: "second_bucket_config"
+    typed_config:
+      "@type": "type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare"
+      request_limit: {bucket_id: "shared_bucket", kbps: {default_value: 1000, runtime_key: "second"}}
+  )YAML");
+  EXPECT_THAT(routeConfig(), HasStatus(absl::StatusCode::kInvalidArgument,
+                                       HasSubstr("mismatched runtime config key second vs. "
+                                                 "existing first")));
+}
+
+TEST_F(ConfigTest, ReusedBucketIdWithDifferentFillIntervalIsAConfigError) {
+  setConfigFromYaml(R"YAML(
+    name: "first_bucket_config"
+    typed_config:
+      "@type": "type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare"
+      fill_interval: 0.050s
+      request_limit: {bucket_id: "shared_bucket", kbps: {default_value: 1000, runtime_key: "same"}}
+  )YAML");
+  auto first_config = routeConfig();
+  ASSERT_OK(first_config);
+
+  setConfigFromYaml(R"YAML(
+    name: "second_bucket_config"
+    typed_config:
+      "@type": "type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare"
+      fill_interval: 0.100s
+      request_limit: {bucket_id: "shared_bucket", kbps: {default_value: 1000, runtime_key: "same"}}
+  )YAML");
+  EXPECT_THAT(routeConfig(), HasStatus(absl::StatusCode::kInvalidArgument,
+                                       HasSubstr("mismatched fill_interval 100ms vs. existing "
+                                                 "50ms")));
+}
+
 TEST_F(ConfigTest, ValidTenantNameSelectorPlainStringParses) {
   setConfigFromYaml(R"YAML(
     name: "plain_string"

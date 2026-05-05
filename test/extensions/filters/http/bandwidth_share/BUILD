@@ -49,6 +49,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/bandwidth_share:config",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/filters/http/bandwidth_share/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
