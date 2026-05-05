@@ -324,7 +324,7 @@ public:
       absl::MutexLock l(&state_->mu);
       first_request = !state_->headers_processed;
     }
-    // Only the first request triggers the read-disable that the bug repro
+    // Only the first request triggers the read-disable that the bug reproduction
     // depends on. Follow-up requests pass through normally so they reach the
     // upstream and exercise the Wasm filter's reload path.
     if (!first_request) {
