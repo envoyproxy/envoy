@@ -144,11 +144,15 @@ public:
     return absl::OkStatus();
   }
 
+  void makeDownstreamConnection() {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  }
+
   // Only for streams that are not expected to be bandwidth limited.
-  void sendRequestAndResponse(IntegrationCodecClient& codec_client) {
-    auto [request_encoder, response_decoder] = codec_client.startRequest(request_headers_post_);
-    codec_client.sendData(request_encoder, std::string(2048, 'a'), false);
-    codec_client.sendTrailers(request_encoder, any_request_trailers_);
+  void sendRequestAndResponse() {
+    auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+    codec_client_->sendData(request_encoder, std::string(2048, 'a'), false);
+    codec_client_->sendTrailers(request_encoder, any_request_trailers_);
     waitForNextUpstreamRequest();
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
     upstream_request_->encodeHeaders(response_headers_, false);
@@ -167,10 +171,10 @@ public:
 
 TEST_F(BandwidthShareIntegrationTest, DisabledJustPassesThrough) {
   initializeFilter(disabledFilter());
-  auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  auto [request_encoder, response_decoder] = codec_client->startRequest(request_headers_post_);
-  codec_client->sendData(request_encoder, std::string(2048, 'a'), false);
-  codec_client->sendTrailers(request_encoder, any_request_trailers_);
+  makeDownstreamConnection();
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+  codec_client_->sendData(request_encoder, std::string(2048, 'a'), false);
+  codec_client_->sendTrailers(request_encoder, any_request_trailers_);
   waitForNextUpstreamRequest();
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(response_headers_, false);
@@ -194,10 +198,10 @@ TEST_F(BandwidthShareIntegrationTest, LimitCausesPausesBothWays) {
       "bandwidth_share.streams_currently_limited.bucket_id.bucket1.tenant..direction.request";
   const std::string response_streams_currently_limited =
       "bandwidth_share.streams_currently_limited.bucket_id.bucket2.tenant..direction.response";
-  auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  auto [request_encoder, response_decoder] = codec_client->startRequest(request_headers_post_);
-  codec_client->sendData(request_encoder, std::string(2048, 'a'), false);
-  codec_client->sendTrailers(request_encoder, any_request_trailers_);
+  makeDownstreamConnection();
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+  codec_client_->sendData(request_encoder, std::string(2048, 'a'), false);
+  codec_client_->sendTrailers(request_encoder, any_request_trailers_);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
@@ -238,8 +242,8 @@ TEST_F(BandwidthShareIntegrationTest, RuntimeLimitChangesApplyToNewStreams) {
       "request";
   const std::string request_bytes_limited =
       "bandwidth_share.bytes.bucket_id.runtime_bucket.tenant..direction.request.handling.limited";
-  auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  sendRequestAndResponse(*codec_client);
+  makeDownstreamConnection();
+  sendRequestAndResponse();
   EXPECT_THAT(test_server_->counters(),
               Not(HasMetric(MetricNameMatches(StartsWith("bandwidth_share.")))));
   EXPECT_THAT(test_server_->gauges(),
@@ -247,9 +251,9 @@ TEST_F(BandwidthShareIntegrationTest, RuntimeLimitChangesApplyToNewStreams) {
 
   ASSERT_OK(setRuntimeInt("bandwidth_share.runtime_request_kbps", 1));
 
-  auto [request_encoder, response_decoder] = codec_client->startRequest(request_headers_post_);
-  codec_client->sendData(request_encoder, std::string(2048, 'a'), false);
-  codec_client->sendTrailers(request_encoder, any_request_trailers_);
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+  codec_client_->sendData(request_encoder, std::string(2048, 'a'), false);
+  codec_client_->sendTrailers(request_encoder, any_request_trailers_);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   test_server_->waitForGaugeGe(request_bytes_pending, 1);
@@ -266,7 +270,7 @@ TEST_F(BandwidthShareIntegrationTest, RuntimeLimitChangesApplyToNewStreams) {
 
   ASSERT_OK(setRuntimeInt("bandwidth_share.runtime_request_kbps", 0));
 
-  sendRequestAndResponse(*codec_client);
+  sendRequestAndResponse();
 
   EXPECT_EQ(limited_bytes, counterValue(request_bytes_limited));
   EXPECT_EQ(0, gaugeValue(request_streams_currently_limited));
@@ -280,10 +284,10 @@ TEST_F(BandwidthShareIntegrationTest, RouteConfigCanLimitAndTagTenantStats) {
   const std::string request_streams_currently_limited =
       "bandwidth_share.streams_currently_limited.bucket_id.route_bucket.tenant.gold.direction."
       "request";
-  auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  auto [request_encoder, response_decoder] = codec_client->startRequest(request_headers_post_);
-  codec_client->sendData(request_encoder, std::string(2048, 'a'), false);
-  codec_client->sendTrailers(request_encoder, any_request_trailers_);
+  makeDownstreamConnection();
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+  codec_client_->sendData(request_encoder, std::string(2048, 'a'), false);
+  codec_client_->sendTrailers(request_encoder, any_request_trailers_);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
@@ -309,10 +313,10 @@ TEST_F(BandwidthShareIntegrationTest, AddsResponseTrailersAfterLimitedResponse) 
       "bandwidth_share.bytes_pending.bucket_id.trailer_request.tenant..direction.request";
   const std::string response_bytes_pending =
       "bandwidth_share.bytes_pending.bucket_id.trailer_response.tenant..direction.response";
-  auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  auto [request_encoder, response_decoder] = codec_client->startRequest(request_headers_post_);
-  codec_client->sendData(request_encoder, std::string(2048, 'a'), false);
-  codec_client->sendTrailers(request_encoder, any_request_trailers_);
+  makeDownstreamConnection();
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+  codec_client_->sendData(request_encoder, std::string(2048, 'a'), false);
+  codec_client_->sendTrailers(request_encoder, any_request_trailers_);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
