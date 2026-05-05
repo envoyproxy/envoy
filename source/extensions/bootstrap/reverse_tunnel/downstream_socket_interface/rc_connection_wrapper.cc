@@ -246,24 +246,7 @@ void RCConnectionWrapper::shutdown() {
   ENVOY_LOG(debug, "RCConnectionWrapper: Shutting down connection ID: {}, state: {}", connection_id,
             static_cast<int>(state));
 
-  // Remove connection callbacks first to prevent recursive calls during shutdown.
-  if (state != Network::Connection::State::Closed) {
-    connection_->removeConnectionCallbacks(*this);
-    ENVOY_LOG(debug, "Connection callbacks removed");
-  }
-
-  // Close the connection if it's still open.
-  state = connection_->state();
-  if (state == Network::Connection::State::Open) {
-    ENVOY_LOG(debug, "Closing open connection gracefully");
-    connection_->close(Network::ConnectionCloseType::FlushWrite);
-  } else if (state == Network::Connection::State::Closing) {
-    ENVOY_LOG(debug, "Connection already closing");
-  } else {
-    ENVOY_LOG(debug, "Connection already closed");
-  }
-
-  // Clear the connection pointer after shutdown.
+  connection_->removeConnectionCallbacks(*this);
   connection_.reset();
   ENVOY_LOG(debug, "RCConnectionWrapper: Connection cleared after shutdown");
   ENVOY_LOG(debug, "RCConnectionWrapper: Shutdown completed");
