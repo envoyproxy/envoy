@@ -3,7 +3,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "library/cc/engine_builder.h"
+#include "library/cc/mobile_engine_builder.h"
 #include "library/common/api/c_types.h"
 #include "library/common/bridge/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
@@ -16,7 +16,7 @@
 #include "library/jni/jni_init.h"
 #include "library/jni/jni_utility.h"
 
-using Envoy::Platform::EngineBuilder;
+using Envoy::Platform::MobileEngineBuilder;
 
 // NOLINT(namespace-envoy)
 
@@ -107,10 +107,11 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     };
   }
 
-  return reinterpret_cast<jlong>(
+  auto* engine =
       new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
-                                /*network_thread_priority*/ absl::nullopt,
-                                (disable_dns_refresh_on_network_change == JNI_TRUE)));
+                                /*network_thread_priority*/ absl::nullopt);
+  engine->disableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change == JNI_TRUE);
+  return reinterpret_cast<jlong>(engine);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
@@ -1066,8 +1067,8 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
 
 // Takes a jstring from Java, converts it to a C++ string, calls the supplied
 // setter on it.
-void setString(Envoy::JNI::JniHelper& jni_helper, jstring java_string, EngineBuilder* builder,
-               EngineBuilder& (EngineBuilder::*setter)(std::string)) {
+void setString(Envoy::JNI::JniHelper& jni_helper, jstring java_string, MobileEngineBuilder* builder,
+               MobileEngineBuilder& (MobileEngineBuilder::*setter)(std::string)) {
   if (!java_string) {
     return;
   }
@@ -1155,7 +1156,7 @@ void configureBuilder(
     jobjectArray runtime_guards, jlong h3_connection_keepalive_initial_interval_milliseconds,
     jboolean use_quic_platform_packet_writer, jboolean enable_connection_migration,
     jboolean migrate_idle_connection, jlong max_idle_time_before_migration_seconds,
-    jlong max_time_on_non_default_network_seconds, Envoy::Platform::EngineBuilder& builder) {
+    jlong max_time_on_non_default_network_seconds, MobileEngineBuilder& builder) {
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.setDisableDnsRefreshOnFailure(disable_dns_refresh_on_failure);
   builder.setDisableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change);
@@ -1173,8 +1174,8 @@ void configureBuilder(
       (h2_connection_keepalive_idle_interval_milliseconds));
   builder.addH2ConnectionKeepaliveTimeoutSeconds((h2_connection_keepalive_timeout_seconds));
 
-  setString(jni_helper, app_version, &builder, &EngineBuilder::setAppVersion);
-  setString(jni_helper, app_id, &builder, &EngineBuilder::setAppId);
+  setString(jni_helper, app_version, &builder, &MobileEngineBuilder::setAppVersion);
+  setString(jni_helper, app_id, &builder, &MobileEngineBuilder::setAppId);
   builder.setDeviceOs("Android");
 
   builder.setStreamIdleTimeoutSeconds((stream_idle_timeout_seconds));
@@ -1238,7 +1239,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_getNativeFilterConfig(JNIEnv* e
                                                                        jstring filter_name_jstr) {
   Envoy::JNI::JniHelper jni_helper(env);
   std::string filter_name = Envoy::JNI::javaStringToCppString(jni_helper, filter_name_jstr);
-  std::string filter_config = EngineBuilder::nativeNameToConfig(filter_name);
+  std::string filter_config = MobileEngineBuilder::nativeNameToConfig(filter_name);
 
   return jni_helper.newStringUtf(filter_config.c_str()).release();
 }
@@ -1265,7 +1266,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jboolean migrate_idle_connection, jlong max_idle_time_before_migration_seconds,
     jlong max_time_on_non_default_network_seconds) {
   Envoy::JNI::JniHelper jni_helper(env);
-  Envoy::Platform::EngineBuilder builder;
+  MobileEngineBuilder builder;
 
   configureBuilder(
       jni_helper, connect_timeout_seconds, disable_dns_refresh_on_failure,
@@ -1283,7 +1284,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       h3_connection_keepalive_initial_interval_milliseconds, use_quic_platform_packet_writer,
       enable_connection_migration, migrate_idle_connection, max_idle_time_before_migration_seconds,
       max_time_on_non_default_network_seconds, builder);
-  return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
+  return reinterpret_cast<intptr_t>(builder.generateBootstrap().value().release());
 }
 
 #if defined(__GNUC__)
