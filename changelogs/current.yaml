@@ -105,6 +105,13 @@ new_features:
     metric processing logic (tag enrichment, name rewriting, custom metric injection)
     into the proxy itself. Configured via
     :ref:`WasmFilterStatsSinkConfig <envoy_v3_api_msg_extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig>`.
+- area: router
+  change: |
+    Added :ref:`refresh_cluster_on_retry <envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>`
+    to :ref:`retry policies <envoy_v3_api_msg_config.route.v3.RetryPolicy>` so retry attempts can
+    refresh the route-selected upstream cluster before being sent. This enables cross-cluster
+    retries for dynamic cluster selection such as the :ref:`matcher cluster specifier
+    <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`.
 - area: mysql_proxy
   change: |
     Added SSL termination support to the MySQL proxy filter with RSA-mediated ``caching_sha2_password``
@@ -114,13 +121,6 @@ new_features:
     RSA public key exchange on behalf of the client. Added a new
     :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.mysql_proxy.v3.MySQLProxy.downstream_ssl>`
     config option with ``DISABLE``, ``REQUIRE``, and ``ALLOW`` modes.
-- area: router
-  change: |
-    Added :ref:`refresh_cluster_on_retry <envoy_v3_api_field_config.route.v3.RetryPolicy.refresh_cluster_on_retry>`
-    to :ref:`retry policies <envoy_v3_api_msg_config.route.v3.RetryPolicy>` so retry attempts can
-    refresh the route-selected upstream cluster before being sent. This enables cross-cluster
-    retries for dynamic cluster selection such as the :ref:`matcher cluster specifier
-    <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`.
 - area: quic
   change: |
     Added support for TLS session ticket resumption in QUIC using configured session ticket keys from
@@ -135,15 +135,5 @@ new_features:
     in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
     instead of using the :ref:`ExtensionWithMatcher
     <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
-- area: jwt_authn
-  change: |
-    Added :ref:`verification_status_header
-    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.ExtractOnlyWithoutValidation.verification_status_header>`
-    to the ``ExtractOnlyWithoutValidation`` requirement. When a JWT is present in the request but fails
-    signature verification, the named request header (default ``x-jwt-signature-verified``) is set to
-    ``false`` so downstream filters (RBAC, ext_authz) can distinguish forwarded-but-unverified claims
-    from validated ones. The header is not set on a successfully verified JWT or when no JWT is present.
-    This behavior can be reverted by setting the runtime guard
-    ``envoy.reloadable_features.jwt_authn_add_verification_status_header`` to ``false``.
 
 deprecated:
