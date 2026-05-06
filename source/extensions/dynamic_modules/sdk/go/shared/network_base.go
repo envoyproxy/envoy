@@ -1,3 +1,4 @@
+//go:generate mockgen -source=network_base.go -destination=mocks/mock_network_base.go -package=mocks
 package shared
 
 // NetworkBuffer is an interface that provides access to the read and write buffers of a network

@@ -20,6 +20,8 @@ fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkF
     "connection_state" => Some(Box::new(ConnectionStateFilterConfig)),
     "half_close" => Some(Box::new(HalfCloseFilterConfig)),
     "buffer_limits" => Some(Box::new(BufferLimitsFilterConfig)),
+    "pause_resume" => Some(Box::new(PauseResumeFilterConfig)),
+    "data_appender" => Some(Box::new(DataAppenderFilterConfig)),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -301,5 +303,76 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for BufferLimitsFilter {
 
   fn on_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut ENF) {
     BELOW_LOW_WATERMARK_CALLED.store(true, Ordering::SeqCst);
+  }
+}
+
+// =============================================================================
+// pause_resume — exercises StopIteration + ContinueReading via the scheduler.
+// =============================================================================
+
+struct PauseResumeFilterConfig;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for PauseResumeFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(PauseResumeFilter { paused: false })
+  }
+}
+
+struct PauseResumeFilter {
+  paused: bool,
+}
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for PauseResumeFilter {
+  fn on_read(
+    &mut self,
+    envoy_filter: &mut ENF,
+    _data_length: usize,
+    _end_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    if !self.paused {
+      self.paused = true;
+      // Schedule a continue_reading via the filter scheduler. on_scheduled fires on
+      // the same worker thread once dispatcher iteration unwinds back.
+      let scheduler = envoy_filter.new_scheduler();
+      scheduler.commit(1);
+      return abi::envoy_dynamic_module_type_on_network_filter_data_status::StopIteration;
+    }
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  }
+
+  fn on_scheduled(&mut self, envoy_filter: &mut ENF, _event_id: u64) {
+    envoy_filter.continue_reading();
+  }
+}
+
+// =============================================================================
+// data_appender — append a fixed suffix to the read buffer so the upstream
+// observes the modification.
+// =============================================================================
+
+struct DataAppenderFilterConfig;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for DataAppenderFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(DataAppenderFilter { appended: false })
+  }
+}
+
+struct DataAppenderFilter {
+  appended: bool,
+}
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for DataAppenderFilter {
+  fn on_read(
+    &mut self,
+    envoy_filter: &mut ENF,
+    _data_length: usize,
+    _end_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    if !self.appended {
+      envoy_filter.append_read_buffer(b"|appended");
+      self.appended = true;
+    }
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   }
 }

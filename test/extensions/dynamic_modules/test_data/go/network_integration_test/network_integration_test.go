@@ -12,6 +12,8 @@ func init() {
 		"connection_state": &connectionStateConfigFactory{},
 		"half_close":       &halfCloseConfigFactory{},
 		"buffer_limits":    &bufferLimitsConfigFactory{},
+		"pause_resume":     &pauseResumeConfigFactory{},
+		"data_appender":    &dataAppenderConfigFactory{},
 	})
 }
 
@@ -167,6 +169,89 @@ func (f *bufferLimitsFilter) OnNewConnection() shared.NetworkFilterStatus {
 	f.handle.SetBufferLimits(32768)
 	if f.handle.GetBufferLimit() != 32768 {
 		panic("expected updated buffer limit")
+	}
+	return shared.NetworkFilterStatusContinue
+}
+
+// =============================================================================
+// pause_resume: returns Stop on the first OnRead call, schedules a ContinueReading
+// via the filter scheduler, and lets the data flow normally on subsequent reads.
+//
+// Verifies that NetworkFilterStatusStop genuinely pauses iteration and that
+// ContinueReading from a scheduled task resumes it. Without the resume the
+// upstream connection never sees the data and the test would hang.
+// =============================================================================
+
+type pauseResumeConfigFactory struct {
+	shared.EmptyNetworkFilterConfigFactory
+}
+
+func (pauseResumeConfigFactory) Create(shared.NetworkFilterConfigHandle, []byte) (shared.NetworkFilterFactory, error) {
+	return &pauseResumeFactory{}, nil
+}
+
+type pauseResumeFactory struct {
+	shared.EmptyNetworkFilterFactory
+}
+
+func (*pauseResumeFactory) Create(handle shared.NetworkFilterHandle) shared.NetworkFilter {
+	return &pauseResumeFilter{handle: handle}
+}
+
+type pauseResumeFilter struct {
+	shared.EmptyNetworkFilter
+	handle shared.NetworkFilterHandle
+	paused bool
+}
+
+func (f *pauseResumeFilter) OnRead(shared.NetworkBuffer, bool) shared.NetworkFilterStatus {
+	if !f.paused {
+		f.paused = true
+		// Schedule the resume on the same worker thread. The scheduler defers the
+		// continuation until after this OnRead returns; otherwise ContinueReading is
+		// a no-op since iteration hasn't been paused yet.
+		f.handle.GetScheduler().Schedule(func() {
+			f.handle.ContinueReading()
+		})
+		return shared.NetworkFilterStatusStop
+	}
+	return shared.NetworkFilterStatusContinue
+}
+
+// =============================================================================
+// data_appender: appends a fixed suffix to every read buffer before letting it
+// flow downstream. Verifies ReadBuffer().Append() works end-to-end (the upstream
+// must observe the suffix).
+// =============================================================================
+
+type dataAppenderConfigFactory struct {
+	shared.EmptyNetworkFilterConfigFactory
+}
+
+func (dataAppenderConfigFactory) Create(shared.NetworkFilterConfigHandle, []byte) (shared.NetworkFilterFactory, error) {
+	return &dataAppenderFactory{}, nil
+}
+
+type dataAppenderFactory struct {
+	shared.EmptyNetworkFilterFactory
+}
+
+func (*dataAppenderFactory) Create(handle shared.NetworkFilterHandle) shared.NetworkFilter {
+	return &dataAppenderFilter{handle: handle}
+}
+
+type dataAppenderFilter struct {
+	shared.EmptyNetworkFilter
+	handle   shared.NetworkFilterHandle
+	appended bool
+}
+
+func (f *dataAppenderFilter) OnRead(buf shared.NetworkBuffer, _ bool) shared.NetworkFilterStatus {
+	// Append once on the first OnRead so the upstream observes the modification.
+	// Subsequent reads pass through unchanged so we don't keep appending forever.
+	if !f.appended {
+		buf.Append([]byte("|appended"))
+		f.appended = true
 	}
 	return shared.NetworkFilterStatusContinue
 }

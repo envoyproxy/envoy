@@ -1709,3 +1709,8 @@ IWYU
 CRTP
 bitrate
 kbps
+cgo
+cgocheck
+dynamicmodulescustom
+strconv
+formatfloat

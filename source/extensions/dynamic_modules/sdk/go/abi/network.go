@@ -9,6 +9,7 @@ import "C"
 
 import (
 	"runtime"
+	"sync"
 	"unsafe"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
@@ -20,10 +21,8 @@ type networkFilterConfigWrapper struct {
 	configHandle  *dymNetworkConfigHandle
 }
 
-type networkFilterWrapper = dymNetworkFilterHandle
-
 var networkConfigManager = newManager[networkFilterConfigWrapper]()
-var networkPluginManager = newManager[networkFilterWrapper]()
+var networkPluginManager = newManager[dymNetworkFilterHandle]()
 
 type dymNetworkBuffer struct {
 	hostPluginPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr
@@ -130,10 +129,15 @@ func (b *dymNetworkBuffer) Append(data []byte) bool {
 }
 
 type dymNetworkFilterHandle struct {
-	hostPluginPtr    C.envoy_dynamic_module_type_network_filter_envoy_ptr
-	plugin           shared.NetworkFilter
-	readBuffer       dymNetworkBuffer
-	writeBuffer      dymNetworkBuffer
+	hostPluginPtr C.envoy_dynamic_module_type_network_filter_envoy_ptr
+	plugin        shared.NetworkFilter
+	readBuffer    dymNetworkBuffer
+	writeBuffer   dymNetworkBuffer
+	// calloutMu guards calloutCallbacks. Per-connection network filter processing is
+	// single-threaded today, so this lock is uncontended in normal use; it's held for
+	// consistency with cluster/bootstrap callout maps and to keep the SDK safe if a future
+	// change introduces cross-thread callout dispatch.
+	calloutMu        sync.Mutex
 	calloutCallbacks map[uint64]shared.HttpCalloutCallback
 	scheduler        *dymScheduler
 	filterDestroyed  bool
@@ -669,10 +673,12 @@ func (h *dymNetworkFilterHandle) HttpCallout(
 		return goResult, 0
 	}
 
+	h.calloutMu.Lock()
 	if h.calloutCallbacks == nil {
 		h.calloutCallbacks = make(map[uint64]shared.HttpCalloutCallback)
 	}
 	h.calloutCallbacks[uint64(calloutID)] = cb
+	h.calloutMu.Unlock()
 	return goResult, uint64(calloutID)
 }
 
@@ -879,13 +885,15 @@ func (h *dymNetworkFilterHandle) GetScheduler() shared.Scheduler {
 					taskID,
 				)
 			},
+			func(p unsafe.Pointer) {
+				C.envoy_dynamic_module_callback_network_filter_scheduler_delete(
+					C.envoy_dynamic_module_type_network_filter_scheduler_module_ptr(p),
+				)
+			},
 		)
 
-		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_network_filter_scheduler_delete(
-				C.envoy_dynamic_module_type_network_filter_scheduler_module_ptr(s.schedulerPtr),
-			)
-		})
+		// Finalizer is a fallback; the destroy hook should call close() synchronously.
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) { s.close() })
 	}
 	return h.scheduler
 }
@@ -951,15 +959,15 @@ func (h *dymNetworkConfigHandle) GetScheduler() shared.Scheduler {
 					taskID,
 				)
 			},
+			func(p unsafe.Pointer) {
+				C.envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
+					C.envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr(p),
+				)
+			},
 		)
 
-		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) {
-			C.envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
-				C.envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr(
-					s.schedulerPtr,
-				),
-			)
-		})
+		// Finalizer is a fallback; the destroy hook should call close() synchronously.
+		runtime.SetFinalizer(h.scheduler, func(s *dymScheduler) { s.close() })
 	}
 	return h.scheduler
 }
@@ -971,7 +979,7 @@ func envoy_dynamic_module_on_network_filter_config_new(
 	config C.envoy_dynamic_module_type_envoy_buffer,
 ) C.envoy_dynamic_module_type_network_filter_config_module_ptr {
 	nameString := envoyBufferToStringUnsafe(name)
-	configBytes := envoyBufferToBytesUnsafe(config)
+	configBytes := envoyBufferToBytesCopy(config)
 
 	configHandle := &dymNetworkConfigHandle{hostConfigPtr: hostConfigPtr}
 	factory, err := sdk.NewNetworkFilterFactory(configHandle, nameString, configBytes)
@@ -1001,7 +1009,11 @@ func envoy_dynamic_module_on_network_filter_config_destroy(
 	if configWrapper == nil {
 		return
 	}
-	configWrapper.configHandle.scheduler = nil
+	if configWrapper.configHandle.scheduler != nil {
+		// See bootstrap config destroy for why we close synchronously.
+		configWrapper.configHandle.scheduler.close()
+		configWrapper.configHandle.scheduler = nil
+	}
 	configWrapper.pluginFactory.OnDestroy()
 	networkConfigManager.remove(unsafe.Pointer(configPtr))
 }
@@ -1106,7 +1118,11 @@ func envoy_dynamic_module_on_network_filter_destroy(
 		return
 	}
 	filterWrapper.filterDestroyed = true
-	filterWrapper.scheduler = nil
+	if filterWrapper.scheduler != nil {
+		// See bootstrap config destroy for why we close synchronously.
+		filterWrapper.scheduler.close()
+		filterWrapper.scheduler = nil
+	}
 	if filterWrapper.plugin != nil {
 		filterWrapper.plugin.OnDestroy()
 	}
@@ -1133,9 +1149,13 @@ func envoy_dynamic_module_on_network_filter_http_callout_done(
 	resultHeaders := envoyHttpHeaderSliceToUnsafeHeaderSlice(unsafe.Slice(headers, int(headersSize)))
 	resultChunks := envoyBufferSliceToUnsafeEnvoyBufferSlice(unsafe.Slice(chunks, int(chunksSize)))
 
+	filterWrapper.calloutMu.Lock()
 	cb := filterWrapper.calloutCallbacks[uint64(calloutID)]
 	if cb != nil {
 		delete(filterWrapper.calloutCallbacks, uint64(calloutID))
+	}
+	filterWrapper.calloutMu.Unlock()
+	if cb != nil {
 		cb.OnHttpCalloutDone(uint64(calloutID), shared.HttpCalloutResult(result), resultHeaders, resultChunks)
 	}
 }

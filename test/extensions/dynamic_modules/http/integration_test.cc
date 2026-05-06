@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/config/metadata.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
@@ -1024,6 +1025,85 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
   FAIL() << "Config was not updated in time";
 }
 
+// Verifies the config-time HttpCallout API: the filter config Create() initiates a
+// callout via HttpFilterConfigHandle.HttpCallout against cluster_0. Per-request filters
+// short-circuit with x-config-callout: success once the callout completes
+// (503 + "pending" until then).
+TEST_P(DynamicModulesIntegrationTest, ConfigCallout) {
+  // C++ SDK does not expose the config-time callout API; skip.
+  if (GetParam() == "cpp") {
+    return;
+  }
+  initializeFilter("http_config_callout", "cluster_0");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // First downstream request: the dispatcher run-loop drives the in-flight config-time
+  // callout out to cluster_0. Serve it so the callout completes; the factory's atomic
+  // flag flips on completion. The downstream request itself short-circuits with 503.
+  {
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    auto response = std::move(encoder_decoder.second);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+  }
+
+  // Subsequent requests should see "success" once the atomic flag has been observed.
+  for (int i = 0; i < 20; ++i) {
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    auto response = std::move(encoder_decoder.second);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+
+    auto hdr = response->headers().get(Http::LowerCaseString("x-config-callout"));
+    ASSERT_FALSE(hdr.empty());
+    if (hdr[0]->value().getStringView() == "success") {
+      return;
+    }
+    absl::SleepFor(absl::Milliseconds(50));
+  }
+  FAIL() << "Config callout did not complete in time";
+}
+
+// Verifies the config-time StartHttpStream API: the filter config Create() opens an HTTP
+// stream via HttpFilterConfigHandle.StartHttpStream against cluster_0. Per-request filters
+// short-circuit with x-config-stream: success once the stream completes
+// (503 + "pending" until then).
+TEST_P(DynamicModulesIntegrationTest, ConfigStream) {
+  // C++ SDK does not expose the config-time stream API; skip.
+  if (GetParam() == "cpp") {
+    return;
+  }
+  initializeFilter("http_config_stream", "cluster_0");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Serve the in-flight config-time stream against cluster_0 on the first request.
+  {
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    auto response = std::move(encoder_decoder.second);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+  }
+
+  for (int i = 0; i < 20; ++i) {
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    auto response = std::move(encoder_decoder.second);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+
+    auto hdr = response->headers().get(Http::LowerCaseString("x-config-stream"));
+    ASSERT_FALSE(hdr.empty());
+    if (hdr[0]->value().getStringView() == "success") {
+      return;
+    }
+    absl::SleepFor(absl::Milliseconds(50));
+  }
+  FAIL() << "Config stream did not complete in time";
+}
+
 // Test buffer limit callbacks for non-terminal filters.
 TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
   initializeFilter("buffer_limit_filter");
@@ -1104,6 +1184,121 @@ TEST_P(DynamicModulesIntegrationTest, ListMetadataCallbacks) {
   auto bool_1 = response->headers().get(Http::LowerCaseString("x-list-bool-1"));
   ASSERT_FALSE(bool_1.empty());
   EXPECT_EQ("false", bool_1[0]->value().getStringView());
+}
+
+// Verifies the scalar dynamic-metadata getters and SetMetadata. The route is configured
+// with metadata under "test_ns" containing string/number/bool values; the filter reads
+// them via Route source, writes them into Dynamic source under a test namespace, and on
+// the response side reads them back from Dynamic source and surfaces them via headers.
+//
+// Verifies: GetMetadataString, GetMetadataNumber, GetMetadataBool, SetMetadata,
+// GetMetadataKeys.
+TEST_P(DynamicModulesIntegrationTest, DynamicMetadata) {
+  // C++ SDK doesn't currently surface the same scalar metadata API in its integration
+  // module; skip.
+  if (GetParam() == "cpp") {
+    return;
+  }
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    // Add metadata to the (single) route under test_ns.
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_metadata();
+    Envoy::Config::Metadata::mutableMetadataValue(*route, "test_ns", "string_key")
+        .set_string_value("hello_metadata");
+    Envoy::Config::Metadata::mutableMetadataValue(*route, "test_ns", "number_key")
+        .set_number_value(42.0);
+    Envoy::Config::Metadata::mutableMetadataValue(*route, "test_ns", "bool_key")
+        .set_bool_value(true);
+  });
+  initializeFilter("dynamic_metadata");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  auto str_hdr = response->headers().get(Http::LowerCaseString("x-dm-string"));
+  ASSERT_FALSE(str_hdr.empty());
+  EXPECT_EQ("hello_metadata", str_hdr[0]->value().getStringView());
+
+  auto num_hdr = response->headers().get(Http::LowerCaseString("x-dm-number"));
+  ASSERT_FALSE(num_hdr.empty());
+  // The number is float-formatted; "42" is what both Go's strconv.FormatFloat(42, 'f', -1, 64)
+  // and Rust's f64::to_string(42.0) produce.
+  EXPECT_EQ("42", num_hdr[0]->value().getStringView());
+
+  auto bool_hdr = response->headers().get(Http::LowerCaseString("x-dm-bool"));
+  ASSERT_FALSE(bool_hdr.empty());
+  EXPECT_EQ("true", bool_hdr[0]->value().getStringView());
+
+  // GetMetadataKeys should report exactly the 3 keys we wrote.
+  auto count_hdr = response->headers().get(Http::LowerCaseString("x-dm-key-count"));
+  ASSERT_FALSE(count_hdr.empty());
+  EXPECT_EQ("3", count_hdr[0]->value().getStringView());
+}
+
+// Verifies SetFilterState/GetFilterState round-trip across filter boundaries:
+// filter_state_writer (configured with "round_trip_value") sets a key on the request
+// side; filter_state_reader (chained after) reads it on the request side and surfaces
+// it via x-filter-state-value on the response.
+TEST_P(DynamicModulesIntegrationTest, FilterStateRoundTrip) {
+  if (GetParam() == "cpp") {
+    return;
+  }
+
+  // Set up the env var first since initializeFilter normally does it but we're going to
+  // hand-build the filter chain.
+  std::string module_name = "http_integration_test";
+  if (GetParam() != "rust_static") {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
+                                    GetParam()),
+        1);
+  } else {
+    module_name += "_static";
+  }
+  TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
+
+  // The reader must run AFTER the writer — prependFilter inserts at the front, so we
+  // prepend reader first, then writer (which then ends up at the front).
+  config_helper_.prependFilter(fmt::format(R"EOF(
+name: envoy.extensions.filters.http.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+  dynamic_module_config:
+    name: {}
+  filter_name: filter_state_reader
+  filter_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: ""
+)EOF",
+                                           module_name));
+  config_helper_.prependFilter(fmt::format(R"EOF(
+name: envoy.extensions.filters.http.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+  dynamic_module_config:
+    name: {}
+  filter_name: filter_state_writer
+  filter_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: round_trip_value
+)EOF",
+                                           module_name));
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  auto fs_hdr = response->headers().get(Http::LowerCaseString("x-filter-state-value"));
+  ASSERT_FALSE(fs_hdr.empty());
+  EXPECT_EQ("round_trip_value", fs_hdr[0]->value().getStringView());
 }
 
 } // namespace Envoy

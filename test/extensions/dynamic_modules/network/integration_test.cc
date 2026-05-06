@@ -258,4 +258,62 @@ TEST_P(DynamicModulesNetworkSdkIntegrationTest, BufferLimits) {
   tcp_client->close();
 }
 
+// Verifies StopIteration + ContinueReading: the filter pauses iteration on the first
+// OnRead and schedules a continue; without the resume, the upstream never receives any
+// bytes. If StopIteration is broken (e.g. ignored, or ContinueReading is broken), this
+// test will hang waiting for waitForData and time out.
+//
+// The C++ test_data module does not implement this filter shape; this test is
+// rust/go-only.
+TEST_P(DynamicModulesNetworkSdkIntegrationTest, PauseResume) {
+  if (GetParam() == "cpp") {
+    return;
+  }
+  initializeSdkFilter("pause_resume");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->connected());
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
+// Verifies the filter can mutate the read buffer (Append/append_read_buffer). The
+// upstream should observe "hello|appended" instead of just "hello".
+//
+// The C++ test_data module does not implement this filter shape; this test is
+// rust/go-only.
+TEST_P(DynamicModulesNetworkSdkIntegrationTest, DataAppender) {
+  if (GetParam() == "cpp") {
+    return;
+  }
+  initializeSdkFilter("data_appender");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->connected());
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("hello", false));
+  // The filter appends "|appended" so the upstream should see 5 + 9 = 14 bytes.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("hello|appended")));
+
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
 } // namespace Envoy

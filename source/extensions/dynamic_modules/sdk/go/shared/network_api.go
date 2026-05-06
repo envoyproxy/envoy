@@ -1,3 +1,4 @@
+//go:generate mockgen -source=network_api.go -destination=mocks/mock_network_api.go -package=mocks
 package shared
 
 // NetworkFilter is the interface to implement your own network filter logic.
