@@ -272,8 +272,7 @@ fn build_resolver(config: &HickoryConfig) -> TokioResolver {
         } else {
           None
         };
-        let mut https_conn =
-          ConnectionConfig::https(std::sync::Arc::from(host), path_opt);
+        let mut https_conn = ConnectionConfig::https(std::sync::Arc::from(host), path_opt);
         https_conn.port = port;
         resolver_config.add_name_server(NameServerConfig::new(ip, true, vec![https_conn]));
       }
@@ -289,7 +288,9 @@ fn build_resolver(config: &HickoryConfig) -> TokioResolver {
   let provider = hickory_resolver::net::runtime::TokioRuntimeProvider::default();
   let mut builder = hickory_resolver::Resolver::builder_with_config(resolver_config, provider);
   *builder.options_mut() = opts;
-  builder.build().unwrap_or_else(|e| panic!("failed to build DNS resolver: {e}"))
+  builder
+    .build()
+    .unwrap_or_else(|e| panic!("failed to build DNS resolver: {e}"))
 }
 
 impl DnsResolverInstance for HickoryDnsResolverImpl {
