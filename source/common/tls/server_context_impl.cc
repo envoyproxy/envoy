@@ -1,5 +1,6 @@
 #include "source/common/tls/server_context_impl.h"
 
+#include <openssl/hpke.h>
 #include <openssl/ssl.h>
 
 #include <algorithm>
@@ -232,8 +233,10 @@ ServerContextImpl::ServerContextImpl(
       if (!ech_keys_vec.empty()) {
         bssl::UniquePtr<SSL_ECH_KEYS> ech_keys(SSL_ECH_KEYS_new());
         for (const auto& key : ech_keys_vec) {
-          bssl::ScopedEVP_HPKE_KEY hpke_key;
-          if (EVP_HPKE_KEY_init(hpke_key.get(), EVP_hpke_x25519_hkdf_sha256(),
+          EVP_HPKE_KEY hpke_key_raw = {};
+          std::unique_ptr<EVP_HPKE_KEY, decltype(&EVP_HPKE_KEY_cleanup)>
+              hpke_key_guard(&hpke_key_raw, EVP_HPKE_KEY_cleanup);
+          if (EVP_HPKE_KEY_init(&hpke_key_raw, EVP_hpke_x25519_hkdf_sha256(),
                                 reinterpret_cast<const uint8_t*>(key.hpke_private_key.data()),
                                 key.hpke_private_key.size()) != 1) {
             creation_status = absl::InvalidArgumentError("Invalid ECH HPKE private key");
@@ -241,7 +244,7 @@ ServerContextImpl::ServerContextImpl(
           }
           if (SSL_ECH_KEYS_add(ech_keys.get(), key.is_retry_config ? 1 : 0,
                                reinterpret_cast<const uint8_t*>(key.ech_config.data()),
-                               key.ech_config.size(), hpke_key.get()) != 1) {
+                               key.ech_config.size(), &hpke_key_raw) != 1) {
             creation_status = absl::InvalidArgumentError("Invalid ECHConfig");
             return;
           }

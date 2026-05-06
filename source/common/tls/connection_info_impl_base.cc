@@ -511,11 +511,13 @@ std::string ConnectionInfoImplBase::echRetryConfigs() const {
 }
 
 absl::string_view ConnectionInfoImplBase::echNameOverride() const {
-  const char* name = SSL_get0_ech_name_override(ssl());
-  if (name == nullptr) {
+  const char* name = nullptr;
+  size_t name_len = 0;
+  SSL_get0_ech_name_override(ssl(), &name, &name_len);
+  if (name == nullptr || name_len == 0) {
     return {};
   }
-  return name;
+  return {name, name_len};
 }
 
 const std::string& ConnectionInfoImplBase::sessionId() const {

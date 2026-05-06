@@ -1,7 +1,9 @@
+#include <stddef.h>
 #include <openssl/ssl.h>
 
-extern "C" const char* SSL_get0_ech_name_override(const SSL* ssl) {
-  // ECH has no equivalent in OpenSSL; no name override available.
+extern "C" void SSL_get0_ech_name_override(const SSL* ssl, const char** out_name,
+                                           size_t* out_name_len) {
   (void)ssl;
-  return nullptr;
+  *out_name = nullptr;
+  *out_name_len = 0;
 }
