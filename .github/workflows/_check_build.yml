@@ -62,4 +62,5 @@ jobs:
         - target: openssl
           name: OpenSSL
           skip: ${{ ! fromJSON(inputs.request).run.check-build-openssl }}
+          catch-errors: true
           slack-channel: '#envoy-openssl'
