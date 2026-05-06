@@ -17,30 +17,25 @@ if [[ ! -f "$DEPS_YAML" ]]; then
     exit 1
 fi
 
-# Find the line number of this dep's top-level YAML key (e.g. "bazel_gazelle:").
-DEP_START_LN="$(grep -n "^${DEP}:$" "$DEPS_YAML" | head -n1 | cut -d: -f1)"
-if [[ -z "$DEP_START_LN" ]]; then
-    echo "ERROR: Could not find dep block '${DEP}:' in ${DEPS_YAML}" >&2
-    exit 1
-fi
+# Read the current release_date directly from the dependency JSON data.
+EXISTING_DATE="$("$JQ" -r --arg dep "$DEP" '.[$dep].release_date' "$DEP_DATA")"
 
-# Read the current release_date from within this dep's block.
-EXISTING_DATE="$(
-    tail -n "+${DEP_START_LN}" "$DEPS_YAML" \
-    | grep -m1 "^  release_date:" \
-    | sed 's/^  release_date: "\(.*\)"$/\1/'
-)"
-
-if [[ -z "$EXISTING_DATE" ]]; then
-    echo "ERROR: Could not find release_date for '${DEP}' in ${DEPS_YAML}" >&2
+if [[ -z "$EXISTING_DATE" || "$EXISTING_DATE" == "null" ]]; then
+    echo "ERROR: Could not find release_date for '${DEP}' in DEP_DATA" >&2
     exit 1
 fi
 
 find_date_line () {
-    local date_match_ln
-    # From the dep's block start, find the matching release_date line number.
+    local dep_ln date_match_ln
+    # Find the line number of the dep's top-level YAML key (e.g. "bazel_gazelle:").
+    dep_ln="$(grep -n "^${DEP}:$" "$DEPS_YAML" | head -n1 | cut -d: -f1)"
+    if [[ -z "$dep_ln" ]]; then
+        echo "ERROR: Could not find dep block '${DEP}:' in ${DEPS_YAML}" >&2
+        exit 1
+    fi
+    # From that line forward, find the first matching release_date line.
     date_match_ln="$(\
-        tail -n "+${DEP_START_LN}" "$DEPS_YAML" \
+        tail -n "+${dep_ln}" "$DEPS_YAML" \
         | grep -n "^  release_date: \"${EXISTING_DATE}\"$" \
         | head -n1 \
         | cut -d: -f1)"
@@ -48,7 +43,7 @@ find_date_line () {
         echo "ERROR: Could not find release_date line for '${DEP}' in ${DEPS_YAML}" >&2
         exit 1
     fi
-    printf '%s' "$((DEP_START_LN + date_match_ln - 1))"
+    printf '%s' "$((dep_ln + date_match_ln - 1))"
 }
 
 update_date () {
