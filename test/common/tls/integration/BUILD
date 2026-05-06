@@ -91,7 +91,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
