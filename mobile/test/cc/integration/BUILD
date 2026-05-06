@@ -117,6 +117,15 @@ envoy_cc_test_library(
         "@abseil-cpp//absl/strings",
         "@envoy//source/extensions/clusters/static:static_cluster_lib",
         "@envoy//source/extensions/load_balancing_policies/round_robin:config",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],
 )
 
@@ -129,5 +138,6 @@ envoy_cc_test(
         "//library/cc:envoy_engine_cc_lib_no_stamp",
         "//test/common/http/filters/assertion:filter_cc_proto",
         "@envoy//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

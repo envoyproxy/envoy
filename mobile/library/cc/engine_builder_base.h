@@ -169,7 +169,8 @@ public:
 
     envoy_engine->run(options);
 
-    auto engine_wrapper = std::shared_ptr<Engine>(new Engine(absl::IgnoreLeak(envoy_engine.release())));
+    auto engine_wrapper =
+        std::shared_ptr<Engine>(new Engine(absl::IgnoreLeak(envoy_engine.release())));
 
     static_cast<T*>(this)->PostRunSetup(engine_wrapper.get());
 
