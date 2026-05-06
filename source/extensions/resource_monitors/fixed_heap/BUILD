@@ -17,6 +17,8 @@ envoy_cc_library(
         "//envoy/server:resource_monitor_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/runtime:runtime_protos_lib",
+        "@abseil-cpp//absl/types:variant",
         "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
 )
@@ -27,8 +29,11 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":fixed_heap_monitor",
+        "//envoy/common:exception_lib",
         "//envoy/registry",
         "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/runtime:runtime_protos_lib",
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],

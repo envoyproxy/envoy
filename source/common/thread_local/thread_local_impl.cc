@@ -33,8 +33,8 @@ SlotPtr InstanceImpl::allocateSlot() {
     slots_.push_back(slot.get());
     return slot;
   }
-  const uint32_t idx = free_slot_indexes_.front();
-  free_slot_indexes_.pop_front();
+  const uint32_t idx = free_slot_indexes_.back();
+  free_slot_indexes_.pop_back();
   ASSERT(idx < slots_.size());
   SlotPtr slot = std::make_unique<SlotImpl>(*this, idx);
   slots_[idx] = slot.get();
