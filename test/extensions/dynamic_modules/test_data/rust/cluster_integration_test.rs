@@ -26,10 +26,14 @@ fn new_cluster_config(
 ) -> Option<Box<dyn ClusterConfig>> {
   let config_str = std::str::from_utf8(config).unwrap_or("");
   match name {
-    "sync_host_selection" => Some(Box::new(SyncHostSelectionClusterConfig {
-      upstream_address: config_str.to_string(),
-      metrics: envoy_cluster_metrics,
-    })),
+    "sync_host_selection" => {
+      let counter_id = envoy_cluster_metrics.define_counter("requests_routed").ok();
+      Some(Box::new(SyncHostSelectionClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    }
     "async_host_selection" => Some(Box::new(AsyncHostSelectionClusterConfig {
       upstream_address: config_str.to_string(),
     })),
@@ -49,16 +53,16 @@ fn new_cluster_config(
 
 struct SyncHostSelectionClusterConfig {
   upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
   metrics: Arc<dyn EnvoyClusterMetrics>,
 }
 
 impl ClusterConfig for SyncHostSelectionClusterConfig {
   fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
-    let counter_id = self.metrics.define_counter("requests_routed").ok();
     Box::new(SyncHostSelectionCluster {
       upstream_address: self.upstream_address.clone(),
       hosts: Arc::new(Mutex::new(HostList(Vec::new()))),
-      counter_id,
+      counter_id: self.counter_id,
       metrics: self.metrics.clone(),
     })
   }
