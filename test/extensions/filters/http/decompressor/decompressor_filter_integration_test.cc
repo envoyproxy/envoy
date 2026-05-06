@@ -4,7 +4,6 @@
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

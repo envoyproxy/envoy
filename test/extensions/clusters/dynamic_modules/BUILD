@@ -27,7 +27,6 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/common/upstream:utility_lib",
         "//test/extensions/dynamic_modules:util",
-        "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",

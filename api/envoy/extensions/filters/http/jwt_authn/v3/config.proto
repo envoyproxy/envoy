@@ -78,6 +78,7 @@ message JwtProvider {
   // otherwise the JWT ``iss`` field is not checked.
   //
   // .. note::
+  //
   //     ``JwtRequirement`` :ref:`allow_missing <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.allow_missing>`
   //     and :ref:`allow_missing_or_failed <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.allow_missing_or_failed>`
   //     are implemented differently than other ``JwtRequirements``. Hence the usage of this field
@@ -324,10 +325,11 @@ message JwtProvider {
   //       alg: PS256
   //
   // .. warning::
-  //   Using the same key name for :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
-  //   and :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
-  //   is not suggested due to potential override of existing entry, while it is not enforced during
-  //   config validation.
+  //
+  //    Using the same key name for :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  //    and :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  //    is not suggested due to potential override of existing entry, while it is not enforced during
+  //    config validation.
   //
   string header_in_metadata = 14;
 
@@ -593,38 +595,70 @@ message JwtRequirement {
     // different is this mode will reject requests with invalid tokens.
     google.protobuf.Empty allow_missing = 6;
 
-    // Extract JWT claims without performing signature validation.
-    // This mode will decode the JWT, extract claims, and forward them as
-    // configured (via claim_to_headers, forward_payload_header, etc.) but
-    // will NOT verify the JWT signature against JWKS.
+    // [#next-major-version: consider removing or gating behind explicit opt-in]
     //
     // .. warning::
     //
-    //    This mode does not verify JWT authenticity. Use only in scenarios where:
+    //    SECURITY WARNING: This mode does NOT verify JWT signatures. Any party
+    //    can forge a JWT with arbitrary claims, and those claims will be extracted
+    //    and forwarded as HTTP headers. Headers set by this mode are
+    //    INDISTINGUISHABLE from headers set by fully validated JWTs unless the
+    //    ``verification_status_header`` is checked by downstream filters
+    //    (set to ``false`` by default on all extract-only requests).
     //
-    //    - JWTs come from a trusted source (e.g., internal service mesh)
-    //    - Signature verification is performed elsewhere in the request path
-    //    - You are in a testing period and the token issuer doesn't support JWKS yet
+    //    DO NOT use this mode if:
+    //      - RBAC policies match on JWT-derived headers
+    //      - ext_authz services trust JWT-derived headers
+    //      - Backend services use JWT-derived headers for authorization
+    //      - The JWT source is not cryptographically authenticated by other means
     //
-    // This mode will:
+    //    Use only when signature verification is PROVABLY performed elsewhere
+    //    in the request path (e.g., by an upstream mTLS-authenticated service).
     //
-    // * Decode the JWT header and payload
-    // * Extract claims and forward them as headers
-    // * Always return success (Status::Ok) regardless of JWT validity
-    // * Log when extraction occurs
-    //
-    // This mode will NOT:
-    //
-    // * Verify the JWT signature
-    // * Validate the (issuer) claim
-    // * Validate the (audience) claim
-    // * Check not-before time (nbf claim)
     ExtractOnlyWithoutValidation extract_only_without_validation = 7;
   }
 }
 
+// Configuration for extract-only mode without JWT signature validation.
+//
+// When this mode is active and a JWT is present in the request but fails
+// signature verification, a verification status header is set on the request
+// to signal to downstream filters (RBAC, ext_authz) that the JWT claims were
+// NOT cryptographically verified. The header is not set when the JWT is valid
+// or when no JWT is present.
+//
 message ExtractOnlyWithoutValidation {
-  // Reserved for future extensions (e.g., claim filtering, logging options)
+  // Name of the HTTP header set to "false" when a JWT is present but fails
+  // signature verification. The header is NOT set when:
+  //
+  // - The JWT is valid (verification succeeded), or
+  // - No JWT is present in the request.
+  //
+  // This means the header's presence is a meaningful signal to downstream
+  // filters: if set, the JWT was present but could not be verified, and any
+  // extracted claim headers should not be trusted for authorization.
+  //
+  // Downstream filters (RBAC, ext_authz) SHOULD check for the absence of this
+  // header (or its non-"false" value) before trusting JWT-derived claim headers
+  // for authorization decisions.
+  //
+  // Default (unset or empty): ``x-jwt-signature-verified``.
+  //
+  // Custom value: uses the specified header name.
+  //
+  // The header-setting behavior is guarded by the
+  // ``envoy.reloadable_features.jwt_authn_add_verification_status_header``
+  // runtime flag (default on). If removal is needed downstream, use header
+  // mutation in a subsequent filter.
+  //
+  // Example: when a JWT is present in the request but fails signature
+  // verification, the request will carry:
+  //
+  // .. code-block:: yaml
+  //
+  //    x-jwt-signature-verified: false
+  //
+  string verification_status_header = 1;
 }
 
 // This message specifies a list of RequiredProvider.

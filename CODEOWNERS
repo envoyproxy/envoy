@@ -159,7 +159,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @paul-r-gall
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @paul-r-gall
-/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
+/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123 @kyessenov
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @kyessenov @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @yanavlasov
@@ -497,5 +497,6 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/peak_ewma/load_balancing_policies/ @rroblak @UNOWNED
 /contrib/kae/ @Misakokoro @UNOWNED
 /contrib/istio @kyessenov @wbpcode @keithmattix @krinkinmu @zirain
+/contrib/reverse_tunnel_reporter @agrawroh @aakugan @basundhara-c
 
 /compat/openssl/ @tedjpoole @envoyproxy/envoy-openssl-sync

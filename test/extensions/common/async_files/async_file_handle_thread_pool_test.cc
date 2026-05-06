@@ -128,13 +128,13 @@ TEST_F(AsyncFileHandleTest, WriteReadClose) {
   }));
   resolveFileActions();
   ASSERT_OK(read_status);
-  EXPECT_THAT(*read_status.value(), BufferStringEqual("help!"));
+  EXPECT_THAT(*read_status.value(), BufferString("help!"));
   ASSERT_OK(handle->read(dispatcher_.get(), 2, 3, [&](absl::StatusOr<Buffer::InstancePtr> status) {
     second_read_status = std::move(status);
   }));
   resolveFileActions();
   ASSERT_OK(second_read_status);
-  EXPECT_THAT(*second_read_status.value(), BufferStringEqual("lp!"));
+  EXPECT_THAT(*second_read_status.value(), BufferString("lp!"));
   close(handle);
 }
 
@@ -295,7 +295,7 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadWriteCanReadAndWrite) {
   }));
   resolveFileActions();
   ASSERT_OK(read_status);
-  EXPECT_THAT(*read_status.value(), BufferStringEqual("help me!"));
+  EXPECT_THAT(*read_status.value(), BufferString("help me!"));
   close(handle);
 }
 
@@ -318,7 +318,7 @@ TEST_F(AsyncFileHandleTest, TruncateReducesFileSize) {
     read_result = std::move(result);
   }));
   resolveFileActions();
-  EXPECT_THAT(read_result, IsOkAndHolds(Pointee(BufferStringEqual("hello"))));
+  EXPECT_THAT(read_result, IsOkAndHolds(Pointee(BufferString("hello"))));
   close(handle);
 }
 
@@ -357,7 +357,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, PartialReadReturnsPartialResult) {
   }));
   resolveFileActions();
   EXPECT_OK(read_status);
-  EXPECT_THAT(*read_status.value(), BufferStringEqual("hel"));
+  EXPECT_THAT(*read_status.value(), BufferString("hel"));
   close(handle);
 }
 
