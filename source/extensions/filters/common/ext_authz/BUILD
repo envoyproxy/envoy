@@ -85,5 +85,3 @@ envoy_cc_library(
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
-
-

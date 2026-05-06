@@ -428,11 +428,10 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   // failure_mode_allow.
   if (Http::CodeUtility::is5xx(status_code)) {
     auto response = std::make_unique<Response>(errorResponse());
-    envoy::service::auth::v3::CheckResponse raw_check_response;
-    raw_check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
-    auto* error_response = raw_check_response.mutable_error_response();
-    error_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(status_code));
-    response->raw_check_response = raw_check_response;
+    response->raw_check_response.emplace();
+    response->raw_check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+    response->raw_check_response->mutable_error_response()->mutable_status()->set_code(
+        static_cast<envoy::type::v3::StatusCode>(status_code));
     return response;
   }
 
@@ -484,9 +483,9 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                 Http::Code::OK,
                                 Protobuf::Struct{}}};
 
-    envoy::service::auth::v3::CheckResponse raw_check_response;
-    raw_check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
-    auto* ok_response = raw_check_response.mutable_ok_response();
+    ok.response_->raw_check_response.emplace();
+    ok.response_->raw_check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+    auto* ok_response = ok.response_->raw_check_response->mutable_ok_response();
 
     for (const auto& header : ok.response_->headers_to_set) {
       auto* h = ok_response->add_headers();
@@ -513,7 +512,6 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
       *ok_response->mutable_dynamic_metadata() = ok.response_->dynamic_metadata;
     }
 
-    ok.response_->raw_check_response = raw_check_response;
     return std::move(ok.response_);
   }
 
@@ -542,13 +540,13 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                   static_cast<Http::Code>(status_code),
                                   Protobuf::Struct{}}};
 
-  envoy::service::auth::v3::CheckResponse raw_check_response;
+  denied.response_->raw_check_response.emplace();
   const auto grpc_status = (status_code == enumToInt(Http::Code::Unauthorized))
                                ? Grpc::Status::WellKnownGrpcStatus::Unauthenticated
                                : Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
-  raw_check_response.mutable_status()->set_code(grpc_status);
+  denied.response_->raw_check_response->mutable_status()->set_code(grpc_status);
 
-  auto* denied_response = raw_check_response.mutable_denied_response();
+  auto* denied_response = denied.response_->raw_check_response->mutable_denied_response();
   denied_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(status_code));
   denied_response->set_body(denied.response_->body);
 
@@ -566,10 +564,9 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   }
 
   if (!denied.response_->dynamic_metadata.fields().empty()) {
-    *raw_check_response.mutable_dynamic_metadata() = denied.response_->dynamic_metadata;
+    *denied.response_->raw_check_response->mutable_dynamic_metadata() = denied.response_->dynamic_metadata;
   }
 
-  denied.response_->raw_check_response = raw_check_response;
   return std::move(denied.response_);
 }
 
