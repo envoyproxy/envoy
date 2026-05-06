@@ -2,6 +2,8 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "test/mocks/server/drain_manager.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -23,6 +25,10 @@ MockListenerComponentFactory::MockListenerComponentFactory()
           throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
         }
         return socket_;
+      }));
+  ON_CALL(*this, createDrainManager_(_))
+      .WillByDefault(Invoke([](envoy::config::listener::v3::Listener::DrainType) {
+        return new testing::NiceMock<MockDrainManager>();
       }));
 }
 

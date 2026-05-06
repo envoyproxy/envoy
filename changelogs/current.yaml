@@ -72,6 +72,11 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: listener_manager
+  change: |
+    Added drain-close callback support for network filter chain factory contexts. Network filters can
+    now observe drain signals from server shutdown, LDS listener removal, and in-place filter chain
+    removal through ``addOnDrainCloseCb``.
 - area: stat_sinks
   change: |
     Added :ref:`max_data_points_per_request

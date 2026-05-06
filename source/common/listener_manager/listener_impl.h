@@ -148,10 +148,14 @@ public:
   bool drainClose(Network::DrainDirection scope) const override {
     return drain_manager_->drainClose(scope) || server_.drainManager().drainClose(scope);
   }
-  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
-                                              DrainCloseCb) const override {
-    IS_ENVOY_BUG("Unexpected function call");
-    return nullptr;
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection direction,
+                                              DrainCloseCb cb) const override {
+    // The validation listener manager creates listeners without a drain manager (see
+    // validation_listener_manager.h). Drains never run in validation mode, so just no-op.
+    if (drain_manager_ == nullptr) {
+      return nullptr;
+    }
+    return drain_manager_->addOnDrainCloseCb(direction, std::move(cb));
   }
   Server::DrainManager& drainManager();
   friend class ListenerImpl;

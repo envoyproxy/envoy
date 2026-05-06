@@ -452,6 +452,9 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        "//envoy/server:filter_config_interface",
+        "//source/common/protobuf",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )

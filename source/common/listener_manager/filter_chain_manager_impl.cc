@@ -1,7 +1,10 @@
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/event/dispatcher.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
@@ -78,10 +81,63 @@ PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
     : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
       filter_chain_scope_(parent_context_.listenerScope().createScope("")),
-      init_manager_(init_manager) {}
+      init_manager_(init_manager),
+      drain_cb_slot_(ThreadLocal::TypedSlot<PerWorkerDrainCallbacks>::makeUnique(
+          parent_context_.serverFactoryContext().threadLocal())) {
+  drain_cb_slot_->set(
+      [](Event::Dispatcher&) { return std::make_shared<PerWorkerDrainCallbacks>(); });
+
+  parent_drain_cb_handle_ = parent_context_.drainDecision().addOnDrainCloseCb(
+      Network::DrainDirection::All, [this](std::chrono::milliseconds) -> absl::Status {
+        startDraining();
+        return absl::OkStatus();
+      });
+}
 
 bool PerFilterChainFactoryContextImpl::drainClose(Network::DrainDirection scope) const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose(scope);
+}
+
+Common::CallbackHandlePtr
+PerFilterChainFactoryContextImpl::addOnDrainCloseCb(Network::DrainDirection /*direction*/,
+                                                    DrainCloseCb cb) const {
+  // Direction is intentionally ignored: filter-chain drains only ever cascade with
+  // DrainDirection::All today, matching DrainManagerImpl's effective behavior.
+  if (is_draining_.load()) {
+    const absl::Status status = cb(std::chrono::milliseconds(0));
+    ENVOY_BUG(status.ok(),
+              absl::StrCat("drain-close callback returned non-OK: ", status.message()));
+    return nullptr;
+  }
+  auto local = drain_cb_slot_->get();
+  ASSERT(local.has_value());
+  return local->cbs_.add(std::move(cb));
+}
+
+void PerFilterChainFactoryContextImpl::startDraining() {
+  if (is_draining_.exchange(true)) {
+    return;
+  }
+  fanOutDrain();
+}
+
+void PerFilterChainFactoryContextImpl::fanOutDrain() {
+  const auto& options = parent_context_.serverFactoryContext().options();
+  const auto drain_time =
+      options.drainStrategy() == Server::DrainStrategy::Immediate
+          ? std::chrono::milliseconds(0)
+          : std::chrono::duration_cast<std::chrono::milliseconds>(options.drainTime());
+  Random::RandomGenerator& random = parent_context_.serverFactoryContext().api().randomGenerator();
+
+  drain_cb_slot_->runOnAllThreads([drain_time, &random](OptRef<PerWorkerDrainCallbacks> tls) {
+    const absl::Status status = tls->cbs_.runCallbacksWith([drain_time, &random] {
+      return drain_time.count() <= 0
+                 ? std::chrono::milliseconds(0)
+                 : std::chrono::milliseconds(random.random() % drain_time.count());
+    });
+    ENVOY_BUG(status.ok(),
+              absl::StrCat("drain-close callback returned non-OK: ", status.message()));
+  });
 }
 
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }

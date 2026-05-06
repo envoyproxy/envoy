@@ -111,6 +111,17 @@ public:
         fallback_filter_chain, filter_chain_factory_builder_, *filter_chain_manager_));
   }
 
+  void expectParentDrainCallback(Network::DrainDecision::DrainCloseCb& stored_parent_cb) {
+    EXPECT_CALL(parent_context_, drainDecision())
+        .WillRepeatedly(ReturnRef(parent_context_.drain_manager_));
+    EXPECT_CALL(parent_context_.drain_manager_, addOnDrainCloseCb(_, _))
+        .WillOnce([&](Network::DrainDirection,
+                      Network::DrainDecision::DrainCloseCb cb) -> Common::CallbackHandlePtr {
+          stored_parent_cb = std::move(cb);
+          return nullptr;
+        });
+  }
+
   // Intermediate states.
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
@@ -312,9 +323,9 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
   auto context1 = filter_chain_manager_->createFilterChainFactoryContext(&filter_chain_messages[1]);
 
   // Server as whole is not draining.
-  MockDrainManager not_a_draining_manager;
+  NiceMock<MockDrainManager> not_a_draining_manager;
   EXPECT_CALL(not_a_draining_manager, drainClose).WillRepeatedly(Return(false));
-  Configuration::MockServerFactoryContext mock_server_context;
+  NiceMock<Configuration::MockServerFactoryContext> mock_server_context;
   EXPECT_CALL(mock_server_context, drainManager).WillRepeatedly(ReturnRef(not_a_draining_manager));
   EXPECT_CALL(parent_context_, serverFactoryContext).WillRepeatedly(ReturnRef(mock_server_context));
 
@@ -347,6 +358,201 @@ TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
             "{\"destination_port\":10000,\"server_names\":[\"example.com\"]}"
 #endif
   );
+}
+
+TEST_P(FilterChainManagerImplTest, DrainCallbackFiresOnStartDraining) {
+  envoy::config::listener::v3::FilterChain fc = filter_chain_template_;
+  fc.set_name("fc_drain");
+  auto context = filter_chain_manager_->createFilterChainFactoryContext(&fc);
+
+  bool callback_fired = false;
+  auto handle = context->drainDecision().addOnDrainCloseCb(
+      Network::DrainDirection::All, [&](std::chrono::milliseconds) -> absl::Status {
+        callback_fired = true;
+        return absl::OkStatus();
+      });
+
+  EXPECT_NE(handle, nullptr);
+  EXPECT_FALSE(callback_fired);
+
+  auto* context_impl = dynamic_cast<PerFilterChainFactoryContextImpl*>(context.get());
+  ASSERT_NE(context_impl, nullptr);
+  context_impl->startDraining();
+
+  EXPECT_TRUE(callback_fired);
+  EXPECT_TRUE(context->drainDecision().drainClose(Network::DrainDirection::All));
+}
+
+TEST_P(FilterChainManagerImplTest, DrainCallbackFiresOnParentDrain) {
+  envoy::config::listener::v3::FilterChain fc = filter_chain_template_;
+  fc.set_name("fc_parent_drain");
+
+  Network::DrainDecision::DrainCloseCb stored_parent_cb;
+  expectParentDrainCallback(stored_parent_cb);
+  auto context = filter_chain_manager_->createFilterChainFactoryContext(&fc);
+
+  bool callback_fired = false;
+  auto handle = context->drainDecision().addOnDrainCloseCb(
+      Network::DrainDirection::All, [&](std::chrono::milliseconds) -> absl::Status {
+        callback_fired = true;
+        return absl::OkStatus();
+      });
+
+  EXPECT_NE(handle, nullptr);
+  EXPECT_FALSE(callback_fired);
+
+  ASSERT_NE(stored_parent_cb, nullptr);
+  EXPECT_TRUE(stored_parent_cb(std::chrono::milliseconds(42)).ok());
+
+  EXPECT_TRUE(callback_fired);
+  EXPECT_TRUE(context->drainDecision().drainClose(Network::DrainDirection::All));
+}
+
+TEST_P(FilterChainManagerImplTest, DrainCallbackIsIdempotent) {
+  envoy::config::listener::v3::FilterChain fc = filter_chain_template_;
+  fc.set_name("fc_idempotent");
+
+  Network::DrainDecision::DrainCloseCb stored_parent_cb;
+  expectParentDrainCallback(stored_parent_cb);
+  auto context = filter_chain_manager_->createFilterChainFactoryContext(&fc);
+
+  int fire_count = 0;
+  auto handle = context->drainDecision().addOnDrainCloseCb(
+      Network::DrainDirection::All, [&](std::chrono::milliseconds) -> absl::Status {
+        fire_count++;
+        return absl::OkStatus();
+      });
+
+  EXPECT_NE(handle, nullptr);
+  ASSERT_NE(stored_parent_cb, nullptr);
+  EXPECT_TRUE(stored_parent_cb(std::chrono::milliseconds(10)).ok());
+  EXPECT_EQ(fire_count, 1);
+
+  auto* context_impl = dynamic_cast<PerFilterChainFactoryContextImpl*>(context.get());
+  ASSERT_NE(context_impl, nullptr);
+  context_impl->startDraining();
+  EXPECT_EQ(fire_count, 1);
+
+  EXPECT_TRUE(stored_parent_cb(std::chrono::milliseconds(20)).ok());
+  EXPECT_EQ(fire_count, 1);
+}
+
+TEST_P(FilterChainManagerImplTest, OnlyRemovedFilterChainsAreDrained) {
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+  for (int i = 0; i < 2; i++) {
+    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+    new_filter_chain.set_name(absl::StrCat("filter_chain_", i));
+    new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
+    filter_chain_messages.push_back(std::move(new_filter_chain));
+  }
+
+  auto filter_chain_0 = std::make_shared<Network::MockFilterChain>();
+  auto filter_chain_1 = std::make_shared<Network::MockFilterChain>();
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
+      .WillOnce(Return(filter_chain_0))
+      .WillOnce(Return(filter_chain_1));
+  EXPECT_TRUE(filter_chain_manager_
+                  ->addFilterChains(GetParam() ? &matcher_ : nullptr,
+                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                        &filter_chain_messages[0], &filter_chain_messages[1]},
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                  .ok());
+
+  FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
+                                                  *filter_chain_manager_};
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _)).Times(0);
+  EXPECT_TRUE(new_filter_chain_manager
+                  .addFilterChains(GetParam() ? &matcher_ : nullptr,
+                                   std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                       &filter_chain_messages[0]},
+                                   nullptr, filter_chain_factory_builder_, new_filter_chain_manager)
+                  .ok());
+
+  ASSERT_EQ(filter_chain_manager_->drainingFilterChains().size(), 1);
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains()[0], filter_chain_1);
+}
+
+TEST_P(FilterChainManagerImplTest, DrainCallbackDelayIsPerCallbackJitter) {
+  envoy::config::listener::v3::FilterChain fc = filter_chain_template_;
+  fc.set_name("fc_jitter");
+
+  Network::DrainDecision::DrainCloseCb stored_parent_cb;
+  expectParentDrainCallback(stored_parent_cb);
+  auto context = filter_chain_manager_->createFilterChainFactoryContext(&fc);
+
+  EXPECT_CALL(parent_context_.server_factory_context_.options_, drainTime())
+      .WillRepeatedly(Return(std::chrono::seconds(10)));
+  EXPECT_CALL(parent_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(100))
+      .WillOnce(Return(250))
+      .WillOnce(Return(700));
+
+  std::vector<Common::CallbackHandlePtr> handles;
+  std::vector<std::chrono::milliseconds> received_delays;
+  for (int i = 0; i < 3; i++) {
+    handles.push_back(context->drainDecision().addOnDrainCloseCb(
+        Network::DrainDirection::All, [&](std::chrono::milliseconds delay) -> absl::Status {
+          received_delays.push_back(delay);
+          return absl::OkStatus();
+        }));
+    EXPECT_NE(handles.back(), nullptr);
+  }
+
+  ASSERT_NE(stored_parent_cb, nullptr);
+  EXPECT_TRUE(stored_parent_cb(std::chrono::milliseconds(0)).ok());
+
+  ASSERT_EQ(received_delays.size(), 3u);
+  EXPECT_EQ(received_delays[0], std::chrono::milliseconds(100));
+  EXPECT_EQ(received_delays[1], std::chrono::milliseconds(250));
+  EXPECT_EQ(received_delays[2], std::chrono::milliseconds(700));
+}
+
+TEST_P(FilterChainManagerImplTest, DrainCallbackImmediateIfImmediateStrategy) {
+  envoy::config::listener::v3::FilterChain fc = filter_chain_template_;
+  fc.set_name("fc_immediate");
+
+  Network::DrainDecision::DrainCloseCb stored_parent_cb;
+  expectParentDrainCallback(stored_parent_cb);
+  auto context = filter_chain_manager_->createFilterChainFactoryContext(&fc);
+
+  EXPECT_CALL(parent_context_.server_factory_context_.options_, drainStrategy())
+      .WillRepeatedly(Return(Server::DrainStrategy::Immediate));
+  // Random must not be consulted under the Immediate strategy.
+  EXPECT_CALL(parent_context_.server_factory_context_.api_.random_, random()).Times(0);
+
+  std::chrono::milliseconds received_delay{999};
+  auto handle = context->drainDecision().addOnDrainCloseCb(
+      Network::DrainDirection::All, [&](std::chrono::milliseconds delay) -> absl::Status {
+        received_delay = delay;
+        return absl::OkStatus();
+      });
+
+  ASSERT_NE(stored_parent_cb, nullptr);
+  EXPECT_TRUE(stored_parent_cb(std::chrono::milliseconds(0)).ok());
+  EXPECT_EQ(received_delay, std::chrono::milliseconds(0));
+}
+
+TEST_P(FilterChainManagerImplTest, DrainCallbackImmediateIfAlreadyDraining) {
+  envoy::config::listener::v3::FilterChain fc = filter_chain_template_;
+  fc.set_name("fc_already_draining");
+  auto context = filter_chain_manager_->createFilterChainFactoryContext(&fc);
+
+  auto* context_impl = dynamic_cast<PerFilterChainFactoryContextImpl*>(context.get());
+  ASSERT_NE(context_impl, nullptr);
+  context_impl->startDraining();
+
+  bool callback_fired = false;
+  std::chrono::milliseconds received_delay{999};
+  auto handle = context->drainDecision().addOnDrainCloseCb(
+      Network::DrainDirection::All, [&](std::chrono::milliseconds delay) -> absl::Status {
+        callback_fired = true;
+        received_delay = delay;
+        return absl::OkStatus();
+      });
+
+  EXPECT_TRUE(callback_fired);
+  EXPECT_EQ(received_delay, std::chrono::milliseconds(0));
+  EXPECT_EQ(handle, nullptr);
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, FilterChainManagerImplTest, ::testing::Values(true, false));

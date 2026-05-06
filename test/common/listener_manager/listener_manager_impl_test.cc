@@ -190,6 +190,21 @@ public:
   MOCK_METHOD(std::string, versionInfo, (), (const));
 };
 
+TEST_P(ListenerManagerImplTest, ProdListenerComponentFactoryCreatesChildDrainManager) {
+  ProdListenerComponentFactory factory(server_);
+  auto child_drain_manager = std::make_unique<NiceMock<MockDrainManager>>();
+  auto* expected_drain_manager = child_drain_manager.get();
+  const auto drain_type = envoy::config::listener::v3::Listener::MODIFY_ONLY;
+
+  EXPECT_CALL(server_, drainManager()).WillOnce(ReturnRef(server_.drain_manager_));
+  EXPECT_CALL(server_, dispatcher()).WillOnce(ReturnRef(server_.dispatcher_));
+  EXPECT_CALL(server_.drain_manager_,
+              createChildManager(testing::Ref(server_.dispatcher_), drain_type))
+      .WillOnce(Return(ByMove(std::move(child_drain_manager))));
+
+  EXPECT_EQ(factory.createDrainManager(drain_type).get(), expected_drain_manager);
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyFilter) {
   const std::string yaml = R"EOF(
 address:

@@ -43,7 +43,7 @@ class ListenerHandle {
 public:
   ListenerHandle(bool need_local_drain_manager = true) {
     if (need_local_drain_manager) {
-      drain_manager_ = new MockDrainManager();
+      drain_manager_ = new NiceMock<MockDrainManager>();
       EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0);
     }
   }
@@ -52,7 +52,7 @@ public:
   MOCK_METHOD(void, onDestroy, ());
 
   Init::ExpectableTargetImpl target_;
-  MockDrainManager* drain_manager_{};
+  NiceMock<MockDrainManager>* drain_manager_{};
   Configuration::FactoryContext* context_{};
 };
 

@@ -122,6 +122,7 @@ envoy_cc_mock(
     hdrs = ["listener_component_factory.h"],
     rbe_pool = "6gig",
     deps = [
+        ":drain_manager_mocks",
         "//envoy/server:drain_manager_interface",
         "//envoy/server:listener_manager_interface",
         "//test/mocks/network:io_handle_mocks",

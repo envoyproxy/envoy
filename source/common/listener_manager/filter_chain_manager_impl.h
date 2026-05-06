@@ -16,6 +16,7 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/common/callback_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
@@ -46,6 +47,9 @@ public:
 // Its lifetime must cover the created network filter chain.
 // Its lifetime should be covered by the owned listeners so as to support replacing the active
 // filter chains in the listener.
+//
+// Drain-close callbacks registered via addOnDrainCloseCb() are stored in per-worker thread-local
+// storage and invoked on the same dispatcher thread that registered them.
 class PerFilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
                                          public Network::DrainDecision {
 public:
@@ -54,11 +58,8 @@ public:
 
   // DrainDecision
   bool drainClose(Network::DrainDirection) const override;
-  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
-                                              DrainCloseCb) const override {
-    IS_ENVOY_BUG("Unexpected function call");
-    return nullptr;
-  }
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection direction,
+                                              DrainCloseCb cb) const override;
 
   // Configuration::FactoryContext
   Network::DrainDecision& drainDecision() override;
@@ -69,16 +70,25 @@ public:
   Configuration::ServerFactoryContext& serverFactoryContext() override;
   Stats::Scope& listenerScope() override;
 
-  void startDraining() override { is_draining_.store(true); }
+  void startDraining() override;
 
 private:
+  struct PerWorkerDrainCallbacks : public ThreadLocal::ThreadLocalObject {
+    Common::CallbackManager<absl::Status, std::chrono::milliseconds> cbs_;
+  };
+
+  // Must be called on the main dispatcher.
+  void fanOutDrain();
+
   Configuration::FactoryContext& parent_context_;
   // The scope that has empty prefix.
   Stats::ScopeSharedPtr scope_;
   // filter_chain_scope_ has the same prefix as listener owners scope.
   Stats::ScopeSharedPtr filter_chain_scope_;
   Init::Manager& init_manager_;
-  std::atomic<bool> is_draining_{false};
+  mutable std::atomic<bool> is_draining_{false};
+  ThreadLocal::TypedSlotPtr<PerWorkerDrainCallbacks> drain_cb_slot_;
+  Common::CallbackHandlePtr parent_drain_cb_handle_;
 };
 
 using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;
