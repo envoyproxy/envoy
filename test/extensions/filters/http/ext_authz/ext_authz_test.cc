@@ -6970,6 +6970,243 @@ TEST_F(HttpFilterTest, ShadowModeWithRequestBody) {
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
 }
 
+// Verifies that encode1xxHeaders returns Continue.
+TEST_F(HttpFilterTest, Encode1xxHeaders) {
+  initialize(getFilterConfig(false, false));
+  Http::TestResponseHeaderMapImpl headers{{":status", "100"}};
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(headers));
+}
+
+// Verifies that per-route gRPC client creation logic is hit.
+TEST_F(HttpFilterTest, CreatePerRouteGrpcClientWithServerContext) {
+  initialize(getFilterConfig(false, false));
+  prepareCheck();
+
+  // Create per-route configuration with gRPC service override.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
+  grpc_service->mutable_envoy_grpc()->set_cluster_name("per_route_cluster");
+
+  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
+      .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
+
+  // Initialize filter with server context.
+  auto new_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto test_filter = std::make_unique<Filter>(config_, std::move(new_client), factory_context_);
+  test_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  // Mock cluster manager to return a client.
+  auto mock_async_client = std::make_shared<Grpc::MockAsyncClient>();
+  EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+      .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_async_client)));
+
+  // Expect the check call on the newly created gRPC client.
+  Grpc::MockAsyncRequest async_request;
+  EXPECT_CALL(*mock_async_client, sendRaw(_, _, _, _, _, _))
+      .WillOnce(Return(&async_request));
+
+  // This should trigger createPerRouteGrpcClient and hit the creation logic.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            test_filter->decodeHeaders(request_headers_, false));
+
+  // Cancel the request before destruction to avoid assertion failure in GrpcClientImpl.
+  EXPECT_CALL(async_request, cancel());
+  test_filter->onDestroy();
+}
+
+// Verifies that per-route HTTP client creation logic is hit.
+TEST_F(HttpFilterTest, CreatePerRouteHttpClientWithServerContext) {
+  initialize(getFilterConfig(false, true));
+  prepareCheck();
+
+  // Create per-route configuration with HTTP service override.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  auto* http_service = per_route_config.mutable_check_settings()->mutable_http_service();
+  http_service->mutable_server_uri()->set_uri("https://per-route.example.com");
+  http_service->mutable_server_uri()->set_cluster("per_route_cluster");
+
+  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
+      .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
+
+  // Initialize filter with server context.
+  auto new_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto test_filter = std::make_unique<Filter>(config_, std::move(new_client), factory_context_);
+  test_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  // Mock cluster manager to return a cluster for the HTTP client.
+  EXPECT_CALL(factory_context_.cluster_manager_, getThreadLocalCluster(absl::string_view("per_route_cluster")));
+
+  // This should trigger createPerRouteHttpClient and hit the creation logic.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            test_filter->decodeHeaders(request_headers_, false));
+}
+
+// Verifies that valid error response mutations are allowed when validate_mutations is true.
+TEST_F(HttpFilterTest, ValidErrorResponseWithMutations) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  validate_mutations: true
+  )EOF");
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  response.status_code = Http::Code::ServiceUnavailable;
+  // Valid mutations.
+  response.headers_to_set = {{"x-error-header", "value"}};
+  response.headers_to_append = {{"x-error-append", "value"}};
+
+  // Should succeed and NOT clear attributes because mutations are valid.
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code, absl::string_view,
+                           std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                           const absl::optional<uint64_t>, absl::string_view) {
+        Http::TestResponseHeaderMapImpl response_headers;
+        modify_headers(response_headers);
+        EXPECT_EQ("value", response_headers.get_("x-error-header"));
+        EXPECT_EQ("value", response_headers.get_("x-error-append"));
+      }));
+
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+}
+
+// Verifies that destination labels are correctly extracted from bootstrap metadata.
+TEST_F(HttpFilterTest, DestinationLabelsFromBootstrap) {
+  const std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  bootstrap_metadata_labels_key: "labels"
+  )EOF";
+
+  // Set up bootstrap metadata.
+  auto* metadata_fields = factory_context_.bootstrap_.mutable_node()->mutable_metadata()->mutable_fields();
+  Protobuf::Struct labels_struct;
+  (*labels_struct.mutable_fields())["app"] = ValueUtil::stringValue("envoy");
+  (*metadata_fields)["labels"] = ValueUtil::structValue(labels_struct);
+
+  initialize(std::string(yaml));
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                           const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        EXPECT_EQ("envoy", check_param.attributes().destination().labels().at("app"));
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+// Verifies that the filter falls back to the default client if per-route gRPC client creation fails.
+TEST_F(HttpFilterTest, PerRouteGrpcClientCreationFailure) {
+  initialize(getFilterConfig(false, false));
+  prepareCheck();
+
+  // Create per-route configuration with gRPC service override.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
+  grpc_service->mutable_envoy_grpc()->set_cluster_name("per_route_cluster");
+
+  FilterConfigPerRoute per_route_filter_config(per_route_config);
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs())
+      .WillByDefault(Return(Router::RouteSpecificFilterConfigs{&per_route_filter_config}));
+
+  // Mock cluster manager to return an error status.
+  EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+      .WillOnce(Return(absl::InternalError("failed")));
+
+  // It should fall back to the default client (client_).
+  EXPECT_CALL(*client_, check(_, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+// Verifies that the filter handles invalid append actions when validation is disabled.
+TEST_F(HttpFilterTest, SawInvalidAppendActionsNoValidation) {
+  initialize(getFilterConfig(false, false));
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        response->saw_invalid_append_actions = true;
+        callbacks.onComplete(std::move(response));
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+// Verifies that the filter ignores invalid header removal when validation is enabled.
+TEST_F(HttpFilterTest, InvalidHeaderRemovalIgnored) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  validate_mutations: true
+  )EOF");
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        response->headers_to_remove = {"invalid\nheader"};
+        callbacks.onComplete(std::move(response));
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(request_headers_, false));
+}
+
+// Verifies that adding query parameters that exceed header limits results in rejection.
+TEST_F(HttpFilterTest, RequestHeaderLimitsReachedWithQueryParameters) {
+  initialize(getFilterConfig(false, false));
+  prepareCheck();
+
+  // Create a header map with a small limit (1KB).
+  Http::TestRequestHeaderMapImpl limited_request_headers({}, 1, 100);
+  limited_request_headers.addCopy(Http::Headers::get().Host, "example.com");
+  limited_request_headers.addCopy(Http::Headers::get().Method, "GET");
+  limited_request_headers.addCopy(Http::Headers::get().Path, "/test");
+  limited_request_headers.addCopy(Http::Headers::get().Scheme, "https");
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        // This will make the path > 1KB.
+        response->query_parameters_to_set = {{"foo", std::string(2048, 'a')}};
+        callbacks.onComplete(std::move(response));
+      }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(limited_request_headers, false));
+  EXPECT_EQ(1U, config_->stats().request_header_limits_reached_.value());
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters
