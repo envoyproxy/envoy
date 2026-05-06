@@ -118,12 +118,6 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   return stream;
 }
 
-quic::QuicSpdyStream*
-EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
-  IS_ENVOY_BUG("Unexpected disallowed server push call");
-  return nullptr;
-}
-
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
   IS_ENVOY_BUG("Unexpected disallowed server initiated stream");
   return nullptr;

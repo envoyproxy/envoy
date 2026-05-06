@@ -6,7 +6,6 @@
 
 #include "test/extensions/common/async_files/mocks.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -58,7 +57,7 @@ protected:
   }
   void expectWriteWithPosition(MockAsyncFileHandle handle, absl::string_view content,
                                off_t offset) {
-    EXPECT_CALL(*handle, write(_, BufferStringEqual(std::string(content)), offset, _));
+    EXPECT_CALL(*handle, write(_, BufferString(std::string(content)), offset, _));
   }
   void completeWriteOfSize(size_t length) {
     mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>{length});

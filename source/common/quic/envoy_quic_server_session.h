@@ -140,7 +140,6 @@ protected:
   // quic::QuicSession
   // Overridden to create stream as encoder and associate it with an decoder.
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
-  quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }

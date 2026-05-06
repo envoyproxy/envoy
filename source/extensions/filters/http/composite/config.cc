@@ -11,6 +11,33 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
+class MatchTreeValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Envoy::Http::HttpMatchingData> {
+public:
+  absl::Status
+  performDataInputValidation(const Matcher::DataInputFactory<Envoy::Http::HttpMatchingData>&,
+                             absl::string_view) override {
+    return absl::OkStatus();
+  }
+};
+
+absl::StatusOr<Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>>
+createMatcherTree(const xds::type::matcher::v3::Matcher& matcher_config,
+                  Envoy::Http::Matching::HttpFilterActionContext& action_context) {
+  MatchTreeValidationVisitor match_tree_validation_visitor;
+  Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
+                            Envoy::Http::Matching::HttpFilterActionContext>
+      matcher_factory(action_context, action_context.server_factory_context_.value(),
+                      match_tree_validation_visitor);
+  auto factory_cb = matcher_factory.create(matcher_config);
+  if (!match_tree_validation_visitor.errors().empty()) {
+    return absl::InvalidArgumentError(
+        fmt::format("requirement violation while creating match tree: {}",
+                    match_tree_validation_visitor.errors()[0]));
+  }
+  return factory_cb();
+}
+
 absl::StatusOr<NamedFilterChainFactoryMapSharedPtr>
 CompositeFilterFactory::compileNamedFilterChains(
     const envoy::extensions::filters::http::composite::v3::Composite& config,
@@ -63,33 +90,86 @@ absl::StatusOr<Http::FilterFactoryCb> CompositeFilterFactory::createFilterFactor
   RETURN_IF_NOT_OK(named_chains_or_error.status());
   auto named_chains = std::move(named_chains_or_error.value());
 
+  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree = nullptr;
+  if (proto_config.has_matcher()) {
+    Envoy::Http::Matching::HttpFilterActionContext action_context{
+        .is_downstream_ = true,
+        .stat_prefix_ = stats_prefix,
+        .factory_context_ = context,
+        .upstream_factory_context_ = absl::nullopt,
+        .server_factory_context_ = context.serverFactoryContext()};
+    auto match_tree_or_error = createMatcherTree(proto_config.matcher(), action_context);
+    RETURN_IF_NOT_OK(match_tree_or_error.status());
+    match_tree = std::move(match_tree_or_error.value());
+  }
+
   const auto& prefix = stats_prefix + "composite.";
   auto stats = std::make_shared<FilterStats>(
       FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(context.scope(), prefix))});
 
-  return [stats, named_chains](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [stats, named_chains, match_tree](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(*stats, callbacks.dispatcher(), false /* is_upstream */,
-                                           named_chains);
+                                           match_tree, named_chains);
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> CompositeFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::composite::v3::Composite&,
-    const std::string& stat_prefix, DualInfo dual_info,
-    Server::Configuration::ServerFactoryContext&) {
+absl::StatusOr<Envoy::Http::FilterFactoryCb> CompositeFilterFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& config, const std::string& stats_prefix,
+    Server::Configuration::UpstreamFactoryContext& context) {
+  const auto& proto_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::filters::http::composite::v3::Composite&>(
+      config, context.serverFactoryContext().messageValidationVisitor());
+
+  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree = nullptr;
+  if (proto_config.has_matcher()) {
+    Envoy::Http::Matching::HttpFilterActionContext action_context{
+        .is_downstream_ = false,
+        .stat_prefix_ = stats_prefix,
+        .factory_context_ = absl::nullopt,
+        .upstream_factory_context_ = context,
+        .server_factory_context_ = context.serverFactoryContext()};
+
+    auto match_tree_or_error = createMatcherTree(proto_config.matcher(), action_context);
+    RETURN_IF_NOT_OK(match_tree_or_error.status());
+    match_tree = std::move(match_tree_or_error.value());
+  }
+
   // This method is called for upstream filters.
   // Named filter chains are not supported for upstream filters.
-  const auto& prefix = stat_prefix + "composite.";
+  const auto& prefix = stats_prefix + "composite.";
   auto stats = std::make_shared<FilterStats>(
-      FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(dual_info.scope, prefix))});
+      FilterStats{ALL_COMPOSITE_FILTER_STATS(POOL_COUNTER_PREFIX(context.scope(), prefix))});
 
-  return [stats, dual_info](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    auto filter = std::make_shared<Filter>(*stats, callbacks.dispatcher(), dual_info.is_upstream);
+  return [stats, match_tree](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    auto filter = std::make_shared<Filter>(*stats, callbacks.dispatcher(), true /* is_upstream */,
+                                           match_tree, nullptr);
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
   };
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+CompositeFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::composite::v3::CompositePerRoute& config,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ =
+          fmt::format("http.{}.", context.scope().symbolTable().toString(context.scope().prefix())),
+      .factory_context_ = absl::nullopt,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = context};
+
+  auto match_tree_or_error = createMatcherTree(config.matcher(), action_context);
+  RETURN_IF_NOT_OK(match_tree_or_error.status());
+  auto match_tree = std::move(match_tree_or_error.value());
+  if (match_tree == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<CompositePerRouteConfig>(match_tree);
 }
 
 /**

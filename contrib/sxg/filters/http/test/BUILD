@@ -36,6 +36,7 @@ envoy_cc_test(
         "//source/common/secret:secret_manager_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/integration:http_integration_lib",
+        "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",

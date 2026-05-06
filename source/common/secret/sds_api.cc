@@ -21,21 +21,21 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api,
                bool warm)
-    : Envoy::Config::SubscriptionBase<envoy::extensions::transport_sockets::tls::v3::Secret>(
-          validation_visitor, "name"),
-      init_target_(fmt::format("SdsApi {}", sds_config_name), [this, warm] { initialize(warm); }),
+    : init_target_(fmt::format("SdsApi {}", sds_config_name), [this, warm] { initialize(warm); }),
       dispatcher_(dispatcher), api_(api),
       scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
-      sds_api_stats_(generateStats(*scope_)), sds_config_(std::move(sds_config)),
-      sds_config_name_(sds_config_name), clean_up_(std::move(destructor_cb)),
-      subscription_factory_(subscription_factory), time_source_(time_source),
+      sds_api_stats_(generateStats(*scope_)), resource_type_helper_(validation_visitor, "name"),
+      sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
+      clean_up_(std::move(destructor_cb)), subscription_factory_(subscription_factory),
+      time_source_(time_source),
       secret_data_{sds_config_name_, "uninitialized", time_source_.systemTime()} {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
-  subscription_ = THROW_OR_RETURN_VALUE(
-      subscription_factory_.subscriptionFromConfigSource(
-          sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {}),
-      Config::SubscriptionPtr);
+  subscription_ =
+      THROW_OR_RETURN_VALUE(subscription_factory_.subscriptionFromConfigSource(
+                                sds_config_, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+                                resource_type_helper_.resourceDecoder(), {}),
+                            Config::SubscriptionPtr);
 }
 
 void SdsApi::resolveDataSource(const FileContentMap& files,
