@@ -78,7 +78,7 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/spel
 CURRENT=rustfmt
 RUSTFMT_PRE="$(git diff | md5sum)"
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @rules_rust//:rustfmt
-RUSTFMT_POST="$(git diff)"
+RUSTFMT_POST="$(git diff | md5sum)"
 if [[ "$RUSTFMT_PRE" != "$RUSTFMT_POST" ]]; then
     echo "ERROR: rustfmt produced changes — Rust code is unformatted." >&2
     echo "Run: bazel run @rules_rust//:rustfmt" >&2
