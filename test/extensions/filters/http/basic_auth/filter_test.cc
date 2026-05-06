@@ -25,7 +25,7 @@ public:
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     ON_CALL(decoder_filter_callbacks_, filterConfigName)
-        .WillByDefault(Return("envoy.filters.http.basic_auth"));
+        .WillByDefault(testing::Return("envoy.filters.http.basic_auth"));
   }
 
   NiceMock<Stats::IsolatedStoreImpl> stats_;
@@ -59,11 +59,11 @@ TEST_F(FilterTest, BasicAuth) {
 TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
   UserMap users;
   users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
-  auto config =
+  FilterConfigConstSharedPtr config =
       std::make_unique<FilterConfig>(std::move(users), "x-username", "",
                                      /*allow_missing=*/false,
                                      /*emit_dynamic_metadata=*/true, "stats", *stats_.rootScope());
-  auto filter = std::make_shared<BasicAuthFilter>(config);
+  std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
   filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
 
   Http::TestRequestHeaderMapImpl request_headers{{"Authorization", "Basic dXNlcjE6dGVzdDE="}};
@@ -350,7 +350,7 @@ public:
     filter_ = std::make_shared<BasicAuthFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     ON_CALL(decoder_filter_callbacks_, filterConfigName)
-        .WillByDefault(Return("envoy.filters.http.basic_auth"));
+        .WillByDefault(testing::Return("envoy.filters.http.basic_auth"));
   }
 
   NiceMock<Stats::IsolatedStoreImpl> stats_;
