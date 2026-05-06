@@ -1,15 +1,16 @@
 #include "source/common/quic/envoy_tls_server_handshaker.h"
 
 #include "source/common/common/macros.h"
-#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
 
 EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     quic::QuicSession* session, const quic::QuicCryptoServerConfig* crypto_config,
-    Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption)
-    : TlsServerHandshaker(session, crypto_config), pinned_ssl_ctx_(std::move(pinned_ssl_ctx)) {
+    Ssl::ServerContextSharedPtr pinned_ssl_ctx, Network::Connection* envoy_connection,
+    bool disable_resumption)
+    : TlsServerHandshaker(session, crypto_config), pinned_ssl_ctx_(std::move(pinned_ssl_ctx)),
+      envoy_connection_(envoy_connection) {
   SSL_set_ex_data(ssl(), handshakerExDataIndex(), this);
   // Also check the pinned context for keys: the factory is shared across workers and
   // config_ may reflect an SDS update before ssl_ctx_ is swapped on the main thread.
@@ -51,11 +52,11 @@ void EnvoyTlsServerHandshaker::keylogCallback(const SSL* ssl, const char* line) 
     // to write through, so silently skip.
     return;
   }
-  auto local_addr =
-      quicAddressToEnvoyAddressInstance(handshaker->session()->connection()->self_address());
-  auto remote_addr =
-      quicAddressToEnvoyAddressInstance(handshaker->session()->connection()->peer_address());
-  handshaker->pinnedServerContext()->writeKeyLog(line, local_addr.get(), remote_addr.get());
+  // Reuse the cached envoy address objects from the per-connection info
+  // provider rather than re-converting QUICHE addresses on every key log line.
+  const auto& info_provider = handshaker->envoy_connection_->connectionInfoProvider();
+  handshaker->pinnedServerContext()->maybeWriteKeyLog(line, info_provider.localAddress().get(),
+                                                      info_provider.remoteAddress().get());
 }
 
 } // namespace Quic

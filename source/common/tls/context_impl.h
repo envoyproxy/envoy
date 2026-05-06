@@ -120,9 +120,10 @@ public:
 
   // Apply the configured local/remote IP-list filters and, if they match,
   // write a single NSS Key Log line. Shared by the TCP TLS key log callback
-  // and by the QUIC TLS key log callback in EnvoyTlsServerHandshaker.
-  void writeKeyLog(const char* line, const Network::Address::Instance* local_addr,
-                   const Network::Address::Instance* remote_addr) const;
+  // and by the QUIC TLS key log callback in EnvoyTlsServerHandshaker. The
+  // call is a no-op when no key log file has been opened.
+  void maybeWriteKeyLog(const char* line, const Network::Address::Instance* local_addr,
+                        const Network::Address::Instance* remote_addr) const;
 
 protected:
   friend class ContextImplPeer;

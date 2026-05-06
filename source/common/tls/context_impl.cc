@@ -405,12 +405,12 @@ void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
   auto ctx = static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
   ASSERT(callbacks != nullptr);
   ASSERT(ctx != nullptr);
-  ctx->writeKeyLog(line, callbacks->connection().connectionInfoProvider().localAddress().get(),
-                   callbacks->connection().connectionInfoProvider().remoteAddress().get());
+  ctx->maybeWriteKeyLog(line, callbacks->connection().connectionInfoProvider().localAddress().get(),
+                        callbacks->connection().connectionInfoProvider().remoteAddress().get());
 }
 
-void ContextImpl::writeKeyLog(const char* line, const Network::Address::Instance* local_addr,
-                              const Network::Address::Instance* remote_addr) const {
+void ContextImpl::maybeWriteKeyLog(const char* line, const Network::Address::Instance* local_addr,
+                                   const Network::Address::Instance* remote_addr) const {
   if (tls_keylog_file_ == nullptr) {
     return;
   }

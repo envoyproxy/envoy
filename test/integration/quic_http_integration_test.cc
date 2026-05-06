@@ -2111,17 +2111,13 @@ TEST_P(QuicHttpIntegrationTest, NoSessionTicketResumptionWithoutKeys) {
 
 class QuicKeylogIntegrationTest : public QuicHttpIntegrationTest {
 public:
-  // EnvoyTlsServerHandshaker (which carries the key log callback hook) is
-  // gated by the same runtime flag as session ticket support today.
-  static constexpr absl::string_view kQuicSessionTicketRuntimeFlag =
-      "envoy.reloadable_features.quic_session_ticket_support";
-
   // Sets the runtime flag, allocates a temp key log file path, configures
   // key_log on the listener (if requested), and calls initialize().
   std::string setUpKeylog(bool configure, bool local_filter = false, bool remote_filter = false,
                           bool local_negative = false, bool remote_negative = false) {
     concurrency_ = 1;
-    config_helper_.addRuntimeOverride(kQuicSessionTicketRuntimeFlag, "true");
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_session_ticket_support",
+                                      "true");
     const std::string path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
     if (configure) {
       configureKeylog(path, local_filter, remote_filter, local_negative, remote_negative);

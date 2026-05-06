@@ -2,6 +2,8 @@
 
 #include <openssl/ssl.h>
 
+#include "envoy/network/connection.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/tls/server_context_impl.h"
 
@@ -22,9 +24,13 @@ namespace Quic {
 // to the ServerContextImpl that was current at connection creation.
 class EnvoyTlsServerHandshaker : public quic::TlsServerHandshaker {
 public:
+  // `envoy_connection` is the EnvoyQuicServerSession passed in via its
+  // Network::Connection facet by the caller; the handshaker holds it as a
+  // raw pointer to avoid a header/dep cycle with envoy_quic_server_session.
   EnvoyTlsServerHandshaker(quic::QuicSession* session,
                            const quic::QuicCryptoServerConfig* crypto_config,
-                           Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption);
+                           Ssl::ServerContextSharedPtr pinned_ssl_ctx,
+                           Network::Connection* envoy_connection, bool disable_resumption);
 
   // Session ticket key callback installed on the QUICHE ssl context.
   // Retrieves the handshaker from ssl ex_data and delegates to the pinned
@@ -51,6 +57,7 @@ private:
   }
 
   Ssl::ServerContextSharedPtr pinned_ssl_ctx_;
+  Network::Connection* envoy_connection_;
 };
 
 } // namespace Quic
