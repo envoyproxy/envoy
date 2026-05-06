@@ -116,6 +116,7 @@ class TestEnvoyClientTransport(unittest.TestCase):
 
         response = self.transport.handle_request(request)
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.read(), b"ok")
 
         # Verify call sequence: headers, chunk1, chunk2, close.
         self.mock_stream.send_headers.assert_called_once_with(unittest.mock.ANY, False)
@@ -204,6 +205,7 @@ class TestAsyncEnvoyClientTransport(unittest.IsolatedAsyncioTestCase):
 
         response = await self.transport.handle_async_request(request)
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(await response.aread(), b"ok")
 
         self.mock_stream.send_headers.assert_called_once_with(unittest.mock.ANY, False)
         self.mock_stream.send_data.assert_has_calls(

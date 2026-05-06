@@ -10,6 +10,7 @@ from .httpx_utils import get_envoy_headers, map_envoy_error
 
 
 class AsyncEnvoyStream(httpx.AsyncByteStream):
+    """An asynchronous byte stream that reads data from an Envoy stream."""
     def __init__(
         self,
         stream: envoy_engine.Stream,
@@ -51,6 +52,7 @@ class AsyncEnvoyStream(httpx.AsyncByteStream):
 
 
 class AsyncResponseHandler:
+    """Handles callbacks from the Envoy engine and pushes data to asyncio queues."""
     def __init__(self, executor: AsyncioExecutor) -> None:
         self.executor = executor
         self.headers_future: asyncio.Future = asyncio.Future()
@@ -136,6 +138,7 @@ class AsyncResponseHandler:
 
 
 class AsyncEnvoyClientTransport(httpx.AsyncBaseTransport):
+    """An asynchronous transport for httpx that uses Envoy Mobile."""
     def __init__(self, engine: envoy_engine.Engine) -> None:
         self._engine = engine
         self._executor = AsyncioExecutor()
@@ -175,6 +178,8 @@ class AsyncEnvoyClientTransport(httpx.AsyncBaseTransport):
         # 3. Finalize by sending an empty string with `end_stream=True` (via `stream.close(b"")`).
 
         # Start by sending the request headers.
+        # Note: These stream operations are synchronous in Python because they are
+        # non-blocking calls that interface directly with the Envoy Mobile C++ engine.
         stream.send_headers(envoy_headers, False)
 
         # Iterate through the request stream and send all data chunks.
