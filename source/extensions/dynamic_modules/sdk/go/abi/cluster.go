@@ -201,10 +201,14 @@ func (h *dymClusterHandle) AddHosts(priority uint32, specs []shared.ClusterHostS
 	zones := make([]C.envoy_dynamic_module_type_module_buffer, len(specs))
 	subZones := make([]C.envoy_dynamic_module_type_module_buffer, len(specs))
 
-	// metadataPairsPerHost MUST be the same for all specs. Use the max length and pad shorter
-	// ones; if any spec has a different number of triples than another, fail (caller error).
+	// metadataPairsPerHost MUST be the same for all specs and each slice length must be an exact
+	// multiple of 3 (filterName, key, value triples). A non-multiple-of-3 length or cross-spec
+	// mismatch is a caller error; return failure rather than silently truncating.
 	pairsPer := uint64(0)
 	for i := range specs {
+		if len(specs[i].MetadataPairs)%3 != 0 {
+			return nil, false
+		}
 		n := uint64(len(specs[i].MetadataPairs)) / 3
 		if i == 0 {
 			pairsPer = n
@@ -315,9 +319,6 @@ func (h *dymClusterHandle) HttpCallout(
 		return goResult, 0
 	}
 	h.wrapper.calloutMu.Lock()
-	if h.wrapper.calloutCallbacks == nil {
-		h.wrapper.calloutCallbacks = make(map[uint64]shared.HttpCalloutCallback)
-	}
 	h.wrapper.calloutCallbacks[uint64(calloutID)] = cb
 	h.wrapper.calloutMu.Unlock()
 	return goResult, uint64(calloutID)
@@ -588,6 +589,10 @@ func (c *dymClusterLbContext) GetHostSelectionRetryCount() uint32 {
 	return uint32(C.envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(c.hostCtxPtr))
 }
 
+// ShouldSelectAnotherHost uses the LB pointer captured at context-construction time rather than
+// the handle argument; the handle parameter exists only to satisfy the interface (which exposes
+// it so callers can pass a handle obtained from a different scope). The captured lbWrapper is
+// always the correct LB for this request's worker.
 func (c *dymClusterLbContext) ShouldSelectAnotherHost(_ shared.ClusterLoadBalancerHandle, priority uint32, index uint64) bool {
 	if c.lbWrapper == nil {
 		return false
@@ -653,8 +658,11 @@ func (a *dymClusterAsyncCompletion) Complete(host shared.ClusterHost, details st
 	)
 	runtime.KeepAlive(details)
 	// Drop from per-LB tracking and from the global async manager so the wrapper can be GC'd.
+	// asyncHandles may already be nil if lb_destroy drained it first.
 	a.lbWrapper.asyncMu.Lock()
-	delete(a.lbWrapper.asyncHandles, a)
+	if a.lbWrapper.asyncHandles != nil {
+		delete(a.lbWrapper.asyncHandles, a)
+	}
 	a.lbWrapper.asyncMu.Unlock()
 	if a.managerPtr != nil {
 		clusterAsyncCompletionManager.remove(a.managerPtr)
@@ -720,8 +728,9 @@ func envoy_dynamic_module_on_cluster_new(
 		return nil
 	}
 	wrapper := &clusterWrapper{
-		hostClusterPtr: hostClusterPtr,
-		configRef:      cfg,
+		hostClusterPtr:   hostClusterPtr,
+		configRef:        cfg,
+		calloutCallbacks: make(map[uint64]shared.HttpCalloutCallback),
 	}
 	cluster := cfg.factory.Create(cfg.configHandle)
 	if cluster == nil {
@@ -803,6 +812,26 @@ func envoy_dynamic_module_on_cluster_lb_destroy(
 		return
 	}
 	w.destroyed = true
+	// Cancel all in-flight async completions before calling OnDestroy. Any goroutine that
+	// subsequently calls Complete will see done=true and skip the C callback, which is
+	// necessary because hostLbPtr is freed immediately after this hook returns.
+	w.asyncMu.Lock()
+	pending := make([]*dymClusterAsyncCompletion, 0, len(w.asyncHandles))
+	for a := range w.asyncHandles {
+		pending = append(pending, a)
+	}
+	w.asyncHandles = nil
+	w.asyncMu.Unlock()
+	for _, a := range pending {
+		if !a.done.Swap(true) {
+			if a.userSelection != nil {
+				a.userSelection.Cancel()
+			}
+			if a.managerPtr != nil {
+				clusterAsyncCompletionManager.remove(a.managerPtr)
+			}
+		}
+	}
 	if w.lb != nil {
 		w.lb.OnDestroy()
 	}

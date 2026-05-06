@@ -154,9 +154,6 @@ func (h *dymBootstrapConfigHandle) HttpCallout(
 		return goResult, 0
 	}
 	h.wrapper.calloutMu.Lock()
-	if h.wrapper.calloutCallbacks == nil {
-		h.wrapper.calloutCallbacks = make(map[uint64]shared.HttpCalloutCallback)
-	}
 	h.wrapper.calloutCallbacks[uint64(calloutID)] = cb
 	h.wrapper.calloutMu.Unlock()
 	return goResult, uint64(calloutID)
@@ -195,9 +192,6 @@ func (h *dymBootstrapConfigHandle) NewTimer(onFire func(timer shared.BootstrapTi
 	}
 	t := &dymBootstrapTimer{hostTimerPtr: timerPtr, onFire: onFire}
 	h.wrapper.timersMu.Lock()
-	if h.wrapper.timers == nil {
-		h.wrapper.timers = make(map[unsafe.Pointer]*dymBootstrapTimer)
-	}
 	h.wrapper.timers[unsafe.Pointer(timerPtr)] = t
 	h.wrapper.timersMu.Unlock()
 	return t
@@ -214,9 +208,6 @@ func (h *dymBootstrapConfigHandle) AddFileWatch(
 		return false
 	}
 	h.wrapper.watchersMu.Lock()
-	if h.wrapper.watchers == nil {
-		h.wrapper.watchers = make(map[string]func(path string, events shared.FileWatcherEvent))
-	}
 	h.wrapper.watchers[path] = onChange
 	h.wrapper.watchersMu.Unlock()
 	return true
@@ -239,9 +230,6 @@ func (h *dymBootstrapConfigHandle) RegisterAdminHandler(
 		return false
 	}
 	h.wrapper.adminMu.Lock()
-	if h.wrapper.adminHandlers == nil {
-		h.wrapper.adminHandlers = make(map[string]shared.BootstrapAdminHandler)
-	}
 	h.wrapper.adminHandlers[pathPrefix] = handler
 	h.wrapper.adminMu.Unlock()
 	return true
@@ -506,7 +494,13 @@ func envoy_dynamic_module_on_bootstrap_extension_config_new(
 		hostLog(shared.LogLevelWarn, "Failed to load bootstrap extension configuration for %q: no factory registered", []any{nameStr})
 		return nil
 	}
-	wrapper := &bootstrapConfigWrapper{hostConfigPtr: hostConfigPtr}
+	wrapper := &bootstrapConfigWrapper{
+		hostConfigPtr:    hostConfigPtr,
+		timers:           make(map[unsafe.Pointer]*dymBootstrapTimer),
+		watchers:         make(map[string]func(path string, events shared.FileWatcherEvent)),
+		adminHandlers:    make(map[string]shared.BootstrapAdminHandler),
+		calloutCallbacks: make(map[uint64]shared.HttpCalloutCallback),
+	}
 	wrapper.configHandle = &dymBootstrapConfigHandle{wrapper: wrapper}
 	ext, err := configFactory.Create(wrapper.configHandle, configBytes)
 	if err != nil {

@@ -301,6 +301,10 @@ type ClusterLoadBalancerContext interface {
 	GetDownstreamHeaders() [][2]UnsafeEnvoyBuffer
 	GetDownstreamHeader(key string, index uint64) (UnsafeEnvoyBuffer, uint64, bool)
 	GetHostSelectionRetryCount() uint32
+	// ShouldSelectAnotherHost asks Envoy whether the candidate host at (priority, index) should
+	// be skipped. handle is accepted for interface symmetry but implementations use the LB
+	// pointer captured when the context was created; callers MUST pass the handle they received
+	// from ChooseHost.
 	ShouldSelectAnotherHost(handle ClusterLoadBalancerHandle, priority uint32, index uint64) bool
 	GetOverrideHost() (address UnsafeEnvoyBuffer, strict bool, ok bool)
 

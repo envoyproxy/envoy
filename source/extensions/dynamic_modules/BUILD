@@ -140,6 +140,7 @@ go_library(
         "sdk/go/abi/matcher.go",
         "sdk/go/abi/network.go",
         "sdk/go/abi/program.go",
+        "sdk/go/abi/scheduler.go",
         "sdk/go/abi/tracer.go",
         "sdk/go/abi/transport_socket.go",
         "sdk/go/abi/udp_listener.go",
