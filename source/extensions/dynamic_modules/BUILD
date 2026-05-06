@@ -49,12 +49,7 @@ envoy_cc_library(
     alwayslink = True,
 )
 
-# A meta-target that aggregates every per-surface abi_impl-style C++ library that
-# implements the `envoy_dynamic_module_callback_*` host callbacks.
-#
-# The Go SDK's `abi/*.go` package is monolithic — importing it pulls in references to
-# every surface's callbacks. So a Go test_data .so always references all of them. Tests
-# that load such .so files must provide all of those symbols in the test binary's
+# Tests that load Go SDK .so files must provide all of those symbols in the test binary's
 # symbol table; otherwise dlopen's RTLD_LAZY can't resolve them and load fails. This
 # meta-target lets a test depend on a single line and get every callback the Go SDK
 # may have referenced.
@@ -79,13 +74,11 @@ envoy_cc_library(
     alwayslink = True,
 )
 
-# The shared package is pure Go (no cgo) — interfaces, types, and EmptyXxx no-ops shared
-# across the SDK and module code. Modules depend on this transitively via go_sdk and
-# go_sdk_abi.
 go_library(
     name = "go_sdk_shared",
     srcs = [
         "sdk/go/shared/http.go",
+        "sdk/go/shared/http_api.go",
         "sdk/go/shared/network_api.go",
         "sdk/go/shared/network_base.go",
         "sdk/go/shared/types.go",
@@ -94,8 +87,6 @@ go_library(
     visibility = ["//visibility:public"],
 )
 
-# The top-level sdk package — pure Go. Holds the factory registries and program-handle
-# indirection. Imports shared.
 go_library(
     name = "go_sdk",
     srcs = ["sdk/go/sdk.go"],
@@ -106,8 +97,6 @@ go_library(
     ],
 )
 
-# The abi package — cgo-heavy. Implements the C-callable trampolines that Envoy invokes
-# and the Go-callable wrappers that bridge into Envoy's host callbacks.
 go_library(
     name = "go_sdk_abi",
     srcs = [

@@ -90,12 +90,6 @@ envoy_cc_test(
     deps = [
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
-        # The Go SDK's `abi` Go package references every surface's
-        # `envoy_dynamic_module_callback_*` symbols, so any Go test_data .so has
-        # unresolved cross-surface callback references. With RTLD_LAZY the loader
-        # accepts these as long as the test binary provides them. all_abi_impls
-        # aggregates every per-surface `abi_impl`/`filter_lib`/`*_lib` library so a
-        # single dep gives the test binary the complete callback symbol surface.
         "//source/extensions/dynamic_modules:all_abi_impls",
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
@@ -156,7 +150,6 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/config:metadata_lib",
-        # See comment on filter_test above for why we link every per-surface abi_impl.
         "//source/extensions/dynamic_modules:all_abi_impls",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/extensions/dynamic_modules:util",
