@@ -1191,6 +1191,11 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
     return;
   }
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              cm) -> void {
+        cm.mutable_drain_timeout()->MergeFrom(ProtobufUtil::TimeUtil::SecondsToDuration(7));
+      });
   autonomous_upstream_ = true;
   initializeOverloadManager(
       TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
