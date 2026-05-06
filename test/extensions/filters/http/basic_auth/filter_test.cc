@@ -59,10 +59,10 @@ TEST_F(FilterTest, BasicAuth) {
 TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
   UserMap users;
   users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
-  auto config = std::make_unique<FilterConfig>(std::move(users), "x-username", "",
-                                               /*allow_missing=*/false,
-                                               /*emit_dynamic_metadata=*/true, "stats",
-                                               *stats_.rootScope());
+  auto config =
+      std::make_unique<FilterConfig>(std::move(users), "x-username", "",
+                                     /*allow_missing=*/false,
+                                     /*emit_dynamic_metadata=*/true, "stats", *stats_.rootScope());
   auto filter = std::make_shared<BasicAuthFilter>(config);
   filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
 
@@ -71,10 +71,10 @@ TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
   request_headers.setHost("host");
   request_headers.setPath("/");
 
-  ProtobufWkt::Struct captured_metadata;
+  Protobuf::Struct captured_metadata;
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setDynamicMetadata("envoy.filters.http.basic_auth", _))
-      .WillOnce(Invoke([&](const std::string&, const ProtobufWkt::Struct& metadata) {
+      .WillOnce(Invoke([&](const std::string&, const Protobuf::Struct& metadata) {
         captured_metadata = metadata;
       }));
 
@@ -395,9 +395,9 @@ TEST_F(AllowMissingFilterTest, ValidBasicCredentialsAuthenticated) {
 
 TEST_F(AllowMissingFilterTest, InvalidBasicCredentialsRejected) {
   // Invalid Basic credentials should still be rejected even when allow_missing is true.
-  // user1:wrongpassword
+  // user1:wrong-password
   Http::TestRequestHeaderMapImpl request_headers{
-      {"Authorization", "Basic dXNlcjE6d3JvbmdwYXNzd29yZA=="}};
+      {"Authorization", "Basic dXNlcjE6d3JvbmctcGFzc3dvcmQ="}};
   request_headers.setScheme("http");
   request_headers.setHost("host");
   request_headers.setPath("/");
@@ -414,7 +414,8 @@ TEST_F(AllowMissingFilterTest, InvalidBasicCredentialsRejected) {
         EXPECT_EQ(grpc_status, absl::nullopt);
         EXPECT_EQ(details, "invalid_credential_for_basic_auth");
       }));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
 }
 
 TEST_F(AllowMissingFilterTest, SuccessSetsDynamicMetadata) {
@@ -424,10 +425,10 @@ TEST_F(AllowMissingFilterTest, SuccessSetsDynamicMetadata) {
   request_headers.setHost("host");
   request_headers.setPath("/");
 
-  ProtobufWkt::Struct captured_metadata;
+  Protobuf::Struct captured_metadata;
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setDynamicMetadata("envoy.filters.http.basic_auth", _))
-      .WillOnce(Invoke([&](const std::string&, const ProtobufWkt::Struct& metadata) {
+      .WillOnce(Invoke([&](const std::string&, const Protobuf::Struct& metadata) {
         captured_metadata = metadata;
       }));
 

@@ -118,7 +118,7 @@ bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view usern
 }
 
 void BasicAuthFilter::setDynamicMetadata(absl::string_view username) {
-  ProtobufWkt::Struct metadata;
+  Protobuf::Struct metadata;
   (*metadata.mutable_fields())[std::string(DynamicMetadataUsernameKey)].set_string_value(
       std::string(username));
   decoder_callbacks_->streamInfo().setDynamicMetadata(
