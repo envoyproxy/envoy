@@ -10,7 +10,6 @@
 #include "source/extensions/clusters/eds/leds.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/admin.h"

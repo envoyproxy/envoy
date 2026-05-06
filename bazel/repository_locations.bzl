@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.33",
-        sha256 = "0d35c07b06033cebf50c767b0acdd31f215035785da4ecb9fbc02c23f2d53805",
+        version = "0.3.34",
+        sha256 = "49bb8b3cff6b28d74f9cd18ca9b3607cf4a5b2e81ecb57a04a9bc3fe94ac7ac8",
         strip_prefix = "toolshed-bazel-v{version}",
         urls = ["https://github.com/envoyproxy/toolshed/releases/download/bazel-v{version}/toolshed-bazel-v{version}.tar.gz"],
     ),
@@ -553,8 +553,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     quiche = dict(
-        version = "e68fe05e70da74a3ea282d927c76f76b4bc4e710",
-        sha256 = "08033a0886b470d4ea836a6b785ef6ef7d638265e5523a37718cdd6d1ef6a409",
+        version = "13384c955f76e3a2b157f7b613ce6c02d594770f",
+        sha256 = "a2310cab30a46e9ccf533cd10632d44852d46784f4192e202cc53b6e353d5876",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
     ),
@@ -589,8 +589,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/re2/releases/download/{version}/re2-{version}.zip"],
     ),
     kafka_source = dict(
-        version = "3.9.1",
-        sha256 = "c15b82940cfb9f67fce909d8600dc8bcfc42d2795da2c26c149d03a627f85234",
+        version = "3.9.2",
+        sha256 = "085bbee8208fea6d1cb22498afa6ffc3835037516643208f705420564b49b80e",
         strip_prefix = "kafka-{version}/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/{version}.zip"],
     ),
@@ -677,8 +677,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/maxmind/libmaxminddb/releases/download/{version}/libmaxminddb-{version}.tar.gz"],
     ),
     thrift = dict(
-        version = "0.22.0",
-        sha256 = "c4649c5879dd56c88f1e7a1c03e0fbfcc3b2a2872fb81616bffba5aa8a225a37",
+        version = "0.23.0",
+        sha256 = "087ba9517063c8252e9e7fb4e3891a9fd85e20af80e0309e2276eff16791d75c",
         strip_prefix = "thrift-{version}/lib/py/",
         urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
     ),

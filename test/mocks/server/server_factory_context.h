@@ -20,7 +20,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/hot_restart.h"

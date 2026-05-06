@@ -122,7 +122,6 @@ protected:
   std::unique_ptr<quic::QuicSpdyClientStream> CreateClientStream() override;
   // quic::QuicSpdySession
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
-  quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override;
   bool ShouldCreateOutgoingBidirectionalStream() override {
     // quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream()

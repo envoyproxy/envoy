@@ -157,6 +157,11 @@ public:
   bool useLocalDecision() const override { return false; }
 
   /**
+   * @return whether the span will be exported to X-Ray.
+   */
+  bool exportedSpan() const override { return sampled_; };
+
+  /**
    * Sets the server error as true for the traced operation/request.
    */
   void setServerError() { server_error_ = true; };

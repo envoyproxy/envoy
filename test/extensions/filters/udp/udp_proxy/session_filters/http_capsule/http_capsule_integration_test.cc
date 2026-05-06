@@ -7,7 +7,6 @@
 
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
 
 namespace Envoy {
 namespace Extensions {

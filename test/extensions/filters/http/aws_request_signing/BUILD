@@ -47,6 +47,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/extensions/common/aws:aws_mocks",
         "//test/integration:http_integration_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/aws_request_signing/v3:pkg_cc_proto",
     ],

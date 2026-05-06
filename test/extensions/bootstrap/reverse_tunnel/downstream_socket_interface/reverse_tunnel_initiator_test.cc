@@ -12,7 +12,6 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/logging.h"
