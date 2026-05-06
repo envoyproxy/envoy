@@ -184,6 +184,7 @@ public:
                   envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
               compliancePolicy, (), (const));
   MOCK_METHOD(const std::vector<std::string>&, serverNames, (), (const));
+  MOCK_METHOD(std::vector<EchKey>, echKeys, (), (const));
 
   Ssl::HandshakerCapabilities capabilities_;
   std::string ciphers_{"RSA"};
