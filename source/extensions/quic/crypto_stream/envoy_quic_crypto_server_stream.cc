@@ -1,6 +1,5 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 
-#include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_tls_server_handshaker.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/runtime/runtime_features.h"
@@ -31,13 +30,8 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
   bool disable_resumption = ticket_config.disable_stateless_resumption || !ticket_config.has_keys ||
                             ticket_config.handles_session_resumption;
 
-  // EnvoyQuicServerSession is the Network::Connection facet of every QUIC
-  // server connection; pass it through so the handshaker can read cached
-  // local/peer addresses without re-converting QUICHE addresses on the
-  // key log hot path.
-  Network::Connection* envoy_connection = static_cast<EnvoyQuicServerSession*>(session);
   return std::make_unique<EnvoyTlsServerHandshaker>(session, crypto_config, factory.sslCtx(),
-                                                    envoy_connection, disable_resumption);
+                                                    disable_resumption);
 }
 
 REGISTER_FACTORY(EnvoyQuicCryptoServerStreamFactoryImpl,

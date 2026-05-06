@@ -12,10 +12,10 @@
 #include "source/common/common/scope_tracker.h"
 #include "source/common/http/session_idle_list_interface.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
-#include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_server_transport_socket_factory.h"
 
 #include "absl/types/optional.h"
 #include "quiche/quic/core/quic_config.h"

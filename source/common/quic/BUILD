@@ -128,7 +128,7 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["envoy_tls_server_handshaker.h"]),
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
-        "//envoy/network:connection_interface",
+        ":envoy_quic_server_session_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/tls:server_context_lib",
@@ -304,12 +304,12 @@ envoy_cc_library(
     ]),
     deps = envoy_select_enable_http3([
         ":envoy_quic_connection_debug_visitor_factory_interface",
-        ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_connection_lib",
         ":envoy_quic_server_crypto_stream_factory_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
+        ":quic_server_transport_socket_factory_lib",
         ":quic_stat_names_lib",
         ":quic_stats_gatherer",
         "//source/common/buffer:buffer_lib",
