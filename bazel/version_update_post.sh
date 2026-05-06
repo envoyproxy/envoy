@@ -17,20 +17,18 @@ if [[ ! -f "$DEPS_YAML" ]]; then
     exit 1
 fi
 
-# Read the current release_date for this dep from deps.yaml.
-# The dep block starts at an unindented line "^DEP:$"; release_date is
-# indented with two spaces inside that block.
+# Find the line number of this dep's top-level YAML key (e.g. "bazel_gazelle:").
+DEP_START_LN="$(grep -n "^${DEP}:$" "$DEPS_YAML" | head -n1 | cut -d: -f1)"
+if [[ -z "$DEP_START_LN" ]]; then
+    echo "ERROR: Could not find dep block '${DEP}:' in ${DEPS_YAML}" >&2
+    exit 1
+fi
+
+# Read the current release_date from within this dep's block.
 EXISTING_DATE="$(
-    awk -v dep="${DEP}" '
-        $0 ~ ("^" dep ":[[:space:]]*$") { found=1; next }
-        found && /^[^ ]/ { exit }
-        found && /^  release_date:/ {
-            sub(/^  release_date: "/, "")
-            sub(/"$/, "")
-            print
-            exit
-        }
-    ' "$DEPS_YAML"
+    tail -n "+${DEP_START_LN}" "$DEPS_YAML" \
+    | grep -m1 "^  release_date:" \
+    | sed 's/^  release_date: "\(.*\)"$/\1/'
 )"
 
 if [[ -z "$EXISTING_DATE" ]]; then
@@ -39,16 +37,10 @@ if [[ -z "$EXISTING_DATE" ]]; then
 fi
 
 find_date_line () {
-    local dep_ln date_match_ln
-    # Find the line number of the dep's top-level YAML key (e.g. "bazel_gazelle:")
-    dep_ln="$(grep -n "^${DEP}:$" "$DEPS_YAML" | head -n1 | cut -d: -f1)"
-    if [[ -z "$dep_ln" ]]; then
-        echo "ERROR: Could not find dep block '${DEP}:' in ${DEPS_YAML}" >&2
-        exit 1
-    fi
-    # From that line forward, find the first matching release_date line
+    local date_match_ln
+    # From the dep's block start, find the matching release_date line number.
     date_match_ln="$(\
-        tail -n "+${dep_ln}" "$DEPS_YAML" \
+        tail -n "+${DEP_START_LN}" "$DEPS_YAML" \
         | grep -n "^  release_date: \"${EXISTING_DATE}\"$" \
         | head -n1 \
         | cut -d: -f1)"
@@ -56,7 +48,7 @@ find_date_line () {
         echo "ERROR: Could not find release_date line for '${DEP}' in ${DEPS_YAML}" >&2
         exit 1
     fi
-    printf '%s' "$((dep_ln + date_match_ln - 1))"
+    printf '%s' "$((DEP_START_LN + date_match_ln - 1))"
 }
 
 update_date () {
