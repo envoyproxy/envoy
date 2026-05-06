@@ -856,7 +856,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectBuffersOnEarlyData) {
   filter_->onData(early_data_buffer, /*end_stream=*/false);
 
   // Now when upstream connection is established, early buffer will be sent.
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(early_data), false));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(early_data), false));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 
   // Any further communications between client and server can resume normally.
@@ -880,8 +880,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectEarlyDataWithEndStream) {
   filter_->onData(early_data_buffer, /*end_stream=*/true);
 
   // Now when upstream connection is established, early buffer will be sent.
-  EXPECT_CALL(*upstream_connections_.at(0),
-              write(BufferStringEqual(early_data), /*end_stream*/ true));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(early_data), /*end_stream*/ true));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 
   // Any further communications between client and server can resume normally.
@@ -903,7 +902,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectDownstreamClosesWithoutData) {
 
   // When upstream connection is established, the end_stream signal should be sent even though
   // the buffer is empty. This ensures the upstream connection is properly closed.
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(""), /*end_stream*/ true));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(""), /*end_stream*/ true));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 }
 
@@ -918,7 +917,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectEmptyBufferWithEndStream) {
   filter_->onData(empty_buffer, /*end_stream=*/true);
 
   // When upstream connection is established, end_stream should be propagated.
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(""), /*end_stream*/ true));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferString(""), /*end_stream*/ true));
   raiseEventUpstreamConnected(/*conn_index=*/0);
 
   // Upstream can still send data back.

@@ -327,6 +327,10 @@ EngineBuilder& EngineBuilder::setMaxConcurrentStreams(int max_concurrent_streams
 
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
+  if (use_worker_thread_) {
+    // Platform certificate validation is not supported with worker thread.
+    return *this;
+  }
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
 }
@@ -379,6 +383,19 @@ std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
   any_config.SerializeToString(&ret);
   return ret;
 #endif
+}
+
+EngineBuilder& EngineBuilder::enableWorkerThread(bool use_worker_thread) {
+  use_worker_thread_ = use_worker_thread;
+  if (use_worker_thread_) {
+    // Platform certificate validation and system proxy settings are not supported with worker
+    // thread.
+    platform_certificates_validation_on_ = false;
+#ifdef __APPLE__
+    respect_system_proxy_settings_ = false;
+#endif
+  }
+  return *this;
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
@@ -446,6 +463,10 @@ EngineBuilder::setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_
 
 #if defined(__APPLE__)
 EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh_interval_secs) {
+  if (use_worker_thread_) {
+    // System proxy settings are not supported with worker thread.
+    return *this;
+  }
   respect_system_proxy_settings_ = value;
   if (refresh_interval_secs > 0) {
     proxy_settings_refresh_interval_secs_ = refresh_interval_secs;
@@ -1143,6 +1164,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #endif // ENVOY_MOBILE_XDS
 
   envoy::config::bootstrap::v3::ApiListenerManager api;
+  if (!use_worker_thread_) {
+    api.set_threading_model(envoy::config::bootstrap::v3::ApiListenerManager::MAIN_THREAD_ONLY);
+  } else {
+    api.set_threading_model(
+        envoy::config::bootstrap::v3::ApiListenerManager::STANDALONE_WORKER_THREAD);
+  }
   auto* listener_manager = bootstrap->mutable_listener_manager();
   listener_manager->mutable_typed_config()->PackFrom(api);
   listener_manager->set_name("envoy.listener_manager_impl.api");
@@ -1151,10 +1178,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine = absl::IgnoreLeak(
-      new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_, high_watermark_,
-                         disable_dns_refresh_on_network_change_, enable_logger_));
+  InternalEngine* envoy_engine = absl::IgnoreLeak(new InternalEngine(
+      std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
+      network_thread_priority_, high_watermark_, disable_dns_refresh_on_network_change_,
+      enable_logger_, use_worker_thread_));
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
