@@ -61,14 +61,15 @@ protected:
   std::string value_;
 };
 
-class ClientIntegrationTest
-    : public BaseClientIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http::CodecType>> {
+class ClientIntegrationTest : public BaseClientIntegrationTest,
+                              public testing::TestWithParam<
+                                  std::tuple<Network::Address::IpVersion, Http::CodecType, bool>> {
 public:
   static void SetUpTestCase() { test_key_value_store_ = std::make_shared<TestKeyValueStore>(); }
   static void TearDownTestCase() { test_key_value_store_.reset(); }
 
   Http::CodecType getCodecType() { return std::get<1>(GetParam()); }
+  bool getUseWorkerThread() { return std::get<2>(GetParam()); }
 
   ClientIntegrationTest() : BaseClientIntegrationTest(/*ip_version=*/std::get<0>(GetParam())) {
     // For server TLS
@@ -86,6 +87,12 @@ public:
   }
 
   void initialize() override {
+    builder_.enableWorkerThread(getUseWorkerThread());
+    if (getUseWorkerThread()) {
+      // Platform cert validation is disabled when using worker thread. The engine will use the
+      // built-in root certs which doesn't have the CA cert for our fake upstream.
+      builder_.enforceTrustChainVerification(false);
+    }
     // Integration test starts upstreams before Envoy which can cause a data race.
     builder_.enableLogger(false);
     builder_.setLogLevel(Logger::Logger::trace);
@@ -194,13 +201,14 @@ public:
   }
 
   static std::string testParamsToString(
-      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http::CodecType>>
+      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http::CodecType, bool>>
           params) {
     return fmt::format(
-        "{}_{}",
+        "{}_{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
-        protocolToString(std::get<1>(params.param)));
+        protocolToString(std::get<1>(params.param)),
+        std::get<2>(params.param) ? "WorkerThreadOn" : "WorkerThreadOff");
   }
 
 protected:
@@ -218,14 +226,17 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersions, ClientIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::ValuesIn({Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                                        Http::CodecType::HTTP3})),
+                                        Http::CodecType::HTTP3}),
+                     testing::Bool()),
     ClientIntegrationTest::testParamsToString);
 
 void ClientIntegrationTest::basicTest() {
   if (getCodecType() != Http::CodecType::HTTP1) {
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
-    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+    if (!getUseWorkerThread()) {
+      EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+      EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+    }
   }
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
@@ -417,6 +428,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
 }
 
 TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAndroid) {
+  expect_data_streams_ = false;
   builder_.enableQuicConnectionMigration(true);
   builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
   builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
@@ -502,6 +514,7 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkChangeEventsAnd
   builder_.enableQuicConnectionMigration(true);
   builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
   builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
+  builder_.setMigrateIdleQuicConnection(true);
   initialize();
 
   if (getCodecType() != Http::CodecType::HTTP3 || version_ != Network::Address::IpVersion::v4) {
@@ -960,8 +973,10 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
 
 TEST_P(ClientIntegrationTest, BasicHttps) {
   EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_)).Times(0);
-  EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
-  EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+  if (!getUseWorkerThread()) {
+    EXPECT_CALL(helper_handle_->mock_helper(), validateCertificateChain(_, _));
+    EXPECT_CALL(helper_handle_->mock_helper(), cleanupAfterCertificateValidation());
+  }
 
   builder_.enablePlatformCertificatesValidation(true);
 
@@ -1109,6 +1124,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
 }
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
+  expect_data_streams_ = false; // 0-RTT request might skip some fields in final stream intel.
   builder_.enableDrainPostDnsRefresh(true);
   // 0-RTT requests will not populate some of the final stream intel fields, so skip the validation.
   expect_data_streams_ = false;
@@ -1684,7 +1700,7 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
 }
 
 TEST_P(ClientIntegrationTest, Proxying) {
-  if (getCodecType() != Http::CodecType::HTTP1) {
+  if (getCodecType() != Http::CodecType::HTTP1 || getUseWorkerThread()) {
     return;
   }
   initialize();
@@ -1734,6 +1750,9 @@ TEST_P(ClientIntegrationTest, TestStats) {
 
 #if defined(__APPLE__)
 TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
+  if (getUseWorkerThread()) {
+    return;
+  }
   builder_.respectSystemProxySettings(true);
   initialize();
   ASSERT_TRUE(Envoy::Api::External::retrieveApi("envoy_proxy_resolver") != nullptr);
@@ -1744,6 +1763,9 @@ TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
 // doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChanged) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+  if (getCodecType() == Http::CodecType::HTTP3) {
+    builder_.setDisableDnsRefreshOnNetworkChange(true);
+  }
   initialize();
   internalEngine()->onDefaultNetworkChanged(1);
   basicTest();
@@ -1756,6 +1778,9 @@ TEST_P(ClientIntegrationTest, OnNetworkChanged) {
 // doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChangeEvent) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+  if (getCodecType() == Http::CodecType::HTTP3) {
+    builder_.setDisableDnsRefreshOnNetworkChange(true);
+  }
   initialize();
   int network = 0;
   network |= static_cast<int>(NetworkType::WWAN);
@@ -1767,15 +1792,36 @@ TEST_P(ClientIntegrationTest, OnNetworkChangeEvent) {
   }
 }
 
+// A thread-safe implementation which can fake SOCKET_ERROR_NOBUFS send errors.
 class MockSendOsSysCalls : public Api::OsSysCallsImpl {
 public:
+  MockSendOsSysCalls() {
+    ON_CALL(*this, send(_, _, _, _))
+        .WillByDefault([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+          int target = target_fd_.load();
+          if (fail_send_.load() && (target == -1 || socket == target)) {
+            bool expected = true;
+            if (fail_send_.compare_exchange_strong(expected, false)) {
+              return Api::SysCallSizeResult{-1, SOCKET_ERROR_NOBUFS};
+            }
+          }
+          return Api::OsSysCallsImpl::send(socket, buffer, length, flags);
+        });
+  }
+
   MOCK_METHOD(Api::SysCallSizeResult, send,
               (os_fd_t socket, void* buffer, size_t length, int flags), (override));
+
+  std::atomic<bool> fail_send_{false};
+  std::atomic<int> target_fd_{-1};
 };
 
 // Tests that a transient write error due to no space available on the socket
 // does not cause the stream to error out when using HTTP/3.
 TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
+  testing::NiceMock<MockSendOsSysCalls> sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
+
   initialize();
   if (upstreamProtocol() != Http::CodecType::HTTP3) {
     return;
@@ -1799,13 +1845,8 @@ TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
   // Wait for the upstream connection to be created and introduce a transient SOCKET_ERROR_NOBUFS
   // write error.
   ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
-  MockSendOsSysCalls sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
-  EXPECT_CALL(sys_calls, send(fd, _, _, _))
-      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOBUFS}))
-      .WillRepeatedly(Invoke([&](os_fd_t socket, void* buffer, size_t length, int flags) {
-        return injector.latched().send(socket, buffer, length, flags);
-      }));
+  sys_calls.target_fd_.store(fd);
+  sys_calls.fail_send_.store(true);
 
   // Complete the request.
   stream_->close(Http::Utility::createRequestTrailerMapPtr());
@@ -1815,6 +1856,9 @@ TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
   ASSERT_EQ(cc_.on_error_calls_, 0);
   ASSERT_EQ(cc_.on_complete_calls_, 1);
   EXPECT_EQ(cc_.status_, "200");
+
+  // Join background threads before local injector and mocks are destroyed to avoid TSAN data races.
+  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, HttpsWithEarlyData) {
@@ -1855,11 +1899,12 @@ TEST_P(ClientIntegrationTest, HttpsWithEarlyData) {
   // Wait for session ticket to be received (QUIC sends it after handshake)
   timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(500));
 
+  int old_upstream_cx_destroy = getCounterValue("cluster.base.upstream_cx_destroy");
   // Close connection to force reconnect and use session ticket
   ASSERT_TRUE(upstream_connection_->close());
   ASSERT_TRUE(upstream_connection_->waitForDisconnect());
   upstream_connection_.reset();
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_destroy", 1));
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_destroy", old_upstream_cx_destroy + 1));
 
   // Reset terminal callback for the second request.
   ConditionalInitializer terminal_callback;

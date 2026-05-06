@@ -73,11 +73,11 @@ INSTANTIATE_TEST_SUITE_P(H1H2H3Codecs, HttpUpstreamTest,
 
 TEST_P(HttpUpstreamTest, WriteUpstream) {
   this->setupUpstream();
-  EXPECT_CALL(this->encoder_, encodeData(BufferStringEqual("foo"), false));
+  EXPECT_CALL(this->encoder_, encodeData(BufferString("foo"), false));
   Buffer::OwnedImpl buffer1("foo");
   this->upstream_->encodeData(buffer1, false);
 
-  EXPECT_CALL(this->encoder_, encodeData(BufferStringEqual("bar"), true));
+  EXPECT_CALL(this->encoder_, encodeData(BufferString("bar"), true));
   Buffer::OwnedImpl buffer2("bar");
   this->upstream_->encodeData(buffer2, true);
 
@@ -89,11 +89,11 @@ TEST_P(HttpUpstreamTest, WriteUpstream) {
 
 TEST_P(HttpUpstreamTest, WriteDownstream) {
   this->setupUpstream();
-  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferStringEqual("foo"), false));
+  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferString("foo"), false));
   Buffer::OwnedImpl buffer1("foo");
   this->upstream_->responseDecoder().decodeData(buffer1, false);
 
-  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferStringEqual("bar"), true));
+  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferString("bar"), true));
   Buffer::OwnedImpl buffer2("bar");
   this->upstream_->responseDecoder().decodeData(buffer2, true);
 }
@@ -284,7 +284,7 @@ TEST_P(HttpUpstreamTest, UpstreamTrailersPropagateFinDownstream) {
   setupUpstream();
   EXPECT_CALL(encoder_.stream_, resetStream(_)).Times(0);
   upstream_->doneWriting();
-  EXPECT_CALL(callbacks_, onUpstreamData(BufferStringEqual(""), true));
+  EXPECT_CALL(callbacks_, onUpstreamData(BufferString(""), true));
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
@@ -724,12 +724,12 @@ TEST_F(CombinedUpstreamTest, RouterFilterInterface) {
 TEST_F(CombinedUpstreamTest, WriteUpstream) {
   this->setup();
   EXPECT_CALL(*this->mock_router_upstream_request_,
-              acceptDataFromRouter(BufferStringEqual("foo"), false /*end_stream*/));
+              acceptDataFromRouter(BufferString("foo"), false /*end_stream*/));
   Buffer::OwnedImpl buffer1("foo");
   this->upstream_->encodeData(buffer1, false);
 
   EXPECT_CALL(*this->mock_router_upstream_request_,
-              acceptDataFromRouter(BufferStringEqual("bar"), true /*end_stream*/));
+              acceptDataFromRouter(BufferString("bar"), true /*end_stream*/));
   Buffer::OwnedImpl buffer2("bar");
   this->upstream_->encodeData(buffer2, true);
 
@@ -756,11 +756,11 @@ TEST_F(CombinedUpstreamTest, CombinedUpstreamGeneratesRequestIdWhenEnabled) {
 
 TEST_F(CombinedUpstreamTest, WriteDownstream) {
   this->setup();
-  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferStringEqual("foo"), false));
+  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferString("foo"), false));
   Buffer::OwnedImpl buffer1("foo");
   this->upstream_->responseDecoder().decodeData(buffer1, false);
 
-  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferStringEqual("bar"), true));
+  EXPECT_CALL(this->callbacks_, onUpstreamData(BufferString("bar"), true));
   Buffer::OwnedImpl buffer2("bar");
   this->upstream_->responseDecoder().decodeData(buffer2, true);
 }

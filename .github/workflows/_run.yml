@@ -10,6 +10,7 @@ on:
       app-key:
       gpg-key:
       gpg-key-password:
+      slack-bot-token:
       ssh-key:
       ssh-key-extra:
     inputs:
@@ -138,6 +139,10 @@ on:
       skip:
         type: boolean
         default: false
+      slack-channel:
+        type: string
+        default: ''
+        description: Slack channel for failure notifications (opt-in, e.g. '#envoy-ci'). Leave empty to disable.
       source:
         type: string
       summary-post:
@@ -387,7 +392,7 @@ jobs:
         BAZELRC_CONTENT: ${{ vars.ENVOY_CI_BAZELRC }}
 
     # NOTE: This is where untrusted code can be run!!!
-    #  It MUST be the last step in the workflow
+    #  Only post-failure notification steps (which don't use any repo code) should follow this step.
     - uses: envoyproxy/toolshed/actions/github/run@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
@@ -443,3 +448,20 @@ jobs:
         ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
         ENVOY_REPO: ${{ github.repository }}
         ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
+
+    - name: Notify Slack on failure
+      if: ${{ failure() && inputs.slack-channel != '' }}
+      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
+      env:
+        JOB_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      with:
+        method: chat.postMessage
+        token: ${{ secrets.slack-bot-token }}
+        payload: |
+          channel: "${{ inputs.slack-channel }}"
+          text: "CI job failed: ${{ inputs.target }}"
+          blocks:
+          - type: section
+            text:
+              type: mrkdwn
+              text: ":x: *CI job failed:* `${{ inputs.target }}`\n<${{ env.JOB_URL }}|View workflow run>"

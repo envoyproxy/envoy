@@ -179,6 +179,9 @@ envoy_dynamic_module_callback_udp_listener_filter_config_define_counter(
     envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr) {
   auto* config = static_cast<DynamicModuleUdpListenerFilterConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   Envoy::Stats::StatName main_stat_name =
       config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
   Envoy::Stats::Counter& c =
@@ -205,6 +208,9 @@ envoy_dynamic_module_callback_udp_listener_filter_config_define_gauge(
     envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr) {
   auto* config = static_cast<DynamicModuleUdpListenerFilterConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   Envoy::Stats::StatName main_stat_name =
       config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
   Envoy::Stats::Gauge& g = Envoy::Stats::Utility::gaugeFromStatNames(
@@ -257,6 +263,9 @@ envoy_dynamic_module_callback_udp_listener_filter_config_define_histogram(
     envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr) {
   auto* config = static_cast<DynamicModuleUdpListenerFilterConfig*>(config_envoy_ptr);
+  if (config->stat_creation_frozen_) {
+    return envoy_dynamic_module_type_metrics_result_Frozen;
+  }
   Envoy::Stats::StatName main_stat_name =
       config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
   Envoy::Stats::Histogram& h = Envoy::Stats::Utility::histogramFromStatNames(
