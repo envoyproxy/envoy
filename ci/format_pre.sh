@@ -76,7 +76,7 @@ CURRENT=spelling
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/spelling:check_spelling_pedantic -- --mark check --target_root="$PWD"
 
 CURRENT=rustfmt
-RUSTFMT_PRE="$(git diff)"
+RUSTFMT_PRE="$(git diff | md5sum)"
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @rules_rust//:rustfmt
 RUSTFMT_POST="$(git diff)"
 if [[ "$RUSTFMT_PRE" != "$RUSTFMT_POST" ]]; then
