@@ -33,7 +33,7 @@ fn new_cluster_config(
         counter_id,
         metrics: envoy_cluster_metrics,
       }))
-    }
+    },
     "async_host_selection" => Some(Box::new(AsyncHostSelectionClusterConfig {
       upstream_address: config_str.to_string(),
     })),
