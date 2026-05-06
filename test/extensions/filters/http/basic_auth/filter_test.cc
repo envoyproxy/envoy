@@ -60,8 +60,7 @@ TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
   UserMap users;
   users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
   FilterConfigConstSharedPtr config =
-      std::make_unique<FilterConfig>(std::move(users), "x-username", "",
-                                     /*allow_missing=*/false,
+      std::make_unique<FilterConfig>(std::move(users), "x-username", "", /*allow_missing=*/false,
                                      /*emit_dynamic_metadata=*/true, "stats", *stats_.rootScope());
   std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
   filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
