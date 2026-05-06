@@ -1744,7 +1744,7 @@ TEST_P(ClientIntegrationTest, TestStats) {
   {
     absl::MutexLock l(engine_lock_);
     std::string stats = engine_->dumpStats();
-    EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 1"))) << stats;
+    EXPECT_TRUE((absl::StrContains(stats, "runtime.load_success: 2"))) << stats;
   }
 }
 

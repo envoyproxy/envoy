@@ -4007,14 +4007,14 @@ TEST_P(SslSocketTest, HalfClose) {
       .WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
-  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), true))
+  EXPECT_CALL(*client_read_filter, onData(BufferString("hello"), true))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) -> Network::FilterStatus {
         Buffer::OwnedImpl buffer("world");
         client_connection->write(buffer, true);
         return Network::FilterStatus::Continue;
       }));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-  EXPECT_CALL(*server_read_filter, onData(BufferStringEqual("world"), true));
+  EXPECT_CALL(*server_read_filter, onData(BufferString("world"), true));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
@@ -4096,7 +4096,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
   EXPECT_CALL(*client_read_filter, onNewConnection())
       .WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
-  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), true))
+  EXPECT_CALL(*client_read_filter, onData(BufferString("hello"), true))
       .WillOnce(Invoke([&](Buffer::Instance& read_buffer, bool) -> Network::FilterStatus {
         read_buffer.drain(read_buffer.length());
         client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -4191,7 +4191,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   EXPECT_CALL(*client_read_filter, onNewConnection())
       .WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
-  EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("hello"), false))
+  EXPECT_CALL(*client_read_filter, onData(BufferString("hello"), false))
       .WillOnce(Invoke([&](Buffer::Instance& read_buffer, bool) -> Network::FilterStatus {
         read_buffer.drain(read_buffer.length());
         // Close without sending close_notify alert.
@@ -4205,7 +4205,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
 
   EXPECT_CALL(*server_read_filter, onNewConnection())
       .WillOnce(Return(Network::FilterStatus::Continue));
-  EXPECT_CALL(*server_read_filter, onData(BufferStringEqual(""), true))
+  EXPECT_CALL(*server_read_filter, onData(BufferString(""), true))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) -> Network::FilterStatus {
         // Close without sending close_notify alert.
         const SslHandshakerImpl* ssl_socket =
