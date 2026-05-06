@@ -12,9 +12,11 @@
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/ssl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_context_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/utility.h"
 
@@ -35,6 +37,8 @@
 
 #include "gtest/gtest.h"
 #include "openssl/crypto.h"
+#include "openssl/evp.h"
+#include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
 using Envoy::Protobuf::util::MessageDifferencer;
@@ -2843,6 +2847,322 @@ common_tls_context:
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
   EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+}
+
+class EchContextImplTest : public SslCertsTest {
+protected:
+  struct EchTestData {
+    std::string private_key_bytes;
+    std::string ech_config_bytes;
+    std::string ech_config_list_bytes;
+  };
+
+  static EchTestData generateEchTestData() {
+    EchTestData data;
+
+    // Generate an HPKE key pair.
+    bssl::ScopedEVP_HPKE_KEY key;
+    EXPECT_EQ(1, EVP_HPKE_KEY_generate(key.get(), EVP_hpke_x25519_hkdf_sha256()));
+
+    // Extract raw private key bytes.
+    uint8_t priv_buf[32];
+    size_t priv_len = 0;
+    EXPECT_EQ(1, EVP_HPKE_KEY_private_key(key.get(), priv_buf, &priv_len, sizeof(priv_buf)));
+    data.private_key_bytes.assign(reinterpret_cast<char*>(priv_buf), priv_len);
+
+    // Serialize a single ECHConfig.
+    bssl::ScopedCBB cbb;
+    EXPECT_EQ(1, CBB_init(cbb.get(), 128));
+    EXPECT_EQ(1, SSL_marshal_ech_config(cbb.get(), /*config_id=*/1, key.get(), "public.example.com",
+                                        /*max_name_len=*/255));
+    uint8_t* ech_buf = nullptr;
+    size_t ech_len = 0;
+    EXPECT_EQ(1, CBB_finish(cbb.get(), &ech_buf, &ech_len));
+    data.ech_config_bytes.assign(reinterpret_cast<char*>(ech_buf), ech_len);
+    OPENSSL_free(ech_buf);
+
+    // Build an SSL_ECH_KEYS with the config so we can marshal the ECHConfigList.
+    bssl::UniquePtr<SSL_ECH_KEYS> ech_keys(SSL_ECH_KEYS_new());
+    EXPECT_NE(nullptr, ech_keys);
+    EXPECT_EQ(1, SSL_ECH_KEYS_add(ech_keys.get(), /*is_retry_config=*/0,
+                                  reinterpret_cast<const uint8_t*>(data.ech_config_bytes.data()),
+                                  data.ech_config_bytes.size(), key.get()));
+    bssl::ScopedCBB cbb2;
+    EXPECT_EQ(1, CBB_init(cbb2.get(), 128));
+    EXPECT_EQ(1, SSL_ECH_KEYS_marshal_retry_configs(ech_keys.get(), cbb2.get()));
+    uint8_t* list_buf = nullptr;
+    size_t list_len = 0;
+    EXPECT_EQ(1, CBB_finish(cbb2.get(), &list_buf, &list_len));
+    data.ech_config_list_bytes.assign(reinterpret_cast<char*>(list_buf), list_len);
+    OPENSSL_free(list_buf);
+
+    return data;
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  ContextManagerImpl manager_{server_factory_context_};
+};
+
+// Server: valid HPKE key + ECHConfig → context builds successfully.
+TEST_F(EchContextImplTest, ServerEchValidKeyAccepted) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
+
+  auto test_data = generateEchTestData();
+
+  const std::string yaml = fmt::format(
+      R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{}"
+      private_key:
+        filename: "{}"
+  encrypted_client_hello:
+    server:
+      keys:
+        - private_key:
+            inline_bytes: "{}"
+          ech_config: "{}"
+  )EOF",
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/"
+                                  "unittest_cert.pem"),
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/"
+                                  "unittest_key.pem"),
+      Base64::encode(test_data.private_key_bytes.data(), test_data.private_key_bytes.size()),
+      Base64::encode(test_data.ech_config_bytes.data(), test_data.ech_config_bytes.size()));
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  ASSERT_TRUE(cfg.ok()) << cfg.status().message();
+
+  auto ctx = manager_.createSslServerContext(*store_.rootScope(), **cfg, nullptr);
+  EXPECT_TRUE(ctx.ok()) << ctx.status().message();
+  if (ctx.ok()) {
+    manager_.removeContext(*ctx);
+  }
+}
+
+// Server: garbage HPKE private key bytes → HPKE init fails at context creation.
+TEST_F(EchContextImplTest, ServerEchInvalidPrivateKey) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
+
+  auto test_data = generateEchTestData();
+  const std::string bad_key = "not_a_valid_hpke_key_bytes_here!";
+
+  const std::string yaml = fmt::format(
+      R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{}"
+      private_key:
+        filename: "{}"
+  encrypted_client_hello:
+    server:
+      keys:
+        - private_key:
+            inline_bytes: "{}"
+          ech_config: "{}"
+  )EOF",
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/"
+                                  "unittest_cert.pem"),
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/"
+                                  "unittest_key.pem"),
+      Base64::encode(bad_key.data(), bad_key.size()),
+      Base64::encode(test_data.ech_config_bytes.data(), test_data.ech_config_bytes.size()));
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  ASSERT_TRUE(cfg.ok());
+
+  EXPECT_EQ(manager_.createSslServerContext(*store_.rootScope(), **cfg, nullptr).status().message(),
+            "Invalid ECH HPKE private key");
+}
+
+// Server: valid key but garbage ECHConfig bytes → SSL_ECH_KEYS_add fails.
+TEST_F(EchContextImplTest, ServerEchInvalidEchConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
+
+  auto test_data = generateEchTestData();
+  const std::string bad_config = "not_a_valid_ech_config_bytes!!!";
+
+  const std::string yaml = fmt::format(
+      R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{}"
+      private_key:
+        filename: "{}"
+  encrypted_client_hello:
+    server:
+      keys:
+        - private_key:
+            inline_bytes: "{}"
+          ech_config: "{}"
+  )EOF",
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/"
+                                  "unittest_cert.pem"),
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/"
+                                  "unittest_key.pem"),
+      Base64::encode(test_data.private_key_bytes.data(), test_data.private_key_bytes.size()),
+      Base64::encode(bad_config.data(), bad_config.size()));
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  ASSERT_TRUE(cfg.ok());
+
+  EXPECT_EQ(manager_.createSslServerContext(*store_.rootScope(), **cfg, nullptr).status().message(),
+            "Invalid ECHConfig");
+}
+
+// Server: runtime flag OFF → ECH key errors are ignored, context builds fine.
+TEST_F(EchContextImplTest, ServerEchRuntimeFlagOff) {
+  // Default runtime has the flag OFF (FALSE_RUNTIME_GUARD).
+  auto test_data = generateEchTestData();
+  const std::string bad_key = "not_a_valid_hpke_key_bytes_here!";
+
+  const std::string yaml = fmt::format(
+      R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{}"
+      private_key:
+        filename: "{}"
+  encrypted_client_hello:
+    server:
+      keys:
+        - private_key:
+            inline_bytes: "{}"
+          ech_config: "{}"
+  )EOF",
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/"
+                                  "unittest_cert.pem"),
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/"
+                                  "unittest_key.pem"),
+      Base64::encode(bad_key.data(), bad_key.size()),
+      Base64::encode(test_data.ech_config_bytes.data(), test_data.ech_config_bytes.size()));
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  ASSERT_TRUE(cfg.ok());
+
+  auto ctx = manager_.createSslServerContext(*store_.rootScope(), **cfg, nullptr);
+  EXPECT_TRUE(ctx.ok()) << ctx.status().message();
+  if (ctx.ok()) {
+    manager_.removeContext(*ctx);
+  }
+}
+
+// Client: valid ECHConfigList → newSsl() succeeds.
+TEST_F(EchContextImplTest, ClientEchConfigListConfigured) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
+
+  auto test_data = generateEchTestData();
+
+  const std::string yaml = fmt::format(R"EOF(
+  common_tls_context: {{}}
+  encrypted_client_hello:
+    client:
+      ech_config_list: "{}"
+  )EOF",
+                                       Base64::encode(test_data.ech_config_list_bytes.data(),
+                                                      test_data.ech_config_list_bytes.size()));
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ClientContextConfigImpl::create(tls_context, factory_context_);
+  ASSERT_TRUE(cfg.ok()) << cfg.status().message();
+
+  auto ctx = ClientContextImpl::create(*store_.rootScope(), **cfg, server_factory_context_);
+  ASSERT_TRUE(ctx.ok()) << ctx.status().message();
+
+  auto ssl = (*ctx)->newSsl(nullptr, nullptr);
+  EXPECT_TRUE(ssl.ok()) << ssl.status().message();
+}
+
+// Client: GREASE enabled → newSsl() succeeds.
+TEST_F(EchContextImplTest, ClientEchGreaseEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
+
+  const std::string yaml = R"EOF(
+  common_tls_context: {}
+  encrypted_client_hello:
+    client:
+      enable_grease: true
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ClientContextConfigImpl::create(tls_context, factory_context_);
+  ASSERT_TRUE(cfg.ok()) << cfg.status().message();
+
+  auto ctx = ClientContextImpl::create(*store_.rootScope(), **cfg, server_factory_context_);
+  ASSERT_TRUE(ctx.ok()) << ctx.status().message();
+
+  auto ssl = (*ctx)->newSsl(nullptr, nullptr);
+  EXPECT_TRUE(ssl.ok()) << ssl.status().message();
+}
+
+// Client: garbage ECHConfigList → SSL_set1_ech_config_list fails in newSsl().
+TEST_F(EchContextImplTest, ClientEchInvalidConfigListFailsNewSsl) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
+
+  const std::string bad_list = "not_a_valid_ech_config_list!!!";
+  const std::string yaml = fmt::format(R"EOF(
+  common_tls_context: {{}}
+  encrypted_client_hello:
+    client:
+      ech_config_list: "{}"
+  )EOF",
+                                       Base64::encode(bad_list.data(), bad_list.size()));
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ClientContextConfigImpl::create(tls_context, factory_context_);
+  ASSERT_TRUE(cfg.ok()) << cfg.status().message();
+
+  auto ctx = ClientContextImpl::create(*store_.rootScope(), **cfg, server_factory_context_);
+  ASSERT_TRUE(ctx.ok()) << ctx.status().message();
+
+  auto ssl = (*ctx)->newSsl(nullptr, nullptr);
+  EXPECT_FALSE(ssl.ok());
+  EXPECT_THAT(ssl.status().message(), testing::HasSubstr("Failed to set ECH config list"));
+}
+
+// Client: runtime flag OFF → garbage ECHConfigList is ignored, newSsl() succeeds.
+TEST_F(EchContextImplTest, ClientEchInvalidConfigListSkippedWhenRuntimeOff) {
+  // Default runtime has the flag OFF.
+  const std::string bad_list = "not_a_valid_ech_config_list!!!";
+  const std::string yaml = fmt::format(R"EOF(
+  common_tls_context: {{}}
+  encrypted_client_hello:
+    client:
+      ech_config_list: "{}"
+  )EOF",
+                                       Base64::encode(bad_list.data(), bad_list.size()));
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ClientContextConfigImpl::create(tls_context, factory_context_);
+  ASSERT_TRUE(cfg.ok()) << cfg.status().message();
+
+  auto ctx = ClientContextImpl::create(*store_.rootScope(), **cfg, server_factory_context_);
+  ASSERT_TRUE(ctx.ok()) << ctx.status().message();
+
+  auto ssl = (*ctx)->newSsl(nullptr, nullptr);
+  EXPECT_TRUE(ssl.ok()) << ssl.status().message();
 }
 
 } // namespace Tls
