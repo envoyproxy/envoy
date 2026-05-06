@@ -176,6 +176,19 @@ In this configuration:
 This pattern provides clean separation between the decision logic (in the Lua filter) and the authorization
 enforcement (in ext_authz), while ensuring the ext_authz filter is only instantiated and invoked when needed.
 
+Cooperative Caching Bypass
+--------------------------
+The External Authorization filter supports bypassing the external authorization service call by retrieving a cached response from dynamic metadata. This is designed to work cooperatively with a preceding caching filter (such as a suitably configured ext_proc filter using an external cache).
+
+To enable this, configure the :ref:`check_response_metadata_key <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.check_response_metadata_key>` with the dynamic metadata key under the ``envoy.filters.http.ext_authz`` namespace where the cached response is stored.
+
+When a cached response is present under the configured key:
+1. The filter will Base64-decode and deserialize it into a ``CheckResponse`` proto.
+2. If deserialization succeeds, the filter will bypass the external service call and apply the cached response (OK, Denied, or Error) directly.
+3. If deserialization fails, the filter will increment the ``invalid_cached_response`` stat and gracefully fall back to making a live call to the external authorization service.
+
+On cache misses (when no cached response is found), the filter will proceed with the live call and, upon receiving a successful response, will write the serialized ``CheckResponse`` as a Base64-encoded string back to the dynamic metadata under the configured key, allowing the caching filter to record and cache it.
+
 Statistics
 ----------
 .. _config_http_filters_ext_authz_stats:
@@ -199,6 +212,7 @@ The HTTP filter outputs statistics in the ``cluster.<route target cluster>.ext_a
   because it couldn't apply all header mutations"
   response_header_limits_reached, Counter, "Total responses for which ext_authz sent a local reply
   because it couldn't apply all header mutations"
+  invalid_cached_response, Counter, Total cached responses that failed to be Base64-decoded or parsed.
 
 Dynamic Metadata
 ----------------
