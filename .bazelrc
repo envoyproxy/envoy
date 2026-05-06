@@ -143,7 +143,6 @@ build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --cxxopt=-Wno-trigraphs
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
 # libc++ - default for clang
