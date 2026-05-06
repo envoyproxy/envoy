@@ -1080,7 +1080,7 @@ kafka_source:
   project_name: "Kafka (source)"
   project_desc: "Open-source distributed event streaming platform"
   project_url: "https://kafka.apache.org"
-  release_date: "2025-05-12"
+  release_date: "2026-02-07"
   use_category:
   - dataplane_ext
   extensions:
