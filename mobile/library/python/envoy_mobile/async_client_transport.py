@@ -11,6 +11,7 @@ from .httpx_utils import get_envoy_headers, map_envoy_error
 
 class AsyncEnvoyStream(httpx.AsyncByteStream):
     """An asynchronous byte stream that reads data from an Envoy stream."""
+
     def __init__(
         self,
         stream: envoy_engine.Stream,
@@ -53,6 +54,7 @@ class AsyncEnvoyStream(httpx.AsyncByteStream):
 
 class AsyncResponseHandler:
     """Handles callbacks from the Envoy engine and pushes data to asyncio queues."""
+
     def __init__(self, executor: AsyncioExecutor) -> None:
         self.executor = executor
         self.headers_future: asyncio.Future = asyncio.Future()
@@ -139,6 +141,7 @@ class AsyncResponseHandler:
 
 class AsyncEnvoyClientTransport(httpx.AsyncBaseTransport):
     """An asynchronous transport for httpx that uses Envoy Mobile."""
+
     def __init__(self, engine: envoy_engine.Engine) -> None:
         self._engine = engine
         self._executor = AsyncioExecutor()
