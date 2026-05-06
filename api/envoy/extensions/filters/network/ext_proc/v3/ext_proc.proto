@@ -108,6 +108,9 @@ message MetadataOptions {
 
   // Describes which typed or untyped dynamic metadata namespaces to receive
   // from the external processing server.
+  // Since the server returns untyped dynamic metadata, this configuration acts
+  // as a whitelist. Only metadata namespaces explicitly listed here will be
+  // ingested by Envoy from the server's response.
   // Receiving of typed metadata is not supported.
   MetadataNamespaces receiving_namespaces = 2;
 }
