@@ -278,6 +278,23 @@ public:
    * @return std::string the SNI used to establish the connection.
    **/
   virtual const std::string& sni() const PURE;
+
+  /**
+   * @return true if Encrypted Client Hello (RFC 9849) was successfully negotiated.
+   **/
+  virtual bool echAccepted() const PURE;
+
+  /**
+   * @return serialized ECH retry configs offered by the server when the client's
+   *         ECH config_id did not match. Empty string if no retry configs were provided.
+   **/
+  virtual std::string echRetryConfigs() const PURE;
+
+  /**
+   * @return the outer (public) SNI override used by ECH, or empty if ECH was not used.
+   *         Only meaningful after the handshake completes.
+   **/
+  virtual absl::string_view echNameOverride() const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;

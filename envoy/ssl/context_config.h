@@ -168,6 +168,17 @@ public:
    * @return an optional factory which can be used to create TLS context provider instances.
    */
   virtual OptRef<UpstreamTlsCertificateSelectorFactory> tlsCertificateSelectorFactory() const PURE;
+
+  /**
+   * @return Raw ECHConfigList bytes for Encrypted Client Hello (RFC 9849).
+   *         Empty if ECH is not configured.
+   */
+  virtual const std::string& echConfigList() const PURE;
+
+  /**
+   * @return true if ECH GREASE should be sent when no ECHConfigList is configured.
+   */
+  virtual bool echGreaseEnabled() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;
@@ -178,6 +189,12 @@ public:
     std::array<uint8_t, 16> name_;         // 16 == SSL_TICKET_KEY_NAME_LEN
     std::array<uint8_t, 32> hmac_key_;     // 32 == SHA256_DIGEST_LENGTH
     std::array<uint8_t, 256 / 8> aes_key_; // AES256 key size, in bytes
+  };
+
+  struct EchKey {
+    std::string hpke_private_key; // raw EVP_HPKE_KEY private-key bytes
+    std::string ech_config;       // serialized ECHConfig bytes
+    bool is_retry_config;
   };
 
   enum class OcspStaplePolicy {
@@ -240,6 +257,12 @@ public:
    * @return reference to the server names configured on the socket factory.
    */
   virtual const std::vector<std::string>& serverNames() const PURE;
+
+  /**
+   * @return a snapshot of the currently active ECH HPKE key set.
+   *         Empty if ECH is not configured.
+   */
+  virtual std::vector<EchKey> echKeys() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
@@ -150,6 +151,12 @@ ServerContextConfigImpl::ServerContextConfigImpl(
     }
   }
 
+  if (config.has_encrypted_client_hello() && config.encrypted_client_hello().has_server()) {
+    auto keys_or_error = getEchKeys(config.encrypted_client_hello().server());
+    SET_AND_RETURN_IF_NOT_OK(keys_or_error.status(), creation_status);
+    ech_keys_ = std::move(*keys_or_error);
+  }
+
   if (!capabilities().provides_certificates) {
     if ((config.common_tls_context().tls_certificates().size() +
          config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0 &&
@@ -263,6 +270,19 @@ ServerContextConfigImpl::getSessionTicketKey(const std::string& key_data) {
   ASSERT(key_data.begin() + pos == key_data.end());
 
   return dst_key;
+}
+
+absl::StatusOr<std::vector<Ssl::ServerContextConfig::EchKey>> ServerContextConfigImpl::getEchKeys(
+    const envoy::extensions::transport_sockets::tls::v3::EncryptedClientHello::ServerConfig&
+        server_config) {
+  std::vector<Ssl::ServerContextConfig::EchKey> result;
+  for (const auto& key_proto : server_config.keys()) {
+    auto private_key_or_error = Config::DataSource::read(key_proto.private_key(), false, api_);
+    RETURN_IF_NOT_OK(private_key_or_error.status());
+    result.push_back(
+        {std::move(*private_key_or_error), key_proto.ech_config(), key_proto.is_retry_config()});
+  }
+  return result;
 }
 
 Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePolicyFromProto(

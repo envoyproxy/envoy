@@ -162,6 +162,8 @@ public:
     return tls_certificate_selector_factory_ ? makeOptRef(*tls_certificate_selector_factory_)
                                              : absl::nullopt;
   }
+  const std::string& echConfigList() const override { return ech_config_list_; }
+  bool echGreaseEnabled() const override { return ech_grease_enabled_; }
 
 private:
   ClientContextConfigImpl(
@@ -177,6 +179,8 @@ private:
   const bool allow_renegotiation_ : 1;
   const bool enforce_rsa_key_usage_ : 1;
   const size_t max_session_keys_;
+  const std::string ech_config_list_;
+  const bool ech_grease_enabled_;
   // Certificate selector contains a reference to this context so should be destroyed first.
   Ssl::UpstreamTlsCertificateSelectorFactoryPtr tls_certificate_selector_factory_;
 };

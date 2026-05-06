@@ -498,6 +498,26 @@ absl::optional<SystemTime> ConnectionInfoImplBase::expirationPeerCertificate() c
   return Utility::getExpirationTime(*cert);
 }
 
+bool ConnectionInfoImplBase::echAccepted() const { return SSL_ech_accepted(ssl()) == 1; }
+
+std::string ConnectionInfoImplBase::echRetryConfigs() const {
+  const uint8_t* data;
+  size_t len;
+  SSL_get0_ech_retry_configs(ssl(), &data, &len);
+  if (data == nullptr) {
+    return {};
+  }
+  return std::string(reinterpret_cast<const char*>(data), len);
+}
+
+absl::string_view ConnectionInfoImplBase::echNameOverride() const {
+  const char* name = SSL_get0_ech_name_override(ssl());
+  if (name == nullptr) {
+    return {};
+  }
+  return name;
+}
+
 const std::string& ConnectionInfoImplBase::sessionId() const {
   return getCachedValueOrCreate<std::string>(CachedValueTag::SessionId, [](SSL* ssl) {
     SSL_SESSION* session = SSL_get_session(ssl);

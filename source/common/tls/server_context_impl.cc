@@ -226,6 +226,32 @@ ServerContextImpl::ServerContextImpl(
         ctx.ocsp_response_ = std::move(response_or_error.value());
       }
     }
+
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_encrypted_client_hello")) {
+      auto ech_keys_vec = config.echKeys();
+      if (!ech_keys_vec.empty()) {
+        bssl::UniquePtr<SSL_ECH_KEYS> ech_keys(SSL_ECH_KEYS_new());
+        for (const auto& key : ech_keys_vec) {
+          bssl::ScopedEVP_HPKE_KEY hpke_key;
+          if (EVP_HPKE_KEY_init(hpke_key.get(), EVP_hpke_x25519_hkdf_sha256(),
+                                reinterpret_cast<const uint8_t*>(key.hpke_private_key.data()),
+                                key.hpke_private_key.size()) != 1) {
+            creation_status = absl::InvalidArgumentError("Invalid ECH HPKE private key");
+            return;
+          }
+          if (SSL_ECH_KEYS_add(ech_keys.get(), key.is_retry_config ? 1 : 0,
+                               reinterpret_cast<const uint8_t*>(key.ech_config.data()),
+                               key.ech_config.size(), hpke_key.get()) != 1) {
+            creation_status = absl::InvalidArgumentError("Invalid ECHConfig");
+            return;
+          }
+        }
+        if (SSL_CTX_set1_ech_keys(ctx.ssl_ctx_.get(), ech_keys.get()) != 1) {
+          creation_status = absl::InvalidArgumentError("Failed to install ECH keys");
+          return;
+        }
+      }
+    }
   }
 }
 

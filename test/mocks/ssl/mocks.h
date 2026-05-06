@@ -82,6 +82,9 @@ public:
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
   MOCK_METHOD(const std::string&, alpn, (), (const));
   MOCK_METHOD(const std::string&, sni, (), (const));
+  MOCK_METHOD(bool, echAccepted, (), (const));
+  MOCK_METHOD(std::string, echRetryConfigs, (), (const));
+  MOCK_METHOD(absl::string_view, echNameOverride, (), (const));
 };
 
 class MockClientContext : public ClientContext {

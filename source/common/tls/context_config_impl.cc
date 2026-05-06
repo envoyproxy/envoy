@@ -415,7 +415,15 @@ ClientContextConfigImpl::ClientContextConfigImpl(
       server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
       allow_renegotiation_(config.allow_renegotiation()),
       enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, true)),
-      max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
+      max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)),
+      ech_config_list_(config.has_encrypted_client_hello() &&
+                               config.encrypted_client_hello().has_client()
+                           ? config.encrypted_client_hello().client().ech_config_list()
+                           : std::string{}),
+      ech_grease_enabled_(config.has_encrypted_client_hello() &&
+                                  config.encrypted_client_hello().has_client()
+                              ? config.encrypted_client_hello().client().enable_grease()
+                              : false) {
 
   if (!enforce_rsa_key_usage_) {
     ENVOY_LOG(

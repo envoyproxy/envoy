@@ -65,7 +65,8 @@ ClientContextImpl::ClientContextImpl(
       auto_host_sni_(config.autoHostServerNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
       enforce_rsa_key_usage_(config.enforceRsaKeyUsage()),
-      max_session_keys_(config.maxSessionKeys()) {
+      max_session_keys_(config.maxSessionKeys()), ech_config_list_(config.echConfigList()),
+      ech_grease_enabled_(config.echGreaseEnabled()) {
   if (!creation_status.ok()) {
     return;
   }
@@ -143,6 +144,19 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
       return absl::InvalidArgumentError(
           absl::StrCat("Failed to create upstream TLS due to failure setting SNI: ",
                        Utility::getLastCryptoError().value_or("unknown")));
+    }
+  }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_encrypted_client_hello")) {
+    if (!ech_config_list_.empty()) {
+      if (SSL_set1_ech_config_list(ssl_con.get(),
+                                   reinterpret_cast<const uint8_t*>(ech_config_list_.data()),
+                                   ech_config_list_.size()) != 1) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Failed to set ECH config list: ", Utility::getLastCryptoError().value_or("unknown")));
+      }
+    } else if (ech_grease_enabled_) {
+      SSL_set_enable_ech_grease(ssl_con.get(), 1);
     }
   }
 

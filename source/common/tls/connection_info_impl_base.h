@@ -59,6 +59,9 @@ public:
   const std::string& tlsVersion() const override;
   const std::string& alpn() const override;
   const std::string& sni() const override;
+  bool echAccepted() const override;
+  std::string echRetryConfigs() const override;
+  absl::string_view echNameOverride() const override;
 
   virtual SSL* ssl() const PURE;
 

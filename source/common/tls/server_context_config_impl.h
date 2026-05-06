@@ -45,6 +45,7 @@ public:
   const std::vector<std::string>& serverNames() const override { return server_names_; }
 
   Ssl::TlsCertificateSelectorFactory& tlsCertificateSelectorFactory() const override;
+  std::vector<Ssl::ServerContextConfig::EchKey> echKeys() const override { return ech_keys_; }
 
 private:
   ServerContextConfigImpl(
@@ -66,11 +67,15 @@ private:
   const Secret::TlsSessionTicketKeysConfigProviderSharedPtr session_ticket_keys_provider_;
   Envoy::Common::CallbackHandlePtr stk_update_callback_handle_;
   Envoy::Common::CallbackHandlePtr stk_validation_callback_handle_;
+  std::vector<Ssl::ServerContextConfig::EchKey> ech_keys_;
 
   absl::StatusOr<std::vector<ServerContextConfig::SessionTicketKey>> getSessionTicketKeys(
       const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& keys);
   absl::StatusOr<ServerContextConfig::SessionTicketKey>
   getSessionTicketKey(const std::string& key_data);
+  absl::StatusOr<std::vector<Ssl::ServerContextConfig::EchKey>> getEchKeys(
+      const envoy::extensions::transport_sockets::tls::v3::EncryptedClientHello::ServerConfig&
+          server_config);
   static OcspStaplePolicy ocspStaplePolicyFromProto(
       const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::OcspStaplePolicy&
           policy);

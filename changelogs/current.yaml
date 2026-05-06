@@ -72,6 +72,15 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tls
+  change: |
+    Added support for Encrypted Client Hello (ECH) per RFC 9849 for both downstream and upstream TLS.
+    Server keys can be loaded inline via the new ``encrypted_client_hello`` field on
+    ``DownstreamTlsContext``; clients can specify an ``ECHConfigList`` bytes or enable GREASE via
+    ``UpstreamTlsContext``. The feature is gated behind the runtime flag
+    ``envoy.reloadable_features.tls_encrypted_client_hello`` (default off). ECH acceptance status
+    is accessible via the connection SSL info interface methods ``echAccepted()``,
+    ``echRetryConfigs()``, and ``echNameOverride()``.
 - area: stat_sinks
   change: |
     Added :ref:`max_data_points_per_request

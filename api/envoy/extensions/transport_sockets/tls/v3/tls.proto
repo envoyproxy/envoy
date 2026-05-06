@@ -3,12 +3,15 @@ syntax = "proto3";
 package envoy.extensions.transport_sockets.tls.v3;
 
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/extensions/transport_sockets/tls/v3/common.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -25,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.transport_sockets.tls]
 // The TLS contexts below provide the transport socket configuration for upstream/downstream TLS.
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message UpstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.UpstreamTlsContext";
@@ -83,9 +86,17 @@ message UpstreamTlsContext {
   // for configurations that would fail if this option were enabled.
   google.protobuf.BoolValue enforce_rsa_key_usage = 5
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Configuration for Encrypted Client Hello (ECH) as defined in :rfc:`9849`.
+  // When set, Envoy will attempt to encrypt the TLS ClientHello using the provided
+  // ``ECHConfigList`` bytes. If ``enable_grease`` is true and no config list is provided,
+  // Envoy will send a GREASE ECH extension for privacy.
+  // [#not-implemented-hide:]
+  EncryptedClientHello encrypted_client_hello = 8
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message DownstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.DownstreamTlsContext";
@@ -169,6 +180,60 @@ message DownstreamTlsContext {
   //   This has no effect when using TLSv1_3.
   //
   bool prefer_client_ciphers = 11;
+
+  // Configuration for Encrypted Client Hello (ECH) as defined in :rfc:`9849`.
+  // When set, Envoy will accept ECH-encrypted ClientHellos and decrypt them using
+  // the provided HPKE keys. Keys can be provided inline or via SDS.
+  // [#not-implemented-hide:]
+  EncryptedClientHello encrypted_client_hello = 12
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+}
+
+// Configuration for Encrypted Client Hello (ECH) per :rfc:`9849`.
+// ECH encrypts the TLS ClientHello — including SNI and ALPN — so that
+// network observers cannot determine which virtual host a client is visiting.
+message EncryptedClientHello {
+  // Client-side ECH configuration.
+  message ClientConfig {
+    // Raw ``ECHConfigList`` bytes as defined by :rfc:`9849` §4.
+    // When set, Envoy will attempt ECH using this config list.
+    bytes ech_config_list = 1;
+
+    // If ``true`` and ``ech_config_list`` is empty, Envoy will send a GREASE
+    // ECH extension to preserve privacy properties of the connection.
+    bool enable_grease = 2;
+  }
+
+  // A single HPKE key used for ECH decryption on the server.
+  message ServerKey {
+    // HPKE private key bytes (raw ``EVP_HPKE_KEY`` private-key format).
+    config.core.v3.DataSource private_key = 1;
+
+    // Serialized ``ECHConfig`` bytes matching this private key.
+    bytes ech_config = 2;
+
+    // If ``true``, this key is only used to supply retry configs to clients
+    // and will not be used for actual ECH decryption.
+    bool is_retry_config = 3;
+  }
+
+  // Server-side ECH configuration.
+  message ServerConfig {
+    // Inline ECH HPKE keys. At least one key must be provided unless
+    // ``ech_keys_sds_secret_config`` is set.
+    repeated ServerKey keys = 1;
+
+    // Config for fetching ECH keys via SDS API.
+    SdsSecretConfig ech_keys_sds_secret_config = 2;
+  }
+
+  oneof config_type {
+    // Client-side ECH configuration. Set on ``UpstreamTlsContext``.
+    ClientConfig client = 1;
+
+    // Server-side ECH configuration. Set on ``DownstreamTlsContext``.
+    ServerConfig server = 2;
+  }
 }
 
 // TLS key log configuration.
