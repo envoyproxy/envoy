@@ -1397,7 +1397,7 @@ thrift:
   project_name: "Apache Thrift"
   project_desc: "Apache Thrift Python library"
   project_url: "https://thrift.apache.org/"
-  release_date: "2025-05-23"
+  release_date: "2026-04-27"
   use_category:
   - test_only
   cpe: "cpe:2.3:a:apache:thrift:*"
