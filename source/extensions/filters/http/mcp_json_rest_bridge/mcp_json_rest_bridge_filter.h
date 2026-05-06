@@ -24,6 +24,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpJsonRestBridge {
 
+inline constexpr char FilterName[] = "envoy.filters.http.mcp_json_rest_bridge";
+
 /**
  * Configuration for the MCP JSON REST Bridge filter.
  */
@@ -42,6 +44,11 @@ public:
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::RequestStorageMode
+  requestStorageMode() const {
+    return proto_config_.request_storage_mode();
+  }
 
 private:
   absl::flat_hash_map<std::string,
