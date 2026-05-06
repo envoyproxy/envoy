@@ -64,5 +64,14 @@ new_features:
     RSA public key exchange on behalf of the client. Added a new
     :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.mysql_proxy.v3.MySQLProxy.downstream_ssl>`
     config option with ``DISABLE``, ``REQUIRE``, and ``ALLOW`` modes.
+- area: ext_authz
+  change: |
+    Added cooperative caching bypass support to the external authorization HTTP filter. The filter can
+    now retrieve a cached ``CheckResponse`` from dynamic metadata, Base64-decode and deserialize it, and
+    apply the cached response directly, bypassing the live authorization service call. If deserialization
+    fails, the filter increments the new ``invalid_cached_response`` statistic and gracefully falls back
+    to a live network call. Configured via the new
+    :ref:`check_response_metadata_key <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.check_response_metadata_key>`
+    option.
 
 deprecated:
