@@ -1232,7 +1232,7 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
 
   // Because the load shed operation uses a two-phase GOAWAY, a request initiated before the drain
   // timer fires will be processed as usual.
-  EXPECT_TRUE(second_request_decoder->complete());
+  EXPECT_TRUE(second_request_decoder->waitForEndStream());
 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
