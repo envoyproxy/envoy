@@ -468,8 +468,7 @@ bool Filter::tryCacheHit() {
     return false;
   }
 
-  const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
-  const auto& filter_metadata = metadata.filter_metadata();
+  const auto& filter_metadata = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   const auto metadata_it = filter_metadata.find("envoy.filters.http.ext_authz");
   if (metadata_it == filter_metadata.end()) {
     return false;
@@ -501,8 +500,7 @@ bool Filter::tryCacheHit() {
                    *decoder_callbacks_, metadata_key);
 
   Filters::Common::ExtAuthz::ResponsePtr authz_response =
-      std::make_unique<Filters::Common::ExtAuthz::Response>(
-          Filters::Common::ExtAuthz::Response{});
+      std::make_unique<Filters::Common::ExtAuthz::Response>();
 
   authz_response->grpc_status = check_response.status().code();
   authz_response->raw_check_response = check_response;
@@ -521,6 +519,7 @@ bool Filter::tryCacheHit() {
     }
     authz_response->body = error_response.body();
   } else {
+    ASSERT(check_response.has_denied_response());
     authz_response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
     authz_response->status_code = Http::Code::Forbidden;
     if (check_response.has_denied_response()) {

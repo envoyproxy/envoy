@@ -35,15 +35,11 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
-namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace ExtAuthz {
+namespace Envoy::Extensions::HttpFilters::ExtAuthz {
 namespace {
 
 class ExtAuthzCacheTest : public testing::Test {
 public:
-  ExtAuthzCacheTest() {}
 
   void initialize(const std::string& yaml) {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
@@ -255,8 +251,76 @@ TEST_F(ExtAuthzCacheTest, InvalidCacheMetadataFallback) {
   EXPECT_EQ(1U, config_->stats().invalid_cached_response_.value());
 }
 
+TEST_F(ExtAuthzCacheTest, CacheHitErrorFailClosed) {
+  initialize(R"(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_server"
+    check_response_metadata_key: "authz_cache"
+  )");
+
+  prepareCheck();
+
+  // Prepare cached response representing an error (500)
+  envoy::service::auth::v3::CheckResponse cached_response;
+  cached_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  auto* error_response = cached_response.mutable_error_response();
+  error_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::InternalServerError)));
+  error_response->set_body("Cached Error Body");
+
+  setCacheMetadata(cached_response, "authz_cache");
+
+  // We expect client_->check to NOT be called
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  // Expect local reply (fail-closed) with custom status from error_response
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::InternalServerError, "Cached Error Body", _, _, _));
+
+  // Call decodeHeaders
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(1U, config_->stats().error_.value());
+}
+
+TEST_F(ExtAuthzCacheTest, CacheHitErrorFailOpen) {
+  initialize(R"(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_server"
+    check_response_metadata_key: "authz_cache"
+    failure_mode_allow: true
+    failure_mode_allow_header_add: true
+  )");
+
+  prepareCheck();
+
+  // Prepare cached response representing an error (500)
+  envoy::service::auth::v3::CheckResponse cached_response;
+  cached_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  auto* error_response = cached_response.mutable_error_response();
+  error_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::InternalServerError)));
+
+  setCacheMetadata(cached_response, "authz_cache");
+
+  // We expect client_->check to NOT be called
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  // Call decodeHeaders
+  request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+  request_headers_.addCopy(Http::Headers::get().Method, "GET");
+  request_headers_.addCopy(Http::Headers::get().Path, "/");
+
+  // Should continue decoding (fail-open)
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  
+  // Verify fail-open header is added
+  EXPECT_EQ("true", request_headers_.get_("x-envoy-auth-failure-mode-allowed"));
+  EXPECT_EQ(1U, config_->stats().error_.value());
+  EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
+}
+
 } // namespace
-} // namespace ExtAuthz
-} // namespace HttpFilters
-} // namespace Extensions
-} // namespace Envoy
+} // namespace Envoy::Extensions::HttpFilters::ExtAuthz
