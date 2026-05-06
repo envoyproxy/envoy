@@ -451,7 +451,7 @@ jobs:
         ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
 
     - name: Notify Slack on failure
-      if: ${{ steps.ci-run.outputs.exit-code != 0 && inputs.slack-channel != '' }}
+      if: ${{ steps.ci-run.outputs.exit-code != 0 && inputs.slack-channel != '' && github.event.workflow_run.event == 'push' }}
       uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
       env:
         JOB_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
