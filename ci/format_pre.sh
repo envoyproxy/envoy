@@ -77,6 +77,11 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/spel
 
 CURRENT=rustfmt
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @rules_rust//:rustfmt
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "ERROR: rustfmt produced changes — Rust code is not formatted." >&2
+    echo "Run: bazel run @rules_rust//:rustfmt" >&2
+    false
+fi
 
 CURRENT=check_format
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:check_format -- fix --fail_on_diff
