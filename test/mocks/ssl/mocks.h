@@ -132,6 +132,8 @@ public:
   MOCK_METHOD(absl::optional<
                   envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
               compliancePolicy, (), (const));
+  MOCK_METHOD(const std::string&, echConfigList, (), (const));
+  MOCK_METHOD(bool, echGreaseEnabled, (), (const));
   MOCK_METHOD(OptRef<Ssl::UpstreamTlsCertificateSelectorFactory>, tlsCertificateSelectorFactory, (),
               (const, override));
   Ssl::HandshakerCapabilities capabilities_;
