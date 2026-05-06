@@ -359,7 +359,9 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
-  transport_socket_->closeSocket(close_type);
+  const bool abort_reset = detected_close_type_ == StreamInfo::DetectedCloseType::RemoteReset ||
+                           detected_close_type_ == StreamInfo::DetectedCloseType::LocalReset;
+  transport_socket_->closeSocket(close_type, abort_reset);
 
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
@@ -373,8 +375,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
-  if (detected_close_type_ == StreamInfo::DetectedCloseType::RemoteReset ||
-      detected_close_type_ == StreamInfo::DetectedCloseType::LocalReset) {
+  if (abort_reset) {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,

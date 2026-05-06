@@ -375,10 +375,20 @@ void SslSocket::shutdownBasic() {
   }
 }
 
-void SslSocket::closeSocket(Network::ConnectionEvent) {
+void SslSocket::closeSocket(Network::ConnectionEvent, bool abort_reset) {
   // Unregister the SSL connection object from private key method providers.
   for (auto const& provider : ctx_->getPrivateKeyMethodProviders()) {
     provider->unregisterPrivateKeyMethod(rawSsl());
+  }
+
+  // When the connection is being torn down with a TCP RST, skip the TLS shutdown
+  // (close_notify). Sending close_notify alongside a RST sends contradictory signals
+  // to the peer (graceful close vs. reset) and races the alert against the RST,
+  // making peer-side reset detection unreliable. Skipping close_notify ensures the
+  // peer reliably observes a connection reset.
+  if (abort_reset && Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.ssl_socket_report_connection_reset")) {
+    return;
   }
 
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
