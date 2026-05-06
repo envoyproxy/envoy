@@ -400,20 +400,10 @@ TEST_P(SslIntegrationTest, TlsDownstreamReset) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  // Abort the connection from the client side by setting SO_LINGER to 0 and closing
-  // the socket directly. This forces a TCP RST to be sent.
-  // NOTE: We bypass connection->close() here because SslSocket would attempt to
-  // perform a graceful TLS shutdown (sending close_notify) even for AbortReset.
-  // Closing the ioHandle directly ensures a TCP RST is sent immediately without
-  // a prior TLS shutdown, allowing the server to correctly detect it as RemoteReset.
-  auto* connection_impl = dynamic_cast<Network::ConnectionImpl*>(connection.get());
-  ASSERT_TRUE(connection_impl != nullptr);
-  struct linger sl;
-  sl.l_onoff = 1;
-  sl.l_linger = 0;
-  auto result_opt = connection_impl->ioHandle().setOption(SOL_SOCKET, SO_LINGER, &sl, sizeof(sl));
-  ASSERT_EQ(0, result_opt.return_value_);
-  connection_impl->ioHandle().close();
+  // Abort the connection with AbortReset. SslSocket skips the TLS close_notify
+  // shutdown when the connection is being torn down with a RST so the server
+  // reliably observes the reset and reports RemoteReset in the access log.
+  connection->close(Network::ConnectionCloseType::AbortReset);
 
   auto result = waitForAccessLog(listener_access_log_name_);
   EXPECT_THAT(result, testing::HasSubstr("DS_CLOSE_TYPE=RemoteReset"));
