@@ -20,10 +20,10 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#include "openssl/evp.h"
-#include "openssl/ssl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/evp.h"
+#include "openssl/ssl.h"
 
 using testing::ReturnRef;
 
@@ -51,8 +51,8 @@ static EchTestData generateEchTestData() {
   // Marshal ECHConfig.
   bssl::ScopedCBB cbb;
   EXPECT_EQ(1, CBB_init(cbb.get(), 128));
-  EXPECT_EQ(1, SSL_marshal_ech_config(cbb.get(), /*config_id=*/1, key.get(),
-                                       "public.example.com", /*max_name_len=*/255));
+  EXPECT_EQ(1, SSL_marshal_ech_config(cbb.get(), /*config_id=*/1, key.get(), "public.example.com",
+                                      /*max_name_len=*/255));
   uint8_t* ech_buf = nullptr;
   size_t ech_len = 0;
   EXPECT_EQ(1, CBB_finish(cbb.get(), &ech_buf, &ech_len));
@@ -62,8 +62,8 @@ static EchTestData generateEchTestData() {
   // Build SSL_ECH_KEYS so we can marshal the ECHConfigList via the retry-configs API.
   bssl::UniquePtr<SSL_ECH_KEYS> ech_keys(SSL_ECH_KEYS_new());
   EXPECT_EQ(1, SSL_ECH_KEYS_add(ech_keys.get(), /*is_retry_config=*/0,
-                                 reinterpret_cast<const uint8_t*>(data.ech_config_bytes.data()),
-                                 data.ech_config_bytes.size(), key.get()));
+                                reinterpret_cast<const uint8_t*>(data.ech_config_bytes.data()),
+                                data.ech_config_bytes.size(), key.get()));
 
   bssl::ScopedCBB cbb2;
   EXPECT_EQ(1, CBB_init(cbb2.get(), 128));
@@ -94,17 +94,14 @@ public:
 
     config_helper_.addConfigModifier(
         [priv, ech_cfg](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto* filter_chain = bootstrap.mutable_static_resources()
-                                   ->mutable_listeners(0)
-                                   ->mutable_filter_chains(0);
+          auto* filter_chain =
+              bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
           auto* transport_socket = filter_chain->mutable_transport_socket();
 
           envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_ctx;
           transport_socket->typed_config().UnpackTo(&tls_ctx);
 
-          auto* key_proto = tls_ctx.mutable_encrypted_client_hello()
-                                ->mutable_server()
-                                ->add_keys();
+          auto* key_proto = tls_ctx.mutable_encrypted_client_hello()->mutable_server()->add_keys();
           key_proto->mutable_private_key()->set_inline_bytes(priv);
           key_proto->set_ech_config(ech_cfg);
           key_proto->set_is_retry_config(false);
@@ -119,9 +116,8 @@ public:
   Network::ClientConnectionPtr makeEchClientConnection(const std::string& ech_config_list_bytes) {
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
     initializeUpstreamTlsContextConfig(ClientSslTransportOptions{}, tls_context);
-    tls_context.mutable_encrypted_client_hello()
-        ->mutable_client()
-        ->set_ech_config_list(ech_config_list_bytes);
+    tls_context.mutable_encrypted_client_hello()->mutable_client()->set_ech_config_list(
+        ech_config_list_bytes);
 
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
     ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(*api_));
@@ -133,11 +129,10 @@ public:
             std::move(cfg), *context_manager_, *client_stats_store->rootScope()),
         Network::UpstreamTransportSocketFactoryPtr);
 
-    Network::Address::InstanceConstSharedPtr address =
-        getSslAddress(version_, lookupPort("http"));
-    return dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(),
-        factory->createTransportSocket({}, nullptr), nullptr, nullptr);
+    Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
+    return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                               factory->createTransportSocket({}, nullptr), nullptr,
+                                               nullptr);
   }
 
   // Create a client connection with ECH GREASE enabled.
@@ -156,11 +151,10 @@ public:
             std::move(cfg), *context_manager_, *grease_stats_store->rootScope()),
         Network::UpstreamTransportSocketFactoryPtr);
 
-    Network::Address::InstanceConstSharedPtr address =
-        getSslAddress(version_, lookupPort("http"));
-    return dispatcher_->createClientConnection(
-        address, Network::Address::InstanceConstSharedPtr(),
-        factory->createTransportSocket({}, nullptr), nullptr, nullptr);
+    Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
+    return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                               factory->createTransportSocket({}, nullptr), nullptr,
+                                               nullptr);
   }
 };
 
@@ -173,8 +167,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EchIntegrationTest,
 // on the client side.
 BORINGSSL_TEST_P(EchIntegrationTest, ServerAcceptsEchFromClient) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
 
   EchTestData data = generateEchTestData();
   initializeWithEchKeys(data);
@@ -221,8 +214,7 @@ BORINGSSL_TEST_P(EchIntegrationTest, RuntimeFlagOffSkipsEch) {
 // successfully but echAccepted() returns false (no real ECH was performed).
 BORINGSSL_TEST_P(EchIntegrationTest, ClientEchGreaseConnectsSuccessfully) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
 
   EchTestData data = generateEchTestData();
   initializeWithEchKeys(data);
@@ -249,8 +241,7 @@ BORINGSSL_TEST_P(EchIntegrationTest, ClientEchGreaseConnectsSuccessfully) {
 // connection uses the outer (unencrypted) SNI.
 BORINGSSL_TEST_P(EchIntegrationTest, ServerProvidesRetryConfigsOnConfigIdMismatch) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_encrypted_client_hello", "true"}});
 
   // Server is configured with key A.
   EchTestData server_data = generateEchTestData();

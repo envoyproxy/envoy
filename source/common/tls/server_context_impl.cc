@@ -234,8 +234,8 @@ ServerContextImpl::ServerContextImpl(
         bssl::UniquePtr<SSL_ECH_KEYS> ech_keys(SSL_ECH_KEYS_new());
         for (const auto& key : ech_keys_vec) {
           EVP_HPKE_KEY hpke_key_raw = {};
-          std::unique_ptr<EVP_HPKE_KEY, decltype(&EVP_HPKE_KEY_cleanup)>
-              hpke_key_guard(&hpke_key_raw, EVP_HPKE_KEY_cleanup);
+          std::unique_ptr<EVP_HPKE_KEY, decltype(&EVP_HPKE_KEY_cleanup)> hpke_key_guard(
+              &hpke_key_raw, EVP_HPKE_KEY_cleanup);
           if (EVP_HPKE_KEY_init(&hpke_key_raw, EVP_hpke_x25519_hkdf_sha256(),
                                 reinterpret_cast<const uint8_t*>(key.hpke_private_key.data()),
                                 key.hpke_private_key.size()) != 1) {
