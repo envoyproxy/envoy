@@ -128,6 +128,25 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "ext_authz_cache_integration_test",
+    srcs = ["ext_authz_cache_integration_test.cc"],
+    extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/ext_authz:config",
+        "//source/extensions/filters/http/header_to_metadata:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_proto_library(
     name = "ext_authz_fuzz_proto",
     srcs = ["ext_authz_fuzz.proto"],
