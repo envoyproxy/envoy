@@ -351,6 +351,17 @@ std::string ConnectionInfoImplBase::ciphersuiteString() const {
   return SSL_CIPHER_get_name(cipher);
 }
 
+uint16_t ConnectionInfoImplBase::tlsGroupId() const { return SSL_get_group_id(ssl()); }
+
+absl::string_view ConnectionInfoImplBase::tlsGroupString() const {
+  const char* group = SSL_get_group_name(tlsGroupId());
+  if (group == nullptr) {
+    return {};
+  }
+
+  return group;
+}
+
 const std::string& ConnectionInfoImplBase::tlsVersion() const {
   return getCachedValueOrCreate<std::string>(
       CachedValueTag::TlsVersion, [](SSL* ssl) { return std::string(SSL_get_version(ssl)); });

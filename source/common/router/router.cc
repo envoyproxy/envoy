@@ -882,6 +882,13 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
       allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
+
+  // If the upstream HTTP filters dropped this request by sending a local reply, we should not
+  // start any shadow streams since the request won't be proxied upstream.
+  if (saw_local_reply_) {
+    active_shadow_policies.clear();
+  }
+
   // Start the shadow streams.
   const size_t num_shadow_policies = active_shadow_policies.size();
   for (size_t i = 0; i < num_shadow_policies; ++i) {
@@ -942,8 +949,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     onRequestComplete();
   }
 
-  // If this was called due to asynchronous host selection, the caller should continueDecoding.
-  return true;
+  // If this was called due to asynchronous host selection, the caller should continueDecoding
+  // if and only if we did not send a local reply.
+  return !saw_local_reply_;
 }
 
 std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalCluster& cluster,
@@ -1622,12 +1630,16 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   const StreamInfo::CoreResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
 
+  const bool show_transport_failure =
+      !transport_failure_reason.empty() &&
+      !Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hide_transport_failure_reason_in_response_body");
   const std::string body =
       absl::StrCat("upstream connect error or disconnect/reset before headers. ",
                    (is_retry_ ? "retried and the latest " : ""),
                    "reset reason: ", Http::Utility::resetReasonToString(reset_reason),
-                   !transport_failure_reason.empty() ? ", transport failure reason: " : "",
-                   transport_failure_reason);
+                   show_transport_failure ? ", transport failure reason: " : "",
+                   show_transport_failure ? transport_failure_reason : "");
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;

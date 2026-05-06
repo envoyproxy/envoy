@@ -46,6 +46,8 @@ jobs:
       # head-sha: ${{ github.sha }}
 
   build:
+    secrets:
+      slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
     permissions:
       actions: read
       contents: read
