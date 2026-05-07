@@ -6750,6 +6750,40 @@ TEST_F(HttpFilterTest, ShadowModeErrorSetsFilterStateAndContinues) {
   EXPECT_EQ(1U, config_->stats().error_.value());
 }
 
+// Verifies that shadow mode correctly captures a custom status code on error.
+TEST_F(HttpFilterTest, ShadowModeErrorWithCustomStatusCode) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  shadow_mode: true
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  response.status_code = Http::Code::ServiceUnavailable;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  const auto* shadow =
+      decoder_filter_callbacks_.streamInfo().filterState()->getDataReadOnly<ShadowDecisionObject>(
+          kShadowFilterStateKey);
+  ASSERT_NE(shadow, nullptr);
+  EXPECT_EQ(shadow->statusCode(), Http::Code::ServiceUnavailable);
+}
+
 // Verify that in shadow mode an OK response sets FilterState and continues as normal.
 TEST_F(HttpFilterTest, ShadowModeOkSetsFilterState) {
   InSequence s;
