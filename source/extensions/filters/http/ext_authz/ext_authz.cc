@@ -39,7 +39,7 @@ void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadat
     for (const MetadataProto* metadata : source_metadata) {
       if (metadata == nullptr) {
         continue; // LCOV_EXCL_LINE
-      }
+      } // LCOV_EXCL_LINE
       const auto& filter_metadata = metadata->filter_metadata();
       if (const auto metadata_it = filter_metadata.find(context_key);
           metadata_it != filter_metadata.end()) {
@@ -53,7 +53,7 @@ void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadat
     for (const MetadataProto* metadata : source_metadata) {
       if (metadata == nullptr) {
         continue; // LCOV_EXCL_LINE
-      }
+      } // LCOV_EXCL_LINE
       const auto& typed_filter_metadata = metadata->typed_filter_metadata();
       if (const auto metadata_it = typed_filter_metadata.find(context_key);
           metadata_it != typed_filter_metadata.end()) {
