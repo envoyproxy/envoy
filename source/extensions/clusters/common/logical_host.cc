@@ -77,6 +77,11 @@ Network::Address::InstanceConstSharedPtr LogicalHost::address() const {
   return address_;
 }
 
+Network::Address::InstanceConstSharedPtr LogicalHost::orcaReportingAddress() const {
+  absl::MutexLock lock(address_lock_);
+  return address_;
+}
+
 Upstream::Host::CreateConnectionData LogicalHost::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
@@ -108,20 +113,13 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
       std::make_shared<RealHostDescription>(address, shared_from_this()));
 }
 
-// TODO(jukie): once a per-host OOB address override is added, dial that
-// instead of the snapshotted data address.
 Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata) const {
-  Network::Address::InstanceConstSharedPtr address;
-  SharedConstAddressVector address_list_or_null;
-  {
-    absl::MutexLock lock(address_lock_);
-    address = address_;
-    address_list_or_null = address_list_or_null_;
-  }
-  // override_transport_socket_options_ takes precedence over caller-supplied options.
+  const Network::Address::InstanceConstSharedPtr address = orcaReportingAddress();
+  const SharedConstAddressVector address_list_or_null = addressListOrNull();
+  // Use override_transport_socket_options if set, otherwise use the passed options.
   const auto& effective_options = override_transport_socket_options_ != nullptr
                                       ? override_transport_socket_options_
                                       : transport_socket_options;

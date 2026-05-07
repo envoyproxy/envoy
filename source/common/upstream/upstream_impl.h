@@ -324,6 +324,9 @@ public:
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
+  Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override {
+    return address_;
+  }
   SharedConstAddressVector addressListOrNull() const override { return address_list_or_null_; }
 
 protected:

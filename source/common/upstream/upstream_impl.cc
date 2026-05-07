@@ -601,18 +601,16 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
                           transport_socket_options, shared_from_this());
 }
 
-// Dial host data address; pass full address list for happy-eyeballs across IPv4/IPv6.
-// TODO(jukie): once a per-host OOB address override is added, replace
-// address() with a dedicated accessor.
 Host::CreateConnectionData HostImplBase::createOrcaReportingConnection(
     Event::Dispatcher& dispatcher,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata) const {
+  const auto orca_address = orcaReportingAddress();
   Network::UpstreamTransportSocketFactory& factory =
       (metadata != nullptr)
-          ? resolveTransportSocketFactory(address(), metadata, transport_socket_options)
+          ? resolveTransportSocketFactory(orca_address, metadata, transport_socket_options)
           : transportSocketFactory();
-  return createConnection(dispatcher, cluster(), address(), addressListOrNull(), factory,
+  return createConnection(dispatcher, cluster(), orca_address, addressListOrNull(), factory,
                           /*options=*/nullptr, transport_socket_options, shared_from_this());
 }
 

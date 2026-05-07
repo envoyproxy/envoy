@@ -661,7 +661,7 @@ TEST_F(OrcaOobManagerWireTest, HostnameUsedAsAuthority) {
   manager.reset();
 }
 
-TEST_F(OrcaOobManagerWireTest, PipeHostFallsBackToAddressString) {
+TEST_F(OrcaOobManagerWireTest, PipeHostFallsBackToClusterName) {
   auto manager = makeManager();
   ASSERT_OK(manager->initialize());
 
@@ -693,8 +693,8 @@ TEST_F(OrcaOobManagerWireTest, PipeHostFallsBackToAddressString) {
   wireConnectionFor(host, *attempt);
   expectCreateCodecClient(*manager, *attempt);
   attempt_timer->invokeCallback();
-  // Pipe addresses have no ip(); authority falls through to address->asString().
-  EXPECT_THAT(captured_authority, testing::HasSubstr("/tmp/orca.sock"));
+  // Pipe address has no ip(); authority falls through to the cluster name.
+  EXPECT_EQ(captured_authority, "fake_cluster");
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   manager.reset();

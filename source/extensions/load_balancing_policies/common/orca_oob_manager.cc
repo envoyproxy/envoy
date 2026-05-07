@@ -347,7 +347,9 @@ std::string OrcaOobManager::OobSession::authority() const {
   if (host_->address()->ip() != nullptr) {
     return host_->address()->ip()->addressAsString();
   }
-  return host_->address()->asString();
+  // Terminal fallback for non-IP addresses (e.g., UDS, Pipe) avoids using a
+  // socket path as :authority.
+  return host_->cluster().name();
 }
 
 Http::CodecClientPtr

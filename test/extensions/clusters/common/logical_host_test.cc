@@ -39,6 +39,7 @@ TEST_F(RealHostDescriptionTest, UnitTest) {
   description_.metadata();
   description_.priority();
   EXPECT_EQ(nullptr, description_.healthCheckAddress());
+  EXPECT_EQ(nullptr, description_.orcaReportingAddress());
 
   // Pass through functions.
   EXPECT_CALL(*mock_host_, transportSocketFactory());

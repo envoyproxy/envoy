@@ -1968,6 +1968,18 @@ TEST_F(HostImplTest, CreateConnection) {
   EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
+TEST_F(HostImplTest, OrcaReportingAddressDefaultsToDataAddress) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3::UNKNOWN));
+  EXPECT_EQ(host->orcaReportingAddress(), host->address());
+}
+
 TEST_F(HostImplTest, CreateOrcaReportingConnectionDialsDataAddress) {
   MockClusterMockPrioritySet cluster;
   Network::Address::InstanceConstSharedPtr address =

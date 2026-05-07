@@ -217,11 +217,14 @@ public:
       const envoy::config::core::v3::Metadata* metadata) const PURE;
 
   /**
-   * Create a dedicated connection for ORCA out-of-band load reporting
-   * (xds.service.orca.v3.OpenRcaService), separate from request and health-check pools. Dials the
-   * host's data address per gRFC A51. LogicalHost overrides this to snapshot its mutable address
-   * state under its lock. Signature mirrors createHealthCheckConnection; metadata and
-   * transport_socket_options are nullptr for v1.
+   * Create a dedicated connection for ORCA out-of-band load reporting per gRFC A51
+   * (xds.service.orca.v3.OpenRcaService), separate from request and health-check pools.
+   * Dials the address returned by orcaReportingAddress().
+   * @param dispatcher supplies the owning dispatcher.
+   * @param transport_socket_options supplies the transport options that will be set on the new
+   * connection.
+   * @param metadata when non-null drives transport socket factory resolution.
+   * @return the connection data.
    */
   virtual CreateConnectionData createOrcaReportingConnection(
       Event::Dispatcher& dispatcher,

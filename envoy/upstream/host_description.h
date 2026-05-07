@@ -264,6 +264,12 @@ public:
   virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;
 
   /**
+   * @return the address used to dial ORCA out-of-band load reporting streams
+   *         (xds.service.orca.v3.OpenRcaService).
+   */
+  virtual Network::Address::InstanceConstSharedPtr orcaReportingAddress() const PURE;
+
+  /**
    * @return the priority of the host.
    */
   virtual uint32_t priority() const PURE;
