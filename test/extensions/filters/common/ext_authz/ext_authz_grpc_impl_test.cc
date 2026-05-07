@@ -635,6 +635,49 @@ ok_response:
                      span_);
 }
 
+// TODO(https://github.com/envoyproxy/envoy/issues/45003)
+// This test ensures the default (buggy) behavior remains unchanged since
+// existing Envoy deployments may be relying on the default (buggy) behavior
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithKeepEmptyValueIgnored) {
+  initialize();
+
+  envoy::service::auth::v3::CheckResponse check_response;
+  TestUtility::loadFromYaml(R"EOF(
+status:
+  code: 0
+ok_response:
+  headers:
+  - header:
+      key: x-keep-empty
+      value: ""
+    keep_empty_value: false
+)EOF",
+                            check_response);
+
+  // If keep_empty_value were respected, the header "x-keep-empty" should be DROPPED
+  // because its value is empty. However, the current implementation ignores this
+  // flag and blindly adds the empty header to the headers_to_set vector.
+  auto expected_authz_response = Response{
+      .status = CheckStatus::OK,
+      .headers_to_set = UnsafeHeaderVector{{"x-keep-empty", ""}},
+      .status_code = Http::Code::OK,
+      .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
+  };
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzOkResponse(expected_authz_response))));
+  client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
+                     span_);
+}
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters
