@@ -6,7 +6,8 @@ permissions:
 on:
   workflow_call:
     secrets:
-      dockerhub-password:
+      dockerhub-token:
+      dockerhub-write-token:
       ENVOY_CI_SYNC_APP_ID:
       ENVOY_CI_SYNC_APP_KEY:
       ENVOY_CI_PUBLISH_APP_ID:
@@ -37,13 +38,14 @@ concurrency:
 
 jobs:
   sign:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+      gpg-key: ${{ secrets.gpg-key }}
+      gpg-key-password: ${{ secrets.gpg-key-password }}
     permissions:
       actions: read
       contents: read
       packages: read
-    secrets:
-      gpg-key: ${{ secrets.gpg-key }}
-      gpg-key-password: ${{ secrets.gpg-key-password }}
     if: ${{ vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy' }}
     name: Sign packages
     uses: ./.github/workflows/_run.yml
@@ -77,7 +79,7 @@ jobs:
 
   container:
     secrets:
-      dockerhub-password: ${{ secrets.dockerhub-password }}
+      dockerhub-write-token: ${{ secrets.dockerhub-write-token }}
     permissions:
       actions: read
       contents: read
@@ -99,6 +101,7 @@ jobs:
     secrets:
       app-id: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_ID || '' }}
       app-key: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_KEY || '' }}
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read

@@ -5,6 +5,8 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      dockerhub-token:
     inputs:
       request:
         type: string
@@ -24,6 +26,8 @@ concurrency:
 
 jobs:
   examples:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read
@@ -76,6 +80,8 @@ jobs:
               shell: bash
 
   distroless:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read
@@ -134,6 +140,8 @@ jobs:
               shell: bash
 
   distro:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read

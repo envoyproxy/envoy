@@ -8,6 +8,7 @@ on:
     secrets:
       app-id:
       app-key:
+      dockerhub-token:
       gpg-key:
       gpg-key-password:
       slack-bot-token:
@@ -387,6 +388,20 @@ jobs:
       name: Configure repo Bazel settings
       env:
         BAZELRC_CONTENT: ${{ vars.ENVOY_CI_BAZELRC }}
+
+    - id: dockerhub
+      run: |
+        if [[ -n "$DOCKERHUB_TOKEN" ]]; then
+          echo "login=true" >> "$GITHUB_OUTPUT"
+        fi
+      env:
+        DOCKERHUB_TOKEN: ${{ secrets.dockerhub-token }}
+    - name: Login to Docker Hub (read-only)
+      if: steps.dockerhub.outputs.login == 'true'
+      uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+      with:
+        username: ${{ inputs.dockerhub-username }}
+        password: ${{ secrets.dockerhub-token }}
 
     # NOTE: This is where untrusted code can be run!!!
     #  Only post-failure notification steps (which don't use any repo code) should follow this step.

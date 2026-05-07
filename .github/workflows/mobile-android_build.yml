@@ -39,6 +39,8 @@ jobs:
       check-name: mobile-android
 
   build:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -63,6 +65,8 @@ jobs:
       target: build
 
   kotlin-hello-world:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -115,6 +119,8 @@ jobs:
       working-directory: mobile
 
   apps:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read

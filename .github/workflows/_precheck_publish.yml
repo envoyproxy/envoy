@@ -6,6 +6,7 @@ permissions:
 on:
   workflow_call:
     secrets:
+      dockerhub-token:
       gcp-key:
         required: true
     inputs:
@@ -23,6 +24,8 @@ concurrency:
 
 jobs:
   publish:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read

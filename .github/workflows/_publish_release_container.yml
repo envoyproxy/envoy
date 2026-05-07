@@ -6,7 +6,7 @@ permissions:
 on:
   workflow_call:
     secrets:
-      dockerhub-password:
+      dockerhub-write-token:
     inputs:
       dev:
         required: true
@@ -233,4 +233,4 @@ jobs:
         manifest-config: ${{ steps.dev-config.outputs.value || steps.release-config.outputs.value }}
         dry-run: ${{ ! inputs.trusted || (inputs.target-branch != 'main' && inputs.dev) }}
         dockerhub-username: ${{ inputs.trusted && inputs.dockerhub-username || '' }}
-        dockerhub-password: ${{ inputs.trusted && secrets.dockerhub-password || '' }}
+        dockerhub-password: ${{ inputs.trusted && secrets.dockerhub-write-token || '' }}
