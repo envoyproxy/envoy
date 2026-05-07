@@ -7,7 +7,6 @@ on:
   workflow_call:
     secrets:
       dockerhub-password:
-      dockerhub-username:
     inputs:
       dev:
         required: true
@@ -16,6 +15,9 @@ on:
       dockerhub-repo:
         required: true
         default: envoy
+        type: string
+      dockerhub-username:
+        required: true
         type: string
       sha:
         required: true
@@ -230,5 +232,5 @@ jobs:
         artifacts-pattern: oci.*
         manifest-config: ${{ steps.dev-config.outputs.value || steps.release-config.outputs.value }}
         dry-run: ${{ ! inputs.trusted || (inputs.target-branch != 'main' && inputs.dev) }}
-        dockerhub-username: ${{ inputs.trusted && secrets.dockerhub-username || '' }}
+        dockerhub-username: ${{ inputs.trusted && inputs.dockerhub-username || '' }}
         dockerhub-password: ${{ inputs.trusted && secrets.dockerhub-password || '' }}

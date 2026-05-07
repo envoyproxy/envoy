@@ -7,7 +7,6 @@ on:
   workflow_call:
     secrets:
       dockerhub-password:
-      dockerhub-username:
       ENVOY_CI_SYNC_APP_ID:
       ENVOY_CI_SYNC_APP_KEY:
       ENVOY_CI_PUBLISH_APP_ID:
@@ -17,6 +16,9 @@ on:
       gpg-key-password:
         required: true
     inputs:
+      dockerhub-username:
+        type: string
+        required: true
       request:
         type: string
         required: true
@@ -75,7 +77,6 @@ jobs:
 
   container:
     secrets:
-      dockerhub-username: ${{ secrets.dockerhub-username }}
       dockerhub-password: ${{ secrets.dockerhub-password }}
     permissions:
       actions: read
@@ -85,6 +86,7 @@ jobs:
     uses: ./.github/workflows/_publish_release_container.yml
     with:
       dockerhub-repo: ${{ vars.DOCKERHUB_REPO || 'envoy' }}
+      dockerhub-username: ${{ inputs.dockerhub-username }}
       dev: ${{ fromJSON(inputs.request).request.version.dev }}
       sha: ${{ fromJSON(inputs.request).request.sha }}
       target-branch: ${{ fromJSON(inputs.request).request.target-branch }}

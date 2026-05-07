@@ -83,7 +83,6 @@ jobs:
   release:
     secrets:
       dockerhub-password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
       ENVOY_CI_SYNC_APP_ID: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)
@@ -125,6 +124,7 @@ jobs:
     uses: ./.github/workflows/_publish_release.yml
     name: Release
     with:
+      dockerhub-username: ${{ vars.DOCKERHUB_USERNAME }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
