@@ -22,9 +22,8 @@ to be eligible for the program:
    :ref:`execution environment <arch_overview_google_vrp_ee>` and be consistent with the
    program's :ref:`threat model <arch_overview_google_vrp_threat_model>`.
 
-2. Vulnerabilities must be reported to **both** the Envoy project and via https://bughunters.google.com/report.
-   To report to the Envoy project, preferably
-   `open a GitHub Security Advisory <https://github.com/envoyproxy/envoy/security/advisories/new>`_
+2. Vulnerabilities must be reported to the Envoy project, preferably by
+   `opening a GitHub Security Advisory <https://github.com/envoyproxy/envoy/security/advisories/new>`_
    — alternatively, you may email envoy-security@googlegroups.com
    Vulnerabilities must be kept under embargo while triage and potential security releases occur.
    Please follow the :repo:`disclosure guidance <SECURITY.md#disclosures>` when submitting reports.
@@ -33,11 +32,16 @@ to be eligible for the program:
    <https://www.linuxfoundation.org/privacy/>`_ with the added proviso that VRP reports (including
    reporter e-mail address and name) may be freely shared with Google for VRP purposes.
 
-3. Vulnerabilities must not be previously known in a public forum, e.g. GitHub issues trackers,
+3. After vulnerability has been confirmed by the Envoy project and the patch had been publically released,
+   you may apply to `Google's Patch Reward program <https://bughunters.google.com/open-source-security/patch-rewards>`_.
+   The program requires you to submit the PR as well as the evidence of improvement, such as resolved security advisory,
+   which are only available after public disclosure.
+
+4. Vulnerabilities must not be previously known in a public forum, e.g. GitHub issues trackers,
    CVE databases (when previously associated with Envoy), etc. Existing CVEs that have not been
    previously associated with an Envoy vulnerability are fair game.
 
-4. Vulnerabilities must not be also submitted to a parallel reward program run by Google or
+5. Vulnerabilities must not be also submitted to a parallel reward program run by Google or
    `Lyft <https://www.lyft.com/security>`_.
 
 Rewards are at the discretion of the Envoy OSS security team and Google. They will be conditioned on
