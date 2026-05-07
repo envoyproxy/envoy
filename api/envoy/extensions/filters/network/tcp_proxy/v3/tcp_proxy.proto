@@ -403,5 +403,5 @@ message TcpProxy {
   // the downstream connection is closed with ``FlushWrite``.
   //
   // This is disabled by default for backward compatibility.
-  bool check_drain_close = 24;
+  google.protobuf.BoolValue check_drain_close = 24;
 }

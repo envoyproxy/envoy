@@ -83,7 +83,7 @@ TEST(ConfigTest, ConfigWithDrainCloseCheck) {
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
-  config.set_check_drain_close(true);
+  config.mutable_check_drain_close()->set_value(true);
 
   EXPECT_TRUE(factory.createFilterFactoryFromProto(config, context).ok());
 }

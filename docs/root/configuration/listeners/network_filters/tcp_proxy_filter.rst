@@ -210,6 +210,7 @@ The downstream statistics are rooted at *tcp.<stat_prefix>.* with the following 
 
   downstream_cx_total, Counter, Total number of connections handled by the filter
   downstream_cx_no_route, Counter, Number of connections for which no matching route was found or the cluster for the route was not found
+  downstream_cx_drain_close, Counter, Total number of connections closed due to drain close
   downstream_cx_tx_bytes_total, Counter, Total bytes written to the downstream connection
   downstream_cx_tx_bytes_buffered, Gauge, Total bytes currently buffered to the downstream connection
   downstream_cx_rx_bytes_total, Counter, Total bytes read from the downstream connection
@@ -225,4 +226,3 @@ The downstream statistics are rooted at *tcp.<stat_prefix>.* with the following 
   on_demand_cluster_timeout, Counter, Total number of connections closed due to on demand cluster lookup timeout
   upstream_flush_total, Counter, Total number of connections that continued to flush upstream data after the downstream connection was closed
   upstream_flush_active, Gauge, Total connections currently continuing to flush upstream data after the downstream connection was closed
-  downstream_cx_drain_close, Counter, Total number of connections closed due to drain close

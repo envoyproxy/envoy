@@ -226,7 +226,7 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
                                  envoy::config::core::v3::TrafficDirection::INBOUND
                              ? Network::DrainDirection::InboundOnly
                              : Network::DrainDirection::All),
-      check_drain_close_(config.check_drain_close()) {
+      check_drain_close_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, check_drain_close, false)) {
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();

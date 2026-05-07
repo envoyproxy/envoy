@@ -280,7 +280,7 @@ TEST_P(TcpProxyTest, DrainCloseIgnoredWhenFlagDisabled) {
 
 TEST_P(TcpProxyTest, DrainCloseAfterDownstreamRead) {
   auto config = defaultConfig();
-  config.set_check_drain_close(true);
+  config.mutable_check_drain_close()->set_value(true);
   setup(1, config);
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
@@ -298,7 +298,7 @@ TEST_P(TcpProxyTest, DrainCloseAfterDownstreamRead) {
 
 TEST_P(TcpProxyTest, DrainCloseUsesInboundOnlyScopeForInboundListeners) {
   auto config = defaultConfig();
-  config.set_check_drain_close(true);
+  config.mutable_check_drain_close()->set_value(true);
   EXPECT_CALL(factory_context_.listener_info_, direction())
       .WillRepeatedly(Return(envoy::config::core::v3::TrafficDirection::INBOUND));
   setup(1, config);
@@ -318,7 +318,7 @@ TEST_P(TcpProxyTest, DrainCloseUsesInboundOnlyScopeForInboundListeners) {
 
 TEST_P(TcpProxyTest, DrainCloseAfterDownstreamWrite) {
   auto config = defaultConfig();
-  config.set_check_drain_close(true);
+  config.mutable_check_drain_close()->set_value(true);
   setup(1, config);
 
   raiseEventUpstreamConnected(0);
