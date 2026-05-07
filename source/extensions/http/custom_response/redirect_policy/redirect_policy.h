@@ -10,6 +10,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
@@ -71,6 +72,7 @@ private:
   const std::unique_ptr<const std::string> uri_;
   const std::unique_ptr<const ::Envoy::Http::Utility::RedirectConfig> redirect_action_;
 
+  Formatter::FormatterPtr path_redirect_formatter_;
   const absl::optional<::Envoy::Http::Code> status_code_;
   const std::unique_ptr<Envoy::Router::HeaderParser> response_header_parser_;
   const std::unique_ptr<Envoy::Router::HeaderParser> request_header_parser_;

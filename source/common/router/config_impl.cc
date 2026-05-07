@@ -47,6 +47,8 @@
 #include "source/common/router/matcher_visitor.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
@@ -771,6 +773,18 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
               "not be stripped: {}",
               redirect_config_->path_redirect_);
   }
+
+  if (route.has_redirect() && !route.redirect().path_redirect_format().empty()) {
+    auto formatter_or =
+        Envoy::Formatter::FormatterImpl::create(route.redirect().path_redirect_format(), true);
+    if (!formatter_or.ok()) {
+      creation_status = absl::InvalidArgumentError(
+          absl::StrCat("Failed to create path_redirect_format formatter: ", formatter_or.status()));
+      return;
+    }
+    path_redirect_formatter_ = std::move(formatter_or.value());
+  }
+
   if (!route.stat_prefix().empty()) {
     route_stats_context_ = std::make_unique<RouteStatsContextImpl>(
         factory_context.scope(), factory_context.routerContext().routeStatNames(),
@@ -843,7 +857,8 @@ bool RouteEntryImplBase::isRedirect() const {
   }
   return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
          !redirect_config_->prefix_rewrite_redirect_.empty() ||
-         redirect_config_->regex_rewrite_redirect_ != nullptr;
+         redirect_config_->regex_rewrite_redirect_ != nullptr ||
+         path_redirect_formatter_ != nullptr;
 }
 
 bool RouteEntryImplBase::matchRoute(const RouteMatchContext& route_match_context,
@@ -1100,10 +1115,15 @@ std::string RouteEntryImplBase::currentUrlPathAfterRewriteWithMatchedPath(
 
 std::string RouteEntryImplBase::newUri(const Http::RequestHeaderMap& headers) const {
   ASSERT(isDirectResponse());
-  return ::Envoy::Http::Utility::newUri(
-      ::Envoy::makeOptRefFromPtr(
-          const_cast<const ::Envoy::Http::Utility::RedirectConfig*>(redirect_config_.get())),
-      headers);
+  const auto redirect_config_ref = ::Envoy::makeOptRefFromPtr(
+      const_cast<const ::Envoy::Http::Utility::RedirectConfig*>(redirect_config_.get()));
+  if (path_redirect_formatter_ != nullptr) {
+    StreamInfo::StreamInfoImpl stream_info(time_source_, nullptr,
+                                           StreamInfo::FilterState::LifeSpan::Request);
+    return ::Envoy::Http::Utility::newUriWithFormatter(redirect_config_ref, headers,
+                                                       *path_redirect_formatter_, stream_info);
+  }
+  return ::Envoy::Http::Utility::newUri(redirect_config_ref, headers);
 }
 
 absl::string_view RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& request_headers,

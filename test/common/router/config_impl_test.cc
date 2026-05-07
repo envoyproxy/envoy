@@ -9167,6 +9167,128 @@ virtual_hosts:
   }
 }
 
+// Test path_redirect_format: substitution-based redirect path.
+TEST_F(RouteConfigurationV2, RedirectPathRedirectFormat) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - match: { prefix: "/api/" }
+        redirect:
+          path_redirect_format: "/new/%REQ(x-version)%"
+      - match: { prefix: "/versioned/" }
+        redirect:
+          path_redirect_format: "/versioned/%REQ(x-version)%"
+          https_redirect: true
+      - match: { prefix: "/no-header/" }
+        redirect:
+          path_redirect_format: "/fixed-path"
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  // path_redirect_format with header substitution
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/api/resource", false, false);
+    headers.addCopy("x-version", "v2");
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    ASSERT_NE(nullptr, redirect);
+    EXPECT_EQ("http://redirect.lyft.com/new/v2", redirect->newUri(headers));
+  }
+  // path_redirect_format with https_redirect
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/versioned/resource", false, false);
+    headers.addCopy("x-version", "v3");
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    ASSERT_NE(nullptr, redirect);
+    EXPECT_EQ("https://redirect.lyft.com/versioned/v3", redirect->newUri(headers));
+  }
+  // path_redirect_format with no-op substitution (static path)
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/no-header/foo", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    ASSERT_NE(nullptr, redirect);
+    EXPECT_EQ("http://redirect.lyft.com/fixed-path", redirect->newUri(headers));
+  }
+}
+
+// path_redirect_format with a bad format string is rejected at config load time.
+TEST_F(RouteConfigurationV2, RedirectPathRedirectFormatInvalid) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - match: { prefix: "/" }
+        redirect:
+          path_redirect_format: "/new/%INVALID_COMMAND_WITH_NO_CLOSING"
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false,
+                        creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_.message(),
+              testing::HasSubstr("Failed to create path_redirect_format formatter"));
+}
+
+// Test path_redirect_format with CEL expressions.
+TEST_F(RouteConfigurationV2, RedirectPathRedirectFormatCEL) {
+  ScopedThreadLocalServerContextSetter server_context_setter(factory_context_);
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - match: { prefix: "/api/" }
+        redirect:
+          path_redirect_format: "/new/%CEL(request.headers['x-version'])%"
+      - match: { prefix: "/extract/" }
+        redirect:
+          path_redirect_format: "/v%CEL(re.extract(request.headers['x-version'], '^v([0-9]+)', '\\\\1'))%/endpoint"
+      - match: { prefix: "/missing/" }
+        redirect:
+          path_redirect_format: "/prefix/%CEL(request.headers['x-absent'])%/suffix"
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  // CEL header substitution: header present
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/api/resource", false, false);
+    headers.addCopy("x-version", "v2");
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    ASSERT_NE(nullptr, redirect);
+    EXPECT_EQ("http://redirect.lyft.com/new/v2", redirect->newUri(headers));
+  }
+  // CEL re.extract: extract numeric version
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/extract/foo", false, false);
+    headers.addCopy("x-version", "v3");
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    ASSERT_NE(nullptr, redirect);
+    EXPECT_EQ("http://redirect.lyft.com/v3/endpoint", redirect->newUri(headers));
+  }
+  // CEL header absent: missing header produces empty string for that substitution,
+  // so the overall path is "/prefix//suffix" (not empty — the redirect still fires)
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/missing/foo", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    ASSERT_NE(nullptr, redirect);
+    EXPECT_EQ("http://redirect.lyft.com/prefix//suffix", redirect->newUri(headers));
+  }
+}
+
 TEST_F(RouteMatcherTest, HeaderMatchedRoutingV2) {
   const std::string yaml = R"EOF(
 virtual_hosts:

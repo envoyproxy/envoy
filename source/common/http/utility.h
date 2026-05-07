@@ -11,12 +11,14 @@
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/formatter/substitution_formatter_base.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/message.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/http/exception.h"
 #include "source/common/http/http_option_limits.h"
@@ -727,6 +729,15 @@ bool schemeIsHttps(const absl::string_view scheme);
  */
 std::string newUri(::Envoy::OptRef<const RedirectConfig> redirect_config,
                    const Http::RequestHeaderMap& headers);
+
+/*
+ * Compute new URI, evaluating formatter to derive the path. Falls back to newUri if the formatter
+ * produces an empty path.
+ */
+std::string newUriWithFormatter(OptRef<const RedirectConfig> redirect_config,
+                                const Http::RequestHeaderMap& headers,
+                                const Formatter::Formatter& formatter,
+                                const StreamInfo::StreamInfo& stream_info);
 
 } // namespace Utility
 } // namespace Http

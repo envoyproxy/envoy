@@ -973,6 +973,7 @@ private:
   Runtime::Loader& loader_;
   std::unique_ptr<const RuntimeData> runtime_;
   std::unique_ptr<const ::Envoy::Http::Utility::RedirectConfig> redirect_config_;
+  Formatter::FormatterPtr path_redirect_formatter_;
   std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
   RetryPolicyConstSharedPtr retry_policy_;
   std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;
