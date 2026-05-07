@@ -822,15 +822,7 @@ case $CI_TARGET in
         ;;
 
     openssl)
-        # This whole boilerplate is to not fail the entire CI if there is an issue with the OpenSSL build or tests,
-        # as this is not a blocker for other work.
-        set +e
-        (set -e; build_openssl)
-        rc=$?
-        set -e
-        if [[ $rc -ne 0 ]]; then
-            echo "ERROR: OpenSSL build or test failed" >&2
-        fi
+        build_openssl
         ;;
 
     publish)

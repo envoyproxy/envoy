@@ -1709,6 +1709,8 @@ IWYU
 CRTP
 bitrate
 kbps
+dataset
+datasets
 cgo
 cgocheck
 dynamicmodulescustom

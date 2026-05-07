@@ -14,7 +14,7 @@
 #include "absl/strings/str_replace.h"
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
-#include "library/cc/engine_builder.h"
+#include "test/cc/engine_builder_test_shim.h"
 #include "library/common/api/external.h"
 #include "library/common/bridge//utility.h"
 

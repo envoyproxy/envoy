@@ -505,6 +505,60 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeCacheHit) {
   std::filesystem::remove(cached_path);
 }
 
+// When the cache path holds a file whose contents do not match the expected SHA256, the
+// factory must remove the tampered file and refuse to dlopen it. The fall-through fetch
+// path then reports the cache miss in NACK mode.
+TEST_F(DynamicModuleFilterConfigTest, NackModeCacheHitTamperedFileIsRejected) {
+  const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
+  std::ifstream input(module_path, std::ios::binary);
+  ASSERT_TRUE(input.good());
+  const std::string module_bytes((std::istreambuf_iterator<char>(input)),
+                                 std::istreambuf_iterator<char>());
+
+  Buffer::OwnedImpl hash_buffer(module_bytes);
+  const std::string expected_sha256 =
+      Hex::encode(Common::Crypto::UtilitySingleton::get().getSha256Digest(hash_buffer));
+
+  // Pre-populate the cache path with attacker-controlled bytes that hash to something other
+  // than ``expected_sha256``. Without the SHA256 verification this would be dlopen'd as is.
+  auto cached_path = Extensions::DynamicModules::moduleTempPath(expected_sha256);
+  std::filesystem::create_directories(cached_path.parent_path());
+  {
+    std::ofstream tampered(cached_path, std::ios::binary);
+    tampered << "not the expected module bytes";
+  }
+  ASSERT_TRUE(std::filesystem::exists(cached_path));
+
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: ")EOF",
+                                                                    expected_sha256, R"EOF("
+    do_not_close: true
+    nack_on_cache_miss: true
+  filter_name: "test_filter"
+  )EOF"));
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  // The verification step removes the tampered file and the code falls through to the fetch
+  // path; in NACK mode the fetch path reports "not cached".
+  EXPECT_FALSE(cb_or_error.ok());
+  EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("not cached"));
+
+  // The tampered cache entry must have been removed by the factory so a subsequent legitimate
+  // fetch can repopulate it.
+  EXPECT_FALSE(std::filesystem::exists(cached_path));
+}
+
 // A cache miss with nack_on_cache_miss rejects the config.
 TEST_F(DynamicModuleFilterConfigTest, NackModeCacheMissReturnsError) {
   const std::string yaml = R"EOF(

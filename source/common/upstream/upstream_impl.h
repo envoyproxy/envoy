@@ -161,7 +161,7 @@ class HostDescriptionImplBase : virtual public HostDescription,
                                 protected Logger::Loggable<Logger::Id::upstream> {
 public:
   Network::UpstreamTransportSocketFactory& transportSocketFactory() const override {
-    absl::ReaderMutexLock lock(&metadata_mutex_);
+    absl::ReaderMutexLock lock(metadata_mutex_);
     return socket_factory_;
   }
 
@@ -175,17 +175,17 @@ public:
   // would be to use TLS and post metadata updates from the main thread. This model would
   // possibly benefit other related and expensive computations too (e.g.: updating subsets).
   MetadataConstSharedPtr metadata() const override {
-    absl::ReaderMutexLock lock(&metadata_mutex_);
+    absl::ReaderMutexLock lock(metadata_mutex_);
     return endpoint_metadata_;
   }
   std::size_t metadataHash() const override {
-    absl::ReaderMutexLock lock(&metadata_mutex_);
+    absl::ReaderMutexLock lock(metadata_mutex_);
     return endpoint_metadata_hash_;
   }
   void metadata(MetadataConstSharedPtr new_metadata) override {
     auto& new_socket_factory = resolveTransportSocketFactory(address(), new_metadata.get());
     {
-      absl::WriterMutexLock lock(&metadata_mutex_);
+      absl::WriterMutexLock lock(metadata_mutex_);
       endpoint_metadata_ = new_metadata;
       endpoint_metadata_hash_ = new_metadata ? MessageUtil::hash(*new_metadata) : 0;
       // Update data members dependent on metadata.

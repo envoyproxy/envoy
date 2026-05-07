@@ -228,7 +228,7 @@ public:
   // NOTE:  Be extremely careful when using ScopedLookup with Mutexes. This
   // code is safe since the lock will be released after the ScopedLookup is
   // destroyed.
-  //   MutexLock l(&mu_);
+  //   MutexLock l(mu_);
   //   ScopedLookup lookup(....);
   //
   // This is NOT safe since the lock is released before the ScopedLookup is

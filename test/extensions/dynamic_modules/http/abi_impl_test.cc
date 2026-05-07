@@ -2422,7 +2422,7 @@ TEST(ABIImpl, Stats) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_InvalidLabels);
 
   // test stat creation after freezing
-  filter_config->stat_creation_frozen_ = true;
+  filter_config->stat_creation_frozen_.store(true, std::memory_order_release);
   result = envoy_dynamic_module_callback_http_filter_config_define_counter(
       filter_config.get(), {counter_vec_name.data(), counter_vec_name.size()},
       counter_vec_labels.data(), counter_vec_labels.size(), &counter_vec_id);
