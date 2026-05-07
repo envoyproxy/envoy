@@ -50,7 +50,7 @@ public:
         // TODO: When a second GcpAuthnClient implementation is added, introduce
         // a GcpAuthnClientFactory to instantiate the appropriate client
         // dynamically.
-        client_( std::make_unique<JwtGcpAuthnClientImpl>(*filter_config_, context_)),
+        client_(std::make_unique<JwtGcpAuthnClientImpl>(*filter_config_, context_)),
         stats_(generateStats(stats_prefix, context_.scope())), jwt_token_cache_(token_cache) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,

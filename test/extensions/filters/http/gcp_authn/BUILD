@@ -52,7 +52,6 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.gcp_authn"],
     deps = [
         ":gcp_authn_mocks",
-        "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
         "//source/extensions/filters/http/gcp_authn",
         "//source/extensions/filters/http/gcp_authn:config",
         "//test/common/http:common_lib",
@@ -60,6 +59,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],
 )
 

@@ -87,7 +87,8 @@ TEST_F(JwtGcpAuthnClientImplTest, Success) {
   client_->fetchToken(audience, absl::nullopt, request_callbacks_);
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
-            "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://test_audience");
+            "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://"
+            "test_audience");
 
   EXPECT_EQ(options_.retry_policy->num_retries().value(), 5);
   EXPECT_EQ(options_.retry_policy->retry_back_off().base_interval().seconds(), 1);
