@@ -148,6 +148,30 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
             "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
 }
 
+// Validates that multiple cipher-suites with the same contents are still equal
+// after dedup.
+TEST_F(SslContextImplTest, TestCipherSuitesDeduplication) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites: "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context1;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context1);
+  auto cfg1 = *ClientContextConfigImpl::create(tls_context1, factory_context_);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context2;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context2);
+  auto cfg2 = *ClientContextConfigImpl::create(tls_context2, factory_context_);
+
+  EXPECT_EQ(cfg1->cipherSuites(), "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256");
+  EXPECT_EQ(cfg2->cipherSuites(), "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256");
+
+  EXPECT_TRUE(manager_.createSslClientContext(*store_.rootScope(), *cfg1).ok());
+  EXPECT_TRUE(manager_.createSslClientContext(*store_.rootScope(), *cfg2).ok());
+}
+
 // Envoy's default cipher preference is server's.
 TEST_F(SslContextImplTest, TestServerCipherPreference) {
   const std::string yaml = R"EOF(

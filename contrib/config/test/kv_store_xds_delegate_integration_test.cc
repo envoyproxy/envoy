@@ -341,7 +341,9 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   // Wait until the discovery responses have been processed.
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  test_server_->waitForCounterGe("runtime.load_success", 2);
+  // Initial snapshot load, post-listener-manager TLS refresh (onWorkerThreadsRegistered), and
+  // first RTDS response each increment runtime.load_success; wait until all have completed.
+  test_server_->waitForCounterGe("runtime.load_success", 3);
 
   // Verify that the xDS resources are used by Envoy.
   checkSecretExists(std::string(CLIENT_CERT_NAME), /*version_info=*/"1");
@@ -360,9 +362,11 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
     layer:
       baz: saz
   )EOF");
+  const uint32_t runtime_loads_before_rtds_v2 =
+      test_server_->counter("runtime.load_success")->value();
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TestTypeUrl::get().Runtime, {rtds_resource}, "2", rtds_stream_.get());
-  test_server_->waitForCounterGe("runtime.load_success", 3);
+  test_server_->waitForCounterGe("runtime.load_success", runtime_loads_before_rtds_v2 + 1);
 
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
@@ -374,8 +378,8 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   // Wait until SDS and RTDS have been loaded from the KV store and updated the Envoy instance.
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  // Two runtime loads are expected, one for the admin layer and one for the RTDS layer.
-  test_server_->waitForCounterGe("runtime.load_success", 2);
+  // Expect initial snapshot load, post-listener-manager TLS refresh, and RTDS restored from KV.
+  test_server_->waitForCounterGe("runtime.load_success", 3);
 
   // Verify that the latest resource values in the KV store are used by Envoy.
   EXPECT_EQ(2, test_server_->counter("xds.kv_store.load_success")->value());
@@ -398,10 +402,12 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
             foo: zoo
             baz: jazz
   )EOF");
+  const uint32_t runtime_loads_before_rtds_v3 =
+      test_server_->counter("runtime.load_success")->value();
   sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TestTypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"3", rtds_stream_.get());
 
-  test_server_->waitForCounterGe("runtime.load_success", 3);
+  test_server_->waitForCounterGe("runtime.load_success", runtime_loads_before_rtds_v3 + 1);
 
   // Verify that the values from the xDS response are used instead of from the persisted xDS once
   // connectivity is re-established.

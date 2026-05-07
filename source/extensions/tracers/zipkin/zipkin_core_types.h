@@ -559,6 +559,7 @@ public:
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void setSampled(bool val) override { sampled_ = val; }
+  bool exportedSpan() const override { return sampled_; }
   bool useLocalDecision() const override { return use_local_decision_; }
   void setOperation(absl::string_view operation) override { setName(std::string(operation)); }
   void injectContext(Tracing::TraceContext& trace_context,
