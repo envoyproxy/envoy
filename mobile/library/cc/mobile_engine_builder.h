@@ -172,8 +172,8 @@ private:
   friend class Platform::EngineBuilderBase<MobileEngineBuilder>;
 
   // base class hooks
-  void PreRunSetup(InternalEngine* engine);
-  void PostRunSetup(Engine* engine);
+  void preRunSetup(InternalEngine* engine);
+  void postRunSetup(Engine* engine);
   absl::Status configXds(envoy::config::bootstrap::v3::Bootstrap* bootstrap);
   void configureDnsCache(
       envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig* dns_cache_config) const;

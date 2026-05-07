@@ -975,7 +975,7 @@ EngineSharedPtr MobileEngineBuilder::build() {
   return Platform::EngineBuilderBase<MobileEngineBuilder>::build().value();
 }
 
-void MobileEngineBuilder::PreRunSetup(InternalEngine* engine) {
+void MobileEngineBuilder::preRunSetup(InternalEngine* engine) {
   engine->disableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change_);
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
@@ -1002,7 +1002,7 @@ void MobileEngineBuilder::PreRunSetup(InternalEngine* engine) {
 #endif
 }
 
-void MobileEngineBuilder::PostRunSetup(Engine* engine) {
+void MobileEngineBuilder::postRunSetup(Engine* engine) {
   if (enable_network_change_monitor_) {
     engine->initializeNetworkChangeMonitor();
   }

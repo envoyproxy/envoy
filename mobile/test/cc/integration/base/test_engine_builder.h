@@ -34,12 +34,12 @@ public:
 
 private:
   // Hooks required by EngineBuilderBase
-  void PreRunSetup(InternalEngine* engine) {
+  void preRunSetup(InternalEngine* engine) {
     (void)engine;
     Envoy::Upstream::forceRegisterStaticClusterFactory();
     Envoy::Extensions::LoadBalancingPolicies::RoundRobin::forceRegisterFactory();
   }
-  void PostRunSetup(Engine*) {}
+  void postRunSetup(Engine*) {}
 
   absl::Status configXds(envoy::config::bootstrap::v3::Bootstrap*) { return absl::OkStatus(); }
   absl::Status configureNode(envoy::config::core::v3::Node* node) {

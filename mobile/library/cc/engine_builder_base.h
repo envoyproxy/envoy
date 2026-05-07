@@ -34,10 +34,10 @@ namespace Platform {
  *
  * Key CRTP Hooks the Derived Class SHOULD/MUST implement:
  * 1. Pre-run and Post-run Lifecycle Hooks:
- *    - `void PreRunSetup(InternalEngine* engine)`: Called inside build() on the engine thread
+ *    - `void preRunSetup(InternalEngine* engine)`: Called inside build() on the engine thread
  *      prior to starting the event loop. Derived builders should register dynamic key-value stores
  *      or string accessors here.
- *    - `void PostRunSetup(Engine* engine)`: Called inside build() immediately after starting
+ *    - `void postRunSetup(Engine* engine)`: Called inside build() immediately after starting
  *      the engine. Used to initialize platform monitors (e.g., NetworkChangeMonitor).
  *
  * 2. Bootstrap Configuration Hooks:
@@ -160,7 +160,7 @@ public:
         /*thread_priority=*/absl::nullopt, high_watermark_, enable_logger_, useWorkerThread());
 
     // Pre-run setup (to be implemented by derived classes if needed)
-    static_cast<T*>(this)->PreRunSetup(envoy_engine.get());
+    static_cast<T*>(this)->preRunSetup(envoy_engine.get());
 
     auto options = std::make_shared<Envoy::OptionsImplBase>();
     options->setConfigProto(std::move(bootstrap.value()));
@@ -172,7 +172,7 @@ public:
     auto engine_wrapper =
         std::shared_ptr<Engine>(new Engine(absl::IgnoreLeak(envoy_engine.release())));
 
-    static_cast<T*>(this)->PostRunSetup(engine_wrapper.get());
+    static_cast<T*>(this)->postRunSetup(engine_wrapper.get());
 
     return engine_wrapper;
   }
