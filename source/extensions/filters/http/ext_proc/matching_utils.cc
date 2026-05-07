@@ -19,7 +19,7 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
     if (expressions.contains(matcher)) {
       continue;
     }
-    auto parse_status = google::api::expr::parser::Parse(matcher);
+    const absl::StatusOr<cel::expr::ParsedExpr>& parse_status = google::api::expr::parser::Parse(matcher);
     if (!parse_status.ok()) {
       throw EnvoyException("Unable to parse descriptor expression: " +
                            parse_status.status().ToString());
@@ -55,7 +55,7 @@ ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& a
 
   for (const auto& hash_entry : expr) {
     Protobuf::Arena arena;
-    const auto result = hash_entry.second.evaluate(activation, &arena);
+    const absl::StatusOr<google::api::expr::runtime::CelValue>& result = hash_entry.second.evaluate(activation, &arena);
     if (!result.ok()) {
       // TODO: Stats?
       continue;
