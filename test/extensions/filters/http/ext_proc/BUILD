@@ -346,6 +346,33 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "save_processing_response_test",
+    size = "small",
+    srcs = ["save_processing_response_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "logging_info_test",
+    size = "small",
+    srcs = ["logging_info_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/filters/http/ext_proc",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "mutation_utils_test",
     size = "small",
     srcs = ["mutation_utils_test.cc"],

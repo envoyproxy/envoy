@@ -5139,6 +5139,39 @@ TEST_F(HttpFilterTest, SaveProcessingResponseHeaders) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+TEST_F(HttpFilterTest, OverrideMessageTimeout) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  max_message_timeout: 10s
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Receive override_message_timeout
+  auto response = std::make_unique<ProcessingResponse>();
+  response->mutable_override_message_timeout()->set_seconds(5);
+
+  stream_callbacks_->onReceiveMessage(std::move(response));
+
+  EXPECT_EQ(1, config_->stats().override_message_timeout_received_.value());
+
+  // Test invalid timeout (too large)
+  response = std::make_unique<ProcessingResponse>();
+  response->mutable_override_message_timeout()->set_seconds(20);
+  stream_callbacks_->onReceiveMessage(std::move(response));
+  EXPECT_EQ(1, config_->stats().override_message_timeout_ignored_.value());
+
+  // Test invalid timeout (too small)
+  response = std::make_unique<ProcessingResponse>();
+  response->mutable_override_message_timeout()->set_nanos(0);
+  stream_callbacks_->onReceiveMessage(std::move(response));
+  EXPECT_EQ(2, config_->stats().override_message_timeout_ignored_.value());
+
+  filter_->onDestroy();
+}
+
 TEST_F(HttpFilterTest, OnProcessingResponseBodies) {
   TestOnProcessingResponseFactory factory;
   Envoy::Registry::InjectFactory<OnProcessingResponseFactory> registration(factory);
