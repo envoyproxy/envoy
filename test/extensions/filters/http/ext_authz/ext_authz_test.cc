@@ -1703,6 +1703,89 @@ TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedWithMock) {
   EXPECT_GT(config_->stats().omitted_response_headers_.value(), 0);
 }
 
+// Test that error response headers are limited in headers_to_set when the limit is hit.
+TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedInSet) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  enforce_response_header_limits: true
+  )EOF");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  response.status_code = Http::Code::InternalServerError;
+  response.body = "{\"error\": \"service error\"}";
+  // Add 3 headers to set.
+  response.headers_to_set.push_back({"x-error-1", "value1"});
+  response.headers_to_set.push_back({"x-error-2", "value2"});
+  response.headers_to_set.push_back({"x-error-3", "value3"});
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(
+          Invoke([&](Http::Code, absl::string_view,
+                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+            // Create a ResponseHeaderMap with a limit of 1 to trigger the break in headers_to_set.
+            Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/1);
+            if (modify_headers) {
+              modify_headers(response_headers);
+            }
+            // With a limit of 1, we should only have 1 header added.
+            EXPECT_EQ(response_headers.size(), 1);
+            EXPECT_TRUE(response_headers.has("x-error-1"));
+            EXPECT_FALSE(response_headers.has("x-error-2"));
+            EXPECT_FALSE(response_headers.has("x-error-3"));
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ(1U, config_->stats().error_.value());
+  // Verify that omitted_response_headers_ stat was incremented.
+  EXPECT_GT(config_->stats().omitted_response_headers_.value(), 0);
+}
+
+// Test for ExtAuthzLoggingInfo clear methods.
+TEST(ExtAuthzLoggingInfoTest, ClearMethods) {
+  ExtAuthzLoggingInfo logging_info(absl::nullopt);
+  logging_info.setLatency(std::chrono::microseconds(100));
+  logging_info.setBytesSent(10);
+  logging_info.setBytesReceived(20);
+  logging_info.setClusterInfo(std::make_shared<NiceMock<Upstream::MockClusterInfo>>());
+  logging_info.setUpstreamHost(std::make_shared<NiceMock<Upstream::MockHostDescription>>());
+
+  EXPECT_TRUE(logging_info.latency().has_value());
+  EXPECT_TRUE(logging_info.bytesSent().has_value());
+  EXPECT_TRUE(logging_info.bytesReceived().has_value());
+  EXPECT_NE(nullptr, logging_info.clusterInfo());
+  EXPECT_NE(nullptr, logging_info.upstreamHost());
+
+  logging_info.clearLatency();
+  logging_info.clearBytesSent();
+  logging_info.clearBytesReceived();
+  logging_info.clearClusterInfo();
+  logging_info.clearUpstreamHost();
+
+  EXPECT_FALSE(logging_info.latency().has_value());
+  EXPECT_FALSE(logging_info.bytesSent().has_value());
+  EXPECT_FALSE(logging_info.bytesReceived().has_value());
+  EXPECT_EQ(nullptr, logging_info.clusterInfo());
+  EXPECT_EQ(nullptr, logging_info.upstreamHost());
+}
+
 // Test that error response headers are limited in headers_to_append when the limit is hit.
 TEST_F(HttpFilterTest, ErrorResponseHeaderLimitsEnforcedInAppend) {
   InSequence s;
