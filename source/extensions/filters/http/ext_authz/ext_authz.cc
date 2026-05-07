@@ -1338,9 +1338,9 @@ void Filter::setShadowFilterState(Filters::Common::ExtAuthz::Response& response)
                                                                      : config_->statusOnError();
     stats_.shadow_error_.inc();
     break;
-  default:                                                       // LCOV_EXCL_LINE
-    IS_ENVOY_BUG("unexpected CheckStatus value in shadow mode"); // LCOV_EXCL_LINE
-    return;                                                      // LCOV_EXCL_LINE
+  default:
+    IS_ENVOY_BUG("unexpected CheckStatus value in shadow mode");
+    return;
   }
 
   auto object = std::make_shared<ShadowDecisionObject>(check_result, status_code,
