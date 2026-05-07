@@ -8253,13 +8253,10 @@ TEST_P(SslSocketTest, CertificateCompressionDisabled) {
   testUtilV2(test_options);
 }
 
-// Verify that when the runtime feature is disabled, connection reset is NOT reported
-// even when the peer sends a TCP RST.
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Verify that when a peer aborts the connection with a TCP RST (via Network::ConnectionCloseType::
 // AbortReset), the SslSocket skips the TLS close_notify shutdown and the remote side detects the
-// close as RemoteReset rather than a graceful close. This relies on the runtime-guarded behavior
-// added in `SslSocket::closeSocket` together with the SO_ERROR probe in `io_handle_bio.cc`.
+// close as RemoteReset rather than a graceful close.
 TEST_P(SslSocketTest, TlsConnectionResetDetection) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
@@ -8362,9 +8359,12 @@ TEST_P(SslSocketTest, TlsConnectionResetDetection) {
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 // Verify that when the runtime feature is disabled, connection reset is NOT reported
-// even when the peer sends a TCP RST.
+// even when the peer aborts the connection with AbortReset. The test runs on all platforms;
+// without `ENVOY_PLATFORM_ENABLE_SEND_RST` the AbortReset degrades to a graceful close, which
+// also does not yield RemoteReset.
 TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
@@ -8472,7 +8472,6 @@ TEST_P(SslSocketTest, TlsConnectionResetDetectionDisabledByRuntime) {
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
-#endif
 
 } // namespace Tls
 } // namespace TransportSockets

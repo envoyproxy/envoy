@@ -408,6 +408,28 @@ TEST_P(SslIntegrationTest, TlsDownstreamReset) {
   auto result = waitForAccessLog(listener_access_log_name_);
   EXPECT_THAT(result, testing::HasSubstr("DS_CLOSE_TYPE=RemoteReset"));
 }
+#else
+// On platforms that do not support sending a TCP RST (no SO_LINGER=0 path),
+// AbortReset must still complete cleanly: ConnectionImpl falls back to a
+// regular close and the peer observes a graceful close (not a RemoteReset).
+TEST_P(SslIntegrationTest, TlsDownstreamResetUnsupported) {
+  useListenerAccessLog("DS_CLOSE_TYPE=%DOWNSTREAM_DETECTED_CLOSE_TYPE%");
+  initialize();
+
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+
+  while (!callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  connection->close(Network::ConnectionCloseType::AbortReset);
+
+  auto result = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(result, testing::Not(testing::HasSubstr("DS_CLOSE_TYPE=RemoteReset")));
+}
 #endif
 
 // This test is disabled because it uses the timed_cert_validator which we don't support.
