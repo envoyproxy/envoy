@@ -39,7 +39,7 @@ public:
   }
 
   static size_t getHostMapSize(DynamicModuleCluster& cluster) {
-    absl::ReaderMutexLock lock(&cluster.host_map_lock_);
+    absl::ReaderMutexLock lock(cluster.host_map_lock_);
     return cluster.host_map_.size();
   }
 
