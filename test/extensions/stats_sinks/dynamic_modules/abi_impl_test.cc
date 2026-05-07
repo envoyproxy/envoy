@@ -1,9 +1,9 @@
 #include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/stat_sinks/dynamic_modules/sink.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/stat_sinks/dynamic_modules/source/sink.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {

@@ -1,11 +1,11 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/stat_sinks/dynamic_modules/sink.h"
+#include "source/extensions/stat_sinks/dynamic_modules/sink_config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/stat_sinks/dynamic_modules/source/sink.h"
-#include "contrib/stat_sinks/dynamic_modules/source/sink_config.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -151,7 +151,7 @@ TEST_F(DynamicModuleStatsSinkTest, FlushWithEmptySnapshot) {
 
 // Flush pre-caches counter names, gauge names, and text-readout
 // names+values so the pointers handed to the module remain valid for the
-// duration of the call. This is the regression test for the -Wdangling-gsl
+// duration of the call. This is the regression test for the dangling-pointer
 // bug where name() returns std::string by value.
 TEST_F(DynamicModuleStatsSinkTest, FlushPreCachesNames) {
   CallRecorder recorder;
@@ -205,7 +205,7 @@ TEST_F(DynamicModuleStatsSinkTest, FlushPreCachesNames) {
 
 // onHistogramComplete binds the histogram name to a local std::string so the
 // buffer pointer remains valid for the duration of the module call. Regression
-// test for a -Wdangling-gsl bug where Metric::name()'s return value (a
+// test for a dangling-pointer bug where Metric::name()'s return value (a
 // std::string by value) was being captured into absl::string_view.
 TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompletePassesNameAndValue) {
   CallRecorder recorder;

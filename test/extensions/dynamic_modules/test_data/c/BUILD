@@ -3,7 +3,6 @@ load("//test/extensions/dynamic_modules/test_data/c:test_data.bzl", "test_progra
 licenses(["notice"])  # Apache 2
 
 package(default_visibility = [
-    "//contrib/stat_sinks/dynamic_modules/test:__pkg__",
     "//test/extensions/access_loggers/dynamic_modules:__pkg__",
     "//test/extensions/clusters/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules:__pkg__",
@@ -14,6 +13,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/udp:__pkg__",
     "//test/extensions/load_balancing_policies/dynamic_modules:__pkg__",
     "//test/extensions/matching/input_matchers/dynamic_modules:__pkg__",
+    "//test/extensions/stats_sinks/dynamic_modules:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",

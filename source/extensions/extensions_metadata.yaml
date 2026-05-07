@@ -1456,6 +1456,13 @@ envoy.stat_sinks.dog_statsd:
   status: stable
   type_urls:
   - envoy.config.metrics.v3.DogStatsdSink
+envoy.stat_sinks.dynamic_modules:
+  categories:
+  - envoy.stats_sinks
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.dynamic_modules.v3.DynamicModuleStatsSink
 envoy.stat_sinks.graphite_statsd:
   categories:
   - envoy.stats_sinks

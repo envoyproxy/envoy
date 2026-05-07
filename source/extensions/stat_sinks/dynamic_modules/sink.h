@@ -3,8 +3,7 @@
 #include "envoy/stats/sink.h"
 
 #include "source/extensions/dynamic_modules/stat_sink_flush_context.h"
-
-#include "contrib/stat_sinks/dynamic_modules/source/sink_config.h"
+#include "source/extensions/stat_sinks/dynamic_modules/sink_config.h"
 
 namespace Envoy {
 namespace Extensions {

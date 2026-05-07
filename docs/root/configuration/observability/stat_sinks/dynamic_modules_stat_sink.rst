@@ -17,10 +17,6 @@ backend without requiring a custom Envoy build.
 
 .. attention::
 
-   The dynamic modules stats sink is only included in :ref:`contrib images <install_contrib>`.
-
-.. attention::
-
    Dynamic modules run in-process with the same privileges as Envoy. Only
    load modules you trust. This extension is currently under active
    development; capabilities and ABI are expected to evolve.

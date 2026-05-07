@@ -1,11 +1,10 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
-
-#include "contrib/envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.pb.h"
 
 namespace Envoy {
 namespace {
@@ -94,8 +93,8 @@ TEST_P(DynamicModulesStatsSinkIntegrationTest, BasicFlush) {
 // Sends a request so cluster/listener counters move; verifies the sink keeps
 // getting called (no crash on a snapshot containing real data).
 TEST_P(DynamicModulesStatsSinkIntegrationTest, FlushAfterTraffic) {
-  // Wrap the test body in a lambda so the brace-initializer commas inside
-  // don't get misparsed by the EXPECT_LOG_CONTAINS preprocessor macro.
+  // Wrap the test body in a lambda so the brace initializer commas inside
+  // are not interpreted as macro argument separators by the log-contains macro.
   auto body = [this]() {
     addStatSinkAndInitialize();
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));

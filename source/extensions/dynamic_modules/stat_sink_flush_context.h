@@ -21,11 +21,11 @@ namespace DynamicModules {
  * The ABI callbacks in source/extensions/dynamic_modules/abi_impl.cc cast the
  * handle back to this type to serve snapshot reads.
  *
- * Lives in core (not contrib) so that the ABI callbacks are provided by every
- * Envoy binary, independent of whether the stats sink contrib extension is
- * linked. Without this, any dynamic module that references the snapshot
- * callbacks (e.g. every Go module, since cgo checks undefined symbols at
- * dlopen time) would fail to load in binaries that omit the contrib stats sink.
+ * Lives in the core dynamic_modules package so that the ABI callbacks are
+ * provided by every Envoy binary, independent of which extensions are linked.
+ * Without this, any dynamic module that references the snapshot callbacks
+ * (e.g. every Go module, since the Go runtime checks undefined symbols at
+ * dlopen time) would fail to load in binaries that omit the stats sink.
  */
 struct StatSinkFlushContext {
   Stats::MetricSnapshot* snapshot;

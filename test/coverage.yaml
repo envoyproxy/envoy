@@ -91,3 +91,4 @@ directories:
   source/extensions/config_subscription/rest: 94.9
   source/extensions/matching/input_matchers/cel_matcher: 100.0
   source/extensions/dynamic_modules/sdk/cpp: 0.0  # SDK code self not directly tested
+  source/extensions/stat_sinks/dynamic_modules: 95.0  # Symbol-resolution error paths not fully exercised.

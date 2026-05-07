@@ -3401,12 +3401,12 @@ __attribute__((weak)) void envoy_dynamic_module_callback_transport_socket_flush_
 // --------------------------------------------------------------------------
 // Stats Sink snapshot callbacks
 //
-// These are provided by core (not the contrib stats sink extension) so that
-// any dynamic module referencing them resolves its undefined symbols at
-// dlopen time regardless of which extensions the hosting Envoy binary links.
+// These live alongside the other common dynamic_modules callbacks so that any
+// module referencing them resolves its undefined symbols at dlopen time
+// regardless of which extensions the hosting Envoy binary links.
 // The snapshot_envoy_ptr parameter is a pointer to an
 // Envoy::Extensions::DynamicModules::StatSinkFlushContext built by the sink
-// wrapper in contrib/stat_sinks/dynamic_modules/source/sink.cc.
+// wrapper in source/extensions/stat_sinks/dynamic_modules/sink.cc.
 // --------------------------------------------------------------------------
 
 namespace {

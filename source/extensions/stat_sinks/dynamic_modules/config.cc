@@ -1,14 +1,13 @@
-#include "contrib/stat_sinks/dynamic_modules/source/config.h"
+#include "source/extensions/stat_sinks/dynamic_modules/config.h"
 
 #include <memory>
 
+#include "envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
-
-#include "contrib/envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.pb.validate.h"
-#include "contrib/stat_sinks/dynamic_modules/source/sink.h"
+#include "source/extensions/stat_sinks/dynamic_modules/sink.h"
 
 namespace Envoy {
 namespace Extensions {

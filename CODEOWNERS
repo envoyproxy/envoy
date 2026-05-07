@@ -156,6 +156,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/grpc_credentials/file_based_metadata @wozz @yanavlasov
 /*/extensions/internal_redirect @botengyao @penguingao
 /*/extensions/stat_sinks/dog_statsd @taiki45 @paul-r-gall
+/*/extensions/stat_sinks/dynamic_modules @prashanthjos @mattklein123
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @paul-r-gall
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @paul-r-gall
@@ -477,7 +478,6 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
 /contrib/kafka/ @mattklein123 @adamkotwasinski
-/contrib/stat_sinks/dynamic_modules/ @prashanthjos @UNOWNED
 /contrib/stat_sinks/wasm_filter/ @prashanthjos @UNOWNED
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui
 /contrib/mysql_proxy/ @rshriram @venilnoronha

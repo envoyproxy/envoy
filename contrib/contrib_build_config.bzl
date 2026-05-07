@@ -51,7 +51,6 @@ CONTRIB_EXTENSIONS = {
     # Stat sinks
     #
 
-    "envoy.stat_sinks.dynamic_modules":                  "//contrib/stat_sinks/dynamic_modules/source:config_lib",
     "envoy.stat_sinks.kafka":                            "//contrib/kafka/stat_sinks/source:config_lib",
     "envoy.stat_sinks.wasm_filter":                      "//contrib/stat_sinks/wasm_filter/source:config_lib",
 

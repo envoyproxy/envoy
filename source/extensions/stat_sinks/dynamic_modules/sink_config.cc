@@ -1,4 +1,4 @@
-#include "contrib/stat_sinks/dynamic_modules/source/sink_config.h"
+#include "source/extensions/stat_sinks/dynamic_modules/sink_config.h"
 
 #include "envoy/common/exception.h"
 

@@ -1,12 +1,13 @@
+#include "envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/configuration.h"
+
+#include "source/extensions/stat_sinks/dynamic_modules/config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.pb.h"
-#include "contrib/stat_sinks/dynamic_modules/source/config.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -191,10 +192,9 @@ sink_name: test_sink
   envoy::extensions::stat_sinks::dynamic_modules::v3::DynamicModuleStatsSink proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
 
-  // createStatsSink returns [[nodiscard]] absl::StatusOr<>, but PGV throws
-  // before it would return; wrap in a lambda so we can silence the nodiscard
-  // warning and so the comma inside the argument list isn't seen as a macro
-  // separator.
+  // createStatsSink returns a [[no_discard]] absl::StatusOr<>, but PGV throws
+  // before it would return; wrap in a lambda so we can silence the warning,
+  // and so the comma inside the argument list isn't seen as a macro separator.
   auto invoke = [this, &proto_config]() {
     auto unused = factory_.createStatsSink(proto_config, context_);
     (void)unused;

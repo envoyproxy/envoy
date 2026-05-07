@@ -1,13 +1,16 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_contrib_extension",
+    "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_contrib_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_contrib_package()
+# Stats sink that delegates flush and histogram observations to a dynamic
+# module loaded via dlopen (see source/extensions/dynamic_modules/abi).
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "sink_config_lib",
@@ -18,7 +21,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
-        "@envoy_api//contrib/envoy/extensions/stat_sinks/dynamic_modules/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/stat_sinks/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 
@@ -34,8 +37,8 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_contrib_extension(
-    name = "config_lib",
+envoy_cc_extension(
+    name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
@@ -45,6 +48,6 @@ envoy_cc_contrib_extension(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/server:configuration_lib",
-        "@envoy_api//contrib/envoy/extensions/stat_sinks/dynamic_modules/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/stat_sinks/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

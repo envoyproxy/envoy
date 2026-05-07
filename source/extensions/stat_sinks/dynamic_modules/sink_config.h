@@ -1,9 +1,9 @@
 #pragma once
 
+#include "envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.pb.h"
+
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
-
-#include "contrib/envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.pb.h"
 
 namespace Envoy {
 namespace Extensions {

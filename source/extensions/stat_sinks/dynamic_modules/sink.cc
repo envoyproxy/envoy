@@ -1,4 +1,4 @@
-#include "contrib/stat_sinks/dynamic_modules/source/sink.h"
+#include "source/extensions/stat_sinks/dynamic_modules/sink.h"
 
 namespace Envoy {
 namespace Extensions {
