@@ -24,6 +24,8 @@ namespace Extensions {
 namespace Wasm {
 namespace {
 
+using testing::Ge;
+
 class WasmFilterIntegrationTest
     : public HttpIntegrationTest,
       public testing::TestWithParam<std::tuple<std::string, std::string, bool, Http::CodecType>> {
