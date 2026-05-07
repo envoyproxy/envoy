@@ -64,17 +64,13 @@ public:
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
 
-  void setCacheMetadata(const envoy::service::auth::v3::CheckResponse& response, const std::string& key) {
-    std::string serialized;
-    ASSERT_TRUE(response.SerializeToString(&serialized));
-    std::string encoded = absl::Base64Escape(serialized);
-
-    Protobuf::Struct struct_value;
-    (*struct_value.mutable_fields())[key].set_string_value(encoded);
+  void setCacheMetadata(const envoy::service::auth::v3::CheckResponse& response, const std::string& metadata_namespace) {
+    Protobuf::Any typed_metadata;
+    typed_metadata.PackFrom(response);
     
-    // Set it in dynamic metadata
-    decoder_callbacks_metadata_.mutable_filter_metadata()->insert(
-        {"envoy.filters.http.ext_authz", struct_value});
+    // Set it in dynamic typed metadata
+    decoder_callbacks_metadata_.mutable_typed_filter_metadata()->insert(
+        {metadata_namespace, typed_metadata});
         
     ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
         .WillByDefault(ReturnRef(decoder_callbacks_metadata_));
@@ -98,7 +94,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitOK) {
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
-    check_response_metadata_key: "authz_cache"
+    check_response_typed_metadata_namespace: "envoy.filters.http.ext_authz.cache"
   )");
 
   prepareCheck();
@@ -111,7 +107,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitOK) {
   header->mutable_header()->set_key("x-cached-header");
   header->mutable_header()->set_value("yes");
 
-  setCacheMetadata(cached_response, "authz_cache");
+  setCacheMetadata(cached_response, "envoy.filters.http.ext_authz.cache");
 
   // We expect client_->check to NOT be called
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -133,7 +129,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitDenied) {
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
-    check_response_metadata_key: "authz_cache"
+    check_response_typed_metadata_namespace: "envoy.filters.http.ext_authz.cache"
   )");
 
   prepareCheck();
@@ -145,7 +141,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitDenied) {
   denied_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::Forbidden)));
   denied_response->set_body("Access Denied by Cache");
 
-  setCacheMetadata(cached_response, "authz_cache");
+  setCacheMetadata(cached_response, "envoy.filters.http.ext_authz.cache");
 
   // We expect client_->check to NOT be called
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -167,7 +163,7 @@ TEST_F(ExtAuthzCacheTest, CacheMissAndRecordgRPC) {
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
-    check_response_metadata_key: "authz_cache"
+    check_response_typed_metadata_namespace: "envoy.filters.http.ext_authz.cache"
   )");
 
   prepareCheck();
@@ -190,15 +186,11 @@ TEST_F(ExtAuthzCacheTest, CacheMissAndRecordgRPC) {
         callbacks.onComplete(std::move(authz_response));
       }));
 
-  // Expect dynamic metadata to be set with the cached response
-  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.ext_authz", _))
-      .WillOnce(Invoke([&](const std::string&, const Protobuf::Struct& metadata) {
-        auto it = metadata.fields().find("authz_cache");
-        ASSERT_NE(it, metadata.fields().end());
-        std::string decoded;
-        ASSERT_TRUE(absl::Base64Unescape(it->second.string_value(), &decoded));
+  // Expect dynamic typed metadata to be set with the cached response directly
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicTypedMetadata("envoy.filters.http.ext_authz.cache", _))
+      .WillOnce(Invoke([&](const std::string&, const Protobuf::Any& metadata) {
         envoy::service::auth::v3::CheckResponse recorded;
-        ASSERT_TRUE(recorded.ParseFromString(decoded));
+        ASSERT_TRUE(MessageUtil::unpackTo(metadata, recorded).ok());
         EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, recorded.status().code());
         EXPECT_EQ("x-live-header", recorded.ok_response().headers(0).header().key());
         EXPECT_EQ("live", recorded.ok_response().headers(0).header().value());
@@ -217,16 +209,20 @@ TEST_F(ExtAuthzCacheTest, InvalidCacheMetadataFallback) {
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
-    check_response_metadata_key: "authz_cache"
+    check_response_typed_metadata_namespace: "envoy.filters.http.ext_authz.cache"
   )");
 
   prepareCheck();
 
-  // Set invalid Base64 in metadata
-  Protobuf::Struct struct_value;
-  (*struct_value.mutable_fields())["authz_cache"].set_string_value("invalid-base64-!!!");
-  decoder_callbacks_metadata_.mutable_filter_metadata()->insert(
-      {"envoy.filters.http.ext_authz", struct_value});
+  // Set unexpected proto type in dynamic typed metadata to trigger unpack failure
+  envoy::config::core::v3::Metadata unexpected_proto;
+  (*unexpected_proto.mutable_filter_metadata())["unexpected"] = {};
+  
+  Protobuf::Any typed_metadata_any;
+  typed_metadata_any.PackFrom(unexpected_proto);
+
+  decoder_callbacks_metadata_.mutable_typed_filter_metadata()->insert(
+      {"envoy.filters.http.ext_authz.cache", typed_metadata_any});
   ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
       .WillByDefault(ReturnRef(decoder_callbacks_metadata_));
 
@@ -256,7 +252,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitErrorFailClosed) {
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
-    check_response_metadata_key: "authz_cache"
+    check_response_typed_metadata_namespace: "envoy.filters.http.ext_authz.cache"
   )");
 
   prepareCheck();
@@ -268,7 +264,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitErrorFailClosed) {
   error_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::InternalServerError)));
   error_response->set_body("Cached Error Body");
 
-  setCacheMetadata(cached_response, "authz_cache");
+  setCacheMetadata(cached_response, "envoy.filters.http.ext_authz.cache");
 
   // We expect client_->check to NOT be called
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -290,7 +286,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitErrorFailOpen) {
     grpc_service:
       envoy_grpc:
         cluster_name: "ext_authz_server"
-    check_response_metadata_key: "authz_cache"
+    check_response_typed_metadata_namespace: "envoy.filters.http.ext_authz.cache"
     failure_mode_allow: true
     failure_mode_allow_header_add: true
   )");
@@ -303,7 +299,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitErrorFailOpen) {
   auto* error_response = cached_response.mutable_error_response();
   error_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::InternalServerError)));
 
-  setCacheMetadata(cached_response, "authz_cache");
+  setCacheMetadata(cached_response, "envoy.filters.http.ext_authz.cache");
 
   // We expect client_->check to NOT be called
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);

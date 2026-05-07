@@ -135,7 +135,8 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/ext_authz:config",
-        "//source/extensions/filters/http/header_to_metadata:config",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -143,7 +144,6 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
     ],
 )
 

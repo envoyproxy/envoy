@@ -280,7 +280,9 @@ public:
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
-  const std::string& checkResponseMetadataKey() const { return check_response_metadata_key_; }
+  const std::string& checkResponseTypedMetadataNamespace() const {
+    return check_response_typed_metadata_namespace_;
+  }
 
   const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
     return allowed_headers_matcher_;
@@ -351,7 +353,7 @@ private:
   const bool include_peer_certificate_;
   const bool include_tls_session_;
   const bool charge_cluster_response_stats_;
-  const std::string check_response_metadata_key_;
+  const std::string check_response_typed_metadata_namespace_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;

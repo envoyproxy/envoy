@@ -200,7 +200,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       include_tls_session_(config.include_tls_session()),
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
-      check_response_metadata_key_(config.check_response_metadata_key()),
+      check_response_typed_metadata_namespace_(config.check_response_typed_metadata_namespace()),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
@@ -463,41 +463,28 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 }
 
 bool Filter::tryCacheHit() {
-  const std::string& metadata_key = config_->checkResponseMetadataKey();
-  if (metadata_key.empty()) {
+  const std::string& metadata_namespace = config_->checkResponseTypedMetadataNamespace();
+  if (metadata_namespace.empty()) {
     return false;
   }
 
-  const auto& filter_metadata = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-  const auto metadata_it = filter_metadata.find("envoy.filters.http.ext_authz");
-  if (metadata_it == filter_metadata.end()) {
+  const auto& typed_metadata = decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
+  const auto cache_it = typed_metadata.find(metadata_namespace);
+  if (cache_it == typed_metadata.end()) {
     return false;
   }
 
-  const auto& fields = metadata_it->second.fields();
-  const auto field_it = fields.find(metadata_key);
-  if (field_it == fields.end()) {
-    return false;
-  }
-
-  std::string unescaped;
   envoy::service::auth::v3::CheckResponse check_response;
-  if (!absl::Base64Unescape(field_it->second.string_value(), &unescaped)) {
-    ENVOY_STREAM_LOG(warn, "ext_authz failed to Base64 decode cached response in metadata key {}",
-                     *decoder_callbacks_, metadata_key);
+  auto status = MessageUtil::unpackTo(cache_it->second, check_response);
+  if (!status.ok()) {
+    ENVOY_STREAM_LOG(warn, "ext_authz failed to unpack cached CheckResponse in namespace {}",
+                     *decoder_callbacks_, metadata_namespace);
     stats_.invalid_cached_response_.inc();
     return false;
   }
 
-  if (!check_response.ParseFromString(unescaped)) {
-    ENVOY_STREAM_LOG(warn, "ext_authz failed to parse cached CheckResponse in metadata key {}",
-                     *decoder_callbacks_, metadata_key);
-    stats_.invalid_cached_response_.inc();
-    return false;
-  }
-
-  ENVOY_STREAM_LOG(debug, "ext_authz found cached CheckResponse in metadata key {}",
-                   *decoder_callbacks_, metadata_key);
+  ENVOY_STREAM_LOG(debug, "ext_authz found cached CheckResponse in typed namespace {}",
+                   *decoder_callbacks_, metadata_namespace);
 
   Filters::Common::ExtAuthz::ResponsePtr authz_response =
       std::make_unique<Filters::Common::ExtAuthz::Response>();
@@ -812,18 +799,13 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   updateLoggingInfo(response->grpc_status);
 
-  const std::string& metadata_key = config_->checkResponseMetadataKey();
-  if (!metadata_key.empty() && response->raw_check_response.has_value()) {
-    std::string serialized_response;
-    if (response->raw_check_response->SerializeToString(&serialized_response)) {
-      Protobuf::Struct struct_value;
-      (*struct_value.mutable_fields())[metadata_key].set_string_value(
-          absl::Base64Escape(serialized_response));
-      decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
-                                                          struct_value);
-      ENVOY_STREAM_LOG(debug, "ext_authz stored CheckResponse in metadata key {}",
-                       *decoder_callbacks_, metadata_key);
-    }
+  const std::string& metadata_namespace = config_->checkResponseTypedMetadataNamespace();
+  if (!metadata_namespace.empty() && response->raw_check_response.has_value()) {
+    Protobuf::Any typed_metadata;
+    typed_metadata.PackFrom(response->raw_check_response.value());
+    decoder_callbacks_->streamInfo().setDynamicTypedMetadata(metadata_namespace, typed_metadata);
+    ENVOY_STREAM_LOG(debug, "ext_authz stored CheckResponse in typed namespace {}",
+                     *decoder_callbacks_, metadata_namespace);
   }
 
   applyResponse(std::move(response));
