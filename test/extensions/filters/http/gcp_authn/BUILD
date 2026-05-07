@@ -45,6 +45,24 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "jwt_gcp_authn_client_impl_test",
+    size = "small",
+    srcs = ["jwt_gcp_authn_client_impl_test.cc"],
+    extension_names = ["envoy.filters.http.gcp_authn"],
+    deps = [
+        ":gcp_authn_mocks",
+        "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
+        "//source/extensions/filters/http/gcp_authn",
+        "//source/extensions/filters/http/gcp_authn:config",
+        "//test/common/http:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
 envoy_extension_cc_mock(
     name = "gcp_authn_mocks",
     hdrs = ["mocks.h"],

@@ -1,16 +1,21 @@
-#include "source/extensions/filters/http/gcp_authn/gcp_authn_impl.h"
+#include "source/extensions/filters/http/gcp_authn/jwt_gcp_authn_client_impl.h"
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 
+namespace {
+constexpr absl::string_view UrlString =
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/"
+    "identity?audience=[AUDIENCE]";
 constexpr char MetadataFlavorKey[] = "Metadata-Flavor";
 constexpr char MetadataFlavor[] = "Google";
 
@@ -27,8 +32,12 @@ Http::RequestMessagePtr buildRequest(absl::string_view url) {
 
   return std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
 }
+} // namespace
 
-void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessagePtr&& request) {
+void JwtGcpAuthnClientImpl::fetchToken(
+    const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+    const absl::optional<std::string>& /*fingerprint*/,
+    GcpAuthnClient::Callbacks& callbacks) {
   // Cancel any active requests.
   cancel();
   ASSERT(callbacks_ == nullptr);
@@ -64,19 +73,20 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
     options.setBufferBodyForRetry(true);
   }
 
+  std::string final_url = absl::StrReplaceAll(UrlString, {{"[AUDIENCE]", audience.url()}});
   active_request_ =
-      thread_local_cluster->httpAsyncClient().send(std::move(request), *this, options);
+      thread_local_cluster->httpAsyncClient().send(buildRequest(final_url), *this, options);
 }
 
-void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
-                               Http::ResponseMessagePtr&& response) {
+void JwtGcpAuthnClientImpl::onSuccess(const Http::AsyncClient::Request&,
+                                      Http::ResponseMessagePtr&& response) {
   auto status = Envoy::Http::Utility::getResponseStatusOrNullopt(response->headers());
   active_request_ = nullptr;
   if (status.has_value()) {
     uint64_t status_code = status.value();
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
       ASSERT(callbacks_ != nullptr);
-      callbacks_->onComplete(response.get());
+      callbacks_->onComplete(std::string(response->bodyAsString()));
       callbacks_ = nullptr;
     } else {
       ENVOY_LOG(error, "Response status is not OK, status: {}", status_code);
@@ -89,9 +99,8 @@ void GcpAuthnClient::onSuccess(const Http::AsyncClient::Request&,
   }
 }
 
-void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
-                               Http::AsyncClient::FailureReason reason) {
-  // TODO(botengyao): handle different failure reasons.
+void JwtGcpAuthnClientImpl::onFailure(const Http::AsyncClient::Request&,
+                                      Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
          reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   ENVOY_LOG(error, "Request failed: stream has been reset");
@@ -99,19 +108,19 @@ void GcpAuthnClient::onFailure(const Http::AsyncClient::Request&,
   onError();
 }
 
-void GcpAuthnClient::cancel() {
+void JwtGcpAuthnClientImpl::cancel() {
   if (active_request_) {
     active_request_->cancel();
     active_request_ = nullptr;
   }
 }
 
-void GcpAuthnClient::onError() {
+void JwtGcpAuthnClientImpl::onError() {
   // Cancel if the request is active.
   cancel();
 
   ASSERT(callbacks_ != nullptr);
-  callbacks_->onComplete(/*response_ptr=*/nullptr);
+  callbacks_->onComplete(absl::InternalError("Failed to fetch token"));
   callbacks_ = nullptr;
 }
 

@@ -2,13 +2,25 @@
 
 #include <memory>
 #include <string>
+#include <utility>
+
+#include "envoy/common/exception.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+#include "envoy/router/router.h"
+#include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/enum_to_int.h"
-#include "source/common/http/header_map_impl.h"
-#include "source/common/http/utility.h"
-#include "source/common/runtime/runtime_features.h"
+#include "source/common/common/logger.h"
+#include "source/common/jwt/jwt.h"
+#include "source/common/jwt/status.h"
+#include "source/common/protobuf/utility.h"
 
-#include "absl/strings/str_replace.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+
 
 namespace Envoy {
 namespace Extensions {
@@ -42,6 +54,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   state_ = State::Calling;
   initiating_call_ = true;
 
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience_proto;
   Envoy::Upstream::ThreadLocalCluster* cluster =
       context_.serverFactoryContext().clusterManager().getThreadLocalCluster(
           route->routeEntry()->clusterName());
@@ -51,9 +64,8 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     auto filter_metadata = cluster->info()->metadata().typed_filter_metadata();
     const auto filter_it = filter_metadata.find(std::string(FilterName));
     if (filter_it != filter_metadata.end()) {
-      envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_it->second, audience));
-      audience_str_ = audience.url();
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_it->second, audience_proto));
+      audience_str_ = audience_proto.url();
     }
   }
 
@@ -70,14 +82,8 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
 
     // Save the pointer to the request headers for header manipulation based on http response later.
     request_header_map_ = &hdrs;
-    // Audience is URL of receiving service that will perform authentication.
-    // The URL format is
-    // "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
-    // So, we add the audience from the config to the final url by substituting the `[AUDIENCE]`
-    // with real audience string from the config.
 
-    std::string final_url = absl::StrReplaceAll(UrlString, {{"[AUDIENCE]", audience_str_}});
-    client_->fetchToken(*this, buildRequest(final_url));
+    client_->fetchToken(audience_proto, absl::nullopt, *this);
     initiating_call_ = false;
   } else {
     // There is no need to fetch the token if no audience is specified because no
@@ -96,13 +102,13 @@ void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallback
   decoder_callbacks_ = &callbacks;
 }
 
-void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
+void GcpAuthnFilter::onComplete(absl::StatusOr<std::string> token) {
   state_ = State::Complete;
   if (!initiating_call_) {
-    if (response != nullptr) {
+    if (token.ok()) {
       // Modify the request header to include the ID token in a header (by default, the
       // `Authorization: Bearer ID_TOKEN` header).
-      std::string token_str = response->bodyAsString();
+      std::string token_str = *token;
       if (request_header_map_ != nullptr) {
         addTokenToRequest(*request_header_map_, token_str, filter_config_->token_header());
       } else {
@@ -119,6 +125,8 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
       } else {
         ENVOY_LOG(error, "Failed to parse the token string, status : {}", Envoy::enumToInt(status));
       }
+    } else {
+      ENVOY_LOG(error, "Failed to fetch token: {}", token.status().message());
     }
     decoder_callbacks_->continueDecoding();
   }

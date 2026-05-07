@@ -5,10 +5,9 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 
-#include "source/common/http/message_impl.h"
-#include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "source/extensions/filters/http/gcp_authn/gcp_authn_impl.h"
+#include "source/extensions/filters/http/gcp_authn/gcp_authn_client.h"
+#include "source/extensions/filters/http/gcp_authn/jwt_gcp_authn_client_impl.h"
 #include "source/extensions/filters/http/gcp_authn/token_cache.h"
 
 namespace Envoy {
@@ -36,7 +35,7 @@ using FilterConfigSharedPtr =
     std::shared_ptr<const envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>;
 
 class GcpAuthnFilter : public Http::PassThroughFilter,
-                       public RequestCallbacks,
+                       public GcpAuthnClient::Callbacks,
                        public Logger::Loggable<Logger::Id::filter> {
 public:
   // State of this filter's communication with the external authentication service.
@@ -48,13 +47,16 @@ public:
                  Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
                  TokenCacheImpl<JwtToken>* token_cache)
       : filter_config_(std::move(filter_config)), context_(context),
-        client_(std::make_unique<GcpAuthnClient>(*filter_config_, context_)),
+        // TODO: When a second GcpAuthnClient implementation is added, introduce
+        // a GcpAuthnClientFactory to instantiate the appropriate client
+        // dynamically.
+        client_( std::make_unique<JwtGcpAuthnClientImpl>(*filter_config_, context_)),
         stats_(generateStats(stats_prefix, context_.scope())), jwt_token_cache_(token_cache) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   void onDestroy() override;
-  void onComplete(const Http::ResponseMessage* response_ptr) override;
+  void onComplete(absl::StatusOr<std::string> token) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   State state() { return state_; }
