@@ -198,7 +198,8 @@ bootstrap_metadata_labels_key: "labels_key"
   fields["label1"] = ValueUtil::stringValue("value1");
   fields["label2"] = ValueUtil::stringValue("value2");
 
-  auto& node_metadata_fields = *context_.bootstrap_.mutable_node()->mutable_metadata()->mutable_fields();
+  auto& node_metadata_fields =
+      *context_.bootstrap_.mutable_node()->mutable_metadata()->mutable_fields();
   node_metadata_fields["labels_key"].mutable_struct_value()->CopyFrom(labels_struct);
 
   initialize(yaml);
