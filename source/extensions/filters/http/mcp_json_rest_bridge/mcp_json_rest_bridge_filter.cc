@@ -338,25 +338,7 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
 
   if (config_->requestStorageMode() == envoy::extensions::filters::http::mcp_json_rest_bridge::v3::
                                            McpJsonRestBridge::DYNAMIC_METADATA) {
-    Protobuf::Struct metadata;
-    (*metadata.mutable_fields())[McpConstants::METHOD_FIELD].set_string_value(method);
-    if (json_rpc.contains(McpConstants::PARAMS_FIELD)) {
-      const auto& params = json_rpc[McpConstants::PARAMS_FIELD];
-      if (params.is_object()) {
-        Protobuf::Struct params_struct;
-        absl::Status status = MessageUtil::loadFromJsonNoThrow(params.dump(), params_struct);
-        if (status.ok()) {
-          *(*metadata.mutable_fields())[McpConstants::PARAMS_FIELD].mutable_struct_value() =
-              std::move(params_struct);
-        } else {
-          ENVOY_STREAM_LOG(warn, "Failed to parse params as Protobuf Struct: {}",
-                           *decoder_callbacks_, status.ToString());
-        }
-      }
-    }
-    decoder_callbacks_->streamInfo().setDynamicMetadata(FilterName, metadata);
-    ENVOY_STREAM_LOG(debug, "MCP JSON REST Bridge filter set dynamic metadata: {}",
-                     *decoder_callbacks_, metadata.DebugString());
+    setDynamicMetadata(method, json_rpc);
   }
 
   // TODO(guoyilin42): Consider supporting local response for tools/list in addition to the GET.
@@ -603,6 +585,29 @@ void McpJsonRestBridgeFilter::sendErrorResponse(Http::Code response_code,
   decoder_callbacks_->sendLocalReply(response_code, response_body, nullptr,
                                      Grpc::Status::WellKnownGrpcStatus::Internal,
                                      response_code_details);
+}
+
+void McpJsonRestBridgeFilter::setDynamicMetadata(absl::string_view method,
+                                                 const nlohmann::json& json_rpc) {
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())[McpConstants::METHOD_FIELD].set_string_value(method);
+  if (json_rpc.contains(McpConstants::PARAMS_FIELD)) {
+    const auto& params = json_rpc[McpConstants::PARAMS_FIELD];
+    if (params.is_object()) {
+      Protobuf::Struct params_struct;
+      absl::Status status = MessageUtil::loadFromJsonNoThrow(params.dump(), params_struct);
+      if (status.ok()) {
+        *(*metadata.mutable_fields())[McpConstants::PARAMS_FIELD].mutable_struct_value() =
+            std::move(params_struct);
+      } else {
+        ENVOY_STREAM_LOG(warn, "Failed to parse params as Protobuf Struct: {}", *decoder_callbacks_,
+                         status);
+      }
+    }
+  }
+  decoder_callbacks_->streamInfo().setDynamicMetadata(FilterName, metadata);
+  ENVOY_STREAM_LOG(debug, "MCP JSON REST Bridge filter set dynamic metadata: {}",
+                   *decoder_callbacks_, metadata.DebugString());
 }
 
 absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc) {

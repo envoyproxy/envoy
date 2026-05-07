@@ -100,6 +100,9 @@ private:
   // fails. Otherwise, it returns OK status.
   absl::Status validateJsonRpcIdAndMethod(const nlohmann::json& json_rpc);
 
+  // Sets dynamic metadata for the filter based on the MCP request method and parameters.
+  void setDynamicMetadata(absl::string_view method, const nlohmann::json& json_rpc);
+
   enum class McpOperation {
     Unspecified = 0,
     // Received the "/mcp" URL but has not parsed the request body yet.
