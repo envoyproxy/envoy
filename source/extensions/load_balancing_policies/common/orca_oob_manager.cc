@@ -343,9 +343,9 @@ std::string OrcaOobManager::OobSession::authority() const {
   if (!host_->hostname().empty()) {
     return std::string(host_->hostname());
   }
-  // Fall back to the host's IP literal without port when no hostname is configured.
+  // For IP addresses, use the full address string which includes brackets for IPv6 and the port.
   if (host_->address()->ip() != nullptr) {
-    return host_->address()->ip()->addressAsString();
+    return host_->address()->asString();
   }
   // Terminal fallback for non-IP addresses (e.g., UDS, Pipe) avoids using a
   // socket path as :authority.
