@@ -73,6 +73,9 @@ protected:
 
   void TearDown() override {
     io_handle_.reset();
+    while (!dispatcher_.to_delete_.empty()) {
+      dispatcher_.to_delete_.pop_front();
+    }
     extension_.reset();
     socket_interface_.reset();
   }

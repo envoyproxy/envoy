@@ -4,6 +4,7 @@ use crate::{
   EnvoyHistogramVecId, NEW_LOAD_BALANCER_CONFIG_FUNCTION,
 };
 use mockall::*;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 
 /// Trait for interacting with the Envoy load balancer and its context.
@@ -1308,21 +1309,27 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
   name: abi::envoy_dynamic_module_type_envoy_buffer,
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_lb_config_module_ptr {
-  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-    name.ptr as *const _,
-    name.length,
-  ));
-  let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
-  let new_config_fn = NEW_LOAD_BALANCER_CONFIG_FUNCTION
-    .get()
-    .expect("NEW_LOAD_BALANCER_CONFIG_FUNCTION must be set");
-  let envoy_lb_config: Arc<dyn EnvoyLbConfig> = Arc::new(EnvoyLbConfigImpl {
-    raw: lb_config_envoy_ptr,
-  });
-  match new_config_fn(name_str, config_slice, envoy_lb_config) {
-    Some(config) => wrap_into_c_void_ptr!(config),
-    None => std::ptr::null(),
-  }
+  catch_unwind(AssertUnwindSafe(|| {
+    let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ));
+    let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+    let new_config_fn = NEW_LOAD_BALANCER_CONFIG_FUNCTION
+      .get()
+      .expect("NEW_LOAD_BALANCER_CONFIG_FUNCTION must be set");
+    let envoy_lb_config: Arc<dyn EnvoyLbConfig> = Arc::new(EnvoyLbConfigImpl {
+      raw: lb_config_envoy_ptr,
+    });
+    match new_config_fn(name_str, config_slice, envoy_lb_config) {
+      Some(config) => wrap_into_c_void_ptr!(config),
+      None => std::ptr::null(),
+    }
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_lb_config_new", panic);
+    std::ptr::null()
+  })
 }
 
 /// # Safety
@@ -1333,7 +1340,12 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(config_ptr, LoadBalancerConfig);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    drop_wrapped_c_void_ptr!(config_ptr, LoadBalancerConfig);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_lb_config_destroy", panic);
+  });
 }
 
 /// # Safety
@@ -1345,14 +1357,20 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
   config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
   lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_lb_module_ptr {
-  // During new_load_balancer, context is not available.
-  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
-  let lb_config = {
-    let raw = config_ptr as *const *const dyn LoadBalancerConfig;
-    &**raw
-  };
-  let lb = lb_config.new_load_balancer(&envoy_lb);
-  wrap_into_c_void_ptr!(lb)
+  catch_unwind(AssertUnwindSafe(|| {
+    // During new_load_balancer, context is not available.
+    let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
+    let lb_config = {
+      let raw = config_ptr as *const *const dyn LoadBalancerConfig;
+      &**raw
+    };
+    let lb = lb_config.new_load_balancer(&envoy_lb);
+    wrap_into_c_void_ptr!(lb)
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_lb_new", panic);
+    std::ptr::null()
+  })
 }
 
 /// # Safety
@@ -1367,19 +1385,27 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
   result_priority: *mut u32,
   result_index: *mut u32,
 ) -> bool {
-  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
-  let lb = {
-    let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
-    &mut **raw
-  };
-  match lb.choose_host(&envoy_lb) {
-    Some(selection) => {
-      *result_priority = selection.priority;
-      *result_index = selection.index;
-      true
-    },
-    None => false,
-  }
+  catch_unwind(AssertUnwindSafe(|| {
+    let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
+    let lb = {
+      let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
+      &mut **raw
+    };
+    match lb.choose_host(&envoy_lb) {
+      Some(selection) => {
+        *result_priority = selection.priority;
+        *result_index = selection.index;
+        true
+      },
+      None => false,
+    }
+  }))
+  .unwrap_or_else(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_lb_choose_host", panic);
+    // Fail-closed: return `false` so Envoy treats this as "no host selected"
+    // rather than reading the (uninitialised) out parameters.
+    false
+  })
 }
 
 /// # Safety
@@ -1393,12 +1419,20 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_on_host_membership_update(
   num_hosts_added: usize,
   num_hosts_removed: usize,
 ) {
-  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
-  let lb = {
-    let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
-    &mut **raw
-  };
-  lb.on_host_membership_update(&envoy_lb, num_hosts_added, num_hosts_removed);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
+    let lb = {
+      let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
+      &mut **raw
+    };
+    lb.on_host_membership_update(&envoy_lb, num_hosts_added, num_hosts_removed);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic(
+      "envoy_dynamic_module_on_lb_on_host_membership_update",
+      panic,
+    );
+  });
 }
 
 /// # Safety
@@ -1409,5 +1443,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_on_host_membership_update(
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_destroy(
   lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(lb_module_ptr, LoadBalancer);
+  let _ = catch_unwind(AssertUnwindSafe(|| {
+    drop_wrapped_c_void_ptr!(lb_module_ptr, LoadBalancer);
+  }))
+  .map_err(|panic| {
+    crate::log_ffi_panic("envoy_dynamic_module_on_lb_destroy", panic);
+  });
 }
