@@ -18,6 +18,7 @@ on:
         - bazel-api
         - build-image
         - check
+        - toolshed-actions
       dependency:
         description: Dependency to update (if applicable)
       version:
@@ -243,6 +244,157 @@ jobs:
         title: 'deps: Bump build images -> `${{ steps.build-tools.outputs.tag_short }}`'
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
         working-directory: envoy
+
+  update-toolshed-actions:
+    if: >-
+      ${{
+           github.event_name == 'workflow_dispatch'
+           && inputs.task == 'toolshed-actions'
+      }}
+    name: >
+      Update toolshed actions
+       (${{ inputs.pr && 'PR/' || '' }}${{ inputs.version || 'latest' }})
+    runs-on: ubuntu-24.04
+    steps:
+    - id: appauth
+      name: Appauth
+      uses: envoyproxy/toolshed/actions/appauth@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+      with:
+        app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/actions/github/checkout@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+      with:
+        token: ${{ steps.appauth.outputs.token }}
+    - name: Resolve toolshed actions SHA and tag
+      id: toolshed
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ steps.appauth.outputs.token }}
+      run: |
+        set -euo pipefail
+
+        # Helper: resolve any ref (tag name, branch, or SHA) to its commit SHA.
+        # The commits API transparently handles both lightweight and annotated tags.
+        resolve_ref_sha() {
+            local ref="$1"
+            gh api "/repos/envoyproxy/toolshed/commits/${ref}" --jq '.sha' 2>/dev/null || true
+        }
+
+        # Helper: find the actions-v* tag whose commit SHA matches the given SHA.
+        # Iterates over all actions-v* releases (paginated) and checks each tag.
+        find_tag_for_sha() {
+            local sha="$1"
+            gh api --paginate "/repos/envoyproxy/toolshed/releases" \
+                --jq '.[] | select(.tag_name | startswith("actions-v")) | .tag_name' \
+            | while read -r tag; do
+                tag_sha=$(resolve_ref_sha "$tag")
+                if [[ "$tag_sha" == "$sha" ]]; then
+                    echo "$tag"
+                    return 0
+                fi
+            done
+        }
+
+        TARGET_TAG=""
+        if [[ -z "$INPUT_VERSION" ]]; then
+            # Resolve latest actions-v* release from envoyproxy/toolshed
+            TARGET_TAG=$(
+                gh api --paginate "/repos/envoyproxy/toolshed/releases" \
+                    --jq 'map(select(.tag_name | startswith("actions-v"))) | .[0].tag_name // empty' \
+                | head -n1)
+            if [[ -z "$TARGET_TAG" ]]; then
+                echo "ERROR: Could not determine latest actions-v* release" >&2
+                exit 1
+            fi
+            TARGET_SHA=$(resolve_ref_sha "$TARGET_TAG")
+        elif [[ "$INPUT_VERSION" =~ ^actions-v ]]; then
+            TARGET_TAG="$INPUT_VERSION"
+            TARGET_SHA=$(resolve_ref_sha "$TARGET_TAG")
+        elif [[ "$INPUT_VERSION" =~ ^[0-9a-f]{40}$ ]]; then
+            TARGET_SHA="$INPUT_VERSION"
+            TARGET_TAG=$(find_tag_for_sha "$TARGET_SHA" || true)
+        else
+            echo "ERROR: version must be empty, an actions-v* tag, or a 40-char commit SHA" >&2
+            exit 1
+        fi
+
+        if [[ -z "$TARGET_SHA" ]]; then
+            echo "ERROR: Could not resolve SHA for version '${INPUT_VERSION:-latest}'" >&2
+            exit 1
+        fi
+
+        echo "sha=${TARGET_SHA}" >> "$GITHUB_OUTPUT"
+        echo "tag=${TARGET_TAG}" >> "$GITHUB_OUTPUT"
+        echo "Resolved: sha=${TARGET_SHA} tag=${TARGET_TAG:-<none>}"
+
+    - name: Update toolshed actions refs
+      id: update
+      env:
+        TARGET_SHA: ${{ steps.toolshed.outputs.sha }}
+        TARGET_TAG: ${{ steps.toolshed.outputs.tag }}
+      run: |
+        set -euo pipefail
+
+        FILES=""
+        if [[ -d .github/workflows ]]; then
+            FILES=$(grep -rl "envoyproxy/toolshed/actions/" .github/workflows/ || true)
+        fi
+        if [[ -z "$FILES" ]]; then
+            echo "No files found containing toolshed action refs"
+            echo "output=${TARGET_SHA:0:7}" >> "$GITHUB_OUTPUT"
+            exit 0
+        fi
+
+        for f in $FILES; do
+            # Replace SHA in uses: lines referencing envoyproxy/toolshed/actions/.
+            # Uses perl with $ENV{} to avoid shell injection from SHA/tag values.
+            if [[ -n "$TARGET_TAG" ]]; then
+                # Known release: update SHA and set/replace trailing semver comment.
+                TARGET_SHA="$TARGET_SHA" TARGET_TAG="$TARGET_TAG" \
+                perl -i -pe '
+                    s{(uses:\s+envoyproxy/toolshed/actions/[^\s@]+@)[0-9a-f]{40}(\s*#.*)?$}
+                     {$1$ENV{TARGET_SHA}  # $ENV{TARGET_TAG}}g
+                ' "$f"
+            else
+                # Unknown SHA: update SHA and remove any stale actions-v comment.
+                TARGET_SHA="$TARGET_SHA" \
+                perl -i -pe '
+                    s{(uses:\s+envoyproxy/toolshed/actions/[^\s@]+@)[0-9a-f]{40}(\s*#\s*actions-v\S+)?[ \t]*$}
+                     {$1$ENV{TARGET_SHA}}g
+                ' "$f"
+            fi
+        done
+
+        echo "output=${TARGET_SHA:0:7}" >> "$GITHUB_OUTPUT"
+        echo "Updated toolshed action refs to ${TARGET_SHA:0:7}${TARGET_TAG:+ (${TARGET_TAG})}"
+
+    - uses: envoyproxy/toolshed/actions/upload/diff@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+      name: Upload diff
+      with:
+        name: toolshed-actions-${{ steps.update.outputs.output }}
+    - name: Create a PR
+      if: ${{ inputs.pr }}
+      uses: envoyproxy/toolshed/actions/github/pr@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
+      with:
+        base: main
+        body: |
+          Created by Envoy dependency bot for @${{ github.actor }}
+
+          ${{ inputs.pr-message }}
+        branch: >-
+          dependency/toolshed-actions/${{ steps.toolshed.outputs.tag || steps.toolshed.outputs.sha }}
+        commit-message: |
+          deps: Bump toolshed actions -> ${{ steps.toolshed.outputs.tag || steps.update.outputs.output }}
+
+          Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
+        title: >-
+          deps: Bump toolshed actions
+          -> ${{ steps.toolshed.outputs.tag || steps.update.outputs.output }}
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
 
   scheduled:
     runs-on: ubuntu-24.04
