@@ -178,16 +178,17 @@ enforcement (in ext_authz), while ensuring the ext_authz filter is only instanti
 
 Cooperative Caching Bypass
 --------------------------
-The External Authorization filter supports bypassing the external authorization service call by retrieving a cached response from dynamic metadata. This is designed to work cooperatively with a preceding caching filter (such as a suitably configured ext_proc filter using an external cache).
+The External Authorization filter supports bypassing the external authorization service call by retrieving a cached response from dynamic typed metadata. This is designed to work cooperatively with a preceding caching filter (such as a suitably configured ext_proc filter using an external cache).
 
-To enable this, configure the :ref:`check_response_metadata_key <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.check_response_metadata_key>` with the dynamic metadata key under the ``envoy.filters.http.ext_authz`` namespace where the cached response is stored.
+To enable this, configure the :ref:`check_response_typed_metadata_namespace <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.check_response_typed_metadata_namespace>` with the dynamic typed metadata namespace where the cached response is stored.
 
-When a cached response is present under the configured key:
-1. The filter will Base64-decode and deserialize it into a ``CheckResponse`` proto.
-2. If deserialization succeeds, the filter will bypass the external service call and apply the cached response (OK, Denied, or Error) directly.
-3. If deserialization fails, the filter will increment the ``invalid_cached_response`` stat and gracefully fall back to making a live call to the external authorization service.
+When a cached response is present under the configured namespace:
+1. The filter will retrieve the ``google.protobuf.Any`` message directly from the dynamic typed metadata.
+2. It will attempt to unpack it directly into a ``CheckResponse`` proto.
+3. If unpacking succeeds, the filter will bypass the external service call and apply the cached response (OK with mutations, Denied, or Error) directly.
+4. If unpacking fails (due to type mismatch), the filter will increment the ``invalid_cached_response`` stat and gracefully fall back to making a live call to the external authorization service.
 
-On cache misses (when no cached response is found), the filter will proceed with the live call and, upon receiving a successful response, will write the serialized ``CheckResponse`` as a Base64-encoded string back to the dynamic metadata under the configured key, allowing the caching filter to record and cache it.
+On cache misses (when no cached response is found under the namespace), the filter will proceed with the live call and, upon receiving a response, will pack the raw ``CheckResponse`` proto directly into a ``google.protobuf.Any`` message and write it to the dynamic typed metadata under the configured namespace, allowing the caching filter to record and cache it in raw binary format.
 
 Statistics
 ----------

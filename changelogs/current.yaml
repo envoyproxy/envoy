@@ -116,12 +116,12 @@ new_features:
     config option with ``DISABLE``, ``REQUIRE``, and ``ALLOW`` modes.
 - area: ext_authz
   change: |
-    Added cooperative caching bypass support to the external authorization HTTP filter. The filter can
-    now retrieve a cached ``CheckResponse`` from dynamic metadata, Base64-decode and deserialize it, and
-    apply the cached response directly, bypassing the live authorization service call. If deserialization
-    fails, the filter increments the new ``invalid_cached_response`` statistic and gracefully falls back
-    to a live network call. Configured via the new
-    :ref:`check_response_metadata_key <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.check_response_metadata_key>`
+    Added strongly-typed cooperative caching bypass support to the external authorization HTTP filter. The filter can
+    now retrieve a cached ``CheckResponse`` directly from dynamic typed metadata, unpack it from ``google.protobuf.Any``,
+    and apply the cached response directly, bypassing the live authorization service call. If unpacking fails (due to type
+    mismatch), the filter increments the new ``invalid_cached_response`` statistic and gracefully falls back to a live
+    network call. Configured via the new
+    :ref:`check_response_typed_metadata_namespace <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.check_response_typed_metadata_namespace>`
     option.
 - area: quic
   change: |
