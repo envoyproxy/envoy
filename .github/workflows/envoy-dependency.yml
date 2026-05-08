@@ -168,8 +168,12 @@ jobs:
             CONTAINER_TAG=$(
                 gh api -H "Accept: application/vnd.github+json" \
                     /repos/envoyproxy/toolshed/releases \
-                    --jq 'map(select(.tag_name | startswith("docker-v"))) | .[0].tag_name' \
+                    --jq 'map(select(.tag_name | startswith("docker-v"))) | .[0].tag_name // empty' \
                 | sed 's/^docker-v//')
+        fi
+        if [[ -z "$CONTAINER_TAG" ]]; then
+            echo "ERROR: Could not determine build image tag from envoyproxy/toolshed releases" >&2
+            exit 1
         fi
         echo "tag=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
         echo "tag_short=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
