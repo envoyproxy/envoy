@@ -165,11 +165,17 @@ jobs:
       working-directory: envoy
     - run: |
         if [[ -z "$CONTAINER_TAG" ]]; then
+            # Source of truth: the latest `docker-v*` GitHub release in
+            # envoyproxy/toolshed. Strip only the `docker-` prefix - the
+            # published images keep the leading `v`, eg
+            # `envoyproxy/envoy-build:ci-v0.1.3`.
             CONTAINER_TAG=$(
                 gh api -H "Accept: application/vnd.github+json" \
+                    --paginate \
                     /repos/envoyproxy/toolshed/releases \
                     --jq 'map(select(.tag_name | startswith("docker-v"))) | .[0].tag_name // empty' \
-                | sed 's/^docker-v//')
+                | head -n1 \
+                | sed 's/^docker-//')
         fi
         if [[ -z "$CONTAINER_TAG" ]]; then
             echo "ERROR: Could not determine build image tag from envoyproxy/toolshed releases" >&2
