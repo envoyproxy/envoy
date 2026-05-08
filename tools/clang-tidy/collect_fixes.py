@@ -69,10 +69,19 @@ def get_output_base(workspace_root: Path) -> Path:
 
 
 def search_roots(workspace_root: Path) -> list[Path]:
-    # Clang-tidy aspect outputs are materialized under the Bazel execroot rather than the
-    # workspace symlink tree. For Envoy clang-tidy runs we only need the fastbuild bin tree.
-    execroot = get_output_base(workspace_root) / "execroot" / workspace_root.name
-    return [execroot / "bazel-out" / "k8-fastbuild" / "bin"]
+    # Use 'bazel info bazel-bin' to get the correct output directory for the current architecture and configuration.
+    bazel_bin = subprocess.check_output(
+        [
+            "bazel",
+            *get_bazel_startup_options(),
+            "info",
+            *get_bazel_build_options(),
+            "bazel-bin",
+        ],
+        text=True,
+        cwd=workspace_root,
+    ).strip()
+    return [Path(bazel_bin)]
 
 
 def parse_target(target: str) -> tuple[str | None, str, str | None, bool]:
