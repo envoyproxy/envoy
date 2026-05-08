@@ -214,11 +214,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     unsafe {
       abi::envoy_dynamic_module_callback_lb_get_cluster_name(self.lb_ptr, &mut result);
       if !result.ptr.is_null() && result.length > 0 {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const _,
-          result.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
       } else {
         String::new()
       }
@@ -257,11 +253,8 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     if found && !result.ptr.is_null() && result.length > 0 {
       unsafe {
         Some(
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            result.ptr as *const _,
-            result.length,
-          ))
-          .to_string(),
+          crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length)
+            .into_owned(),
         )
       }
     } else {
@@ -323,11 +316,8 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     if found && !result.ptr.is_null() && result.length > 0 {
       unsafe {
         Some(
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            result.ptr as *const _,
-            result.length,
-          ))
-          .to_string(),
+          crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length)
+            .into_owned(),
         )
       }
     } else {
@@ -378,29 +368,18 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
     unsafe {
       let region_str = if !region.ptr.is_null() && region.length > 0 {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          region.ptr as *const _,
-          region.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(region.ptr as *const u8, region.length).into_owned()
       } else {
         String::new()
       };
       let zone_str = if !zone.ptr.is_null() && zone.length > 0 {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          zone.ptr as *const _,
-          zone.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(zone.ptr as *const u8, zone.length).into_owned()
       } else {
         String::new()
       };
       let sub_zone_str = if !sub_zone.ptr.is_null() && sub_zone.length > 0 {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          sub_zone.ptr as *const _,
-          sub_zone.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(sub_zone.ptr as *const u8, sub_zone.length)
+          .into_owned()
       } else {
         String::new()
       };
@@ -458,11 +437,8 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     if found && !result.ptr.is_null() && result.length > 0 {
       unsafe {
         Some(
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            result.ptr as *const _,
-            result.length,
-          ))
-          .to_string(),
+          crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length)
+            .into_owned(),
         )
       }
     } else {
@@ -572,11 +548,8 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     if found && !result.ptr.is_null() && result.length > 0 {
       unsafe {
         Some(
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            result.ptr as *const _,
-            result.length,
-          ))
-          .to_string(),
+          crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length)
+            .into_owned(),
         )
       }
     } else {
@@ -609,11 +582,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     };
     if found && !result.ptr.is_null() && result.length > 0 {
       Some(unsafe {
-        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-          result.ptr as *const _,
-          result.length,
-        ))
-        .to_string()
+        crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length).into_owned()
       })
     } else {
       None
@@ -679,16 +648,10 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
         .iter()
         .map(|h| unsafe {
           (
-            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-              h.key_ptr as *const _,
-              h.key_length,
-            ))
-            .to_string(),
-            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-              h.value_ptr as *const _,
-              h.value_length,
-            ))
-            .to_string(),
+            crate::ffi_helpers::str_lossy_from_raw(h.key_ptr as *const u8, h.key_length)
+              .into_owned(),
+            crate::ffi_helpers::str_lossy_from_raw(h.value_ptr as *const u8, h.value_length)
+              .into_owned(),
           )
         })
         .collect(),
@@ -720,11 +683,8 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     if found {
       unsafe {
         Some((
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            result.ptr as *const _,
-            result.length,
-          ))
-          .to_string(),
+          crate::ffi_helpers::str_lossy_from_raw(result.ptr as *const u8, result.length)
+            .into_owned(),
           count,
         ))
       }
@@ -775,11 +735,8 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     if found {
       unsafe {
         Some((
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            address.ptr as *const _,
-            address.length,
-          ))
-          .to_string(),
+          crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length)
+            .into_owned(),
           strict,
         ))
       }
@@ -1310,18 +1267,18 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_lb_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
-    let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-      name.ptr as *const _,
-      name.length,
-    ));
-    let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
     let new_config_fn = NEW_LOAD_BALANCER_CONFIG_FUNCTION
       .get()
       .expect("NEW_LOAD_BALANCER_CONFIG_FUNCTION must be set");
     let envoy_lb_config: Arc<dyn EnvoyLbConfig> = Arc::new(EnvoyLbConfigImpl {
       raw: lb_config_envoy_ptr,
     });
-    match new_config_fn(name_str, config_slice, envoy_lb_config) {
+    match new_config_fn(name_str.as_ref(), config_slice, envoy_lb_config) {
       Some(config) => wrap_into_c_void_ptr!(config),
       None => std::ptr::null(),
     }

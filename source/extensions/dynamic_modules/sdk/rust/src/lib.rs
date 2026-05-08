@@ -12,6 +12,11 @@ pub mod catch_unwind;
 pub mod cert_validator;
 pub mod cluster;
 pub mod dns_resolver;
+// Implementation detail. Public so SDK-provided macros (for example, `declare_matcher!`) that
+// expand in user crates can reach the safe helpers; users should not depend on this module
+// directly.
+#[doc(hidden)]
+pub mod ffi_helpers;
 pub mod http;
 pub mod listener;
 pub mod load_balancer;
@@ -416,8 +421,8 @@ macro_rules! set_factory_once {
       if !::std::ptr::fn_addr_eq(*$static.get().unwrap(), new_val) {
         $crate::envoy_log_critical!(
           "Duplicate factory registration for {}. A different module already registered this \
-           factory. Check dynamic_module_config for conflicting standalone and consolidated \
-           .so loads.",
+           factory. Check dynamic_module_config for conflicting standalone and consolidated .so \
+           loads.",
           $name,
         );
         // Return the "init failed" sentinel rather than panicking; unwinding across the

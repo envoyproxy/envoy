@@ -33,6 +33,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 using testing::StartsWith;
 
 namespace Envoy {
@@ -78,7 +80,7 @@ BORINGSSL_TEST_P(SslIntegrationTest, UnknownSslAlert) {
 
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
-  test_server_->waitForCounterGe(counter_name, 1);
+  test_server_->waitForCounter(counter_name, Ge(1));
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -835,7 +837,7 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientRsaOnly) {
   EXPECT_FALSE(codec_client->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
-  test_server_->waitForCounterGe(counter_name, 1);
+  test_server_->waitForCounter(counter_name, Ge(1));
   EXPECT_EQ(1U, counter->value());
   counter->reset();
 }
@@ -904,7 +906,7 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaClientEcdsaOnly) {
           ->connected());
   const std::string counter_name = listenerStatPrefix("ssl.connection_error");
   Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
-  test_server_->waitForCounterGe(counter_name, 1);
+  test_server_->waitForCounter(counter_name, Ge(1));
   EXPECT_EQ(1U, counter->value());
   counter->reset();
 }
@@ -1375,8 +1377,8 @@ typed_config:
   ASSERT(socket);
 
   // wait for the server tls handshake into sleep state.
-  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep", 1,
-                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_sleep", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
 
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
   ENVOY_LOG_MISC(debug, "debug: closing connection");
@@ -1384,8 +1386,8 @@ typed_config:
   connection.reset();
 
   // wait the sleep timer in cert selector is triggered.
-  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep_finished", 1,
-                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_sleep_finished", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
 }
 
 BORINGSSL_TEST_P(SslIntegrationTest, AsyncCertSelectionAfterSslShutdown) {
@@ -1406,15 +1408,15 @@ typed_config:
   ASSERT(socket);
 
   // wait for the server tls handshake into sleep state.
-  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep", 1,
-                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_sleep", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
 
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
   connection->close(Network::ConnectionCloseType::NoFlush);
 
   // wait the sleep timer in cert selector is triggered.
-  test_server_->waitForCounterEq("aysnc_cert_selection.cert_selection_sleep_finished", 1,
-                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter("aysnc_cert_selection.cert_selection_sleep_finished", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
 
   connection.reset();
 }

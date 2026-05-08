@@ -1812,7 +1812,9 @@ impl EnvoySpan for EnvoySpanImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
       Some(String::from_utf8_lossy(slice).to_string())
     } else {
       None
@@ -1841,7 +1843,9 @@ impl EnvoySpan for EnvoySpanImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
       Some(String::from_utf8_lossy(slice).to_string())
     } else {
       None
@@ -1860,7 +1864,9 @@ impl EnvoySpan for EnvoySpanImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
       Some(String::from_utf8_lossy(slice).to_string())
     } else {
       None
@@ -3425,7 +3431,9 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       )
     };
     if success && !result.ptr.is_null() && result.length > 0 {
-      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
       Some(slice.to_vec())
     } else {
       None
@@ -3803,15 +3811,14 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
-    // This assumes that the name is a valid UTF-8 string. Should we relax? At the moment,
-    // it is a String at protobuf level.
-    let name_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        name.ptr as *const _,
-        name.length,
-      ))
+    // The name is sourced from a protobuf string field (and thus UTF-8 by contract); we still
+    // route through `str_lossy_from_raw` so a malformed input on the FFI seam produces a lossy
+    // decode rather than undefined behaviour.
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
     };
-    let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
 
     let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
       raw_ptr: envoy_filter_config_ptr,
@@ -3819,7 +3826,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
 
     envoy_dynamic_module_on_http_filter_config_new_impl(
       &mut envoy_filter_config,
-      name_str,
+      name_str.as_ref(),
       config_slice,
       NEW_HTTP_FILTER_CONFIG_FUNCTION
         .get()
@@ -3894,18 +3901,17 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_ne
   config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr {
   catch_unwind(AssertUnwindSafe(|| {
-    // This assumes that the name is a valid UTF-8 string. Should we relax? At the moment,
-    // it is a String at protobuf level.
-    let name_str = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        name.ptr as *const _,
-        name.length,
-      ))
+    // See `envoy_dynamic_module_on_http_filter_config_new`: route through `str_lossy_from_raw`
+    // so a malformed input on the FFI seam produces a lossy decode rather than undefined
+    // behaviour.
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
     };
-    let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
 
     envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
-      name_str,
+      name_str.as_ref(),
       config_slice,
       NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
         .get()
@@ -4178,14 +4184,20 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
     let filter = &mut **filter;
     let headers = if headers_size > 0 {
       Some(unsafe {
-        std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          headers as *const (EnvoyBuffer, EnvoyBuffer),
+          headers_size,
+        )
       })
     } else {
       None
     };
     let body = if body_chunks_size > 0 {
       Some(unsafe {
-        std::slice::from_raw_parts(body_chunks as *const EnvoyBuffer, body_chunks_size)
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          body_chunks as *const EnvoyBuffer,
+          body_chunks_size,
+        )
       })
     } else {
       None
@@ -4319,7 +4331,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_headers
     let filter = &mut **filter;
     let headers = if headers_size > 0 {
       unsafe {
-        std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          headers as *const (EnvoyBuffer, EnvoyBuffer),
+          headers_size,
+        )
       }
     } else {
       &[]
@@ -4356,7 +4371,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_data(
     let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
     let filter = &mut **filter;
     let data = if data_count > 0 {
-      unsafe { std::slice::from_raw_parts(data as *const EnvoyBuffer, data_count) }
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(data as *const EnvoyBuffer, data_count) }
     } else {
       &[]
     };
@@ -4392,7 +4407,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_trailer
     let filter = &mut **filter;
     let trailers = if trailers_size > 0 {
       unsafe {
-        std::slice::from_raw_parts(trailers as *const (EnvoyBuffer, EnvoyBuffer), trailers_size)
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          trailers as *const (EnvoyBuffer, EnvoyBuffer),
+          trailers_size,
+        )
       }
     } else {
       &[]
@@ -4482,14 +4500,20 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_callout
     let config = &**config;
     let headers = if headers_size > 0 {
       Some(unsafe {
-        std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          headers as *const (EnvoyBuffer, EnvoyBuffer),
+          headers_size,
+        )
       })
     } else {
       None
     };
     let body = if body_chunks_size > 0 {
       Some(unsafe {
-        std::slice::from_raw_parts(body_chunks as *const EnvoyBuffer, body_chunks_size)
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          body_chunks as *const EnvoyBuffer,
+          body_chunks_size,
+        )
       })
     } else {
       None
@@ -4530,7 +4554,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
     let config = &**config;
     let headers = if headers_size > 0 {
       unsafe {
-        std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          headers as *const (EnvoyBuffer, EnvoyBuffer),
+          headers_size,
+        )
       }
     } else {
       &[]
@@ -4569,7 +4596,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
     let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
     let config = &**config;
     let data = if data_count > 0 {
-      unsafe { std::slice::from_raw_parts(data as *const EnvoyBuffer, data_count) }
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(data as *const EnvoyBuffer, data_count) }
     } else {
       &[]
     };
@@ -4607,7 +4634,10 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_http_stream_
     let config = &**config;
     let trailers = if trailers_size > 0 {
       unsafe {
-        std::slice::from_raw_parts(trailers as *const (EnvoyBuffer, EnvoyBuffer), trailers_size)
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          trailers as *const (EnvoyBuffer, EnvoyBuffer),
+          trailers_size,
+        )
       }
     } else {
       &[]

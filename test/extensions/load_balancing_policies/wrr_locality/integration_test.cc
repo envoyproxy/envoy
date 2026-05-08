@@ -13,6 +13,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
@@ -225,7 +226,7 @@ public:
     HttpIntegrationTest::initialize();
 
     // Cluster should become active.
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 1);
+    test_server_->waitForGauge("cluster_manager.active_clusters", Ge(1));
 
     // Wait for our statically specified listener to become ready, and register
     // its port in the test framework's downstream listener port map.
@@ -347,7 +348,7 @@ TEST_P(WrrLocalityEdsIntegrationTest, AddRemoveLocality) {
       current_endpoints.mutable_endpoints()->DeleteSubrange(1, 1);
     }
     eds_helper_.setEds({current_endpoints});
-    test_server_->waitForCounterGe("cluster.cluster_1.membership_change", i + 1);
+    test_server_->waitForCounter("cluster.cluster_1.membership_change", Ge(i + 1));
 
     const std::vector<uint64_t> upstream_qps = {100, 100, 100, 100};
     // Send another 100 requests to cluster1, expecting weights to be used.

@@ -82,9 +82,6 @@ on:
       docker-ipv6:
         default: true
         type: boolean
-      dockerhub-username:
-        default: envoyproxy
-        type: string
       downloads:
         type: string
       entrypoint:
