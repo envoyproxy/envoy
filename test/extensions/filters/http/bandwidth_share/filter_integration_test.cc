@@ -118,6 +118,16 @@ public:
       response_trailer_prefix: x-test-
   )";
   }
+  std::string responseTrailersWithoutDelayFilter() {
+    return R"(
+    name: bwshare
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare
+      response_limit: {bucket_id: "trailer_response", kbps: {default_value: 1024}}
+      enable_response_trailers: true
+      response_trailer_prefix: x-test-
+  )";
+  }
   std::string tenantTaggedRouteConfig() {
     return R"(
     request_limit: {bucket_id: "route_bucket", kbps: {default_value: 1, runtime_key: "route_request"}}
@@ -400,6 +410,22 @@ TEST_F(BandwidthShareIntegrationTest, RouteConfigCanLimitAndTagTenantStats) {
       512);
   EXPECT_EQ(0, gaugeValue(request_streams_currently_limited));
   EXPECT_EQ(0, gaugeValue(request_bytes_pending));
+}
+
+TEST_F(BandwidthShareIntegrationTest, DoesNotAddEmptyResponseTrailersWithoutDelay) {
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  initializeFilter(responseTrailersWithoutDelayFilter());
+  makeDownstreamConnection();
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers_post_);
+  codec_client_->sendData(request_encoder, "a", true);
+  waitForNextUpstreamRequest();
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(response_headers_, false);
+  response_decoder->waitForHeaders();
+  upstream_request_->encodeData(1, true);
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+
+  EXPECT_EQ(nullptr, response_decoder->trailers());
 }
 
 TEST_F(BandwidthShareIntegrationTest, AddsResponseTrailersAfterLimitedResponse) {

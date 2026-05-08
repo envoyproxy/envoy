@@ -63,6 +63,7 @@ private:
   friend class FilterTest;
   const FilterConfig& getConfig();
 
+  bool shouldSetResponseTrailers() const;
   void updateStatsOnDecodeFinish();
   void updateStatsOnEncodeFinish();
 

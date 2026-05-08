@@ -146,9 +146,9 @@ Http::FilterDataStatus BandwidthShare::encodeData(Buffer::Instance& data, bool e
     const auto& config = getConfig();
 
     // Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
-    // If upstream has trailers, addEncodedTrailers won't be called
+    // If upstream has trailers, addEncodedTrailers won't be called.
     bool trailer_added = false;
-    if (end_stream && config.enableResponseTrailers()) {
+    if (end_stream && config.enableResponseTrailers() && shouldSetResponseTrailers()) {
       trailers_ = &encoder_callbacks_->addEncodedTrailers();
       trailer_added = true;
     }
@@ -180,6 +180,11 @@ void BandwidthShare::updateStatsOnDecodeFinish() {
       config.timeSource().monotonicTime() - request_state_.start_time_);
 }
 
+bool BandwidthShare::shouldSetResponseTrailers() const {
+  return request_state_.delay_ != std::chrono::milliseconds{0} ||
+         response_state_.delay_ != std::chrono::milliseconds{0};
+}
+
 void BandwidthShare::updateStatsOnEncodeFinish() {
   const auto& config = getConfig();
   std::chrono::milliseconds response_duration =
@@ -190,8 +195,7 @@ void BandwidthShare::updateStatsOnEncodeFinish() {
     return;
   }
 
-  if (request_state_.delay_ == std::chrono::milliseconds{0} &&
-      response_state_.delay_ == std::chrono::milliseconds{0}) {
+  if (!shouldSetResponseTrailers()) {
     return;
   }
 
