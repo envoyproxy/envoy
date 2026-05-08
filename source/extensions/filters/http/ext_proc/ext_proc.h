@@ -490,6 +490,7 @@ private:
 class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
                public Http::PassThroughFilter,
                public ExternalProcessorCallbacks {
+  friend class FilterAccessor;
   // The result of an attempt to open the stream
   enum class StreamOpenState {
     // The stream was opened successfully

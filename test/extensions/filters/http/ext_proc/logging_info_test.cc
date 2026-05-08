@@ -108,6 +108,16 @@ TEST_F(ExtProcLoggingInfoTest, GetField) {
   EXPECT_TRUE(absl::holds_alternative<absl::monostate>(logging_info_.getField("non_existent")));
 }
 
+TEST_F(ExtProcLoggingInfoTest, ProcessingEffectsConst) {
+  const auto& const_logging_info = logging_info_;
+
+  // Exercise both directions
+  EXPECT_EQ(Effect::None,
+            const_logging_info.processingEffects(TrafficDirection::INBOUND).header_effect_);
+  EXPECT_EQ(Effect::None,
+            const_logging_info.processingEffects(TrafficDirection::OUTBOUND).header_effect_);
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

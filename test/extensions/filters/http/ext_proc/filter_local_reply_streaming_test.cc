@@ -1329,6 +1329,56 @@ TEST_F(StreamingLocalReplyTest, SaveStreamingLocalResponse) {
   filter_->onDestroy();
 }
 
+TEST_F(StreamingLocalReplyTest, StartLocalResponseInvalidHeaders) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  auto response = std::make_unique<ProcessingResponse>();
+  auto* headers_response =
+      response->mutable_streamed_immediate_response()->mutable_headers_response();
+  auto* h = headers_response->mutable_headers()->add_headers();
+  h->set_key(":status");
+  h->set_raw_value(std::string(1, '\0')); // Invalid header value
+
+  stream_callbacks_->onReceiveMessage(std::move(response));
+}
+
+TEST_F(StreamingLocalReplyTest, ProcessLocalTrailersInvalid) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+
+  // Start local response
+  auto response1 = std::make_unique<ProcessingResponse>();
+  auto* headers_response =
+      response1->mutable_streamed_immediate_response()->mutable_headers_response();
+  auto* h1 = headers_response->mutable_headers()->add_headers();
+  h1->set_key(":status");
+  h1->set_raw_value("200");
+  headers_response->set_end_of_stream(false);
+
+  stream_callbacks_->onReceiveMessage(std::move(response1));
+
+  // Send invalid trailers
+  auto response2 = std::make_unique<ProcessingResponse>();
+  auto* trailers_response =
+      response2->mutable_streamed_immediate_response()->mutable_trailers_response();
+  auto* h2 = trailers_response->add_headers();
+  h2->set_key("invalid name");
+  h2->set_raw_value("value");
+
+  stream_callbacks_->onReceiveMessage(std::move(response2));
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters
