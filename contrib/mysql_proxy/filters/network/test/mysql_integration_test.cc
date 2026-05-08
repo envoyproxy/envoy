@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 #include "mysql_test_utils.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -57,7 +58,7 @@ TEST_P(MySQLIntegrationTest, MySQLStatsNewSessionTest) {
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.sessions", SESSIONS);
+  test_server_->waitForCounter("mysql.mysql_stats.sessions", Ge(SESSIONS));
 }
 
 /**
@@ -99,7 +100,7 @@ TEST_P(MySQLIntegrationTest, MySQLLoginTest) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
@@ -149,7 +150,7 @@ TEST_P(MySQLIntegrationTest, DISABLED_MySQLUnitTestMultiClientsLoop) {
   }
 
   // Verify counters: CLIENT_NUM login attempts, no failures
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", CLIENT_NUM);
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(CLIENT_NUM));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_attempts")->value(), CLIENT_NUM);
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
@@ -193,7 +194,7 @@ TEST_P(MySQLIntegrationTest, MySQLLoginFailTest) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  test_server_->waitForCounter("mysql.mysql_stats.login_attempts", Ge(1));
   EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 1);
 }
 

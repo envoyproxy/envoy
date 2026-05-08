@@ -6,6 +6,7 @@
 #include "test/extensions/config_subscription/filesystem/filesystem_subscription_test_harness.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"

@@ -18,6 +18,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/proto_message_extraction/extraction_util",
+        "//source/extensions/filters/http/proto_message_extraction/extraction_util:proto_extractor",
         "//test/proto:extraction_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",

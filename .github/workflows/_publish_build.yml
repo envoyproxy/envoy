@@ -6,6 +6,7 @@ permissions:
 on:
   workflow_call:
     secrets:
+      dockerhub-token:
       gpg-key:
         required: true
       gpg-key-password:
@@ -33,6 +34,8 @@ concurrency:
 
 jobs:
   binary:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read
@@ -58,6 +61,8 @@ jobs:
       upload-path: container/envoy/${{ inputs.arch }}/bin/
 
   docker:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
     permissions:
       actions: read
       contents: read
@@ -87,13 +92,14 @@ jobs:
       runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
 
   distribution:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+      gpg-key: ${{ secrets.gpg-key }}
+      gpg-key-password: ${{ secrets.gpg-key-password }}
     permissions:
       actions: read
       contents: read
       packages: read
-    secrets:
-      gpg-key: ${{ secrets.gpg-key }}
-      gpg-key-password: ${{ secrets.gpg-key-password }}
     name: Packages
     needs:
     - binary

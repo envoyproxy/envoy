@@ -17,7 +17,7 @@ public:
   std::string protocol() const override;
   absl::string_view failureReason() const override;
   bool canFlushClose() override { return true; }
-  void closeSocket(Network::ConnectionEvent) override {}
+  void closeSocket(Network::ConnectionEvent, bool) override {}
   void onConnected() override;
   IoResult doRead(Buffer::Instance& buffer) override;
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;

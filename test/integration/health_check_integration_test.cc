@@ -13,6 +13,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -74,7 +76,7 @@ public:
     acceptXdsConnection();
 
     // Expect 1 for the statically specified CDS server.
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 1);
+    test_server_->waitForGauge("cluster_manager.active_clusters", Ge(1));
 
     registerTestServerPorts({"http"});
 
@@ -241,7 +243,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttp) {
   clusters_[cluster_idx].host_stream_->encodeData(1024, true);
 
   // Verify that Envoy detected the health check response.
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -257,7 +259,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyHttp) {
       Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
   clusters_[cluster_idx].host_stream_->encodeData(1024, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -278,14 +280,14 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   clusters_[cluster_idx].host_stream_->encodeData(0, true);
 
   // Wait for health check
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 1);
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Eq(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
 
   // Wait until the next attempt is made.
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(2));
 
   // Respond with retriable status
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
@@ -301,13 +303,13 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   clusters_[cluster_idx].host_stream_->encodeData(0, true);
 
   // Wait for second health check
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Eq(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 
   // Wait until the next attempt is made.
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 3);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(3));
 
   // Respond with retriable status a second time, matching unhealthy threshold
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
@@ -323,13 +325,13 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   clusters_[cluster_idx].host_stream_->encodeData(0, true);
 
   // Wait for third health check
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.failure", 2);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Eq(2));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 0);
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(0));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
 
   // Wait until the next attempt is made.
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 4);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(4));
 
   // Respond with healthy status again.
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
@@ -345,9 +347,9 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   clusters_[cluster_idx].host_stream_->encodeData(0, true);
 
   // Wait for fourth health check
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 2);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Eq(2));
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
 }
 
@@ -366,10 +368,10 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointExpectedAndRetriablePrecede
   clusters_[cluster_idx].host_stream_->encodeData(0, true);
 
   // Wait for health check
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 1);
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Eq(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
 }
 
@@ -390,16 +392,16 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointImmediateHealthcheckFailHtt
       false);
   clusters_[cluster_idx].host_stream_->encodeData(1024, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.attempt")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_excluded", 1);
+  test_server_->waitForGauge("cluster.cluster_1.membership_excluded", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 
   // Wait until the next attempt is made.
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(2));
 
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
       *dispatcher_, clusters_[cluster_idx].host_stream_));
@@ -413,10 +415,10 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointImmediateHealthcheckFailHtt
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_excluded", 0);
+  test_server_->waitForGauge("cluster.cluster_1.membership_excluded", Eq(0));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 }
@@ -431,7 +433,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointTimeoutHttp) {
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
   // Endpoint doesn't reply, and a healthcheck failure occurs (due to timeout).
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -454,7 +456,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect());
@@ -476,7 +478,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 2);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(2));
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -515,7 +517,7 @@ TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayError) {
   clusters_[cluster_idx].host_fake_connection_->encodeProtocolError();
 
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 
@@ -536,7 +538,7 @@ TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayError) {
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -626,7 +628,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcp) {
   AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -645,7 +647,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointWrongResponseTcp) {
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -662,7 +664,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcpWithProxyProtocolV
   AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -678,7 +680,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcpWithProxyProtocolV
   AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -692,7 +694,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointTimeoutTcp) {
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -768,7 +770,7 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointServingGrpc) {
           {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
       response);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -790,7 +792,7 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointNotServingGrpc) {
           {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
       response);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -805,7 +807,7 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointTimeoutGrpc) {
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -828,7 +830,7 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointServiceUnknownGrpc) {
           {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
       response);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -851,7 +853,7 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointUnknownStatusGrpc) {
           {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
       response);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -916,7 +918,7 @@ TEST_P(ExternalHealthCheckIntegrationTest, SingleEndpointHealthyExternal) {
   AssertionResult result = clusters_[cluster_idx].external_host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -936,7 +938,7 @@ TEST_P(ExternalHealthCheckIntegrationTest, SingleEndpointWrongResponseExternal) 
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -950,7 +952,7 @@ TEST_P(ExternalHealthCheckIntegrationTest, SingleEndpointTimeoutExternal) {
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -1006,7 +1008,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttpWithPayload) {
   cluster_data.host_stream_->encodeData(1024, true);
 
   // Verify that Envoy detected the health check response.
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -1061,7 +1063,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttpWithBinaryPayloa
   cluster_data.host_stream_->encodeData(1024, true);
 
   // Verify that Envoy detected the health check response.
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }

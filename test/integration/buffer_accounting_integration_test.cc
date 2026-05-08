@@ -24,6 +24,8 @@
 #include "integration_stream_decoder.h"
 #include "socket_interface_swap.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -110,8 +112,8 @@ public:
     for (uint32_t idx = 0; idx < num_responses; ++idx) {
       responses.emplace_back(codec_client_->makeRequestWithBody(header_map, request_body_size));
       if (!cluster_to_wait_for.empty()) {
-        test_server_->waitForGaugeEq(
-            absl::StrCat("cluster.", cluster_to_wait_for, ".upstream_rq_active"), idx + 1);
+        test_server_->waitForGauge(
+            absl::StrCat("cluster.", cluster_to_wait_for, ".upstream_rq_active"), Eq(idx + 1));
       }
     }
 
@@ -413,7 +415,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToShadowUpstream) {
   }
 
   write_matcher_->setResumeWrites();
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", num_requests);
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_completed", Eq(num_requests));
 }
 
 TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
@@ -646,7 +648,8 @@ public:
 
     write_matcher_->setWriteReturnsEgain();
     ASSERT_TRUE(tcp_client_->write(std::string(524288, 'a'), false));
-    test_server_->waitForCounterEq("tcp.tcp_stats.downstream_flow_control_paused_reading_total", 1);
+    test_server_->waitForCounter("tcp.tcp_stats.downstream_flow_control_paused_reading_total",
+                                 Eq(1));
     tcp_client_->close();
   }
 
@@ -726,14 +729,14 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 
   // Set the pressure so the overload action kicks in
   updateResource(0.95);
-  test_server_->waitForGaugeEq(
-      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
+  test_server_->waitForGauge(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", Eq(62));
 
   // Wait for the proxy to notice and take action for the overload by only
   // resetting the largest stream.
   if (streamBufferAccounting()) {
-    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 1);
-    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
+    test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Ge(1));
+    test_server_->waitForCounter("envoy.overload_actions.reset_high_memory_stream.count", Ge(1));
     EXPECT_TRUE(largest_request_response->waitForReset());
     EXPECT_TRUE(largest_request_response->reset());
 
@@ -745,8 +748,8 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 
   // Wait for the proxy to notice and take action for the overload.
   if (streamBufferAccounting()) {
-    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 2);
-    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 2);
+    test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Ge(2));
+    test_server_->waitForCounter("envoy.overload_actions.reset_high_memory_stream.count", Ge(2));
     EXPECT_TRUE(medium_request_response->waitForReset());
     EXPECT_TRUE(medium_request_response->reset());
 
@@ -755,8 +758,8 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 
   // Reduce resource pressure
   updateResource(0.80);
-  test_server_->waitForGaugeEq(
-      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
+  test_server_->waitForGauge(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", Eq(0));
 
   // Resume writes to upstream, any request streams that survive can go through.
   write_matcher_->setResumeWrites();
@@ -826,26 +829,26 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 
   // Set the pressure so the overload action kills largest response
   updateResource(0.95);
-  test_server_->waitForGaugeEq(
-      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
+  test_server_->waitForGauge(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", Eq(62));
   if (streamBufferAccounting()) {
-    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 1);
-    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
+    test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Ge(1));
+    test_server_->waitForCounter("envoy.overload_actions.reset_high_memory_stream.count", Ge(1));
     ASSERT_TRUE(upstream_request_for_largest_response->waitForReset());
   }
 
   // Set the pressure so the overload action kills medium response
   updateResource(0.96);
   if (streamBufferAccounting()) {
-    test_server_->waitForCounterGe("http.config_test.downstream_rq_rx_reset", 2);
-    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 2);
+    test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset", Ge(2));
+    test_server_->waitForCounter("envoy.overload_actions.reset_high_memory_stream.count", Ge(2));
     ASSERT_TRUE(upstream_request_for_medium_response->waitForReset());
   }
 
   // Reduce resource pressure
   updateResource(0.80);
-  test_server_->waitForGaugeEq(
-      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
+  test_server_->waitForGauge(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", Eq(0));
 
   // Resume writes to downstream, any responses that survive can go through.
   write_matcher_->setResumeWrites();
@@ -903,17 +906,17 @@ protected:
     codec_client_->sendData(request_encoder, 1000, false);
     // Wait for an upstream request to have our reach its buffer limit and read
     // disable.
-    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_backed_up_total", 1);
-    test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
-                                   1);
+    test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+    test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_backed_up_total", Eq(1));
+    test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                                 Eq(1));
 
     codec_client_->sendData(request_encoder, 1000, true);
 
     // Verify codec received but is buffered as we're still read disabled.
     buffer_factory_->waitUntilTotalBufferedExceeds(2000);
-    test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
-                                   0);
+    test_server_->waitForCounter("http.config_test.downstream_flow_control_resumed_reading_total",
+                                 Eq(0));
     EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
       absl::MutexLock l{tee.mutex_};
       EXPECT_EQ(tee.request_body_.length(), 1000);
@@ -955,9 +958,9 @@ protected:
 
     // Wait for an upstream response to have our reach its buffer limit and read
     // disable.
-    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total",
-                                   1);
+    test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+    test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                                 Eq(1));
 
     upstream_request->encodeData(500, true);
     ASSERT_TRUE(upstream_request->complete());
@@ -965,9 +968,9 @@ protected:
     // Verify codec received and has buffered onStreamClose for upstream as we're still read
     // disabled.
     buffer_factory_->waitUntilTotalBufferedExceeds(1500);
-    test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
-    test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
-                                   0);
+    test_server_->waitForGauge("cluster.cluster_0.http2.deferred_stream_close", Eq(1));
+    test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                                 Eq(0));
     EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
       absl::MutexLock l{tee.mutex_};
       EXPECT_EQ(tee.response_body_.length(), 1000);
@@ -997,7 +1000,7 @@ protected:
 
     for (int i = 0; i < num_requests; ++i) {
       responses.emplace_back(codec_client_->startRequest(default_request_headers_));
-      test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", i + 1);
+      test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(i + 1));
     }
 
     return responses;
@@ -1037,17 +1040,17 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
   codec_client_->sendData(request_encoder, 1000, false);
   // Wait for an upstream request to have our reach its buffer limit and read
   // disable.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_backed_up_total", 1);
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
-                                 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_backed_up_total", Eq(1));
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Eq(1));
 
   codec_client_->sendData(request_encoder, 1000, true);
 
   // Verify codec received but is buffered as we're still read disabled.
   buffer_factory_->waitUntilTotalBufferedExceeds(2000);
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
-                                 0);
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_resumed_reading_total",
+                               Eq(0));
   EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
     absl::MutexLock l{tee.mutex_};
     EXPECT_EQ(tee.request_body_.length(), 1000);
@@ -1061,8 +1064,8 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
   upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response_decoder->waitForEndStream());
   ASSERT_TRUE(upstream_request->complete());
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
-                                 1);
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_resumed_reading_total",
+                               Eq(1));
 }
 
 TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
@@ -1082,15 +1085,16 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
 
   // Wait for an upstream response to have our reach its buffer limit and read
   // disable.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Eq(1));
 
   upstream_request->encodeData(500, false);
 
   // Verify codec received but is buffered as we're still read disabled.
   buffer_factory_->waitUntilTotalBufferedExceeds(1500);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
-                                 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                               Eq(0));
   EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
     absl::MutexLock l{tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 1000);
@@ -1103,8 +1107,8 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
   upstream_request->encodeData(1, true);
   ASSERT_TRUE(response_decoder->waitForEndStream());
   ASSERT_TRUE(upstream_request->complete());
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
-                                 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                               Eq(1));
 }
 
 TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream) {
@@ -1124,15 +1128,16 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream)
 
   // Wait for an upstream response to have our reach its buffer limit and read
   // disable.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Eq(1));
   upstream_request->encodeData(500, true);
 
   // Verify codec received and has buffered onStreamClose for upstream as we're still read disabled.
   buffer_factory_->waitUntilTotalBufferedExceeds(1500);
-  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
-                                 0);
+  test_server_->waitForGauge("cluster.cluster_0.http2.deferred_stream_close", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                               Eq(0));
   EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
     absl::MutexLock l{tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 1000);
@@ -1143,9 +1148,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream)
 
   ASSERT_TRUE(response_decoder->waitForEndStream());
   ASSERT_TRUE(upstream_request->complete());
-  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 0);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
-                                 1);
+  test_server_->waitForGauge("cluster.cluster_0.http2.deferred_stream_close", Eq(0));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                               Eq(1));
 }
 
 TEST_P(Http2DeferredProcessingIntegrationTest,
@@ -1166,8 +1171,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
 
   // Wait for an upstream response to have our reach its buffer limit and read
   // disable.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Eq(1));
 
   auto close_if_over_9000 =
       [](StreamTee& tee, Http::StreamEncoderFilterCallbacks* encoder_cbs)
@@ -1186,9 +1192,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
 
   // Verify codec received and has buffered onStreamClose for upstream as we're still read disabled.
   buffer_factory_->waitUntilTotalBufferedExceeds(9001);
-  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
-                                 0);
+  test_server_->waitForGauge("cluster.cluster_0.http2.deferred_stream_close", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                               Eq(0));
   EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
     absl::MutexLock l{tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 9000);
@@ -1199,9 +1205,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
 
   ASSERT_TRUE(response_decoder->waitForReset());
   ASSERT_TRUE(upstream_request->complete());
-  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 0);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
-                                 1);
+  test_server_->waitForGauge("cluster.cluster_0.http2.deferred_stream_close", Eq(0));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                               Eq(1));
 }
 
 TEST_P(Http2DeferredProcessingIntegrationTest,
@@ -1225,17 +1231,18 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
 
   // Wait for an upstream response to have our reach its buffer limit and read
   // disable.
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Eq(1));
 
   upstream_request->encodeData(500, true);
   ASSERT_TRUE(upstream_request->complete());
 
   // Verify codec received and has buffered onStreamClose for upstream as we're still read disabled.
   buffer_factory_->waitUntilTotalBufferedExceeds(1500);
-  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
-                                 0);
+  test_server_->waitForGauge("cluster.cluster_0.http2.deferred_stream_close", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                               Eq(0));
   EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
     absl::MutexLock l{tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 1000);
@@ -1243,10 +1250,10 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
 
   // Downstream sends a RST, we should clean up the buffered upstream.
   codec_client_->sendReset(request_encoder);
-  test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 0);
+  test_server_->waitForGauge("cluster.cluster_0.http2.deferred_stream_close", Eq(0));
   // Resetting the upstream stream doesn't increment this count.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
-                                 0);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
+                               Eq(0));
 }
 
 TEST_P(Http2DeferredProcessingIntegrationTest, CanRoundRobinBetweenStreams) {
@@ -1260,24 +1267,24 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanRoundRobinBetweenStreams) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const uint32_t num_requests = 4;
   auto request_response_pairs = startRequests(num_requests);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 4);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(4));
   writeToRequests(request_response_pairs, {2500, 2500, 2500, 2510}, false);
 
   // Wait for an upstream request to have our reach its buffer limit and read
   // disable.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_backed_up_total", 4);
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
-                                 4);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 10000);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_backed_up_total", Eq(4));
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Eq(4));
+  test_server_->waitForCounter("http.config_test.downstream_cx_rx_bytes_total", Ge(10000));
 
   // Subsequent data should be buffered at downstream codec for deferred
   // processing.
   writeToRequests(request_response_pairs, {2500, 2500, 2500, 2500}, false);
 
   // Verify codec received but is buffered as we're still read disabled.
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 20000);
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
-                                 0);
+  test_server_->waitForCounter("http.config_test.downstream_cx_rx_bytes_total", Ge(20000));
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_resumed_reading_total",
+                               Eq(0));
 
   // Track the order of when streams invoke decodeData to understand the
   // ordering in deferred processing.
@@ -1299,8 +1306,8 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanRoundRobinBetweenStreams) {
 
   // Allow draining to the upstream, this will trigger deferred processing.
   write_matcher_->setResumeWrites();
-  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_resumed_reading_total",
-                                 4);
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_resumed_reading_total",
+                               Ge(4));
 
   std::vector<FakeStreamPtr> upstream_requests;
   waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
@@ -1320,7 +1327,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanRoundRobinBetweenStreams) {
   waitForNumTurns(turns, mu, 8);
 
   writeToRequests(request_response_pairs, {2500, 2500, 2500, 2500}, true);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 40000);
+  test_server_->waitForCounter("http.config_test.downstream_cx_rx_bytes_total", Ge(40000));
 
   // Allow draining to upstream, this will trigger second round of deferred
   // processing. Check drain to upstream.
@@ -1360,7 +1367,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
   const uint32_t response_body_size = 14000;
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(3));
   // Tracking turns and block writes to downstream on end stream.
   absl::Mutex mu;
   std::vector<uint64_t> turns;
@@ -1390,16 +1397,18 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
     upstream_requests.emplace_back(std::move(upstream_request_));
     upstream_requests[i]->encodeHeaders(default_response_headers_, false);
     upstream_requests[i]->encodeData(4000, false);
-    test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 4000 * (i + 1));
+    test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                                 Ge(4000 * (i + 1)));
   }
 
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 3);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Eq(3));
 
   // Data that should be buffered by the upstream codec.
   upstream_requests[0]->encodeData(4000, false);
   upstream_requests[1]->encodeData(10000, true);
   upstream_requests[2]->encodeData(10000, true);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 36000);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Ge(36000));
 
   // Enable writes, check drainage.
   write_matcher_->setResumeWrites();
@@ -1438,7 +1447,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
   // process. We expect that the 3rd stream, which didn't get a turn above will
   // get to go and exit.
   upstream_requests[0]->encodeData(6000, true);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 42000);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total", Ge(42000));
   write_matcher_->setResumeWrites();
 
   waitForNumTurns(turns, mu, 6);
@@ -1493,7 +1502,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const uint32_t num_requests = 3;
   auto request_response_pairs = startRequests(num_requests);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(3));
 
   // Track which stream processed what amount of the request data at a
   // particular point.
@@ -1523,21 +1532,21 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
 
   // Wait for an upstream request to have our reach its buffer limit and read
   // disable.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_backed_up_total", 3);
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
-                                 3);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 85000);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_backed_up_total", Eq(3));
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Eq(3));
+  test_server_->waitForCounter("http.config_test.downstream_cx_rx_bytes_total", Ge(85000));
 
   // Only the first stream should have drained its data, the second streams data
   // is stuck in the connection output buffer. This read-disables all the
   // streams flowing to that connection, allowing us to queue additional
   // data for the third stream.
   write_matcher_->setResumeWrites();
-  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_resumed_reading_total",
-                                 3);
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
-                                 6);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_tx_bytes_total", 10000);
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_resumed_reading_total",
+                               Ge(3));
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Eq(6));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_tx_bytes_total", Ge(10000));
 
   std::vector<FakeStreamPtr> upstream_requests;
   waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
@@ -1553,7 +1562,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
   // Should be able to write to third stream with data.
   Buffer::OwnedImpl data(std::string(65535, 'C'));
   codec_client_->sendData(request_response_pairs[2].first, 65535, true);
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 150000);
+  test_server_->waitForCounter("http.config_test.downstream_cx_rx_bytes_total", Ge(150000));
 
   // Enabling again should cause us to chunk this write to third stream.
   write_matcher_->setResumeWrites();

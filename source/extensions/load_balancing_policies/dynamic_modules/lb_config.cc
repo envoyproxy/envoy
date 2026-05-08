@@ -48,6 +48,8 @@ DynamicModuleLbConfig::create(const std::string& lb_policy_name, const std::stri
     return absl::InvalidArgumentError("failed to create in-module load balancer configuration");
   }
 
+  config->stat_creation_frozen_ = true;
+
   return config;
 }
 

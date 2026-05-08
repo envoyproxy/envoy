@@ -143,7 +143,6 @@ build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --cxxopt=-Wno-trigraphs
 build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
 # libc++ - default for clang
@@ -437,6 +436,11 @@ common:engflow-common --credential_helper=*.engflow.com=%workspace%/bazel/engflo
 common:engflow-common --grpc_keepalive_time=60s
 common:engflow-common --grpc_keepalive_timeout=30s
 common:engflow-common --remote_cache_compression
+# Recover from transient gRPC failures (e.g. UNAVAILABLE: io exception) talking to engflow.
+common:engflow-common --remote_retries=10
+common:engflow-common --remote_retry_max_delay=60s
+# Recover when blobs are evicted from the CAS mid-build (common during patch releases).
+common:engflow-common --experimental_remote_cache_eviction_retries=5
 
 # this provides access to RBE+cache
 common:rbe --config=remote-cache
@@ -445,6 +449,7 @@ common:rbe --config=remote-exec
 # this provides access to just cache
 common:remote-cache --config=engflow-common
 common:remote-cache --remote_cache=grpcs://mordenite.cluster.engflow.com
+common:remote-cache --experimental_remote_downloader=grpcs://mordenite.cluster.engflow.com
 common:remote-cache --remote_timeout=3600s
 
 common:remote-exec --remote_executor=grpcs://mordenite.cluster.engflow.com

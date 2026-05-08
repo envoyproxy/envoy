@@ -13,6 +13,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/network/connection_socket_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
@@ -156,7 +157,8 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
                   !proto_config.validation().dynamic_metadata_namespace().empty()
               ? proto_config.validation().dynamic_metadata_namespace()
               : "envoy.filters.network.reverse_tunnel"),
-      required_cluster_name_(proto_config.required_cluster_name()) {}
+      required_cluster_name_(proto_config.required_cluster_name()),
+      use_http_upgrade_(proto_config.use_http_upgrade()) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id, absl::string_view tenant_id,
@@ -281,7 +283,11 @@ Http::RequestDecoder& ReverseTunnelFilter::newStream(Http::ResponseEncoder& resp
 void ReverseTunnelFilter::RequestDecoderImpl::decodeHeaders(
     Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) {
   headers_ = std::move(headers);
-  if (end_stream) {
+  // For an Upgrade request, the HTTP/1 server codec calls decodeHeaders with
+  // end_stream=false because it now considers the connection a tunnel awaiting
+  // more bytes. The handshake has no body, so process the headers immediately
+  // rather than waiting for an end-of-stream that never comes.
+  if (end_stream || Http::Utility::isUpgrade(*headers_)) {
     processIfComplete(true);
   }
 }
@@ -348,6 +354,31 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     // Close the connection after sending the response.
     parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     return;
+  }
+
+  // When upgrade negotiation is enabled, require the request to advertise the
+  // `reverse-tunnel` upgrade. The HTTP/1 server codec already validates the
+  // `Connection: Upgrade` paired token, so we only re-check the `Upgrade` value here.
+  if (parent_.config_->useHttpUpgrade()) {
+    const auto upgrade = headers_->getUpgradeValue();
+    if (!absl::EqualsIgnoreCase(upgrade, Bootstrap::ReverseConnection::ReverseConnectionUtility::
+                                             REVERSE_TUNNEL_UPGRADE_PROTOCOL)) {
+      parent_.stats_.parse_error_.inc();
+      ENVOY_CONN_LOG(debug,
+                     "reverse_tunnel: upgrade negotiation enabled but Upgrade header missing or "
+                     "unexpected (got '{}')",
+                     parent_.read_callbacks_->connection(), upgrade);
+      sendLocalReply(
+          Http::Code::UpgradeRequired, "Upgrade: reverse-tunnel required",
+          [](Http::ResponseHeaderMap& h) {
+            h.setReferenceKey(Http::Headers::get().Upgrade,
+                              Bootstrap::ReverseConnection::ReverseConnectionUtility::
+                                  REVERSE_TUNNEL_UPGRADE_PROTOCOL);
+          },
+          absl::nullopt, "reverse_tunnel_upgrade_required");
+      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      return;
+    }
   }
 
   // Extract node/cluster/tenant identifiers from HTTP headers.
@@ -453,16 +484,28 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     return;
   }
 
-  // Respond with 200 OK.
+  // Respond. In upgrade mode we send `101 Switching Protocols` with the upgrade headers
+  // echoed; the HTTP/1 server codec (created with allow_upgrade) flushes them and stops
+  // parsing further bytes as HTTP, leaving the spliced connection for the tunnel.
   auto resp_headers = Http::ResponseHeaderMapImpl::create();
-  resp_headers->setStatus(200);
+  if (parent_.config_->useHttpUpgrade()) {
+    resp_headers->setStatus(101);
+    resp_headers->setReferenceKey(Http::Headers::get().Connection,
+                                  Http::Headers::get().ConnectionValues.Upgrade);
+    resp_headers->setReferenceKey(
+        Http::Headers::get().Upgrade,
+        Bootstrap::ReverseConnection::ReverseConnectionUtility::REVERSE_TUNNEL_UPGRADE_PROTOCOL);
+  } else {
+    resp_headers->setStatus(200);
+  }
   encoder_.encodeHeaders(*resp_headers, true);
 
   parent_.processAcceptedConnection(node_id, cluster_id, tenant_id);
   parent_.stats_.accepted_.inc();
 
-  // Close the connection if configured to do so after handling the request.
-  if (parent_.config_->autoCloseConnections()) {
+  // Close the listener-side connection so tunnel bytes go to the duped fd, not back into
+  // this filter's codec. Required in upgrade mode; opt-in otherwise.
+  if (parent_.config_->useHttpUpgrade() || parent_.config_->autoCloseConnections()) {
     auto& connection = parent_.read_callbacks_->connection();
     Bootstrap::ReverseConnection::ReverseConnectionUtility::applySslQuietClose(connection);
     connection.close(Network::ConnectionCloseType::FlushWrite);
