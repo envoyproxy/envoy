@@ -24,8 +24,13 @@ const std::string& BandwidthShare::filterName() {
 void BandwidthShare::StatsInProgress::update(uint64_t length_sent, uint64_t bytes_buffered,
                                              std::chrono::milliseconds delay) {
   ASSERT(stats_.has_value());
-  if (bytes_buffered) {
+  if (bytes_buffered_ || bytes_buffered) {
     stats_->bytes_limited_.add(length_sent);
+  } else {
+    stats_->bytes_not_limited_.add(length_sent);
+  }
+
+  if (bytes_buffered) {
     if (bytes_buffered_ > bytes_buffered) {
       stats_->bytes_pending_.sub(bytes_buffered_ - bytes_buffered);
     } else {
@@ -37,7 +42,6 @@ void BandwidthShare::StatsInProgress::update(uint64_t length_sent, uint64_t byte
     bytes_buffered_ = bytes_buffered;
     delay_ += delay;
   } else {
-    stats_->bytes_not_limited_.add(length_sent);
     if (bytes_buffered_ > 0) {
       stats_->bytes_pending_.sub(bytes_buffered_);
       stats_->streams_currently_limited_.dec();
