@@ -263,3 +263,75 @@ Common errors are:
 
 More detailed list of error that can be raised by BoringSSL can be found
 `here <https://github.com/google/boringssl/blob/main/crypto/err/ssl.errordata>`_
+
+.. _arch_overview_ssl_tls_defaults:
+
+TLS protocol defaults, cipher suites, and groups
+-------------------------------------------------
+
+The following summarizes Envoy's out-of-the-box TLS configuration for non-FIPS builds. FIPS builds
+may differ; see :ref:`arch_overview_ssl_fips`.
+
+**Default TLS protocol versions**
+
++------------------+---------------------+---------------------+
+| Role             | Minimum version     | Maximum version     |
++==================+=====================+=====================+
+| Client (upstream)| TLS 1.2             | TLS 1.2             |
++------------------+---------------------+---------------------+
+| Server (downstream)| TLS 1.2           | TLS 1.3             |
++------------------+---------------------+---------------------+
+
+**Default cipher suites (TLS 1.0–1.2 only)**
+
+TLS 1.2 cipher suites are configured via the
+:ref:`cipher_suites <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.cipher_suites>`
+field. See that field's documentation for the authoritative default list and FIPS variants.
+
+**TLS 1.3 cipher suites**
+
+TLS 1.3 cipher suites are **not** configurable via ``cipher_suites``; BoringSSL selects from its
+built-in set. The suites that may be negotiated are:
+
+.. code-block:: none
+
+  TLS_AES_128_GCM_SHA256
+  TLS_AES_256_GCM_SHA384
+  TLS_CHACHA20_POLY1305_SHA256
+
+**Default ECDH groups**
+
+In non-FIPS builds: ``X25519``, ``P-256``. In FIPS builds: ``P-256`` only. These are configured
+via the
+:ref:`ecdh_curves <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.ecdh_curves>`
+field.
+
+.. _arch_overview_ssl_pq_key_exchange:
+
+Post-quantum key exchange
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+BoringSSL supports the post-quantum hybrid key exchange group ``X25519MLKEM768`` (and historically
+``X25519Kyber768Draft00``) for TLS 1.3 connections. Envoy's BoringSSL integration exposes these
+groups, so Envoy is **capable** of negotiating post-quantum hybrid key exchange.
+
+However, Envoy always passes an explicit group list to BoringSSL via
+``SSL_CTX_set1_curves_list``. This **overrides** BoringSSL's built-in default group list (which
+would include ``X25519MLKEM768``). Because Envoy's built-in default is ``X25519:P-256``,
+post-quantum hybrid groups are **not** negotiated unless the operator explicitly opts in by
+configuring ``ecdh_curves``.
+
+To enable post-quantum hybrid key exchange, set ``ecdh_curves`` explicitly in
+:ref:`TlsParameters <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsParameters>`:
+
+.. code-block:: yaml
+
+  ecdh_curves:
+    - X25519MLKEM768
+    - X25519
+    - P-256
+
+Post-quantum hybrid groups only apply to TLS 1.3 connections; classic groups are still
+negotiated for TLS 1.2. Whether a given connection actually used a post-quantum group can be
+observed at runtime via the ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``
+:ref:`access log formatters <config_access_log_format>`.
