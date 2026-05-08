@@ -390,6 +390,7 @@ jobs:
         BAZELRC_CONTENT: ${{ vars.ENVOY_CI_BAZELRC }}
 
     - id: dockerhub
+      if: runner.os == 'Linux'
       run: |
         if [[ -n "$DOCKERHUB_TOKEN" ]]; then
           echo "login=true" >> "$GITHUB_OUTPUT"
@@ -397,7 +398,7 @@ jobs:
       env:
         DOCKERHUB_TOKEN: ${{ secrets.dockerhub-token }}
     - name: Login to Docker Hub (read-only)
-      if: steps.dockerhub.outputs.login == 'true'
+      if: runner.os == 'Linux' && steps.dockerhub.outputs.login == 'true'
       uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
       with:
         username: ${{ vars.DOCKERHUB_USERNAME }}
