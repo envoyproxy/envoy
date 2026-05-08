@@ -4,6 +4,7 @@
 #include <set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -423,7 +424,7 @@ public:
     return Config::ServerExtensionValues::get().DEFAULT_LISTENER;
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::listener::v3::ListenerManager>();
+    return std::make_unique<envoy::config::bootstrap::v3::ListenerManager>();
   }
 };
 

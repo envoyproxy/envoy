@@ -11,6 +11,7 @@ namespace Envoy {
 namespace {
 
 using envoy::config::cluster::v3::Cluster;
+using testing::Ge;
 
 class CdsIntegrationTest : public XdsIntegrationTest {
 public:
@@ -72,15 +73,15 @@ protected:
                                    {cluster}, {cluster}, {}, version);
 
     // Wait for cluster to be added.
-    EXPECT_TRUE(waitForCounterGe("cluster_manager.cluster_added", 1));
-    EXPECT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", cluster_count + 1));
+    EXPECT_TRUE(waitForCounter("cluster_manager.cluster_added", Ge(1)));
+    EXPECT_TRUE(waitForGauge("cluster_manager.active_clusters", Ge(cluster_count + 1)));
 
     // ACK of the initial version.
     EXPECT_TRUE(compareDiscoveryRequest(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(),
                                         version, expected_resources, {}, {},
                                         /*expect_node=*/false));
 
-    EXPECT_TRUE(waitForGaugeGe("cluster_manager.cluster_removed", 0));
+    EXPECT_TRUE(waitForGauge("cluster_manager.cluster_removed", Ge(0)));
   }
 
   void sendUpdatedCdsResponseAndVerify(const std::string& version) {
@@ -98,8 +99,8 @@ protected:
                                         /*expect_node=*/false));
 
     // Cluster count should stay the same.
-    EXPECT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", cluster_count));
-    EXPECT_TRUE(waitForGaugeGe("cluster_manager.cluster_removed", 0));
+    EXPECT_TRUE(waitForGauge("cluster_manager.active_clusters", Ge(cluster_count)));
+    EXPECT_TRUE(waitForGauge("cluster_manager.cluster_removed", Ge(0)));
   }
 
   bool use_xdstp_{false};

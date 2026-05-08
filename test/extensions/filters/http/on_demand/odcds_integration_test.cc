@@ -297,6 +297,7 @@ public:
 };
 
 using OdCdsIntegrationTest = OdCdsIntegrationTestBase;
+using testing::Ge;
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OdCdsIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -2042,7 +2043,7 @@ TEST_P(OdCdsXdstpAdsIntegrationTest, OnDemandClusterDiscoveryWithSotwAds) {
   EXPECT_EQ(5, test_server_->gauge("cluster_manager.active_clusters")->value());
 
   // Envoy should now complete initialization.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   registerTestServerPorts({"http"});
 
   // Send the first request.
@@ -2157,7 +2158,7 @@ key:
                                        {"Addr", "x-foo-key=foo"}});
     createRdsStream("foo_route1");
     sendRdsResponse(route_config_formatter("foo_route1"), "1");
-    test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+    test_server_->waitForCounter("http.config_test.rds.foo_route1.update_success", Ge(1));
     return response;
   }
 

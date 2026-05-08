@@ -229,6 +229,7 @@ public:
   void startRtdsSubscriptions(ReadyCallback on_done) override;
   Stats::Scope& getRootScope() override;
   void countDeprecatedFeatureUse() const override;
+  absl::Status onWorkerThreadsRegistered() override;
 
 private:
   friend RtdsSubscription;

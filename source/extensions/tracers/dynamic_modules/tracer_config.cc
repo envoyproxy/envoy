@@ -101,6 +101,7 @@ absl::StatusOr<DynamicModuleTracerConfigSharedPtr> newDynamicModuleTracerConfig(
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module tracer config");
   }
+  config->stat_creation_frozen_ = true;
   return config;
 }
 
@@ -140,6 +141,11 @@ void DynamicModuleSpan::log(SystemTime timestamp, const std::string& event) {
   envoy_dynamic_module_type_envoy_buffer event_buf = {.ptr = const_cast<char*>(event.data()),
                                                       .length = event.size()};
   config_->on_span_log_(in_module_span_, timestamp_ns, event_buf);
+}
+
+bool DynamicModuleSpan::exportedSpan() const {
+  // TODO(jkoch): extend module ABI with hook as an optimization
+  return true;
 }
 
 void DynamicModuleSpan::finishSpan() { config_->on_span_finish_(in_module_span_); }

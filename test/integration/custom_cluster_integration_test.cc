@@ -50,7 +50,7 @@ public:
       cluster_0->mutable_cluster_type()->CopyFrom(cluster_type);
     });
     HttpIntegrationTest::initialize();
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 1);
+    test_server_->waitForGauge("cluster_manager.active_clusters", testing::Ge(1));
   }
 
   Network::Address::IpVersion ipVersion() const { return version_; }

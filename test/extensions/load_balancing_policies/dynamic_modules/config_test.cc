@@ -1,3 +1,6 @@
+#include <atomic>
+#include <thread>
+
 #include "envoy/extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/common/upstream/upstream_impl.h"
@@ -14,6 +17,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -215,6 +219,11 @@ protected:
 
     ON_CALL(priority_set_, hostSetsPerPriority())
         .WillByDefault(ReturnRef(priority_set_.host_sets_));
+  }
+
+  // Re-opens stat creation so tests can call `define_*` from the test thread.
+  static void unfreezeStatCreation(DynamicModuleLbConfig& config) {
+    config.stat_creation_frozen_ = false;
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
@@ -1748,6 +1757,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsCounterDefineAndIncrement) {
   ASSERT_NE(typed_config, nullptr);
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a counter (no labels).
   envoy_dynamic_module_type_module_buffer name = {.ptr = "test_counter", .length = 12};
@@ -1789,6 +1799,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsGaugeDefineAndManipulate) {
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a gauge (no labels).
   envoy_dynamic_module_type_module_buffer name = {.ptr = "test_gauge", .length = 10};
@@ -1833,6 +1844,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsHistogramDefineAndRecord) {
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a histogram (no labels).
   envoy_dynamic_module_type_module_buffer name = {.ptr = "test_histogram", .length = 14};
@@ -1862,6 +1874,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsInvalidId) {
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Using invalid IDs should return MetricNotFound (no labels).
   EXPECT_EQ(
@@ -1915,6 +1928,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsMultipleCounters) {
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define two counters.
   envoy_dynamic_module_type_module_buffer name1 = {.ptr = "counter_a", .length = 9};
@@ -1957,6 +1971,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsCounterVecWithLabels) {
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a counter vec with two labels.
   envoy_dynamic_module_type_module_buffer name = {.ptr = "req_total", .length = 9};
@@ -2003,6 +2018,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsGaugeVecWithLabels) {
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a gauge vec with one label.
   envoy_dynamic_module_type_module_buffer name = {.ptr = "active_conns", .length = 12};
@@ -2045,6 +2061,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsHistogramVecWithLabels) {
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a histogram vec with one label.
   envoy_dynamic_module_type_module_buffer name = {.ptr = "latency", .length = 7};
@@ -2088,6 +2105,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecScalarIdConflictErrors) {
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a counter vec (ID 1 in vec space).
   envoy_dynamic_module_type_module_buffer counter_name = {.ptr = "cv", .length = 2};
@@ -2148,6 +2166,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecWrongLabelCount) {
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a gauge vec with one label.
   envoy_dynamic_module_type_module_buffer gauge_name = {.ptr = "gwl", .length = 3};
@@ -2185,6 +2204,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecNotFoundWithLabels) {
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Using non-existent vec IDs with labels should return MetricNotFound.
   envoy_dynamic_module_type_module_buffer label_val = {.ptr = "val", .length = 3};
@@ -2194,6 +2214,127 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecNotFoundWithLabels) {
   EXPECT_EQ(
       envoy_dynamic_module_type_metrics_result_MetricNotFound,
       envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, 999, &label_val, 1, 5));
+}
+
+// Verifies the factory auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(DynamicModulesLoadBalancerTest, MetricsFrozenAfterInit) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  ASSERT_NE(typed_config, nullptr);
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+  EXPECT_TRUE(lb_config->stat_creation_frozen_);
+
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "frozen_counter", .length = 14};
+  envoy_dynamic_module_type_module_buffer label_name = {.ptr = "label", .length = 5};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, name, nullptr, 0,
+                                                                   &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, name, &label_name, 1,
+                                                                   &out_id));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Frozen,
+      envoy_dynamic_module_callback_lb_config_define_gauge(config_ptr, name, nullptr, 0, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_lb_config_define_gauge(config_ptr, name, &label_name, 1,
+                                                                 &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_lb_config_define_histogram(config_ptr, name, nullptr, 0,
+                                                                     &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_lb_config_define_histogram(config_ptr, name, &label_name,
+                                                                     1, &out_id));
+}
+
+// Drives concurrent labeled increments from multiple threads to verify no data race in the
+// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+TEST_F(DynamicModulesLoadBalancerTest, MetricsConcurrentIncrementCounterVecNoRace) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_TRUE(lb_config_or_error.ok());
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  ASSERT_NE(typed_config, nullptr);
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
+
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "race_counter", .length = 12};
+  std::string label_name_str = "status";
+  envoy_dynamic_module_type_module_buffer label_names[1] = {
+      {.ptr = const_cast<char*>(label_name_str.data()), .length = label_name_str.size()}};
+  size_t counter_id = 0;
+  ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, name, label_names, 1,
+                                                                   &counter_id));
+
+  constexpr int kNumThreads = 8;
+  constexpr int kIncrementsPerThread = 2000;
+
+  // Pre-warm the test scope's counter cache so workers only hit the cache. `TestScope` uses an
+  // unsynchronized map for counter caching that would otherwise race independently of the path
+  // under test.
+  for (int t = 0; t < kNumThreads; ++t) {
+    const std::string label_value_str = absl::StrCat("worker_", t);
+    envoy_dynamic_module_type_module_buffer label_value = {
+        .ptr = const_cast<char*>(label_value_str.data()), .length = label_value_str.size()};
+    ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+              envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_id,
+                                                                        &label_value, 1, 0));
+  }
+
+  std::vector<std::thread> threads;
+  threads.reserve(kNumThreads);
+  std::atomic<int> ready{0};
+  std::atomic<bool> go{false};
+  for (int t = 0; t < kNumThreads; ++t) {
+    threads.emplace_back([&, t]() {
+      const std::string label_value_str = absl::StrCat("worker_", t);
+      envoy_dynamic_module_type_module_buffer label_value = {
+          .ptr = const_cast<char*>(label_value_str.data()), .length = label_value_str.size()};
+      ready.fetch_add(1, std::memory_order_relaxed);
+      while (!go.load(std::memory_order_acquire)) {
+      }
+      for (int i = 0; i < kIncrementsPerThread; ++i) {
+        ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+                  envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_id,
+                                                                            &label_value, 1, 1));
+      }
+    });
+  }
+  while (ready.load(std::memory_order_acquire) < kNumThreads) {
+  }
+  go.store(true, std::memory_order_release);
+  for (auto& th : threads) {
+    th.join();
+  }
+
+  uint64_t total = 0;
+  for (int t = 0; t < kNumThreads; ++t) {
+    auto counter = TestUtility::findCounter(
+        factory_context_.store_,
+        absl::StrCat("dynamicmodulescustom.race_counter.status.worker_", t));
+    ASSERT_NE(nullptr, counter) << "missing counter for worker_" << t;
+    total += counter->value();
+  }
+  EXPECT_EQ(static_cast<uint64_t>(kNumThreads) * kIncrementsPerThread, total);
 }
 
 } // namespace

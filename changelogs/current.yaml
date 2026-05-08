@@ -5,6 +5,14 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: router
+  change: |
+    The upstream transport failure reason (e.g. TLS certificate validation errors) is no longer included
+    in the HTTP response body sent to downstream clients. It remains available in access logs via
+    ``%UPSTREAM_TRANSPORT_FAILURE_REASON%``. This behavioral change can be temporarily reverted by setting
+    runtime guard ``envoy.reloadable_features.hide_transport_failure_reason_in_response_body`` to ``false``.
+    This is being changed because in many cases the upstream failure details are inappropriate to send to
+    the downstream client as it discloses too many internal details.
 - area: golang
   change: |
     Reduced the per-cgo-call mutex acquisition on the Golang HTTP filter by making the
@@ -21,6 +29,11 @@ minor_behavior_changes:
     on the five methods that write to the per-request ``strValue`` scratch buffer
     (``getStringValue``, ``getDynamicMetadata``, ``getStringFilterState``, ``getStringProperty``,
     ``getSecret``).
+- area: stats
+  change: |
+    Optimized prometheus stats endpoint. Users should see a roughly 30-40% latency improvement in calls to the endpoint
+    for cases where the scrape results in lots of cluster stats.
+    There should be no visible changes to users, or incompatibilities.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -59,6 +72,11 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: stat_sinks
+  change: |
+    Added :ref:`max_data_points_per_request
+    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.max_data_points_per_request>`
+    configuration to the OpenTelemetry stat sink to chunk metric export requests.
 - area: set_metadata_filter
   change: |
     Added :ref:`per-route configuration support <envoy_v3_api_msg_extensions.filters.http.set_metadata.v3.Config>`
@@ -110,6 +128,33 @@ new_features:
     in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
     instead of using the :ref:`ExtensionWithMatcher
     <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
+- area: resource_monitors
+  change: |
+    Overload manager fixed heap resource monitor now supports :ref:`max_heap_size_bytes_runtime
+    <envoy_v3_api_field_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig.max_heap_size_bytes_runtime>`
+    for runtime-overridable max heap size (e.g. RTDS or ``/runtime_modify``).
+- area: jwt_authn
+  change: |
+    Added :ref:`verification_status_header
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.ExtractOnlyWithoutValidation.verification_status_header>`
+    to the ``ExtractOnlyWithoutValidation`` requirement. When a JWT is present in the request but fails
+    signature verification, the named request header (default ``x-jwt-signature-verified``) is set to
+    ``false`` so downstream filters (RBAC, ext_authz) can distinguish forwarded-but-unverified claims
+    from validated ones. The header is not set on a successfully verified JWT or when no JWT is present.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.jwt_authn_add_verification_status_header`` to ``false``.
+- area: access_log
+  change: |
+    Added ``%UPSTREAM_SERVER_NAME%`` access log formatter returning the SNI from the established upstream
+    TLS connection.
+- area: attributes
+  change: |
+    Added ``upstream.server_name`` CEL attribute returning the SNI from the established upstream
+    TLS connection.
+- area: tls
+  change: |
+    Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
+    to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
 - area: watchdog
   change: |
     Added :ref:`envoy.watchdog.backtrace_action

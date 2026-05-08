@@ -3,7 +3,7 @@
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
-#include "library/cc/engine_builder.h"
+#include "test/cc/engine_builder_test_shim.h"
 #include "library/common/engine_types.h"
 #include "library/common/http/header_utility.h"
 
