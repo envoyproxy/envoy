@@ -47,7 +47,11 @@ class BandwidthShareIntegrationTest : public Event::TestUsingSimulatedTime,
                                       public testing::Test {
 public:
   BandwidthShareIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {
+    // FairTokenBucket derives its initial fullness from elapsed monotonic time.
+    // Starting at zero makes newly-created buckets appear empty in integration tests.
+    simTime().setMonotonicTime(std::chrono::seconds(1));
+  }
 
   void initializeFilter(const std::string& config) {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -423,6 +427,7 @@ TEST_F(BandwidthShareIntegrationTest, DoesNotAddEmptyResponseTrailersWithoutDela
   upstream_request_->encodeHeaders(response_headers_, false);
   response_decoder->waitForHeaders();
   upstream_request_->encodeData(1, true);
+  simTime().advanceTimeWait(std::chrono::milliseconds(0));
   ASSERT_TRUE(response_decoder->waitForEndStream());
 
   EXPECT_EQ(nullptr, response_decoder->trailers());
