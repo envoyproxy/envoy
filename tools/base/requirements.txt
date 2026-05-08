@@ -4,8 +4,8 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes requirements.in
 #
-abstracts==0.0.12 \
-    --hash=sha256:acc01ff56c8a05fb88150dff62e295f9071fc33388c42f1dfc2787a8d1c755ff
+abstracts==0.1.1 \
+    --hash=sha256:dc095e83e2dd18318a499bb1cfe0b0a4d64485fc9d1c809a8bbedd36c7a7b8b1
     # via
     #   -r requirements.in
     #   aio-api-bazel
