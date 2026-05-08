@@ -190,9 +190,7 @@ void BandwidthShare::updateStatsOnEncodeFinish() {
     return;
   }
 
-  if (request_duration_ == std::chrono::milliseconds{0} &&
-      request_state_.delay_ == std::chrono::milliseconds{0} &&
-      response_duration == std::chrono::milliseconds{0} &&
+  if (request_state_.delay_ == std::chrono::milliseconds{0} &&
       response_state_.delay_ == std::chrono::milliseconds{0}) {
     return;
   }
