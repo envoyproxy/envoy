@@ -1,16 +1,23 @@
 #include "source/extensions/filters/http/bandwidth_share/fair_token_bucket_impl.h"
 
 #include <algorithm>
-#include <limits>
 
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
+
+#include "absl/numeric/int128.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace BandwidthShareFilter {
 namespace FairTokenBucket {
+
+namespace {
+
+constexpr uint64_t NanosPerSecond = 1000000000UL;
+
+} // namespace
 
 Client::~Client() { bucket_->clientDestroyed(*this); }
 
@@ -19,7 +26,6 @@ std::chrono::milliseconds Client::fillInterval() const { return bucket_->fillInt
 Bucket::Bucket(uint64_t max_tokens, TimeSource& time_source,
                std::chrono::milliseconds fill_interval)
     : time_source_(time_source), fill_interval_(fill_interval), max_tokens_(max_tokens) {
-  ASSERT(max_tokens_ < std::numeric_limits<uint64_t>::max() / 1000000000UL);
   ASSERT(max_tokens_ > 0);
   ASSERT(fill_interval_ >= std::chrono::milliseconds(10));
   ASSERT(fill_interval_ <= std::chrono::milliseconds(1000));
@@ -82,11 +88,19 @@ uint64_t Bucket::tokensInBucket() {
   empty_at_ = std::max(empty_at_, now - std::chrono::seconds{1});
   std::chrono::nanoseconds fill_duration_nanos =
       std::chrono::duration_cast<std::chrono::nanoseconds>(now - empty_at_);
-  return fill_duration_nanos.count() * max_tokens_ / 1000000000UL;
+  ASSERT(fill_duration_nanos.count() >= 0);
+  return static_cast<uint64_t>(absl::uint128{static_cast<uint64_t>(fill_duration_nanos.count())} *
+                               max_tokens_ / NanosPerSecond);
 }
 
 void Bucket::consumeTokens(uint64_t tokens) {
-  empty_at_ += std::chrono::nanoseconds{tokens * 1000000000UL / max_tokens_};
+  // With very high token limits, very small consumes can round down to 0 ns of
+  // bucket time. That is acceptable: each consume is below the bucket's time
+  // resolution, and it would take an impractical number of such consumes to
+  // materially exceed the limit.
+  const uint64_t nanos =
+      static_cast<uint64_t>(absl::uint128{tokens} * NanosPerSecond / max_tokens_);
+  empty_at_ += std::chrono::nanoseconds{nanos};
 }
 
 uint64_t Bucket::requestTokens(Client& client, uint64_t want_tokens) {

@@ -7,8 +7,8 @@ Bandwidth share
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare>`
 
-The HTTP Bandwidth share filter limits the size of data flow to the max bandwidth set in the ``limit_kbps``
-when the request's route, virtual host or filter chain has a
+The HTTP Bandwidth share filter limits the size of data flow to the max bandwidth set in ``request_limit.kbps``
+or ``response_limit.kbps`` when the request's route, virtual host or filter chain has a
 :ref:`bandwidth share configuration <envoy_v3_api_msg_extensions.filters.http.bandwidth_share.v3.BandwidthShare>`.
 
 If the bandwidth limit has been exhausted the filter stops further transfer until more bandwidth gets allocated

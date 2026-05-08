@@ -21,6 +21,7 @@ envoy_cc_library(
         "//envoy/common:token_bucket_interface",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
+        "@abseil-cpp//absl/numeric:int128",
     ],
 )
 

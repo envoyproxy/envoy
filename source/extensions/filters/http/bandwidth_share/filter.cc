@@ -182,26 +182,26 @@ void BandwidthShare::updateStatsOnEncodeFinish() {
       std::chrono::duration_cast<std::chrono::milliseconds>(config.timeSource().monotonicTime() -
                                                             response_state_.start_time_);
 
-  if (response_bucket_) {
-    if (config.enableResponseTrailers() && trailers_ != nullptr) {
-      if (request_duration_ > std::chrono::milliseconds{0}) {
-        trailers_->setCopy(config.responseTrailers().request_duration_,
-                           std::to_string(request_duration_.count()));
-      }
-      if (request_state_.delay_ > std::chrono::milliseconds{0}) {
-        trailers_->setCopy(config.responseTrailers().request_delay_,
-                           std::to_string(request_state_.delay_.count()));
-      }
-      if (response_duration > std::chrono::milliseconds{0}) {
-        trailers_->setCopy(config.responseTrailers().response_duration_,
-                           std::to_string(response_duration.count()));
-      }
-      if (response_state_.delay_ > std::chrono::milliseconds{0}) {
-        trailers_->setCopy(config.responseTrailers().response_delay_,
-                           std::to_string(response_state_.delay_.count()));
-      }
-    }
+  if (!response_bucket_ || !config.enableResponseTrailers() || trailers_ == nullptr) {
+    return;
   }
+
+  if (request_duration_ == std::chrono::milliseconds{0} &&
+      request_state_.delay_ == std::chrono::milliseconds{0} &&
+      response_duration == std::chrono::milliseconds{0} &&
+      response_state_.delay_ == std::chrono::milliseconds{0}) {
+    return;
+  }
+
+  const auto& response_trailers = config.responseTrailers();
+  trailers_->setCopy(response_trailers.request_duration_,
+                     std::to_string(request_duration_.count()));
+  trailers_->setCopy(response_trailers.request_delay_,
+                     std::to_string(request_state_.delay_.count()));
+  trailers_->setCopy(response_trailers.response_duration_,
+                     std::to_string(response_duration.count()));
+  trailers_->setCopy(response_trailers.response_delay_,
+                     std::to_string(response_state_.delay_.count()));
 }
 
 const FilterConfig& BandwidthShare::getConfig() {

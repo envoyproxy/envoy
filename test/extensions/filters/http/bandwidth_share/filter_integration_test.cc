@@ -21,6 +21,9 @@ namespace {
 
 using ::testing::_;
 using ::testing::Contains;
+using ::testing::Eq;
+using ::testing::Ge;
+using ::testing::Lt;
 using ::testing::Not;
 using ::testing::Property;
 using ::testing::ResultOf;
@@ -220,17 +223,17 @@ TEST_F(BandwidthShareIntegrationTest, LimitCausesPausesBothWays) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  test_server_->waitForGaugeGe(request_bytes_pending, 1);
+  test_server_->waitForGauge(request_bytes_pending, Ge(1));
   EXPECT_EQ(1, gaugeValue(request_streams_currently_limited));
-  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  test_server_->waitForGauge(request_bytes_pending, Eq(0));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(response_headers_, false);
   response_decoder->waitForHeaders();
   upstream_request_->encodeData(2048, false);
   upstream_request_->encodeTrailers(any_response_trailers_);
-  test_server_->waitForGaugeGe(response_bytes_pending, 1);
+  test_server_->waitForGauge(response_bytes_pending, Ge(1));
   EXPECT_EQ(1, gaugeValue(response_streams_currently_limited));
-  test_server_->waitForGaugeEq(response_bytes_pending, 0);
+  test_server_->waitForGauge(response_bytes_pending, Eq(0));
   ASSERT_TRUE(response_decoder->waitForEndStream());
 
   EXPECT_GT(
@@ -262,14 +265,14 @@ TEST_F(BandwidthShareIntegrationTest, ResetWhileRequestBytesBufferedCleansStats)
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  test_server_->waitForGaugeGe(request_bytes_pending, 1);
+  test_server_->waitForGauge(request_bytes_pending, Ge(1));
   EXPECT_EQ(1, gaugeValue(request_streams_currently_limited));
 
   codec_client_->sendReset(request_encoder);
   ASSERT_TRUE(response_decoder->waitForReset());
   ASSERT_TRUE(upstream_request_->waitForReset(*dispatcher_));
 
-  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  test_server_->waitForGauge(request_bytes_pending, Eq(0));
   EXPECT_EQ(0, gaugeValue(request_streams_currently_limited));
 }
 
@@ -290,13 +293,13 @@ TEST_F(BandwidthShareIntegrationTest, ResetWhileResponseBytesBufferedCleansStats
   upstream_request_->encodeHeaders(response_headers_, false);
   response_decoder->waitForHeaders();
   upstream_request_->encodeData(2048, false);
-  test_server_->waitForGaugeGe(response_bytes_pending, 1);
+  test_server_->waitForGauge(response_bytes_pending, Ge(1));
   EXPECT_EQ(1, gaugeValue(response_streams_currently_limited));
 
   upstream_request_->encodeResetStream();
   ASSERT_TRUE(response_decoder->waitForReset());
 
-  test_server_->waitForGaugeEq(response_bytes_pending, 0);
+  test_server_->waitForGauge(response_bytes_pending, Eq(0));
   EXPECT_EQ(0, gaugeValue(response_streams_currently_limited));
 }
 
@@ -324,9 +327,9 @@ TEST_F(BandwidthShareIntegrationTest, RuntimeLimitChangesApplyToNewStreams) {
   codec_client_->sendTrailers(request_encoder, any_request_trailers_);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  test_server_->waitForGaugeGe(request_bytes_pending, 1);
+  test_server_->waitForGauge(request_bytes_pending, Ge(1));
   EXPECT_EQ(1, gaugeValue(request_streams_currently_limited));
-  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  test_server_->waitForGauge(request_bytes_pending, Eq(0));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(response_headers_, true);
   ASSERT_TRUE(response_decoder->waitForEndStream());
@@ -360,18 +363,13 @@ TEST_F(BandwidthShareIntegrationTest, PendingResponseBytesDecreaseWhileStillBuff
   response_decoder->waitForHeaders();
   upstream_request_->encodeData(4096, false);
 
-  test_server_->waitForGaugeGe(response_bytes_pending, 2048);
+  test_server_->waitForGauge(response_bytes_pending, Ge(2048));
   Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
-  while (gaugeValue(response_bytes_pending) >= 1024) {
-    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
-    ASSERT_TRUE(bound.withinBound())
-        << "timed out waiting for " << response_bytes_pending << " to be < 1024, current value "
-        << gaugeValue(response_bytes_pending);
-  }
+  ASSERT_TRUE(test_server_->waitForGauge(response_bytes_pending, Lt(1024)));
   EXPECT_GT(gaugeValue(response_bytes_pending), 0);
 
   upstream_request_->encodeData(1, true);
-  test_server_->waitForGaugeEq(response_bytes_pending, 0);
+  test_server_->waitForGauge(response_bytes_pending, Eq(0));
   ASSERT_TRUE(response_decoder->waitForEndStream());
 }
 
@@ -389,9 +387,9 @@ TEST_F(BandwidthShareIntegrationTest, RouteConfigCanLimitAndTagTenantStats) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  test_server_->waitForGaugeGe(request_bytes_pending, 1);
+  test_server_->waitForGauge(request_bytes_pending, Ge(1));
   EXPECT_EQ(1, gaugeValue(request_streams_currently_limited));
-  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  test_server_->waitForGauge(request_bytes_pending, Eq(0));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(response_headers_, true);
   ASSERT_TRUE(response_decoder->waitForEndStream());
@@ -418,14 +416,14 @@ TEST_F(BandwidthShareIntegrationTest, AddsResponseTrailersAfterLimitedResponse) 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  test_server_->waitForGaugeGe(request_bytes_pending, 1);
-  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  test_server_->waitForGauge(request_bytes_pending, Ge(1));
+  test_server_->waitForGauge(request_bytes_pending, Eq(0));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(response_headers_, false);
   response_decoder->waitForHeaders();
   upstream_request_->encodeData(2048, true);
-  test_server_->waitForGaugeGe(response_bytes_pending, 1);
-  test_server_->waitForGaugeEq(response_bytes_pending, 0);
+  test_server_->waitForGauge(response_bytes_pending, Ge(1));
+  test_server_->waitForGauge(response_bytes_pending, Eq(0));
   ASSERT_TRUE(response_decoder->waitForEndStream());
   ASSERT_NE(nullptr, response_decoder->trailers());
 
@@ -454,14 +452,14 @@ TEST_F(BandwidthShareIntegrationTest, AddsResponseTrailersToUpstreamTrailers) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  test_server_->waitForGaugeGe(request_bytes_pending, 1);
-  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  test_server_->waitForGauge(request_bytes_pending, Ge(1));
+  test_server_->waitForGauge(request_bytes_pending, Eq(0));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(response_headers_, false);
   response_decoder->waitForHeaders();
   upstream_request_->encodeData(2048, false);
-  test_server_->waitForGaugeGe(response_bytes_pending, 1);
-  test_server_->waitForGaugeEq(response_bytes_pending, 0);
+  test_server_->waitForGauge(response_bytes_pending, Ge(1));
+  test_server_->waitForGauge(response_bytes_pending, Eq(0));
   upstream_request_->encodeTrailers(any_response_trailers_);
   ASSERT_TRUE(response_decoder->waitForEndStream());
   ASSERT_NE(nullptr, response_decoder->trailers());
@@ -492,15 +490,15 @@ TEST_F(BandwidthShareIntegrationTest, PausesUpstreamTrailersBehindBufferedRespon
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  test_server_->waitForGaugeGe(request_bytes_pending, 1);
-  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  test_server_->waitForGauge(request_bytes_pending, Ge(1));
+  test_server_->waitForGauge(request_bytes_pending, Eq(0));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(response_headers_, false);
   response_decoder->waitForHeaders();
   upstream_request_->encodeData(2048, false);
-  test_server_->waitForGaugeGe(response_bytes_pending, 1);
+  test_server_->waitForGauge(response_bytes_pending, Ge(1));
   upstream_request_->encodeTrailers(any_response_trailers_);
-  test_server_->waitForGaugeEq(response_bytes_pending, 0);
+  test_server_->waitForGauge(response_bytes_pending, Eq(0));
   ASSERT_TRUE(response_decoder->waitForEndStream());
   ASSERT_NE(nullptr, response_decoder->trailers());
 
@@ -528,8 +526,8 @@ TEST_F(BandwidthShareIntegrationTest, AddsResponseTrailersWhenUpstreamTrailersDo
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  test_server_->waitForGaugeGe(request_bytes_pending, 1);
-  test_server_->waitForGaugeEq(request_bytes_pending, 0);
+  test_server_->waitForGauge(request_bytes_pending, Ge(1));
+  test_server_->waitForGauge(request_bytes_pending, Eq(0));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(response_headers_, false);
   response_decoder->waitForHeaders();
@@ -541,7 +539,11 @@ TEST_F(BandwidthShareIntegrationTest, AddsResponseTrailersWhenUpstreamTrailersDo
   EXPECT_THAT(*response_decoder->trailers(),
               ContainsHeader("x-test-bandwidth-request-delay-ms", _));
   EXPECT_THAT(*response_decoder->trailers(),
+              ContainsHeader("x-test-bandwidth-response-delay-ms", _));
+  EXPECT_THAT(*response_decoder->trailers(),
               ContainsHeader("x-test-bandwidth-request-duration-ms", _));
+  EXPECT_THAT(*response_decoder->trailers(),
+              ContainsHeader("x-test-bandwidth-response-duration-ms", _));
 }
 
 } // namespace
