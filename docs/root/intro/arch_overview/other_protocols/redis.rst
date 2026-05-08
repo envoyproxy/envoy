@@ -95,7 +95,7 @@ Every Redis cluster has its own extra statistics tree rooted at *cluster.<name>.
 
   max_upstream_unknown_connections_reached, Counter, Total number of times that an upstream connection to an unknown host is not created after redirection having reached the connection pool's max_upstream_unknown_connections limit
   upstream_cx_drained, Counter, Total number of upstream connections drained of active requests before being closed
-  upstream_resp3_hello_failure, Counter, Total number of upstream ``HELLO 3`` negotiations that did not result in a successful RESP3 handshake (error reply, wrong reply shape, connection error, or non-3 ``proto`` field). Only emitted when the cluster's ``upstream_protocol.version`` is ``RESP3``.
+  upstream_resp3_hello_failure, Counter, "Total number of upstream ``HELLO 3`` negotiations that did not result in a successful RESP3 handshake (error reply, wrong reply shape, connection error, or non-3 ``proto`` field). Only emitted when the cluster's ``upstream_protocol.version`` is ``RESP3``."
   upstream_commands.upstream_rq_time, Histogram, Histogram of upstream request times for all types of requests
 
 .. _arch_overview_redis_cluster_command_stats:

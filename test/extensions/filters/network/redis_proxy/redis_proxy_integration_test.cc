@@ -719,7 +719,8 @@ public:
   void roundtripToUpstreamStep(FakeUpstreamPtr& upstream, const std::string& request,
                                const std::string& response, IntegrationTcpClientPtr& redis_client,
                                FakeRawConnectionPtr& fake_upstream_connection,
-                               const std::string& auth_username, const std::string& auth_password);
+                               const std::string& auth_username, const std::string& auth_password,
+                               bool stage_auth_ack = false);
   /**
    * A upstream server expects the request on the upstream and respond with the response.
    * @param upstream a handle to the server that will respond to the request.
@@ -729,12 +730,17 @@ public:
    * server.
    * @param auth_username supplies the fake upstream's server username, if not an empty string.
    * @param auth_password supplies the fake upstream's server password, if not an empty string.
+   * @param stage_auth_ack when true, wait for AUTH bytes only, send +OK, then wait for the
+   *   user request bytes. Required by the AWS-IAM init pipeline which gates user requests in
+   *   ``held_user_requests_`` until the upstream AUTH ack arrives. The default false matches
+   *   the legacy synchronous-AUTH path that ships AUTH and the user request in one burst.
    */
   void expectUpstreamRequestResponse(FakeUpstreamPtr& upstream, const std::string& request,
                                      const std::string& response,
                                      FakeRawConnectionPtr& fake_upstream_connection,
                                      const std::string& auth_username = "",
-                                     const std::string& auth_password = "");
+                                     const std::string& auth_password = "",
+                                     bool stage_auth_ack = false);
 
   /**
    * Similar to ``roundtripToUpstreamStep`` but sends a request and then determines which upstream
@@ -1018,7 +1024,7 @@ void RedisProxyIntegrationTest::initialize() {
 void RedisProxyIntegrationTest::roundtripToUpstreamStep(
     FakeUpstreamPtr& upstream, const std::string& request, const std::string& response,
     IntegrationTcpClientPtr& redis_client, FakeRawConnectionPtr& fake_upstream_connection,
-    const std::string& auth_username, const std::string& auth_password) {
+    const std::string& auth_username, const std::string& auth_password, bool stage_auth_ack) {
   redis_client->clearData();
   if (fake_upstream_connection.get() != nullptr) {
     fake_upstream_connection->clearData();
@@ -1026,7 +1032,7 @@ void RedisProxyIntegrationTest::roundtripToUpstreamStep(
   ASSERT_TRUE(redis_client->write(request));
 
   expectUpstreamRequestResponse(upstream, request, response, fake_upstream_connection,
-                                auth_username, auth_password);
+                                auth_username, auth_password, stage_auth_ack);
 
   redis_client->waitForData(response);
   // The original response should be received by the fake Redis client.
@@ -1036,7 +1042,7 @@ void RedisProxyIntegrationTest::roundtripToUpstreamStep(
 void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
     FakeUpstreamPtr& upstream, const std::string& request, const std::string& response,
     FakeRawConnectionPtr& fake_upstream_connection, const std::string& auth_username,
-    const std::string& auth_password) {
+    const std::string& auth_password, bool stage_auth_ack) {
   std::string proxy_to_server;
   bool expect_auth_command = false;
   std::string ok = "+OK\r\n";
@@ -1050,15 +1056,27 @@ void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
     std::string auth_command = (auth_username.empty())
                                    ? makeBulkStringArray({"auth", auth_password})
                                    : makeBulkStringArray({"auth", auth_username, auth_password});
-    EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
-                                                      &proxy_to_server));
-    // EXPECT_TRUE(fake_upstream_connection->waitForData(450,
-    //                                                   &proxy_to_server));
-    // The original request should be the same as the data received by the server.
-    EXPECT_EQ(auth_command + request, proxy_to_server);
-    // Send back an OK for the auth command.
-    EXPECT_TRUE(fake_upstream_connection->write(ok));
-
+    if (stage_auth_ack) {
+      // AWS-IAM init pipeline: AUTH lands first, the upstream client holds the user request
+      // in held_user_requests_ until +OK arrives, then drains. waitForData waits for an exact
+      // byte count, so we MUST split the wait into two phases — combining AUTH + request in a
+      // single waitForData would never see the buffer settle at the combined size before +OK
+      // is written, and after +OK it would never see exactly auth.size() either.
+      EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size(), &proxy_to_server));
+      EXPECT_EQ(auth_command, proxy_to_server);
+      EXPECT_TRUE(fake_upstream_connection->write(ok));
+      EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
+                                                        &proxy_to_server));
+      EXPECT_EQ(auth_command + request, proxy_to_server);
+    } else {
+      // Legacy synchronous-AUTH path: the upstream client snaps to Ready inline and ships
+      // AUTH and the user request together in a single burst, so a single waitForData on
+      // the combined size is the correct expectation.
+      EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
+                                                        &proxy_to_server));
+      EXPECT_EQ(auth_command + request, proxy_to_server);
+      EXPECT_TRUE(fake_upstream_connection->write(ok));
+    }
   } else {
     EXPECT_TRUE(fake_upstream_connection->waitForData(request.size(), &proxy_to_server));
     // The original request should be the same as the data received by the server.
@@ -1721,7 +1739,9 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAut
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
 
-  // roundtrip to cluster_0 (catch_all route)
+  // roundtrip to cluster_0 (catch_all route). The IAM init pipeline holds the user request
+  // until the upstream AUTH +OK arrives, so the helper must stage the AUTH ack — see
+  // expectUpstreamRequestResponse's stage_auth_ack branch for the rationale.
   roundtripToUpstreamStep(
       fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n", redis_client,
       fake_upstream_connection[0], "cluster_0_username",
@@ -1729,7 +1749,8 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAut
       "?Action=connect&User=cluster_0_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
       "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
       "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
-      "b31882a92ff7ef159e6d19bf422a1019d28e88fbfc04c4c94a215134f0b69c2e&X-Amz-SignedHeaders=host");
+      "b31882a92ff7ef159e6d19bf422a1019d28e88fbfc04c4c94a215134f0b69c2e&X-Amz-SignedHeaders=host",
+      /*stage_auth_ack=*/true);
 
   // roundtrip to cluster_1 (prefix "foo:" route)
   roundtripToUpstreamStep(
@@ -1739,7 +1760,8 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAut
       "?Action=connect&User=cluster_1_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
       "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
       "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
-      "8dd2faa4d1ba56ae8e45c24b7cd20d4d7b41acf15e48c199fad7484c4bacf8ef&X-Amz-SignedHeaders=host");
+      "8dd2faa4d1ba56ae8e45c24b7cd20d4d7b41acf15e48c199fad7484c4bacf8ef&X-Amz-SignedHeaders=host",
+      /*stage_auth_ack=*/true);
 
   // roundtrip to cluster_2 (prefix "baz:" route)
   roundtripToUpstreamStep(
@@ -1749,7 +1771,8 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAut
       "?Action=connect&User=cluster_2_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
       "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
       "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
-      "0b2d4d6304834c7104fc39c29b7a9e93dbdc400fb72a422b3f0a72ef2366c5f8&X-Amz-SignedHeaders=host");
+      "0b2d4d6304834c7104fc39c29b7a9e93dbdc400fb72a422b3f0a72ef2366c5f8&X-Amz-SignedHeaders=host",
+      /*stage_auth_ack=*/true);
 
   EXPECT_TRUE(fake_upstream_connection[0]->close());
   EXPECT_TRUE(fake_upstream_connection[1]->close());
