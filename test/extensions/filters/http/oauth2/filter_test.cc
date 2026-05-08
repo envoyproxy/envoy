@@ -183,7 +183,8 @@ public:
       bool bearer_partitioned = false, bool hmac_partitioned = false,
       bool expires_partitioned = false, bool id_token_partitioned = false,
       bool refresh_token_partitioned = false, bool nonce_partitioned = false,
-      bool code_verifier_partitioned = false) {
+      bool code_verifier_partitioned = false,
+      bool use_access_token_expiry_for_id_token_cookie = false) {
 
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
@@ -305,6 +306,7 @@ public:
     }
 
     p.set_disable_token_encryption(disable_token_encryption);
+    p.set_use_access_token_expiry_for_id_token_cookie(use_access_token_expiry_for_id_token_cookie);
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
@@ -3203,6 +3205,87 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenExpiresInFromJwt) {
        "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "IdToken=" + encrypted_id_token + ";path=/;Max-Age=2554415000;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN + ";path=/;Max-Age=1200;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", id_token, "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
+
+/**
+ * Scenario: The Oauth filter saves cookies with tokens after successful receipt of the tokens,
+ * with use_access_token_expiry_for_id_token_cookie enabled.
+ *
+ * Expected behavior: The lifetime of the id token cookie is taken from the access token's
+ * expires_in value even though the id token JWT contains a valid exp claim.
+ */
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenUsesAccessTokenExpiry) {
+  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
+                 1200 /* default_refresh_token_expires_in */, false, false, false, false, false,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                     CookieConfig_SameSite_DISABLED,
+                 0, 0, false, "", "", "", "", "", "", "", false, false, false, false, false, false,
+                 false, true /* use_access_token_expiry_for_id_token_cookie */));
+  TestScopedRuntime scoped_runtime;
+  oauthHMAC = "MqrMKGLbdIEogLWZPRffaVTXDGRRveG3gn9bZu5Gd4Q=;";
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+  filter_->decodeHeaders(request_headers, false);
+
+  const std::string id_token =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+      "eyJ1bmlxdWVfbmFtZSI6ImFsZXhjZWk4OCIsInN1YiI6ImFsZXhjZWk4OCIsImp0aSI6IjQ5ZTFjMzc1IiwiYXVkIjoi"
+      "dGVzdCIsIm5iZiI6MTcwNzQxNDYzNSwiZXhwIjoyNTU0NDE2MDAwLCJpYXQiOjE3MDc0MTQ2MzYsImlzcyI6ImRvdG5l"
+      "dC11c2VyLWp3dHMifQ.LaGOw6x0-m7r-WzxgCIdPnAfp0O1hy6mW4klq9Vs2XM";
+  const std::string encrypted_id_token =
+      "Fc1bBwAAAAAVzVsHAAAAANmnPnluIb9exn3WlbkgaDHNTVoZUE-1O8H_"
+      "amXtsHZWG04QXuzJxsFxxe58HpCeWYx7QYi886mP3fCWDBrOJZ4DkwJjQXtvp9VdmKhCr1qCYQ9mSdv6GY50g-aOOr-"
+      "x1wXNGCfnURYA48u2BulYuHqG2FzNAfbPo8uNO0IS3CUNE3C9gLcs4gHq9AjMwXVe3PLxV0ihrcXCUVp0ao9R2k2Ki1V"
+      "LZpaH6ntay0IUJft2hjvq3lVvtCakEH0LYmzx9G0MGwaqiaeeFBNQyCY9iji5BOAfFezKnLKAvsYn2egVDHEFXCCSUW2"
+      "3YEA57eGNDrs1PIZXRvLrjyJCiBE-0Iiq74MgHSG6usBK21wks8VOGyIy3qRkz-LcmgLX9ZB1lA";
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=" + encrypted_id_token + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN + ";path=/;Max-Age=1200;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),

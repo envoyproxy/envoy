@@ -72,6 +72,13 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: oauth2
+  change: |
+    Added :ref:`use_access_token_expiry_for_id_token_cookie
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_access_token_expiry_for_id_token_cookie>`
+    to the OAuth2 filter, allowing the ID token cookie lifetime to be set from the access token's
+    ``expires_in`` value rather than from the ``exp`` claim in the ID token JWT. This is useful
+    when the access token has a longer lifetime than the ID token.
 - area: stat_sinks
   change: |
     Added :ref:`max_data_points_per_request

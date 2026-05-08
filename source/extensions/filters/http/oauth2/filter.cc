@@ -480,6 +480,8 @@ FilterConfig::FilterConfig(
       disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
       disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()),
       disable_token_encryption_(proto_config.disable_token_encryption()),
+      use_access_token_expiry_for_id_token_cookie_(
+          proto_config.use_access_token_expiry_for_id_token_cookie()),
       bearer_token_cookie_settings_(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_bearer_token_cookie_config())
@@ -1192,11 +1194,15 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
         config_->defaultRefreshTokenExpiresIn();
     return std::to_string(default_refresh_token_expires_in.count());
   }
+
   return std::to_string(expires_in.count());
 }
 
 std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
                                                    const std::chrono::seconds& expires_in) const {
+  if (config_->useAccessTokenExpiryForIdTokenCookie()) {
+    return std::to_string(expires_in.count());
+  }
   if (!id_token.empty()) {
     JwtVerify::Jwt jwt;
     if (jwt.parseFromString(id_token) == JwtVerify::Status::Ok && jwt.exp_ != 0) {

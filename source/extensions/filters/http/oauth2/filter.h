@@ -201,6 +201,9 @@ public:
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
   bool disableAccessTokenSetCookie() const { return disable_access_token_set_cookie_; }
   bool disableRefreshTokenSetCookie() const { return disable_refresh_token_set_cookie_; }
+  bool useAccessTokenExpiryForIdTokenCookie() const {
+    return use_access_token_expiry_for_id_token_cookie_;
+  }
   const Router::RetryPolicyConstSharedPtr& retryPolicy() const { return retry_policy_; }
   bool shouldUseRefreshToken(
       const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
@@ -268,6 +271,7 @@ private:
   const bool disable_access_token_set_cookie_ : 1;
   const bool disable_refresh_token_set_cookie_ : 1;
   const bool disable_token_encryption_ : 1;
+  const bool use_access_token_expiry_for_id_token_cookie_ : 1;
   Router::RetryPolicyConstSharedPtr retry_policy_;
   const CookieSettings bearer_token_cookie_settings_;
   const CookieSettings hmac_cookie_settings_;

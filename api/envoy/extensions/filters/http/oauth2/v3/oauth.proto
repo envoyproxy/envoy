@@ -151,7 +151,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -304,6 +304,13 @@ message OAuth2Config {
   // Note: If a request matches pass_through_matcher, it bypasses OAuth validation and this matcher won't be evaluated.
   // This matcher takes precedence over deny_redirect_matcher.
   repeated config.route.v3.HeaderMatcher allow_failed_matcher = 27;
+
+  // If set to true, the expiration time for the ID token cookie will always be derived from the
+  // access token's ``expires_in`` value rather than from the ``exp`` claim in the ID token JWT.
+  // This is useful when the access token has a longer lifetime than the ID token and you want the
+  // ID token cookie to remain valid for the full access token lifetime.
+  // Default is false (use the ID token's own ``exp`` claim when available).
+  bool use_access_token_expiry_for_id_token_cookie = 28;
 }
 
 // Per-route OAuth2 config.
