@@ -6,15 +6,17 @@
 #include <string>
 #include <vector>
 
-#include "absl/strings/string_view.h"
 #include "envoy/api/api.h"
 #include "envoy/secret/secret_provider.h"
+
 #include "source/common/common/base64.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/datasource.h"
 #include "source/common/http/utility.h"
+
+#include "absl/strings/string_view.h"
 #include "third_party/openssl/boringssl/src/include/openssl/asn1.h"
 #include "third_party/openssl/boringssl/src/include/openssl/bio.h"
 #include "third_party/openssl/boringssl/src/include/openssl/mem.h"
@@ -43,9 +45,8 @@ std::vector<std::string> getSubjectAltNames(X509* cert) {
       if (gen->type == GEN_URI) {
         ASN1_IA5STRING* uri = gen->d.uniformResourceIdentifier;
         if (uri != nullptr) {
-          sans.push_back(std::string(
-              reinterpret_cast<const char*>(ASN1_STRING_get0_data(uri)),
-              ASN1_STRING_length(uri)));
+          sans.push_back(std::string(reinterpret_cast<const char*>(ASN1_STRING_get0_data(uri)),
+                                     ASN1_STRING_length(uri)));
         }
       }
     }
@@ -54,15 +55,12 @@ std::vector<std::string> getSubjectAltNames(X509* cert) {
   return sans;
 }
 
-bool validateSubjectAltNames(
-    const std::vector<std::string>& sans,
-    const std::vector<Matchers::StringMatcherImpl>& san_matchers) {
+bool validateSubjectAltNames(const std::vector<std::string>& sans,
+                             const std::vector<Matchers::StringMatcherImpl>& san_matchers) {
   if (san_matchers.empty()) {
     // Regex match for SAN.
-    static const LazyRE2 org_regex = {
-        "^agents\\.global\\.org-\\d+\\.system\\.id\\.goog$"};
-    static const LazyRE2 proj_regex = {
-        "^agents\\.global\\.proj-\\d+\\.system\\.id\\.goog$"};
+    static const LazyRE2 org_regex = {"^agents\\.global\\.org-\\d+\\.system\\.id\\.goog$"};
+    static const LazyRE2 proj_regex = {"^agents\\.global\\.proj-\\d+\\.system\\.id\\.goog$"};
 
     for (const auto& san : sans) {
       if (RE2::FullMatch(san, *org_regex) || RE2::FullMatch(san, *proj_regex)) {
@@ -89,20 +87,18 @@ std::optional<std::string> calculateFingerprint(X509* cert) {
     ENVOY_LOG_MISC(error, "Failed to get DER encoding of certificate");
     return std::nullopt;
   }
-  std::unique_ptr<unsigned char, decltype(&::OPENSSL_free)> free_der(
-      der, ::OPENSSL_free);
+  std::unique_ptr<unsigned char, decltype(&::OPENSSL_free)> free_der(der, ::OPENSSL_free);
 
   std::vector<uint8_t> digest(SHA256_DIGEST_LENGTH);
   SHA256(der, len, digest.data());
 
   // Base64 encode unpadded
-  std::string base64_fingerprint = Base64::encode(
-      reinterpret_cast<const char*>(digest.data()), digest.size(), false);
+  std::string base64_fingerprint =
+      Base64::encode(reinterpret_cast<const char*>(digest.data()), digest.size(), false);
 
   // Double encode '+' to '%252B'.
   // First, encode '+' to '%2B'. Other base64 chars like '/' are left unencoded
-  std::string encoded_fp =
-      Envoy::Http::Utility::PercentEncoding::encode(base64_fingerprint, "+");
+  std::string encoded_fp = Envoy::Http::Utility::PercentEncoding::encode(base64_fingerprint, "+");
   // Second, encode '%' to '%25', which double encodes the result of the first
   // pass.
   return Envoy::Http::Utility::PercentEncoding::encode(encoded_fp);
@@ -110,10 +106,10 @@ std::optional<std::string> calculateFingerprint(X509* cert) {
 
 } // namespace
 
-std::optional<std::string> getCertificateFingerprint(
-    Secret::TlsCertificateConfigProviderSharedPtr tls_cert_provider,
-    const std::vector<Matchers::StringMatcherImpl>& san_matchers,
-    Api::Api& api) {
+std::optional<std::string>
+getCertificateFingerprint(Secret::TlsCertificateConfigProviderSharedPtr tls_cert_provider,
+                          const std::vector<Matchers::StringMatcherImpl>& san_matchers,
+                          Api::Api& api) {
   // Config::DataSource::read() is blocking and should only be called on the
   // main thread.
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -139,10 +135,8 @@ std::optional<std::string> getCertificateFingerprint(
     return std::nullopt;
   }
 
-  bssl::UniquePtr<BIO> bio(
-      BIO_new_mem_buf(file_content.data(), file_content.size()));
-  bssl::UniquePtr<X509> cert(
-      PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file_content.data(), file_content.size()));
+  bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
   if (!cert) {
     ENVOY_LOG_MISC(error, "Failed to parse certificate");
     return std::nullopt;

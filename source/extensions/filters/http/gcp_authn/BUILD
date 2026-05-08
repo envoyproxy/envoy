@@ -74,7 +74,6 @@ envoy_cc_library(
     srcs = ["crypto_utils.cc"],
     hdrs = ["crypto_utils.h"],
     deps = [
-        "@abseil-cpp//absl/strings:string_view",
         "//envoy/api:api_interface",
         "//envoy/secret:secret_provider_interface",
         "//source/common/common:assert_lib",
@@ -85,5 +84,6 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//third_party/openssl:crypto",
         "//util/regexp/re2",
+        "@abseil-cpp//absl/strings:string_view",
     ],
 )

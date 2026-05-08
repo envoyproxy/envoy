@@ -100,14 +100,12 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.gcp_authn"],
     deps = [
-        "@abseil-cpp//absl/status",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
         "//envoy/api:api_interface",
         "//source/common/common:matchers_lib",
         "//source/extensions/filters/http/gcp_authn:crypto_utils",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/status",
     ],
 )
