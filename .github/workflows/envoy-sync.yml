@@ -26,7 +26,6 @@ jobs:
       matrix:
         downstream:
         - go-control-plane
-        - envoy-filter-example
         - data-plane-api
         - mobile-website
     steps:
