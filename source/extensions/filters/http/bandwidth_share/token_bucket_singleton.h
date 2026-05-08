@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -31,8 +32,10 @@ public:
   get(Singleton::Manager& singleton_manager, TimeSource& time_source, Stats::Scope& stats_scope);
 
   // Adds a bucket to the singleton. If the bucket_id already exists and
-  // has a different runtime_config_ key, an error is returned.
+  // has a different runtime config key, default value, or fill interval, an
+  // error is returned.
   absl::Status setBucket(absl::string_view bucket_id, Runtime::UInt32&& max_tokens_runtime_config,
+                         uint32_t max_tokens_default_value,
                          std::chrono::milliseconds fill_interval);
 
   // Retrieves a bucket with the given id. Should never be called with
@@ -52,12 +55,15 @@ private:
   Thread::MutexBasicLockable mu_;
   struct Entry {
     Entry(std::shared_ptr<FairTokenBucket::Bucket> bucket, uint64_t max_tokens,
-          std::chrono::milliseconds fill_interval, Runtime::UInt32&& max_tokens_runtime_config)
+          uint32_t max_tokens_default_value, std::chrono::milliseconds fill_interval,
+          Runtime::UInt32&& max_tokens_runtime_config)
         : bucket_(std::move(bucket)), max_tokens_(max_tokens), fill_interval_(fill_interval),
+          max_tokens_default_value_(max_tokens_default_value),
           max_tokens_runtime_config_(std::move(max_tokens_runtime_config)) {}
     std::shared_ptr<FairTokenBucket::Bucket> bucket_;
     uint64_t max_tokens_ = 0;
     std::chrono::milliseconds fill_interval_ = std::chrono::milliseconds{};
+    const uint32_t max_tokens_default_value_;
     const Runtime::UInt32 max_tokens_runtime_config_;
   };
   TimeSource& time_source_;

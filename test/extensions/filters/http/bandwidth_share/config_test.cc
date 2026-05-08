@@ -109,6 +109,27 @@ TEST_F(ConfigTest, ReusedBucketIdWithDifferentRuntimeKeyIsAConfigError) {
                                                  "existing first")));
 }
 
+TEST_F(ConfigTest, ReusedBucketIdWithDifferentDefaultValueIsAConfigError) {
+  setConfigFromYaml(R"YAML(
+    name: "first_bucket_config"
+    typed_config:
+      "@type": "type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare"
+      request_limit: {bucket_id: "shared_bucket", kbps: {default_value: 1000, runtime_key: "same"}}
+  )YAML");
+  auto first_config = routeConfig();
+  ASSERT_OK(first_config);
+
+  setConfigFromYaml(R"YAML(
+    name: "second_bucket_config"
+    typed_config:
+      "@type": "type.googleapis.com/envoy.extensions.filters.http.bandwidth_share.v3.BandwidthShare"
+      request_limit: {bucket_id: "shared_bucket", kbps: {default_value: 2000, runtime_key: "same"}}
+  )YAML");
+  EXPECT_THAT(routeConfig(), HasStatus(absl::StatusCode::kInvalidArgument,
+                                       HasSubstr("mismatched default value 2000KiB/s vs. existing "
+                                                 "1000KiB/s")));
+}
+
 TEST_F(ConfigTest, ReusedBucketIdWithDifferentFillIntervalIsAConfigError) {
   setConfigFromYaml(R"YAML(
     name: "first_bucket_config"

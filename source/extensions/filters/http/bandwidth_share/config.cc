@@ -75,12 +75,14 @@ protoToSharedState(const ProtoConfig& config,
   if (config.has_request_limit()) {
     RETURN_IF_NOT_OK(bucket_singleton->setBucket(
         config.request_limit().bucket_id(),
-        Runtime::UInt32(config.request_limit().kbps(), context.runtime()), fill_interval));
+        Runtime::UInt32(config.request_limit().kbps(), context.runtime()),
+        config.request_limit().kbps().default_value(), fill_interval));
   }
   if (config.has_response_limit()) {
     RETURN_IF_NOT_OK(bucket_singleton->setBucket(
         config.response_limit().bucket_id(),
-        Runtime::UInt32(config.response_limit().kbps(), context.runtime()), fill_interval));
+        Runtime::UInt32(config.response_limit().kbps(), context.runtime()),
+        config.response_limit().kbps().default_value(), fill_interval));
   }
   absl::flat_hash_map<std::string, FilterConfig::TenantConfig> tenant_configs;
   for (const auto& pair : config.tenant_configs()) {

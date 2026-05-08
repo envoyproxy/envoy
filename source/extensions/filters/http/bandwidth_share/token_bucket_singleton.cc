@@ -29,16 +29,18 @@ TokenBucketSingleton::get(Singleton::Manager& singleton_manager, TimeSource& tim
 
 absl::Status TokenBucketSingleton::setBucket(absl::string_view bucket_id,
                                              Runtime::UInt32&& max_tokens_runtime_config,
+                                             uint32_t max_tokens_default_value,
                                              std::chrono::milliseconds fill_interval) {
   Thread::LockGuard lock(mu_);
   auto it = buckets_.find(bucket_id);
   if (it == buckets_.end()) {
     const uint64_t max_tokens_value = bytesPerSecond(max_tokens_runtime_config);
-    buckets_.emplace(
-        bucket_id, Entry{max_tokens_value == 0 ? nullptr
-                                               : FairTokenBucket::Bucket::create(
-                                                     max_tokens_value, time_source_, fill_interval),
-                         max_tokens_value, fill_interval, std::move(max_tokens_runtime_config)});
+    buckets_.emplace(bucket_id, Entry{max_tokens_value == 0
+                                          ? nullptr
+                                          : FairTokenBucket::Bucket::create(
+                                                max_tokens_value, time_source_, fill_interval),
+                                      max_tokens_value, max_tokens_default_value, fill_interval,
+                                      std::move(max_tokens_runtime_config)});
     return absl::OkStatus();
   }
   auto& entry = it->second;
@@ -49,6 +51,12 @@ absl::Status TokenBucketSingleton::setBucket(absl::string_view bucket_id,
                      max_tokens_runtime_config.runtimeKey(), " vs. existing ",
                      entry.max_tokens_runtime_config_.runtimeKey(),
                      " - to have different config you must use a distinct bucket_id"));
+  } else if (max_tokens_default_value != entry.max_tokens_default_value_) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "bandwidth_share bucket ", bucket_id,
+        " attempted configuration with mismatched default value ", max_tokens_default_value,
+        "KiB/s vs. existing ", entry.max_tokens_default_value_,
+        "KiB/s - to have different config you must use a distinct bucket_id"));
   } else if (fill_interval != entry.fill_interval_) {
     return absl::InvalidArgumentError(
         absl::StrCat("bandwidth_share bucket ", bucket_id,
