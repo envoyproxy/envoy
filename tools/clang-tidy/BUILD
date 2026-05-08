@@ -14,8 +14,8 @@ clang_tidy(
 py_binary(
     name = "collect_fixes",
     srcs = ["collect_fixes.py"],
-    main = "collect_fixes.py",
     args = ["--workspace_root=%s" % PATH],
-    deps = [requirement("pyyaml")],
+    main = "collect_fixes.py",
     visibility = ["//visibility:public"],
+    deps = [requirement("pyyaml")],
 )

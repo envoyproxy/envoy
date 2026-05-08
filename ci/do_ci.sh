@@ -422,8 +422,8 @@ case $CI_TARGET in
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
         if [[ $# -ge 1 ]]; then
             CLANG_TIDY_TARGETS=("$@")
-        elif [[ -n "$CLANG_TIDY_TARGETS" ]]; then
-            read -ra CLANG_TIDY_TARGETS <<< "${CLANG_TIDY_TARGETS}"
+        elif [[ -n "${CLANG_TIDY_TARGETS[*]}" ]]; then
+            read -ra CLANG_TIDY_TARGETS <<< "${CLANG_TIDY_TARGETS[*]}"
         else
             CLANG_TIDY_TARGETS=(
                 //contrib/...
