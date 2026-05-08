@@ -107,9 +107,9 @@ jobs:
       target: kotlin-hello-world
       runs-on: ubuntu-22.04
       steps-pre: |
-        - uses: envoyproxy/toolshed/actions/envoy/android/pre@7e03a14db2f1a03ef4a272b3a01d8006c1d99c43  # actions-v0.4.14
+        - uses: envoyproxy/toolshed/actions/envoy/android/pre@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       steps-post: |
-        - uses: envoyproxy/toolshed/actions/envoy/android/post@7e03a14db2f1a03ef4a272b3a01d8006c1d99c43  # actions-v0.4.14
+        - uses: envoyproxy/toolshed/actions/envoy/android/post@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
           with:
             apk: bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
             app: io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
@@ -152,7 +152,7 @@ jobs:
       target: ${{ matrix.target }}
       runs-on: ubuntu-22.04
       steps-pre: |
-        - uses: envoyproxy/toolshed/actions/envoy/android/pre@7e03a14db2f1a03ef4a272b3a01d8006c1d99c43  # actions-v0.4.14
+        - uses: envoyproxy/toolshed/actions/envoy/android/pre@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       steps-post: ${{ matrix.steps-post }}
       timeout-minutes: 50
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
@@ -163,7 +163,7 @@ jobs:
         include:
         - name: java-hello-world
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/envoy/android/post@7e03a14db2f1a03ef4a272b3a01d8006c1d99c43  # actions-v0.4.14
+            - uses: envoyproxy/toolshed/actions/envoy/android/post@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
               with:
                 apk: bazel-bin/examples/java/hello_world/hello_envoy.apk
                 app: io.envoyproxy.envoymobile.helloenvoy/.MainActivity
@@ -186,7 +186,7 @@ jobs:
             --config=mobile-android-release
             //test/kotlin/apps/baseline:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/envoy/android/post@7e03a14db2f1a03ef4a272b3a01d8006c1d99c43  # actions-v0.4.14
+            - uses: envoyproxy/toolshed/actions/envoy/android/post@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
               with:
                 apk: bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
@@ -203,7 +203,7 @@ jobs:
             --config=mobile-android-release
             //test/kotlin/apps/experimental:hello_envoy_kt
           steps-post: |
-            - uses: envoyproxy/toolshed/actions/envoy/android/post@7e03a14db2f1a03ef4a272b3a01d8006c1d99c43  # actions-v0.4.14
+            - uses: envoyproxy/toolshed/actions/envoy/android/post@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
               with:
                 apk: bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
                 app: io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity

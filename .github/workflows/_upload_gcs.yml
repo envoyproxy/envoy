@@ -29,17 +29,17 @@ jobs:
       with:
         name: ${{ matrix.artifact }}
         path: ${{ matrix.artifact }}
-    - uses: envoyproxy/toolshed/actions/jq@7e03a14db2f1a03ef4a272b3a01d8006c1d99c43  # actions-v0.4.14
+    - uses: envoyproxy/toolshed/actions/jq@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       id: metadata
       with:
         input: ${{ matrix.artifact }}/gcs-metadata.json
         input-format: json-path
     - run: |
         rm -rf ${{ matrix.artifact }}/gcs-metadata.json
-    - uses: envoyproxy/toolshed/actions/gcp/setup@7e03a14db2f1a03ef4a272b3a01d8006c1d99c43  # actions-v0.4.14
+    - uses: envoyproxy/toolshed/actions/gcp/setup@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       with:
         key: ${{ secrets.gcp-key }}
-    - uses: envoyproxy/toolshed/actions/gcs/artefact/sync@7e03a14db2f1a03ef4a272b3a01d8006c1d99c43  # actions-v0.4.14
+    - uses: envoyproxy/toolshed/actions/gcs/artefact/sync@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       with:
         bucket: ${{ fromJSON(steps.metadata.outputs.value).bucket }}
         path: ${{ matrix.artifact }}
