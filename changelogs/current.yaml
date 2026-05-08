@@ -166,10 +166,9 @@ new_features:
 - area: docs
   change: |
     Refreshed documentation for default TLS cipher suites, TLS 1.3 cipher suite handling, and ECDH groups.
-    Clarified that Envoy's default ``ecdh_curves`` value (``X25519:P-256``) overrides BoringSSL's built-in
-    group list and therefore does not negotiate post-quantum hybrid groups such as ``X25519MLKEM768`` unless
-    the user explicitly configures them. Added a "Post-quantum key exchange" subsection to the TLS architecture
-    overview. Updated the v3 ``TlsParameters`` proto field comments accordingly and added a deprecation notice
-    to the frozen v2 ``TlsParameters`` message pointing to the v3 documentation.
+    Clarified that post-quantum hybrid key exchange is not enabled by default and can be enabled by
+    explicitly configuring ``ecdh_curves`` (for example with ``X25519MLKEM768``). Added a
+    "Post-quantum key exchange" subsection to the TLS architecture overview and updated the v3
+    ``TlsParameters`` proto field comments accordingly.
 
 deprecated:
