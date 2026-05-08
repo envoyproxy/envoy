@@ -3,9 +3,12 @@
 import argparse
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
+
+import yaml
 
 
 def parse_args() -> argparse.Namespace:
@@ -155,14 +158,63 @@ def collect_fix_files(
     return results
 
 
-def merge_file_contents(fix_files: list[Path]) -> str:
-    merged_contents = []
-    for fix_file in fix_files:
-        content = fix_file.read_text(encoding="utf-8").strip()
-        if content:
-            merged_contents.append(content)
+def external_repository_from_path(path: str) -> str | None:
+    match = re.search(r"(^|/)external/([^/]+)/", path)
+    if match is None:
+        return None
 
-    return "\n---\n".join(merged_contents) + "\n"
+    return match.group(2)
+
+
+def is_fixable_path(path: str, repository_name: str | None) -> bool:
+    external_repository = external_repository_from_path(path)
+    if external_repository is None:
+        return True
+
+    return external_repository in {"envoy_api", repository_name}
+
+
+def filter_document_diagnostics(document: dict, repository_name: str | None) -> dict | None:
+    diagnostics = document.get("Diagnostics")
+    if not isinstance(diagnostics, list):
+        return None
+
+    filtered_diagnostics = []
+    for diagnostic in diagnostics:
+        if not isinstance(diagnostic, dict):
+            continue
+        diagnostic_message = diagnostic.get("DiagnosticMessage")
+        if not isinstance(diagnostic_message, dict):
+            continue
+        file_path = diagnostic_message.get("FilePath")
+        if not isinstance(file_path, str):
+            continue
+        if is_fixable_path(file_path, repository_name):
+            filtered_diagnostics.append(diagnostic)
+
+    if not filtered_diagnostics:
+        return None
+
+    filtered_document = dict(document)
+    filtered_document["Diagnostics"] = filtered_diagnostics
+    return filtered_document
+
+
+def merge_file_contents(fix_files: list[Path], repository_name: str | None) -> str:
+    merged_documents = []
+    for fix_file in fix_files:
+        with fix_file.open(encoding="utf-8") as stream:
+            for document in yaml.safe_load_all(stream):
+                if not isinstance(document, dict):
+                    continue
+                filtered_document = filter_document_diagnostics(document, repository_name)
+                if filtered_document is not None:
+                    merged_documents.append(filtered_document)
+
+    if not merged_documents:
+        return ""
+
+    return yaml.safe_dump_all(merged_documents, explicit_start=True, sort_keys=False)
 
 
 def main() -> int:
@@ -189,7 +241,7 @@ def main() -> int:
         )
         return 1
 
-    merged = merge_file_contents(fix_files)
+    merged = merge_file_contents(fix_files, args.repository)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(merged, encoding="utf-8")
 

@@ -1,3 +1,4 @@
+load("@base_pip3//:requirements.bzl", "requirement")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_python//python:defs.bzl", "py_binary")
 load(":clang_tidy.bzl", "clang_tidy")
@@ -15,5 +16,6 @@ py_binary(
     srcs = ["collect_fixes.py"],
     main = "collect_fixes.py",
     args = ["--workspace_root=%s" % PATH],
+    deps = [requirement("pyyaml")],
     visibility = ["//visibility:public"],
 )
