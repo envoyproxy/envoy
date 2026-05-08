@@ -7185,14 +7185,15 @@ TEST_F(HttpFilterTest, ValidErrorResponseWithMutations) {
 
   // Should succeed and NOT clear attributes because mutations are valid.
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code, absl::string_view,
-                           std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                           const absl::optional<uint64_t>, absl::string_view) {
-        Http::TestResponseHeaderMapImpl response_headers;
-        modify_headers(response_headers);
-        EXPECT_EQ("value", response_headers.get_("x-error-header"));
-        EXPECT_EQ("value", response_headers.get_("x-error-append"));
-      }));
+      .WillOnce(
+          Invoke([&](Http::Code, absl::string_view,
+                     std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+            Http::TestResponseHeaderMapImpl response_headers;
+            modify_headers(response_headers);
+            EXPECT_EQ("value", response_headers.get_("x-error-header"));
+            EXPECT_EQ("value", response_headers.get_("x-error-append"));
+          }));
 
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 }
