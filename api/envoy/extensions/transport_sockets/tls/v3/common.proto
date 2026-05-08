@@ -80,6 +80,18 @@ message TlsParameters {
   // <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#Cipher-suite-configuration>`_
   // when negotiating TLS 1.0-1.2 (this setting has no effect when negotiating TLS 1.3).
   //
+  // .. note::
+  //
+  //   **TLS 1.3 cipher suites are not configurable via this field.** When TLS 1.3 is negotiated,
+  //   BoringSSL selects from its built-in set of TLS 1.3 cipher suites. The suites that may be
+  //   negotiated are:
+  //
+  //   .. code-block:: none
+  //
+  //     TLS_AES_128_GCM_SHA256
+  //     TLS_AES_256_GCM_SHA384
+  //     TLS_CHACHA20_POLY1305_SHA256
+  //
   // If not specified, a default list will be used. Defaults are different for server (downstream) and
   // client (upstream) TLS configurations.
   // Defaults will change over time in response to security considerations; If you care, configure
@@ -137,6 +149,32 @@ message TlsParameters {
   // .. code-block:: none
   //
   //   P-256
+  //
+  // .. warning::
+  //
+  //   **Post-quantum hybrid key exchange is not enabled by default.** Envoy passes the curve list
+  //   explicitly to BoringSSL via ``SSL_CTX_set1_curves_list``, which **overrides** BoringSSL's
+  //   built-in default group list. BoringSSL's built-in default would include the post-quantum
+  //   hybrid group ``X25519MLKEM768``, but because Envoy always supplies an explicit list
+  //   (defaulting to ``X25519:P-256``), ``X25519MLKEM768`` and other post-quantum hybrid groups
+  //   are **not** negotiated unless the operator explicitly adds them to ``ecdh_curves``.
+  //
+  //   Users who want post-quantum hybrid key exchange for TLS 1.3 connections should set
+  //   ``ecdh_curves`` explicitly, for example:
+  //
+  //   .. code-block:: yaml
+  //
+  //     ecdh_curves:
+  //       - X25519MLKEM768
+  //       - X25519
+  //       - P-256
+  //
+  //   Post-quantum hybrid groups only apply to TLS 1.3. Whether a given connection actually
+  //   negotiated a post-quantum group can be observed at runtime via the
+  //   ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%`` access log formatters.
+  //
+  // See :ref:`arch_overview_ssl_tls_defaults` for a summary of all TLS defaults including
+  // post-quantum key exchange.
   repeated string ecdh_curves = 4;
 
   // If specified, the TLS connection will only support the specified signature algorithms.

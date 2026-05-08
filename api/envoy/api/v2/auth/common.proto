@@ -24,6 +24,14 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Common TLS configuration]
 
+// .. note::
+//
+//   This message is part of the **frozen** v2 API. The default values listed here may be stale
+//   and do not reflect the current runtime defaults. For authoritative and up-to-date
+//   documentation of TLS cipher suites, ECDH curves, and protocol version defaults -- including
+//   TLS 1.3 cipher suite handling and post-quantum hybrid key exchange — refer to the v3 message
+//   :ref:`envoy.extensions.transport_sockets.tls.v3.TlsParameters
+//   <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsParameters>`.
 message TlsParameters {
   enum TlsProtocol {
     // Envoy will choose the optimal TLS version.

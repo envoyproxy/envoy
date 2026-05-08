@@ -163,4 +163,13 @@ new_features:
     Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
     to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
 
+- area: docs
+  change: |
+    Refreshed documentation for default TLS cipher suites, TLS 1.3 cipher suite handling, and ECDH groups.
+    Clarified that Envoy's default ``ecdh_curves`` value (``X25519:P-256``) overrides BoringSSL's built-in
+    group list and therefore does not negotiate post-quantum hybrid groups such as ``X25519MLKEM768`` unless
+    the user explicitly configures them. Added a "Post-quantum key exchange" subsection to the TLS architecture
+    overview. Updated the v3 ``TlsParameters`` proto field comments accordingly and added a deprecation notice
+    to the frozen v2 ``TlsParameters`` message pointing to the v3 documentation.
+
 deprecated:
