@@ -40,7 +40,7 @@ For more information on building and different build targets, please refer to :r
 
 .. warning::
    These instructions for building Envoy use
-   `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags>`_ image.
+   `envoyproxy/envoy-build <https://hub.docker.com/r/envoyproxy/envoy-build/tags?name=ci->`_ image.
    You will need 4-5GB of disk space to accommodate this image.
 
    This script runs as effective root on your host system.

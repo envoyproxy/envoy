@@ -68,15 +68,17 @@ def dockerhub_envoy_role(
     if part.startswith("envoy"):
         part = part[len("envoy"):]
 
-    # envoy-build-ubuntu images
+    # envoy-build images
     if part.startswith("build"):
-        parts = part.split("-")
-        if len(parts) > 2:
-            title = f"envoyproxy/envoy-build-ubuntu:{''.join(parts[2:])}-<build_sha>"
-            full_url = f"https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?name={''.join(parts[2:])}"
-        else:
-            title = f"envoyproxy/envoy-build-ubuntu:<build_sha>"
-            full_url = f"https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags"
+        variant = "ci"
+        if part.startswith("build-"):
+            variant = part[len("build-"):]
+            if variant == "ubuntu":
+                variant = "ci"
+            elif variant.startswith("ubuntu-"):
+                variant = variant[len("ubuntu-"):]
+        title = f"envoyproxy/envoy-build:{variant}-<build_sha>"
+        full_url = f"https://hub.docker.com/r/envoyproxy/envoy-build/tags?name={variant}-"
 
     # dev images
     elif part.endswith("-dev"):

@@ -3,12 +3,12 @@
 There are two available flavors of Envoy Docker images for Linux, based on Ubuntu and Alpine Linux
 and an image based on Windows2019.
 
-## Ubuntu Envoy image
+## Linux build image
 
-The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build-ubuntu:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CI checks,
-where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/main/ci/envoy_build_sha.sh). Developers
-may work with the latest build image SHA in [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8)
-repo to provide a self-contained environment for building Envoy binaries and running tests that reflects the latest built Ubuntu Envoy image.
+The Linux Envoy build image at [`envoyproxy/envoy-build:ci-<tag>`](https://hub.docker.com/r/envoyproxy/envoy-build/tags?name=ci-) is used for CI checks,
+where `<tag>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/main/ci/envoy_build_sha.sh). Developers
+may work with the latest build image tag in [`envoyproxy/toolshed/docker/build`](https://github.com/envoyproxy/toolshed/tree/main/docker/build)
+to provide a self-contained environment for building Envoy binaries and running tests that reflects the latest Linux CI build image.
 Moreover, the Docker image at [`envoyproxy/envoy:dev-<hash>`](https://hub.docker.com/r/envoyproxy/envoy/tags?name=dev) is an image that has an Envoy binary at `/usr/local/bin/envoy`.
 The `<hash>` corresponds to the main commit at which the binary was compiled. Lastly, `envoyproxy/envoy:dev` contains an Envoy
 binary built from the latest tip of main that passed tests.
@@ -38,9 +38,9 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 
 # Build image base and compiler versions
 
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 13 and Clang 18 compiler.
+* `envoyproxy/envoy-build:ci-<tag>` &mdash; based on Debian trixie-slim with GCC 13 and Clang 18.
 
-The source for theis images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+The source for these images is located in [envoyproxy/toolshed/docker/build](https://github.com/envoyproxy/toolshed/tree/main/docker/build)
 repository.
 
 The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests. This is configured with `--config=clang`. We have an additional Linux CI run with GCC which builds binary only, configured with `--config=gcc`.
@@ -67,7 +67,7 @@ These are the only supported configurations. If you need a different toolchain c
 The `./ci/run_envoy_docker.sh` script can be used to set up a Docker container on Linux and Windows
 to build an Envoy static binary and run tests.
 
-The build image defaults to `envoyproxy/envoy-build-ubuntu` on Linux and
+The build image defaults to `envoyproxy/envoy-build` (the `ci` variant) on Linux and
 `envoyproxy/envoy-build-windows2019` on Windows, but you can choose build image by setting
 `ENVOY_BUILD_IMAGE` in the environment.
 
@@ -75,13 +75,13 @@ In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the 
 invoking the build.
 
 ```bash
-ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build-ubuntu:<tag> http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build:ci-<tag> http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the default GOPROXY in China.
 
 ```bash
-ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build-ubuntu:<tag> go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_BUILD_IMAGE=docker.io/envoyproxy/envoy-build:ci-<tag> go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 ## Resource Requirements and Troubleshooting
@@ -228,9 +228,9 @@ Docker host.
 
 # Testing changes to the build image as a developer
 
-The base build image used in the CI flows here lives in the [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+The base build image used in the CI flows here lives in [envoyproxy/toolshed/docker/build](https://github.com/envoyproxy/toolshed/tree/main/docker/build)
 repository. If you need to make and/or test changes to the build image, instructions to do so can be found in
-the [docker](https://github.com/envoyproxy/envoy-build-tools/blob/main/docker/README.md) folder.
+the [docker/build](https://github.com/envoyproxy/toolshed/tree/main/docker/build) folder.
 See the Dockerfiles and build scripts there for building a new image.
 
 # macOS Build Flow

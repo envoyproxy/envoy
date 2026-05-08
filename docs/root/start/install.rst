@@ -232,8 +232,8 @@ The following table shows the available Docker tag variants for the latest
 
 .. _install_tools:
 
-`envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu>`__
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+`envoyproxy/envoy-build <https://hub.docker.com/r/envoyproxy/envoy-build>`__
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 Build images are always versioned using their commit SHA, which is in turn committed to the Envoy repository
 to ensure reproducible builds.
@@ -245,13 +245,17 @@ to ensure reproducible builds.
 
    * - variant
      - latest (amd64/arm64)
-   * - envoy-build-ubuntu (default)
-     - :dockerhub_envoy:`build-ubuntu`
-   * - envoy-build-ubuntu:mobile
-     - :dockerhub_envoy:`build-ubuntu-mobile`
+   * - envoy-build:ci (default)
+     - :dockerhub_envoy:`build`
+   * - envoy-build:mobile
+     - :dockerhub_envoy:`build-mobile`
+
+Additional variants (`worker`, `devtools`, `docker`, `gcc`, `test`) are available for CI workflows in
+`envoyproxy/toolshed/docker/build <https://github.com/envoyproxy/toolshed/tree/main/docker/build>`__.
 
 .. note::
-   The ``envoy-build-ubuntu`` image does not contain a working Envoy server, but can be used for
+   The ``envoy-build`` image does not contain a working Envoy server, but can be used for
    building Envoy and related containers.
 
-   This image requires 4-5GB of available disk space to use.
+   The ``ci``, ``gcc``, and ``mobile`` variants bundle LLVM and require about 4-5GB of available disk
+   space. Other variants (``worker``, ``devtools``, ``docker``, ``test``) are much smaller.
