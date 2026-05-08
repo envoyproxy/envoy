@@ -70,12 +70,11 @@ using ScopeKeyPtr = std::unique_ptr<ScopeKey>;
 class StringKeyFragment : public ScopeKeyFragmentBase {
 public:
   explicit StringKeyFragment(absl::string_view value)
-      : value_(value), hash_(HashUtil::xxHash64(value_)) {}
+      : hash_(HashUtil::xxHash64(value)) {}
 
   uint64_t hash() const override { return hash_; }
 
 private:
-  const std::string value_;
   const uint64_t hash_;
 };
 
