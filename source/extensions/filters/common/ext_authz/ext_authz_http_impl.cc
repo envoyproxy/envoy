@@ -429,7 +429,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   if (Http::CodeUtility::is5xx(status_code)) {
     auto response = std::make_unique<Response>(errorResponse());
     response->raw_check_response.emplace();
-    response->raw_check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+    response->raw_check_response->mutable_status()->set_code(
+        Grpc::Status::WellKnownGrpcStatus::Internal);
     response->raw_check_response->mutable_error_response()->mutable_status()->set_code(
         static_cast<envoy::type::v3::StatusCode>(status_code));
     return response;
@@ -484,7 +485,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                 Protobuf::Struct{}}};
 
     ok.response_->raw_check_response.emplace();
-    ok.response_->raw_check_response->mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+    ok.response_->raw_check_response->mutable_status()->set_code(
+        Grpc::Status::WellKnownGrpcStatus::Ok);
     auto* ok_response = ok.response_->raw_check_response->mutable_ok_response();
 
     for (const auto& header : ok.response_->headers_to_set) {
@@ -547,7 +549,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   denied.response_->raw_check_response->mutable_status()->set_code(grpc_status);
 
   auto* denied_response = denied.response_->raw_check_response->mutable_denied_response();
-  denied_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(status_code));
+  denied_response->mutable_status()->set_code(
+      static_cast<envoy::type::v3::StatusCode>(status_code));
   denied_response->set_body(denied.response_->body);
 
   for (const auto& header : denied.response_->headers_to_set) {
@@ -564,7 +567,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   }
 
   if (!denied.response_->dynamic_metadata.fields().empty()) {
-    *denied.response_->raw_check_response->mutable_dynamic_metadata() = denied.response_->dynamic_metadata;
+    *denied.response_->raw_check_response->mutable_dynamic_metadata() =
+        denied.response_->dynamic_metadata;
   }
 
   return std::move(denied.response_);

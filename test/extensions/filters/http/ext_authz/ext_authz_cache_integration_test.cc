@@ -2,9 +2,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
@@ -12,22 +12,22 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
-#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-// A simple test-only HTTP filter that acts as the "Fake Cache" caching layer in our integration test.
-// It intercepts requests with 'x-simulate-cache' header, Base64-decodes and deserializes it into
-// a strongly-typed CheckResponse proto, and writes it directly to dynamic typed metadata under the
-// configured cache namespace before stripping the header.
+// A simple test-only HTTP filter that acts as the "Fake Cache" caching layer in our integration
+// test. It intercepts requests with 'x-simulate-cache' header, Base64-decodes and deserializes it
+// into a strongly-typed CheckResponse proto, and writes it directly to dynamic typed metadata under
+// the configured cache namespace before stripping the header.
 class CacheSimulatorFilter : public Http::PassThroughFilter {
 public:
   CacheSimulatorFilter() = default;
-  
+
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     const auto simulate_header = headers.get(Http::LowerCaseString("x-simulate-cache"));
     if (!simulate_header.empty()) {
@@ -38,7 +38,7 @@ public:
         if (check_response.ParseFromString(decoded)) {
           Protobuf::Any typed_metadata;
           typed_metadata.PackFrom(check_response);
-          
+
           // Store direct CheckResponse Any under the configured typed metadata cache namespace
           decoder_callbacks_->streamInfo().setDynamicTypedMetadata(
               "envoy.filters.http.ext_authz.cache", typed_metadata);
@@ -50,7 +50,8 @@ public:
   }
 };
 
-class CacheSimulatorFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class CacheSimulatorFilterConfig
+    : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
 public:
   CacheSimulatorFilterConfig() : EmptyHttpDualFilterConfig("cache-simulator-filter") {}
   absl::StatusOr<Http::FilterFactoryCb>
@@ -66,9 +67,7 @@ static Registry::RegisterFactory<CacheSimulatorFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_cache_simulator_filter_;
 
-
-class ExtAuthzCacheIntegrationTest : public HttpIntegrationTest,
-                                     public testing::Test {
+class ExtAuthzCacheIntegrationTest : public HttpIntegrationTest, public testing::Test {
 public:
   ExtAuthzCacheIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {}
@@ -94,8 +93,10 @@ public:
 
       // 2. Set up ext_authz filter config, bypass namespace set
       envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_proto;
-      ext_authz_proto.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_authz_cluster");
-      ext_authz_proto.set_check_response_typed_metadata_namespace("envoy.filters.http.ext_authz.cache");
+      ext_authz_proto.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+          "ext_authz_cluster");
+      ext_authz_proto.set_check_response_typed_metadata_namespace(
+          "envoy.filters.http.ext_authz.cache");
       ext_authz_proto.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
@@ -104,7 +105,8 @@ public:
 
       // Prepend filters to HCM (cache_simulator_filter first, then ext_authz)
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(cache_simulator_config));
+      config_helper_.prependFilter(
+          MessageUtil::getJsonStringFromMessageOrError(cache_simulator_config));
     });
 
     HttpIntegrationTest::initialize();
@@ -131,18 +133,17 @@ TEST_F(ExtAuthzCacheIntegrationTest, CacheHitOKBypassesRPC) {
 
   // 2. Client connection and request
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"},
-      {":path", "/test"},
-      {":scheme", "http"},
-      {":authority", "host"},
-      {"x-simulate-cache", base64_cached_response}
-  };
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                         {":path", "/test"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"x-simulate-cache", base64_cached_response}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 
   // 3. Verify request goes upstream with injected headers, and gRPC bypasses
-  AssertionResult result = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  AssertionResult result =
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
   RELEASE_ASSERT(result, result.message());
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());
@@ -170,20 +171,19 @@ TEST_F(ExtAuthzCacheIntegrationTest, CacheHitDeniedBypassesRPC) {
   envoy::service::auth::v3::CheckResponse cached_response;
   cached_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
   auto* denied_response = cached_response.mutable_denied_response();
-  denied_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::Forbidden)));
+  denied_response->mutable_status()->set_code(
+      static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::Forbidden)));
   denied_response->set_body("Cache Denied Body");
 
   std::string base64_cached_response = serializeAndEncode(cached_response);
 
   // 2. Client request
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"},
-      {":path", "/test"},
-      {":scheme", "http"},
-      {":authority", "host"},
-      {"x-simulate-cache", base64_cached_response}
-  };
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                         {":path", "/test"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"x-simulate-cache", base64_cached_response}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
 

@@ -134,8 +134,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.ext_authz"],
     rbe_pool = "linux_x64_small",
     deps = [
-        "//source/extensions/filters/http/ext_authz:config",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/ext_authz:config",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",

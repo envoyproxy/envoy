@@ -35,12 +35,14 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
-namespace Envoy::Extensions::HttpFilters::ExtAuthz {
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ExtAuthz {
 namespace {
 
 class ExtAuthzCacheTest : public testing::Test {
 public:
-
   void initialize(const std::string& yaml) {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
     if (!yaml.empty()) {
@@ -64,14 +66,15 @@ public:
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
 
-  void setCacheMetadata(const envoy::service::auth::v3::CheckResponse& response, const std::string& metadata_namespace) {
+  void setCacheMetadata(const envoy::service::auth::v3::CheckResponse& response,
+                        const std::string& metadata_namespace) {
     Protobuf::Any typed_metadata;
     typed_metadata.PackFrom(response);
-    
+
     // Set it in dynamic typed metadata
     decoder_callbacks_metadata_.mutable_typed_filter_metadata()->insert(
         {metadata_namespace, typed_metadata});
-        
+
     ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
         .WillByDefault(ReturnRef(decoder_callbacks_metadata_));
   }
@@ -116,7 +119,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitOK) {
   request_headers_.addCopy(Http::Headers::get().Host, "example.com");
   request_headers_.addCopy(Http::Headers::get().Method, "GET");
   request_headers_.addCopy(Http::Headers::get().Path, "/");
-  
+
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
   // Verify mutations are applied
@@ -138,7 +141,8 @@ TEST_F(ExtAuthzCacheTest, CacheHitDenied) {
   envoy::service::auth::v3::CheckResponse cached_response;
   cached_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
   auto* denied_response = cached_response.mutable_denied_response();
-  denied_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::Forbidden)));
+  denied_response->mutable_status()->set_code(
+      static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::Forbidden)));
   denied_response->set_body("Access Denied by Cache");
 
   setCacheMetadata(cached_response, "envoy.filters.http.ext_authz.cache");
@@ -147,14 +151,16 @@ TEST_F(ExtAuthzCacheTest, CacheHitDenied) {
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
 
   // Expect local reply
-  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::Forbidden, "Access Denied by Cache", _, _, _));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              sendLocalReply(Http::Code::Forbidden, "Access Denied by Cache", _, _, _));
 
   // Call decodeHeaders
   request_headers_.addCopy(Http::Headers::get().Host, "example.com");
   request_headers_.addCopy(Http::Headers::get().Method, "GET");
   request_headers_.addCopy(Http::Headers::get().Path, "/");
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(1U, config_->stats().denied_.value());
 }
 
@@ -169,9 +175,10 @@ TEST_F(ExtAuthzCacheTest, CacheMissAndRecordgRPC) {
   prepareCheck();
 
   // We expect client_->check to be called
-  Filters::Common::ExtAuthz::ResponsePtr authz_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+  Filters::Common::ExtAuthz::ResponsePtr authz_response =
+      std::make_unique<Filters::Common::ExtAuthz::Response>();
   authz_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  
+
   envoy::service::auth::v3::CheckResponse raw_response;
   raw_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
   auto* h = raw_response.mutable_ok_response()->add_headers();
@@ -187,7 +194,8 @@ TEST_F(ExtAuthzCacheTest, CacheMissAndRecordgRPC) {
       }));
 
   // Expect dynamic typed metadata to be set with the cached response directly
-  EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicTypedMetadata("envoy.filters.http.ext_authz.cache", _))
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setDynamicTypedMetadata("envoy.filters.http.ext_authz.cache", _))
       .WillOnce(Invoke([&](const std::string&, const Protobuf::Any& metadata) {
         envoy::service::auth::v3::CheckResponse recorded;
         ASSERT_TRUE(MessageUtil::unpackTo(metadata, recorded).ok());
@@ -217,7 +225,7 @@ TEST_F(ExtAuthzCacheTest, InvalidCacheMetadataFallback) {
   // Set unexpected proto type in dynamic typed metadata to trigger unpack failure
   envoy::config::core::v3::Metadata unexpected_proto;
   (*unexpected_proto.mutable_filter_metadata())["unexpected"] = {};
-  
+
   Protobuf::Any typed_metadata_any;
   typed_metadata_any.PackFrom(unexpected_proto);
 
@@ -231,7 +239,8 @@ TEST_F(ExtAuthzCacheTest, InvalidCacheMetadataFallback) {
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                            const StreamInfo::StreamInfo&) -> void {
-        Filters::Common::ExtAuthz::ResponsePtr fallback_response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        Filters::Common::ExtAuthz::ResponsePtr fallback_response =
+            std::make_unique<Filters::Common::ExtAuthz::Response>();
         fallback_response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
         callbacks.onComplete(std::move(fallback_response));
       }));
@@ -242,7 +251,7 @@ TEST_F(ExtAuthzCacheTest, InvalidCacheMetadataFallback) {
   request_headers_.addCopy(Http::Headers::get().Path, "/");
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  
+
   // Verify stats
   EXPECT_EQ(1U, config_->stats().invalid_cached_response_.value());
 }
@@ -261,7 +270,8 @@ TEST_F(ExtAuthzCacheTest, CacheHitErrorFailClosed) {
   envoy::service::auth::v3::CheckResponse cached_response;
   cached_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
   auto* error_response = cached_response.mutable_error_response();
-  error_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::InternalServerError)));
+  error_response->mutable_status()->set_code(
+      static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::InternalServerError)));
   error_response->set_body("Cached Error Body");
 
   setCacheMetadata(cached_response, "envoy.filters.http.ext_authz.cache");
@@ -270,14 +280,16 @@ TEST_F(ExtAuthzCacheTest, CacheHitErrorFailClosed) {
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
 
   // Expect local reply (fail-closed) with custom status from error_response
-  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(Http::Code::InternalServerError, "Cached Error Body", _, _, _));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError, "Cached Error Body", _, _, _));
 
   // Call decodeHeaders
   request_headers_.addCopy(Http::Headers::get().Host, "example.com");
   request_headers_.addCopy(Http::Headers::get().Method, "GET");
   request_headers_.addCopy(Http::Headers::get().Path, "/");
 
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(1U, config_->stats().error_.value());
 }
 
@@ -297,7 +309,8 @@ TEST_F(ExtAuthzCacheTest, CacheHitErrorFailOpen) {
   envoy::service::auth::v3::CheckResponse cached_response;
   cached_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
   auto* error_response = cached_response.mutable_error_response();
-  error_response->mutable_status()->set_code(static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::InternalServerError)));
+  error_response->mutable_status()->set_code(
+      static_cast<envoy::type::v3::StatusCode>(enumToInt(Http::Code::InternalServerError)));
 
   setCacheMetadata(cached_response, "envoy.filters.http.ext_authz.cache");
 
@@ -311,7 +324,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitErrorFailOpen) {
 
   // Should continue decoding (fail-open)
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  
+
   // Verify fail-open header is added
   EXPECT_EQ("true", request_headers_.get_("x-envoy-auth-failure-mode-allowed"));
   EXPECT_EQ(1U, config_->stats().error_.value());
@@ -319,4 +332,7 @@ TEST_F(ExtAuthzCacheTest, CacheHitErrorFailOpen) {
 }
 
 } // namespace
-} // namespace Envoy::Extensions::HttpFilters::ExtAuthz
+} // namespace ExtAuthz
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

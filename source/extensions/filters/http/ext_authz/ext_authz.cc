@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/strings/escaping.h"
-
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/common/assert.h"
@@ -17,6 +15,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
+
+#include "absl/strings/escaping.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -468,7 +468,8 @@ bool Filter::tryCacheHit() {
     return false;
   }
 
-  const auto& typed_metadata = decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
+  const auto& typed_metadata =
+      decoder_callbacks_->streamInfo().dynamicMetadata().typed_filter_metadata();
   const auto cache_it = typed_metadata.find(metadata_namespace);
   if (cache_it == typed_metadata.end()) {
     return false;
@@ -510,8 +511,7 @@ bool Filter::tryCacheHit() {
     authz_response->status = Filters::Common::ExtAuthz::CheckStatus::Denied;
     authz_response->status_code = Http::Code::Forbidden;
     if (check_response.has_denied_response()) {
-      copyHeaderFieldIntoResponse(authz_response,
-                                  check_response.denied_response().headers());
+      copyHeaderFieldIntoResponse(authz_response, check_response.denied_response().headers());
       const uint32_t status_code = check_response.denied_response().status().code();
       if (status_code > 0) {
         authz_response->status_code = static_cast<Http::Code>(status_code);
@@ -520,8 +520,7 @@ bool Filter::tryCacheHit() {
     }
   }
 
-  if (check_response.has_ok_response() &&
-      check_response.ok_response().has_dynamic_metadata()) {
+  if (check_response.has_ok_response() && check_response.ok_response().has_dynamic_metadata()) {
     authz_response->dynamic_metadata = check_response.ok_response().dynamic_metadata();
   } else {
     authz_response->dynamic_metadata = check_response.dynamic_metadata();
