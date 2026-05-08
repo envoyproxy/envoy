@@ -1,7 +1,9 @@
+#include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/address.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
@@ -546,6 +548,70 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InitializeUnsupportedProtocolVersionFal
   })";
 
   EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_response));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, ToolsListLocalResponse) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF";
+
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute per_route;
+    auto* tool = per_route.mutable_tool_config()->add_tools();
+    tool->set_name("my_local_tool");
+    tool->mutable_tool_list_config()->set_title("My Local Tool");
+    tool->mutable_tool_list_config()->set_description("Does a local thing.");
+    tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+    Protobuf::Any per_route_any;
+    MessageUtil::packFrom(per_route_any, per_route);
+    route->mutable_typed_per_filter_config()->insert(
+        {"envoy.filters.http.mcp_json_rest_bridge", per_route_any});
+  });
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "id": 123,
+    "method": "tools/list"
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("200"));
+  EXPECT_THAT(response->headers().getContentTypeValue(), StrEq("application/json"));
+
+  const std::string expected_rpc_response = R"({
+    "jsonrpc": "2.0",
+    "id": 123,
+    "result": {
+      "tools": [
+        {
+          "name": "my_local_tool",
+          "title": "My Local Tool",
+          "description": "Does a local thing.",
+          "inputSchema": {
+            "type": "object"
+          }
+        }
+      ]
+    }
+  })";
+  EXPECT_EQ(nlohmann::json::parse(response->body()), nlohmann::json::parse(expected_rpc_response));
 }
 
 } // namespace

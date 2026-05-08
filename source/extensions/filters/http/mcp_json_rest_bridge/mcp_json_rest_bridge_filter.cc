@@ -6,10 +6,13 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/http_request_builder.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
 #include "absl/base/no_destructor.h"
 #include "absl/container/flat_hash_set.h"
@@ -240,8 +243,9 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
 
   if (mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
-      mcp_operation_ == McpOperation::OperationFailed) {
-    // sendLocalReply was called in handleMcpMethod for these operations.
+      mcp_operation_ == McpOperation::OperationFailed ||
+      mcp_operation_ == McpOperation::ToolsListLocal) {
+    // sendLocalReply/encodeHeaders was called in handleMcpMethod for these operations.
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -257,6 +261,7 @@ Http::FilterHeadersStatus McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseH
   // The response for InitializedNotification is empty body so we don't need
   // to modify the response headers.
   case McpOperation::InitializationAck:
+  case McpOperation::ToolsListLocal:
     return Http::FilterHeadersStatus::Continue;
   default:
     break;
@@ -276,7 +281,8 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   // No need to encode the response body for Initialization and InitializationAck.
   if (mcp_operation_ == McpOperation::Unspecified ||
       mcp_operation_ == McpOperation::Initialization ||
-      mcp_operation_ == McpOperation::InitializationAck) {
+      mcp_operation_ == McpOperation::InitializationAck ||
+      mcp_operation_ == McpOperation::ToolsListLocal) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -321,6 +327,68 @@ Http::FilterTrailersStatus McpJsonRestBridgeFilter::encodeTrailers(Http::Respons
   return Http::FilterTrailersStatus::Continue;
 }
 
+void McpJsonRestBridgeFilter::serveToolsListLocal(
+    const McpJsonRestBridgePerRouteConfig& per_route_config, const nlohmann::json& json_rpc) {
+  std::string request_id_json = "null";
+  if (json_rpc.contains("id")) {
+    request_id_json = json_rpc["id"].dump();
+  }
+
+  Buffer::OwnedImpl response_data;
+  response_data.add("{\"jsonrpc\":\"2.0\",\"id\":");
+  response_data.add(request_id_json);
+  response_data.add(",\"result\":{\"tools\":[");
+
+  bool first_tool = true;
+  for (const auto& tool : per_route_config.toolConfig().tools()) {
+    if (!first_tool) {
+      response_data.add(",");
+    }
+    first_tool = false;
+
+    response_data.add("{");
+    nlohmann::json name_json = tool.name();
+    response_data.add("\"name\":");
+    response_data.add(name_json.dump());
+
+    if (!tool.tool_list_config().title().empty()) {
+      nlohmann::json title_json = tool.tool_list_config().title();
+      response_data.add(",\"title\":");
+      response_data.add(title_json.dump());
+    }
+
+    nlohmann::json desc_json = tool.tool_list_config().description();
+    response_data.add(",\"description\":");
+    response_data.add(desc_json.dump());
+
+    response_data.add(",\"inputSchema\":");
+    if (!tool.tool_list_config().input_schema().empty()) {
+      response_data.add(tool.tool_list_config().input_schema());
+    } else {
+      response_data.add("{\"type\":\"object\"}");
+    }
+
+    if (!tool.tool_list_config().output_schema().empty()) {
+      response_data.add(",\"outputSchema\":");
+      response_data.add(tool.tool_list_config().output_schema());
+    }
+
+    response_data.add("}");
+  }
+
+  response_data.add("]}}");
+
+  Http::ResponseHeaderMapPtr response_headers = Http::ResponseHeaderMapImpl::create();
+  response_headers->setStatus(200);
+  response_headers->setContentType(Http::Headers::get().ContentTypeValues.Json);
+  response_headers->setContentLength(response_data.length());
+
+  decoder_callbacks_->encodeHeaders(std::move(response_headers), false,
+                                    "mcp_json_rest_bridge_tools_list");
+
+  decoder_callbacks_->encodeData(response_data, true);
+}
+
 void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
                                               Http::RequestHeaderMapOptRef request_headers) {
   ENVOY_STREAM_LOG(debug, "Handling MCP JSON-RPC: {}", *decoder_callbacks_, json_rpc.dump());
@@ -337,6 +405,14 @@ void McpJsonRestBridgeFilter::handleMcpMethod(const nlohmann::json& json_rpc,
   }
   // TODO(guoyilin42): Consider supporting local response for tools/list in addition to the GET.
   if (method == McpConstants::Methods::TOOLS_LIST) {
+    mcp_operation_ = McpOperation::ToolsListLocal;
+    const auto* per_route_config =
+        Http::Utility::resolveMostSpecificPerFilterConfig<McpJsonRestBridgePerRouteConfig>(
+            decoder_callbacks_);
+    if (per_route_config && !per_route_config->toolConfig().tools().empty()) {
+      serveToolsListLocal(*per_route_config, json_rpc);
+      return;
+    }
     absl::StatusOr<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule> http_rule =
         config_->getToolsListHttpRule();
     if (http_rule.ok() && !http_rule->get().empty()) {

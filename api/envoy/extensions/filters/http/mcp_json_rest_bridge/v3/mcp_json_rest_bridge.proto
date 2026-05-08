@@ -170,13 +170,40 @@ message ServerToolConfig {
   HttpRule tool_list_http_rule = 3;
 }
 
-// Configuration for a specific MCP tool.
+// Note: Based on the method in HttpRule, we will set the readOnlyHint bit in
+// annotations for GET method to indicate no server state mutation.
+message ToolsListSpecificConfig {
+  // Optional, human-readable name of the tool for display purposes.
+  string title = 1;
+
+  // Human-readable description of functionality.
+  string description = 2;
+
+  // The JSON Schema describing expected parameters, as a serialized JSON string.
+  // It is raw json without type: object which includes "properties" and "required" key
+  string input_schema = 3;
+
+  // [#not-implemented-hide:]
+  // The validation of structured results
+  string output_schema = 4;
+}
+
+// Path and host of MCP server that hosts this tool
+message McpServerInfo {
+  string path = 1;
+  string host = 2;
+}
+
 message ToolConfig {
-  // Name of the tool.
+  // Unique identifier of the tool. Used both for tools/list and tools/call transcoding.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The HTTP configuration rules that apply to the normal backend.
   HttpRule http_rule = 2;
+
+  ToolsListSpecificConfig tool_list_config = 3;
+
+  McpServerInfo server_info = 4;
 }
 
 // Defines the schema of the JSON-RPC to REST mapping. It specifies how the "arguments"
@@ -226,4 +253,9 @@ message HttpRule {
   //   fields (e.g., "user.data" maps the value of the "data" field inside "user").
   // - If omitted: There is no HTTP request body; fields not in the path become query parameters.
   string body = 6;
+}
+
+// Per-route override configuration for the MCP JSON REST Bridge filter.
+message McpJsonRestBridgePerRoute {
+  ServerToolConfig tool_config = 1;
 }

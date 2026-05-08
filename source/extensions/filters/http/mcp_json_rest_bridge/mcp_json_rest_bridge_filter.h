@@ -53,6 +53,22 @@ private:
   uint32_t max_response_body_size_;
 };
 
+class McpJsonRestBridgePerRouteConfig : public Router::RouteSpecificFilterConfig {
+public:
+  explicit McpJsonRestBridgePerRouteConfig(
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
+          proto_config)
+      : tool_config_(proto_config.tool_config()) {}
+
+  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig&
+  toolConfig() const {
+    return tool_config_;
+  }
+
+private:
+  const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ServerToolConfig tool_config_;
+};
+
 using McpJsonRestBridgeFilterConfigSharedPtr = std::shared_ptr<McpJsonRestBridgeFilterConfig>;
 
 /**
@@ -77,6 +93,10 @@ private:
   // Handles "method" field in the MCP request.
   void handleMcpMethod(const nlohmann::json& json_rpc,
                        Http::RequestHeaderMapOptRef request_headers);
+
+  // Serves a local tools/list response using the per-route configuration, bypassing upstream.
+  void serveToolsListLocal(const McpJsonRestBridgePerRouteConfig& per_route_config,
+                           const nlohmann::json& json_rpc);
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
@@ -103,10 +123,12 @@ private:
     InitializationAck = 3,
     // Clients send a tools/list request to discover available tools.
     ToolsList = 4,
+    // Clients send a tools/list request that is handled locally via per-route config.
+    ToolsListLocal = 5,
     // Clients send a tools/call request to invoke a tool.
-    ToolsCall = 5,
+    ToolsCall = 6,
     // MCP operation failed.
-    OperationFailed = 6,
+    OperationFailed = 7,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   absl::optional<nlohmann::json> session_id_;
