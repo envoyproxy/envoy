@@ -445,8 +445,8 @@ message Http1ProtocolOptions {
   // This is a no-op if ``accept_http_10`` is not true.
   string default_host_for_http_10 = 3;
 
-  // Describes how the keys for response headers should be formatted. By default, all header keys
-  // are lower cased.
+  // Describes how the keys for headers encoded by the HTTP/1 codec should be formatted. By
+  // default, all header keys are lower cased.
   HeaderKeyFormat header_key_format = 4;
 
   // Enables trailers for HTTP/1. By default the HTTP/1 codec drops proxied trailers.
