@@ -72,6 +72,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tcp_proxy
+  change: |
+    Added :ref:`check_drain_close
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.check_drain_close>` to the TCP proxy
+    filter to close downstream connections with ``FlushWrite`` when the drain manager requests drain close during
+    downstream read or write handling.
 - area: stat_sinks
   change: |
     Added :ref:`max_data_points_per_request
@@ -128,6 +134,11 @@ new_features:
     in the composite HTTP filter. Now users could specify the matcher inline in the filter configuration
     instead of using the :ref:`ExtensionWithMatcher
     <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` filter.
+- area: resource_monitors
+  change: |
+    Overload manager fixed heap resource monitor now supports :ref:`max_heap_size_bytes_runtime
+    <envoy_v3_api_field_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig.max_heap_size_bytes_runtime>`
+    for runtime-overridable max heap size (e.g. RTDS or ``/runtime_modify``).
 - area: jwt_authn
   change: |
     Added :ref:`verification_status_header

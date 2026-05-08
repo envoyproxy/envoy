@@ -7,7 +7,6 @@ on:
   workflow_call:
     secrets:
       dockerhub-password:
-      dockerhub-username:
       ENVOY_CI_SYNC_APP_ID:
       ENVOY_CI_SYNC_APP_KEY:
       ENVOY_CI_PUBLISH_APP_ID:
@@ -17,6 +16,9 @@ on:
       gpg-key-password:
         required: true
     inputs:
+      dockerhub-username:
+        type: string
+        required: true
       request:
         type: string
         required: true
@@ -75,7 +77,6 @@ jobs:
 
   container:
     secrets:
-      dockerhub-username: ${{ secrets.dockerhub-username }}
       dockerhub-password: ${{ secrets.dockerhub-password }}
     permissions:
       actions: read
@@ -85,6 +86,7 @@ jobs:
     uses: ./.github/workflows/_publish_release_container.yml
     with:
       dockerhub-repo: ${{ vars.DOCKERHUB_REPO || 'envoy' }}
+      dockerhub-username: ${{ inputs.dockerhub-username }}
       dev: ${{ fromJSON(inputs.request).request.version.dev }}
       sha: ${{ fromJSON(inputs.request).request.sha }}
       target-branch: ${{ fromJSON(inputs.request).request.target-branch }}
@@ -137,12 +139,12 @@ jobs:
     needs:
     - release
     steps:
-    - uses: envoyproxy/toolshed/actions/appauth@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+    - uses: envoyproxy/toolshed/actions/appauth@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/actions/dispatch@3c6fada5be38699cba49c9883d731ebe503d0b9d  # v0.4.10
+    - uses: envoyproxy/toolshed/actions/dispatch@2ed4461f62fe3cf80196c05bea0d7dc39f15cf26  # actions-v0.4.12
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}

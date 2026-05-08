@@ -12,6 +12,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -79,7 +80,7 @@ public:
         Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(), {some_rtds_resource},
         {some_rtds_resource}, {}, "1");
     // Wait until the RTDS updates from the DiscoveryResponse have been applied.
-    ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
+    ASSERT_TRUE(waitForCounter(load_success_counter, Ge(load_success_value + 1)));
 
     // Verify that the Runtime config values are from the RTDS response.
     EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
@@ -95,7 +96,7 @@ public:
         Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(), {some_rtds_resource},
         {some_rtds_resource}, {}, "2", {{"test", Protobuf::Any()}});
     // Wait until the RTDS updates from the DiscoveryResponse have been applied.
-    ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
+    ASSERT_TRUE(waitForCounter(load_success_counter, Ge(load_success_value + 1)));
 
     // Verify that the Runtime config values are from the RTDS response.
     EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));

@@ -35,8 +35,7 @@ public:
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
                  absl::optional<int> thread_priority = absl::nullopt,
-                 absl::optional<size_t> high_watermark = absl::nullopt,
-                 bool disable_dns_refresh_on_network_change = false, bool enable_logger = true,
+                 absl::optional<size_t> high_watermark = absl::nullopt, bool enable_logger = true,
                  bool use_worker_thread = false);
 
   /**
@@ -205,6 +204,13 @@ public:
    */
   Stats::Store& getStatsStore();
 
+  /**
+   * Set whether to disable DNS refresh on network change events.
+   */
+  void disableDnsRefreshOnNetworkChange(bool disable) {
+    disable_dns_refresh_on_network_change_ = disable;
+  }
+
 private:
   // Needs access to the private constructor.
   GTEST_FRIEND_CLASS(InternalEngineTest, ThreadCreationFailed);
@@ -212,7 +218,6 @@ private:
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
                  absl::optional<int> thread_priority, absl::optional<size_t> high_watermark,
-                 bool disable_dns_refresh_on_network_change,
                  Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger = true,
                  bool use_worker_thread = false);
 
@@ -266,7 +271,7 @@ private:
   Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.
   bool terminated_{false};
   absl::Notification engine_running_;
-  bool disable_dns_refresh_on_network_change_;
+  bool disable_dns_refresh_on_network_change_{false};
   int prev_network_type_{0};
   Network::Address::InstanceConstSharedPtr prev_local_addr_{nullptr};
   bool enable_logger_{true};

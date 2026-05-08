@@ -20,6 +20,7 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
@@ -50,11 +51,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
-
-// Matcher to convert a Buffer::Instance to its string representation for composition.
-MATCHER_P(BufferString, m, "") {
-  return testing::ExplainMatchResult(m, arg->toString(), result_listener);
-}
 
 // Matcher to parse a buffer string into a CheckRequest proto.
 MATCHER_P(AsCheckRequest, m, "") {
@@ -5671,10 +5667,10 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
       .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
 
   // Mock the sendRaw call with matcher-based validation for the gRPC authorization check.
-  EXPECT_CALL(*mock_raw_grpc_client,
-              sendRaw(_, _,
-                      BufferString(AsCheckRequest(HasContextExtension("test_key", "test_value"))),
-                      _, _, _))
+  EXPECT_CALL(
+      *mock_raw_grpc_client,
+      sendRaw(_, _, BufferPtrString(AsCheckRequest(HasContextExtension("test_key", "test_value"))),
+              _, _, _))
       .WillOnce([&](absl::string_view /*service_full_name*/, absl::string_view /*method_name*/,
                     Buffer::InstancePtr&& /*request*/, Grpc::RawAsyncRequestCallbacks& callbacks,
                     Tracing::Span& parent_span,

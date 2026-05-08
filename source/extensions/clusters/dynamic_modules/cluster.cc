@@ -360,7 +360,7 @@ bool DynamicModuleCluster::addHosts(
   }
 
   {
-    absl::WriterMutexLock lock(&host_map_lock_);
+    absl::WriterMutexLock lock(host_map_lock_);
     for (const auto& host : result_hosts) {
       host_map_[host.get()] = host;
     }
@@ -442,7 +442,7 @@ Upstream::HostSharedPtr DynamicModuleCluster::findHostByAddress(const std::strin
 }
 
 Upstream::HostSharedPtr DynamicModuleCluster::findHost(void* raw_host_ptr) {
-  absl::ReaderMutexLock lock(&host_map_lock_);
+  absl::ReaderMutexLock lock(host_map_lock_);
   auto it = host_map_.find(raw_host_ptr);
   if (it == host_map_.end()) {
     return nullptr;
@@ -456,7 +456,7 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
 
   // Remove all valid hosts from the map.
   {
-    absl::WriterMutexLock lock(&host_map_lock_);
+    absl::WriterMutexLock lock(host_map_lock_);
     for (const auto& host : hosts) {
       if (host == nullptr) {
         continue;
@@ -619,12 +619,12 @@ absl::flat_hash_set<const DynamicModuleLoadBalancer*>& activeDynamicModuleLoadBa
 }
 
 void registerActiveDynamicModuleLoadBalancer(const DynamicModuleLoadBalancer* lb) {
-  absl::MutexLock lock(&activeDynamicModuleLoadBalancersMutex());
+  absl::MutexLock lock(activeDynamicModuleLoadBalancersMutex());
   activeDynamicModuleLoadBalancers().insert(lb);
 }
 
 void unregisterActiveDynamicModuleLoadBalancer(const DynamicModuleLoadBalancer* lb) {
-  absl::MutexLock lock(&activeDynamicModuleLoadBalancersMutex());
+  absl::MutexLock lock(activeDynamicModuleLoadBalancersMutex());
   activeDynamicModuleLoadBalancers().erase(lb);
 }
 } // namespace
@@ -632,7 +632,7 @@ void unregisterActiveDynamicModuleLoadBalancer(const DynamicModuleLoadBalancer* 
 bool DynamicModuleLoadBalancer::withActiveInstance(
     const DynamicModuleLoadBalancer* lb,
     absl::FunctionRef<void(const DynamicModuleLoadBalancer&)> f) {
-  absl::MutexLock lock(&activeDynamicModuleLoadBalancersMutex());
+  absl::MutexLock lock(activeDynamicModuleLoadBalancersMutex());
   if (!activeDynamicModuleLoadBalancers().contains(lb)) {
     return false;
   }

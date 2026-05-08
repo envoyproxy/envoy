@@ -1,26 +1,25 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_mobile_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("//bazel:envoy_mobile_cc_test.bzl", "envoy_cc_test_with_engine_builder")
 
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
 
-envoy_cc_test(
+envoy_cc_test_with_engine_builder(
     name = "engine_common_test",
     srcs = ["engine_common_test.cc"],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
         "//library/common:engine_common_lib",
         "@envoy_build_config//:extension_registry",
     ],
 )
 
-envoy_cc_test(
+envoy_cc_test_with_engine_builder(
     name = "internal_engine_test",
     srcs = ["internal_engine_test.cc"],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
         "//library/common:internal_engine_lib_no_stamp",
         "//library/common/bridge:utility_lib",
         "//library/common/http:header_utility_lib",

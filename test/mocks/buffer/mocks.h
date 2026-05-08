@@ -98,17 +98,12 @@ MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
   return TestUtility::buffersEqual(arg, *rhs);
 }
 
-MATCHER_P(BufferStringEqual, rhs, rhs) {
-  *result_listener << "\"" << arg.toString() << "\"";
-
-  Buffer::OwnedImpl buffer(rhs);
-  return TestUtility::buffersEqual(arg, buffer);
+MATCHER_P(BufferString, m, "") {
+  return testing::ExplainMatchResult(m, arg.toString(), result_listener);
 }
 
-MATCHER_P(BufferStringContains, rhs,
-          std::string(negation ? "doesn't contain" : "contains") + " \"" + rhs + "\"") {
-  *result_listener << "\"" << arg.toString() << "\"";
-  return arg.toString().find(rhs) != std::string::npos;
+MATCHER_P(BufferPtrString, m, "") {
+  return testing::ExplainMatchResult(m, arg->toString(), result_listener);
 }
 
 ACTION_P(AddBufferToString, target_string) {

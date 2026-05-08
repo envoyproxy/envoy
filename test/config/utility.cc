@@ -32,6 +32,7 @@
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 envoy::config::bootstrap::v3::Bootstrap&
@@ -1960,11 +1961,11 @@ void EdsHelper::setEdsAndWait(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& cluster_load_assignments,
     IntegrationTestServerStats& server_stats) {
   // Make sure the last version has been accepted before setting a new one.
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
+  server_stats.waitForCounter("cluster.cluster_0.update_success", Ge(update_successes_));
   setEds(cluster_load_assignments);
   // Make sure Envoy has consumed the update now that it is running.
   ++update_successes_;
-  server_stats.waitForCounterGe("cluster.cluster_0.update_success", update_successes_);
+  server_stats.waitForCounter("cluster.cluster_0.update_success", Ge(update_successes_));
   RELEASE_ASSERT(
       update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
 }

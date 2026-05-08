@@ -220,7 +220,13 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
       upstream_drain_manager_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
       random_generator_(context.serverFactoryContext().api().randomGenerator()),
-      regex_engine_(context.serverFactoryContext().regexEngine()) {
+      regex_engine_(context.serverFactoryContext().regexEngine()),
+      drain_decision_(context.drainDecision()),
+      drain_close_scope_(context.listenerInfo().direction() ==
+                                 envoy::config::core::v3::TrafficDirection::INBOUND
+                             ? Network::DrainDirection::InboundOnly
+                             : Network::DrainDirection::All),
+      check_drain_close_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, check_drain_close, false)) {
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();
@@ -1112,6 +1118,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   // Before there is an upstream the connection should be readDisabled. If the upstream is
   // destroyed, there should be no further reads as well.
   ASSERT(0 == data.length());
+  maybeCloseDownstreamForDrainClose();
   return Network::FilterStatus::StopIteration;
 }
 
@@ -1248,6 +1255,20 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
+  maybeCloseDownstreamForDrainClose();
+}
+
+void Filter::maybeCloseDownstreamForDrainClose() {
+  if (!config_->checkDrainClose() || downstream_closed_ ||
+      read_callbacks_->connection().state() != Network::Connection::State::Open ||
+      !config_->drainDecision().drainClose(config_->drainCloseScope())) {
+    return;
+  }
+
+  ENVOY_CONN_LOG(debug, "drain closing tcp_proxy connection", read_callbacks_->connection());
+  config_->stats().downstream_cx_drain_close_.inc();
+  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite,
+                                      StreamInfo::LocalCloseReasons::get().TcpProxyDrainClose);
 }
 
 void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
