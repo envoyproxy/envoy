@@ -501,7 +501,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
   Stats::MockCounter timeout_counter;
   EXPECT_CALL(timeout_counter, inc());
   server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), timeout_counter);
-  EXPECT_CALL(*transport_socket, closeSocket(ConnectionEvent::LocalClose));
+  EXPECT_CALL(*transport_socket, closeSocket(ConnectionEvent::LocalClose, false));
   mock_timer->invokeCallback();
   EXPECT_THAT(stream_info_.connectionTerminationDetails(),
               Optional(HasSubstr("transport socket timeout")));
@@ -4018,7 +4018,7 @@ TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutClosesConnecti
 
   // Timer callback fires - closeSocket is called first, then during buffer drain enabled() is
   // checked
-  EXPECT_CALL(*transport_socket_, closeSocket(ConnectionEvent::LocalClose));
+  EXPECT_CALL(*transport_socket_, closeSocket(ConnectionEvent::LocalClose, false));
   EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(false));
   buffer_timer->invokeCallback();
   EXPECT_EQ(static_cast<const Network::Connection&>(*connection_).localCloseReason(),
@@ -4065,7 +4065,7 @@ TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutCancelledOnDra
   EXPECT_CALL(*buffer_timer, disableTimer());
   EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Write).ok());
 
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::NoFlush);
 }
 
@@ -4204,7 +4204,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
       }));
   EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Read).ok());
   // Deferred close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
 }
 
 // Test that if a read event occurs after
@@ -4231,7 +4231,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithFilt
       }));
   EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Read).ok());
   // Deferred close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
 }
 
 // Test that if a read event occurs after
@@ -4262,7 +4262,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithWrit
   EXPECT_CALL(*transport_socket_, doWrite(_, true))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   // Deferred close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
 }
 
 // Test that if a read event occurs after
@@ -4292,7 +4292,7 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredCanFlush
   EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Read).ok());
 
   // Deferred close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
 }
 
 // Test that if a read event occurs after close(ConnectionCloseType::NoFlush),
@@ -4303,7 +4303,7 @@ TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseNoFlush) {
   initialize();
 
   // Immediate connection close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::NoFlush);
 
   // We don't even see a doRead(), let alone an onData() callback.
@@ -4320,7 +4320,7 @@ TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseFlushWrite) {
   initialize();
 
   // Connection flush and close.
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::FlushWrite);
 
   // We don't even see a doRead(), let alone an onData() callback.
@@ -4341,7 +4341,7 @@ TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseFlushWriteWriteData) {
   // it will be flushed here.
   EXPECT_CALL(*transport_socket_, doWrite(_, true))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::FlushWrite);
 
   // We don't even see a doRead(), let alone an onData() callback.
@@ -4359,7 +4359,7 @@ TEST_F(PostCloseConnectionImplTest, CloseAbort) {
   // Connection abort. We have data written above in writeSomeData(),
   // it won't be written and flushed due to ``ConnectionCloseType::Abort``.
   EXPECT_CALL(*transport_socket_, doWrite(_, true)).Times(0);
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::Abort);
 }
 
@@ -4372,7 +4372,7 @@ TEST_F(PostCloseConnectionImplTest, AbortReset) {
   // Connection abort. We have data written above in writeSomeData(),
   // it won't be written and flushed due to ``ConnectionCloseType::AbortReset``.
   EXPECT_CALL(*transport_socket_, doWrite(_, true)).Times(0);
-  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  EXPECT_CALL(*transport_socket_, closeSocket(_, _));
   connection_->close(ConnectionCloseType::AbortReset);
 }
 

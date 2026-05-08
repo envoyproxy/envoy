@@ -34,6 +34,15 @@ minor_behavior_changes:
     Optimized prometheus stats endpoint. Users should see a roughly 30-40% latency improvement in calls to the endpoint
     for cases where the scrape results in lots of cluster stats.
     There should be no visible changes to users, or incompatibilities.
+- area: tls
+  change: |
+    ``SslSocket`` now reports ``ECONNRESET`` as ``ConnectionReset`` by reading the system error
+    code from BoringSSL's error queue, matching ``RawBufferSocket`` behavior. When a connection
+    is closed with ``ConnectionCloseType::AbortReset``, ``SslSocket`` also skips the TLS
+    ``close_notify`` shutdown so the peer reliably observes a TCP RST instead of racing a
+    graceful close against the reset.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.ssl_socket_report_connection_reset`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -72,13 +81,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-- area: oauth2
+- area: tcp_proxy
   change: |
-    Added :ref:`use_access_token_expiry_for_id_token_cookie
-    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_access_token_expiry_for_id_token_cookie>`
-    to the OAuth2 filter, allowing the ID token cookie lifetime to be set from the access token's
-    ``expires_in`` value rather than from the ``exp`` claim in the ID token JWT. This is useful
-    when the access token has a longer lifetime than the ID token.
+    Added :ref:`check_drain_close
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.check_drain_close>` to the TCP proxy
+    filter to close downstream connections with ``FlushWrite`` when the drain manager requests drain close during
+    downstream read or write handling.
 - area: stat_sinks
   change: |
     Added :ref:`max_data_points_per_request
@@ -158,10 +166,16 @@ new_features:
   change: |
     Added ``upstream.server_name`` CEL attribute returning the SNI from the established upstream
     TLS connection.
-
 - area: tls
   change: |
     Added substitution commands ``%DOWNSTREAM_TLS_GROUP%`` and ``%UPSTREAM_TLS_GROUP%``. The TLS group may be used
     to discern if a TLS connection used a post quantum safe key exchange (e.g. X25519MLKEM768).
+- area: oauth2
+  change: |
+    Added :ref:`use_access_token_expiry_for_id_token_cookie
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_access_token_expiry_for_id_token_cookie>`
+    to the OAuth2 filter, allowing the ID token cookie lifetime to be set from the access token's
+    ``expires_in`` value rather than from the ``exp`` claim in the ID token JWT. This is useful
+    when the access token has a longer lifetime than the ID token.
 
 deprecated:

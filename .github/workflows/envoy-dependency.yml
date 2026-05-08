@@ -146,12 +146,6 @@ jobs:
           path: envoy
           fetch-depth: 0
         token: ${{ steps.appauth.outputs.token }}
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      name: Checkout Envoy build tools repository
-      with:
-        repository: envoyproxy/envoy-build-tools
-        path: build-tools
-        fetch-depth: 0
     - run: |
         shas=(
             sha-ci
@@ -171,16 +165,29 @@ jobs:
       working-directory: envoy
     - run: |
         if [[ -z "$CONTAINER_TAG" ]]; then
-            # get current build image version
-            CONTAINER_TAG=$(git log -1 --pretty=format:"%H" "./docker")
+            # Source of truth: the latest `docker-v*` GitHub release in
+            # envoyproxy/toolshed. Strip only the `docker-` prefix - the
+            # published images keep the leading `v`, eg
+            # `envoyproxy/envoy-build:ci-v0.1.3`.
+            CONTAINER_TAG=$(
+                gh api -H "Accept: application/vnd.github+json" \
+                    --paginate \
+                    /repos/envoyproxy/toolshed/releases \
+                    --jq 'map(select(.tag_name | startswith("docker-v"))) | .[0].tag_name // empty' \
+                | head -n1 \
+                | sed 's/^docker-//')
+        fi
+        if [[ -z "$CONTAINER_TAG" ]]; then
+            echo "ERROR: Could not determine build image tag from envoyproxy/toolshed releases" >&2
+            exit 1
         fi
         echo "tag=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
-        echo "tag_short=${CONTAINER_TAG::7}" >> "$GITHUB_OUTPUT"
+        echo "tag_short=${CONTAINER_TAG}" >> "$GITHUB_OUTPUT"
       env:
         CONTAINER_TAG: ${{ inputs.version }}
+        GH_TOKEN: ${{ steps.appauth.outputs.token }}
       id: build-tools
       name: Build image SHA
-      working-directory: build-tools
 
     - name: Check Docker SHAs
       id: build-images
