@@ -44,7 +44,7 @@ constexpr absl::string_view LocalReplyFilterStateKey =
     "envoy.filters.network.http_connection_manager.local_reply_owner";
 class LocalReplyOwnerObject : public StreamInfo::FilterState::Object {
 public:
-  LocalReplyOwnerObject(const std::string& filter_config_name)
+  LocalReplyOwnerObject(absl::string_view filter_config_name)
       : filter_config_name_(filter_config_name) {}
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
