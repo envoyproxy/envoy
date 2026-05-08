@@ -68,3 +68,22 @@ envoy_cc_extension(
         "@envoy_api//envoy/extensions/filters/http/gcp_authn/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "crypto_utils",
+    srcs = ["crypto_utils.cc"],
+    hdrs = ["crypto_utils.h"],
+    deps = [
+        "@abseil-cpp//absl/strings:string_view",
+        "//envoy/api:api_interface",
+        "//envoy/secret:secret_provider_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:matchers_lib",
+        "//source/common/config:datasource_lib",
+        "//source/common/http:utility_lib",
+        "//third_party/openssl:crypto",
+        "//util/regexp/re2",
+    ],
+)
