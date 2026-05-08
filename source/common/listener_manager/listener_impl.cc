@@ -343,7 +343,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       per_connection_buffer_high_watermark_timeout_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(config, per_connection_buffer_high_watermark_timeout, 0))),
       listener_tag_(parent_.factory_->nextListenerTag()), name_(name),
-      added_via_api_(added_via_api), workers_started_(workers_started), maybe_stale_hash_(hash),
+      added_via_api_(added_via_api),
+      allow_dynamic_override_(!added_via_api && config.allow_dynamic_override()),
+      workers_started_(workers_started), maybe_stale_hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       max_connections_to_accept_per_socket_event_(
@@ -510,6 +512,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       per_connection_buffer_high_watermark_timeout_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(config, per_connection_buffer_high_watermark_timeout, 0))),
       listener_tag_(origin.listener_tag_), name_(name), added_via_api_(added_via_api),
+      allow_dynamic_override_(!added_via_api && config.allow_dynamic_override()),
       workers_started_(workers_started), maybe_stale_hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
@@ -1099,6 +1102,12 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   // The in place update needs the active listener in worker thread. worker_started guarantees the
   // existence of that active listener.
   if (!worker_started) {
+    return false;
+  }
+
+  // The LDS replacement of a static with allow_dynamic_override listener must transfer
+  // ownership to LDS by marking the replacement added_via_api_=true.
+  if (allow_dynamic_override_) {
     return false;
   }
 

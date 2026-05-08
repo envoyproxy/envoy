@@ -247,6 +247,94 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerIntegrationTest,
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerMultiAddressesIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
+class StaticOverrideListenerIntegrationTest : public ListenerIntegrationTestBase,
+                                              public Grpc::GrpcClientIntegrationParamTest {
+public:
+  StaticOverrideListenerIntegrationTest()
+      : ListenerIntegrationTestBase(ipVersion(),
+                                    ConfigHelper::httpProxyConfig(/*downstream_use_quic=*/false,
+                                                                  /*multiple_addresses=*/false)) {}
+
+  void setGrpcServiceHelper(envoy::config::core::v3::GrpcService& grpc_service,
+                            const std::string& cluster_name,
+                            Network::Address::InstanceConstSharedPtr address) override {
+    setGrpcService(grpc_service, cluster_name, address);
+  }
+
+  void initialize() override {
+    use_lds_ = false;
+    setUpstreamCount(1);
+    defer_listener_finalization_ = true;
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Add the LDS cluster.
+      auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      lds_cluster->set_name("lds_cluster");
+      ConfigHelper::setHttp2(*lds_cluster);
+
+      // Keep the static listener and mark it overridable. Save a copy so the test can
+      // re-send it (with modifications) via LDS later.
+      auto* static_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      static_listener->set_name(listener_name_);
+      static_listener->set_allow_dynamic_override(true);
+      listener_config_.CopyFrom(*static_listener);
+
+      // Wire LDS up alongside the static listener.
+      auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+      lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+      lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+      auto* grpc_service = lds_api_config_source->add_grpc_services();
+      setGrpcServiceHelper(*grpc_service, "lds_cluster", getLdsFakeUpstream().localAddress());
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, StaticOverrideListenerIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Verifies that a static listener with allow_dynamic_override=true is replaced when LDS pushes
+// a listener with the same name, but is NOT removed by LDS state-of-the-world responses that
+// omit it before any matching listener has been delivered.
+TEST_P(StaticOverrideListenerIntegrationTest, OverridesStaticListener) {
+  on_server_init_function_ = [&]() { createLdsStream(); };
+  initialize();
+
+  // Static listener is up before any LDS response arrives.
+  ASSERT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  EXPECT_EQ(test_server_->server().listenerManager().listeners()[0].get().name(), listener_name_);
+
+  // An LDS response that does not include the static listener's name must not remove it: LDS
+  // hasn't taken ownership yet.
+  sendLdsResponse(std::vector<std::string>{}, "1");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
+  ASSERT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  EXPECT_EQ(test_server_->server().listenerManager().listeners()[0].get().name(), listener_name_);
+
+  // Send an LDS response with the same listener name. The metadata change forces a different
+  // hash so the manager treats it as an update rather than a no-op.
+  (*(*listener_config_.mutable_metadata()->mutable_filter_metadata())["override_marker"]
+        .mutable_fields())["v"]
+      .set_number_value(1);
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+
+  // After the override, the listener is dynamic and an empty LDS response removes it.
+  sendLdsResponse(std::vector<std::string>{}, "3");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(3));
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 0);
+}
+
 // Tests that an update with an unknown filter config proto is rejected.
 TEST_P(ListenerIntegrationTest, CleanlyRejectsUnknownFilterConfigProto) {
   on_server_init_function_ = [&]() {

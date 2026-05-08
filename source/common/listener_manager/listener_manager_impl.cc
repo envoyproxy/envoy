@@ -442,7 +442,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
     if (!name_matcher.match(listener->configName())) {
       continue;
     }
-    if (listener->blockRemove()) {
+    if (!listener->addedViaApi()) {
       auto& static_listener = *config_dump->mutable_static_listeners()->Add();
       listener->dumpListenerConfig(*static_listener.mutable_listener());
       TimestampUtil::systemClockToTimestamp(listener->last_updated_,

@@ -245,12 +245,17 @@ public:
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
    */
+  bool addedViaApi() const { return added_via_api_; }
   bool blockLdsUpdate(uint64_t new_hash) {
     // Receiving LDS update with FCDS config will cause full listener update. Therefore,
     // we should not block the update if FCDS is configured, regardless of the hash.
     return (!configInternal().has_fcds_config() && new_hash == maybe_stale_hash_) ||
-           !added_via_api_;
+           (!added_via_api_ && !allow_dynamic_override_);
   }
+  // Removal is only allowed for listeners that came from LDS. A static listener with
+  // allow_dynamic_override=true permits LDS-driven *replacement*; until that replacement
+  // happens the listener is still static and not removable. Once replaced, the new listener
+  // has added_via_api_=true and standard dynamic-removal applies.
   bool blockRemove() { return !added_via_api_; }
 
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
@@ -451,6 +456,7 @@ private:
   const uint64_t listener_tag_;
   const std::string name_;
   const bool added_via_api_;
+  const bool allow_dynamic_override_;
   const bool workers_started_;
   // Note: when FCDS is enabled and filter chains change, the stored hash may become stale.
   // We deliberately skip recomputing it for performance, since the hash is only used

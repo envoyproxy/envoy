@@ -1596,6 +1596,48 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
+TEST_P(ListenerManagerImplTest, StaticListenerAllowDynamicOverride) {
+  InSequence s;
+
+  // Add a static listener with dynamic override.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+allow_dynamic_override: true
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, false);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", false));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // LDS replaces the static listener, the replacement is treated as dynamic.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  - name: fake
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+  checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);
+
+  // Once overridden, the listener is purely dynamic; LDS can remove it.
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_TRUE(manager_->removeListener("foo"));
+}
+
 // Tests that when listener tears down, server's initManager is notified.
 TEST_P(ListenerManagerImplTest, ListenerTeardownNotifiesServerInitManager) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));

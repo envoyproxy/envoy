@@ -61,7 +61,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 39]
+// [#next-free-field: 40]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -447,4 +447,16 @@ message Listener {
   // listener address and additional addresses by default. See :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive>`
   // to explicitly configure TCP keepalive settings for individual additional addresses.
   core.v3.TcpKeepalive tcp_keepalive = 37;
+
+  // If true, this static listener may be replaced by an LDS listener with the same
+  // :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>`. By default static
+  // listeners cannot be modified or removed by LDS.
+  //
+  // Until LDS delivers a listener with a matching name the listener remains static, and an
+  // LDS state-of-the-world response that omits this name will not remove it. Once LDS does
+  // deliver a matching listener the static instance is replaced, and the replacement is
+  // thereafter treated as a regular dynamic listener (subject to LDS updates and removals).
+  //
+  // Has no effect on listeners that are themselves added via LDS.
+  bool allow_dynamic_override = 39;
 }
